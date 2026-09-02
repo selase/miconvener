@@ -1,0 +1,1231 @@
+# NativePHP Mobile Development Skill
+
+> **Purpose:** This is a self-contained reference document for AI assistants building NativePHP Mobile applications. It provides complete framework knowledge so an LLM can generate correct, idiomatic NativePHP Mobile code without additional context.
+
+> **Version:** NativePHP Mobile v3 "Air" (released February 1, 2026)
+> **License:** MIT (free, open source)
+> **Requirements:** PHP 8.4+, Laravel 11+, macOS (for iOS builds), Android Studio, Xcode
+> **Minimum OS:** iOS 18.2+, Android 33+
+
+---
+
+## 1. Framework Overview
+
+### What is NativePHP Mobile?
+
+NativePHP Mobile embeds a fully compiled PHP 8.4 interpreter directly inside native iOS (Swift) and Android (Kotlin) shell applications. Your entire Laravel application is bundled into the app binary and executed **on-device** — there is no remote server required for the app to function.
+
+The UI renders in a WebView (WKWebView on iOS, Android WebView on Android) using your existing Blade templates, Livewire components, or Inertia pages. Native capabilities (camera, microphone, GPS, etc.) are accessed through a **Bridge system** that connects PHP to native platform APIs.
+
+### When to Use NativePHP Mobile
+
+**Best for:**
+- Laravel teams building mobile companions to existing web apps
+- API client apps that wrap a remote Laravel backend
+- Internal tools, dashboards, MVPs
+- Content-driven apps (news, documentation, forms)
+- Apps that need specific native features (push notifications, biometrics, camera)
+
+**Not ideal for:**
+- Games or complex animations
+- Heavy offline-first sync requirements (no built-in sync framework)
+- Apps requiring deep platform-specific native UI
+- Performance-critical real-time applications (single-threaded PHP)
+
+### Architecture (4 Layers)
+
+```
+Layer 4: UI Layer
+         WebView renders Blade/Livewire/Inertia HTML+CSS+JS
+         Edge components provide native TopBar, BottomNav, SideNav, FAB
+
+Layer 3: Bridge Layer
+         PHP <-> Native function calls via nativephp_call() / nativephp_can()
+         BridgeFunctionRegistry routes calls to native implementations
+         JavaScript bridge available via /_native/api/call HTTP endpoint
+
+Layer 2: PHP Runtime
+         Embedded PHP 8.4 compiled as C library (libphp)
+         Single-threaded execution on serial dispatch queue
+         Full Laravel framework bootstrapped on each request
+
+Layer 1: Native Shell
+         Swift app (iOS) / Kotlin app (Android)
+         Hosts WebView, manages lifecycle, registers bridge functions
+         Compiles plugins' native code at build time
+```
+
+### Request Flow
+
+1. User taps a link or submits a form in the WebView
+2. WebView intercepts the request (custom `php://` URL scheme on iOS, `127.0.0.1` interception on Android)
+3. Static assets (`_assets/`) served directly from filesystem
+4. PHP requests queued on a serial dispatch queue (single-threaded)
+5. Laravel `Kernel::handle()` processes the request normally
+6. Response (HTML, JSON, redirect) returned to WebView
+7. Cookies synchronized between WebView cookie store and PHP
+
+---
+
+## 2. Project Setup
+
+### Installation
+
+```bash
+# Create a new Laravel project (or use existing)
+composer create-project laravel/laravel my-mobile-app
+cd my-mobile-app
+
+# Install NativePHP Mobile
+composer require nativephp/mobile
+
+# Initialize (downloads PHP binaries, creates native project shells)
+php artisan native:install
+```
+
+### Configuration (`config/nativephp.php`)
+
+```php
+return [
+    // Unique app identifier (reverse domain notation)
+    'app_id' => env('NATIVEPHP_APP_ID', 'com.example.myapp'),
+
+    // App version (semver)
+    'app_version' => env('NATIVEPHP_APP_VERSION', '1.0.0'),
+
+    // Deep link configuration
+    'deeplink_scheme' => 'myapp',      // myapp://
+    'deeplink_host' => 'open',         // myapp://open/path
+
+    // Permissions (declared in native manifests)
+    'permissions' => [
+        'microphone' => false,
+        'microphone_background' => false,
+        'camera' => false,
+        'location' => false,
+        'internet' => true,
+    ],
+
+    // Env vars to REMOVE from production bundle (security)
+    'cleanup_env_keys' => [
+        'DB_*', 'REDIS_*', 'MAIL_*', 'AWS_*',
+        'STRIPE_*', '*_SECRET', '*_KEY',
+    ],
+
+    // Env vars to KEEP in production bundle
+    'cleanup_exclude_keys' => [
+        'APP_NAME', 'APP_ENV', 'APP_URL',
+    ],
+
+    // Files to exclude from bundle
+    'cleanup_exclude_files' => [
+        'tests', '.github', 'docs',
+    ],
+];
+```
+
+### Directory Structure
+
+```
+my-mobile-app/
+├── app/
+│   ├── Livewire/              # Livewire components (recommended for mobile)
+│   ├── Models/                # Eloquent models (SQLite only)
+│   ├── Providers/
+│   │   └── NativeAppServiceProvider.php
+│   └── Services/              # Business logic, API clients
+├── config/
+│   └── nativephp.php          # App ID, permissions, cleanup rules
+├── database/
+│   └── migrations/            # SQLite migrations (run on every app start)
+├── nativephp/                 # Generated by native:install
+│   ├── android/               # Android Studio project (auto-managed)
+│   └── ios/                   # Xcode project (auto-managed)
+├── resources/
+│   ├── views/
+│   │   └── livewire/          # Mobile UI views
+│   └── js/
+│       └── app.js
+├── routes/
+│   └── web.php                # Routes (standard Laravel routing)
+└── public/
+    ├── app-icon.png           # 1024x1024 app icon
+    └── splash-screen.png      # Splash screen image
+```
+
+### Environment Setup
+
+**macOS (iOS + Android):**
+```bash
+# Xcode (iOS)
+xcode-select --install
+# Accept Xcode license
+sudo xcodebuild -license accept
+
+# Android Studio
+# Download from developer.android.com
+# Set ANDROID_HOME environment variable
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools
+```
+
+**Linux/Windows (Android only):**
+```bash
+# Android Studio only — iOS requires macOS
+# WSL is NOT supported for Android builds
+```
+
+---
+
+## 3. Plugin System
+
+NativePHP v3 uses a modular plugin architecture. Each native capability is a separate Composer package.
+
+### Installing Plugins
+
+```bash
+composer require nativephp/mobile-camera
+composer require nativephp/mobile-device
+# etc.
+```
+
+After installing, the plugin is automatically discovered and compiled into the native project on next build.
+
+### JavaScript Bridge
+
+Plugins are also accessible from JavaScript (Vue/React/Inertia or Alpine.js):
+
+```json
+// package.json
+"imports": {
+    "#nativephp": "./vendor/nativephp/mobile/resources/dist/native.js"
+}
+```
+
+```javascript
+import { Microphone, Events } from '#nativephp';
+
+// Call native functions from JS
+await Microphone.record().start();
+```
+
+### Available Plugins
+
+#### Free Plugins (MIT License — bundled with framework)
+
+| Plugin | Package | Facade | Key Methods |
+|---|---|---|---|
+| **Browser** | `nativephp/mobile-browser` | `Browser` | `open(url)`, `inApp(url)`, `auth(url)` |
+| **Camera** | `nativephp/mobile-camera` | `Camera` | `getPhoto()`, `recordVideo()`, `pickImages()` |
+| **Device** | `nativephp/mobile-device` | `Device` | `getId()`, `getInfo()`, `getBatteryInfo()`, `vibrate()`, `flashlight()` |
+| **Dialog** | `nativephp/mobile-dialog` | `Dialog` | `alert(title, message, buttons)`, `toast(message)` |
+| **File** | `nativephp/mobile-file` | `File` | `move(from, to)`, `copy(from, to)` |
+| **Microphone** | `nativephp/mobile-microphone` | `Microphone` | `record()->start()`, `stop()`, `pause()`, `resume()`, `getStatus()`, `getRecording()` |
+| **Network** | `nativephp/mobile-network` | `Network` | `status()` returns `{connected, type, isExpensive, isConstrained}` |
+| **Share** | `nativephp/mobile-share` | `Share` | `file(path, mime)`, `url(url)` |
+| **System** | `nativephp/mobile-system` | `System` | `isMobile()`, `isIos()`, `isAndroid()`, `appSettings()` |
+
+#### Community Plugins (Free)
+
+| Plugin | Package | Key Methods |
+|---|---|---|
+| **Screen** | `srwiez/nativephp-mobile-screen` | Wake lock, brightness control |
+
+#### Premium Plugins ($49 each, or $199 Starter Kit bundle for all 5)
+
+| Plugin | Package | Facade | Key Methods |
+|---|---|---|---|
+| **Biometrics** | `nativephp/mobile-biometrics` | `Biometrics` | `prompt(reason)` → Face ID / Touch ID / Fingerprint |
+| **Firebase** | `nativephp/mobile-firebase` | `PushNotifications` | `getToken()`, handles FCM/APNS push notifications |
+| **Geolocation** | `nativephp/mobile-geolocation` | `Geolocation` | `getCurrentPosition(accuracy)`, `checkPermissions()`, `requestPermissions()` |
+| **Scanner** | `nativephp/mobile-scanner` | `Scanner` | QR/barcode scanning with continuous mode |
+| **Secure Storage** | `nativephp/mobile-secure-storage` | `SecureStorage` | `set(key, value)`, `get(key)`, `delete(key)` — iOS Keychain / Android Keystore (requires iOS 18.2+, Android 33+) |
+
+### Creating Custom Plugins
+
+```bash
+php artisan native:plugin:create MyPlugin
+```
+
+This generates:
+```
+my-plugin/
+├── composer.json
+├── nativephp.json              # Manifest with bridge functions
+├── src/
+│   └── MyPluginServiceProvider.php
+└── resources/
+    ├── android/
+    │   └── MyPluginFunctions.kt
+    └── ios/
+        └── MyPluginFunctions.swift
+```
+
+---
+
+## 4. Native APIs Reference
+
+### Device
+
+```php
+use Native\Mobile\Facades\Device;
+
+$id = Device::getId();                    // Unique device identifier string
+$info = Device::getInfo();                // ['platform' => 'ios', 'model' => 'iPhone 15', 'os_version' => '18.0']
+$battery = Device::getBatteryInfo();      // ['level' => 0.85, 'is_charging' => true]
+Device::vibrate();                        // Haptic feedback
+Device::flashlight();                     // Toggle flashlight on/off
+```
+
+### Camera
+
+```php
+use Native\Mobile\Facades\Camera;
+
+Camera::getPhoto();                       // Opens native camera, fires PhotoTaken event
+Camera::recordVideo();                    // Opens video recorder
+Camera::pickImages(type: 'images', multiple: true);  // Gallery picker
+```
+
+### Dialog
+
+```php
+use Native\Mobile\Facades\Dialog;
+
+Dialog::alert('Title', 'Message', ['OK', 'Cancel']);  // Native alert, fires DialogResult event
+Dialog::toast('Quick message');                        // Toast notification
+```
+
+### Microphone
+
+```php
+use Native\Mobile\Facades\Microphone;
+
+Microphone::record()->start();     // Start native recording (M4A/AAC output)
+Microphone::stop();                // Stop recording, fires RecordingStopped event with file path
+Microphone::pause();               // Pause recording
+Microphone::resume();              // Resume recording
+```
+
+Background recording is enabled via `microphone_background` permission in `config/nativephp.php`.
+
+### Network
+
+```php
+use Native\Mobile\Facades\Network;
+
+$status = Network::status();
+// Returns: [
+//   'connected' => true,
+//   'type' => 'wifi',         // wifi, cellular, ethernet, none
+//   'isExpensive' => false,   // metered connection
+//   'isConstrained' => false  // low-data mode
+// ]
+```
+
+### Browser
+
+```php
+use Native\Mobile\Facades\Browser;
+
+Browser::open('https://example.com');         // System browser
+Browser::inApp('https://example.com');        // SFSafariViewController / Chrome Custom Tabs
+Browser::auth('https://api.com/oauth/start'); // OAuth flow (returns to app via deep link)
+```
+
+### Share
+
+```php
+use Native\Mobile\Facades\Share;
+
+Share::file('/path/to/file.pdf', 'application/pdf');  // Native share sheet
+Share::url('https://example.com');                      // Share a URL
+```
+
+### Secure Storage ($49 premium)
+
+```php
+use Native\Mobile\Facades\SecureStorage;
+
+SecureStorage::set('api_token', 'xxx');    // Stored in iOS Keychain / Android Keystore (AES-256-GCM)
+$token = SecureStorage::get('api_token');   // Retrieve value
+SecureStorage::delete('api_token');         // Remove value
+```
+
+### Push Notifications ($49 premium — Firebase)
+
+```php
+use Native\Mobile\Facades\PushNotifications;
+
+PushNotifications::getToken();    // Request permission + retrieve FCM/APNS device token
+```
+
+**Setup:** Place `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) in your application root — NativePHP configures them automatically.
+
+**Event handling:**
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\PushNotification\TokenGenerated;
+
+#[OnNative(TokenGenerated::class)]
+public function storePushToken(string $token): void
+{
+    // Send token to your backend API
+    app(ApiClient::class)->post('/devices', ['push_token' => $token]);
+}
+```
+
+**Important:** Tokens can change during app updates or FCM operations. Request on every app bootup.
+
+### Biometrics ($49 premium)
+
+```php
+use Native\Mobile\Facades\Biometrics;
+
+Biometrics::prompt('Authenticate to view sensitive data');
+// Triggers Face ID / Touch ID / Fingerprint
+// Fires BiometricResult event with success/failure
+```
+
+### Geolocation ($49 premium)
+
+```php
+use Native\Mobile\Facades\Geolocation;
+
+$status = Geolocation::checkPermissions();
+Geolocation::requestPermissions();
+$position = Geolocation::getCurrentPosition('fine');  // 'fine' or 'coarse'
+// Fires PositionReceived event with lat/lng
+```
+
+### System
+
+```php
+use Native\Mobile\Facades\System;
+
+System::isMobile();     // true when running in NativePHP
+System::isIos();         // true on iOS
+System::isAndroid();     // true on Android
+System::appSettings();   // Opens device settings page for this app
+```
+
+---
+
+## 5. Edge Components (Native UI Chrome)
+
+Edge components render truly native UI elements outside the WebView. They provide the navigation chrome around your web content.
+
+### Top Bar
+
+```blade
+<native:top-bar
+    title="My Screen"
+    subtitle="Optional subtitle"
+    show-navigation-icon
+    background-color="#1a1a2e"
+    text-color="#ffffff"
+>
+    <native:top-bar-action id="search" icon="search" label="Search" :url="route('search')" />
+    <native:top-bar-action id="settings" icon="settings" label="Settings" url="/settings" />
+</native:top-bar>
+```
+
+**Platform behavior:** Android shows first 3 actions as icons, rest in overflow (⋮). iOS collapses after 5. Max 10 actions.
+
+### Bottom Navigation
+
+```blade
+<native:bottom-nav label-visibility="labeled">
+    <native:bottom-nav-item
+        id="home"
+        label="Home"
+        icon="home"
+        url="/"
+        :active="true"
+    />
+    <native:bottom-nav-item
+        id="search"
+        label="Search"
+        icon="search"
+        url="/search"
+    />
+    <native:bottom-nav-item
+        id="profile"
+        label="Profile"
+        icon="person"
+        url="/profile"
+        badge="3"
+    />
+</native:bottom-nav>
+```
+
+**Attributes:** `label-visibility` (`labeled`|`selected`|`unlabeled`), `dark`. Items support `badge` (text/number) and `news` (dot indicator).
+
+### Side Navigation (Drawer)
+
+```blade
+<native:side-nav>
+    <native:side-nav-item label="Dashboard" icon="home" url="/" />
+    <native:side-nav-item label="Settings" icon="settings" url="/settings" />
+    <native:side-nav-item label="Logout" icon="logout" url="/logout" />
+</native:side-nav>
+```
+
+### Available Icons
+
+Edge components use platform-native icons (Material Symbols on Android, SF Symbols on iOS). Common names:
+`home`, `search`, `person`, `settings`, `add`, `check-circle`, `calendar-today`, `notifications`, `arrow-back`, `logout`, `mic`, `description`, `folder`, `delete`, `edit`, `share`, `favorite`
+
+---
+
+## 6. Events System
+
+Events flow from native code to PHP through multiple channels.
+
+### Listening to Native Events in Livewire
+
+```php
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Native\Mobile\Events\Network\StatusChanged;
+
+class MyComponent extends Component
+{
+    // Listen for native camera event
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path): void
+    {
+        // $path is the local file path to the captured photo
+        $this->processPhoto($path);
+    }
+
+    // Listen for network status changes
+    #[OnNative(StatusChanged::class)]
+    public function handleNetworkChange(bool $connected, string $type): void
+    {
+        $this->isOnline = $connected;
+    }
+}
+```
+
+### Event Flow
+
+```
+Native Code (Swift/Kotlin)
+    │
+    ├── 1. JavaScript CustomEvent dispatched to WebView document
+    │      document.dispatchEvent(new CustomEvent('native-event', { detail: payload }))
+    │
+    ├── 2. HTTP POST to /_native/api/events (handled by NativeEventController)
+    │
+    └── 3. Livewire.dispatch('native:EventClassName', payload)
+           │
+           └── Received by #[OnNative(EventClassName::class)] attribute
+```
+
+### Available Events
+
+| Plugin | Event | Payload |
+|---|---|---|
+| Camera | `PhotoTaken` | `string $path` |
+| Camera | `VideoRecorded` | `string $path` |
+| Camera | `ImagesPicked` | `array $paths` |
+| Dialog | `DialogResult` | `int $buttonIndex` |
+| Microphone | `MicrophoneRecorded` | `string $path, string $mimeType, ?string $id` |
+| Network | `StatusChanged` | `bool $connected, string $type` |
+| Firebase | `TokenGenerated` | `string $token` |
+| PushNotifications | `NotificationReceived` | `array $data` |
+| Biometrics | `BiometricResult` | `bool $success` |
+| Geolocation | `PositionReceived` | `float $lat, float $lng, float $accuracy` |
+| Scanner | `BarcodeScanned` | `string $value, string $format` |
+
+### JavaScript Bridge (Frontend -> Native)
+
+```javascript
+// Call a native function from JavaScript (without going through PHP)
+async function callNative(method, params = {}) {
+    const response = await fetch('/_native/api/call', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+        body: JSON.stringify({ method, params }),
+    });
+    return response.json();
+}
+
+// Examples:
+await callNative('Device.Vibrate');
+const status = await callNative('Network.Status');
+await callNative('Dialog.Toast', { message: 'Hello!' });
+```
+
+---
+
+## 7. Authentication Patterns
+
+NativePHP does not include a built-in auth system. The recommended patterns are:
+
+### Pattern A: Sanctum Token (API Client)
+
+For apps that connect to a remote Laravel backend:
+
+```php
+// 1. Login: send credentials to remote API
+$response = Http::post('https://api.example.com/api/login', [
+    'email' => $email,
+    'password' => $password,
+    'device_name' => Device::getId(),
+]);
+
+// 2. Store token securely
+SecureStorage::set('api_token', $response->json('token'));
+
+// 3. Use token for all subsequent requests
+$data = Http::withToken(SecureStorage::get('api_token'))
+    ->get('https://api.example.com/api/user')
+    ->json();
+
+// 4. On logout
+SecureStorage::delete('api_token');
+```
+
+### Pattern B: Local Auth (Standalone App)
+
+For apps that don't connect to a remote API:
+
+```php
+// Standard Laravel auth with local SQLite database
+// Users table in SQLite, sessions in SQLite
+// Use normal Laravel auth (Breeze/Fortify)
+Auth::attempt(['email' => $email, 'password' => $password]);
+```
+
+### Pattern C: OAuth (Third-Party SSO)
+
+```php
+// Browser::auth() opens a secure in-app browser for OAuth
+Browser::auth('https://api.example.com/oauth/google/redirect');
+
+// The OAuth provider redirects to your deep link scheme:
+// myapp://auth/callback?token=xxx
+
+// Handle in deep link route:
+Route::get('/auth/callback', function (Request $request) {
+    SecureStorage::set('api_token', $request->query('token'));
+    return redirect('/dashboard');
+});
+```
+
+### Middleware for Auth Gating
+
+```php
+// app/Http/Middleware/EnsureAuthenticated.php
+class EnsureAuthenticated
+{
+    public function handle(Request $request, Closure $next): mixed
+    {
+        $token = SecureStorage::get('api_token');
+
+        if (! $token) {
+            return redirect('/login');
+        }
+
+        return $next($request);
+    }
+}
+
+// Register in web middleware group or route-level
+```
+
+---
+
+## 8. Database Patterns
+
+### SQLite Only
+
+NativePHP **forces SQLite** as the database connection. During build, `DB_CONNECTION` is automatically set to `sqlite`. This is a deliberate security decision — no production database credentials are shipped in the app bundle.
+
+### Migrations Run on Every App Start
+
+```php
+// Migrations execute automatically when the app launches.
+// Use safe migration patterns:
+
+Schema::create('notes', function (Blueprint $table) {
+    $table->id();
+    $table->string('title');
+    $table->text('content')->nullable();
+    $table->boolean('synced')->default(false);
+    $table->timestamps();
+});
+```
+
+### Storage Disks
+
+```php
+// NativePHP registers two custom disks:
+
+// 'mobile_public' -> storage/app/public (accessible via /_assets/storage URL)
+Storage::disk('mobile_public')->put('photo.jpg', $contents);
+$url = Storage::disk('mobile_public')->url('photo.jpg');
+
+// 'temp' -> OS temp directory
+Storage::disk('temp')->put('processing.tmp', $data);
+```
+
+### API-First Data Architecture (Recommended)
+
+For apps connected to a remote backend:
+
+```
+Local SQLite                           Remote API
+├── Cache/offline data                 ├── Source of truth
+├── Pending uploads                    ├── Business logic
+├── User preferences                   ├── Complex queries
+└── Queue of actions                   └── Multi-user sync
+```
+
+```php
+// Sync pattern: pull remote data into local cache
+class SyncService
+{
+    public function pullData(): void
+    {
+        $response = Http::withToken(SecureStorage::get('api_token'))
+            ->get(config('api.url') . '/data');
+
+        foreach ($response->json('items') as $item) {
+            LocalCache::updateOrCreate(
+                ['remote_id' => $item['id']],
+                ['data' => $item, 'synced_at' => now()]
+            );
+        }
+    }
+
+    public function pushPendingActions(): void
+    {
+        $pending = PendingAction::where('synced', false)->get();
+
+        foreach ($pending as $action) {
+            $response = Http::withToken(SecureStorage::get('api_token'))
+                ->post(config('api.url') . $action->endpoint, $action->payload);
+
+            if ($response->successful()) {
+                $action->update(['synced' => true]);
+            }
+        }
+    }
+}
+```
+
+---
+
+## 9. UI Approach
+
+### Blade + Livewire + Alpine.js
+
+NativePHP renders your standard Laravel views in a WebView. Use Livewire for reactive server-side components and Alpine.js for client-side interactions.
+
+### Blade Directives
+
+```blade
+{{-- Render only on mobile --}}
+@mobile
+    <p>You're on the mobile app!</p>
+@endmobile
+
+{{-- Render only on web --}}
+@web
+    <p>You're on the web version</p>
+@endweb
+
+{{-- Platform-specific rendering --}}
+@ios
+    <p>iOS-specific content</p>
+@endios
+
+@android
+    <p>Android-specific content</p>
+@endandroid
+```
+
+### Mobile-Optimized Layout
+
+```blade
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @livewireStyles
+</head>
+<body class="bg-white text-gray-900 overscroll-none">
+    <native:top-bar title="{{ $title ?? '' }}" />
+
+    <main class="pt-safe pb-20 px-4">
+        {{ $slot }}
+    </main>
+
+    <native:bottom-nav>
+        <native:bottom-nav-item id="home" label="Home" icon="home" url="/" />
+        <native:bottom-nav-item id="settings" label="Settings" icon="settings" url="/settings" />
+    </native:bottom-nav>
+
+    @livewireScripts
+</body>
+</html>
+```
+
+### Touch-Friendly Design Tips
+
+- Minimum touch target: 44x44px (Apple HIG) / 48x48dp (Material)
+- Use `touch-none` / `select-none` on interactive elements to prevent text selection
+- Use `overscroll-none` on body to prevent pull-to-refresh interference
+- Pad bottom content for BottomNav overlap (`pb-20`)
+- Use `@touchstart` / `@touchend` instead of `@click` for press-and-hold interactions
+- Test with `native:jump` on real devices for accurate touch behavior
+
+---
+
+## 10. Build & Deployment
+
+### Development Commands
+
+```bash
+# Run on iOS simulator
+php artisan native:run ios
+
+# Run on Android emulator
+php artisan native:run android
+
+# Run with hot reload (requires watchman: brew install watchman)
+php artisan native:run ios --watch
+php artisan native:run android --watch
+
+# Test on real device without compiling
+php artisan native:jump
+# Displays QR code → scan with Jump companion app
+# App runs on your dev machine, renders in Jump's WebView
+```
+
+### Production Commands
+
+```bash
+# Package for Android (APK for testing, AAB for Play Store)
+php artisan native:package android
+
+# Package for iOS (IPA)
+php artisan native:package ios
+
+# Publish to app stores
+php artisan native:release
+```
+
+### Build Process (What Happens)
+
+1. Validates `NATIVEPHP_APP_ID` and `NATIVEPHP_APP_VERSION`
+2. Processes app icon (1024x1024 `public/app-icon.png`) and splash screen
+3. Runs `npm run build` for frontend assets
+4. Runs `composer install --no-dev` (release builds)
+5. Cleans `.env` file (removes keys matching `cleanup_env_keys`)
+6. Copies Laravel project into native project's assets directory
+7. Discovers and compiles all installed plugins (native code + manifests)
+8. Executes platform build (Gradle for Android, xcodebuild for iOS)
+9. Outputs APK/AAB (Android) or IPA (iOS)
+
+### App Icon & Splash Screen
+
+```
+public/app-icon.png        # 1024x1024px, PNG, no transparency for iOS
+public/splash-screen.png   # Full-screen splash (centered, background color fills gaps)
+```
+
+### Debugging
+
+```bash
+# View native logs (PHP errors, bridge calls, events)
+php artisan native:tail
+
+# View specific platform logs
+php artisan native:tail --ios
+php artisan native:tail --android
+```
+
+---
+
+## 11. Common Patterns & Best Practices
+
+### API Client Service
+
+```php
+class ApiClient
+{
+    public function __construct(
+        private string $baseUrl,
+        private int $timeout = 30,
+    ) {}
+
+    public function get(string $endpoint, array $query = []): mixed
+    {
+        return $this->request('get', $endpoint, query: $query);
+    }
+
+    public function post(string $endpoint, array $data = []): mixed
+    {
+        return $this->request('post', $endpoint, data: $data);
+    }
+
+    private function request(string $method, string $endpoint, array $data = [], array $query = []): mixed
+    {
+        $token = SecureStorage::get('api_token');
+
+        $response = Http::withToken($token)
+            ->timeout($this->timeout)
+            ->retry(3, 1000)
+            ->{$method}($this->baseUrl . $endpoint, $data ?: $query);
+
+        if ($response->status() === 401) {
+            // Token expired — redirect to login
+            SecureStorage::delete('api_token');
+            redirect('/login');
+        }
+
+        return $response->json();
+    }
+}
+```
+
+### Offline-First Pattern
+
+```php
+class OfflineAwareComponent extends Component
+{
+    public bool $isOnline = true;
+    public array $items = [];
+
+    public function mount(): void
+    {
+        $this->checkConnectivity();
+        $this->loadItems();
+    }
+
+    public function checkConnectivity(): void
+    {
+        $status = Network::status();
+        $this->isOnline = $status['connected'] ?? false;
+    }
+
+    public function loadItems(): void
+    {
+        if ($this->isOnline) {
+            // Fetch from API and cache locally
+            $items = app(ApiClient::class)->get('/items');
+            foreach ($items as $item) {
+                CachedItem::updateOrCreate(
+                    ['remote_id' => $item['id']],
+                    ['data' => json_encode($item), 'synced_at' => now()]
+                );
+            }
+            $this->items = $items;
+        } else {
+            // Load from local cache
+            $this->items = CachedItem::all()
+                ->map(fn ($i) => json_decode($i->data, true))
+                ->toArray();
+        }
+    }
+}
+```
+
+### Push Notification Registration
+
+```php
+// After successful login:
+public function registerDevice(): void
+{
+    PushNotifications::enroll();
+}
+
+#[OnNative(TokenReceived::class)]
+public function handlePushToken(string $token): void
+{
+    app(ApiClient::class)->post('/devices', [
+        'token' => $token,
+        'platform' => System::isIos() ? 'ios' : 'android',
+        'device_id' => Device::getId(),
+    ]);
+}
+```
+
+### Permission Handling
+
+```php
+// Check before using a capability
+public function takePhoto(): void
+{
+    if (! nativephp_can('Camera.GetPhoto')) {
+        Dialog::alert('Camera Unavailable', 'Camera plugin is not installed.');
+        return;
+    }
+
+    Camera::getPhoto();
+}
+```
+
+### Deep Links
+
+```php
+// config/nativephp.php
+'deeplink_scheme' => 'myapp',
+'deeplink_host' => 'open',
+
+// routes/web.php
+// Deep link: myapp://open/meeting/ABC123
+Route::get('/meeting/{code}', MeetingRoom::class);
+
+// The deep link path maps directly to your web routes
+```
+
+---
+
+## 12. Known Limitations
+
+| Limitation | Details | Workaround |
+|---|---|---|
+| **Single-threaded PHP** | All PHP executes on a serial queue. Heavy computation blocks the UI. | Move heavy work to JavaScript (Web Workers, AudioWorklet) or remote API |
+| **No background processing** | No queue worker, no scheduled tasks while app is backgrounded. On roadmap, not yet available. | Queue actions locally, process when app returns to foreground |
+| **SQLite only** | No MySQL/PostgreSQL. Forced at build time. | Use SQLite for local cache, remote API for source of truth |
+| **Minimum OS versions** | iOS 18.2+ and Android 33+ required for all plugins | Exclude older device support |
+| **WebView-based UI** | Content area is HTML, not truly native UI | Use Tailwind for polished mobile CSS, Edge for native chrome |
+| **Livewire 4 compatibility** | Some Livewire 4 features still being integrated (Issue #13) | Use Alpine.js for critical client-side interactions as fallback |
+| **No offline sync framework** | No built-in mechanism like Realm or Firestore offline | Implement custom sync service with local SQLite + remote API |
+| **iOS requires macOS** | Cannot build iOS apps on Windows/Linux | Use macOS for iOS builds, or CI/CD with macOS runners |
+| **WSL not supported** | Android builds don't work under Windows Subsystem for Linux | Use native Windows or Linux (not WSL) for Android |
+| **Cookie/CSRF management** | WebView cookie store requires synchronization with PHP | Framework handles this automatically, but be aware of edge cases |
+| **OPcache differences** | OPcache behavior on mobile differs from server | Generally not a concern unless doing performance profiling |
+| **16KB page size** | Android apps must target NDK v27 for Google Play (Nov 2025 requirement) | NativePHP handles this in its build configuration |
+
+---
+
+## 13. Code Examples
+
+### Complete Auth Flow
+
+```php
+// app/Livewire/Auth/Login.php
+class Login extends Component
+{
+    public string $email = '';
+    public string $password = '';
+    public string $error = '';
+
+    public function login(): void
+    {
+        $this->validate([
+            'email' => 'required|email',
+            'password' => 'required|min:8',
+        ]);
+
+        try {
+            $response = Http::post(config('api.url') . '/auth/login', [
+                'email' => $this->email,
+                'password' => $this->password,
+                'device_name' => Device::getId(),
+            ]);
+
+            if ($response->successful()) {
+                SecureStorage::set('api_token', $response->json('token'));
+                SecureStorage::set('user', json_encode($response->json('user')));
+
+                // Register for push notifications
+                PushNotifications::enroll();
+
+                $this->redirect('/');
+            } else {
+                $this->error = $response->json('message', 'Invalid credentials');
+            }
+        } catch (\Exception $e) {
+            $this->error = 'Unable to connect. Check your network.';
+        }
+    }
+
+    public function render(): View
+    {
+        return view('livewire.auth.login')
+            ->layout('layouts.guest');
+    }
+}
+```
+
+```blade
+{{-- resources/views/livewire/auth/login.blade.php --}}
+<div class="min-h-screen flex items-center justify-center px-6">
+    <div class="w-full max-w-sm">
+        <h1 class="text-2xl font-bold text-center mb-8">Welcome Back</h1>
+
+        @if($error)
+            <div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+                {{ $error }}
+            </div>
+        @endif
+
+        <form wire:submit="login" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Email</label>
+                <input type="email" wire:model="email"
+                       class="w-full rounded-lg border p-3 text-base"
+                       autocomplete="email" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1">Password</label>
+                <input type="password" wire:model="password"
+                       class="w-full rounded-lg border p-3 text-base"
+                       autocomplete="current-password" />
+            </div>
+
+            <button type="submit"
+                    class="w-full bg-blue-600 text-white rounded-lg p-3 text-base font-semibold"
+                    wire:loading.attr="disabled">
+                <span wire:loading.remove>Sign In</span>
+                <span wire:loading>Signing in...</span>
+            </button>
+        </form>
+    </div>
+</div>
+```
+
+### Complete Livewire Component with Edge + Events
+
+```php
+// app/Livewire/Dashboard.php
+class Dashboard extends Component
+{
+    public array $items = [];
+    public bool $isOnline = true;
+
+    public function mount(): void
+    {
+        $this->checkNetwork();
+        $this->loadItems();
+    }
+
+    #[OnNative(StatusChanged::class)]
+    public function onNetworkChange(bool $connected): void
+    {
+        $this->isOnline = $connected;
+
+        if ($connected) {
+            $this->loadItems();
+            app(SyncService::class)->pushPendingActions();
+        }
+    }
+
+    public function loadItems(): void
+    {
+        if ($this->isOnline) {
+            $this->items = app(ApiClient::class)->get('/items')['data'] ?? [];
+        } else {
+            $this->items = CachedItem::latest()->limit(50)->get()->toArray();
+        }
+    }
+
+    private function checkNetwork(): void
+    {
+        $this->isOnline = Network::status()['connected'] ?? false;
+    }
+
+    public function render(): View
+    {
+        return view('livewire.dashboard')
+            ->layout('layouts.app', ['title' => 'Dashboard']);
+    }
+}
+```
+
+```blade
+{{-- resources/views/livewire/dashboard.blade.php --}}
+<div>
+    <native:top-bar title="Dashboard" />
+
+    <div class="px-4 py-4 space-y-3">
+        @forelse($items as $item)
+            <a href="/items/{{ $item['id'] }}"
+               class="block bg-white rounded-xl p-4 shadow-sm border">
+                <h3 class="font-semibold">{{ $item['title'] }}</h3>
+                <p class="text-sm text-gray-500 mt-1">{{ $item['subtitle'] }}</p>
+            </a>
+        @empty
+            <div class="text-center text-gray-400 py-12">
+                <p>No items yet</p>
+            </div>
+        @endforelse
+    </div>
+
+    <native:bottom-nav>
+        <native:bottom-nav-item id="home" label="Home" icon="home" url="/" />
+        <native:bottom-nav-item id="profile" label="Profile" icon="person" url="/profile" />
+        <native:bottom-nav-item id="settings" label="Settings" icon="settings" url="/settings" />
+    </native:bottom-nav>
+</div>
+```
+
+---
+
+## 14. Quick Reference
+
+### Artisan Commands
+
+| Command | Description |
+|---|---|
+| `native:install` | Initial setup (download PHP binaries, create native projects) |
+| `native:run ios` | Build and run on iOS simulator/device |
+| `native:run android` | Build and run on Android emulator/device |
+| `native:run --watch` | Hot reload mode (requires watchman) |
+| `native:jump` | Test on real device via QR code (no compilation) |
+| `native:package ios` | Create production IPA |
+| `native:package android` | Create production APK/AAB |
+| `native:release` | Publish to app stores |
+| `native:tail` | View native app logs |
+| `native:plugin:create Name` | Create a custom plugin scaffold |
+| `native:plugin:register` | Register unregistered plugins |
+
+### Key Facades
+
+```php
+use Native\Mobile\Facades\Device;
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Facades\Dialog;
+use Native\Mobile\Facades\Microphone;
+use Native\Mobile\Facades\Network;
+use Native\Mobile\Facades\Browser;
+use Native\Mobile\Facades\Share;
+use Native\Mobile\Facades\System;
+use Native\Mobile\Facades\SecureStorage;      // Premium
+use Native\Mobile\Facades\PushNotifications;   // Premium
+use Native\Mobile\Facades\Biometrics;          // Premium
+use Native\Mobile\Facades\Geolocation;         // Premium
+use Native\Mobile\Facades\Scanner;             // Premium
+```
+
+### Key PHP Functions
+
+```php
+nativephp_call('PluginNamespace.FunctionName', json_encode($params));  // Call native function
+nativephp_can('PluginNamespace.FunctionName');                          // Check if function available
+```
+
+### Useful Links
+
+- Documentation: https://nativephp.com/docs/mobile/3
+- GitHub: https://github.com/NativePHP/mobile-air
+- Kitchen Sink Demo: https://github.com/NativePHP/kitchen-sink-mobile
+- API Starter Kit: https://github.com/NativePHP/mobile-api-starter-kit
+- Plugin Marketplace: https://nativephp.com/plugins
+- Jump App: Available on iOS App Store and Google Play Store

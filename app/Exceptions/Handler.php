@@ -1,0 +1,78 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Exceptions;
+
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
+final class Handler extends ExceptionHandler
+{
+    /**
+     * A list of exception types with their corresponding custom log levels.
+     *
+     * @var array<class-string<Throwable>, \Psr\Log\LogLevel::*>
+     */
+    protected $levels = [
+        //
+    ];
+
+    /**
+     * A list of the exception types that are not reported.
+     *
+     * @var array<int, class-string<Throwable>>
+     */
+    protected $dontReport = [
+        //
+    ];
+
+    /**
+     * A list of the inputs that are never flashed to the session on validation exceptions.
+     *
+     * @var array<int, string>
+     */
+    protected $dontFlash = [
+        'current_password',
+        'password',
+        'password_confirmation',
+    ];
+
+    /**
+     * Register the exception handling callbacks for the application.
+     */
+    public function register(): void
+    {
+        $this->renderable(function (TenantMembershipException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 403);
+            }
+
+            if (auth()->check()) {
+                auth()->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            return redirect()->route('login')->withErrors(['email' => $e->getMessage()]);
+        });
+
+        $this->reportable(function (Throwable $e): void {
+            /**
+             * Send exception to slack if an error occurred in the application
+             */
+            $errorLog = collect([
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'code' => $e->getCode(),
+            ])
+                ->concat(collect($e->getTrace())->take(5))
+                ->all();
+
+            if (config('logging.channels.slack.url')) {
+                Log::channel('slack')->error($e->getMessage(), $errorLog);
+            }
+        });
+    }
+}

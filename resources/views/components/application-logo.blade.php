@@ -1,0 +1,1 @@
+<img alt="Logo" src="{{ \App\Libraries\Helper::getTenantLogoUrl() }}" class="h-25px logo" />

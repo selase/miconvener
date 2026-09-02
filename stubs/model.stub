@@ -1,0 +1,17 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Traits\HasUuid;
+use App\Traits\BelongsToTenant;
+use App\Traits\SpatieActivityLogs;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class {{ class }} extends Model
+{
+    use HasFactory;
+    use HasUuid;
+    use BelongsToTenant;
+    use SpatieActivityLogs;
+}
