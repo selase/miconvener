@@ -35,7 +35,7 @@ afterEach(function () {
 
 beforeEach(function () {
     if (! config('session.domain')) {
-        config(['session.domain' => '.starterkit-v2.test']);
+        config(['session.domain' => '.miconvener.test']);
     }
 
     refreshTenantDatabases();

@@ -17,8 +17,8 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         if (str_contains(config('app.url'), '.test')) {
-            config(['session.domain' => '.starterkit-v2.test']);
-            config(['app.url' => 'http://starterkit-v2.test']);
+            config(['session.domain' => '.miconvener.test']);
+            config(['app.url' => 'http://miconvener.test']);
         }
     }
 }

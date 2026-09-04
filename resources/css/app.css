@@ -1,3 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@config "../../tailwind.config.js";
+@source "../js";
+
+/* Console (Inertia) surface only — scoped so the legacy Blade/Metronic pages are unaffected */
+.font-console {
+    font-feature-settings: 'cv11', 'ss01';
+}
+
+.num {
+    font-variant-numeric: tabular-nums;
+}

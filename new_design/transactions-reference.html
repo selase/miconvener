@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transactions — reference implementation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   1. TOKENS — nothing below this block hard-codes a value
+   ============================================================ */
+:root{
+  --surface:#FFFFFF;
+  --surface-sunken:#F7F7F8;
+  --surface-hover:#F2F2F4;
+  --ink:#111113;
+  --ink-secondary:#6B7280;
+  --ink-tertiary:#9CA3AF;
+  --border:#E8E8EC;
+  --border-strong:#D9D9DE;
+  --accent:#2563EB;
+  --accent-graph:#4F46E5;
+  --inverse:#0A0A0A;
+
+  --success-fg:#0F7A4D; --success-bg:#E9F7F0;
+  --warning-fg:#9A6400; --warning-bg:#FDF5E3;
+  --danger-fg:#C4281C;  --danger-bg:#FDF0EF;
+  --neutral-fg:#4B5563; --neutral-bg:#F1F1F3;
+
+  --r-sm:6px; --r-md:10px; --r-lg:12px; --r-xl:16px; --r-full:999px;
+
+  --shadow-float:0 16px 40px -12px rgba(17,17,19,.18), 0 2px 6px rgba(17,17,19,.06);
+  --shadow-raised:0 1px 2px rgba(17,17,19,.06);
+
+  --control-h:44px;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+
+/* ============================================================
+   2. BASE
+   ============================================================ */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  font-size:14px;line-height:20px;color:var(--ink);
+  background:var(--surface);
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:'cv11' 1,'ss01' 1;
+}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-sm)}
+svg{display:block}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ============================================================
+   3. SHELL
+   ============================================================ */
+.app{display:grid;grid-template-columns:296px minmax(0,1fr) 480px;height:100vh;overflow:hidden}
+.sidebar{background:var(--surface-sunken);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 16px}
+.content{overflow-y:auto;padding:0 32px 48px}
+.drawer{border-left:1px solid var(--border);overflow-y:auto;padding:24px;position:relative}
+
+/* ---- sidebar ---- */
+.identity{display:flex;gap:12px;align-items:center;padding:4px 8px 24px}
+.brand-tile{width:48px;height:48px;border-radius:var(--r-md);background:var(--inverse);display:grid;place-items:center;flex:none}
+.identity-text{min-width:0}
+.org{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org-email{font-size:13px;color:var(--ink-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--r-md);
+  font-size:15px;font-weight:500;color:var(--ink-secondary);transition:background 120ms ease-out,color 120ms ease-out;width:100%;text-align:left}
+.nav-item svg{color:currentColor;flex:none}
+.nav-item:hover{background:rgba(242,242,244,.7);color:var(--ink)}
+.nav-item[aria-current="page"]{background:var(--surface-hover);color:var(--ink)}
+
+.nav-secondary{display:flex;flex-direction:column;gap:2px;margin-top:24px}
+.nav-link{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:14px;color:var(--accent);
+  border-radius:var(--r-md);transition:background 120ms ease-out;text-decoration:none}
+.nav-link:hover{background:rgba(242,242,244,.7)}
+
+.sidebar-footer{margin-top:auto;display:flex;align-items:center;gap:12px;padding-top:20px}
+.launcher{width:40px;height:40px;border-radius:var(--r-md);background:var(--danger-fg);display:grid;place-items:center;flex:none}
+.env-toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-secondary)}
+.switch{width:34px;height:20px;border-radius:var(--r-full);background:var(--border-strong);position:relative;transition:background 120ms ease-out}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:var(--r-full);background:#fff;transition:transform 120ms ease-out}
+.switch[aria-pressed="true"]{background:var(--success-fg)}
+.switch[aria-pressed="true"]::after{transform:translateX(14px)}
+
+/* ---- content header ---- */
+.page-head{position:sticky;top:0;background:var(--surface);padding-top:28px;z-index:5}
+h1{font-size:30px;line-height:36px;font-weight:700;letter-spacing:-.02em;margin-bottom:20px}
+.tabs{display:flex;gap:20px;border-bottom:1px solid var(--border)}
+.tab{font-size:15px;font-weight:500;color:var(--ink-secondary);padding:0 2px 12px;position:relative;transition:color 120ms ease-out}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink)}
+.tab[aria-selected="true"]::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--inverse)}
+
+/* ---- toolbar ---- */
+.toolbar{display:flex;gap:12px;flex-wrap:wrap;padding:20px 0}
+.search{display:flex;align-items:center;gap:10px;height:var(--control-h);min-width:280px;flex:0 1 320px;
+  background:var(--surface-sunken);border-radius:var(--r-md);padding:0 14px;color:var(--ink-secondary)}
+.search input{border:none;background:none;outline:none;font:inherit;color:var(--ink);width:100%}
+.search input::placeholder{color:var(--ink-secondary)}
+.control{display:flex;align-items:center;height:var(--control-h);border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);overflow:hidden}
+.control-part{display:flex;align-items:center;gap:8px;padding:0 14px;height:100%;font-size:14px;font-weight:500;transition:background 120ms ease-out}
+.control-part:hover{background:var(--surface-hover)}
+.control-divider{width:1px;height:100%;background:var(--border)}
+.arrow-glyph{color:var(--ink-tertiary);padding:0 2px}
+.filter-count{background:var(--inverse);color:#fff;font-size:11px;font-weight:600;border-radius:var(--r-full);padding:1px 6px;line-height:16px}
+
+/* ---- chart ---- */
+.chart{position:relative;height:220px;margin-bottom:8px}
+.chart svg{width:100%;height:100%;overflow:visible}
+.chart-tooltip{position:absolute;top:12px;background:var(--surface-sunken);border-radius:var(--r-md);padding:12px;
+  font-size:13px;pointer-events:none;opacity:0;transition:opacity 120ms ease-out;min-width:150px}
+.chart-tooltip.on{opacity:1}
+.tt-row{display:flex;justify-content:space-between;gap:20px}
+.tt-row+.tt-row{margin-top:4px}
+.tt-label{color:var(--ink-secondary)}
+.tt-value{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---- table ---- */
+table{width:100%;border-collapse:collapse}
+thead th{background:var(--surface-sunken);font-size:11px;line-height:16px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--ink-secondary);text-align:left;padding:8px 20px}
+thead th:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm)}
+thead th:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0;text-align:right}
+tbody tr{border-bottom:1px solid var(--border);cursor:pointer;transition:background 120ms ease-out}
+tbody tr:hover{background:var(--surface-hover)}
+tbody tr[aria-selected="true"]{background:var(--surface-hover)}
+tbody tr.flagged{background:color-mix(in srgb,var(--danger-bg) 40%,transparent)}
+tbody td{padding:16px 20px;height:64px;vertical-align:middle}
+.cust{font-weight:500}
+.txn-id{display:inline-flex;align-items:center;gap:6px;max-width:220px}
+.txn-id span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.amount-cell{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.date-cell{text-align:right;color:var(--ink-secondary);font-variant-numeric:tabular-nums}
+
+.pill{display:inline-block;border-radius:var(--r-full);padding:2px 10px;font-size:12px;font-weight:500}
+.pill.success{background:var(--success-bg);color:var(--success-fg)}
+.pill.pending{background:var(--warning-bg);color:var(--warning-fg)}
+.pill.failed{background:var(--danger-bg);color:var(--danger-fg)}
+.pill.refunded{background:var(--neutral-bg);color:var(--neutral-fg)}
+
+/* skeleton + empty */
+.skel{height:12px;border-radius:var(--r-sm);background:var(--surface-sunken)}
+.empty{padding:56px 20px;border-bottom:1px solid var(--border)}
+.empty p{font-size:15px;font-weight:600;margin-bottom:6px}
+.empty span{color:var(--ink-secondary)}
+.empty button{margin-top:14px;color:var(--accent);font-weight:500}
+
+/* ============================================================
+   4. DRAWER
+   ============================================================ */
+.hero{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+.hero-amount{font-size:32px;line-height:38px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hero-actions{display:flex;gap:8px;flex:none}
+.btn{display:inline-flex;align-items:center;gap:8px;height:var(--control-h);padding:0 16px;border:1px solid var(--border);
+  border-radius:var(--r-md);background:var(--surface);font-size:14px;font-weight:500;transition:background 120ms ease-out,border-color 120ms ease-out}
+.btn:hover{background:var(--surface-hover);border-color:var(--border-strong)}
+.icon-btn{width:var(--control-h);height:var(--control-h);display:grid;place-items:center;border:1px solid var(--border);
+  border-radius:var(--r-md);transition:background 120ms ease-out}
+.icon-btn:hover{background:var(--surface-hover)}
+
+.banner{display:flex;gap:12px;border-radius:var(--r-lg);padding:16px;margin-bottom:20px}
+.banner.success{background:var(--success-bg)}
+.banner.success svg{color:var(--success-fg)}
+.banner.failed{background:var(--danger-bg)}
+.banner.failed svg{color:var(--danger-fg)}
+.banner.pending{background:var(--warning-bg)}
+.banner.pending svg{color:var(--warning-fg)}
+.banner-title{font-size:15px;font-weight:600;margin-bottom:2px}
+.banner-title em{font-style:normal;font-weight:400;color:var(--ink-secondary)}
+
+.segmented{display:flex;background:var(--surface-sunken);border-radius:var(--r-lg);padding:4px;margin-bottom:20px}
+.segmented button{flex:1;padding:8px;border-radius:var(--r-md);font-size:15px;font-weight:500;color:var(--ink-secondary);transition:background 120ms ease-out,color 120ms ease-out}
+.segmented button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-raised)}
+
+.card-art{position:relative;aspect-ratio:16/10;background:var(--inverse);border-radius:var(--r-xl);padding:24px;
+  margin-bottom:20px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between}
+.card-emboss{position:absolute;right:-56px;top:-30px;width:300px;height:300px;opacity:.04;color:#fff}
+.card-number{font-family:var(--mono);font-size:20px;line-height:26px;font-weight:500;letter-spacing:.12em;color:#fff;position:relative}
+.card-foot{display:flex;align-items:flex-end;justify-content:space-between;position:relative}
+.card-meta{font-family:var(--mono);font-size:13px;line-height:20px;text-transform:uppercase;color:rgba(255,255,255,.85)}
+.network{display:flex;align-items:center}
+.network i{display:block;width:28px;height:28px;border-radius:var(--r-full);background:rgba(255,255,255,.9)}
+.network i+i{margin-left:-12px;background:rgba(255,255,255,.45)}
+
+.detail-card{border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:20px}
+.detail-card h2{font-size:16px;line-height:24px;font-weight:600;margin-bottom:16px}
+.row{display:flex;justify-content:space-between;gap:24px}
+.row+.row{margin-top:14px}
+.row dt{color:var(--ink)}
+.row dd{text-align:right;font-variant-numeric:tabular-nums}
+.row dd.link{color:var(--accent)}
+.copyable{display:inline-flex;align-items:center;gap:6px;color:var(--accent);max-width:220px}
+.copyable span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.copyable:hover span{text-decoration:underline}
+
+.toast{position:fixed;right:24px;bottom:24px;background:var(--inverse);color:#fff;border-radius:var(--r-xl);
+  padding:14px 18px;display:flex;align-items:center;gap:16px;font-size:14px;font-weight:500;
+  box-shadow:var(--shadow-float);transform:translateY(12px);opacity:0;pointer-events:none;transition:opacity 200ms ease-out,transform 200ms ease-out}
+.toast.on{opacity:1;transform:none;pointer-events:auto}
+
+/* ============================================================
+   5. RESPONSIVE
+   ============================================================ */
+@media (max-width:1279px){
+  .app{grid-template-columns:296px minmax(0,1fr)}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(480px,100%);background:var(--surface);
+    box-shadow:var(--shadow-float);transform:translateX(100%);transition:transform 200ms ease-out;z-index:20}
+  .drawer.open{transform:none}
+}
+@media (max-width:1023px){
+  .app{grid-template-columns:76px minmax(0,1fr)}
+  .sidebar{padding:20px 12px}
+  .identity-text,.org-email,.nav-item span,.nav-link span,.env-toggle span{display:none}
+  .nav-item,.nav-link{justify-content:center;padding:12px}
+  .content{padding:0 20px 40px}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="identity">
+      <div class="brand-tile">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 19V7a2 2 0 0 1 2-2h6.5a4.5 4.5 0 0 1 0 9H9" stroke="#fff" stroke-width="2.2" stroke-linecap="square"/></svg>
+      </div>
+      <div class="identity-text">
+        <div class="org">Purpledot, Accra</div>
+        <div class="org-email">payments@purpledot.io</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Dashboard</span></button>
+      <button class="nav-item" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span>Transactions</span></button>
+      <button class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"><path d="M4 8h16l-1.2 11a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 8zM9 8V6a3 3 0 0 1 6 0v2"/></svg><span>Checkout</span></button>
+      <button class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M10 13a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-5.7-5.7L11 7"/><path d="M14 11a4 4 0 0 0-6-.5l-2 2A4 4 0 0 0 11.7 18L13 17"/></svg><span>Payment links</span></button>
+      <button class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Connect</span></button>
+      <button class="nav-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.6 7" transform="translate(1.4 0)"/></svg><span>Settings</span></button>
+    </nav>
+
+    <div class="nav-secondary">
+      <a class="nav-link" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg><span>Create payment link</span></a>
+      <a class="nav-link" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg><span>Submit a dispute</span></a>
+      <a class="nav-link" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg><span>Help centre</span></a>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="launcher" aria-label="Open app launcher">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+      <div class="env-toggle">
+        <button class="switch" id="envSwitch" aria-pressed="true" aria-label="Toggle test mode"></button>
+        <span>Test mode</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= CONTENT ================= -->
+  <main class="content">
+    <div class="page-head">
+      <h1>Transactions</h1>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-tab="payments">Payments</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="refunds">Refunds</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="exports">Exports</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="flagged">Flagged</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <label class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="search" placeholder="Search name or ID" aria-label="Search transactions">
+      </label>
+
+      <div class="control">
+        <button class="control-part">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          Last 30 days
+        </button>
+        <div class="control-divider"></div>
+        <button class="control-part num">04/08/2026 <span class="arrow-glyph">→</span> 03/09/2026</button>
+      </div>
+
+      <button class="control control-part" style="border:1px solid var(--border)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        More filters <span class="filter-count">2</span>
+      </button>
+    </div>
+
+    <div class="chart" id="chart">
+      <svg viewBox="0 0 900 200" preserveAspectRatio="none" id="chartSvg"></svg>
+      <div class="chart-tooltip" id="tooltip">
+        <div class="tt-row"><span class="tt-label">Realised</span><span class="tt-value" id="ttReal">—</span></div>
+        <div class="tt-row"><span class="tt-label">Average</span><span class="tt-value" id="ttAvg">—</span></div>
+      </div>
+    </div>
+
+    <div id="panelPayments">
+      <table>
+        <thead>
+          <tr><th>Status</th><th>Customer</th><th>Transaction ID</th><th>Date</th><th>Amount</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div id="panelEmpty" hidden>
+      <table><thead><tr><th>Status</th><th>Customer</th><th>Transaction ID</th><th>Date</th><th>Amount</th></tr></thead></table>
+      <div class="empty">
+        <p id="emptyTitle">No refunds in this period</p>
+        <span>Refunds appear here once a payment is returned to a customer.</span><br>
+        <button>Widen the date range</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= DRAWER ================= -->
+  <aside class="drawer" id="drawer">
+    <div class="hero">
+      <div class="hero-amount" id="dAmount">4,589.95 ZAR</div>
+      <div class="hero-actions">
+        <button class="btn" id="refundBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+          Refund
+        </button>
+        <button class="icon-btn" aria-label="More actions">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="banner success" id="dBanner">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+      <div>
+        <div class="banner-title"><span id="dStatusWord">Successful</span> <em id="dCode">(800.100.152)</em></div>
+        <div id="dStatusBody">Transaction has been completed successfully.</div>
+      </div>
+    </div>
+
+    <div class="segmented" role="tablist">
+      <button role="tab" aria-selected="true" data-seg="details">Details</button>
+      <button role="tab" aria-selected="false" data-seg="updates">Updates</button>
+    </div>
+
+    <div id="segDetails">
+      <div class="card-art">
+        <svg class="card-emboss" viewBox="0 0 24 24" fill="none"><path d="M5 19V7a2 2 0 0 1 2-2h6.5a4.5 4.5 0 0 1 0 9H9" stroke="currentColor" stroke-width="3"/></svg>
+        <div class="card-number" id="dCardNo">4903 23** **** 9866</div>
+        <div class="card-foot">
+          <div>
+            <div class="card-meta" id="dExpiry">03/2028</div>
+            <div class="card-meta" id="dHolder">Matthew Paige Damon</div>
+          </div>
+          <div class="network" aria-label="Card network"><i></i><i></i></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <h2>Customer details</h2>
+        <dl>
+          <div class="row"><dt>Name</dt><dd class="link" id="dName">Matthew Paige Damon</dd></div>
+          <div class="row"><dt>Email</dt><dd class="link" id="dEmail">m.damon@example.com</dd></div>
+          <div class="row"><dt>Country</dt><dd id="dCountry">South Africa</dd></div>
+        </dl>
+      </div>
+
+      <div class="detail-card">
+        <h2>Payment info</h2>
+        <dl>
+          <div class="row">
+            <dt>Entity ID</dt>
+            <dd><button class="copyable" id="copyEntity"><span id="dEntity">8acda4ca63b2dsa233560163d41</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" style="flex:none"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>
+            </button></dd>
+          </div>
+          <div class="row"><dt>Account holder</dt><dd class="link" id="dAcct">William Hunting</dd></div>
+          <div class="row"><dt>Card type</dt><dd id="dType">Debit</dd></div>
+          <div class="row"><dt>Issuing institute</dt><dd class="link" id="dBank">Standard Bank</dd></div>
+          <div class="row"><dt>Processed</dt><dd class="num" id="dProcessed">03 Sep 2026, 10:39</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div id="segUpdates" hidden>
+      <div class="detail-card">
+        <h2>Timeline</h2>
+        <dl>
+          <div class="row"><dt>Payment authorised</dt><dd class="num">10:39:02</dd></div>
+          <div class="row"><dt>Risk checks passed</dt><dd class="num">10:39:04</dd></div>
+          <div class="row"><dt>Captured</dt><dd class="num">10:39:07</dd></div>
+          <div class="row"><dt>Settled to balance</dt><dd class="num">11:02:19</dd></div>
+        </dl>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toastMsg">Copied to clipboard</span>
+  <button aria-label="Dismiss" id="toastClose">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+</div>
+
+<script>
+/* ---------- data ---------- */
+const txns = [
+  {name:'Esther Howard',   id:'code_2204_3c5f7766_323687', status:'pending',  amount:'12,763.27', cur:'KES', date:'03 Sep, 14:39', holder:'Esther Howard', card:'5218 41** **** 2210', exp:'11/2027', bank:'Equity Bank', type:'Credit', country:'Kenya', entity:'1fb9c02e77a41d9930bb54c1e', code:'800.400.500', body:'Awaiting confirmation from the issuing bank.'},
+  {name:'Savannah Nguyen', id:'204_3c5f7766_323687_sds',   status:'success',  amount:'2,312.99',  cur:'ZAR', date:'03 Sep, 12:43', holder:'Savannah Nguyen', card:'4024 00** **** 7731', exp:'06/2029', bank:'Nedbank', type:'Debit', country:'South Africa', entity:'0c47ae19b8d2f6a5510c9e37b', code:'000.100.110', body:'Transaction has been completed successfully.'},
+  {name:'Matthew Paige Damon', id:'204_3c5f7766_323687_sd', status:'success', amount:'4,589.95', cur:'ZAR', date:'03 Sep, 10:39', holder:'William Hunting', card:'4903 23** **** 9866', exp:'03/2028', bank:'Standard Bank', type:'Debit', country:'South Africa', entity:'8acda4ca63b2dsa233560163d41', code:'800.100.152', body:'Transaction has been completed successfully.'},
+  {name:'Leslie Alexander', id:'105952137_aa41',           status:'pending',  amount:'407.94',    cur:'EUR', date:'02 Sep, 18:39', holder:'Leslie Alexander', card:'5555 34** **** 0021', exp:'01/2027', bank:'N26', type:'Credit', country:'Germany', entity:'55b1de0942c7f83aa9911f6c2', code:'800.400.500', body:'Awaiting confirmation from the issuing bank.'},
+  {name:'Floyd Miles',     id:'105952137_bd02',            status:'failed',   amount:'12,763.27', cur:'ZAR', date:'02 Sep, 17:43', holder:'Floyd Miles', card:'4111 90** **** 4402', exp:'09/2026', bank:'Absa', type:'Debit', country:'South Africa', entity:'e01f7cc3ab55d9207714aa63f', code:'800.100.168', body:'Declined by the issuing bank. Ask the customer to try another card.'},
+  {name:'Darrell Steward', id:'105952137_c711',            status:'success',  amount:'2,312.95',  cur:'USD', date:'02 Sep, 12:23', holder:'Darrell Steward', card:'3782 82** **** 1005', exp:'12/2028', bank:'Chase', type:'Credit', country:'United States', entity:'71dd0ab84f2e6c3390bb17e55', code:'000.100.110', body:'Transaction has been completed successfully.'},
+  {name:'Theresa Webb',    id:'code_2204_3c5f7766_998210', status:'refunded', amount:'407.94',    cur:'USD', date:'02 Sep, 10:43', holder:'Theresa Webb', card:'4539 11** **** 6672', exp:'08/2027', bank:'Wells Fargo', type:'Debit', country:'United States', entity:'aa39fb7712c04e88b0d631c9a', code:'000.200.100', body:'Refund issued to the original payment method.'},
+  {name:'Wade Warren',     id:'105952137_e930',            status:'success',  amount:'18,004.10', cur:'KES', date:'01 Sep, 09:12', holder:'Wade Warren', card:'5412 75** **** 3388', exp:'04/2029', bank:'KCB', type:'Credit', country:'Kenya', entity:'c3390bb17e5571dd0ab84f2e6', code:'000.100.110', body:'Transaction has been completed successfully.'}
+];
+const pillLabel = {success:'Successful', pending:'Pending', failed:'Failed', refunded:'Refunded'};
+const bannerCopy = {success:'Successful', pending:'Pending', failed:'Failed', refunded:'Refunded'};
+
+/* ---------- table ---------- */
+const rows = document.getElementById('rows');
+function renderRows(list){
+  rows.innerHTML = list.map((t,i)=>`
+    <tr data-i="${txns.indexOf(t)}" ${t.status==='failed'?'class="flagged"':''} aria-selected="${txns.indexOf(t)===2}">
+      <td><span class="pill ${t.status}">${pillLabel[t.status]}</span></td>
+      <td class="cust">${t.name}</td>
+      <td><div class="txn-id"><span>${t.id}</span>${t.status==='failed'?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger-fg)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>':''}</div></td>
+      <td class="date-cell">${t.date}</td>
+      <td class="amount-cell">${t.amount} ${t.cur}</td>
+    </tr>`).join('');
+}
+renderRows(txns);
+
+rows.addEventListener('click', e=>{
+  const tr = e.target.closest('tr'); if(!tr) return;
+  [...rows.children].forEach(r=>r.setAttribute('aria-selected','false'));
+  tr.setAttribute('aria-selected','true');
+  select(txns[tr.dataset.i]);
+  if(window.innerWidth < 1280) document.getElementById('drawer').classList.add('open');
+});
+
+document.getElementById('search').addEventListener('input', e=>{
+  const q = e.target.value.toLowerCase();
+  renderRows(txns.filter(t=>t.name.toLowerCase().includes(q)||t.id.toLowerCase().includes(q)));
+});
+
+/* ---------- drawer ---------- */
+function select(t){
+  document.getElementById('dAmount').textContent = `${t.amount} ${t.cur}`;
+  const banner = document.getElementById('dBanner');
+  banner.className = 'banner ' + (t.status==='refunded' ? 'pending' : t.status);
+  document.getElementById('dStatusWord').textContent = bannerCopy[t.status];
+  document.getElementById('dCode').textContent = `(${t.code})`;
+  document.getElementById('dStatusBody').textContent = t.body;
+  document.getElementById('dCardNo').textContent = t.card;
+  document.getElementById('dExpiry').textContent = t.exp;
+  document.getElementById('dHolder').textContent = t.holder;
+  document.getElementById('dName').textContent = t.name;
+  document.getElementById('dEmail').textContent = t.name.toLowerCase().replace(/[^a-z]+/g,'.') + '@example.com';
+  document.getElementById('dCountry').textContent = t.country;
+  document.getElementById('dEntity').textContent = t.entity;
+  document.getElementById('dAcct').textContent = t.holder;
+  document.getElementById('dType').textContent = t.type;
+  document.getElementById('dBank').textContent = t.bank;
+  document.getElementById('dProcessed').textContent = t.date;
+}
+
+document.querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-seg]').forEach(x=>x.setAttribute('aria-selected', x===b));
+  document.getElementById('segDetails').hidden = b.dataset.seg!=='details';
+  document.getElementById('segUpdates').hidden = b.dataset.seg!=='updates';
+}));
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected', x===b));
+  const isPayments = b.dataset.tab==='payments';
+  document.getElementById('panelPayments').hidden = !isPayments;
+  document.getElementById('panelEmpty').hidden = isPayments;
+  document.getElementById('emptyTitle').textContent =
+    b.dataset.tab==='refunds' ? 'No refunds in this period'
+    : b.dataset.tab==='exports' ? 'No exports yet'
+    : 'Nothing flagged in this period';
+}));
+
+/* ---------- toast ---------- */
+const toast = document.getElementById('toast');
+let toastTimer;
+function showToast(msg){
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toast.classList.remove('on'), 4000);
+}
+document.getElementById('toastClose').onclick = ()=>toast.classList.remove('on');
+document.getElementById('copyEntity').onclick = ()=>showToast('Copied to clipboard');
+document.getElementById('refundBtn').onclick = ()=>showToast('Payment refunded');
+document.getElementById('envSwitch').onclick = e=>{
+  const on = e.currentTarget.getAttribute('aria-pressed')==='true';
+  e.currentTarget.setAttribute('aria-pressed', String(!on));
+  showToast(on ? 'Live mode enabled' : 'Test mode enabled');
+};
+
+/* ---------- chart ---------- */
+const W=900, H=200, PAD=8;
+const real=[], avg=[];
+for(let i=0;i<30;i++){
+  real.push(36000 + Math.sin(i/2.6)*4200 + Math.cos(i/1.4)*2100 + (i*140));
+  avg.push(34000 + Math.sin(i/1.9+1)*5600 + Math.cos(i/3.1)*2600 + (i*90));
+}
+const all=[...real,...avg], min=Math.min(...all)*0.94, max=Math.max(...all)*1.04;
+const X=i=>PAD + i*(W-PAD*2)/(real.length-1);
+const Y=v=>H - ((v-min)/(max-min))*(H-20) - 10;
+function smooth(pts){
+  let d=`M${pts[0][0]},${pts[0][1]}`;
+  for(let i=0;i<pts.length-1;i++){
+    const [x0,y0]=pts[i], [x1,y1]=pts[i+1], cx=(x0+x1)/2;
+    d+=` C${cx},${y0} ${cx},${y1} ${x1},${y1}`;
+  }
+  return d;
+}
+const realPts=real.map((v,i)=>[X(i),Y(v)]), avgPts=avg.map((v,i)=>[X(i),Y(v)]);
+document.getElementById('chartSvg').innerHTML = `
+  <path d="${smooth(avgPts)}" fill="none" stroke="var(--border-strong)" stroke-width="1.5" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"/>
+  <path d="${smooth(realPts)}" fill="none" stroke="var(--accent-graph)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+  <line id="cross" x1="0" y1="0" x2="0" y2="${H}" stroke="var(--border-strong)" stroke-width="1" vector-effect="non-scaling-stroke" opacity="0"/>
+  <circle id="dotR" r="4.5" fill="var(--accent-graph)" opacity="0"/>
+  <circle id="dotA" r="4.5" fill="var(--ink-tertiary)" opacity="0"/>`;
+
+const chart=document.getElementById('chart'), tip=document.getElementById('tooltip');
+const cross=document.getElementById('cross'), dotR=document.getElementById('dotR'), dotA=document.getElementById('dotA');
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+chart.addEventListener('mousemove', e=>{
+  const b=chart.getBoundingClientRect();
+  const ratio=Math.min(Math.max((e.clientX-b.left)/b.width,0),1);
+  const i=Math.round(ratio*(real.length-1));
+  const x=X(i);
+  cross.setAttribute('x1',x); cross.setAttribute('x2',x); cross.setAttribute('opacity','1');
+  dotR.setAttribute('cx',x); dotR.setAttribute('cy',Y(real[i])); dotR.setAttribute('opacity','1');
+  dotA.setAttribute('cx',x); dotA.setAttribute('cy',Y(avg[i])); dotA.setAttribute('opacity','1');
+  document.getElementById('ttReal').textContent=fmt(real[i]);
+  document.getElementById('ttAvg').textContent=fmt(avg[i]);
+  tip.classList.add('on');
+  const px=(x/W)*b.width;
+  tip.style.left = Math.min(Math.max(px-80,0), b.width-170) + 'px';
+});
+chart.addEventListener('mouseleave', ()=>{
+  tip.classList.remove('on');
+  [cross,dotR,dotA].forEach(el=>el.setAttribute('opacity','0'));
+});
+
+/* ---------- drawer close on Escape (sheet mode) ---------- */
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') document.getElementById('drawer').classList.remove('open');
+});
+</script>
+</body>
+</html>

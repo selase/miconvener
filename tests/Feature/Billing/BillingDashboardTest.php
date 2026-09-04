@@ -38,8 +38,9 @@ it('displays billing dashboard with transactions and subscription', function () 
 
     // 3. Assert
     $response->assertStatus(200);
-    $response->assertViewIs('billing.index');
-    $response->assertSee('Billing & Subscription');
-    // $response->assertSeeText('Active'); // Subscription status (Fails in Feature test due to transaction isolation, verified in DebugBillingTest)
-    $response->assertSee(number_format(5000 / 100, 2)); // Transaction amount
+    $response->assertInertia(fn ($page) => $page
+        ->component('Billing/Index')
+        ->where('subscription.status', 'active')
+        ->where('transactions.data.0.amount_formatted', number_format(5000 / 100, 2))
+    );
 });

@@ -5,32 +5,29 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Contracts\View\Factory;
-use Illuminate\Contracts\View\View;
+use App\Services\Tenancy\TenantContext;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class DashboardController extends Controller
 {
-    public function index(): Factory|View
+    public function index(TenantContext $tenantContext): Response
     {
-        $tenant = app(\App\Services\Tenancy\TenantContext::class)->getTenant();
-        $meteringService = app(\App\Services\Tenancy\FeatureMeteringService::class);
+        $tenant = $tenantContext->getTenant();
 
-        // Fetch usage for enabled metered features
-        $usages = $tenant->features()
-            ->where('enabled', true)
-            ->get()
-            ->filter(fn ($feature): bool => ($feature->meta['type'] ?? null) === 'limit')
-            ->map(fn ($feature) => $meteringService->getUsage($tenant, $feature->feature_key))
-            ->values()
-            ->all();
-
-        // Checklist Logic
         $checklist = [
             'onboarding' => (bool) $tenant->onboarding_completed_at,
             'team' => $tenant->users()->count() > 1,
             'branding' => (! empty($tenant->logo) || ! empty(data_get($tenant->meta, 'branding.primary_color')) || ! empty(data_get($tenant->meta, 'primary_color'))),
         ];
 
-        return view('tenant.dashboard', ['usages' => $usages, 'checklist' => $checklist]);
+        return Inertia::render('Tenant/Dashboard', [
+            'checklist' => $checklist,
+            'links' => [
+                'branding' => route('tenant.settings.index'),
+                'team' => route('tenant.users.index'),
+                'finishOnboarding' => route('tenant.onboarding.finish'),
+            ],
+        ]);
     }
 }

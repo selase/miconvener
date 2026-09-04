@@ -45,7 +45,7 @@ final class LeadController extends Controller
         ]);
 
         // 4. Dispatch Notification
-        Mail::to(config('mail.from.address', 'sales@starterkit.test'))->send(new NewEnterpriseLead($lead));
+        Mail::to(config('mail.from.address'))->send(new NewEnterpriseLead($lead));
 
         return back()->with('success', 'Thank you! Our sales team will reach out to you shortly.');
     }

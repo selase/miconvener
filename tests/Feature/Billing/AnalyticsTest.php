@@ -27,11 +27,7 @@ test('billing dashboard displays last 6 months revenue analytics', function () {
 
     $response->assertStatus(200);
 
-    // Inspect View Data
-    $stats = $response->original->getData()['monthlyStats'];
-
-    // Expect 6 data points (filled with 0 if empty, but we'll focus on presence first)
-    // expect(count($stats))->toBeGreaterThanOrEqual(2);
+    $stats = $response->viewData('page')['props']['monthlyStats'];
 
     // Find Current Month
     $currentMonthStat = collect($stats)->first(fn ($s) => $s['label'] === now()->format('M'));
@@ -41,5 +37,5 @@ test('billing dashboard displays last 6 months revenue analytics', function () {
     $lastMonthStat = collect($stats)->first(fn ($s) => $s['label'] === now()->subMonth()->format('M'));
     expect($lastMonthStat['amount'])->toBe(10000);
 
-    $response->assertSee('Spending Analytics');
+    $response->assertInertia(fn ($page) => $page->component('Billing/Index'));
 });

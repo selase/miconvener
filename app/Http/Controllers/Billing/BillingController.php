@@ -4,34 +4,52 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Billing;
 
+use App\Enum\UsageMetric;
 use App\Http\Controllers\Controller;
+use App\Models\Invoice;
+use App\Models\Package;
+use App\Models\Tenant;
 use App\Models\Transaction;
+use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
-
-// Or View if Blade
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class BillingController extends Controller
 {
-    public function index(Request $request, \App\Services\Tenancy\TenantContext $tenantContext): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+    public function index(Request $request, TenantContext $tenantContext): Response
     {
-        $tenant = $tenantContext->getTenant(); // Resolve via DI
+        $tenant = $tenantContext->getTenant();
 
-        // If we are in a tenant context
-        if (!$tenant instanceof \App\Models\Tenant) {
-            // Fallback or error?
-            // Depending on architecture, user might be accessing billing for their "personal" account or "selected" tenant.
-            // Assuming tenant context is set by middleware.
-            $tenant = auth()->user()->latestTenant; // Fallback?
+        if (! $tenant instanceof Tenant) {
+            $tenant = auth()->user()->latestTenant;
         }
 
         $transactions = Transaction::where('tenant_id', $tenant->id)
             ->latest()
-            ->paginate(10);
+            ->paginate(10)
+            ->through(fn (Transaction $transaction): array => [
+                'id' => $transaction->id,
+                'description' => $transaction->description ?? $transaction->type,
+                'amount_formatted' => number_format($transaction->amount / 100, 2),
+                'currency' => $transaction->currency,
+                'status' => $transaction->status,
+                'created_at' => $transaction->created_at->format('Y-m-d'),
+                'can_refund' => in_array($transaction->status, ['success', 'succeeded'], true),
+            ]);
 
-        $invoices = \App\Models\Invoice::where('tenant_id', $tenant->id)
-            ->where('status', '!=', \App\Models\Invoice::STATUS_DRAFT)
+        $invoices = Invoice::where('tenant_id', $tenant->id)
+            ->where('status', '!=', Invoice::STATUS_DRAFT)
             ->latest()
-            ->get();
+            ->get()
+            ->map(fn (Invoice $invoice): array => [
+                'id' => $invoice->id,
+                'number' => $invoice->number,
+                'total' => number_format((float) $invoice->total, 2),
+                'status' => $invoice->status,
+                'created_at' => $invoice->created_at->format('Y-m-d'),
+            ]);
+
         $subscription = $tenant->latestSubscription;
 
         // Analytics: Last 6 months revenue
@@ -40,62 +58,62 @@ final class BillingController extends Controller
             ->whereIn('status', ['success', 'succeeded'])
             ->where('created_at', '>=', $sixMonthsAgo)
             ->get()
-            ->groupBy(function ($val): string {
-                return \Carbon\Carbon::parse($val->created_at)->format('M'); // Group by Month Name (Jan, Feb)
-            });
+            ->groupBy(fn ($transaction): string => $transaction->created_at->format('M'));
 
-        // Fill standard 6 month buckets
         $monthlyStats = [];
         for ($i = 5; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
-            $monthLabel = $date->format('M');
-
-            $transactionsInMonth = $monthlyData->get($monthLabel, collect([]));
-            $total = $transactionsInMonth->sum('amount');
+            $monthLabel = now()->subMonths($i)->format('M');
+            $total = $monthlyData->get($monthLabel, collect())->sum('amount');
 
             $monthlyStats[] = [
                 'label' => $monthLabel,
-                'amount' => $total, // In cents
+                'amount' => $total,
                 'formatted' => number_format($total / 100, 2),
             ];
         }
 
-        $accruedMetered = $this->calculateAccruedMetered($tenant);
-
-        return view('billing.index', [
-            'tenant' => $tenant,
+        return Inertia::render('Billing/Index', [
             'transactions' => $transactions,
             'invoices' => $invoices,
-            'subscription' => $subscription,
+            'subscription' => $subscription ? [
+                'package_name' => $tenant->package?->name,
+                'status' => $subscription->provider_status,
+                'current_period_end' => $subscription->current_period_end?->format('Y-m-d'),
+            ] : null,
+            'accruedMetered' => number_format($this->calculateAccruedMetered($tenant), 2),
             'monthlyStats' => $monthlyStats,
-            'accruedMetered' => $accruedMetered,
         ]);
     }
 
-    public function pricing(Request $request, \App\Services\Tenancy\TenantContext $tenantContext): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+    public function pricing(Request $request, TenantContext $tenantContext): Response
     {
         $tenant = $tenantContext->getTenant();
-        $packages = \App\Models\Package::where('is_active', true)->with('features')->get();
+        $packages = Package::where('is_active', true)->with('features')->orderBy('sort_order')->get();
 
-        return view('billing.pricing', [
-            'tenant' => $tenant,
-            'packages' => $packages,
-            'currentPackage' => $tenant->package,
+        return Inertia::render('Billing/Pricing', [
+            'packages' => $packages->map(fn (Package $package): array => [
+                'id' => $package->id,
+                'slug' => $package->slug,
+                'name' => $package->name,
+                'price' => (float) $package->price,
+                'yearly_price' => (float) ($package->yearly_price ?? $package->price * 10),
+                'is_free' => $package->isFree(),
+                'features' => $package->features->pluck('name'),
+            ]),
+            'currentPackageSlug' => $tenant->package?->slug,
         ]);
     }
 
-    private function calculateAccruedMetered(\App\Models\Tenant $tenant): float
+    private function calculateAccruedMetered(Tenant $tenant): float
     {
         $total = 0.0;
         $start = now()->startOfMonth();
 
-        $metrics = \App\Enum\UsageMetric::cases();
+        $metrics = UsageMetric::cases();
 
-        // Check for tenant-specific or package-specific pricing
         $tenant->load(['usagePrices', 'package.usagePrices']);
 
         foreach ($metrics as $metric) {
-            // Get usage for this month
             $usageCount = $tenant->usage()
                 ->where('feature_slug', $metric->value)
                 ->where('period_start', '>=', $start)
@@ -105,7 +123,6 @@ final class BillingController extends Controller
                 continue;
             }
 
-            // Find effective price (Tenant > Package)
             $priceModel = $tenant->usagePrices->firstWhere('metric', $metric);
 
             if (! $priceModel && $tenant->package) {

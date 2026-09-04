@@ -11,9 +11,9 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 final class LoginHistoryExport implements FromCollection
 {
     /**
-     * @return Collection
+     * @return Collection<int, UserLoginHistory>
      */
-    public function collection()
+    public function collection(): Collection
     {
         return UserLoginHistory::query()->select(['id', 'ip_address', 'location', 'client_device', 'platform', 'browser', 'login_at', 'logout_at'])
             ->latest()

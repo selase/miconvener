@@ -52,6 +52,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Session Serialization
+    |--------------------------------------------------------------------------
+    |
+    | Determines how Laravel serializes session data. The "json" format is
+    | recommended for security reasons, as it prevents PHP object injection
+    | attacks by not unserializing arbitrary objects from session data.
+    |
+    */
+
+    'serialization' => 'json',
+
+    /*
+    |--------------------------------------------------------------------------
     | Session File Location
     |--------------------------------------------------------------------------
     |

@@ -5,165 +5,63 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\User\StoreUserRequest;
-use App\Http\Requests\User\UpdateUserRequest;
+use App\Http\Requests\Tenant\StoreTeamMemberRequest;
+use App\Http\Requests\Tenant\UpdateTeamMemberRequest;
 use App\Libraries\Helper;
+use App\Mail\Users\SendAccountDetails;
 use App\Models\Role;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Tenancy\TenantContext;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class UserController extends Controller
 {
-    public function index(string $subdomain): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+    public function index(string $subdomain): Response
     {
         $this->authorize('read user');
         $tenant = $this->getTenant();
 
-        $breadcrumbs = [
-            ['link' => route('tenant.dashboard', ['subdomain' => $tenant->slug]), 'name' => __('Home')],
-            ['name' => __('Users')],
-        ];
-
-        // Only show roles relevant to this tenant
-        $roles = Role::where(function ($q) use ($tenant): void {
-            $q->whereNull('tenant_id')
-                ->orWhere('tenant_id', $tenant->id);
-        })->get();
-
-        $isSuperAdmin = \Illuminate\Support\Facades\Gate::allows('access-superadmin-dashboard');
-
-        // Exclude Superadmin from selection if not superadmin
-        if (! $isSuperAdmin) {
-            $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Superadmin');
-        }
-
-        $statuses = User::STATUSES;
-        $tenants = [$tenant]; // Only this tenant
-
-        return view('admin.user-management.users.index', [
-            'breadcrumbs' => $breadcrumbs,
-            'roles' => $roles,
-            'statuses' => $statuses,
-            'tenants' => $tenants,
-        ]);
-    }
-
-    public function getAllUsers(Request $request, string $subdomain): JsonResponse
-    {
-        $this->authorize('read user');
-        $tenant = $this->getTenant();
-
-        $columns = [
-            0 => 'uuid',
-            1 => 'first_name',
-            2 => 'roles.name',
-            3 => 'last_login_at',
-            4 => 'created_at',
-            5 => 'action',
-        ];
-
-        $query = User::where('tenant_id', $tenant->id);
-
-        $totalData = $query->count();
-        $totalFiltered = $totalData;
-
-        $limit = $request->input('length');
-        $start = $request->input('start');
-        $order = $columns[$request->input('order.0.column')];
-        $dir = $request->input('order.0.dir');
-
-        if (empty($request->input('search.value'))) {
-            $users = $query->with(['roles:id,name'])
-                ->offset($start)
-                ->limit($limit)
-                ->orderBy($order, $dir)
-                ->get();
-        } else {
-            $search = $request->input('search.value');
-            $users = $query->with(['roles:id,name'])
-                ->where(function ($query) use ($search): void {
-                    $query->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                })
-                ->offset($start)
-                ->limit($limit)
-                ->orderBy($order, $dir)
-                ->get();
-
-            $totalFiltered = $query->count();
-        }
-
-        $data = [];
-        foreach ($users as $user) {
-            $action = '';
-            // Basic actions for tenant admin
-            if (auth()->user()->can('update user')) {
-                $action .= '<a href="javascript:void(0)" onclick="updateUser(\''.$user->uuid.'\')" class="btn btn-icon btn-active-light-primary w-30px h-30px me-3"
-                                    data-toggle="tooltip" data-placement="top" title="Edit User">
-                                    <i class="fas fa-edit fs-4"></i>
-                                </a>';
-            }
-
-            if (auth()->user()->can('delete user')) {
-                $action .= '<a href="javascript:void(0)" onclick="deleteData(\''.$user->uuid.'\', \'/users/\')" class="btn btn-icon btn-active-light-danger w-30px h-30px"
-                                    data-toggle="tooltip" data-placement="top" title="Delete User">
-                                    <i class="fas fa-trash fs-4"></i>
-                                </a>';
-            }
-
-            $userPhoto = $user->photo ? \Illuminate\Support\Facades\Storage::url($user->photo) : $user->gravatar;
-
-            $client = '<div class="symbol symbol-circle symbol-50px overflow-hidden me-3">
-                            <a href="javascript:void(0)">
-                                <div class="symbol-label">
-                                    <img src="'.$userPhoto.'" alt="'.$user->displayName().'" class="w-100">
-                                </div>
-                            </a>
-                        </div>
-                        <div class="d-flex flex-column">
-                            <a href="javascript:void(0)" class="text-gray-800 text-hover-primary mb-1">'.$user->displayName().'</a>
-                            <span>'.$user->email.'</span>
-                        </div>';
-
-            $data[] = [
+        $users = User::where('tenant_id', $tenant->id)
+            ->with('roles:id,name')
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->through(fn (User $user): array => [
                 'uuid' => $user->uuid,
-                'client' => $client,
+                'name' => $user->displayName(),
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'phone_no' => $user->phone_no,
+                'avatar' => $user->photo ? Storage::url($user->photo) : $user->gravatar,
                 'role' => $user->roles->pluck('name')->first(),
+                'role_id' => $user->roles->first()?->id,
+                'status' => $user->status,
                 'last_login_at' => $user->last_login_at?->diffForHumans(),
                 'created_at' => $user->created_at->format('Y-m-d'),
-                'action' => $action,
-            ];
-        }
+            ]);
 
-        return response()->json([
-            'draw' => (int) $request->input('draw'),
-            'recordsTotal' => (int) $totalData,
-            'recordsFiltered' => (int) $totalFiltered,
-            'data' => $data,
+        return Inertia::render('Tenant/Team/Index', [
+            'users' => $users,
+            'roles' => $this->availableRoles(),
+            'statuses' => User::STATUSES,
         ]);
     }
 
-    public function store(StoreUserRequest $request, string $subdomain): JsonResponse
+    public function store(StoreTeamMemberRequest $request, string $subdomain): RedirectResponse
     {
-        $this->authorize('create user');
         $tenant = $this->getTenant();
         $validated = $request->validated();
 
-        $role = Role::where('id', $validated['role'])
-            ->where(function ($q) use ($tenant): void {
-                $q->whereNull('tenant_id')
-                    ->orWhere('tenant_id', $tenant->id);
-            })->firstOrFail();
+        $role = Role::findById($validated['role']);
 
-        if ($role->isSystemRole() && $role->name === 'Superadmin') {
-            abort(403, 'Cannot assign Superadmin role.');
-        }
-
-        return DB::transaction(function () use ($validated, $tenant, $role) {
+        DB::transaction(function () use ($validated, $tenant, $role): void {
             $password = Helper::generateRandomPassword();
             $user = User::create([
                 'first_name' => $validated['first_name'],
@@ -179,45 +77,22 @@ final class UserController extends Controller
             $user->assignRole($role);
             $user->tenants()->attach($tenant->id);
 
-            // Send email
-            \Illuminate\Support\Facades\Mail::to($user->email)
-                ->queue(new \App\Mail\Users\SendAccountDetails($user->first_name, $user->email, $password));
-
-            return response()->json([
-                'status' => 'success',
-                'message' => __('locale.messages.created', ['name' => 'User']),
-            ]);
+            Mail::to($user->email)->queue(new SendAccountDetails($user->first_name, $user->email, $password));
         });
+
+        return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
+            ->with('success', __('locale.messages.created', ['name' => 'Team member']));
     }
 
-    public function edit(string $subdomain, User $user): JsonResponse
+    public function update(UpdateTeamMemberRequest $request, string $subdomain, User $user): RedirectResponse
     {
-        $this->authorize('update user');
         $tenant = $this->getTenant();
 
-        // Ensure user belongs to this tenant
         if ($user->tenant_id !== $tenant->id) {
             abort(403);
         }
 
-        return response()->json([
-            'data' => $user,
-            'role' => [
-                'id' => $user->roles->first()?->id,
-            ],
-        ]);
-    }
-
-    public function update(UpdateUserRequest $request, string $subdomain, User $user): JsonResponse
-    {
-        $this->authorize('update user');
-        $tenant = $this->getTenant();
         $validated = $request->validated();
-
-        // Ensure user belongs to this tenant
-        if ($user->tenant_id !== $tenant->id) {
-            abort(403);
-        }
 
         $user->update([
             'first_name' => $validated['first_name'],
@@ -227,22 +102,58 @@ final class UserController extends Controller
             'status' => $validated['status'],
         ]);
 
-        $role = Role::where('id', $validated['role'])
-            ->where(function ($q) use ($tenant): void {
-                $q->whereNull('tenant_id')
-                    ->orWhere('tenant_id', $tenant->id);
-            })->firstOrFail();
+        $role = Role::findById($validated['role']);
 
         setPermissionsTeamId($tenant->id);
         $user->syncRoles([$role]);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => __('locale.messages.updated', ['name' => 'User']),
-        ]);
+        return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
+            ->with('success', __('locale.messages.updated', ['name' => 'Team member']));
     }
 
-    protected function getTenant()
+    public function destroy(string $subdomain, User $user): RedirectResponse
+    {
+        $this->authorize('delete user');
+        $tenant = $this->getTenant();
+
+        if ($user->tenant_id !== $tenant->id) {
+            abort(403);
+        }
+
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'You cannot remove your own account.');
+        }
+
+        $user->tenants()->detach($tenant->id);
+        $user->delete();
+
+        return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
+            ->with('success', __('locale.messages.deleted', ['name' => 'Team member']));
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function availableRoles(): array
+    {
+        $tenant = $this->getTenant();
+
+        $roles = Role::where(function ($query) use ($tenant): void {
+            $query->whereNull('tenant_id')
+                ->orWhere('tenant_id', $tenant->id);
+        })->get();
+
+        if (! Gate::allows('access-superadmin-dashboard')) {
+            $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Superadmin');
+        }
+
+        return $roles->map(fn ($role): array => [
+            'id' => $role->id,
+            'name' => $role->name,
+        ])->values()->all();
+    }
+
+    private function getTenant(): Tenant
     {
         $tenant = app(TenantContext::class)->getTenant();
         if (! $tenant) {

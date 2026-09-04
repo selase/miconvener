@@ -1,17 +1,33 @@
 {
+  "_rolldown-runtime-hePW80VL.js": {
+    "file": "assets/rolldown-runtime-hePW80VL.js",
+    "name": "rolldown-runtime"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-DKySXD4K.css",
-    "src": "resources/css/app.css",
-    "isEntry": true,
+    "file": "assets/app-DIEaqE-q.css",
     "name": "app",
     "names": [
       "app.css"
-    ]
+    ],
+    "src": "resources/css/app.css",
+    "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-C8ndUtuH.js",
+    "file": "assets/app-MJ0XSwWk.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_rolldown-runtime-hePW80VL.js"
+    ]
+  },
+  "resources/js/app.jsx": {
+    "file": "assets/app-C1heC-bN.js",
+    "name": "app",
+    "src": "resources/js/app.jsx",
+    "isEntry": true,
+    "imports": [
+      "_rolldown-runtime-hePW80VL.js"
+    ]
   }
 }

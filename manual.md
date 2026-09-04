@@ -4,7 +4,7 @@
 
 Welcome to the Multi-Tenant SaaS Starter Kit. This documentation serves as the primary source of truth for the kit's architecture, features, and usage patterns. It is designed to guide developers of all levels (Junior to Senior) and stakeholders in understanding, setting up, and utilizing the system.
 
-This starter kit is built on **Laravel 12** and **PHP 8.4**, providing a robust foundation for building scalable, secure, and multi-tenant SaaS applications. It incorporates best practices for tenancy isolation, role-based access control (RBAC), feature flagging, and secure secrets management.
+This starter kit is built on **Laravel 13** and **PHP 8.5**, providing a robust foundation for building scalable, secure, and multi-tenant SaaS applications. It incorporates best practices for tenancy isolation, role-based access control (RBAC), feature flagging, and secure secrets management.
 
 ## High-Level Overview
 
@@ -251,6 +251,78 @@ This is the highest level of isolation, where each tenant operates on its own de
 *   **Note:** Each tenant will have entirely different connection parameters, potentially pointing to different cloud providers or physical servers.
 
 The `TenantDatabaseManager` intelligently handles these configurations, ensuring that the correct database connection is established for the active tenant, regardless of the chosen isolation tier. This flexibility allows the SaaS platform to cater to a wide range of customer needs and compliance requirements.
+
+---
+
+### 2.3 Frontend Architecture: Inertia.js + React
+
+The adopted frontend stack for this project is **Inertia.js + React**, not Livewire. This is documented as the standing convention in `.agent/rules/02-laravel-stack.md` and `.agent/rules/laravel-inertia-stack.md`, and applies to all new feature work going forward.
+
+**Current state:** `inertiajs/inertia-laravel`, `@inertiajs/react`, `react`, and `react-dom` are installed. `App\Http\Middleware\HandleInertiaRequests` shares `auth`, `tenant` (id/name/slug/features), and `flash` on every request. The entire tenant-facing console — dashboard, team, roles, API keys, billing, finance, LLM usage/config, settings, onboarding — is built as Inertia + React pages under `resources/js/Pages/Tenant/` and `resources/js/Pages/Billing/`, styled with the shared design system described in **§2.4**. A handful of legacy Blade/Metronic views remain for screens not yet migrated (e.g. `tenant.settings-hub`, `tenant.usage`, `tenant.notifications` in `routes/subdomain.php`) — these migrate opportunistically, not as a blocking prerequisite.
+
+**Conventions (from `.agent/rules/`):**
+
+*   **Controllers:** Use `Inertia::render()` to return views. Follow the `[Feature]Controller.php` naming pattern. Routes are grouped by feature in `routes/web.php` / `routes/subdomain.php` and named.
+*   **Frontend structure:** Page components live in `resources/js/Pages/`; reusable components live in `resources/js/Components/Console/`. Functional components with JSX only — no class components.
+*   **Data flow:** Never pass raw Eloquent models to the frontend — always serialize through a dedicated array/resource shape in the controller. Use Inertia's `useForm` for all form state, and `usePage().props` for global data (auth, flash messages).
+*   **Navigation:** Always use `@inertiajs/react`'s `<Link>` component for internal links, to preserve SPA-style navigation instead of full page reloads.
+*   **Styling:** Tailwind CSS utility classes only; no inline styles.
+*   **Strict constraint:** do not mix Livewire and Inertia within the same view unless explicitly requested — pick one per screen.
+*   **Backend logic:** business logic stays in `app/Services/`; controllers stay thin (validation + response orchestration only), per the same "slim controller" rule that already applies to the rest of this codebase.
+
+### 2.4 Design System (Console UI)
+
+The tenant console follows a light, near-monochrome design system specified in `new_design/admin-ui-design-prompt.md` (the original brief — kept as historical reference, not living documentation). This section is the living reference: what's actually built, where it lives, and the gotchas that cost real debugging time.
+
+#### Tokens
+
+Defined in `tailwind.config.js` under `theme.extend`, consumed everywhere as Tailwind utility classes (`bg-surface`, `text-ink-secondary`, etc.) — never hand-written hex values in a page or component.
+
+| Token group | Values |
+|---|---|
+| `surface` | DEFAULT `#FFFFFF`, `sunken` `#F7F7F8`, `hover` `#F2F2F4` |
+| `ink` | DEFAULT `#111113`, `secondary` `#6B7280`, `tertiary` `#9CA3AF` |
+| `border` | DEFAULT `#E8E8EC`, `strong` `#D9D9DE` |
+| `accent` | DEFAULT `#2563EB` (focus rings and links **only** — never a button fill), `graph` `#4F46E5` (charts) |
+| `inverse` | `#0A0A0A` (Toast background, active tab underline) |
+| `success` / `warning` / `danger` / `neutral` | each has `fg` + `bg` pair, used by `StatusPill`, `StatusBanner`, `StatusDot` |
+| radius | `sm` 6px, `md` 10px, `lg` 12px, `xl` 16px |
+| shadow | `float`, `raised` — the only two shadows in the system; plain cards get **no** shadow, just a `border-border` hairline |
+| `spacing.control` | 44px — the height of every interactive control (buttons, inputs, selects) |
+| typography | `font-console` (Inter, tabular numerals) for the console; `.num` utility class (in `resources/css/app.css`) forces `font-variant-numeric: tabular-nums` on any element showing money/IDs/counts; monospace (JetBrains Mono) reserved for IDs and card numbers |
+
+#### The core rule: pages over modals, modals for the small stuff
+
+Standing product decision: **prefer a full page to a modal.** Every CRUD flow in the console is a real page with its own URL by default. `Drawer` (a persistent right-hand panel, not an overlay, at ≥1280px) is used for viewing a selected row's detail without navigating away. `Modal` is reserved for two cases only: destructive confirmations (replacing the browser's native `confirm()`/`alert()`), and small self-contained forms (roughly ≤6 fields, no sub-navigation) where staying on the list is clearly better than a page — e.g. adding a team member, creating/editing/duplicating a role.
+
+#### Primitive inventory (`resources/js/Components/Console/`)
+
+| Component | Purpose |
+|---|---|
+| `Button` | Neutral outline only, never a solid accent fill. Renders as `<Link>` when given `href` |
+| `IconButton` | 44px square icon-only button |
+| `Input`, `Select`, `Checkbox` | Standard form field trio — every form in the console uses these, not raw `<input>`/`<select>` |
+| `SearchInput` | Pill/sunken search box with a leading search icon — visually distinct from `Input` on purpose |
+| `StatusPill`, `StatusDot`, `CurrencyChip` | Table-cell status/metadata indicators |
+| `SegmentedControl` | Sunken-track toggle (e.g. Monthly/Yearly, Data/Loading/Empty) |
+| `StatusBanner` | Colored icon banner for a Drawer or Modal's headline status |
+| `DetailCard`, `LabelValueRow`, `CopyField` | Compose a Drawer's detail sections; `CopyField` wires into the shared `Toast` on copy |
+| `Table`, `Thead`, `Th`, `Tr`, `Td`, `TableSkeleton`, `TableEmpty` | Table primitives incl. loading and empty states |
+| `Drawer` | Persistent 3-column panel at ≥1280px, overlay sheet below it. See gotcha below |
+| `Modal` | Centered overlay dialog, `max-w-md` by default — pass `className="max-w-2xl"` etc. for wider content |
+| `ConfirmModal` | Built on `Modal` — the standard replacement for `window.confirm`/`window.alert`. `danger` prop reddens the confirm button; `hideCancel` for single-button acknowledgements |
+| `Toast` / `ToastProvider` | Global bottom-right toast, mounted once in `resources/js/app.jsx`; call `useToast()` anywhere |
+| `PageHeader` | Page title + optional tab row (the `tabs`/`activeTab` props exist but no page uses them yet) |
+
+A living, click-through reference of all of the above in every state lives at `/design-system` (`resources/js/Pages/Tenant/DesignSystem/Index.jsx`, `App\Http\Controllers\Tenant\DesignSystemController`) — deliberately left out of the sidebar nav, and gated to global superadmins only (`can:access-superadmin-dashboard`, set in the controller's constructor — same pattern as `Admin\RoleController`/`FeatureController`/`PackageController`). A tenant's own Org Superadmin does **not** pass this check; only a platform-level Superadmin (`tenant_id IS NULL` role assignment) does. Check it before building a new page.
+
+**Not built, and not started until a real page needs one** (YAGNI — the brief names these but nothing in the app uses them yet): `Tabs` as its own component (currently inlined in `PageHeader`), `DateRangeControl`, `FilterButton`, `PaymentCardArt`, `FloatingPanel`.
+
+#### Gotchas (cost real debugging time — read before touching `Drawer` or modal-izing a page)
+
+1. **`Drawer`'s desktop mode must use `position: relative`, not `static`.** A `position: static` element ignores `z-index` entirely, no matter what value you give it. `Drawer.jsx` originally used `xl:static xl:z-auto` for its docked desktop layout, which silently made its close button unclickable on every page using it — it rendered underneath `PageHeader`'s `position: sticky; z-index: 5` with no error, no warning, just a dead button. Fixed to `xl:relative xl:z-10`. If you ever add another docked (non-overlay) panel, give it `relative` + an explicit `z-index`, not `static`.
+2. **`Drawer`/`Modal`-pairing layout is scoped, not page-wide.** Wrap only the content-plus-panel in `<div className="flex">…</div>`; do **not** wrap the whole page. A `Drawer` in `xl:relative` mode stretches to match its flex sibling's height (default flex `align-items: stretch`) — wrap the entire page and a short drawer's content ends up pinned near the top of a multi-thousand-pixel-tall stretched box, scrolling out of view long before the visible viewport catches up.
+3. **When converting a page's Edit flow from its own route to a modal fed by the Index page's already-loaded row data, audit the Index controller's payload for every field the form needs.** A dedicated `edit()` action can quietly carry fields (e.g. `first_name`/`last_name` split out from a combined display `name`) that the `index()` action's payload never included, because nothing needed them there before. Deleting the dedicated route removes that field's only source — the modal silently renders blank inputs instead of erroring. Check the old controller action's payload line by line against the new one before deleting it.
 
 ---
 

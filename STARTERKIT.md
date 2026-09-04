@@ -116,17 +116,17 @@ When building new features, integrate with:
 ### Core Architecture
 
 **Application Type**: Multi-tenant SaaS platform
-**Laravel Version**: v12 (using Laravel 10 structure)
-**PHP Version**: 8.4.15
+**Laravel Version**: v13 (using Laravel 10 structure)
+**PHP Version**: 8.5.0
 **Database**: PostgreSQL (landlord) + tenant-specific databases
 
 **Frontend Stack**:
-- Livewire v4 (reactive components)
-- Alpine.js v3 (lightweight interactivity)
+- React + Inertia.js (functional components, TypeScript/JSX) — the adopted stack for all new frontend work; see `.agent/rules/laravel-inertia-stack.md` for conventions
 - Tailwind CSS v4 (utility-first styling)
 - Vite (module bundler)
+- Livewire v4 is **not used** for new work. A handful of legacy Livewire components remain under `app/Livewire/Tenant/` (`Dashboard`, `NotificationPreferences`, `UsageDashboard`, `SubscriptionManager`) from before this decision — leave them as-is until deliberately migrated to Inertia + React; do not extend them or add new Livewire components.
 
-**Testing**: Pest v4, PHPUnit v12
+**Testing**: Pest v5, PHPUnit v13
 
 ---
 
@@ -492,7 +492,7 @@ event(new InvoiceIssued($invoice));
 - Redirects to 2FA verification page
 - Session-based challenge tracking
 
-**Livewire Component: UserProfileSecurity**:
+**Controller: `Tenant\OrgSettingsController`** (Blade, not Livewire):
 - Enable/disable 2FA
 - Generate recovery codes
 - Manage security settings
@@ -663,30 +663,43 @@ event(new InvoiceIssued($invoice));
 
 ## 13. Frontend Components
 
-### Livewire Components (3)
-1. **PricingTable** - Displays subscription plans and pricing
-2. **TenantHealthCheck** - Admin dashboard health monitoring
-3. **UserProfileSecurity** - Security settings with 2FA management
+**Target stack (all new work): React + Inertia.js.** Livewire is not used for new frontend work — see `.agent/rules/laravel-inertia-stack.md` for the required conventions (`Inertia::render()` in controllers, pages in `resources/js/Pages/`, reusable components in `resources/js/Components/`, API Resources — never raw Eloquent models — as props, `useForm`/`usePage().props`, `<Link>` navigation, Tailwind-only styling).
 
-### View Structure
+**Current state:** Inertia + React are not installed yet (no `inertiajs/inertia-laravel`, no `@inertiajs/react`/`react`/`react-dom`, no `HandleInertiaRequests` middleware, no `resources/js/Pages/`). The console today is server-rendered Blade on the Metronic Bootstrap 5 theme, plus 4 legacy Livewire components predating this decision:
+1. **Tenant/Dashboard** - Tenant-facing dashboard
+2. **Tenant/NotificationPreferences** - Notification settings
+3. **Tenant/UsageDashboard** - Usage/metering display
+4. **Tenant/SubscriptionManager** - Subscription management
+
+Leave these as-is; do not extend them or add new Livewire components. Migrate a screen to Inertia + React when you touch it for other reasons, rather than as a standalone rewrite task.
+
+### View Structure (current)
 ```
 /resources/views/
-├── livewire/          # Livewire component views
-├── admin/             # Admin dashboard
-├── billing/           # Billing and pricing pages
-├── tenant/            # Tenant-specific views
-├── auth/              # Authentication pages
-├── marketing/         # Marketing pages
-├── settings/          # Settings pages
-└── layouts/           # Layout templates
+├── livewire/          # Legacy Livewire component views — do not add to
+├── admin/             # Admin dashboard (Blade)
+├── billing/           # Billing and pricing pages (Blade)
+├── tenant/            # Tenant-specific views (Blade)
+├── auth/              # Authentication pages (Blade)
+├── marketing/         # Marketing pages (Blade)
+├── settings/          # Settings pages (Blade)
+└── layouts/           # Layout templates (Blade)
+```
+
+### Target Structure (new work)
+```
+/resources/js/
+├── Pages/             # Inertia page components (one per Inertia::render() call)
+└── Components/        # Reusable React components
 ```
 
 ### Technology
-- **Blade Templates** - Laravel templating engine
+- **React + Inertia.js** - Adopted frontend stack for all new work
 - **Tailwind CSS v4** - Utility-first styling
-- **Alpine.js v3** - Lightweight JavaScript framework
 - **Chart.js** - Data visualization
 - **Vite** - Frontend build tool
+- **Blade Templates** - Still powers the existing (legacy) console screens; not used for new work
+- **Alpine.js v3** - Bundled with the remaining Livewire v4 components only; not a general-purpose choice for new work
 
 ---
 

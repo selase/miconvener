@@ -61,6 +61,9 @@ test('subdomain routing resolves the correct tenant', function () {
     // Assert the correct tenant is set in the context
     $this->assertEquals($tenant->id, app(TenantContext::class)->getTenant()->id);
 
-    // Assert the default dashboard content renders
-    $response->assertSee('Welcome');
+    // Assert the dashboard renders as the correct tenant's Inertia page
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tenant/Dashboard')
+        ->where('tenant.name', $tenant->name)
+    );
 });

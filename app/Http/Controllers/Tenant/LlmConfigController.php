@@ -7,12 +7,17 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Models\TenantLlmConfig;
 use App\Services\Tenancy\TenantContext;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class LlmConfigController extends Controller
 {
-    public function index()
+    private const array PROVIDERS = ['openai', 'anthropic', 'google'];
+
+    public function index(): Response|RedirectResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
 
@@ -21,15 +26,22 @@ final class LlmConfigController extends Controller
                 ->with('error', __('BYOK is not enabled for your organization. Please contact support.'));
         }
 
-        // Fetch existing configs keyed by provider
         $configs = TenantLlmConfig::where('tenant_id', $tenant->id)
             ->get()
             ->keyBy('provider');
 
-        return view('admin.tenant.llm-config.index', ['configs' => $configs]);
+        return Inertia::render('Tenant/LlmConfig/Index', [
+            'providers' => self::PROVIDERS,
+            'configs' => collect(self::PROVIDERS)->mapWithKeys(fn (string $provider): array => [
+                $provider => [
+                    'configured' => $configs->has($provider),
+                    'is_active' => (bool) ($configs->get($provider)?->is_active ?? false),
+                ],
+            ]),
+        ]);
     }
 
-    public function update(Request $request)
+    public function update(Request $request): RedirectResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
 
@@ -40,8 +52,8 @@ final class LlmConfigController extends Controller
 
         $validated = $request->validate([
             'configs' => ['array'],
-            'configs.*.provider' => ['required', Rule::in(['openai', 'anthropic', 'google'])],
-            'configs.*.api_key' => ['nullable', 'string', 'min:10'], // Allow null to clear? Or separate delete?
+            'configs.*.provider' => ['required', Rule::in(self::PROVIDERS)],
+            'configs.*.api_key' => ['nullable', 'string', 'min:10'],
             'configs.*.is_active' => ['boolean'],
         ]);
 
@@ -53,12 +65,11 @@ final class LlmConfigController extends Controller
             ]);
 
             if (! empty($data['api_key'])) {
-                $config->api_key_encrypted = $data['api_key']; // Setter handles encryption
+                $config->api_key_encrypted = $data['api_key'];
                 $config->is_active = $data['is_active'] ?? true;
                 $config->save();
             }
 
-            // Handle toggling active state without re-entering key
             if ($config->exists && isset($data['is_active'])) {
                 $config->is_active = (bool) $data['is_active'];
                 $config->save();
@@ -69,7 +80,7 @@ final class LlmConfigController extends Controller
             ->with('success', __('LLM Configurations updated successfully.'));
     }
 
-    public function destroy(string $provider)
+    public function destroy(string $provider): RedirectResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
 

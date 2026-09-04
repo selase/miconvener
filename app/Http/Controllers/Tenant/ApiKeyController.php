@@ -8,9 +8,10 @@ use App\Http\Controllers\Controller;
 use App\Models\TenantApiKey;
 use App\Services\Api\ApiKeyService;
 use App\Services\Tenancy\TenantContext;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class ApiKeyController extends Controller
 {
@@ -19,31 +20,31 @@ final class ApiKeyController extends Controller
         private readonly TenantContext $tenantContext
     ) {}
 
-    /**
-     * Display a listing of API keys.
-     */
-    public function index(string $subdomain): View
+    public function index(string $subdomain): Response
     {
         $this->authorize('manage api keys');
 
         $tenant = $this->tenantContext->getTenant();
         $apiKeys = TenantApiKey::where('tenant_id', $tenant->id)
             ->with('user')
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (TenantApiKey $key): array => [
+                'id' => $key->id,
+                'name' => $key->name,
+                'key_hint' => $key->key_hint,
+                'created_by' => $key->user?->displayName(),
+                'created_at' => $key->created_at->format('Y-m-d'),
+                'last_used_at' => $key->last_used_at?->diffForHumans(),
+                'revoked_at' => $key->revoked_at?->format('Y-m-d'),
+            ]);
 
-        $breadcrumbs = [
-            ['link' => route('tenant.dashboard', ['subdomain' => $tenant->slug]), 'name' => __('Home')],
-            ['name' => __('API Keys')],
-        ];
-
-        return view('admin.settings.api-keys.index', ['apiKeys' => $apiKeys, 'breadcrumbs' => $breadcrumbs]);
+        return Inertia::render('Tenant/ApiKeys/Index', [
+            'apiKeys' => $apiKeys,
+        ]);
     }
 
-    /**
-     * Store a newly created API key in storage.
-     */
-    public function store(Request $request, string $subdomain): JsonResponse
+    public function store(Request $request, string $subdomain): RedirectResponse
     {
         $this->authorize('manage api keys');
 
@@ -59,32 +60,24 @@ final class ApiKeyController extends Controller
             $request->name
         );
 
-        return response()->json([
-            'status' => 'success',
-            'message' => __('API Key generated successfully.'),
-            'key' => $result['key'], // Plain key to be shown once in the UI
-        ]);
+        return redirect()->route('tenant.api-keys.index', ['subdomain' => $subdomain])
+            ->with('success', __('API Key generated successfully.'))
+            ->with('plainKey', $result['key']);
     }
 
-    /**
-     * Remove the specified API key from storage (Revoke).
-     */
-    public function destroy(string $subdomain, string $id): JsonResponse
+    public function destroy(string $subdomain, string $id): RedirectResponse
     {
         $this->authorize('manage api keys');
 
         $tenant = $this->tenantContext->getTenant();
 
-        // Manual lookup because of UUID and connection weirdness sometimes with default implicit binding
         $apiKey = TenantApiKey::where('id', $id)
             ->where('tenant_id', $tenant->id)
             ->firstOrFail();
 
         $apiKey->update(['revoked_at' => now()]);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => __('API Key revoked successfully.'),
-        ]);
+        return redirect()->route('tenant.api-keys.index', ['subdomain' => $subdomain])
+            ->with('success', __('API Key revoked successfully.'));
     }
 }

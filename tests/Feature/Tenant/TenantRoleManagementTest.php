@@ -138,6 +138,20 @@ test('org superadmin can duplicate a system role', function () {
     ], 'landlord');
 });
 
+test('duplicate form endpoint returns JSON for the role duplication modal', function () {
+    $this->actingAs($this->orgSuperadmin);
+
+    setPermissionsTeamId(null);
+    $sourceRole = Role::where('name', 'Org Admin')->whereNull('tenant_id')->firstOrFail();
+    setPermissionsTeamId($this->tenant->id);
+
+    $response = $this->getJson(route('tenant.roles.duplicate.form', ['subdomain' => $this->tenant->slug, 'role' => $sourceRole->id]));
+
+    $response->assertOk();
+    $response->assertJsonStructure(['sourceRole' => ['id', 'name'], 'permissions', 'sourcePermissionNames']);
+    $response->assertJsonFragment(['name' => 'Org Admin']);
+});
+
 test('duplicate only includes TENANT_SAFE permissions', function () {
     $this->actingAs($this->orgSuperadmin);
 

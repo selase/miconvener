@@ -75,6 +75,8 @@ test('refund button is visible for success transactions', function () {
 
     $response = actingAs($user)->get(route('billing.index', ['subdomain' => $tenant->slug]));
 
-    $response->assertSee('Refund');
-    $response->assertSee(route('billing.refund', ['transaction' => Transaction::first(), 'subdomain' => $tenant->slug]));
+    $response->assertInertia(fn ($page) => $page
+        ->component('Billing/Index')
+        ->where('transactions.data.0.can_refund', true)
+    );
 });

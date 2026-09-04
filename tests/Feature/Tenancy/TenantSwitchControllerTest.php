@@ -29,7 +29,7 @@ test('it switches tenant successfully', function () {
     $tenant->users()->attach($user->id);
 
     $this->actingAs($user)
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->postJson(route('tenant.switch'), [
             'tenant_id' => $tenant->id,
         ])
@@ -50,7 +50,7 @@ test('it prevents switching to non member tenant', function () {
     // No attachment
 
     $this->actingAs($user)
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->postJson(route('tenant.switch'), [
             'tenant_id' => $tenant->id,
         ])

@@ -30,7 +30,7 @@ final class AppSetupDatabase extends Command
     public function handle(): int
     {
         // 1. Interactive Prompts
-        $database = $this->ask('Enter the PostgreSQL database name', env('DB_DATABASE', 'starterkit_landlord'));
+        $database = $this->ask('Enter the PostgreSQL database name', env('DB_DATABASE', 'miconvener'));
         $user = $this->ask('Enter the PostgreSQL username', 'selase');
         $password = $this->ask('Enter the PostgreSQL password', 'root');
         $host = env('DB_HOST', '127.0.0.1');

@@ -11,9 +11,9 @@ use Spatie\Activitylog\Models\Activity;
 final class AuditTrailExport implements FromCollection
 {
     /**
-     * @return Collection
+     * @return Collection<int, Activity>
      */
-    public function collection()
+    public function collection(): Collection
     {
         return Activity::all();
     }

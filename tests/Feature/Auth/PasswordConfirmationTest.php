@@ -24,7 +24,7 @@ test('password can be confirmed', function () {
 
     $this->withSession(['active_tenant_id' => $tenant->id])
         ->actingAs($user)
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->post('/confirm-password', [
             'password' => 'password',
         ])
@@ -38,7 +38,7 @@ test('password is not confirmed with invalid password', function () {
 
     $this->withSession(['active_tenant_id' => $tenant->id])
         ->actingAs($user)
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->post('/confirm-password', [
             'password' => 'wrong-password',
         ])

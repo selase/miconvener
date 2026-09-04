@@ -9,7 +9,8 @@ use App\Libraries\Helper;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class OrgSettingsController extends Controller
 {
@@ -18,19 +19,22 @@ final class OrgSettingsController extends Controller
     /**
      * Display the tenant settings page.
      */
-    public function index(): View
+    public function index(): Response
     {
         $this->authorize('manage organization settings');
         $tenant = $this->tenantContext->getTenant();
 
-        $breadcrumbs = [
-            ['link' => route('tenant.dashboard'), 'name' => __('Dashboard')],
-            ['link' => '#', 'name' => __('Organization Settings')],
-        ];
-
-        return view('tenant.settings.index', [
-            'tenant' => $tenant,
-            'breadcrumbs' => $breadcrumbs,
+        return Inertia::render('Tenant/Settings/Index', [
+            'org' => [
+                'name' => $tenant->name,
+                'email' => $tenant->email,
+                'phone_number' => $tenant->phone_number,
+                'logo' => Helper::getTenantLogoUrl(),
+                'primary_color' => data_get($tenant->meta, 'primary_color', '#009EF7'),
+                'require_2fa' => (bool) $tenant->require_2fa,
+                'custom_domain' => $tenant->custom_domain,
+                'custom_domain_status' => $tenant->custom_domain_status,
+            ],
         ]);
     }
 
@@ -111,7 +115,7 @@ final class OrgSettingsController extends Controller
                 break;
             }
             // Also check A record if they point to IPs
-            if (isset($record['ip']) && $record['ip'] == '127.0.0.1') { // Replace with actual IPs
+            if (isset($record['ip']) && $record['ip'] === '127.0.0.1') { // Replace with actual IPs
                 $verified = true;
                 break;
             }

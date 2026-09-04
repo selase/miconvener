@@ -11,7 +11,7 @@
   <php>
     <ini name="memory_limit" value="512M"/>
     <env name="APP_ENV" value="testing"/>
-    <env name="APP_URL" value="http://starterkit-v2.test"/>
+    <env name="APP_URL" value="http://miconvener.test"/>
     <env name="BCRYPT_ROUNDS" value="4"/>
     <env name="DB_CONNECTION" value="sqlite"/>
     <env name="DB_DATABASE" value=":memory:"/>
@@ -19,8 +19,9 @@
     <env name="MAIL_MAILER" value="array"/>
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SESSION_DRIVER" value="array"/>
-    <env name="SESSION_DOMAIN" value=".starterkit-v2.test"/>
+    <env name="SESSION_DOMAIN" value=".miconvener.test"/>
     <env name="TELESCOPE_ENABLED" value="false"/>
+    <env name="INERTIA_SSR_ENABLED" value="false"/>
   </php>
   <source>
     <include>

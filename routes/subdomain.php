@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Tenant\DashboardController;
+use App\Http\Controllers\Tenant\DesignSystemController;
+use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\OrgSettingsController;
 use App\Http\Controllers\Tenant\RoleController;
 use App\Http\Controllers\Tenant\UserController;
@@ -14,8 +17,11 @@ Route::get('/tenant-test', function () {
 });
 
 Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function () {
-    Route::get('/dashboard', fn (string $subdomain) => view('tenant.dashboard'))
+    Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('tenant.dashboard');
+
+    Route::get('/design-system', [DesignSystemController::class, 'index'])
+        ->name('tenant.design-system');
 
     Route::get('/settings/hub', fn (string $subdomain) => view('tenant.settings-hub'))
         ->name('tenant.settings.hub');
@@ -50,11 +56,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('/settings/payments', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'update'])
         ->name('tenant.settings.payments.update');
 
-    Route::post('users/all', [UserController::class, 'getAllUsers'])->name('tenant.users.all');
-    Route::resource('users', UserController::class)->names('tenant.users');
+    Route::resource('users', UserController::class)->names('tenant.users')->except(['show', 'create', 'edit']);
     Route::get('roles/{role}/duplicate', [RoleController::class, 'duplicateForm'])->name('tenant.roles.duplicate.form');
     Route::post('roles/{role}/duplicate', [RoleController::class, 'duplicate'])->name('tenant.roles.duplicate');
-    Route::resource('roles', RoleController::class)->names('tenant.roles');
+    Route::resource('roles', RoleController::class)->names('tenant.roles')->except(['show', 'create', 'edit']);
     Route::resource('api-keys', App\Http\Controllers\Tenant\ApiKeyController::class)
         ->names('tenant.api-keys')
         ->only(['index', 'store', 'destroy']);
@@ -72,11 +77,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         Route::delete('/{provider}', [App\Http\Controllers\Tenant\LlmConfigController::class, 'destroy'])->name('destroy');
     });
 
-    // Onboarding Wizard (duplicated for subdomains)
+    // Onboarding Wizard
     Route::group(['prefix' => 'onboarding', 'as' => 'tenant.onboarding.'], function () {
-        Route::get('wizard', [App\Http\Controllers\Admin\OnboardingController::class, 'index'])->name('wizard');
-        Route::post('branding', [App\Http\Controllers\Admin\OnboardingController::class, 'updateBranding'])->name('branding.update');
-        Route::post('finish', [App\Http\Controllers\Admin\OnboardingController::class, 'finish'])->name('finish');
+        Route::get('wizard', [OnboardingController::class, 'index'])->name('wizard');
+        Route::post('branding', [OnboardingController::class, 'updateBranding'])->name('branding.update');
+        Route::post('finish', [OnboardingController::class, 'finish'])->name('finish');
     });
 
     // LLM Billing

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\DuplicateRoleRequest;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Services\Tenancy\EntitlementService;
 use App\Services\Tenancy\RoleDuplicationService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -15,11 +16,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class RoleController extends Controller
 {
-    public function index(string $subdomain): View|JsonResponse
+    public function index(string $subdomain): Response
     {
         $this->authorize('read role');
         $tenant = $this->getTenant();
@@ -30,68 +32,23 @@ final class RoleController extends Controller
                     ->orWhereNull('tenant_id');
             })->get();
 
-        if (request()->wantsJson() || request()->ajax()) {
-            return response()->json($allRoles);
-        }
+        $toPayload = fn (Role $role): array => [
+            'id' => $role->id,
+            'name' => $role->name,
+            'permissions' => $role->permissions->pluck('name')->values()->all(),
+            'is_system' => $role->tenant_id === null,
+        ];
 
-        $systemRoles = $allRoles->filter(fn (Role $role): bool => $role->tenant_id === null);
-        $customRoles = $allRoles->filter(fn (Role $role): bool => $role->tenant_id !== null);
+        $systemRoles = $allRoles->filter(fn (Role $role): bool => $role->tenant_id === null)->map($toPayload)->values();
+        $customRoles = $allRoles->filter(fn (Role $role): bool => $role->tenant_id !== null)
+            ->map(fn (Role $role): array => [...$toPayload($role), 'users_count' => $role->assignedUsersCount()])
+            ->values();
 
-        // Load user counts for custom roles (needed for delete guard UI)
-        $customRoles->each(function (Role $role): void {
-            $role->setAttribute('users_count', $role->assignedUsersCount());
-        });
-
-        return view('tenant.roles.index', ['systemRoles' => $systemRoles, 'customRoles' => $customRoles]);
-    }
-
-    public function create(string $subdomain): View
-    {
-        $this->authorize('create role');
-        $tenant = $this->getTenant();
-        $allowedPermissionNames = app(\App\Services\Tenancy\EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
-        $permissions = Permission::whereIn('name', $allowedPermissionNames)->get();
-
-        return view('tenant.roles.create', ['permissions' => $permissions]);
-    }
-
-    public function show(string $subdomain, string $id): View|JsonResponse
-    {
-        $this->authorize('read role');
-        $tenant = $this->getTenant();
-
-        $role = Role::where(function ($query) use ($tenant): void {
-            $query->where('tenant_id', $tenant->id)
-                ->orWhereNull('tenant_id');
-        })->where('id', $id)->firstOrFail();
-
-        if (request()->wantsJson() || request()->ajax()) {
-            return response()->json($role->load('permissions'));
-        }
-
-        return view('tenant.roles.show', ['role' => $role]);
-    }
-
-    public function edit(string $subdomain, string $id): View
-    {
-        $this->authorize('update role');
-        $tenant = $this->getTenant();
-        $role = Role::where('tenant_id', $tenant->id)
-            ->where('id', $id)
-            ->with('permissions')
-            ->firstOrFail();
-
-        $allowedPermissionNames = app(\App\Services\Tenancy\EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
-        $permissions = Permission::whereIn('name', $allowedPermissionNames)->get();
-
-        // Load source role permissions for comparison if this is a cloned role
-        $sourcePermissions = [];
-        if ($role->cloned_from_role_id) {
-            $sourceRole = $role->clonedFromRole;
-            $sourcePermissions = $sourceRole?->permissions->pluck('name')->toArray() ?? [];
-        }
-
-        return view('tenant.roles.edit', ['role' => $role, 'permissions' => $permissions, 'sourcePermissions' => $sourcePermissions]);
+        return Inertia::render('Tenant/Roles/Index', [
+            'systemRoles' => $systemRoles,
+            'customRoles' => $customRoles,
+            'permissions' => $this->allowedPermissionNames(),
+        ]);
     }
 
     public function store(Request $request, string $subdomain): RedirectResponse|JsonResponse
@@ -99,13 +56,13 @@ final class RoleController extends Controller
         $this->authorize('create role');
         $tenant = $this->getTenant();
 
-        $allowedPermissionNames = app(\App\Services\Tenancy\EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
+        $allowedPermissionNames = app(EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
 
         $validated = $request->validate([
             'name' => [
                 'required',
                 'string',
-                Rule::unique('roles')->where(fn($query) => $query->where('tenant_id', $tenant->id)),
+                Rule::unique('roles')->where(fn ($query) => $query->where('tenant_id', $tenant->id)),
                 Rule::notIn(Role::SYSTEM_ROLES),
             ],
             'permissions' => 'array',
@@ -150,13 +107,13 @@ final class RoleController extends Controller
             return response()->json(['message' => 'Cannot modify system roles.'], 403);
         }
 
-        $allowedPermissionNames = app(\App\Services\Tenancy\EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
+        $allowedPermissionNames = app(EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
 
         $validated = $request->validate([
             'name' => [
                 'required',
                 'string',
-                Rule::unique('roles')->ignore($role->id)->where(fn($query) => $query->where('tenant_id', $tenant->id)),
+                Rule::unique('roles')->ignore($role->id)->where(fn ($query) => $query->where('tenant_id', $tenant->id)),
                 Rule::notIn(Role::SYSTEM_ROLES),
             ],
             'permissions' => 'array',
@@ -185,7 +142,7 @@ final class RoleController extends Controller
         });
     }
 
-    public function duplicateForm(string $subdomain, string $role): View
+    public function duplicateForm(string $subdomain, string $role): JsonResponse
     {
         $this->authorize('create role');
         $tenant = $this->getTenant();
@@ -195,17 +152,24 @@ final class RoleController extends Controller
             ->with('permissions')
             ->firstOrFail();
 
-        $allowedPermissionNames = app(\App\Services\Tenancy\EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
-        $permissions = Permission::whereIn('name', $allowedPermissionNames)->get();
+        $allowedPermissionNames = app(EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
 
         // Pre-select permissions that the source role has (filtered to TENANT_SAFE)
         $sourcePermissionNames = $sourceRole->permissions
             ->pluck('name')
             ->intersect(Permission::TENANT_SAFE)
             ->intersect($allowedPermissionNames)
-            ->toArray();
+            ->values()
+            ->all();
 
-        return view('tenant.roles.duplicate', ['sourceRole' => $sourceRole, 'permissions' => $permissions, 'sourcePermissionNames' => $sourcePermissionNames]);
+        return response()->json([
+            'sourceRole' => [
+                'id' => $sourceRole->id,
+                'name' => $sourceRole->name,
+            ],
+            'permissions' => Permission::whereIn('name', $allowedPermissionNames)->pluck('name')->values()->all(),
+            'sourcePermissionNames' => $sourcePermissionNames,
+        ]);
     }
 
     public function duplicate(DuplicateRoleRequest $request, string $subdomain): RedirectResponse|JsonResponse
@@ -272,5 +236,16 @@ final class RoleController extends Controller
         }
 
         return $tenant;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function allowedPermissionNames(): array
+    {
+        $tenant = $this->getTenant();
+        $allowedPermissionNames = app(EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
+
+        return Permission::whereIn('name', $allowedPermissionNames)->pluck('name')->values()->all();
     }
 }

@@ -11,16 +11,14 @@ use App\Services\Tenancy\TenantContext;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class FinanceController extends Controller
 {
     public function __construct(private readonly TenantContext $tenantContext) {}
 
-    /**
-     * Display a listing of merchant transactions.
-     */
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $tenant = $this->tenantContext->getTenant();
 
@@ -43,48 +41,34 @@ final class FinanceController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $transactions = $query->paginate(15);
+        $transactions = $query->paginate(15)->withQueryString()->through(fn (MerchantTransaction $transaction): array => [
+            'id' => $transaction->id,
+            'provider_transaction_id' => $transaction->provider_transaction_id,
+            'customer_name' => $transaction->customer_name,
+            'customer_email' => $transaction->customer_email,
+            'amount' => $transaction->amount,
+            'amount_formatted' => number_format($transaction->amount / 100, 2),
+            'currency' => $transaction->currency,
+            'status' => $transaction->status,
+            'type' => $transaction->type,
+            'provider' => $transaction->provider,
+            'created_at' => $transaction->created_at->format('Y-m-d H:i'),
+            'can_refund' => $transaction->status === 'succeeded' && $transaction->type === 'payment',
+        ]);
 
-        // Stats for cards
         $stats = [
             'total_volume' => MerchantTransaction::where('tenant_id', $tenant->id)->where('status', 'succeeded')->sum('amount'),
             'transaction_count' => MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'payment')->count(),
             'refund_volume' => MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->sum('amount'),
         ];
 
-        // Analytics: Last 6 months revenue (aggregated in DB, not in PHP)
-        $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
-        $monthlyRaw = MerchantTransaction::where('tenant_id', $tenant->id)
-            ->where('status', 'succeeded')
-            ->where('type', 'payment')
-            ->where('created_at', '>=', $sixMonthsAgo)
-            ->selectRaw("to_char(created_at, 'Mon') as month_label, sum(amount) as total_amount")
-            ->groupByRaw("to_char(created_at, 'Mon'), date_trunc('month', created_at)")
-            ->orderByRaw("date_trunc('month', created_at)")
-            ->pluck('total_amount', 'month_label');
-
-        $monthlyStats = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = now()->subMonths($i)->format('M');
-            $monthlyStats[] = ['label' => $month, 'amount' => ($monthlyRaw->get($month, 0)) / 100];
-        }
-
-        $breadcrumbs = [
-            ['link' => route('tenant.dashboard'), 'name' => __('Dashboard')],
-            ['link' => '#', 'name' => __('Finance & Sales')],
-        ];
-
-        return view('tenant.finance.index', [
+        return Inertia::render('Tenant/Finance/Index', [
             'transactions' => $transactions,
             'stats' => $stats,
-            'monthlyStats' => $monthlyStats,
-            'breadcrumbs' => $breadcrumbs,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 
-    /**
-     * Process a refund for a transaction.
-     */
     public function refund(Request $request, MerchantTransaction $transaction, PaymentGateway $gateway)
     {
         $tenant = $this->tenantContext->getTenant();
@@ -93,18 +77,12 @@ final class FinanceController extends Controller
             abort(403);
         }
 
-        // IMPORTANT: Set commerce context for the gateway factory!
         $request->attributes->set('payment_context', 'commerce');
-        // Re-resolve or let Laravel handle it if it wasn't instantiated yet.
-        // Actually, since $gateway is injected, we need to make sure the resolve happened WITH the attribute set.
-        // Usually, method injection happens during call.
-        // If we want to be SURE, we pull it from app() AFTER setting the attribute.
         $merchantGateway = app(PaymentGateway::class);
 
         try {
             $result = $merchantGateway->refund($transaction->provider_transaction_id);
 
-            // Create refund record
             MerchantTransaction::create([
                 'tenant_id' => $tenant->id,
                 'provider' => $transaction->provider,

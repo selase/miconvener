@@ -38,8 +38,10 @@ test('org admin can access and update tenant settings via subdomain', function (
         ->get("http://{$subdomainHost}/settings", ['HTTP_HOST' => $subdomainHost]);
 
     $response->assertStatus(200);
-    $response->assertSee('Organization Name');
-    $response->assertSee('acme');
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tenant/Settings/Index')
+        ->where('tenant.name', $tenant->name)
+    );
 
     // 2. Update settings
     $response = $this->actingAs($user)

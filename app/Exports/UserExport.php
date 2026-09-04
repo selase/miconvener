@@ -11,9 +11,9 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 final class UserExport implements FromCollection
 {
     /**
-     * @return Collection
+     * @return Collection<int, User>
      */
-    public function collection()
+    public function collection(): Collection
     {
         return User::all();
     }
