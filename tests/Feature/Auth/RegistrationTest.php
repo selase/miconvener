@@ -24,10 +24,12 @@ beforeEach(function () {
 });
 
 test('registration screen can be rendered', function () {
+    $appName = config('app.name');
+
     $this->get('/register')
         ->assertStatus(200)
-        ->assertSee('Start your QNotify workspace')
-        ->assertSee('Choose a paid plan, create your account, and launch your first branch queue.')
+        ->assertSee("Start your {$appName} workspace")
+        ->assertSee('Choose a paid plan, create your account, and provision your first tenant.')
         ->assertSee('Pro')
         ->assertSee('Business')
         ->assertSee('Enterprise')
@@ -38,7 +40,7 @@ test('new users can register with a paid plan', function () {
     $plan = Package::where('slug', 'pro')->firstOrFail();
 
     $response = $this
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->post('/register', [
             'first_name' => 'Ada',
             'last_name' => 'Osei',
@@ -57,7 +59,7 @@ test('registration requires a paid plan', function () {
     $freePlan = Package::where('slug', 'free')->firstOrFail();
 
     $this
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->post('/register', [
             'first_name' => 'Ada',
             'last_name' => 'Osei',
@@ -74,7 +76,7 @@ test('registration creates a tenant for the new user', function () {
     $plan = Package::where('slug', 'pro')->firstOrFail();
 
     $this
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->post('/register', [
             'first_name' => 'Ada',
             'last_name' => 'Osei',
@@ -96,7 +98,7 @@ test('registration creates a tenant for the new user', function () {
 
 test('registration requires all fields', function () {
     $this
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->post('/register', [])
         ->assertSessionHasErrors(['first_name', 'last_name', 'organization_name', 'email', 'password', 'plan']);
 });

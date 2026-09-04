@@ -7,8 +7,8 @@
 @section('content')
 
 <div>
-    <h2 class="brand-font text-[24px] font-bold text-slate-900 tracking-tight">Start your QNotify workspace</h2>
-    <p class="mt-2 text-[14px] text-slate-500">Choose a paid plan, create your account, and launch your first branch queue.</p>
+    <h2 class="brand-font text-[24px] font-bold text-slate-900 tracking-tight">Start your {{ config('app.name') }} workspace</h2>
+    <p class="mt-2 text-[14px] text-slate-500">Choose a paid plan, create your account, and provision your first tenant.</p>
 
     @if ($errors->any())
         <div class="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">

@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     @php
-        $brandName = 'QNotify';
-        $brandMark = 'QN';
+        $brandName = config('app.name', 'MiConvener');
+        $brandMark = mb_strtoupper(mb_substr($brandName, 0, 2));
         $favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Cpath d='M20 18h16c9.941 0 18 8.059 18 18s-8.059 18-18 18H20V18zm14 10H30v16h4c4.418 0 8-3.582 8-8s-3.582-8-8-8z' fill='%23fff'/%3E%3C/svg%3E";
     @endphp
     <meta charset="utf-8" />
@@ -54,18 +54,18 @@
         {{-- Main copy (pushed to lower half) --}}
         <div class="relative mt-auto pb-10 z-10">
             <h1 class="brand-font text-[30px] xl:text-[36px] font-bold text-white leading-tight tracking-[-0.02em]">
-                Every insight,<br>automated.
+                Build SaaS,<br>not boilerplate.
             </h1>
             <p class="mt-3 text-[14px] leading-[24px] text-white/45">
-                Capture queue activity, get AI insights, and keep service operations moving.
+                Multi-tenant Laravel scaffolding with billing, RBAC, and clean integration paths — out of the box.
             </p>
-            {{-- Animated queue pipeline (vertical) --}}
+            {{-- Animated platform pipeline (vertical) --}}
             <div class="mt-10">
                 @foreach ([
-                    ['📱', 'Join Queue',  'Customers check in from any device',               'from-blue-500/20 to-blue-600/10',     'border-blue-400/25'],
-                    ['🧭', 'Route',      'Send requests to the right branch or provider',     'from-violet-500/20 to-violet-600/10', 'border-violet-400/25'],
-                    ['📣', 'Notify',     'Automatic turn alerts and live status updates',      'from-emerald-500/20 to-teal-600/10',  'border-emerald-400/25'],
-                    ['✅', 'Complete',   'Keep walk-ins and follow-ups moving smoothly',       'from-amber-500/20 to-orange-600/10',  'border-amber-400/25'],
+                    ['🏢', 'Provision',     'Spin up tenant databases on signup',           'from-blue-500/20 to-blue-600/10',     'border-blue-400/25'],
+                    ['🔐', 'Authenticate',  'SSO, 2FA, and tenant-scoped RBAC',             'from-violet-500/20 to-violet-600/10', 'border-violet-400/25'],
+                    ['💳', 'Bill',          'Stripe and Paystack with prorated invoicing',  'from-emerald-500/20 to-teal-600/10',  'border-emerald-400/25'],
+                    ['📊', 'Govern',        'Usage metering, audit logs, compliance ready', 'from-amber-500/20 to-orange-600/10',  'border-amber-400/25'],
                 ] as [$icon, $title, $desc, $gradient, $border])
                     <div class="flex gap-3.5">
                         <div class="flex flex-col items-center">

@@ -13,7 +13,7 @@ Your payment was successful and your **{{ $package->name }}** subscription for *
 - **Status:** Active
 </x-mail::panel>
 
-You can now access all {{ $package->name }} features from your dashboard. Start by creating your first branch and queue for your team.
+You can now access all {{ $package->name }} features from your dashboard. Invite your team, configure roles, and start building.
 
 <x-mail::button :url="$dashboardUrl">
 Go to your dashboard
@@ -22,7 +22,7 @@ Go to your dashboard
 **Need help getting started?** Check out our quick-start guide or reply to this email and we'll walk you through it.
 
 Thanks,<br>
-The QNotify Team
+The {{ config('app.name') }} Team
 
 ---
 

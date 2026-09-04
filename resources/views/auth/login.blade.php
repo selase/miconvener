@@ -6,7 +6,7 @@
 
 <div>
     <h2 class="brand-font text-[26px] font-bold text-slate-900 tracking-tight">Welcome back</h2>
-    <p class="mt-2 text-[14px] text-slate-500">Sign in to your QNotify account.</p>
+    <p class="mt-2 text-[14px] text-slate-500">Sign in to your {{ config('app.name') }} account.</p>
 
     @if (session('status'))
         <div class="mt-5 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">

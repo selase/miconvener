@@ -15,7 +15,6 @@
       "Bash(\"$HOME/Library/Application Support/Herd/bin/php\" -i)",
       "Bash(\"$HOME/Library/Application Support/Herd/bin/php\" -r 'echo ini_get\\(\"\"memory_limit\"\"\\);')",
       "Bash(\"$HOME/Library/Application Support/Herd/bin/php\":*)",
-      "Bash(\"$HOME/Library/Application Support/Herd/bin/php\" -d memory_limit=512M vendor/bin/pest --compact --filter=\"MeetingRoom\")",
       "Bash(vendor/bin/pint:*)",
       "mcp__laravel-boost__get-absolute-url",
       "mcp__laravel-boost__list-routes",

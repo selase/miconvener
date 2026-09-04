@@ -16,12 +16,13 @@ beforeEach(function () {
 
 test('login screen can be rendered', function () {
     $tenant = setActiveTenantForTest();
+    $appName = config('app.name');
 
     $this->withSession(['active_tenant_id' => $tenant->id])
         ->get('/login')
         ->assertStatus(200)
-        ->assertSee('QNotify')
-        ->assertSee('Sign in to your QNotify account.');
+        ->assertSee($appName)
+        ->assertSee("Sign in to your {$appName} account.");
 });
 
 test('users can authenticate using the login screen', function () {
@@ -29,13 +30,13 @@ test('users can authenticate using the login screen', function () {
     $tenant = setActiveTenantForTest($user);
 
     $response = $this->withSession(['active_tenant_id' => $tenant->id])
-        ->withoutMiddleware(App\Http\Middleware\VerifyCsrfToken::class)
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
         ->post('/login', [
             'email' => $user->email,
             'password' => 'password',
         ]);
 
-    $expectedUrl = 'http://'.$tenant->slug.'.starterkit-v2.test/dashboard';
+    $expectedUrl = 'http://'.$tenant->slug.'.miconvener.test/dashboard';
     $response->assertRedirect($expectedUrl);
 });
 
