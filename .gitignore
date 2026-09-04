@@ -6,6 +6,10 @@
 .env
 .env.backup
 .phpunit.result.cache
+.phpunit.cache
+.playwright-mcp
+.claude/scheduled_tasks.lock
+/storage/tenants
 Homestead.json
 Homestead.yaml
 npm-debug.log
