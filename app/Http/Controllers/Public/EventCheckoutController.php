@@ -38,7 +38,15 @@ final class EventCheckoutController extends Controller
             ->first();
 
         if (! $gateway) {
-            return redirect()->back()->with('error', 'This event is not currently accepting payments.');
+            $hasOtherActiveGateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
+                ->where('is_active', true)
+                ->exists();
+
+            $message = $hasOtherActiveGateway
+                ? 'This event currently only accepts payments via Paystack, which is not configured for this organizer.'
+                : 'This event is not currently accepting payments.';
+
+            return redirect()->back()->with('error', $message);
         }
 
         $paystack = new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]);
