@@ -32,6 +32,7 @@ final class Package extends Model
         'is_free',
         'sort_order',
         'markup_percentage',
+        'default_platform_fee_percentage',
         'paystack_plan_code',
         'paystack_yearly_plan_code',
         'stripe_price_id',
@@ -47,6 +48,7 @@ final class Package extends Model
         'is_free' => 'boolean',
         'sort_order' => 'integer',
         'markup_percentage' => 'decimal:2',
+        'default_platform_fee_percentage' => 'decimal:2',
     ];
 
     public function isFree(): bool
