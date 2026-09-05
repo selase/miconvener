@@ -20,6 +20,10 @@ final class EventPayout extends Model
 
     public const string STATUS_PAID = 'paid';
 
+    public const string STATUS_PROCESSING = 'processing';
+
+    public const string STATUS_FAILED = 'failed';
+
     protected $connection = 'landlord';
 
     protected $fillable = [
@@ -31,6 +35,8 @@ final class EventPayout extends Model
         'scheduled_at',
         'paid_at',
         'note',
+        'provider_reference',
+        'failure_reason',
     ];
 
     protected $casts = [

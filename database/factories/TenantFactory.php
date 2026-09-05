@@ -33,6 +33,7 @@ final class TenantFactory extends Factory
             'country' => fake()->country(),
             'city' => fake()->city(),
             'state' => fake()->state(),
+            'settlement_mode' => Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT,
         ];
     }
 }

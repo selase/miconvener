@@ -26,10 +26,13 @@ final class TenantPayoutAccount extends Model
     protected $fillable = [
         'tenant_id',
         'type',
+        'bank_code',
         'label',
         'account_name',
         'account_number_encrypted',
         'is_verified',
+        'recipient_code',
+        'resolved_account_name',
     ];
 
     protected $casts = [

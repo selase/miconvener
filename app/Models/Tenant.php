@@ -25,6 +25,10 @@ final class Tenant extends Model
     use HasUuids;
     use SpatieActivityLogs;
 
+    public const string SETTLEMENT_MODE_PLATFORM_DEFAULT = 'platform_default';
+
+    public const string SETTLEMENT_MODE_OWN_GATEWAY = 'own_gateway';
+
     protected $connection = 'landlord';
 
     protected $fillable = [
@@ -61,6 +65,7 @@ final class Tenant extends Model
         'markup_percentage',
         'llm_topup_balance',
         'platform_fee_percentage',
+        'settlement_mode',
         'created_at',
         'updated_at',
     ];
@@ -131,6 +136,11 @@ final class Tenant extends Model
     public function hasActivePaymentGateway(): bool
     {
         return $this->paymentGateways()->where('is_active', true)->exists();
+    }
+
+    public function isPlatformDefaultSettlement(): bool
+    {
+        return $this->settlement_mode === self::SETTLEMENT_MODE_PLATFORM_DEFAULT;
     }
 
     public function package()
