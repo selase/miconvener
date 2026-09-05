@@ -203,7 +203,7 @@ Route::post('/webhooks/paystack', [App\Http\Controllers\Billing\WebhookControlle
 // Merchant Webhooks (Public)
 Route::post('/webhooks/merchant/stripe/{tenant}', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handleStripe'])->middleware('throttle:webhooks')->name('webhooks.merchant.stripe');
 Route::post('/webhooks/merchant/paystack/{tenant}', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handlePaystack'])->middleware('throttle:webhooks')->name('webhooks.merchant.paystack');
-Route::post('/webhooks/settlement/paystack', [App\Http\Controllers\Public\SettlementWebhookController::class, 'handle'])->middleware('throttle:webhooks')->name('webhooks.settlement.paystack');
+Route::post('/webhooks/settlement/paystack', [App\Http\Controllers\Public\SettlementWebhookController::class, 'handle'])->middleware('throttle:settlement-webhooks')->name('webhooks.settlement.paystack');
 
 Route::get('/billing/callback', App\Http\Controllers\Billing\CallbackController::class)
     ->middleware(['auth']) // Maybe? Or guest if flow allows? Usually auth if we redirect to dashboard.
