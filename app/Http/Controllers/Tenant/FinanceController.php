@@ -69,7 +69,7 @@ final class FinanceController extends Controller
         ]);
     }
 
-    public function refund(Request $request, MerchantTransaction $transaction, PaymentGateway $gateway)
+    public function refund(Request $request, string $subdomain, MerchantTransaction $transaction)
     {
         $tenant = $this->tenantContext->getTenant();
 
