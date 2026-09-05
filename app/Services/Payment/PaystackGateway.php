@@ -23,7 +23,7 @@ final class PaystackGateway implements PaymentGateway
     public function createCustomer(string $email, string $name): string
     {
         try {
-            $response = Http::withToken($this->secret)->post("{$this->baseUrl}/customer", [
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/customer", [
                 'email' => $email,
                 'first_name' => $name,
             ])->throw();
@@ -37,10 +37,10 @@ final class PaystackGateway implements PaymentGateway
     public function createCheckoutSession(string $customerId, string $planId, string $redirectUrl): string
     {
         try {
-            $customerResponse = Http::withToken($this->secret)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
+            $customerResponse = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
             $email = $customerResponse->json('data.email');
 
-            $response = Http::withToken($this->secret)->post("{$this->baseUrl}/transaction/initialize", [
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/transaction/initialize", [
                 'email' => $email,
                 'plan' => $planId,
                 'callback_url' => $redirectUrl,
@@ -55,10 +55,10 @@ final class PaystackGateway implements PaymentGateway
     public function createOneTimeCheckoutSession(string $customerId, int $amount, string $currency, string $redirectUrl, array $metadata = []): string
     {
         try {
-            $customerResponse = Http::withToken($this->secret)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
+            $customerResponse = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
             $email = $customerResponse->json('data.email');
 
-            $response = Http::withToken($this->secret)->post("{$this->baseUrl}/transaction/initialize", [
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/transaction/initialize", [
                 'email' => $email,
                 'amount' => $amount,
                 'currency' => $currency,
@@ -79,10 +79,10 @@ final class PaystackGateway implements PaymentGateway
         }
 
         try {
-            $customerResponse = Http::withToken($this->secret)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
+            $customerResponse = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
             $email = $customerResponse->json('data.email');
 
-            $response = Http::withToken($this->secret)->post("{$this->baseUrl}/transaction/charge_authorization", [
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/transaction/charge_authorization", [
                 'email' => $email,
                 'amount' => $amount,
                 'authorization_code' => $options['authorization_code'],
@@ -100,7 +100,7 @@ final class PaystackGateway implements PaymentGateway
     public function subscriptionDetails(string $subscriptionId): array
     {
         try {
-            $response = Http::withToken($this->secret)->get("{$this->baseUrl}/subscription/{$subscriptionId}")->throw();
+            $response = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/subscription/{$subscriptionId}")->throw();
 
             return [
                 'status' => $response->json('data.status'),
@@ -119,7 +119,7 @@ final class PaystackGateway implements PaymentGateway
                 $payload['amount'] = $amount;
             }
 
-            $response = Http::withToken($this->secret)->post("{$this->baseUrl}/refund", $payload)->throw();
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/refund", $payload)->throw();
 
             return $response->json('data.id') ?? 'pending';
         } catch (Throwable $e) {
@@ -130,7 +130,7 @@ final class PaystackGateway implements PaymentGateway
     public function verifyTransaction(string $reference): array
     {
         try {
-            $response = Http::withToken($this->secret)->get("{$this->baseUrl}/transaction/verify/{$reference}")->throw();
+            $response = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/transaction/verify/{$reference}")->throw();
             $data = $response->json('data');
 
             return [
