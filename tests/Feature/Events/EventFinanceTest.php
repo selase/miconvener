@@ -54,6 +54,13 @@ test('finance stats reflect confirmed registrations and paid payouts only', func
 });
 
 test('host can add a payout account and the account number is stored encrypted, never returned raw', function () {
+    \Illuminate\Support\Facades\Http::fake([
+        'api.paystack.co/bank/resolve*' => \Illuminate\Support\Facades\Http::response([
+            'status' => true,
+            'data' => ['account_name' => 'Purpledot Limited'],
+        ]),
+    ]);
+
     [$tenant, $user] = financeHost();
 
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
@@ -64,6 +71,7 @@ test('host can add a payout account and the account number is stored encrypted, 
         'label' => 'Absa Bank Ghana — current',
         'account_name' => 'Purpledot Limited',
         'account_number' => '1234567894417',
+        'bank_code' => '030',
     ], ['HTTP_HOST' => $host]);
 
     $response->assertCreated();
