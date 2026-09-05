@@ -165,6 +165,15 @@ final class EventFinanceController extends Controller
         ]);
 
         $payoutModel = $eventModel->payouts()->where('id', $payout)->firstOrFail();
+
+        if ($payoutModel->status === EventPayout::STATUS_PROCESSING) {
+            return response()->json(['message' => 'This payout is currently being sent and cannot be manually updated. Wait for the transfer to complete, or check back shortly.'], 422);
+        }
+
+        if ($validated['status'] === EventPayout::STATUS_PAID && $tenant->isPlatformDefaultSettlement()) {
+            return response()->json(['message' => 'Platform-default payouts are marked paid automatically once the transfer completes — use "Send payout" instead.'], 422);
+        }
+
         $payoutModel->update([
             'status' => $validated['status'],
             'paid_at' => $validated['status'] === EventPayout::STATUS_PAID ? now() : null,

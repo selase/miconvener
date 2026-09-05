@@ -87,6 +87,9 @@ test('host can add a payout account and the account number is stored encrypted, 
 
 test('host can record a payout and mark it paid', function () {
     [$tenant, $user] = financeHost();
+    // Manually marking a payout paid is own_gateway bookkeeping: platform_default
+    // payouts are flipped to paid by the transfer webhook, never by hand.
+    $tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);
     EventLedgerEntry::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'net_amount' => 15_000]);
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);

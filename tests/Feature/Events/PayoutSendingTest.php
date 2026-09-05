@@ -127,6 +127,53 @@ test('a transfer uses the events own currency, not a hardcoded GHS', function ()
     Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/transfer') && $request['currency'] === 'USD');
 });
 
+test('a processing payout cannot be manually moved back to scheduled or to paid', function () {
+    [$tenant, $user] = payoutSendingHost();
+    $tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'status' => EventPayout::STATUS_PROCESSING,
+        'provider_reference' => 'in_flight_ref_2',
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $this->actingAs($user)->patchJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}", ['status' => 'scheduled'], ['HTTP_HOST' => $host])
+        ->assertStatus(422);
+    $this->actingAs($user)->patchJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}", ['status' => 'paid'], ['HTTP_HOST' => $host])
+        ->assertStatus(422);
+
+    expect($payout->fresh())->status->toBe(EventPayout::STATUS_PROCESSING)->paid_at->toBeNull();
+});
+
+test('a platform_default tenant cannot manually mark a scheduled payout as paid', function () {
+    [$tenant, $user] = payoutSendingHost();
+    expect($tenant->isPlatformDefaultSettlement())->toBeTrue();
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'status' => EventPayout::STATUS_SCHEDULED,
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $response = $this->actingAs($user)->patchJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}", ['status' => 'paid'], ['HTTP_HOST' => $host]);
+
+    $response->assertStatus(422);
+    expect($response->json('message'))->toContain('Send payout');
+    expect($payout->fresh())->status->toBe(EventPayout::STATUS_SCHEDULED)->paid_at->toBeNull();
+});
+
 test('a transfer.success webhook flips the payout to paid and writes one payout ledger row, idempotently', function () {
     [$tenant] = payoutSendingHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id, 'currency' => 'USD']);
