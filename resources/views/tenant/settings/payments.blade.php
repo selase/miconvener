@@ -65,6 +65,33 @@
                 </div>
             </div>
 
+            @if(auth()->user() && in_array(auth()->user()->email, ['hiselase@gmail.com', 'dev@wearepurpledot.com']))
+            <div class="row g-5 g-xl-10 mb-5">
+                <div class="col-12">
+                    <div class="card card-flush">
+                        <div class="card-header pt-7">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bolder text-dark">Platform Fee (Superadmin)</span>
+                                <span class="text-muted mt-1 fw-bold fs-7">The commission percentage taken on this organization's ticket sales</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <form action="{{ route('tenant.settings.payments.platform-fee') }}" method="POST">
+                                @csrf
+                                <div class="fv-row mb-5">
+                                    <label class="fw-bold fs-6 mb-2">Fee Percentage</label>
+                                    <input type="number" step="0.1" min="0" max="100" name="platform_fee_percentage" class="form-control form-control-solid" style="max-width: 200px" value="{{ $tenant->platform_fee_percentage }}" />
+                                </div>
+                                <div class="text-end">
+                                    <button type="submit" class="btn btn-primary">Save Fee</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <div class="row g-5 g-xl-10">
                 <!-- Stripe Configuration -->
                 <div class="col-xl-6">

@@ -109,4 +109,29 @@ final class PaymentSettingsController extends Controller
             'message' => 'Settlement mode updated.',
         ]);
     }
+
+    /**
+     * Superadmin-only: set a tenant's platform fee percentage from the UI,
+     * writing to the same column php artisan events:set-platform-fee writes
+     * to. The CLI command remains for scripted/bulk use.
+     */
+    public function updatePlatformFee(Request $request): RedirectResponse
+    {
+        $tenant = $this->tenantContext->getTenant();
+
+        if (! $request->user() || ! in_array($request->user()->email, ['hiselase@gmail.com', 'dev@wearepurpledot.com'], true)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'platform_fee_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $tenant->update(['platform_fee_percentage' => $validated['platform_fee_percentage']]);
+
+        return back()->with([
+            'status' => 'success',
+            'message' => 'Platform fee percentage updated.',
+        ]);
+    }
 }

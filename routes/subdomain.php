@@ -85,6 +85,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('tenant.settings.payments.update');
     Route::post('/settings/payments/settlement-mode', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'updateSettlementMode'])
         ->name('tenant.settings.payments.settlement-mode');
+    Route::post('/settings/payments/platform-fee', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'updatePlatformFee'])
+        ->name('tenant.settings.payments.platform-fee');
 
     Route::resource('users', UserController::class)->names('tenant.users')->except(['show', 'create', 'edit']);
     Route::get('roles/{role}/duplicate', [RoleController::class, 'duplicateForm'])->name('tenant.roles.duplicate.form');
