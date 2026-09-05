@@ -130,7 +130,7 @@ final class SettlementWebhookController extends Controller
                 'gateway_fee_amount' => 0,
                 'commission_amount' => 0,
                 'net_amount' => $payout->amount,
-                'currency' => 'GHS',
+                'currency' => $payout->event->currency,
                 'provider' => 'paystack',
                 'provider_reference' => $reference,
             ]);

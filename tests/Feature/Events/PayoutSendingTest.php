@@ -84,9 +84,52 @@ test('resending a failed payout uses a fresh reference, not a replay of the fail
     expect($payout->fresh()->provider_reference)->not->toBe('old_failed_reference');
 });
 
+test('a payout already processing cannot be sent again and fires no second transfer call', function () {
+    Http::preventStrayRequests();
+
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'bank_code' => '030', 'recipient_code' => 'RCP_cached_2']);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'amount' => 5_000,
+        'status' => EventPayout::STATUS_PROCESSING,
+        'provider_reference' => 'in_flight_reference',
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host]);
+
+    $response->assertStatus(422);
+    Http::assertNothingSent();
+    expect($payout->fresh())->status->toBe(EventPayout::STATUS_PROCESSING)->provider_reference->toBe('in_flight_reference');
+});
+
+test('a transfer uses the events own currency, not a hardcoded GHS', function () {
+    Http::fake([
+        'api.paystack.co/transfer' => Http::response(['status' => true, 'data' => ['transfer_code' => 'TRF_usd', 'status' => 'pending']]),
+    ]);
+
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id, 'currency' => 'USD']);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'bank_code' => '030', 'recipient_code' => 'RCP_cached_usd']);
+    $payout = EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'payout_account_id' => $account->id, 'amount' => 5_000]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host])->assertOk();
+
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/transfer') && $request['currency'] === 'USD');
+});
+
 test('a transfer.success webhook flips the payout to paid and writes one payout ledger row, idempotently', function () {
     [$tenant] = payoutSendingHost();
-    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $event = Event::factory()->create(['tenant_id' => $tenant->id, 'currency' => 'USD']);
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
     $payout = EventPayout::factory()->create([
         'tenant_id' => $tenant->id,
@@ -108,6 +151,9 @@ test('a transfer.success webhook flips the payout to paid and writes one payout 
 
     expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PAID);
     expect(EventLedgerEntry::where('payout_id', $payout->id)->where('type', EventLedgerEntry::TYPE_PAYOUT)->count())->toBe(1);
+
+    $ledgerEntry = EventLedgerEntry::where('payout_id', $payout->id)->where('type', EventLedgerEntry::TYPE_PAYOUT)->firstOrFail();
+    expect($ledgerEntry->currency)->toBe('USD');
 });
 
 test('a transfer.failed webhook flips the payout to failed with no ledger row', function () {

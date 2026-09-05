@@ -110,39 +110,48 @@ final class EventFinanceController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
-        $payoutModel = $eventModel->payouts()->where('id', $payout)->firstOrFail();
 
-        if (! in_array($payoutModel->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true)) {
-            return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
-        }
+        return DB::transaction(function () use ($eventModel, $payout, $settlementGateway): JsonResponse {
+            // Lock the payout row for the whole check-send-write sequence so two
+            // concurrent "send" requests for the same payout can't both pass the
+            // status check and both fire a live Paystack transfer. Each retry
+            // deliberately generates a fresh reference, so Paystack's own
+            // duplicate-reference protection cannot catch a double send.
+            $payoutModel = $eventModel->payouts()->where('id', $payout)->lockForUpdate()->firstOrFail();
 
-        $account = $payoutModel->payoutAccount;
-
-        try {
-            if (! $account->recipient_code) {
-                $recipientCode = $settlementGateway->createRecipient(
-                    $account->type === TenantPayoutAccount::TYPE_MOBILE_MONEY ? 'mobile_money' : 'nuban',
-                    $account->resolved_account_name ?? $account->account_name,
-                    (string) $account->account_number_encrypted,
-                    (string) $account->bank_code,
-                    'GHS'
-                );
-                $account->update(['recipient_code' => $recipientCode]);
+            if (! in_array($payoutModel->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true)) {
+                return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
             }
 
-            $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
-            $transfer = $settlementGateway->initiateTransfer($account->recipient_code, $payoutModel->amount, 'GHS', $reference);
-        } catch (PaymentFailedException $e) {
-            return response()->json(['message' => 'Could not send payout: '.$e->getMessage()], 502);
-        }
+            $account = $payoutModel->payoutAccount;
+            $currency = $eventModel->currency;
 
-        $payoutModel->update([
-            'status' => EventPayout::STATUS_PROCESSING,
-            'provider_reference' => $reference,
-            'failure_reason' => null,
-        ]);
+            try {
+                if (! $account->recipient_code) {
+                    $recipientCode = $settlementGateway->createRecipient(
+                        $account->type === TenantPayoutAccount::TYPE_MOBILE_MONEY ? 'mobile_money' : 'nuban',
+                        $account->resolved_account_name ?? $account->account_name,
+                        (string) $account->account_number_encrypted,
+                        (string) $account->bank_code,
+                        $currency
+                    );
+                    $account->update(['recipient_code' => $recipientCode]);
+                }
 
-        return response()->json(['message' => 'Payout sent.', 'transfer_code' => $transfer['transfer_code']]);
+                $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
+                $transfer = $settlementGateway->initiateTransfer($account->recipient_code, $payoutModel->amount, $currency, $reference);
+            } catch (PaymentFailedException $e) {
+                return response()->json(['message' => 'Could not send payout: '.$e->getMessage()], 502);
+            }
+
+            $payoutModel->update([
+                'status' => EventPayout::STATUS_PROCESSING,
+                'provider_reference' => $reference,
+                'failure_reason' => null,
+            ]);
+
+            return response()->json(['message' => 'Payout sent.', 'transfer_code' => $transfer['transfer_code']]);
+        });
     }
 
     public function updatePayoutStatus(Request $request, string $subdomain, string $event, string $payout): JsonResponse
