@@ -64,6 +64,26 @@ final class PublicEventController extends Controller
                 : ['nullable'],
         ]);
 
+        $existingRegistration = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('event_id', $eventModel->id)
+            ->where('email', $validated['email'])
+            ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED])
+            ->first();
+
+        if ($existingRegistration) {
+            return $existingRegistration->status === EventRegistration::STATUS_PENDING_PAYMENT
+                ? redirect()->route('public.events.checkout', [
+                    'subdomain' => $tenant->slug,
+                    'event' => $eventModel->slug,
+                    'registration' => $existingRegistration->id,
+                ])
+                : redirect()->route('public.events.confirmation', [
+                    'subdomain' => $tenant->slug,
+                    'event' => $eventModel->slug,
+                    'registration' => $existingRegistration->id,
+                ]);
+        }
+
         $ticketType = $usesTicketTypes ? $activeTicketTypes->firstWhere('id', $validated['ticket_type_id']) : null;
 
         $isFull = $usesTicketTypes
