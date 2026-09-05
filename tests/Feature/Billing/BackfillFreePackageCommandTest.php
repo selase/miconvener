@@ -44,3 +44,20 @@ test('backfilling fails gracefully when no free package exists', function () {
     expect(Artisan::output())->toContain('No free package found');
     expect($tenant->refresh()->package_id)->toBeNull();
 });
+
+test('--dry-run reports the affected tenant count without changing any tenant', function () {
+    Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\EventPackageSeeder']);
+    $growth = Package::where('slug', 'growth')->firstOrFail();
+    $unassigned1 = Tenant::factory()->create(['package_id' => null]);
+    $unassigned2 = Tenant::factory()->create(['package_id' => null]);
+    $alreadyAssigned = Tenant::factory()->create(['package_id' => $growth->id]);
+
+    $exitCode = Artisan::call('billing:backfill-free-package', ['--dry-run' => true]);
+
+    expect($exitCode)->toBe(Command::SUCCESS);
+    expect(Artisan::output())->toContain('2 tenant(s) would be backfilled');
+    expect($unassigned1->refresh()->package_id)->toBeNull();
+    expect($unassigned2->refresh()->package_id)->toBeNull();
+    expect((int) $alreadyAssigned->refresh()->package_id)->toBe((int) $growth->id);
+    expect(TenantFeature::where('tenant_id', $unassigned1->id)->exists())->toBeFalse();
+});

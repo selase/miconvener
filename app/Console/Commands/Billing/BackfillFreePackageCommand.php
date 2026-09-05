@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 
 final class BackfillFreePackageCommand extends Command
 {
-    protected $signature = 'billing:backfill-free-package';
+    protected $signature = 'billing:backfill-free-package {--dry-run : Report how many tenants would be affected without making any changes}';
 
     protected $description = 'One-off: assign every tenant without a package to the Free event-tier package.';
 
@@ -23,6 +23,13 @@ final class BackfillFreePackageCommand extends Command
             $this->error('No free package found. Run the EventPackageSeeder first.');
 
             return self::FAILURE;
+        }
+
+        if ($this->option('dry-run')) {
+            $count = Tenant::whereNull('package_id')->count();
+            $this->info("[Dry run] {$count} tenant(s) would be backfilled onto the Free package. No changes were made.");
+
+            return self::SUCCESS;
         }
 
         $count = 0;
