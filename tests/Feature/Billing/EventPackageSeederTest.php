@@ -55,3 +55,15 @@ test('EventPackageSeeder creates all eleven catalog features', function () {
     expect(Feature::where('slug', 'events_in_flight')->where('type', 'limit')->exists())->toBeTrue();
     expect(Feature::where('slug', 'custom-domains')->where('type', 'boolean')->exists())->toBeTrue();
 });
+
+test('running the full DatabaseSeeder produces the event-tier packages, not the SaaS-generic ones', function () {
+    Artisan::call('db:seed');
+
+    expect(Package::where('slug', 'free')->exists())->toBeTrue();
+    expect(Package::where('slug', 'growth')->exists())->toBeTrue();
+    // The old PackageSeeder read config('product-page.plans') and produced
+    // packages named after whatever that config held (typically 'starter',
+    // 'pro', 'enterprise') — 'pro' must no longer appear once EventPackageSeeder
+    // has replaced PackageSeeder's entry.
+    expect(Package::where('slug', 'pro')->exists())->toBeFalse();
+});

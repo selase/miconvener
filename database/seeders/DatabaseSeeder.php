@@ -24,7 +24,7 @@ final class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             PermissionsSeeder::class,
             CustomDomainFeatureSeeder::class,
-            PackageSeeder::class,
+            EventPackageSeeder::class,
             TenantSeeder::class,
             UserSeeder::class,
         ]);
