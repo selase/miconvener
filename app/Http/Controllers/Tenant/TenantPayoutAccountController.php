@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Contracts\SettlementGateway;
 use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
+use App\Models\EventPayout;
 use App\Models\TenantPayoutAccount;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -70,7 +71,17 @@ final class TenantPayoutAccountController extends Controller
         $this->authorize('manage organization settings');
         $tenant = $this->getTenant();
 
-        TenantPayoutAccount::where('tenant_id', $tenant->id)->where('id', $account)->firstOrFail()->delete();
+        $accountModel = TenantPayoutAccount::where('tenant_id', $tenant->id)->where('id', $account)->firstOrFail();
+
+        $hasActivePayouts = $accountModel->payouts()
+            ->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])
+            ->exists();
+
+        if ($hasActivePayouts) {
+            return response()->json(['message' => 'Cannot remove this account: it has scheduled, in-flight, or completed payouts. Those records must be preserved.'], 422);
+        }
+
+        $accountModel->delete();
 
         return response()->json(['message' => 'Payout account removed.']);
     }
