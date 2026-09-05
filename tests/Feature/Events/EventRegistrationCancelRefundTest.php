@@ -1,0 +1,167 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Events;
+
+use App\Models\Event;
+use App\Models\EventRegistration;
+use App\Models\Tenant;
+use App\Models\TenantPaymentGateway;
+use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Http;
+
+beforeEach(function () {
+    refreshTenantDatabases();
+    Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
+    Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+});
+
+function cancelRefundHost(string $slug): array
+{
+    $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+    $user = User::factory()->create(['tenant_id' => $tenant->id]);
+    setPermissionsTeamId($tenant->id);
+    $user->assignRole('Org Superadmin');
+    $tenant->users()->attach($user->id);
+
+    return [$tenant, $user];
+}
+
+function cancelRefundSubdomain(string $slug): string
+{
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+
+    return "{$slug}.{$baseDomain}";
+}
+
+test('cancelling a confirmed paid registration automatically refunds via the tenant Paystack gateway', function () {
+    Http::fake([
+        'api.paystack.co/refund' => Http::response([
+            'status' => true,
+            'data' => ['id' => 'ref_cancel_1'],
+        ]),
+    ]);
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_123',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+
+    Http::assertSent(fn ($request): bool => $request->url() === 'https://api.paystack.co/refund'
+        && $request['transaction'] === 'paid_ref_123');
+});
+
+test('cancellation is aborted and the registration stays confirmed when the refund call fails', function () {
+    Http::fake([
+        'api.paystack.co/refund' => Http::response(['status' => false, 'message' => 'Transaction not found'], 400),
+    ]);
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_456',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertStatus(502);
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CONFIRMED);
+});
+
+test('cancellation is aborted with 422 when a paid registration has no active payment gateway configured', function () {
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_789',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertStatus(422);
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CONFIRMED);
+});
+
+test('cancelling a free confirmed registration does not attempt a refund', function () {
+    Http::preventStrayRequests();
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 0,
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+});
+
+test('cancelling a waitlisted registration never attempts a refund, even with a nonzero amount', function () {
+    Http::preventStrayRequests();
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_WAITLISTED,
+        'waitlist_position' => 1,
+        'amount' => 5000,
+        'payment_reference' => null,
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+});

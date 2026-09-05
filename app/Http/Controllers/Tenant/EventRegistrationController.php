@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationRejected;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\Tenant;
+use App\Models\TenantPaymentGateway;
+use App\Services\Payment\PaystackGateway;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 final class EventRegistrationController extends Controller
@@ -70,6 +75,17 @@ final class EventRegistrationController extends Controller
             return response()->json(['message' => 'This registration cannot be cancelled.'], 422);
         }
 
+        $wasPaid = $registrationModel->status !== EventRegistration::STATUS_WAITLISTED
+            && $registrationModel->amount > 0
+            && $registrationModel->payment_reference !== null;
+
+        if ($wasPaid) {
+            $refundFailure = $this->refundPaidRegistration($tenant, $registrationModel);
+            if ($refundFailure !== null) {
+                return $refundFailure;
+            }
+        }
+
         $freesUpASpot = $registrationModel->status !== EventRegistration::STATUS_WAITLISTED;
         $ticketTypeId = $registrationModel->ticket_type_id;
 
@@ -80,6 +96,38 @@ final class EventRegistrationController extends Controller
         }
 
         return response()->json(['message' => 'Registration cancelled.']);
+    }
+
+    /**
+     * Attempts the automatic Paystack refund for a paid registration being
+     * cancelled. Returns null on success (caller proceeds to cancel); returns
+     * a JsonResponse to short-circuit cancel() when the refund cannot be
+     * issued, so a cancellation is never silently completed without a refund.
+     */
+    private function refundPaidRegistration(Tenant $tenant, EventRegistration $registrationModel): ?JsonResponse
+    {
+        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
+            ->where('provider', 'paystack')
+            ->where('is_active', true)
+            ->first();
+
+        if (! $gateway) {
+            return response()->json(['message' => 'Cannot cancel: no active payment gateway is configured to process the refund.'], 422);
+        }
+
+        try {
+            (new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]))->refund($registrationModel->payment_reference);
+        } catch (PaymentFailedException $e) {
+            Log::error('Automatic refund on registration cancellation failed', [
+                'tenant' => $tenant->id,
+                'registration' => $registrationModel->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => 'Cancellation aborted: the refund could not be processed. '.$e->getMessage()], 502);
+        }
+
+        return null;
     }
 
     private function confirmOrInviteToPay(EventRegistration $registration, string $reason): void
