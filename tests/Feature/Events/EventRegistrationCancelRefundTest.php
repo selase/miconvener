@@ -22,7 +22,9 @@ beforeEach(function () {
 
 function cancelRefundHost(string $slug): array
 {
-    $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+    // This suite exercises the tenant's own Paystack gateway refund path, so
+    // every tenant it creates opts out of platform_default settlement.
+    $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared', 'settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
     $user->assignRole('Org Superadmin');

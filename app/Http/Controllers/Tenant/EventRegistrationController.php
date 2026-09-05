@@ -10,6 +10,7 @@ use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationRejected;
 use App\Models\Event;
+use App\Models\EventLedgerEntry;
 use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
@@ -115,17 +116,20 @@ final class EventRegistrationController extends Controller
      */
     private function refundPaidRegistration(Tenant $tenant, EventRegistration $registrationModel): ?JsonResponse
     {
-        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
-            ->where('provider', 'paystack')
-            ->where('is_active', true)
-            ->first();
+        $paystack = $tenant->isPlatformDefaultSettlement()
+            ? $this->platformRefundGateway()
+            : $this->tenantRefundGateway($tenant);
 
-        if (! $gateway) {
-            return response()->json(['message' => 'Cannot cancel: no active payment gateway is configured to process the refund.'], 422);
+        if (! $paystack) {
+            $message = $tenant->isPlatformDefaultSettlement()
+                ? 'Cannot cancel: the platform has not configured its own settlement credentials to process the refund.'
+                : 'Cannot cancel: no active payment gateway is configured to process the refund.';
+
+            return response()->json(['message' => $message], 422);
         }
 
         try {
-            $refundId = (new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]))->refund($registrationModel->payment_reference);
+            $refundId = $paystack->refund($registrationModel->payment_reference);
         } catch (PaymentFailedException $e) {
             Log::error('Automatic refund on registration cancellation failed', [
                 'tenant' => $tenant->id,
@@ -141,6 +145,23 @@ final class EventRegistrationController extends Controller
         return null;
     }
 
+    private function tenantRefundGateway(Tenant $tenant): ?PaystackGateway
+    {
+        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
+            ->where('provider', 'paystack')
+            ->where('is_active', true)
+            ->first();
+
+        return $gateway ? new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]) : null;
+    }
+
+    private function platformRefundGateway(): ?PaystackGateway
+    {
+        $secret = config('services.settlement.paystack.secret_key');
+
+        return $secret ? new PaystackGateway(['secret_key' => $secret]) : null;
+    }
+
     /**
      * Mirrors the refund into the merchant ledger so the Finance dashboard's
      * volumes stay correct and the already-refunded charge no longer offers a
@@ -154,8 +175,13 @@ final class EventRegistrationController extends Controller
             ->where('provider_transaction_id', $registrationModel->payment_reference)
             ->first();
 
-        if (! $transaction) {
-            Log::warning('Automatic refund succeeded but no matching merchant transaction was found to reconcile', [
+        $chargeEntry = EventLedgerEntry::where('tenant_id', $tenant->id)
+            ->where('type', EventLedgerEntry::TYPE_CHARGE)
+            ->where('provider_reference', $registrationModel->payment_reference)
+            ->first();
+
+        if (! $transaction && ! $chargeEntry) {
+            Log::warning('Automatic refund succeeded but no matching transaction or ledger entry was found to reconcile', [
                 'tenant' => $tenant->id,
                 'registration' => $registrationModel->id,
                 'payment_reference' => $registrationModel->payment_reference,
@@ -165,20 +191,38 @@ final class EventRegistrationController extends Controller
             return;
         }
 
-        MerchantTransaction::create([
-            'tenant_id' => $tenant->id,
-            'provider' => $transaction->provider,
-            'provider_transaction_id' => $refundId !== 'pending' ? $refundId : 'REF_'.$transaction->provider_transaction_id,
-            'amount' => $transaction->amount,
-            'currency' => $transaction->currency,
-            'status' => 'succeeded',
-            'type' => 'refund',
-            'description' => 'Refund for '.$transaction->provider_transaction_id,
-            'customer_email' => $transaction->customer_email,
-            'meta' => ['refund_id' => $refundId],
-        ]);
+        if ($transaction) {
+            MerchantTransaction::create([
+                'tenant_id' => $tenant->id,
+                'provider' => $transaction->provider,
+                'provider_transaction_id' => $refundId !== 'pending' ? $refundId : 'REF_'.$transaction->provider_transaction_id,
+                'amount' => $transaction->amount,
+                'currency' => $transaction->currency,
+                'status' => 'succeeded',
+                'type' => 'refund',
+                'description' => 'Refund for '.$transaction->provider_transaction_id,
+                'customer_email' => $transaction->customer_email,
+                'meta' => ['refund_id' => $refundId],
+            ]);
 
-        $transaction->update(['status' => 'refunded']);
+            $transaction->update(['status' => 'refunded']);
+        }
+
+        if ($chargeEntry) {
+            EventLedgerEntry::create([
+                'tenant_id' => $tenant->id,
+                'event_id' => $chargeEntry->event_id,
+                'type' => EventLedgerEntry::TYPE_REFUND,
+                'registration_id' => $registrationModel->id,
+                'gross_amount' => $chargeEntry->gross_amount,
+                'gateway_fee_amount' => $chargeEntry->gateway_fee_amount,
+                'commission_amount' => $chargeEntry->commission_amount,
+                'net_amount' => -$chargeEntry->net_amount,
+                'currency' => $chargeEntry->currency,
+                'provider' => $chargeEntry->provider,
+                'provider_reference' => $refundId !== 'pending' ? $refundId : 'REF_'.$chargeEntry->provider_reference,
+            ]);
+        }
     }
 
     private function confirmOrInviteToPay(EventRegistration $registration, string $reason): void
