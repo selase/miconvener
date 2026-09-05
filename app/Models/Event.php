@@ -130,6 +130,11 @@ final class Event extends Model
         return $this->hasMany(EventPayout::class)->orderByDesc('created_at');
     }
 
+    public function ledgerEntries(): HasMany
+    {
+        return $this->hasMany(EventLedgerEntry::class, 'event_id');
+    }
+
     public function sponsors(): HasMany
     {
         return $this->hasMany(EventSponsor::class)->orderBy('sort_order');

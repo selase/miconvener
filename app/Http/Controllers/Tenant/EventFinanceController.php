@@ -6,11 +6,13 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
 use App\Models\TenantPayoutAccount;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -22,15 +24,18 @@ final class EventFinanceController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        $collected = (int) $eventModel->registrations()->confirmed()->sum('amount');
-        $fees = (int) $eventModel->registrations()->confirmed()->sum('platform_fee_amount');
+        $collected = (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('gross_amount');
+        $fees = (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('commission_amount');
+        $netCollected = $this->netCollected($eventModel);
         $paidOut = (int) $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount');
 
         $stats = [
             'collected' => $collected,
             'fees' => $fees,
             'net' => $collected - $fees,
+            'net_collected' => $netCollected,
             'paid_out' => $paidOut,
+            'available_balance' => $this->availableBalance($eventModel),
             'confirmed_orders' => $eventModel->registrations()->confirmed()->count(),
         ];
 
@@ -53,6 +58,7 @@ final class EventFinanceController extends Controller
                 'scheduled_at' => $p->scheduled_at?->toIso8601String(),
                 'paid_at' => $p->paid_at?->toIso8601String(),
                 'note' => $p->note,
+                'failure_reason' => $p->failure_reason,
                 'payout_account_label' => $p->payoutAccount?->label,
                 'payout_account_masked_number' => $p->payoutAccount?->maskedAccountNumber(),
             ])->values(),
@@ -72,15 +78,28 @@ final class EventFinanceController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $payout = $eventModel->payouts()->create([
-            'tenant_id' => $tenant->id,
-            'payout_account_id' => $validated['payout_account_id'],
-            'amount' => $validated['amount'],
-            'scheduled_at' => $validated['scheduled_at'] ?? null,
-            'note' => $validated['note'] ?? null,
-        ]);
+        return DB::transaction(function () use ($eventModel, $tenant, $validated): JsonResponse {
+            // Lock the event row for the balance-check-then-create sequence so
+            // two concurrent payout requests (or a payout racing a refund)
+            // can't both read the same available balance and both pass,
+            // over-drawing the event's collected funds.
+            Event::where('id', $eventModel->id)->lockForUpdate()->firstOrFail();
 
-        return response()->json(['id' => $payout->id], 201);
+            $available = $this->availableBalance($eventModel);
+            if ($validated['amount'] > $available) {
+                return response()->json(['message' => "Requested amount ({$validated['amount']}) exceeds the available balance ({$available})."], 422);
+            }
+
+            $payout = $eventModel->payouts()->create([
+                'tenant_id' => $tenant->id,
+                'payout_account_id' => $validated['payout_account_id'],
+                'amount' => $validated['amount'],
+                'scheduled_at' => $validated['scheduled_at'] ?? null,
+                'note' => $validated['note'] ?? null,
+            ]);
+
+            return response()->json(['id' => $payout->id], 201);
+        });
     }
 
     public function updatePayoutStatus(Request $request, string $subdomain, string $event, string $payout): JsonResponse
@@ -107,31 +126,51 @@ final class EventFinanceController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
+        $ownGateway = ! $tenant->isPlatformDefaultSettlement();
 
         $filename = "{$eventModel->slug}-settlement-statement.csv";
 
-        return response()->streamDownload(function () use ($eventModel): void {
+        return response()->streamDownload(function () use ($eventModel, $ownGateway): void {
             $handle = fopen('php://output', 'wb');
-            fputcsv($handle, ['Registration', 'Email', 'Ticket code', 'Status', 'Amount', 'Platform fee', 'Net', 'Currency', 'Confirmed at']);
+            fputcsv($handle, ['Type', 'Registration/Reference', 'Gross', 'Gateway fee', 'Commission', 'Net', 'Currency', 'Date']);
 
-            $eventModel->registrations()->confirmed()->orderBy('created_at')->chunk(200, function ($registrations) use ($handle): void {
-                foreach ($registrations as $registration) {
+            $eventModel->ledgerEntries()->orderBy('created_at')->chunk(200, function ($entries) use ($handle, $ownGateway): void {
+                foreach ($entries as $entry) {
                     fputcsv($handle, [
-                        $registration->full_name,
-                        $registration->email,
-                        $registration->ticket_code,
-                        $registration->status,
-                        $registration->amount,
-                        $registration->platform_fee_amount,
-                        $registration->amount - $registration->platform_fee_amount,
-                        $registration->currency,
-                        $registration->created_at->toIso8601String(),
+                        $entry->type,
+                        $entry->registration?->full_name ?? $entry->provider_reference,
+                        $entry->gross_amount,
+                        $ownGateway ? 'not tracked' : $entry->gateway_fee_amount,
+                        $entry->commission_amount,
+                        $entry->net_amount,
+                        $entry->currency,
+                        $entry->created_at->toIso8601String(),
                     ]);
                 }
             });
 
+            fputcsv($handle, []);
+            fputcsv($handle, ['Reconciliation']);
+            fputcsv($handle, ['Collected (gross)', $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('gross_amount')]);
+            fputcsv($handle, ['Paid out', $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount')]);
+            fputcsv($handle, ['Available balance', $eventModel->ledgerEntries()->whereIn('type', [EventLedgerEntry::TYPE_CHARGE, EventLedgerEntry::TYPE_REFUND])->sum('net_amount') - $eventModel->payouts()->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])->sum('amount')]);
+
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function netCollected(Event $eventModel): int
+    {
+        return (int) $eventModel->ledgerEntries()->whereIn('type', [EventLedgerEntry::TYPE_CHARGE, EventLedgerEntry::TYPE_REFUND])->sum('net_amount');
+    }
+
+    private function availableBalance(Event $eventModel): int
+    {
+        $committedToPayouts = (int) $eventModel->payouts()
+            ->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])
+            ->sum('amount');
+
+        return $this->netCollected($eventModel) - $committedToPayouts;
     }
 
     private function findEvent(string $tenantId, string $eventId): Event

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Models\Event;
+use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
@@ -32,8 +33,8 @@ function financeHost(): array
 test('finance stats reflect confirmed registrations and paid payouts only', function () {
     [$tenant, $user] = financeHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);
-    EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED, 'amount' => 10_000, 'platform_fee_amount' => 500]);
-    EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED, 'amount' => 20_000, 'platform_fee_amount' => 1_000]);
+    EventLedgerEntry::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'gross_amount' => 10_000, 'gateway_fee_amount' => 150, 'commission_amount' => 500, 'net_amount' => 9_350]);
+    EventLedgerEntry::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'gross_amount' => 20_000, 'gateway_fee_amount' => 300, 'commission_amount' => 1_000, 'net_amount' => 18_700]);
     EventRegistration::factory()->pendingPayment()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'amount' => 99_000, 'platform_fee_amount' => 9_900]);
 
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
@@ -87,6 +88,7 @@ test('host can add a payout account and the account number is stored encrypted, 
 test('host can record a payout and mark it paid', function () {
     [$tenant, $user] = financeHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    EventLedgerEntry::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'net_amount' => 15_000]);
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
 
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
@@ -112,8 +114,9 @@ test('host can record a payout and mark it paid', function () {
 test('the settlement statement export only includes confirmed registrations', function () {
     [$tenant, $user] = financeHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);
-    EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED, 'full_name' => 'Kwame Asante']);
+    $confirmed = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED, 'full_name' => 'Kwame Asante']);
     EventRegistration::factory()->pendingPayment()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'full_name' => 'Should Not Appear']);
+    EventLedgerEntry::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'registration_id' => $confirmed->id]);
 
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";

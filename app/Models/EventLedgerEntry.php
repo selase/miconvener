@@ -46,6 +46,7 @@ final class EventLedgerEntry extends Model
         'gateway_fee_amount' => 'integer',
         'commission_amount' => 'integer',
         'net_amount' => 'integer',
+        'created_at' => 'datetime',
     ];
 
     public function event(): BelongsTo
