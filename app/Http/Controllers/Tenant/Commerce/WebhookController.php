@@ -101,7 +101,25 @@ final class WebhookController extends Controller
                 $this->recordTransaction($tenant, 'paystack', (object) $data);
                 $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')));
             } elseif ($event === 'charge.failed') {
-                $this->recordTransaction($tenant, 'paystack', (object) $data, 'failed');
+                $reference = $data['reference'] ?? null;
+
+                // Webhook delivery is not ordered: a retried charge.failed can
+                // land after the matching charge.success. Never downgrade a
+                // charge that already succeeded.
+                $alreadySucceeded = MerchantTransaction::where('tenant_id', $tenant->id)
+                    ->where('provider', 'paystack')
+                    ->where('provider_transaction_id', $reference)
+                    ->where('status', 'succeeded')
+                    ->exists();
+
+                if ($alreadySucceeded) {
+                    Log::info('Ignored a stale Paystack charge.failed webhook for an already-succeeded charge', [
+                        'tenant' => $tenant->id,
+                        'reference' => $reference,
+                    ]);
+                } else {
+                    $this->recordTransaction($tenant, 'paystack', (object) $data, 'failed');
+                }
             }
         } catch (Throwable $e) {
             Log::error('Merchant Paystack webhook processing failed', [

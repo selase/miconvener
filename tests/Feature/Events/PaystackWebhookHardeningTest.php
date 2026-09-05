@@ -194,3 +194,43 @@ test('charge.success still confirms the registration exactly once (regression)',
     $registration->refresh();
     expect($registration->status)->toBe(EventRegistration::STATUS_CONFIRMED);
 });
+
+test('a stale charge.failed webhook does not downgrade an already-succeeded transaction', function () {
+    Mail::fake();
+    [$tenant] = webhookHardeningHost('acme');
+    $secret = 'sk_test_webhook_secret';
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => $secret,
+        'is_active' => true,
+    ]);
+
+    $transaction = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'ref_race_123',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'succeeded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $payload = [
+        'event' => 'charge.failed',
+        'data' => [
+            'reference' => 'ref_race_123',
+            'amount' => 5000,
+            'currency' => 'GHS',
+            'customer' => ['email' => 'guest@example.com', 'first_name' => 'Paying', 'last_name' => 'Guest'],
+            'metadata' => [],
+        ],
+    ];
+
+    signedPaystackWebhookCall($this, $tenant->id, $secret, $payload)->assertOk();
+
+    expect($transaction->fresh()->status)->toBe('succeeded');
+    expect(MerchantTransaction::where('tenant_id', $tenant->id)->count())->toBe(1);
+});
