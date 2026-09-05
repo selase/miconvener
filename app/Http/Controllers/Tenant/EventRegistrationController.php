@@ -17,6 +17,7 @@ use App\Services\Payment\PaystackGateway;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -68,34 +69,41 @@ final class EventRegistrationController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
-        $registrationModel = $eventModel->registrations()->where('id', $registration)->firstOrFail();
 
-        $cancellable = [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN, EventRegistration::STATUS_WAITLISTED];
-        if (! in_array($registrationModel->status, $cancellable, true)) {
-            return response()->json(['message' => 'This registration cannot be cancelled.'], 422);
-        }
+        return DB::transaction(function () use ($tenant, $eventModel, $registration): JsonResponse {
+            // Lock the row for the whole check-refund-write sequence so a
+            // concurrent cancel request on the same registration (double
+            // click, two admin sessions) blocks here instead of racing past
+            // the status check and issuing a second Paystack refund.
+            $registrationModel = $eventModel->registrations()->where('id', $registration)->lockForUpdate()->firstOrFail();
 
-        $wasPaid = $registrationModel->status !== EventRegistration::STATUS_WAITLISTED
-            && $registrationModel->amount > 0
-            && $registrationModel->payment_reference !== null;
-
-        if ($wasPaid) {
-            $refundFailure = $this->refundPaidRegistration($tenant, $registrationModel);
-            if ($refundFailure !== null) {
-                return $refundFailure;
+            $cancellable = [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN, EventRegistration::STATUS_WAITLISTED];
+            if (! in_array($registrationModel->status, $cancellable, true)) {
+                return response()->json(['message' => 'This registration cannot be cancelled.'], 422);
             }
-        }
 
-        $freesUpASpot = $registrationModel->status !== EventRegistration::STATUS_WAITLISTED;
-        $ticketTypeId = $registrationModel->ticket_type_id;
+            $wasPaid = $registrationModel->status !== EventRegistration::STATUS_WAITLISTED
+                && $registrationModel->amount > 0
+                && $registrationModel->payment_reference !== null;
 
-        $registrationModel->update(['status' => EventRegistration::STATUS_CANCELLED]);
+            if ($wasPaid) {
+                $refundFailure = $this->refundPaidRegistration($tenant, $registrationModel);
+                if ($refundFailure !== null) {
+                    return $refundFailure;
+                }
+            }
 
-        if ($freesUpASpot) {
-            $this->promoteFromWaitlist($eventModel, $ticketTypeId);
-        }
+            $freesUpASpot = $registrationModel->status !== EventRegistration::STATUS_WAITLISTED;
+            $ticketTypeId = $registrationModel->ticket_type_id;
 
-        return response()->json(['message' => 'Registration cancelled.']);
+            $registrationModel->update(['status' => EventRegistration::STATUS_CANCELLED]);
+
+            if ($freesUpASpot) {
+                $this->promoteFromWaitlist($eventModel, $ticketTypeId);
+            }
+
+            return response()->json(['message' => 'Registration cancelled.']);
+        });
     }
 
     /**
