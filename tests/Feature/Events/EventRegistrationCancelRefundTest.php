@@ -6,11 +6,13 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     refreshTenantDatabases();
@@ -164,4 +166,144 @@ test('cancelling a waitlisted registration never attempts a refund, even with a 
 
     $response->assertOk();
     expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+});
+
+test('an automatic refund on cancel marks the original charge refunded and writes a refund ledger row', function () {
+    Http::fake([
+        'api.paystack.co/refund' => Http::response([
+            'status' => true,
+            'data' => ['id' => 'ref_ledger_1'],
+        ]),
+    ]);
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_ledger',
+    ]);
+
+    $charge = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'paid_ref_ledger',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'succeeded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+    expect($charge->fresh()->status)->toBe('refunded');
+
+    $refundRow = MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->firstOrFail();
+    expect($refundRow->provider_transaction_id)->toBe('ref_ledger_1')
+        ->and($refundRow->provider)->toBe('paystack')
+        ->and($refundRow->amount)->toBe(5000)
+        ->and($refundRow->currency)->toBe('GHS')
+        ->and($refundRow->status)->toBe('succeeded')
+        ->and($refundRow->customer_email)->toBe('guest@example.com')
+        ->and($refundRow->meta)->toBe(['refund_id' => 'ref_ledger_1']);
+});
+
+test('a pending-shaped paystack refund response still cancels and records the REF_ fallback id', function () {
+    Http::fake([
+        'api.paystack.co/refund' => Http::response(['status' => true, 'data' => []]),
+    ]);
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_pending',
+    ]);
+
+    $charge = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'paid_ref_pending',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'succeeded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+    expect($charge->fresh()->status)->toBe('refunded');
+
+    $refundRow = MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->firstOrFail();
+    expect($refundRow->provider_transaction_id)->toBe('REF_paid_ref_pending')
+        ->and($refundRow->meta)->toBe(['refund_id' => 'pending']);
+});
+
+test('a refund with no matching merchant transaction still cancels and logs a reconciliation warning', function () {
+    Log::spy();
+    Http::fake([
+        'api.paystack.co/refund' => Http::response([
+            'status' => true,
+            'data' => ['id' => 'ref_orphan_1'],
+        ]),
+    ]);
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_orphan',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+    expect(MerchantTransaction::where('tenant_id', $tenant->id)->count())->toBe(0);
+
+    Log::shouldHaveReceived('warning')->once();
 });

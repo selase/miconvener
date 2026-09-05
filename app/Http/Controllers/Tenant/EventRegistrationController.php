@@ -11,6 +11,7 @@ use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationRejected;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Services\Payment\PaystackGateway;
@@ -124,7 +125,7 @@ final class EventRegistrationController extends Controller
         }
 
         try {
-            (new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]))->refund($registrationModel->payment_reference);
+            $refundId = (new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]))->refund($registrationModel->payment_reference);
         } catch (PaymentFailedException $e) {
             Log::error('Automatic refund on registration cancellation failed', [
                 'tenant' => $tenant->id,
@@ -135,7 +136,49 @@ final class EventRegistrationController extends Controller
             return response()->json(['message' => 'Cancellation aborted: the refund could not be processed. '.$e->getMessage()], 502);
         }
 
+        $this->recordRefundInLedger($tenant, $registrationModel, $refundId);
+
         return null;
+    }
+
+    /**
+     * Mirrors the refund into the merchant ledger so the Finance dashboard's
+     * volumes stay correct and the already-refunded charge no longer offers a
+     * live Refund button. A missing original transaction row is logged rather
+     * than raised — the money has already moved, so the cancellation must not
+     * be rolled back over a bookkeeping gap.
+     */
+    private function recordRefundInLedger(Tenant $tenant, EventRegistration $registrationModel, string $refundId): void
+    {
+        $transaction = MerchantTransaction::where('tenant_id', $tenant->id)
+            ->where('provider_transaction_id', $registrationModel->payment_reference)
+            ->first();
+
+        if (! $transaction) {
+            Log::warning('Automatic refund succeeded but no matching merchant transaction was found to reconcile', [
+                'tenant' => $tenant->id,
+                'registration' => $registrationModel->id,
+                'payment_reference' => $registrationModel->payment_reference,
+                'refund_id' => $refundId,
+            ]);
+
+            return;
+        }
+
+        MerchantTransaction::create([
+            'tenant_id' => $tenant->id,
+            'provider' => $transaction->provider,
+            'provider_transaction_id' => $refundId !== 'pending' ? $refundId : 'REF_'.$transaction->provider_transaction_id,
+            'amount' => $transaction->amount,
+            'currency' => $transaction->currency,
+            'status' => 'succeeded',
+            'type' => 'refund',
+            'description' => 'Refund for '.$transaction->provider_transaction_id,
+            'customer_email' => $transaction->customer_email,
+            'meta' => ['refund_id' => $refundId],
+        ]);
+
+        $transaction->update(['status' => 'refunded']);
     }
 
     private function confirmOrInviteToPay(EventRegistration $registration, string $reason): void
