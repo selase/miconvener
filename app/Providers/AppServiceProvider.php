@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Opcodes\LogViewer\Facades\LogViewer;
+use RuntimeException;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -72,6 +73,15 @@ final class AppServiceProvider extends ServiceProvider
             return match ($driver) {
                 'paystack' => $app->make(\App\Services\Payment\PaystackGateway::class),
                 default => $app->make(\App\Services\Payment\StripeGateway::class),
+            };
+        });
+
+        $this->app->bind(\App\Contracts\SettlementGateway::class, function ($app) {
+            $driver = config('services.settlement.default', 'paystack');
+
+            return match ($driver) {
+                'paystack' => $app->make(\App\Services\Settlement\PaystackSettlementGateway::class),
+                default => throw new RuntimeException("Unsupported settlement driver: {$driver}"),
             };
         });
     }

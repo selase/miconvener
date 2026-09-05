@@ -55,4 +55,13 @@ return [
         'default_fee_percentage' => (float) env('PLATFORM_DEFAULT_FEE_PERCENTAGE', 5.0),
     ],
 
+    'settlement' => [
+        'default' => env('SETTLEMENT_DRIVER', 'paystack'),
+        'paystack' => [
+            'secret_key' => env('SETTLEMENT_PAYSTACK_SECRET_KEY'),
+            'public_key' => env('SETTLEMENT_PAYSTACK_PUBLIC_KEY'),
+            'webhook_secret' => env('SETTLEMENT_PAYSTACK_WEBHOOK_SECRET'),
+        ],
+    ],
+
 ];
