@@ -57,6 +57,14 @@ final class UserController extends Controller
     public function store(StoreTeamMemberRequest $request, string $subdomain): RedirectResponse
     {
         $tenant = $this->getTenant();
+
+        $limit = $tenant->featureLimitValue('team_seats');
+        if ($limit !== null && $tenant->users()->count() >= $limit) {
+            $message = "Your plan allows {$limit} team member(s). Remove an existing member, or upgrade your plan, to invite another.";
+
+            return redirect()->back()->withErrors(['email' => $message]);
+        }
+
         $validated = $request->validated();
 
         $role = Role::findById($validated['role']);
