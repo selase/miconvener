@@ -179,10 +179,12 @@ final class Tenant extends Model
 
         // 2. Enable/Update features from the new package
         foreach ($package->features as $feature) {
+            $enabled = $feature->type === 'limit' || $this->pivotValueIsTruthy($feature->pivot->value);
+
             $this->features()->updateOrCreate(
                 ['feature_key' => $feature->slug],
                 [
-                    'enabled' => true,
+                    'enabled' => $enabled,
                     'meta' => [
                         'value' => $feature->pivot->value,
                         'type' => $feature->type,
@@ -386,5 +388,16 @@ final class Tenant extends Model
         return Attribute::make(
             get: fn () => $this->attributes['email_sender_address'] ?? null,
         );
+    }
+
+    /**
+     * Determine whether a package_features pivot "value" column represents a
+     * truthy boolean. The column is a plain, uncast string (e.g. "true",
+     * "1", "false", "0", or empty), so this mirrors the check already used
+     * in App\Livewire\Tenant\UsageDashboard for the same ambiguity.
+     */
+    private function pivotValueIsTruthy(mixed $value): bool
+    {
+        return in_array($value, ['true', '1', 1, true], true);
     }
 }

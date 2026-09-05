@@ -8,6 +8,8 @@ use App\Models\Package;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Billing\SubscriptionProvisioningService;
+use Illuminate\Support\Facades\Artisan;
 
 test('tenant features are synced when a package is assigned', function () {
     // Setup
@@ -118,6 +120,44 @@ test('tenant features are updated when package changes', function () {
     $this->assertDatabaseHas('tenant_features', [
         'tenant_id' => $tenant->id,
         'feature_key' => 'f2',
+        'enabled' => true,
+    ]);
+});
+
+test('a boolean feature whose package pivot value is false is synced as disabled, not enabled', function () {
+    Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\EventPackageSeeder']);
+
+    $free = Package::where('slug', 'free')->firstOrFail();
+    $tenant = Tenant::factory()->create(['package_id' => null]);
+
+    $service = app(SubscriptionProvisioningService::class);
+    $service->upgrade($tenant, $free);
+
+    // Free's catalog pivot has custom-domains => false: syncFeaturesFromPackage
+    // must not flip this to enabled just because the feature row exists.
+    expect($tenant->featureEnabled('custom-domains'))->toBeFalse();
+    $this->assertDatabaseHas('tenant_features', [
+        'tenant_id' => $tenant->id,
+        'feature_key' => 'custom-domains',
+        'enabled' => false,
+    ]);
+});
+
+test('a boolean feature whose package pivot value is true is synced as enabled', function () {
+    Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\MasterFeaturePackageSeeder']);
+
+    // The 'business' package grants llm_byok => true in MasterFeaturePackageSeeder.
+    $package = Package::where('slug', 'business')->firstOrFail();
+
+    $tenant = Tenant::factory()->create(['package_id' => null]);
+
+    $service = app(SubscriptionProvisioningService::class);
+    $service->upgrade($tenant, $package);
+
+    expect($tenant->featureEnabled('llm_byok'))->toBeTrue();
+    $this->assertDatabaseHas('tenant_features', [
+        'tenant_id' => $tenant->id,
+        'feature_key' => 'llm_byok',
         'enabled' => true,
     ]);
 });
