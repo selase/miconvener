@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Contracts\SettlementGateway;
+use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
@@ -13,6 +15,7 @@ use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -100,6 +103,46 @@ final class EventFinanceController extends Controller
 
             return response()->json(['id' => $payout->id], 201);
         });
+    }
+
+    public function sendPayout(string $subdomain, string $event, string $payout, SettlementGateway $settlementGateway): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+        $payoutModel = $eventModel->payouts()->where('id', $payout)->firstOrFail();
+
+        if (! in_array($payoutModel->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true)) {
+            return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
+        }
+
+        $account = $payoutModel->payoutAccount;
+
+        try {
+            if (! $account->recipient_code) {
+                $recipientCode = $settlementGateway->createRecipient(
+                    $account->type === TenantPayoutAccount::TYPE_MOBILE_MONEY ? 'mobile_money' : 'nuban',
+                    $account->resolved_account_name ?? $account->account_name,
+                    (string) $account->account_number_encrypted,
+                    (string) $account->bank_code,
+                    'GHS'
+                );
+                $account->update(['recipient_code' => $recipientCode]);
+            }
+
+            $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
+            $transfer = $settlementGateway->initiateTransfer($account->recipient_code, $payoutModel->amount, 'GHS', $reference);
+        } catch (PaymentFailedException $e) {
+            return response()->json(['message' => 'Could not send payout: '.$e->getMessage()], 502);
+        }
+
+        $payoutModel->update([
+            'status' => EventPayout::STATUS_PROCESSING,
+            'provider_reference' => $reference,
+            'failure_reason' => null,
+        ]);
+
+        return response()->json(['message' => 'Payout sent.', 'transfer_code' => $transfer['transfer_code']]);
     }
 
     public function updatePayoutStatus(Request $request, string $subdomain, string $event, string $payout): JsonResponse

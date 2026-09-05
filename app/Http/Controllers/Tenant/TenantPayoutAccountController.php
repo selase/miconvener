@@ -58,6 +58,13 @@ final class TenantPayoutAccountController extends Controller
         return response()->json($this->payload($account), 201);
     }
 
+    public function banks(string $subdomain, SettlementGateway $settlementGateway): JsonResponse
+    {
+        $this->authorize('manage organization settings');
+
+        return response()->json($settlementGateway->listBanks());
+    }
+
     public function destroy(string $subdomain, string $account): JsonResponse
     {
         $this->authorize('manage organization settings');

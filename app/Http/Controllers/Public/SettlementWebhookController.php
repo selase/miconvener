@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Models\EventLedgerEntry;
+use App\Models\EventPayout;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
@@ -104,14 +105,42 @@ final class SettlementWebhookController extends Controller
         Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
     }
 
-    /**
-     * Placeholder for Task 9, which implements the payout side of this
-     * webhook (transfer.success/transfer.failed) — left unimplemented here
-     * (a no-op) so this task's own tests only exercise charge confirmation.
-     * Task 9 replaces this method's body.
-     */
     private function confirmTransfer(string $event, string $reference, array $data): void
     {
-        // Implemented in Task 9.
+        if ($reference === '') {
+            return;
+        }
+
+        $payout = EventPayout::where('provider_reference', $reference)->first();
+        if (! $payout || $payout->status !== EventPayout::STATUS_PROCESSING) {
+            // Already processed (idempotent redelivery) or not a payout this
+            // webhook is tracking — a no-op either way.
+            return;
+        }
+
+        if ($event === 'transfer.success') {
+            $payout->update(['status' => EventPayout::STATUS_PAID, 'paid_at' => now()]);
+
+            EventLedgerEntry::create([
+                'tenant_id' => $payout->tenant_id,
+                'event_id' => $payout->event_id,
+                'type' => EventLedgerEntry::TYPE_PAYOUT,
+                'payout_id' => $payout->id,
+                'gross_amount' => $payout->amount,
+                'gateway_fee_amount' => 0,
+                'commission_amount' => 0,
+                'net_amount' => $payout->amount,
+                'currency' => 'GHS',
+                'provider' => 'paystack',
+                'provider_reference' => $reference,
+            ]);
+
+            return;
+        }
+
+        $payout->update([
+            'status' => EventPayout::STATUS_FAILED,
+            'failure_reason' => (string) ($data['reason'] ?? 'Transfer failed'),
+        ]);
     }
 }

@@ -1,0 +1,134 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Events;
+
+use App\Models\Event;
+use App\Models\EventLedgerEntry;
+use App\Models\EventPayout;
+use App\Models\Tenant;
+use App\Models\TenantPayoutAccount;
+use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Http;
+
+beforeEach(function () {
+    refreshTenantDatabases();
+    Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
+    Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+    config(['services.settlement.paystack.secret_key' => 'sk_settlement_test_123']);
+    config(['services.settlement.paystack.webhook_secret' => 'sk_settlement_test_123']);
+});
+
+function payoutSendingHost(): array
+{
+    $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
+    $user = User::factory()->create(['tenant_id' => $tenant->id]);
+    setPermissionsTeamId($tenant->id);
+    $user->assignRole('Org Superadmin');
+    $tenant->users()->attach($user->id);
+
+    return [$tenant, $user];
+}
+
+test('sending a scheduled payout creates a recipient, initiates a transfer, and moves status to processing', function () {
+    Http::fake([
+        'api.paystack.co/transferrecipient' => Http::response(['status' => true, 'data' => ['recipient_code' => 'RCP_test_1']]),
+        'api.paystack.co/transfer' => Http::response(['status' => true, 'data' => ['transfer_code' => 'TRF_test_1', 'status' => 'pending']]),
+    ]);
+
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'bank_code' => '030']);
+    $payout = EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'payout_account_id' => $account->id, 'amount' => 5_000]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    $payout->refresh();
+    expect($payout->status)->toBe(EventPayout::STATUS_PROCESSING);
+    expect($payout->provider_reference)->not->toBeNull();
+
+    $account->refresh();
+    expect($account->recipient_code)->toBe('RCP_test_1');
+});
+
+test('resending a failed payout uses a fresh reference, not a replay of the failed one', function () {
+    Http::fake([
+        'api.paystack.co/transfer' => Http::response(['status' => true, 'data' => ['transfer_code' => 'TRF_test_2', 'status' => 'pending']]),
+    ]);
+
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'bank_code' => '030', 'recipient_code' => 'RCP_cached_1']);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'amount' => 5_000,
+        'status' => EventPayout::STATUS_FAILED,
+        'provider_reference' => 'old_failed_reference',
+        'failure_reason' => 'Insufficient balance',
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host])->assertOk();
+
+    Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), '/transfer') && $request['reference'] !== 'old_failed_reference');
+    expect($payout->fresh()->provider_reference)->not->toBe('old_failed_reference');
+});
+
+test('a transfer.success webhook flips the payout to paid and writes one payout ledger row, idempotently', function () {
+    [$tenant] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'amount' => 5_000,
+        'status' => EventPayout::STATUS_PROCESSING,
+        'provider_reference' => 'transfer_ref_success_1',
+    ]);
+
+    $payload = ['event' => 'transfer.success', 'data' => ['reference' => 'transfer_ref_success_1', 'transfer_code' => 'TRF_x']];
+    $body = json_encode($payload);
+    $signature = hash_hmac('sha512', $body, 'sk_settlement_test_123');
+
+    $webhook = fn () => $this->call('POST', '/webhooks/settlement/paystack', [], [], [], ['HTTP_x-paystack-signature' => $signature, 'CONTENT_TYPE' => 'application/json'], $body);
+
+    $webhook()->assertOk();
+    $webhook()->assertOk(); // delivered twice — must stay idempotent
+
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PAID);
+    expect(EventLedgerEntry::where('payout_id', $payout->id)->where('type', EventLedgerEntry::TYPE_PAYOUT)->count())->toBe(1);
+});
+
+test('a transfer.failed webhook flips the payout to failed with no ledger row', function () {
+    [$tenant] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'amount' => 5_000,
+        'status' => EventPayout::STATUS_PROCESSING,
+        'provider_reference' => 'transfer_ref_failed_1',
+    ]);
+
+    $payload = ['event' => 'transfer.failed', 'data' => ['reference' => 'transfer_ref_failed_1', 'reason' => 'Insufficient balance in platform account']];
+    $body = json_encode($payload);
+    $signature = hash_hmac('sha512', $body, 'sk_settlement_test_123');
+
+    $this->call('POST', '/webhooks/settlement/paystack', [], [], [], ['HTTP_x-paystack-signature' => $signature, 'CONTENT_TYPE' => 'application/json'], $body)->assertOk();
+
+    expect($payout->fresh())->status->toBe(EventPayout::STATUS_FAILED)->failure_reason->toBe('Insufficient balance in platform account');
+    expect(EventLedgerEntry::where('payout_id', $payout->id)->count())->toBe(0);
+});
