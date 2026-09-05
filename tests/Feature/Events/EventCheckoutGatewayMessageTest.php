@@ -56,6 +56,10 @@ test('checkout shows a Paystack-specific message when only a non-Paystack gatewa
     [$tenant] = gatewayMessageHost('acme');
     $host = gatewayMessageSubdomain('acme');
 
+    // Explicit own_gateway: this tenant has configured its own (non-Paystack) gateway,
+    // which pre-existing tenants (Task 1's column default) would not have set otherwise.
+    $tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
+
     TenantPaymentGateway::factory()->create([
         'tenant_id' => $tenant->id,
         'provider' => 'stripe',

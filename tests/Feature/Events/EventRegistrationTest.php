@@ -125,6 +125,10 @@ test('public paid registration redirects to Paystack checkout', function () {
     [$tenant] = eventHost('acme');
     $host = eventSubdomainHost('acme');
 
+    // Explicit own_gateway: this tenant has configured its own Paystack credentials,
+    // which pre-existing tenants (Task 1's column default) would not have set otherwise.
+    $tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
+
     TenantPaymentGateway::factory()->create([
         'tenant_id' => $tenant->id,
         'provider' => 'paystack',
