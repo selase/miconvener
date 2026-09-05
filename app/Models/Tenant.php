@@ -138,6 +138,16 @@ final class Tenant extends Model
         return $this->paymentGateways()->where('is_active', true)->exists();
     }
 
+    /**
+     * A platform_default tenant settles through the platform's own gateway and
+     * so never has a TenantPaymentGateway row of its own — it can still accept
+     * payments, which hasActivePaymentGateway() alone would deny.
+     */
+    public function canAcceptPayments(): bool
+    {
+        return $this->isPlatformDefaultSettlement() || $this->hasActivePaymentGateway();
+    }
+
     public function isPlatformDefaultSettlement(): bool
     {
         return $this->settlement_mode === self::SETTLEMENT_MODE_PLATFORM_DEFAULT;

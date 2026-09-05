@@ -103,7 +103,7 @@ final class EventController extends Controller
         $wouldBePaid = ($validated['ticket_price'] ?? 0) > 0
             || $eventModel->ticketTypes->where('is_active', true)->where('price', '>', 0)->isNotEmpty();
 
-        if ($wouldBePaid && $validated['status'] === Event::STATUS_PUBLISHED && ! $tenant->hasActivePaymentGateway()) {
+        if ($wouldBePaid && $validated['status'] === Event::STATUS_PUBLISHED && ! $tenant->canAcceptPayments()) {
             $message = 'Connect a payment gateway under Settings → Payments before publishing a paid event.';
             if ($request->wantsJson()) {
                 return response()->json(['message' => $message], 422);
@@ -186,7 +186,7 @@ final class EventController extends Controller
                 'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
             ],
             'registrations' => $registrations,
-            'hasActiveGateway' => $tenant->hasActivePaymentGateway(),
+            'hasActiveGateway' => $tenant->canAcceptPayments(),
             'publicUrl' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]),
         ]);
     }

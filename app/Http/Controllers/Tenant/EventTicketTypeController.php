@@ -22,7 +22,7 @@ final class EventTicketTypeController extends Controller
 
         $validated = $this->validateTicketType($request);
 
-        if ($validated['price'] > 0 && $eventModel->isPublished() && ! $tenant->hasActivePaymentGateway()) {
+        if ($validated['price'] > 0 && $eventModel->isPublished() && ! $tenant->canAcceptPayments()) {
             return response()->json(['message' => 'Connect a payment gateway under Settings → Payments before adding a paid ticket type to a published event.'], 422);
         }
 
@@ -44,7 +44,7 @@ final class EventTicketTypeController extends Controller
 
         $validated = $this->validateTicketType($request);
 
-        if ($validated['price'] > 0 && $eventModel->isPublished() && ! $tenant->hasActivePaymentGateway()) {
+        if ($validated['price'] > 0 && $eventModel->isPublished() && ! $tenant->canAcceptPayments()) {
             return response()->json(['message' => 'Connect a payment gateway under Settings → Payments before making this ticket type paid.'], 422);
         }
 
