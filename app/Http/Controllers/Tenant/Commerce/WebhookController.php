@@ -14,6 +14,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 final class WebhookController extends Controller
 {
@@ -45,16 +46,25 @@ final class WebhookController extends Controller
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
-        switch ($event->type) {
-            case 'checkout.session.completed':
-                $session = $event->data->object;
-                $this->recordTransaction($tenant, 'stripe', $session);
-                break;
+        try {
+            switch ($event->type) {
+                case 'checkout.session.completed':
+                    $session = $event->data->object;
+                    $this->recordTransaction($tenant, 'stripe', $session);
+                    break;
 
-            case 'payment_intent.succeeded':
-                $paymentIntent = $event->data->object;
-                // Avoid double counting if using both
-                break;
+                case 'payment_intent.succeeded':
+                    // Avoid double counting if using both
+                    break;
+            }
+        } catch (Throwable $e) {
+            Log::error('Merchant Stripe webhook processing failed', [
+                'tenant' => $tenant->id,
+                'event' => $event->type,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => 'Webhook processing failed'], 500);
         }
 
         return response()->json(['status' => 'success']);
@@ -78,15 +88,30 @@ final class WebhookController extends Controller
         $secret = $gateway->api_key_encrypted; // Paystack uses secret key for hashing
 
         if (! $signature || $signature !== hash_hmac('sha512', $request->getContent(), (string) $secret)) {
+            Log::warning('Merchant Paystack webhook signature verification failed', ['tenant' => $tenant->id]);
+
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
         $event = $request->input('event');
         $data = $request->input('data');
 
-        if ($event === 'charge.success') {
-            $this->recordTransaction($tenant, 'paystack', (object) $data);
-            $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')));
+        try {
+            if ($event === 'charge.success') {
+                $this->recordTransaction($tenant, 'paystack', (object) $data);
+                $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')));
+            } elseif ($event === 'charge.failed') {
+                $this->recordTransaction($tenant, 'paystack', (object) $data, 'failed');
+            }
+        } catch (Throwable $e) {
+            Log::error('Merchant Paystack webhook processing failed', [
+                'tenant' => $tenant->id,
+                'event' => $event,
+                'reference' => $data['reference'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => 'Webhook processing failed'], 500);
         }
 
         return response()->json(['status' => 'success']);
@@ -128,7 +153,7 @@ final class WebhookController extends Controller
         Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
     }
 
-    private function recordTransaction(Tenant $tenant, string $provider, $data): void
+    private function recordTransaction(Tenant $tenant, string $provider, $data, string $status = 'succeeded'): void
     {
         MerchantTransaction::updateOrCreate(
             [
@@ -139,7 +164,7 @@ final class WebhookController extends Controller
             [
                 'amount' => $provider === 'stripe' ? $data->amount_total : ($data->amount),
                 'currency' => mb_strtoupper((string) $provider === 'stripe' ? $data->currency : ($data->currency ?? 'NGN')),
-                'status' => 'succeeded',
+                'status' => $status,
                 'type' => 'payment',
                 'customer_email' => $provider === 'stripe' ? ($data->customer_details->email ?? null) : ($data->customer['email'] ?? null),
                 'customer_name' => $provider === 'stripe' ? ($data->customer_details->name ?? null) : mb_trim(($data->customer['first_name'] ?? '').' '.($data->customer['last_name'] ?? '')),
