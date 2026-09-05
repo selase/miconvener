@@ -12,23 +12,45 @@ function formatMoney(amount, currency) {
 }
 
 function NewAccountForm({ onDone }) {
-    const [form, setForm] = useState({ type: 'bank', label: '', account_name: '', account_number: '' });
+    const [form, setForm] = useState({ type: 'bank', label: '', account_name: '', account_number: '', bank_code: '' });
+    const [banks, setBanks] = useState([]);
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        csrfFetch(route('tenant.payout-accounts.banks'))
+            .then((r) => (r.ok ? r.json() : []))
+            .then((list) => setBanks(Array.isArray(list) ? list : []))
+            .catch(() => setBanks([]));
+    }, []);
 
     const submit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        await csrfFetch(route('tenant.payout-accounts.store'), { method: 'POST', body: JSON.stringify(form) });
+        setError(null);
+        const response = await csrfFetch(route('tenant.payout-accounts.store'), { method: 'POST', body: JSON.stringify(form) });
         setSaving(false);
-        setForm({ type: 'bank', label: '', account_name: '', account_number: '' });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            setError(body.message || 'Could not add this account.');
+            return;
+        }
+        setForm({ type: 'bank', label: '', account_name: '', account_number: '', bank_code: '' });
         onDone();
     };
 
     return (
         <form onSubmit={submit} className="grid grid-cols-2 gap-3 border-t border-border p-4">
+            {error && <p className="col-span-2 text-[13px] text-danger-fg">{error}</p>}
             <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                 <option value="bank">Bank account</option>
                 <option value="mobile_money">Mobile money</option>
+            </Select>
+            <Select label="Bank" value={form.bank_code} onChange={(e) => setForm({ ...form, bank_code: e.target.value })} required>
+                <option value="">Select a bank…</option>
+                {banks.map((b) => (
+                    <option key={b.code} value={b.code}>{b.name}</option>
+                ))}
             </Select>
             <Input label="Label" placeholder="e.g. Absa Bank Ghana — current" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} required />
             <Input label="Account name" value={form.account_name} onChange={(e) => setForm({ ...form, account_name: e.target.value })} required />
@@ -41,11 +63,13 @@ function NewAccountForm({ onDone }) {
 function NewPayoutForm({ event, accounts, onDone }) {
     const [form, setForm] = useState({ payout_account_id: accounts[0]?.id ?? '', amount: '', scheduled_at: '', note: '' });
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
 
     const submit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        await csrfFetch(route('tenant.events.finance.payouts.store', { event: event.id }), {
+        setError(null);
+        const response = await csrfFetch(route('tenant.events.finance.payouts.store', { event: event.id }), {
             method: 'POST',
             body: JSON.stringify({
                 ...form,
@@ -55,6 +79,11 @@ function NewPayoutForm({ event, accounts, onDone }) {
             }),
         });
         setSaving(false);
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            setError(body.message || 'Could not record this payout.');
+            return;
+        }
         setForm({ payout_account_id: accounts[0]?.id ?? '', amount: '', scheduled_at: '', note: '' });
         onDone();
     };
@@ -65,6 +94,7 @@ function NewPayoutForm({ event, accounts, onDone }) {
 
     return (
         <form onSubmit={submit} className="grid grid-cols-4 gap-3 border-t border-border p-4">
+            {error && <p className="col-span-4 text-[13px] text-danger-fg">{error}</p>}
             <Select label="To account" value={form.payout_account_id} onChange={(e) => setForm({ ...form, payout_account_id: e.target.value })}>
                 {accounts.map((a) => (
                     <option key={a.id} value={a.id}>{a.label} ({a.masked_account_number})</option>
@@ -80,30 +110,51 @@ function NewPayoutForm({ event, accounts, onDone }) {
 
 export default function FinancePanel({ event }) {
     const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
 
     const load = () => {
         csrfFetch(route('tenant.events.finance.index', { event: event.id }))
-            .then((r) => r.json())
-            .then(setData);
+            .then((r) => {
+                if (!r.ok) {
+                    throw new Error('Could not load this event’s finances.');
+                }
+                return r.json();
+            })
+            .then(setData)
+            .catch((e) => setError(e.message));
     };
 
     useEffect(load, [event.id]);
 
     const removeAccount = async (id) => {
-        await csrfFetch(route('tenant.payout-accounts.destroy', { account: id }), { method: 'DELETE' });
+        setError(null);
+        const response = await csrfFetch(route('tenant.payout-accounts.destroy', { account: id }), { method: 'DELETE' });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            setError(body.message || 'Could not remove this account.');
+            return;
+        }
         load();
     };
 
     const markPaid = async (payout) => {
-        await csrfFetch(route('tenant.events.finance.payouts.status', { event: event.id, payout: payout.id }), {
+        setError(null);
+        const response = await csrfFetch(route('tenant.events.finance.payouts.status', { event: event.id, payout: payout.id }), {
             method: 'PATCH',
             body: JSON.stringify({ status: 'paid' }),
         });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            setError(body.message || 'Could not update this payout.');
+            return;
+        }
         load();
     };
 
     if (!data) {
-        return <p className="text-sm text-ink-secondary">Loading…</p>;
+        return error
+            ? <p className="text-[13px] text-danger-fg">{error}</p>
+            : <p className="text-sm text-ink-secondary">Loading…</p>;
     }
 
     const { stats, accounts, payouts } = data;
@@ -120,6 +171,8 @@ export default function FinancePanel({ event }) {
                     Settlement statement
                 </a>
             </div>
+
+            {error && <p className="mb-5 border border-danger-fg/30 px-4 py-3 text-[13px] text-danger-fg">{error}</p>}
 
             <div className="mb-6 grid grid-cols-4 gap-px bg-border">
                 <div className="bg-surface p-4">
