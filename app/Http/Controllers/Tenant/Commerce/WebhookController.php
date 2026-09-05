@@ -122,6 +122,8 @@ final class WebhookController extends Controller
         ]);
         $registration->save();
 
+        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
+
         Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
     }
 
