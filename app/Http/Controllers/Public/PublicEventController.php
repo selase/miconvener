@@ -103,10 +103,13 @@ final class PublicEventController extends Controller
             $registration->issueTicket();
             $registration->save();
             app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
+            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
         } elseif ($status === EventRegistration::STATUS_WAITLISTED) {
+            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationWaitlisted($registration));
         } elseif ($status === EventRegistration::STATUS_PENDING_APPROVAL) {
+            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationPendingApproval($registration));
         }
 
