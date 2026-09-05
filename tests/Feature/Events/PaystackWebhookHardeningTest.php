@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Mockery;
 use RuntimeException;
 
 beforeEach(function () {
@@ -149,7 +150,12 @@ test('a paystack webhook processing exception is caught, logged, and returns 500
     $response = signedPaystackWebhookCall($this, $tenant->id, $secret, $payload);
 
     $response->assertStatus(500);
-    Log::shouldHaveReceived('error')->once();
+    Log::shouldHaveReceived('error')->once()->with(
+        'Merchant Paystack webhook processing failed',
+        Mockery::on(fn ($context): bool => $context['tenant'] === $tenant->id
+            && $context['event'] === 'charge.success'
+            && $context['reference'] === 'ref_boom_123')
+    );
 });
 
 test('charge.success still confirms the registration exactly once (regression)', function () {
