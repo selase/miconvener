@@ -9,14 +9,24 @@
 
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+
+        <script>
+            (function () {
+                try {
+                    var stored = localStorage.getItem('miconvener-theme');
+                    var dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+                    document.documentElement.classList.toggle('dark', dark);
+                } catch (e) {}
+            })();
+        </script>
 
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.jsx'])
         @routes
         @inertiaHead
     </head>
-    <body class="font-console antialiased bg-surface text-ink">
+    <body class="font-console antialiased bg-surface text-ink console-root">
         @inertia
     </body>
 </html>

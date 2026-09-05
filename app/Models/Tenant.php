@@ -60,6 +60,7 @@ final class Tenant extends Model
         'custom_domain_status',
         'markup_percentage',
         'llm_topup_balance',
+        'platform_fee_percentage',
         'created_at',
         'updated_at',
     ];
@@ -74,6 +75,7 @@ final class Tenant extends Model
         'require_2fa' => 'boolean',
         'markup_percentage' => 'decimal:2',
         'llm_topup_balance' => 'integer',
+        'platform_fee_percentage' => 'float',
     ];
 
     public function requiresDedicatedDb(): bool
@@ -114,6 +116,21 @@ final class Tenant extends Model
     public function featureEnabled(string $key): bool
     {
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();
+    }
+
+    public function paymentGateways(): HasMany
+    {
+        return $this->hasMany(TenantPaymentGateway::class);
+    }
+
+    public function payoutAccounts(): HasMany
+    {
+        return $this->hasMany(TenantPayoutAccount::class)->orderByDesc('created_at');
+    }
+
+    public function hasActivePaymentGateway(): bool
+    {
+        return $this->paymentGateways()->where('is_active', true)->exists();
     }
 
     public function package()

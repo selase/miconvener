@@ -1,7 +1,13 @@
 import { Link } from '@inertiajs/react';
 
-export default function Button({ children, icon: Icon, href, disabled = false, className = '', ...props }) {
-    const classes = `inline-flex h-control items-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium text-ink transition-colors duration-120 ease-out hover:bg-surface-hover hover:border-border-strong disabled:pointer-events-none disabled:opacity-50 ${
+const VARIANTS = {
+    default: 'border-border bg-surface text-ink hover:bg-surface-hover hover:border-border-strong',
+    primary: 'border-accent bg-accent text-accent-ink hover:opacity-90',
+    active: 'border-accent bg-accent-soft text-accent hover:border-accent',
+};
+
+export default function Button({ children, icon: Icon, href, disabled = false, variant = 'default', className = '', ...props }) {
+    const classes = `inline-flex h-control items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors duration-120 ease-out disabled:pointer-events-none disabled:opacity-50 ${VARIANTS[variant] ?? VARIANTS.default} ${
         disabled ? 'pointer-events-none opacity-50' : ''
     } ${className}`;
     const content = (

@@ -3,6 +3,8 @@ import forms from '@tailwindcss/forms';
 
 /** @type {import('tailwindcss').Config} */
 export default {
+    darkMode: 'class',
+
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
@@ -14,46 +16,59 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Nunito', ...defaultTheme.fontFamily.sans],
-                console: ['Inter', ...defaultTheme.fontFamily.sans],
-                mono: ['"JetBrains Mono"', ...defaultTheme.fontFamily.mono],
+                console: ['Geist', ...defaultTheme.fontFamily.sans],
+                mono: ['"Geist Mono"', ...defaultTheme.fontFamily.mono],
             },
             colors: {
                 surface: {
-                    DEFAULT: '#FFFFFF',
-                    sunken: '#F7F7F8',
-                    hover: '#F2F2F4',
+                    DEFAULT: 'var(--color-surface)',
+                    sunken: 'var(--color-surface-sunken)',
+                    hover: 'var(--color-surface-hover)',
                 },
                 ink: {
-                    DEFAULT: '#111113',
-                    secondary: '#6B7280',
-                    tertiary: '#9CA3AF',
+                    DEFAULT: 'var(--color-text)',
+                    secondary: 'var(--color-text-secondary)',
+                    tertiary: 'var(--color-text-tertiary)',
                 },
                 border: {
-                    DEFAULT: '#E8E8EC',
-                    strong: '#D9D9DE',
+                    DEFAULT: 'var(--color-border)',
+                    strong: 'var(--color-border-strong)',
                 },
                 accent: {
-                    DEFAULT: '#2563EB',
-                    graph: '#4F46E5',
+                    DEFAULT: 'var(--color-accent)',
+                    soft: 'var(--color-accent-soft)',
+                    ink: 'var(--color-accent-ink)',
+                    graph: 'var(--color-accent)',
                 },
-                inverse: '#0A0A0A',
-                success: { fg: '#0F7A4D', bg: '#E9F7F0' },
-                warning: { fg: '#9A6400', bg: '#FDF5E3' },
-                danger: { fg: '#C4281C', bg: '#FDF0EF' },
-                neutral: { fg: '#4B5563', bg: '#F1F1F3' },
+                inverse: {
+                    DEFAULT: 'var(--color-inverse)',
+                    ink: 'var(--color-inverse-ink)',
+                },
+                success: { fg: 'var(--color-success-fg)', bg: 'var(--color-success-bg)' },
+                warning: { fg: 'var(--color-warning-fg)', bg: 'var(--color-warning-bg)' },
+                danger: { fg: 'var(--color-danger-fg)', bg: 'var(--color-danger-bg)' },
+                neutral: { fg: 'var(--color-neutral-fg)', bg: 'var(--color-neutral-bg)' },
+                canvas: 'var(--color-ink)',
             },
             borderRadius: {
-                sm: '6px',
-                md: '10px',
-                lg: '12px',
-                xl: '16px',
+                DEFAULT: '0px',
+                none: '0px',
+                sm: '0px',
+                md: '0px',
+                lg: '0px',
+                xl: '0px',
+                full: '9999px',
             },
             boxShadow: {
-                float: '0 16px 40px -12px rgba(17,17,19,.18), 0 2px 6px rgba(17,17,19,.06)',
-                raised: '0 1px 2px rgba(17,17,19,.06)',
+                float: '0 16px 40px -12px rgba(0,0,0,.24), 0 2px 6px rgba(0,0,0,.08)',
+                raised: '0 1px 2px rgba(0,0,0,.06)',
             },
             spacing: {
-                control: '44px',
+                control: '40px',
+            },
+            letterSpacing: {
+                tight: '-0.02em',
+                tighter: '-0.045em',
             },
             transitionDuration: {
                 120: '120ms',

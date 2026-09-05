@@ -1,0 +1,151 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Tenant;
+
+use App\Http\Controllers\Controller;
+use App\Models\Event;
+use App\Models\EventPayout;
+use App\Models\TenantPayoutAccount;
+use App\Services\Tenancy\TenantContext;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+final class EventFinanceController extends Controller
+{
+    public function index(string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $collected = (int) $eventModel->registrations()->confirmed()->sum('amount');
+        $fees = (int) $eventModel->registrations()->confirmed()->sum('platform_fee_amount');
+        $paidOut = (int) $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount');
+
+        $stats = [
+            'collected' => $collected,
+            'fees' => $fees,
+            'net' => $collected - $fees,
+            'paid_out' => $paidOut,
+            'confirmed_orders' => $eventModel->registrations()->confirmed()->count(),
+        ];
+
+        $accounts = TenantPayoutAccount::where('tenant_id', $tenant->id)->orderByDesc('created_at')->get();
+
+        return response()->json([
+            'stats' => $stats,
+            'accounts' => $accounts->map(fn (TenantPayoutAccount $a): array => [
+                'id' => $a->id,
+                'type' => $a->type,
+                'label' => $a->label,
+                'account_name' => $a->account_name,
+                'masked_account_number' => $a->maskedAccountNumber(),
+                'is_verified' => $a->is_verified,
+            ])->values(),
+            'payouts' => $eventModel->payouts->map(fn (EventPayout $p): array => [
+                'id' => $p->id,
+                'amount' => $p->amount,
+                'status' => $p->status,
+                'scheduled_at' => $p->scheduled_at?->toIso8601String(),
+                'paid_at' => $p->paid_at?->toIso8601String(),
+                'note' => $p->note,
+                'payout_account_label' => $p->payoutAccount?->label,
+                'payout_account_masked_number' => $p->payoutAccount?->maskedAccountNumber(),
+            ])->values(),
+        ]);
+    }
+
+    public function storePayout(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $validated = $request->validate([
+            'payout_account_id' => ['required', Rule::exists('tenant_payout_accounts', 'id')->where('tenant_id', $tenant->id)],
+            'amount' => ['required', 'integer', 'min:1'],
+            'scheduled_at' => ['nullable', 'date'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $payout = $eventModel->payouts()->create([
+            'tenant_id' => $tenant->id,
+            'payout_account_id' => $validated['payout_account_id'],
+            'amount' => $validated['amount'],
+            'scheduled_at' => $validated['scheduled_at'] ?? null,
+            'note' => $validated['note'] ?? null,
+        ]);
+
+        return response()->json(['id' => $payout->id], 201);
+    }
+
+    public function updatePayoutStatus(Request $request, string $subdomain, string $event, string $payout): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $validated = $request->validate([
+            'status' => ['required', Rule::in([EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PAID])],
+        ]);
+
+        $payoutModel = $eventModel->payouts()->where('id', $payout)->firstOrFail();
+        $payoutModel->update([
+            'status' => $validated['status'],
+            'paid_at' => $validated['status'] === EventPayout::STATUS_PAID ? now() : null,
+        ]);
+
+        return response()->json(['message' => 'Payout updated.']);
+    }
+
+    public function exportSettlementStatement(string $subdomain, string $event): StreamedResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $filename = "{$eventModel->slug}-settlement-statement.csv";
+
+        return response()->streamDownload(function () use ($eventModel): void {
+            $handle = fopen('php://output', 'wb');
+            fputcsv($handle, ['Registration', 'Email', 'Ticket code', 'Status', 'Amount', 'Platform fee', 'Net', 'Currency', 'Confirmed at']);
+
+            $eventModel->registrations()->confirmed()->orderBy('created_at')->chunk(200, function ($registrations) use ($handle): void {
+                foreach ($registrations as $registration) {
+                    fputcsv($handle, [
+                        $registration->full_name,
+                        $registration->email,
+                        $registration->ticket_code,
+                        $registration->status,
+                        $registration->amount,
+                        $registration->platform_fee_amount,
+                        $registration->amount - $registration->platform_fee_amount,
+                        $registration->currency,
+                        $registration->created_at->toIso8601String(),
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function findEvent(string $tenantId, string $eventId): Event
+    {
+        return Event::where('tenant_id', $tenantId)->where('id', $eventId)->firstOrFail();
+    }
+
+    private function getTenant()
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        if (! $tenant) {
+            abort(403, 'Tenant context not resolved.');
+        }
+
+        return $tenant;
+    }
+}

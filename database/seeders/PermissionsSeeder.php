@@ -105,13 +105,13 @@ final class PermissionsSeeder extends Seeder
     }
 
     /**
-     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user')}[]
+     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event')}[]
      */
     public function modelPermissions(): array
     {
         $data = [];
 
-        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team'];
+        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team', 'event'];
 
         foreach ($models as $value) {
             foreach ($this->crudActions($value) as $action) {

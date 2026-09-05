@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant\Commerce;
 
 use App\Http\Controllers\Controller;
+use App\Mail\Events\EventRegistrationConfirmed;
+use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 final class WebhookController extends Controller
 {
@@ -83,9 +86,43 @@ final class WebhookController extends Controller
 
         if ($event === 'charge.success') {
             $this->recordTransaction($tenant, 'paystack', (object) $data);
+            $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')));
         }
 
         return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * If this charge was for an event ticket (carried in the checkout
+     * metadata), confirm the matching registration. Idempotent: a
+     * registration already confirmed is left untouched, so Paystack's
+     * at-least-once webhook delivery can't double-process it.
+     */
+    private function confirmEventRegistrationIfApplicable(Tenant $tenant, array $metadata, ?string $reference, int $amount, string $currency): void
+    {
+        $registrationId = $metadata['event_registration_id'] ?? null;
+        if (! $registrationId) {
+            return;
+        }
+
+        $registration = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('id', $registrationId)
+            ->first();
+
+        if (! $registration || $registration->isConfirmed()) {
+            return;
+        }
+
+        $registration->issueTicket();
+        $registration->fill([
+            'status' => EventRegistration::STATUS_CONFIRMED,
+            'payment_reference' => $reference,
+            'amount' => $amount,
+            'currency' => $currency,
+        ]);
+        $registration->save();
+
+        Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
     }
 
     private function recordTransaction(Tenant $tenant, string $provider, $data): void
@@ -101,8 +138,8 @@ final class WebhookController extends Controller
                 'currency' => mb_strtoupper((string) $provider === 'stripe' ? $data->currency : ($data->currency ?? 'NGN')),
                 'status' => 'succeeded',
                 'type' => 'payment',
-                'customer_email' => $provider === 'stripe' ? ($data->customer_details->email ?? null) : ($data->customer->email ?? null),
-                'customer_name' => $provider === 'stripe' ? ($data->customer_details->name ?? null) : ($data->customer->first_name.' '.$data->customer->last_name),
+                'customer_email' => $provider === 'stripe' ? ($data->customer_details->email ?? null) : ($data->customer['email'] ?? null),
+                'customer_name' => $provider === 'stripe' ? ($data->customer_details->name ?? null) : mb_trim(($data->customer['first_name'] ?? '').' '.($data->customer['last_name'] ?? '')),
                 'description' => $provider === 'stripe' ? 'Stripe Checkout' : 'Paystack Charge',
                 'meta' => (array) $data,
             ]

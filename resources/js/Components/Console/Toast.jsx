@@ -18,7 +18,7 @@ export function ToastProvider({ children }) {
             {children}
 
             <div
-                className={`fixed bottom-6 right-6 z-50 flex items-center gap-4 rounded-lg bg-inverse px-4.5 py-3.5 text-sm font-medium text-white shadow-float transition-all duration-200 ease-out ${
+                className={`fixed bottom-6 right-6 z-50 flex items-center gap-4 bg-inverse px-4.5 py-3.5 text-sm font-medium text-inverse-ink shadow-float transition-all duration-200 ease-out ${
                     message ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'
                 }`}
             >

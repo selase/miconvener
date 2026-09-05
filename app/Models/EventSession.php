@@ -1,0 +1,111 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+
+final class EventSession extends Model
+{
+    use BelongsToTenant;
+    use HasFactory;
+    use HasUuids;
+
+    public const string TYPE_WORKSHOP = 'workshop';
+
+    protected $connection = 'landlord';
+
+    protected $fillable = [
+        'tenant_id',
+        'event_id',
+        'title',
+        'description',
+        'starts_at',
+        'ends_at',
+        'location',
+        'track',
+        'type',
+        'capacity',
+        'sort_order',
+    ];
+
+    protected $casts = [
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+        'capacity' => 'integer',
+        'sort_order' => 'integer',
+    ];
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
+    }
+
+    public function speakers(): BelongsToMany
+    {
+        return $this->belongsToMany(Speaker::class, 'event_session_speakers', 'session_id', 'speaker_id')
+            ->withPivot(['role', 'sort_order'])
+            ->orderBy('event_session_speakers.sort_order');
+    }
+
+    public function registrations(): BelongsToMany
+    {
+        return $this->belongsToMany(EventRegistration::class, 'event_registration_sessions', 'session_id', 'registration_id');
+    }
+
+    public function scopeWorkshops(Builder $query): Builder
+    {
+        return $query->where('type', self::TYPE_WORKSHOP);
+    }
+
+    public function signupCount(): int
+    {
+        return $this->registrations()->count();
+    }
+
+    public function isFull(): bool
+    {
+        return $this->capacity !== null && $this->signupCount() >= $this->capacity;
+    }
+
+    /**
+     * Other sessions in the same event whose time range overlaps this one,
+     * sharing either a room (non-empty location) or a speaker.
+     *
+     * @return array<int, array{title: string, reason: string}>
+     */
+    public function clashes(): array
+    {
+        $overlapping = self::where('event_id', $this->event_id)
+            ->where('id', '!=', $this->id)
+            ->where('starts_at', '<', $this->ends_at)
+            ->where('ends_at', '>', $this->starts_at)
+            ->with('speakers:id,name')
+            ->get();
+
+        $mySpeakerIds = $this->speakers->pluck('id')->all();
+
+        $clashes = [];
+        foreach ($overlapping as $other) {
+            if ($this->location && $other->location === $this->location) {
+                $clashes[] = ['title' => $other->title, 'reason' => "Same room ({$this->location})"];
+
+                continue;
+            }
+
+            $sharedSpeakers = $other->speakers->whereIn('id', $mySpeakerIds);
+            if ($sharedSpeakers->isNotEmpty()) {
+                $clashes[] = ['title' => $other->title, 'reason' => "Same speaker ({$sharedSpeakers->pluck('name')->implode(', ')})"];
+            }
+        }
+
+        return $clashes;
+    }
+}

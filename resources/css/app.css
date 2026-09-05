@@ -3,6 +3,56 @@
 @config "../../tailwind.config.js";
 @source "../js";
 
+:root {
+    --color-ink: #ffffff;
+    --color-surface: #fbfbfc;
+    --color-surface-sunken: #f1f3f4;
+    --color-surface-hover: #f1f3f4;
+    --color-text: #111618;
+    --color-text-secondary: #5a656a;
+    --color-text-tertiary: #8b979c;
+    --color-border: #dfe3e5;
+    --color-border-strong: #c7cdd0;
+    --color-accent: #00897c;
+    --color-accent-soft: rgba(0, 137, 124, 0.09);
+    --color-accent-ink: #ffffff;
+    --color-inverse: #111618;
+    --color-inverse-ink: #ffffff;
+    --color-success-fg: #0f7a4d;
+    --color-success-bg: #e9f7f0;
+    --color-warning-fg: #8a6112;
+    --color-warning-bg: #fdf5e3;
+    --color-danger-fg: #a93f33;
+    --color-danger-bg: #fdf0ef;
+    --color-neutral-fg: #5a656a;
+    --color-neutral-bg: #f1f3f4;
+}
+
+.dark {
+    --color-ink: #08090a;
+    --color-surface: #0c0e10;
+    --color-surface-sunken: #111417;
+    --color-surface-hover: #161b1e;
+    --color-text: #e8ecee;
+    --color-text-secondary: #8a959b;
+    --color-text-tertiary: #5c666b;
+    --color-border: #1c2226;
+    --color-border-strong: #2a3236;
+    --color-accent: #00d8c4;
+    --color-accent-soft: rgba(0, 216, 196, 0.1);
+    --color-accent-ink: #05201d;
+    --color-inverse: #e8ecee;
+    --color-inverse-ink: #08090a;
+    --color-success-fg: #3ecf8e;
+    --color-success-bg: rgba(62, 207, 142, 0.12);
+    --color-warning-fg: #d6a13d;
+    --color-warning-bg: rgba(214, 161, 61, 0.12);
+    --color-danger-fg: #e0685a;
+    --color-danger-bg: rgba(224, 104, 90, 0.12);
+    --color-neutral-fg: #8a959b;
+    --color-neutral-bg: #161b1e;
+}
+
 /* Console (Inertia) surface only — scoped so the legacy Blade/Metronic pages are unaffected */
 .font-console {
     font-feature-settings: 'cv11', 'ss01';
@@ -10,4 +60,36 @@
 
 .num {
     font-variant-numeric: tabular-nums;
+}
+
+.console-root,
+.console-root * {
+    border-radius: 0 !important;
+}
+
+.console-root ::selection {
+    background: var(--color-accent-soft);
+}
+
+/* Print isolation: reveal only the element carrying .print-area (badges,
+   settlement statements, ...) and hide the console chrome around it. */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .print-area,
+    .print-area * {
+        visibility: visible;
+    }
+
+    .print-area {
+        position: absolute;
+        inset: 0;
+        padding: 16px;
+    }
+
+    .no-print {
+        display: none !important;
+    }
 }

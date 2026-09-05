@@ -51,4 +51,8 @@ return [
         'dev_bypass' => env('PAYMENT_DEV_BYPASS', false),
     ],
 
+    'platform' => [
+        'default_fee_percentage' => (float) env('PLATFORM_DEFAULT_FEE_PERCENTAGE', 5.0),
+    ],
+
 ];

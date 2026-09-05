@@ -63,6 +63,10 @@ final class RolePermissions
             'read application health',
             'manage organization settings',
             'manage api keys',
+            'create event',
+            'read event',
+            'update event',
+            'delete event',
         ]);
     }
 
@@ -89,6 +93,10 @@ final class RolePermissions
             'read role',
             'update role',
             'delete role',
+            'create event',
+            'read event',
+            'update event',
+            'delete event',
         ]);
     }
 
@@ -115,6 +123,10 @@ final class RolePermissions
             'read user',
             'update user',
             'delete user',
+            'create event',
+            'read event',
+            'update event',
+            'delete event',
         ]);
     }
 }
