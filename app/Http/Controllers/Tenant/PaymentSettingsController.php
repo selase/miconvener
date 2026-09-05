@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -82,6 +83,30 @@ final class PaymentSettingsController extends Controller
         return back()->with([
             'status' => 'success',
             'message' => __(':provider settings updated successfully.', ['provider' => ucfirst((string) $validated['provider'])]),
+        ]);
+    }
+
+    /**
+     * Switch the tenant's settlement mode between platform_default and own_gateway.
+     */
+    public function updateSettlementMode(Request $request): RedirectResponse
+    {
+        $this->authorize('manage organization settings');
+        $tenant = $this->tenantContext->getTenant();
+
+        $validated = $request->validate([
+            'settlement_mode' => ['required', 'string', 'in:'.Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT.','.Tenant::SETTLEMENT_MODE_OWN_GATEWAY],
+        ]);
+
+        if ($validated['settlement_mode'] === Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT && ! config('services.settlement.paystack.secret_key')) {
+            return back()->with('error', 'Platform-default settlement is not available yet — the platform has not configured its own settlement credentials.');
+        }
+
+        $tenant->update(['settlement_mode' => $validated['settlement_mode']]);
+
+        return back()->with([
+            'status' => 'success',
+            'message' => 'Settlement mode updated.',
         ]);
     }
 }

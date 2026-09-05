@@ -18,6 +18,53 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="alert alert-danger d-flex align-items-center p-5 mb-10">
+                    <span class="svg-icon svg-icon-2hx svg-icon-danger me-4">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </span>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-danger">Error</h4>
+                        <span>{{ session('error') }}</span>
+                    </div>
+                </div>
+            @endif
+
+            <div class="row g-5 g-xl-10 mb-5">
+                <div class="col-12">
+                    <div class="card card-flush">
+                        <div class="card-header pt-7">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bolder text-dark">Settlement Mode</span>
+                                <span class="text-muted mt-1 fw-bold fs-7">How does money for this organization reach your bank account?</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <form action="{{ route('tenant.settings.payments.settlement-mode') }}" method="POST">
+                                @csrf
+                                <div class="fv-row mb-5">
+                                    <label class="form-check form-check-custom form-check-solid mb-3">
+                                        <input class="form-check-input" type="radio" name="settlement_mode" value="platform_default" {{ $tenant->settlement_mode === 'platform_default' ? 'checked' : '' }} />
+                                        <span class="form-check-label">
+                                            <span class="fw-bold">Platform default</span> — {{ config('app.name') }} collects payments on your behalf and pays you out to your bank/mobile-money account. No Paystack/Stripe account needed.
+                                        </span>
+                                    </label>
+                                    <label class="form-check form-check-custom form-check-solid">
+                                        <input class="form-check-input" type="radio" name="settlement_mode" value="own_gateway" {{ $tenant->settlement_mode === 'own_gateway' ? 'checked' : '' }} />
+                                        <span class="form-check-label">
+                                            <span class="fw-bold">Own gateway</span> — payments go straight into your own Stripe/Paystack account below.
+                                        </span>
+                                    </label>
+                                </div>
+                                <div class="text-end">
+                                    <button type="submit" class="btn btn-primary">Save Settlement Mode</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-5 g-xl-10">
                 <!-- Stripe Configuration -->
                 <div class="col-xl-6">
