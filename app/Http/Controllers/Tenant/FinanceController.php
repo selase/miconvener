@@ -7,6 +7,10 @@ namespace App\Http\Controllers\Tenant;
 use App\Contracts\PaymentGateway;
 use App\Http\Controllers\Controller;
 use App\Models\MerchantTransaction;
+use App\Models\Tenant;
+use App\Models\TenantPaymentGateway;
+use App\Services\Payment\PaystackGateway;
+use App\Services\Payment\StripeGateway;
 use App\Services\Tenancy\TenantContext;
 use Exception;
 use Illuminate\Http\Request;
@@ -73,12 +77,24 @@ final class FinanceController extends Controller
     {
         $tenant = $this->tenantContext->getTenant();
 
+        $this->authorize('update event');
+
+        if (! $tenant->featureEnabled('commerce')) {
+            abort(403);
+        }
+
         if ($transaction->tenant_id !== $tenant->id) {
             abort(403);
         }
 
-        $request->attributes->set('payment_context', 'commerce');
-        $merchantGateway = app(PaymentGateway::class);
+        $merchantGateway = $this->resolveTenantGatewayFor($tenant, $transaction);
+
+        if (! $merchantGateway) {
+            return back()->with(
+                'error',
+                "Refund failed: no active {$transaction->provider} gateway is configured for this organizer. Configure it under Settings > Payments and try again."
+            );
+        }
 
         try {
             $refundId = $merchantGateway->refund($transaction->provider_transaction_id);
@@ -105,5 +121,38 @@ final class FinanceController extends Controller
 
             return back()->with('error', 'Refund failed: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Resolves the gateway that actually took this charge, using the tenant's
+     * own credentials for the transaction's own provider. Deliberately avoids
+     * the PaymentGateway container binding: that binding picks whichever
+     * active gateway sorts first (so a Paystack charge could be handed to
+     * Stripe) and, with no active gateway at all, silently falls back to the
+     * platform's own credentials — refunding a tenant's customer out of the
+     * platform's account. Returns null when the tenant has no active gateway
+     * for this provider.
+     */
+    private function resolveTenantGatewayFor(Tenant $tenant, MerchantTransaction $transaction): ?PaymentGateway
+    {
+        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
+            ->where('provider', $transaction->provider)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $gateway) {
+            return null;
+        }
+
+        $config = [
+            'secret_key' => $gateway->api_key_encrypted,
+            'public_key' => $gateway->public_key_encrypted,
+        ];
+
+        return match ($transaction->provider) {
+            'paystack' => new PaystackGateway($config),
+            'stripe' => new StripeGateway(app(\Stripe\StripeClient::class), $config),
+            default => null,
+        };
     }
 }

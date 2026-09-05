@@ -17,12 +17,13 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 });
 
-function financeRefundHost(string $slug): array
+function financeRefundHost(string $slug, string $role = 'Org Superadmin'): array
 {
     $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
-    $user->assignRole('Org Superadmin');
+    $user->assignRole($role);
     $tenant->users()->attach($user->id);
 
     return [$tenant, $user];
@@ -75,4 +76,101 @@ test('refunding a transaction stores the real Paystack refund id, not a mangled 
     $refundRecord = MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->firstOrFail();
     expect($refundRecord->provider_transaction_id)->toBe('ref_test_456');
     expect($refundRecord->meta)->toBe(['refund_id' => 'ref_test_456']);
+});
+
+test('a paystack transaction is not refunded through a stripe-only tenant gateway or the platform account', function () {
+    Http::preventStrayRequests();
+
+    [$tenant, $user] = financeRefundHost('acme');
+    $host = financeRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'stripe',
+        'api_key_encrypted' => 'sk_stripe_123',
+        'is_active' => true,
+    ]);
+
+    $transaction = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'orig_ref_999',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'succeeded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $response = $this->actingAs($user)->post("http://{$host}/finance/refund/{$transaction->id}", [], ['HTTP_HOST' => $host]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('error');
+    expect(session('error'))->toContain('no active paystack gateway is configured');
+
+    expect($transaction->fresh()->status)->toBe('succeeded');
+    expect(MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->count())->toBe(0);
+});
+
+test('a tenant user without the update event permission cannot issue a refund', function () {
+    Http::preventStrayRequests();
+
+    $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
+    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
+    $user = User::factory()->create(['tenant_id' => $tenant->id]);
+    setPermissionsTeamId($tenant->id);
+    $tenant->users()->attach($user->id);
+
+    $host = financeRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $transaction = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'orig_ref_777',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'succeeded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $response = $this->actingAs($user)->post("http://{$host}/finance/refund/{$transaction->id}", [], ['HTTP_HOST' => $host]);
+
+    $response->assertForbidden();
+    expect($transaction->fresh()->status)->toBe('succeeded');
+});
+
+test('a refund is forbidden when the commerce feature is disabled for the tenant', function () {
+    Http::preventStrayRequests();
+
+    $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
+    $user = User::factory()->create(['tenant_id' => $tenant->id]);
+    setPermissionsTeamId($tenant->id);
+    $user->assignRole('Org Superadmin');
+    $tenant->users()->attach($user->id);
+
+    $host = financeRefundSubdomain('acme');
+
+    $transaction = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'orig_ref_888',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'succeeded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $response = $this->actingAs($user)->post("http://{$host}/finance/refund/{$transaction->id}", [], ['HTTP_HOST' => $host]);
+
+    $response->assertForbidden();
+    expect($transaction->fresh()->status)->toBe('succeeded');
 });
