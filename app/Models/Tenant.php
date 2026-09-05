@@ -305,6 +305,32 @@ final class Tenant extends Model
     }
 
     /**
+     * Get the configured numeric limit for a limit-type feature, or null
+     * when the feature is missing, disabled, not a limit type, or set to
+     * unlimited (a negative stored value). Unlike canUse()/recordUsage(),
+     * this does not consult TenantFeatureUsage — it's for gates that
+     * compare against a live COUNT query instead of a running counter
+     * (e.g. concurrent events-in-flight, current team seat count).
+     */
+    public function featureLimitValue(string $featureSlug): ?int
+    {
+        $feature = $this->features()->where('feature_key', $featureSlug)->first();
+
+        if (! $feature || ! $feature->enabled) {
+            return null;
+        }
+
+        $meta = $feature->meta ?? [];
+        if (($meta['type'] ?? null) !== 'limit') {
+            return null;
+        }
+
+        $limit = (int) ($meta['value'] ?? 0);
+
+        return $limit < 0 ? null : $limit;
+    }
+
+    /**
      * Get the user's avatar.
      */
     protected function gravatar(): Attribute
