@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant\Commerce;
 
 use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Models\EventLedgerEntry;
 use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
@@ -99,7 +100,7 @@ final class WebhookController extends Controller
         try {
             if ($event === 'charge.success') {
                 $this->recordTransaction($tenant, 'paystack', (object) $data);
-                $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')));
+                $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')));
             } elseif ($event === 'charge.failed') {
                 $reference = $data['reference'] ?? null;
 
@@ -141,7 +142,7 @@ final class WebhookController extends Controller
      * registration already confirmed is left untouched, so Paystack's
      * at-least-once webhook delivery can't double-process it.
      */
-    private function confirmEventRegistrationIfApplicable(Tenant $tenant, array $metadata, ?string $reference, int $amount, string $currency): void
+    private function confirmEventRegistrationIfApplicable(Tenant $tenant, array $metadata, ?string $reference, int $amount, int $gatewayFeeAmount, string $currency): void
     {
         $registrationId = $metadata['event_registration_id'] ?? null;
         if (! $registrationId) {
@@ -156,6 +157,9 @@ final class WebhookController extends Controller
             return;
         }
 
+        $eventModel = $registration->event;
+        $commissionAmount = (int) round($amount * $eventModel->effectivePlatformFeePercentage() / 100);
+
         $registration->issueTicket();
         $registration->fill([
             'status' => EventRegistration::STATUS_CONFIRMED,
@@ -164,6 +168,20 @@ final class WebhookController extends Controller
             'currency' => $currency,
         ]);
         $registration->save();
+
+        EventLedgerEntry::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $eventModel->id,
+            'type' => EventLedgerEntry::TYPE_CHARGE,
+            'registration_id' => $registration->id,
+            'gross_amount' => $amount,
+            'gateway_fee_amount' => $gatewayFeeAmount,
+            'commission_amount' => $commissionAmount,
+            'net_amount' => $amount - $gatewayFeeAmount - $commissionAmount,
+            'currency' => $currency,
+            'provider' => 'paystack',
+            'provider_reference' => $reference,
+        ]);
 
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
