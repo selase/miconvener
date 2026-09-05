@@ -81,19 +81,19 @@ final class FinanceController extends Controller
         $merchantGateway = app(PaymentGateway::class);
 
         try {
-            $result = $merchantGateway->refund($transaction->provider_transaction_id);
+            $refundId = $merchantGateway->refund($transaction->provider_transaction_id);
 
             MerchantTransaction::create([
                 'tenant_id' => $tenant->id,
                 'provider' => $transaction->provider,
-                'provider_transaction_id' => $result['id'] ?? 'REF_'.$transaction->provider_transaction_id,
+                'provider_transaction_id' => $refundId !== 'pending' ? $refundId : 'REF_'.$transaction->provider_transaction_id,
                 'amount' => $transaction->amount,
                 'currency' => $transaction->currency,
                 'status' => 'succeeded',
                 'type' => 'refund',
                 'description' => 'Refund for '.$transaction->provider_transaction_id,
                 'customer_email' => $transaction->customer_email,
-                'meta' => $result,
+                'meta' => ['refund_id' => $refundId],
             ]);
 
             $transaction->update(['status' => 'refunded']);
