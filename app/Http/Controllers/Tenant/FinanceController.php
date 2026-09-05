@@ -87,6 +87,10 @@ final class FinanceController extends Controller
             abort(403);
         }
 
+        if ($transaction->status !== 'succeeded' || $transaction->type !== 'payment') {
+            return back()->with('error', 'This transaction has already been refunded or is not eligible for a refund.');
+        }
+
         $merchantGateway = $this->resolveTenantGatewayFor($tenant, $transaction);
 
         if (! $merchantGateway) {

@@ -112,6 +112,39 @@ test('a paystack transaction is not refunded through a stripe-only tenant gatewa
     expect(MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->count())->toBe(0);
 });
 
+test('a direct POST cannot refund a transaction that has already been refunded', function () {
+    Http::preventStrayRequests();
+
+    [$tenant, $user] = financeRefundHost('acme');
+    $host = financeRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $transaction = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'orig_ref_already_refunded',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'refunded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $response = $this->actingAs($user)->post("http://{$host}/finance/refund/{$transaction->id}", [], ['HTTP_HOST' => $host]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('error', 'This transaction has already been refunded or is not eligible for a refund.');
+
+    expect($transaction->fresh()->status)->toBe('refunded');
+    expect(MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->count())->toBe(0);
+});
+
 test('a tenant user without the update event permission cannot issue a refund', function () {
     Http::preventStrayRequests();
 
