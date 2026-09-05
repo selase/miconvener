@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\EventRegistration;
+use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Services\Payment\PaystackGateway;
 use App\Services\Tenancy\TenantContext;
@@ -32,13 +33,12 @@ final class EventCheckoutController extends Controller
             ]);
         }
 
-        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
-            ->where('provider', 'paystack')
-            ->where('is_active', true)
-            ->first();
+        $paystack = $tenant->isPlatformDefaultSettlement()
+            ? $this->platformGateway()
+            : $this->tenantGateway($tenant);
 
-        if (! $gateway) {
-            $hasOtherActiveGateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
+        if (! $paystack) {
+            $hasOtherActiveGateway = ! $tenant->isPlatformDefaultSettlement() && TenantPaymentGateway::where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->exists();
 
@@ -49,7 +49,6 @@ final class EventCheckoutController extends Controller
             return redirect()->back()->with('error', $message);
         }
 
-        $paystack = new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]);
         $customerId = $paystack->createCustomer($registrationModel->email, $registrationModel->full_name);
 
         $checkoutUrl = $paystack->createOneTimeCheckoutSession(
@@ -63,10 +62,28 @@ final class EventCheckoutController extends Controller
             ]),
             [
                 'event_registration_id' => $registrationModel->id,
+                'tenant_id' => $tenant->id,
                 'type' => 'event_ticket',
             ]
         );
 
         return redirect($checkoutUrl);
+    }
+
+    private function tenantGateway(Tenant $tenant): ?PaystackGateway
+    {
+        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
+            ->where('provider', 'paystack')
+            ->where('is_active', true)
+            ->first();
+
+        return $gateway ? new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]) : null;
+    }
+
+    private function platformGateway(): ?PaystackGateway
+    {
+        $secret = config('services.settlement.paystack.secret_key');
+
+        return $secret ? new PaystackGateway(['secret_key' => $secret]) : null;
     }
 }
