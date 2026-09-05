@@ -176,6 +176,7 @@ final class Event extends Model
     {
         return (float) ($this->platform_fee_percentage
             ?? $this->tenant?->platform_fee_percentage
+            ?? $this->tenant?->package?->default_platform_fee_percentage
             ?? config('services.platform.default_fee_percentage'));
     }
 

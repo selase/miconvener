@@ -53,6 +53,24 @@ final class EventController extends Controller
         $this->authorize('create event');
         $tenant = $this->getTenant();
 
+        $limit = $tenant->featureLimitValue('events_in_flight');
+        if ($limit !== null) {
+            $currentCount = Event::where('tenant_id', $tenant->id)
+                ->where('status', '!=', Event::STATUS_CANCELLED)
+                ->where('ends_at', '>=', now())
+                ->count();
+
+            if ($currentCount >= $limit) {
+                $message = "Your plan allows {$limit} concurrent event(s). Cancel an existing upcoming event, or upgrade your plan, to create another.";
+
+                if ($request->wantsJson()) {
+                    return response()->json(['message' => $message], 422);
+                }
+
+                return redirect()->back()->withErrors(['name' => $message]);
+            }
+        }
+
         $validated = $this->validateEvent($request);
 
         if ($request->hasFile('hero_image')) {

@@ -102,10 +102,14 @@ final class PublicEventController extends Controller
         if ($status === EventRegistration::STATUS_CONFIRMED) {
             $registration->issueTicket();
             $registration->save();
+            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
+            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
         } elseif ($status === EventRegistration::STATUS_WAITLISTED) {
+            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationWaitlisted($registration));
         } elseif ($status === EventRegistration::STATUS_PENDING_APPROVAL) {
+            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationPendingApproval($registration));
         }
 
@@ -122,15 +126,6 @@ final class PublicEventController extends Controller
             'event' => $eventModel->slug,
             'registration' => $registration->id,
         ]);
-    }
-
-    private function nextWaitlistPosition(Event $event, ?EventTicketType $ticketType): int
-    {
-        $query = $ticketType
-            ? EventRegistration::where('ticket_type_id', $ticketType->id)
-            : EventRegistration::where('event_id', $event->id)->whereNull('ticket_type_id');
-
-        return 1 + $query->waitlisted()->count();
     }
 
     public function confirmation(string $subdomain, string $event, string $registration): Response
@@ -214,6 +209,15 @@ final class PublicEventController extends Controller
         return Inertia::render('Public/Events/SpeakerPortalPreview', [
             'event' => ['name' => $eventModel->name],
         ]);
+    }
+
+    private function nextWaitlistPosition(Event $event, ?EventTicketType $ticketType): int
+    {
+        $query = $ticketType
+            ? EventRegistration::where('ticket_type_id', $ticketType->id)
+            : EventRegistration::where('event_id', $event->id)->whereNull('ticket_type_id');
+
+        return 1 + $query->waitlisted()->count();
     }
 
     private function getTenant()
