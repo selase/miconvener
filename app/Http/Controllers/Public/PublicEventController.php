@@ -6,12 +6,14 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationPendingApproval;
 use App\Mail\Events\EventRegistrationWaitlisted;
 use App\Models\Event;
 use App\Models\EventMaterial;
 use App\Models\EventRegistration;
 use App\Models\EventTicketType;
+use App\Models\Tenant;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -71,17 +73,12 @@ final class PublicEventController extends Controller
             ->first();
 
         if ($existingRegistration) {
-            return $existingRegistration->status === EventRegistration::STATUS_PENDING_PAYMENT
-                ? redirect()->route('public.events.checkout', [
-                    'subdomain' => $tenant->slug,
-                    'event' => $eventModel->slug,
-                    'registration' => $existingRegistration->id,
-                ])
-                : redirect()->route('public.events.confirmation', [
-                    'subdomain' => $tenant->slug,
-                    'event' => $eventModel->slug,
-                    'registration' => $existingRegistration->id,
-                ]);
+            $this->resendRegistrationLink($tenant, $existingRegistration);
+
+            return back()->with(
+                'success',
+                'A registration already exists for this email address. We have re-sent the link to that inbox — please check your email.'
+            );
         }
 
         $ticketType = $usesTicketTypes ? $activeTicketTypes->firstWhere('id', $validated['ticket_type_id']) : null;
@@ -229,6 +226,30 @@ final class PublicEventController extends Controller
         return Inertia::render('Public/Events/SpeakerPortalPreview', [
             'event' => ['name' => $eventModel->name],
         ]);
+    }
+
+    /**
+     * Re-sends the status-appropriate registration email to an address that
+     * already holds a live registration for this event. The link is delivered
+     * to the inbox that owns it, never through the HTTP response, so merely
+     * knowing someone's email address cannot expose their ticket QR or PII.
+     */
+    private function resendRegistrationLink(Tenant $tenant, EventRegistration $registration): void
+    {
+        $mailable = match ($registration->status) {
+            EventRegistration::STATUS_PENDING_PAYMENT => new EventRegistrationPaymentInvite($registration, 'approved'),
+            EventRegistration::STATUS_PENDING_APPROVAL => new EventRegistrationPendingApproval($registration),
+            EventRegistration::STATUS_WAITLISTED => new EventRegistrationWaitlisted($registration),
+            EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN => new EventRegistrationConfirmed($registration),
+            default => null,
+        };
+
+        if (! $mailable) {
+            return;
+        }
+
+        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+        Mail::to($registration->email)->queue($mailable);
     }
 
     private function nextWaitlistPosition(Event $event, ?EventTicketType $ticketType): int

@@ -397,6 +397,7 @@ function RegistrationPanel({ event }) {
             <h3 className="text-[15px] font-medium text-ink">Register</h3>
 
             {flash?.error && <div className="mt-3 bg-danger-bg px-3.5 py-2.5 text-[13px] text-danger-fg">{flash.error}</div>}
+            {flash?.success && <div className="mt-3 bg-success-bg px-3.5 py-2.5 text-[13px] text-success-fg">{flash.success}</div>}
 
             <form onSubmit={submit} className="mt-4 space-y-4">
                 {hasTicketTypes && (
