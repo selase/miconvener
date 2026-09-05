@@ -209,7 +209,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
 // Public event pages (no auth — attendees register here)
 Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.events.show');
-Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->name('public.events.register');
+Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
 Route::get('/e/{event}/registrations/{registration}', [PublicEventController::class, 'confirmation'])->name('public.events.confirmation');
 Route::get('/e/{event}/registrations/{registration}/materials/{material}/download', [MaterialDownloadController::class, 'download'])->name('public.events.materials.download');

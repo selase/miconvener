@@ -65,5 +65,8 @@ final class RouteServiceProvider extends ServiceProvider
 
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(30)
             ->by($request->ip()));
+
+        RateLimiter::for('public-registration', fn (Request $request) => Limit::perMinute(10)
+            ->by($request->ip()));
     }
 }
