@@ -198,7 +198,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 });
 
 Route::post('/webhooks/stripe', [App\Http\Controllers\Billing\WebhookController::class, 'handleStripe'])->middleware('throttle:webhooks')->name('webhooks.stripe');
-Route::post('/webhooks/paystack', [App\Http\Controllers\Billing\WebhookController::class, 'handlePaystack'])->middleware('throttle:webhooks')->name('webhooks.paystack');
+// Paystack allows one webhook URL per business account, so both platform-level
+// Paystack URLs reach the same handler, which routes by payload. Either may be
+// used as the account's single webhook URL, and both work whether settlement and
+// subscription billing share one Paystack account or use two.
+Route::post('/webhooks/paystack', [App\Http\Controllers\Public\SettlementWebhookController::class, 'handle'])->middleware('throttle:webhooks')->name('webhooks.paystack');
 
 // Merchant Webhooks (Public)
 Route::post('/webhooks/merchant/stripe/{tenant}', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handleStripe'])->middleware('throttle:webhooks')->name('webhooks.merchant.stripe');

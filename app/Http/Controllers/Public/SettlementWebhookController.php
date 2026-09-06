@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Public;
 
+use App\Http\Controllers\Billing\WebhookController as BillingWebhookController;
 use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
+use App\Services\Billing\SubscriptionProvisioningService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -18,27 +20,54 @@ use Throwable;
 final class SettlementWebhookController extends Controller
 {
     /**
-     * Handles both platform_default charge confirmations and payout
-     * transfer confirmations — both originate from Purpledot's own
-     * Paystack account, so both are verified against the platform's own
-     * secret key. Paystack has no separate webhook-signing secret (unlike
-     * Stripe): it signs the raw body with the same secret API key used to
-     * make requests, so this must match PaystackSettlementGateway's key,
-     * not a distinct "webhook secret" value.
+     * The single platform-level Paystack webhook entry point.
+     *
+     * Paystack allows one webhook URL per business account, while this platform
+     * receives two unrelated streams on its own accounts: event ticket charges
+     * and payout transfers for platform-default settlement, and subscription
+     * billing for the SaaS product itself. Routing both through one endpoint
+     * means the same URL works whether those streams share a single Paystack
+     * account or are split across two.
+     *
+     * Paystack has no separate webhook-signing secret (unlike Stripe): it signs
+     * the raw body with the same secret API key used to make requests. Each
+     * stream is therefore verified against its own key, and whichever key
+     * matches tells us which account the event came from.
      */
-    public function handle(Request $request)
+    public function handle(Request $request, BillingWebhookController $billing, SubscriptionProvisioningService $provisioningService)
     {
-        $signature = $request->header('x-paystack-signature');
-        $secret = config('services.settlement.paystack.secret_key');
+        $signature = (string) $request->header('x-paystack-signature');
+        $body = $request->getContent();
 
-        if (! $signature || ! $secret || $signature !== hash_hmac('sha512', $request->getContent(), (string) $secret)) {
-            Log::warning('Settlement webhook signature verification failed');
+        $settlementKey = (string) config('services.settlement.paystack.secret_key');
+        $billingKey = (string) config('services.paystack.secret_key');
+
+        $settlementMatches = $settlementKey !== '' && hash_equals(hash_hmac('sha512', $body, $settlementKey), $signature);
+        $billingMatches = $billingKey !== '' && hash_equals(hash_hmac('sha512', $body, $billingKey), $signature);
+
+        if ($signature === '' || (! $settlementMatches && ! $billingMatches)) {
+            Log::warning('Platform Paystack webhook signature verification failed');
 
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
         $event = $request->input('event');
         $data = $request->input('data');
+
+        // Only ticket charges and payout transfers belong to settlement. Anything
+        // else is subscription billing, which was previously dropped on the floor
+        // here: the match arm's default returned 200 and did nothing, so pointing
+        // the account's single webhook URL at this endpoint silently discarded
+        // every subscription event.
+        if (! $this->isSettlementEvent($event, (array) ($data['metadata'] ?? []))) {
+            return $billing->handlePaystack($request, $provisioningService);
+        }
+
+        if (! $settlementMatches) {
+            Log::warning('Settlement event was not signed with the settlement key', ['event' => $event]);
+
+            return response()->json(['error' => 'Invalid signature'], 400);
+        }
 
         try {
             match ($event) {
@@ -53,6 +82,21 @@ final class SettlementWebhookController extends Controller
         }
 
         return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * A charge belongs to settlement only when it carries event ticket metadata;
+     * a subscription charge from the billing account looks otherwise identical.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    private function isSettlementEvent(?string $event, array $metadata): bool
+    {
+        if ($event === 'transfer.success' || $event === 'transfer.failed') {
+            return true;
+        }
+
+        return $event === 'charge.success' && ($metadata['type'] ?? null) === 'event_ticket';
     }
 
     private function confirmPlatformDefaultCharge(array $metadata, ?string $reference, int $amount, int $gatewayFeeAmount, string $currency): void
