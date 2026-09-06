@@ -34,6 +34,7 @@ final class EventFinanceController extends Controller
 
         $stats = [
             'collected' => $collected,
+            'refunded' => (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_REFUND)->sum('gross_amount'),
             'fees' => $fees,
             'net' => $collected - $fees,
             'net_collected' => $netCollected,

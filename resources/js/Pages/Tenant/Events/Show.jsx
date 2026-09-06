@@ -63,7 +63,7 @@ function formatAmount(amount, currency) {
     return `${currency} ${(amount / 100).toFixed(2)}`;
 }
 
-function OverviewTab({ event, registrations, hasActiveGateway, publicUrl }) {
+function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, publicUrl }) {
     const confirmed = registrations.filter((r) => r.status === 'confirmed' || r.status === 'checked_in');
     const confirmedCount = confirmed.length;
     const revenue = confirmed.reduce((sum, r) => sum + r.amount, 0);
@@ -97,8 +97,9 @@ function OverviewTab({ event, registrations, hasActiveGateway, publicUrl }) {
             </div>
 
             <p className="text-xs text-ink-secondary">
-                Money still settles 100% to your connected Paystack account. The platform fee shown above is what MiConvener
-                separately invoices — it isn't deducted automatically yet.
+                {settlementMode === 'platform_default'
+                    ? 'MiConvener collects payments for this event and pays out to your registered payout account. The platform fee above is deducted from what settles to you — see the Finance tab for the full breakdown.'
+                    : 'Money settles 100% to your own connected Paystack account. The platform fee shown above is what MiConvener separately invoices — it isn’t deducted automatically.'}
             </p>
 
             <div>
@@ -217,7 +218,7 @@ function GuestsTab({ event, registrations }) {
     );
 }
 
-export default function Show({ event, registrations, hasActiveGateway, publicUrl }) {
+export default function Show({ event, registrations, hasActiveGateway, settlementMode, publicUrl }) {
     const [tab, setTab] = useState('Overview');
     const [editing, setEditing] = useState(false);
 
@@ -247,7 +248,7 @@ export default function Show({ event, registrations, hasActiveGateway, publicUrl
 
             <div className="px-8 py-6">
                 {tab === 'Overview' && (
-                    <OverviewTab event={event} registrations={registrations} hasActiveGateway={hasActiveGateway} publicUrl={publicUrl} />
+                    <OverviewTab event={event} registrations={registrations} hasActiveGateway={hasActiveGateway} settlementMode={settlementMode} publicUrl={publicUrl} />
                 )}
                 {tab === 'Tickets' && (
                     <TicketTypesPanel event={event} ticketTypes={event.ticket_types} onChange={() => router.reload({ only: ['event'] })} />

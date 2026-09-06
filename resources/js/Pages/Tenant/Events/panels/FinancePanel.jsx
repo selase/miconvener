@@ -174,11 +174,15 @@ export default function FinancePanel({ event }) {
 
             {error && <p className="mb-5 border border-danger-fg/30 px-4 py-3 text-[13px] text-danger-fg">{error}</p>}
 
-            <div className="mb-6 grid grid-cols-4 gap-px bg-border">
+            <div className="mb-6 grid grid-cols-5 gap-px bg-border">
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Collected</div>
                     <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.collected, event.currency)}</div>
                     <div className="mt-0.5 text-xs text-ink-tertiary">{stats.confirmed_orders} orders</div>
+                </div>
+                <div className="bg-surface p-4">
+                    <div className="text-xs text-ink-secondary">Refunded</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.refunded, event.currency)}</div>
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Platform fee</div>
@@ -186,11 +190,13 @@ export default function FinancePanel({ event }) {
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Settles to you</div>
-                    <div className="mt-1 text-xl font-semibold text-accent">{formatMoney(stats.net, event.currency)}</div>
+                    <div className="mt-1 text-xl font-semibold text-accent">{formatMoney(stats.net_collected, event.currency)}</div>
+                    <div className="mt-0.5 text-xs text-ink-tertiary">after refunds &amp; fees</div>
                 </div>
                 <div className="bg-surface p-4">
-                    <div className="text-xs text-ink-secondary">Paid out so far</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.paid_out, event.currency)}</div>
+                    <div className="text-xs text-ink-secondary">Available to pay out</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.available_balance, event.currency)}</div>
+                    <div className="mt-0.5 text-xs text-ink-tertiary">{formatMoney(stats.paid_out, event.currency)} paid out so far</div>
                 </div>
             </div>
 

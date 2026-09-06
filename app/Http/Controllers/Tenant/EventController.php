@@ -187,6 +187,7 @@ final class EventController extends Controller
             ],
             'registrations' => $registrations,
             'hasActiveGateway' => $tenant->canAcceptPayments(),
+            'settlementMode' => $tenant->settlement_mode,
             'publicUrl' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]),
         ]);
     }
