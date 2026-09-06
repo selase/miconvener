@@ -186,7 +186,7 @@ final class WebhookController extends Controller
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
 
-        Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
+        Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
     }
 
     private function recordTransaction(Tenant $tenant, string $provider, $data, string $status = 'succeeded'): void

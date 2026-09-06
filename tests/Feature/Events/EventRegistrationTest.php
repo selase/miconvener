@@ -208,7 +208,9 @@ test('paystack webhook confirms the matching registration exactly once', functio
     expect($registration->ticket_code)->not->toBeNull();
     expect($registration->payment_reference)->toBe('ref_abc123');
 
-    Mail::assertSent(EventRegistrationConfirmed::class, 1);
+    // Queued rather than sent, so a webhook delivered twice still results in a
+    // single confirmation email being handed to the queue.
+    Mail::assertQueued(EventRegistrationConfirmed::class, 1);
 });
 
 test('an event and its registrations are isolated to their own tenant', function () {

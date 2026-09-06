@@ -105,7 +105,10 @@ final class SettlementWebhookController extends Controller
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
 
-        Mail::to($registration->email)->send(new EventRegistrationConfirmed($registration));
+        // Queued, not sent inline: the ticket and its ledger entry are already
+        // committed by this point, so a slow or failing mail transport must not
+        // turn a successful charge into a 500 and a provider retry.
+        Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
     }
 
     private function confirmTransfer(string $event, string $reference, array $data): void

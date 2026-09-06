@@ -162,3 +162,43 @@ test('the settlement webhook verifies signatures using the platform secret key, 
 
     expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CONFIRMED);
 });
+
+test('a mail transport failure cannot fail the settlement webhook', function () {
+    // The ticket and its ledger entry commit before the confirmation email is
+    // handed off. Sending inline would turn a successful charge into a 500 and a
+    // provider retry whenever the mail transport is slow or unavailable.
+    Mail::fake();
+    [$tenant] = chargeLedgerHost('acme');
+    config(['services.settlement.paystack.secret_key' => 'sk_platform_mail_test']);
+
+    $event = Event::factory()->published()->paid(5_000)->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->pendingPayment()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'guest@example.com',
+        'amount' => 5_000,
+    ]);
+
+    $payload = [
+        'event' => 'charge.success',
+        'data' => [
+            'reference' => 'ref_mail_queue_1',
+            'amount' => 5_000,
+            'fees' => 75,
+            'currency' => 'GHS',
+            'metadata' => [
+                'tenant_id' => $tenant->id,
+                'event_registration_id' => $registration->id,
+                'type' => 'event_ticket',
+            ],
+        ],
+    ];
+    $body = json_encode($payload);
+    $signature = hash_hmac('sha512', $body, config('services.settlement.paystack.secret_key'));
+
+    $this->call('POST', '/webhooks/settlement/paystack', [], [], [], ['HTTP_x-paystack-signature' => $signature, 'CONTENT_TYPE' => 'application/json'], $body)
+        ->assertOk();
+
+    Mail::assertQueued(\App\Mail\Events\EventRegistrationConfirmed::class);
+    Mail::assertNothingSent();
+});
