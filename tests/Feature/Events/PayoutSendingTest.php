@@ -224,3 +224,39 @@ test('a transfer.failed webhook flips the payout to failed with no ledger row', 
     expect($payout->fresh())->status->toBe(EventPayout::STATUS_FAILED)->failure_reason->toBe('Insufficient balance in platform account');
     expect(EventLedgerEntry::where('payout_id', $payout->id)->count())->toBe(0);
 });
+
+test('a transfer parked awaiting an OTP is recorded as failed, not as sent', function () {
+    // Paystack accepts the request and answers with status "otp" when the platform
+    // account still requires a one-time code per transfer. No money moves and no
+    // webhook follows, so treating it as processing would tell the organizer they
+    // had been paid and then freeze the record beyond manual correction.
+    Http::fake([
+        'api.paystack.co/transferrecipient' => Http::response(['status' => true, 'data' => ['recipient_code' => 'RCP_otp_1']]),
+        'api.paystack.co/transfer' => Http::response(['status' => true, 'data' => ['transfer_code' => 'TRF_otp_1', 'status' => 'otp']]),
+    ]);
+
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'bank_code' => '030']);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'amount' => 5_000,
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host]);
+
+    $response->assertStatus(502);
+
+    $payout->refresh();
+    expect($payout->status)->toBe(EventPayout::STATUS_FAILED);
+    expect($payout->failure_reason)->toContain('one-time code');
+
+    // Failed payouts stay re-sendable, so the organizer can retry once the
+    // provider account is configured.
+    expect(in_array($payout->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true))->toBeTrue();
+});

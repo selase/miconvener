@@ -145,6 +145,26 @@ final class EventFinanceController extends Controller
                 return response()->json(['message' => 'Could not send payout: '.$e->getMessage()], 502);
             }
 
+            // Paystack accepts the request but parks the transfer when the platform
+            // account still requires an OTP per transfer. No money moves and no
+            // webhook follows, so recording it as processing would tell the
+            // organizer they had been paid and then freeze the record, since a
+            // processing payout cannot be corrected by hand.
+            $transferStatus = (string) ($transfer['status'] ?? '');
+
+            if (! in_array($transferStatus, ['success', 'pending', 'queued'], true)) {
+                $payoutModel->update([
+                    'status' => EventPayout::STATUS_FAILED,
+                    'failure_reason' => $transferStatus === 'otp'
+                        ? 'The payment provider is asking for a one-time code before it will release transfers. Turn off per-transfer OTP on the platform Paystack account, then send this payout again.'
+                        : "The payment provider did not release the transfer (status: {$transferStatus}).",
+                ]);
+
+                return response()->json([
+                    'message' => $payoutModel->failure_reason,
+                ], 502);
+            }
+
             $payoutModel->update([
                 'status' => EventPayout::STATUS_PROCESSING,
                 'provider_reference' => $reference,
