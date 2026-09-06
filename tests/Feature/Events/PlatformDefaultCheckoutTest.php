@@ -79,3 +79,36 @@ test('an own_gateway tenant with no TenantPaymentGateway row gets the existing n
     $response->assertRedirect();
     $response->assertSessionHas('error', 'This event is not currently accepting payments.');
 });
+
+test('checkout sends an Inertia location response so the browser can leave for Paystack', function () {
+    Http::fake([
+        'api.paystack.co/customer/*' => Http::response(['data' => ['email' => 'guest@example.com']]),
+        'api.paystack.co/customer' => Http::response(['data' => ['customer_code' => 'CUS_platform_1']]),
+        'api.paystack.co/transaction/initialize' => Http::response(['data' => ['authorization_url' => 'https://checkout.paystack.com/platform123']]),
+    ]);
+
+    [$tenant] = platformDefaultHost('acme');
+    $host = platformDefaultSubdomain('acme');
+
+    $event = Event::factory()->published()->paid(5000)->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->pendingPayment()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'guest@example.com',
+        'amount' => 5000,
+    ]);
+
+    // Attendees reach checkout from an Inertia form submission, which follows
+    // redirects with XHR. A plain 302 to Paystack is blocked by CORS, so the
+    // response has to be Inertia's 409 location instruction instead.
+    $response = $this->get("http://{$host}/e/{$event->slug}/checkout/{$registration->id}", [
+        'HTTP_HOST' => $host,
+        'X-Inertia' => 'true',
+        // The real asset version, or Inertia answers with its own 409 reload
+        // instruction and masks the response under test.
+        'X-Inertia-Version' => (string) (new \App\Http\Middleware\HandleInertiaRequests())->version(request()),
+    ]);
+
+    $response->assertStatus(409);
+    $response->assertHeader('X-Inertia-Location', 'https://checkout.paystack.com/platform123');
+});

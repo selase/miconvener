@@ -11,10 +11,12 @@ use App\Models\TenantPaymentGateway;
 use App\Services\Payment\PaystackGateway;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 final class EventCheckoutController extends Controller
 {
-    public function checkout(string $subdomain, string $event, string $registration): RedirectResponse
+    public function checkout(string $subdomain, string $event, string $registration): Response|RedirectResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
         if (! $tenant) {
@@ -67,7 +69,12 @@ final class EventCheckoutController extends Controller
             ]
         );
 
-        return redirect($checkoutUrl);
+        // The attendee arrives here from an Inertia form submission, which follows
+        // redirects with XHR. A plain redirect to Paystack's domain is therefore
+        // blocked by CORS and the attendee sees only a network error. Inertia\'s
+        // location response tells the client to perform a full page visit instead,
+        // and degrades to an ordinary 302 for non-Inertia requests.
+        return Inertia::location($checkoutUrl);
     }
 
     private function tenantGateway(Tenant $tenant): ?PaystackGateway
