@@ -47,7 +47,9 @@ final class PackageSeeder extends Seeder
                 [
                     'name' => $planData['name'],
                     'description' => $planData['description'],
-                    'price' => $planData['monthly_price'], // Storing monthly price as base price
+                    // A plan with no numeric price is a "contact us" tier; it is stored
+                    // at zero, matching how EventPackageSeeder records Enterprise.
+                    'price' => $planData['monthly_price'] ?? 0,
                     'interval' => 'month', // Default to monthly
                     'billing_model' => Package::BILLING_MODEL_FLAT_RATE, // Simplified assumption
                     'is_active' => true,
@@ -65,7 +67,7 @@ final class PackageSeeder extends Seeder
                 $packageFeatures['users-limit'] = ['value' => 5]; // Implicit limit
                 $packageFeatures['file-retention'] = ['value' => 1]; // 24 hours
                 $packageFeatures['analytics'] = ['value' => true]; // Basic
-            } elseif ($slug === 'pro') {
+            } elseif ($slug === 'growth') {
                 $packageFeatures['projects-limit'] = ['value' => -1]; // Unlimited
                 $packageFeatures['users-limit'] = ['value' => 20];
                 $packageFeatures['file-retention'] = ['value' => 30]; // 30 days

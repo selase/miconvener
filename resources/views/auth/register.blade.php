@@ -39,7 +39,7 @@
 
                         <label class="block cursor-pointer group">
                             <input type="radio" name="plan" value="{{ $plan['slug'] }}" class="sr-only peer"
-                                {{ old('plan', 'pro') === $plan['slug'] ? 'checked' : '' }} required>
+                                {{ old('plan', 'starter') === $plan['slug'] ? 'checked' : '' }} required>
                             <div class="relative rounded-2xl border-2 border-slate-200 p-4 transition-all
                                         peer-checked:border-blue-500 peer-checked:bg-blue-50/50
                                         hover:border-slate-300 hover:shadow-sm">

@@ -47,8 +47,9 @@ new class extends Component
         <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             @foreach (config('product-page.plans', []) as $plan)
                 @php
-                    $isPopular = $plan['most_popular'] ?? false;
-                    $isFree    = $plan['monthly_price'] === 0;
+                    $isPopular  = $plan['most_popular'] ?? false;
+                    $isFree     = $plan['monthly_price'] === 0;
+                    $priceLabel = $plan['price_label'] ?? null;
                 @endphp
 
                 <div class="relative flex flex-col rounded-2xl border p-6 transition-all
@@ -72,7 +73,10 @@ new class extends Component
 
                     {{-- Price --}}
                     <div class="mb-6">
-                        @if ($isFree)
+                        @if ($priceLabel)
+                            <div class="pricing-heading text-4xl font-bold {{ $isPopular ? 'text-white' : 'text-slate-900' }}">{{ $priceLabel }}</div>
+                            <div class="mt-1 text-xs {{ $isPopular ? 'text-blue-200' : 'text-slate-400' }}">{{ $plan['price_note'] ?? '' }}</div>
+                        @elseif ($isFree)
                             <div class="pricing-heading text-4xl font-bold {{ $isPopular ? 'text-white' : 'text-slate-900' }}">Free</div>
                             <div class="mt-1 text-xs {{ $isPopular ? 'text-blue-200' : 'text-slate-400' }}">No credit card required</div>
                         @else

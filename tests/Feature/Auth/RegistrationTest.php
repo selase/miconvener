@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Package;
-use Database\Seeders\MasterFeaturePackageSeeder;
+use Database\Seeders\EventPackageSeeder;
 use Stevebauman\Location\Facades\Location;
 use Stevebauman\Location\Position;
 
@@ -14,7 +14,7 @@ beforeEach(function () {
         Position::make(['countryName' => 'Testland'])
     );
 
-    $this->seed(MasterFeaturePackageSeeder::class);
+    $this->seed(EventPackageSeeder::class);
 });
 
 test('registration screen can be rendered', function () {
@@ -24,14 +24,17 @@ test('registration screen can be rendered', function () {
         ->assertStatus(200)
         ->assertSee("Start your {$appName} workspace")
         ->assertSee('Choose a paid plan, create your account, and provision your first tenant.')
-        ->assertSee('Pro')
-        ->assertSee('Business')
-        ->assertSee('Enterprise')
+        // Only paid, self-serve plans appear. Free is excluded because the
+        // controller rejects it; Enterprise is excluded because it has no
+        // numeric price and routes to a sales conversation instead.
+        ->assertSee('Starter')
+        ->assertSee('Growth')
+        ->assertDontSee('Enterprise')
         ->assertDontSee('Free');
 });
 
 test('new users can register with a paid plan', function () {
-    $plan = Package::where('slug', 'pro')->firstOrFail();
+    $plan = Package::where('slug', 'starter')->firstOrFail();
 
     $response = $this
         ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
@@ -45,7 +48,7 @@ test('new users can register with a paid plan', function () {
             'plan' => $plan->slug,
         ]);
 
-    $response->assertRedirect(route('billing.confirm', ['plan' => 'pro', 'interval' => 'month']));
+    $response->assertRedirect(route('billing.confirm', ['plan' => 'starter', 'interval' => 'month']));
     $this->assertAuthenticated();
 });
 
@@ -67,7 +70,7 @@ test('registration requires a paid plan', function () {
 });
 
 test('registration creates a tenant for the new user', function () {
-    $plan = Package::where('slug', 'pro')->firstOrFail();
+    $plan = Package::where('slug', 'starter')->firstOrFail();
 
     $this
         ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)

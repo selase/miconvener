@@ -30,7 +30,7 @@ test('cold provisioning creates a functional tenant with dedicated DB and synced
     $admin = User::factory()->create();
     $admin->assignRole('Superadmin');
 
-    $package = Package::where('slug', 'pro')->first();
+    $package = Package::where('slug', 'growth')->first();
 
     $payload = [
         'name' => 'Cold Provisioned Tenant',
@@ -66,7 +66,7 @@ test('cold provisioning creates a functional tenant with dedicated DB and synced
     expect(Schema::connection('tenant')->hasTable('posts'))->toBeTrue();
 
     // 4. Verify Features were synced from Package
-    // Package 'pro' has 'analytics' and 'priority-support' based on PackageSeeder
+    // Package 'growth' has 'analytics' and 'priority-support' based on PackageSeeder
     expect($tenant->features()->where('feature_key', 'analytics')->exists())->toBeTrue();
     expect($tenant->features()->where('feature_key', 'priority-support')->exists())->toBeTrue();
 
