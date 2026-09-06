@@ -14,6 +14,10 @@ beforeEach(function () {
     refreshTenantDatabases();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+
+    // Platform-default settlement means the platform collects on the tenant's
+    // behalf, which it can only do while it holds its own gateway credentials.
+    \Illuminate\Support\Facades\Config::set('services.settlement.paystack.secret_key', 'sk_test_platform');
 });
 
 function publishingHost(array $tenantAttributes = []): array

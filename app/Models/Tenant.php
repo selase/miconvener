@@ -83,6 +83,18 @@ final class Tenant extends Model
         'platform_fee_percentage' => 'float',
     ];
 
+    /**
+     * Whether the platform itself holds credentials to collect on a tenant's behalf.
+     *
+     * New tenants default to platform_default settlement, so without this check a
+     * tenant could publish a paid event and sell tickets the platform has no way
+     * to charge.
+     */
+    public static function platformSettlementIsConfigured(): bool
+    {
+        return filled(config('services.settlement.paystack.secret_key'));
+    }
+
     public function requiresDedicatedDb(): bool
     {
         return in_array($this->isolation_mode, ['db_per_tenant', 'byo']);
@@ -145,7 +157,11 @@ final class Tenant extends Model
      */
     public function canAcceptPayments(): bool
     {
-        return $this->isPlatformDefaultSettlement() || $this->hasActivePaymentGateway();
+        if ($this->isPlatformDefaultSettlement()) {
+            return self::platformSettlementIsConfigured();
+        }
+
+        return $this->hasActivePaymentGateway();
     }
 
     public function isPlatformDefaultSettlement(): bool
