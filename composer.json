@@ -1,7 +1,7 @@
 {
     "name": "purpledot/miconvener",
     "type": "project",
-    "description": "MiConvener — API-first standalone event management platform.",
+    "description": "MiConvener — multi-tenant event management platform.",
     "keywords": ["laravel", "events", "event-management"],
     "license": "MIT",
     "require": {

@@ -1,139 +1,96 @@
 # Project Tracks
 
-This file tracks all major tracks for the project. Each track has its own detailed plan in its respective folder.
+The running record of major tracks, per the SDD protocol in `.agent/rules/01-sdd-protocol.md`.
+Completed tracks are never deleted — this file is the history.
+
+Two things to know before you read it:
+
+- **There are no per-track plan folders.** Earlier entries used to link to
+  `conductor/tracks/<name>/plan.md`; none of those files were ever committed. The links
+  were removed rather than left dangling. This file is the only record.
+- **Tracks below the "Events domain" heading are the current product.** Everything above it
+  is the multi-tenant SaaS starterkit MiConvener is built on (see `manual.md`), largely
+  finished before the event platform work began.
 
 ---
 
 ## [x] Track: Baseline Inventory & Safety Checks
 
-_Link: [./conductor/tracks/baseline_20260113/](./conductor/tracks/baseline_20260113/)_
-
 ## [x] Track: Landlord Database & Tenancy Registry
-
-_Link: [./conductor/tracks/landlord_registry_20260113/](./conductor/tracks/landlord_registry_20260113/)_
 
 ## [x] Track: Secrets Abstraction
 
-_Link: [./conductor/tracks/secrets_abstraction_20260113/](./conductor/tracks/secrets_abstraction_20260113/)_
-
 ## [x] Track: Tenant Context Switching
-
-_Link: [./conductor/tracks/context_switching_20260113/](./conductor/tracks/context_switching_20260113/)_
 
 ## [x] Track: Tenant Models & Strategy
 
-_Link: [./conductor/tracks/tenant_models_20260113/](./conductor/tracks/tenant_models_20260113/)_
-
 ## [x] Track: Tenant-Aware Queues & Jobs
-
-_Link: [./conductor/tracks/tenant_queues_20260113/](./conductor/tracks/tenant_queues_20260113/)_
 
 ## [x] Track: Tenant Migrations Orchestration
 
-_Link: [./conductor/tracks/tenant_migrations_20260113/](./conductor/tracks/tenant_migrations_20260113/)_
-
 ## [x] Track: Postgres Path
-
-_Link: [./conductor/tracks/postgres_support_20260113/](./conductor/tracks/postgres_support_20260113/)_
 
 ## [x] Track: Storage Foundations
 
-_Link: [./conductor/tracks/storage_foundations_20260113/](./conductor/tracks/storage_foundations_20260113/)_
-
 ## [x] Track: RBAC Tenant Scoping
-
-_Link: [./conductor/tracks/rbac_scoping_20260113/](./conductor/tracks/rbac_scoping_20260113/)_
 
 ## [x] Track: Feature Flags Tenant-Scoped
 
-_Link: [./conductor/tracks/feature_flags_20260113/](./conductor/tracks/feature_flags_20260113/)_
-
 ## [x] Track: Encryption at Rest & Field Encryption
-
-_Link: [./conductor/tracks/encryption_20260113/](./conductor/tracks/encryption_20260113/)_
 
 ## [x] Track: Operational Telemetry Foundations
 
-_Link: [./conductor/tracks/telemetry_20260113/](./conductor/tracks/telemetry_20260113/)_
-
 ## [x] Track: Tests & Quality Gates
-_Link [./conductor/tracks/quality_gates_20260113/](./conductor/tracks/quality_gates_20260113/)_
 
 ## [x] Track: Convert All Tests to Pest
-_Link: [./conductor/tracks/pest_conversion_20260115/](./conductor/tracks/pest_conversion_20260115/)
 
 ## [x] Track: Implement Subdomain-Based Tenant Routing
-_Link: [./conductor/tracks/subdomain_routing_20260116/](./conductor/tracks/subdomain_routing_20260116/)
 
 ## [x] Track: Automated Tenant Provisioning
-_Link: [./conductor/tracks/automated_provisioning.md](./conductor/tracks/automated_provisioning.md)
 
 ## [x] Track: Tenant-Level Settings & Branding
-_Link: [./conductor/tracks/tenant_settings.md](./conductor/tracks/tenant_settings.md)
 
 ## [x] Track: Metered Features & Usage Limits
-_Link: [./conductor/tracks/metered_features.md](./conductor/tracks/metered_features.md)
 
 ## [x] Track: Roles, Permissions, Feature Flags & Packages
-_Link: [./conductor/tracks/roles_permissions_packages.md](./conductor/tracks/roles_permissions_packages.md)
 
 ## [x] Track: Organizational Role Management
-_Link: [./conductor/tracks/tenant_role_management/plan.md](./conductor/tracks/tenant_role_management/plan.md)
 
 ## [x] Track: Subscription & Billing Integration
-_Link: [./conductor/tracks/subscription_billing/plan.md](./conductor/tracks/subscription_billing/plan.md)
 
 ## [x] Track: API & Developer Tokens
-_Link: [./conductor/tracks/api_tokens/plan.md](./conductor/tracks/api_tokens/plan.md)
 
 ## [x] Track: Dashboard Analytics & Reporting
-_Link: [./conductor/tracks/analytics_reporting/plan.md](./conductor/tracks/analytics_reporting/plan.md)
 
 ## [x] Track: Onboarding Flows
-_Link: [./conductor/tracks/onboarding_flows/plan.md](./conductor/tracks/onboarding_flows/plan.md)
 
 ## [x] Track: Deployment & CI/CD
-_Link: [./conductor/tracks/deployment_cicd/plan.md](./conductor/tracks/deployment_cicd/plan.md)
 
 ## [x] Track: Product Page Kit
-_Link: [./conductor/tracks/product_page_kit/plan.md](./conductor/tracks/product_page_kit/plan.md)
 
 ## [x] Track: Tenant API Keys + LLM Token Usage
-_Link: [./conductor/tracks/llm_api_management/plan.md](./conductor/tracks/llm_api_management/plan.md)_
 
 ## [x] Track: Tenancy Confidence Suite
-_Link: [./conductor/tracks/tenancy_confidence/plan.md](./conductor/tracks/tenancy_confidence/plan.md)_
 
 ## [x] Track: Enterprise Lead Capture
-_Link: [./conductor/tracks/enterprise_lead_capture.md](./conductor/tracks/enterprise_lead_capture.md)_
 
 ## [x] Track: Tenant Health Dashboard
-_Link: [./conductor/tracks/tenant_health_dashboard.md](./conductor/tracks/tenant_health_dashboard.md)_
 
 ## [x] Track: Premium Asset Generation
-_Link: [./conductor/tracks/premium_assets.md](./conductor/tracks/premium_assets.md)_
 
 ## [x] Track: Enterprise Security (2FA)
-_Link: [./conductor/tracks/enterprise_2fa.md](./conductor/tracks/enterprise_2fa.md)_
 
 ## [x] Track: Real KMS integration
-_Link: [./conductor/tracks/kms_integration.md](./conductor/tracks/kms_integration.md)_
 
 ## [x] Track: Audit Log Export
-_Link: [./conductor/tracks/audit_log_export.md](./conductor/tracks/audit_log_export.md)_
 
 ## [x] Track: Visual Dashboard Polish
-_Link: [./conductor/tracks/dashboard_polish.md](./conductor/tracks/dashboard_polish.md)_
 
 ## [x] Track: Advanced Team Roles (Multi-Role)
-_Link: [./conductor/tracks/team_roles.md](./conductor/tracks/team_roles.md)_
 
 ## [x] Track: Custom Domain Support
-_Link: [./conductor/tracks/custom_domain_support.md](./conductor/tracks/custom_domain_support.md)_
 
 ## [x] Track: Tenant Usage Metering & Billing
-_Link: [./conductor/tracks/tenant_usage_billing/metadata.json](./conductor/tracks/tenant_usage_billing/metadata.json)_
-
 
 <!-- Track: Billing Module using existing user rule to append to conductor/tracks.md instead of deleting -->
 ## Billing Module (Completed)
@@ -144,23 +101,83 @@ _Link: [./conductor/tracks/tenant_usage_billing/metadata.json](./conductor/track
 - [x] Update Sidebar with Billing module
 
 ## [x] Track: Enhanced Analytics Filtering & Drill-down
-_Link: [./conductor/tracks/analytics_features_20260122/plan.md](./conductor/tracks/analytics_features_20260122/plan.md)_
 
 ## [x] Track: PostgreSQL Migration Audit
-_Link: [./conductor/tracks/postgres_migration_audit/plan.md](./conductor/tracks/postgres_migration_audit/plan.md)_
 
 ## [x] Track: Modern Invoicing Experience
-_Link: [./conductor/tracks/modern_invoicing/plan.md](./conductor/tracks/modern_invoicing/plan.md)_
 
 ## [x] Track: Tenant Commerce & Finance
-_Link: [./conductor/tracks/tenant_commerce_finance/plan.md](./conductor/tracks/tenant_commerce_finance/plan.md)_
-## [x] Track: Tenant-Aware Global Search
-_Link: [./conductor/tracks/global_search/plan.md](./conductor/tracks/global_search/plan.md)_
 
-## [ ] Track: Outgoing Webhooks
-_Link: [./conductor/tracks/outgoing_webhooks/plan.md](./conductor/tracks/outgoing_webhooks/plan.md)_
+## [x] Track: Tenant-Aware Global Search
 
 ## [x] Track: Entitlement & Authorization Bridge
-_Link: [./conductor/tracks/entitlement_bridge/plan.md](./conductor/tracks/entitlement_bridge/plan.md)_
-## [ ] Track: Paystack Recurring Billing & Dunning
-_Link: [./implementation.md](./implementation.md)_
+
+## [x] Track: Paystack Recurring Billing & Dunning
+
+Verified by `tests/Feature/Billing/PaystackWebhookTest.php` (5 passing): signature rejection,
+`charge.success` extending `ends_at`, `invoice.payment_failed` sending dunning without
+cancelling, and `subscription.disable` reverting the tenant to the `free` package.
+Shipped: `VerifyPaystackSignature`, the three `app/Jobs/Billing/Process*` handlers,
+the three `app/Mail/Billing/` mailables, `RequireActiveSubscription` middleware, and
+`paystack:simulate` (`App\Services\Billing\PaystackSimulatorService`).
+
+## [-] Track: Outgoing Webhooks — delivery engine done, no console UI
+
+Built and wired: `WebhookEndpoint` / `WebhookCall` models, `SendWebhookJob`
+(`tests/Feature/Jobs/SendWebhookJobTest.php`), and `WebhookEventSubscriber` registered in
+`EventServiceProvider`. Missing: any route or page for a tenant to create, edit or inspect
+an endpoint — rows can only be created directly in the database. Also unbuilt: delivery-log
+replay, dead-letter queue, and the webhook simulator.
+
+---
+
+# Events domain (MiConvener)
+
+The event platform itself. Built against `miconvener.md` §4–9 without per-track entries at the
+time; recorded here retrospectively from the code and git history, so treat the granularity as
+coarser than the starterkit tracks above.
+
+## [x] Track: Event core, ticketing & registration
+
+Events, ticket types, and registrations across seven statuses (`pending_payment`, `confirmed`,
+`cancelled`, `checked_in`, `pending_approval`, `rejected`, `waitlisted`), with approval and
+waitlist flows, capacity, and the public `/e/{event}` registration and checkout surface.
+
+## [x] Track: Programme, speakers & venue
+
+Sessions with reorder and per-session capacity, a reusable speaker directory, token-scoped
+speaker portal (confirm, upload slides), venue rooms and seat assignment, and ICS export
+for both the programme and an attendee's personal agenda.
+
+## [x] Track: On-site operations
+
+QR check-in with search and scan, badge tiers and print logging, and event service requests.
+
+## [x] Track: Engagement
+
+Live polls and quizzes with leaderboards and response moderation, a threaded event forum with
+votes, reports and bans, and controlled material downloads.
+
+## [x] Track: Communications & reporting
+
+Scheduled event blasts with per-recipient open tracking, and ten report exports
+(registrations, check-ins, forum, polls, attendee directory, session attendance,
+dietary/accessibility, audit log, certificates, sponsor deliverables).
+
+## [x] Track: Payments & settlement
+
+The highest-risk area, and where the recent hardening commits concentrate. Two settlement
+modes per tenant (`platform_default` charges through the platform's own Paystack account;
+`own_gateway` uses the tenant's credentials), an append-only `event_ledger_entries` table
+(charge / refund / payout) that the finance screen and available-balance check read from,
+payout accounts verified by name-enquiry before use, and the payout send → transfer webhook →
+`paid` lifecycle with row locking on both the balance check and the send.
+`payouts:reconcile` (scheduled every 15 minutes) chases payouts whose transfer webhook never
+arrived, so a lost webhook cannot strand money that has already left the platform.
+
+## [ ] Track: Commerce gaps vs. `miconvener.md` §5
+
+Not started, and each is called for by the brief: promo codes, discounts and complimentary
+tickets; invite-only ticket types with access codes; `payout_schedules` (holdback,
+T+N-after-event automatic payouts — payouts are manual/on-demand only today); and a true
+double-entry ledger with balanced accounts, the current event ledger being single-sided.

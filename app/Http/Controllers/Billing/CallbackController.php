@@ -10,6 +10,7 @@ use App\Mail\SubscriptionConfirmedMail;
 use App\Models\Invoice;
 use App\Models\Package;
 use App\Models\Transaction;
+use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\WalletService;
 use App\Services\Tenancy\TenantContext;
@@ -17,7 +18,6 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -227,27 +227,16 @@ final class CallbackController extends Controller
                 ->with('error', 'Invalid token pack fulfillment.');
         }
 
-        $pack = $packs[$packKey];
-        $tokens = (int) $pack['tokens'];
+        $tokens = (int) $packs[$packKey]['tokens'];
 
-        DB::connection('landlord')->table('tenants')
-            ->where('id', $tenant->id)
-            ->increment('llm_topup_balance', $tokens);
-
-        Transaction::create([
-            'tenant_id' => $tenant->id,
-            'amount' => (int) round((float) $pack['price'] * 100),
-            'currency' => $pack['currency'],
-            'status' => 'success',
-            'type' => 'credit',
-            'provider' => config('services.payment.default', 'stripe'),
-            'provider_transaction_id' => (string) ($result['transaction_id'] ?? 'token_purchase_'.now()->timestamp),
-            'meta' => [
-                'type' => 'llm_token_purchase',
-                'pack_key' => $packKey,
-                'tokens' => $tokens,
-            ],
-        ]);
+        // Shared with the webhook and keyed on the provider's reference, so a
+        // refreshed callback page cannot credit the same pack twice and the
+        // webhook cannot credit it again after the browser already did.
+        app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase(
+            $tenant,
+            (string) ($result['transaction_id'] ?? ''),
+            (array) data_get($result, 'metadata', []),
+        );
 
         return redirect()->route('tenant.llm-usage.index', ['subdomain' => $tenant->slug])
             ->with('success', 'Success! '.number_format($tokens).' tokens have been added to your balance.');

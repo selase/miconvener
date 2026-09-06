@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Package;
 use App\Models\Tenant;
 use App\Models\Transaction;
+use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\WalletService;
 use Carbon\Carbon;
@@ -193,6 +194,41 @@ final class WebhookController extends Controller
                 ]);
 
                 Log::info("Paystack: wallet top-up {$credits} credits for tenant {$tenant->id}");
+            }
+
+            return;
+        }
+
+        // Token packs and invoices used to be fulfilled only when the customer's
+        // browser came back from the provider. A mobile money payment is approved
+        // on the customer's phone and that tab often never returns, which took the
+        // money and delivered nothing. The webhook always arrives, so it fulfils
+        // them here too; both routes are idempotent, so whichever lands first wins.
+        $reference = (string) ($data['reference'] ?? '');
+
+        if ($metaType === 'llm_token_purchase') {
+            if (app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase($tenant, $reference, $metadata)) {
+                Log::info("Paystack: fulfilled token purchase for tenant {$tenant->id} via webhook");
+            }
+
+            return;
+        }
+
+        if (in_array($metaType, ['invoice_payment', 'metered_invoice'], true)) {
+            $invoiceId = $metadata['invoice_id'] ?? null;
+
+            if ($invoiceId) {
+                $paid = app(PaymentFulfillmentService::class)->fulfillInvoice(
+                    $tenant,
+                    (string) $invoiceId,
+                    $reference,
+                    (int) ($data['amount'] ?? 0),
+                    mb_strtoupper((string) ($data['currency'] ?? 'GHS')),
+                );
+
+                if ($paid) {
+                    Log::info("Paystack: marked invoice {$invoiceId} paid for tenant {$tenant->id} via webhook");
+                }
             }
 
             return;

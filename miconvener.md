@@ -2,6 +2,19 @@
 
 > **Purpose of this document:** a complete build brief to hand to an LLM (or an engineering team) to design and implement a standalone, headless event management platform exposed entirely through APIs, which other products can integrate with.
 
+> ⚠️ **Scope note — read before planning any work from this document.**
+> The API-first architecture in **§1–3** was considered and **deliberately not adopted**. MiConvener
+> is being built as a server-rendered multi-tenant Inertia + React monolith. None of the following
+> exists or is planned: a versioned `/api/v1` product surface, OAuth2 client-credentials or PKCE
+> scopes, the public webhook event catalogue in §3.3, generated SDKs, or the embeddable JS widgets
+> in §3.4. Read §1–3, §9's "the management console is a client of the public API", and §5.4's
+> `/v1/...` finance endpoints as *aspirational framing only*.
+>
+> **§4–9 remain authoritative** for the domain itself — entities, registration modes, payments and
+> settlement, on-site operations, engagement, communications and exports — and are what the build
+> actually follows, delivered through the console and public event pages rather than a public API.
+> See `README.md` for the real architecture and `conductor/tracks.md` for current status.
+
 ---
 
 ## 1. Product positioning
