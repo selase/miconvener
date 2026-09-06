@@ -24,7 +24,9 @@ final class TenantProvisioner
             $this->createDatabase($tenant);
         }
 
-        $this->runMigrations($tenant);
+        if ($tenant->requiresDedicatedDb()) {
+            $this->runMigrations($tenant);
+        }
 
         if ($tenant->package_id) {
             $tenant->syncFeaturesFromPackage();
@@ -87,11 +89,19 @@ final class TenantProvisioner
         Log::info("Running migrations for tenant {$tenant->id}");
 
         try {
-            Artisan::call('tenants:migrate', [
+            $exitCode = Artisan::call('tenants:migrate', [
                 '--tenant' => $tenant->id,
             ]);
 
             Log::info(Artisan::output());
+
+            if ($exitCode !== 0) {
+                throw TenantProvisioningException::migrationFailed((string) $tenant->id);
+            }
+        } catch (TenantProvisioningException $e) {
+            Log::error("Migration failed for tenant {$tenant->id}: ".$e->getMessage());
+
+            throw $e;
         } catch (Throwable $e) {
             Log::error("Migration failed for tenant {$tenant->id}: ".$e->getMessage());
             throw TenantProvisioningException::migrationFailed($tenant->id, $e);

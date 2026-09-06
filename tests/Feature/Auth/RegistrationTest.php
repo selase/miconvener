@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Package;
-use App\Services\Tenancy\TenantProvisioner;
 use Database\Seeders\MasterFeaturePackageSeeder;
 use Stevebauman\Location\Facades\Location;
 use Stevebauman\Location\Position;
@@ -16,11 +15,6 @@ beforeEach(function () {
     );
 
     $this->seed(MasterFeaturePackageSeeder::class);
-
-    // Prevent actual DB provisioning during registration tests
-    $this->mock(TenantProvisioner::class)
-        ->shouldReceive('provision')
-        ->andReturnNull();
 });
 
 test('registration screen can be rendered', function () {
@@ -94,6 +88,11 @@ test('registration creates a tenant for the new user', function () {
     $tenant = $user->tenants()->first();
     expect($tenant->name)->toBe('Test Organization');
     expect($tenant->slug)->toBe('test-organization');
+
+    // Signups share the landlord database. A dedicated database per signup would
+    // provision one Postgres database per tenant for tables the product does not
+    // use, against the hosting provider's per-cluster database limit.
+    expect($tenant->isolation_mode)->toBe('shared');
 });
 
 test('registration requires all fields', function () {

@@ -43,6 +43,8 @@ final class TenantsMigrate extends Command
         /** @var \Illuminate\Database\Eloquent\Collection<int, Tenant> $tenants */
         $tenants = $query->get();
 
+        $failed = false;
+
         foreach ($tenants as $tenant) {
             $this->info("Migrating tenant: {$tenant->name} ({$tenant->id})");
 
@@ -85,11 +87,15 @@ final class TenantsMigrate extends Command
                 $this->error($e->getMessage());
             }
 
+            if ($status === 'failed') {
+                $failed = true;
+            }
+
             $finish = now();
             $this->logRun((string) $tenant->id, $status, $output, $exception, $start, $finish);
         }
 
-        return Command::SUCCESS;
+        return $failed ? Command::FAILURE : Command::SUCCESS;
     }
 
     private function logRun(string $tenantId, string $status, ?string $output, ?string $exception, \Carbon\CarbonInterface $start, \Carbon\CarbonInterface $finish): void

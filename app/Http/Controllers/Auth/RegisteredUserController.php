@@ -78,7 +78,7 @@ final class RegisteredUserController extends Controller
             'slug' => $slug,
             'email' => $request->string('email')->toString(),
             'status' => TenantStatusEnum::ACTIVE,
-            'isolation_mode' => 'db_per_tenant',
+            'isolation_mode' => 'shared',
             'db_driver' => 'pgsql',
         ]);
 
