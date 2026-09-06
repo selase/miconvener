@@ -16,7 +16,11 @@ final class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
-        $schedule->command(RunHealthChecksCommand::class)->everyMinute();
+        // Deliberately not every minute. The environment scales to zero and the
+        // scheduler wakes it, so a per-minute task holds it awake continuously and
+        // the scale-to-zero setting buys nothing. Aligned with payouts:reconcile so
+        // both run in the same wake window rather than each causing its own.
+        $schedule->command(RunHealthChecksCommand::class)->everyFifteenMinutes();
         $schedule->command('backup:clean')->daily()->at('01:00');
         $schedule->command('backup:run')->daily()->at('01:30');
         $schedule->command('backup:monitor')->dailyAt('02:00');
