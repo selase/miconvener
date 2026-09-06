@@ -18,7 +18,6 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
     config(['services.settlement.paystack.secret_key' => 'sk_settlement_test_123']);
-    config(['services.settlement.paystack.webhook_secret' => 'sk_settlement_test_123']);
 });
 
 function payoutSendingHost(): array

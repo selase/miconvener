@@ -21,12 +21,15 @@ final class SettlementWebhookController extends Controller
      * Handles both platform_default charge confirmations and payout
      * transfer confirmations — both originate from Purpledot's own
      * Paystack account, so both are verified against the platform's own
-     * webhook secret, not any tenant's.
+     * secret key. Paystack has no separate webhook-signing secret (unlike
+     * Stripe): it signs the raw body with the same secret API key used to
+     * make requests, so this must match PaystackSettlementGateway's key,
+     * not a distinct "webhook secret" value.
      */
     public function handle(Request $request)
     {
         $signature = $request->header('x-paystack-signature');
-        $secret = config('services.settlement.paystack.webhook_secret');
+        $secret = config('services.settlement.paystack.secret_key');
 
         if (! $signature || ! $secret || $signature !== hash_hmac('sha512', $request->getContent(), (string) $secret)) {
             Log::warning('Settlement webhook signature verification failed');

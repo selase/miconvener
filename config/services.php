@@ -58,9 +58,11 @@ return [
     'settlement' => [
         'default' => env('SETTLEMENT_DRIVER', 'paystack'),
         'paystack' => [
+            // Paystack has no separate webhook-signing secret (unlike
+            // Stripe) — it signs webhooks with this same secret key, so
+            // the settlement webhook verifies against secret_key too.
             'secret_key' => env('SETTLEMENT_PAYSTACK_SECRET_KEY'),
             'public_key' => env('SETTLEMENT_PAYSTACK_PUBLIC_KEY'),
-            'webhook_secret' => env('SETTLEMENT_PAYSTACK_WEBHOOK_SECRET'),
         ],
     ],
 

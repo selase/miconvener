@@ -17,7 +17,6 @@ beforeEach(function () {
     refreshTenantDatabases();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
-    config(['services.settlement.paystack.webhook_secret' => 'settlement_webhook_secret_test']);
 });
 
 function chargeLedgerHost(string $slug): array
@@ -81,7 +80,6 @@ test('a platform_default charge.success confirms the registration via tenant_id 
     [$tenant] = chargeLedgerHost('acme');
     $platformSecret = 'sk_settlement_platform_secret';
     config(['services.settlement.paystack.secret_key' => $platformSecret]);
-    config(['services.settlement.paystack.webhook_secret' => $platformSecret]);
 
     $event = Event::factory()->published()->paid(10_000)->create(['tenant_id' => $tenant->id, 'platform_fee_percentage' => 5.0]);
     $registration = EventRegistration::factory()->pendingPayment()->create([
@@ -120,9 +118,47 @@ test('a platform_default charge.success confirms the registration via tenant_id 
 });
 
 test('an invalid settlement webhook signature is rejected', function () {
-    config(['services.settlement.paystack.webhook_secret' => 'real_secret']);
+    config(['services.settlement.paystack.secret_key' => 'real_secret']);
 
     $response = $this->call('POST', '/webhooks/settlement/paystack', [], [], [], ['HTTP_x-paystack-signature' => 'wrong-signature', 'CONTENT_TYPE' => 'application/json'], json_encode(['event' => 'charge.success', 'data' => []]));
 
     $response->assertStatus(400);
+});
+
+test('the settlement webhook verifies signatures using the platform secret key, not a separate webhook secret', function () {
+    Mail::fake();
+    [$tenant] = chargeLedgerHost('acme');
+    $platformSecret = 'sk_settlement_real_key';
+    config(['services.settlement.paystack.secret_key' => $platformSecret]);
+    // Paystack has no separate webhook-signing secret (unlike Stripe) — it
+    // signs with the same secret API key. Deliberately setting a different,
+    // unused webhook_secret proves verification doesn't depend on it.
+    config(['services.settlement.paystack.webhook_secret' => 'this-value-must-not-be-used']);
+
+    $event = Event::factory()->published()->paid(5000)->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->pendingPayment()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'guest@example.com',
+        'amount' => 5000,
+    ]);
+
+    $payload = [
+        'event' => 'charge.success',
+        'data' => [
+            'reference' => 'ref_secret_key_check',
+            'amount' => 5000,
+            'fees' => 0,
+            'currency' => 'GHS',
+            'customer' => ['email' => 'guest@example.com', 'first_name' => 'Paying', 'last_name' => 'Guest'],
+            'metadata' => ['event_registration_id' => $registration->id, 'tenant_id' => $tenant->id, 'type' => 'event_ticket'],
+        ],
+    ];
+    $body = json_encode($payload);
+    $signature = hash_hmac('sha512', $body, $platformSecret);
+
+    $this->call('POST', '/webhooks/settlement/paystack', [], [], [], ['HTTP_x-paystack-signature' => $signature, 'CONTENT_TYPE' => 'application/json'], $body)
+        ->assertOk();
+
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CONFIRMED);
 });
