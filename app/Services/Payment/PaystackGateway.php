@@ -121,7 +121,9 @@ final class PaystackGateway implements PaymentGateway
 
             $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/refund", $payload)->throw();
 
-            return $response->json('data.id') ?? 'pending';
+            $refundId = $response->json('data.id');
+
+            return $refundId === null ? 'pending' : (string) $refundId;
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
         }
