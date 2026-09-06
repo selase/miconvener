@@ -27,6 +27,7 @@ yarn-error.log
 AGENTS.md
 GEMINI.md
 .github/copilot-instructions.md
+/.codex
 
 # Local git worktrees
 /.worktrees
