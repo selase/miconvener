@@ -34,6 +34,10 @@ final class Kernel extends ConsoleKernel
         // Invoicing
         $schedule->command('billing:generate-invoices')->monthlyOn(1, '05:00');
 
+        // Settlement — chase payouts whose transfer webhook never arrived, so a
+        // lost webhook cannot strand money that has already left the platform.
+        $schedule->command('payouts:reconcile')->everyFifteenMinutes()->withoutOverlapping();
+
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
     }

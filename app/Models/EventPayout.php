@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class EventPayout extends Model
 {
@@ -53,5 +54,10 @@ final class EventPayout extends Model
     public function payoutAccount(): BelongsTo
     {
         return $this->belongsTo(TenantPayoutAccount::class, 'payout_account_id');
+    }
+
+    public function ledgerEntries(): HasMany
+    {
+        return $this->hasMany(EventLedgerEntry::class, 'payout_id');
     }
 }

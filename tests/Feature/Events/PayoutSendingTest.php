@@ -150,7 +150,10 @@ test('a processing payout cannot be manually moved back to scheduled or to paid'
     expect($payout->fresh())->status->toBe(EventPayout::STATUS_PROCESSING)->paid_at->toBeNull();
 });
 
-test('a platform_default tenant cannot manually mark a scheduled payout as paid', function () {
+test('a platform_default tenant can record a payout settled outside the platform', function () {
+    // Automated transfers are unavailable while the provider account requires a
+    // one-time code per transfer, so recording a payout made by hand is the
+    // operating path, not a loophole. It still may not overwrite a live transfer.
     [$tenant, $user] = payoutSendingHost();
     expect($tenant->isPlatformDefaultSettlement())->toBeTrue();
 
@@ -168,9 +171,36 @@ test('a platform_default tenant cannot manually mark a scheduled payout as paid'
 
     $response = $this->actingAs($user)->patchJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}", ['status' => 'paid'], ['HTTP_HOST' => $host]);
 
-    $response->assertStatus(422);
-    expect($response->json('message'))->toContain('Send payout');
-    expect($payout->fresh())->status->toBe(EventPayout::STATUS_SCHEDULED)->paid_at->toBeNull();
+    $response->assertOk();
+    expect($payout->fresh())->status->toBe(EventPayout::STATUS_PAID)->paid_at->not->toBeNull();
+
+    // The payout has to reach the ledger too, or the settlement statement lists
+    // no line item for money that has demonstrably left.
+    $entries = $payout->fresh()->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->get();
+    expect($entries)->toHaveCount(1);
+    expect($entries->first()->gross_amount)->toBe($payout->amount);
+    expect($entries->first()->provider)->toBe('manual');
+});
+
+test('recording a payout paid twice does not double the ledger', function () {
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+    $payout = EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'payout_account_id' => $account->id,
+        'status' => EventPayout::STATUS_SCHEDULED,
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+    $url = "http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}";
+
+    $this->actingAs($user)->patchJson($url, ['status' => 'paid'], ['HTTP_HOST' => $host])->assertOk();
+    $this->actingAs($user)->patchJson($url, ['status' => 'paid'], ['HTTP_HOST' => $host])->assertOk();
+
+    expect($payout->fresh()->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->count())->toBe(1);
 });
 
 test('a transfer.success webhook flips the payout to paid and writes one payout ledger row, idempotently', function () {

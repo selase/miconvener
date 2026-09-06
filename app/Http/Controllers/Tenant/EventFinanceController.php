@@ -185,22 +185,43 @@ final class EventFinanceController extends Controller
             'status' => ['required', Rule::in([EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PAID])],
         ]);
 
-        $payoutModel = $eventModel->payouts()->where('id', $payout)->firstOrFail();
+        return DB::transaction(function () use ($eventModel, $payout, $validated): JsonResponse {
+            // Locked for the same reason as sending: a live transfer must not be
+            // overwritten by a manual status change decided from stale data.
+            $payoutModel = $eventModel->payouts()->where('id', $payout)->lockForUpdate()->firstOrFail();
 
-        if ($payoutModel->status === EventPayout::STATUS_PROCESSING) {
-            return response()->json(['message' => 'This payout is currently being sent and cannot be manually updated. Wait for the transfer to complete, or check back shortly.'], 422);
-        }
+            if ($payoutModel->status === EventPayout::STATUS_PROCESSING) {
+                return response()->json(['message' => 'This payout is currently being sent and cannot be manually updated. Wait for the transfer to complete, or check back shortly.'], 422);
+            }
 
-        if ($validated['status'] === EventPayout::STATUS_PAID && $tenant->isPlatformDefaultSettlement()) {
-            return response()->json(['message' => 'Platform-default payouts are marked paid automatically once the transfer completes — use "Send payout" instead.'], 422);
-        }
+            $markingPaid = $validated['status'] === EventPayout::STATUS_PAID;
 
-        $payoutModel->update([
-            'status' => $validated['status'],
-            'paid_at' => $validated['status'] === EventPayout::STATUS_PAID ? now() : null,
-        ]);
+            $payoutModel->update([
+                'status' => $validated['status'],
+                'paid_at' => $markingPaid ? now() : null,
+            ]);
 
-        return response()->json(['message' => 'Payout updated.']);
+            // A payout settled outside the platform still has to reach the ledger,
+            // or it is missing from the settlement statement's line items while
+            // still counting against the reconciliation totals.
+            if ($markingPaid && ! $payoutModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->exists()) {
+                EventLedgerEntry::create([
+                    'tenant_id' => $payoutModel->tenant_id,
+                    'event_id' => $payoutModel->event_id,
+                    'type' => EventLedgerEntry::TYPE_PAYOUT,
+                    'payout_id' => $payoutModel->id,
+                    'gross_amount' => $payoutModel->amount,
+                    'gateway_fee_amount' => 0,
+                    'commission_amount' => 0,
+                    'net_amount' => $payoutModel->amount,
+                    'currency' => $eventModel->currency,
+                    'provider' => 'manual',
+                    'provider_reference' => $payoutModel->provider_reference,
+                ]);
+            }
+
+            return response()->json(['message' => 'Payout updated.']);
+        });
     }
 
     public function exportSettlementStatement(string $subdomain, string $event): StreamedResponse
