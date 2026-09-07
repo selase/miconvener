@@ -45,6 +45,60 @@ final class FinanceController extends Controller
             : $this->merchantTransactionBackedIndex($request, $tenant);
     }
 
+    public function refund(Request $request, string $subdomain, MerchantTransaction $transaction)
+    {
+        $tenant = $this->tenantContext->getTenant();
+
+        $this->authorize('update event');
+
+        if (! $tenant->featureEnabled('commerce')) {
+            abort(403);
+        }
+
+        if ($transaction->tenant_id !== $tenant->id) {
+            abort(403);
+        }
+
+        if ($transaction->status !== 'succeeded' || $transaction->type !== 'payment') {
+            return back()->with('error', 'This transaction has already been refunded or is not eligible for a refund.');
+        }
+
+        $merchantGateway = $this->resolveTenantGatewayFor($tenant, $transaction);
+
+        if (! $merchantGateway) {
+            return back()->with(
+                'error',
+                "Refund failed: no active {$transaction->provider} gateway is configured for this organizer. Configure it under Settings > Payments and try again."
+            );
+        }
+
+        try {
+            $refundId = $merchantGateway->refund($transaction->provider_transaction_id);
+
+            MerchantTransaction::create([
+                'tenant_id' => $tenant->id,
+                'provider' => $transaction->provider,
+                'provider_transaction_id' => $refundId !== 'pending' ? $refundId : 'REF_'.$transaction->provider_transaction_id,
+                'amount' => $transaction->amount,
+                'currency' => $transaction->currency,
+                'status' => 'succeeded',
+                'type' => 'refund',
+                'description' => 'Refund for '.$transaction->provider_transaction_id,
+                'customer_email' => $transaction->customer_email,
+                'meta' => ['refund_id' => $refundId],
+            ]);
+
+            $transaction->update(['status' => 'refunded']);
+
+            return back()->with('success', 'Refund processed successfully.');
+
+        } catch (Exception $e) {
+            Log::error('Merchant refund failed', ['tenant' => $tenant->id, 'error' => $e->getMessage()]);
+
+            return back()->with('error', 'Refund failed: '.$e->getMessage());
+        }
+    }
+
     private function merchantTransactionBackedIndex(Request $request, Tenant $tenant): Response
     {
         $query = MerchantTransaction::where('tenant_id', $tenant->id)->latest();
@@ -156,60 +210,6 @@ final class FinanceController extends Controller
             'stats' => $stats,
             'filters' => $request->only(['search', 'status']),
         ]);
-    }
-
-    public function refund(Request $request, string $subdomain, MerchantTransaction $transaction)
-    {
-        $tenant = $this->tenantContext->getTenant();
-
-        $this->authorize('update event');
-
-        if (! $tenant->featureEnabled('commerce')) {
-            abort(403);
-        }
-
-        if ($transaction->tenant_id !== $tenant->id) {
-            abort(403);
-        }
-
-        if ($transaction->status !== 'succeeded' || $transaction->type !== 'payment') {
-            return back()->with('error', 'This transaction has already been refunded or is not eligible for a refund.');
-        }
-
-        $merchantGateway = $this->resolveTenantGatewayFor($tenant, $transaction);
-
-        if (! $merchantGateway) {
-            return back()->with(
-                'error',
-                "Refund failed: no active {$transaction->provider} gateway is configured for this organizer. Configure it under Settings > Payments and try again."
-            );
-        }
-
-        try {
-            $refundId = $merchantGateway->refund($transaction->provider_transaction_id);
-
-            MerchantTransaction::create([
-                'tenant_id' => $tenant->id,
-                'provider' => $transaction->provider,
-                'provider_transaction_id' => $refundId !== 'pending' ? $refundId : 'REF_'.$transaction->provider_transaction_id,
-                'amount' => $transaction->amount,
-                'currency' => $transaction->currency,
-                'status' => 'succeeded',
-                'type' => 'refund',
-                'description' => 'Refund for '.$transaction->provider_transaction_id,
-                'customer_email' => $transaction->customer_email,
-                'meta' => ['refund_id' => $refundId],
-            ]);
-
-            $transaction->update(['status' => 'refunded']);
-
-            return back()->with('success', 'Refund processed successfully.');
-
-        } catch (Exception $e) {
-            Log::error('Merchant refund failed', ['tenant' => $tenant->id, 'error' => $e->getMessage()]);
-
-            return back()->with('error', 'Refund failed: '.$e->getMessage());
-        }
     }
 
     /**
