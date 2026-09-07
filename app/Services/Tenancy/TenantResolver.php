@@ -12,6 +12,14 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 final class TenantResolver
 {
     /**
+     * Hostnames that live alongside tenants on the same domain and must never be
+     * mistaken for one, or visiting them would 404 instead of serving the site.
+     *
+     * @var list<string>
+     */
+    private const array RESERVED_SUBDOMAINS = ['www'];
+
+    /**
      * Resolve the active tenant from the request.
      *
      * @throws HttpException
@@ -60,7 +68,7 @@ final class TenantResolver
             }
         }
 
-        if ($subdomain) {
+        if ($subdomain && ! in_array($subdomain, self::RESERVED_SUBDOMAINS, true)) {
             /** @var Tenant|null $tenant */
             $tenant = Tenant::where('slug', $subdomain)->first();
 
@@ -68,10 +76,14 @@ final class TenantResolver
                 return $tenant;
             }
 
-            // Only throw 404 if it looks like a tenant subdomain but no tenant exists
-            if ($request->route('subdomain')) {
-                throw new HttpException(404, 'Tenant not found');
-            }
+            // The host names an organization that does not exist. Falling through
+            // would serve whatever the catch-all routes match -- in practice the
+            // marketing landing page, on a 200 -- which tells the visitor the
+            // organization is real. This has to hold for a subdomain derived from
+            // the host as well as one captured by a route parameter: no route in
+            // the subdomain group matches "/", so a bare unknown subdomain reaches
+            // the central routes with no {subdomain} parameter set at all.
+            throw new HttpException(404, 'Tenant not found');
         }
 
         // 2. Session
