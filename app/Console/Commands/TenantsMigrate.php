@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Contracts\TenantMigratorContract;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Tenancy\TenantDatabaseManager;
-use App\Services\Tenancy\TenantMigrator;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +31,7 @@ final class TenantsMigrate extends Command
     /**
      * Execute the console command.
      */
-    public function handle(TenantContext $context, TenantDatabaseManager $dbManager, TenantMigrator $migrator): int
+    public function handle(TenantContext $context, TenantDatabaseManager $dbManager, TenantMigratorContract $migrator): int
     {
         $tenantId = (string) $this->option('tenant');
 

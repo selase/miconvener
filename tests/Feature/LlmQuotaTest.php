@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Models\Tenant;
 use App\Models\TenantApiKey;
 use App\Models\TenantFeature;
-use App\Services\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,12 +43,9 @@ final class LlmQuotaTest extends TestCase
             'key_hint' => 'test-sec',
         ]);
 
-        // Mock TenantContext
-        $this->mock(TenantContext::class, function ($mock) {
-            $mock->shouldReceive('getTenant')->andReturn($this->tenant)->byDefault();
-            $mock->shouldReceive('activeTenantId')->andReturn($this->tenant->id)->byDefault();
-            $mock->shouldReceive('setTenant')->andReturn(null);
-        });
+        // TenantContext is set for real by the AuthenticateWithApiKey middleware once
+        // it resolves the tenant from the X-API-KEY header on each request below, so
+        // it does not need to be mocked (and cannot be, since it is final).
     }
 
     public function test_it_blocks_request_when_quota_exceeded()
