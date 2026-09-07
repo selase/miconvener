@@ -6,6 +6,7 @@ namespace App\Services\Payment;
 
 use App\Contracts\PaymentGateway;
 use App\Exceptions\PaymentFailedException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -124,6 +125,17 @@ final class PaystackGateway implements PaymentGateway
             $refundId = $response->json('data.id');
 
             return $refundId === null ? 'pending' : (string) $refundId;
+        } catch (RequestException $e) {
+            // Paystack's error body carries a machine-readable "code" (e.g.
+            // transaction_reversed) alongside the human-readable message.
+            // Surface it via providerCode so callers can react to specific
+            // failure reasons instead of only having free-text to match on.
+            throw PaymentFailedException::fromProvider(
+                'paystack',
+                $e->getMessage(),
+                providerCode: $e->response->json('code'),
+                previous: $e,
+            );
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
         }

@@ -25,6 +25,21 @@ use Illuminate\Support\Facades\Mail;
 
 final class EventRegistrationController extends Controller
 {
+    /**
+     * Paystack's refund error code when the transaction was already
+     * reversed before this attempt (e.g. the organizer refunded it manually
+     * on the Paystack dashboard). The customer already has their money
+     * back, so it is not a cancellation failure.
+     */
+    private const string PAYSTACK_TRANSACTION_ALREADY_REVERSED = 'transaction_reversed';
+
+    /**
+     * Ledger sentinel used in place of a provider refund id when Paystack
+     * reports the transaction was already reversed, since that response
+     * carries no fresh refund id for us to record.
+     */
+    private const string REFUND_ALREADY_REVERSED_MARKER = 'already_reversed';
+
     public function approve(string $subdomain, string $event, string $registration): JsonResponse
     {
         $this->authorize('update event');
@@ -131,13 +146,25 @@ final class EventRegistrationController extends Controller
         try {
             $refundId = $paystack->refund($registrationModel->payment_reference);
         } catch (PaymentFailedException $e) {
-            Log::error('Automatic refund on registration cancellation failed', [
+            if ($e->providerCode !== self::PAYSTACK_TRANSACTION_ALREADY_REVERSED) {
+                Log::error('Automatic refund on registration cancellation failed', [
+                    'tenant' => $tenant->id,
+                    'registration' => $registrationModel->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json(['message' => 'Cancellation aborted: the refund could not be processed. '.$e->getMessage()], 502);
+            }
+
+            // The money is already back with the customer, which is exactly
+            // what cancelling this registration wanted, so treat it as a
+            // successful refund rather than blocking cancellation forever.
+            Log::info('Automatic refund on registration cancellation found the transaction already reversed on Paystack; completing cancellation', [
                 'tenant' => $tenant->id,
                 'registration' => $registrationModel->id,
-                'error' => $e->getMessage(),
             ]);
 
-            return response()->json(['message' => 'Cancellation aborted: the refund could not be processed. '.$e->getMessage()], 502);
+            $refundId = self::REFUND_ALREADY_REVERSED_MARKER;
         }
 
         $this->recordRefundInLedger($tenant, $registrationModel, $refundId);
@@ -195,7 +222,7 @@ final class EventRegistrationController extends Controller
             MerchantTransaction::create([
                 'tenant_id' => $tenant->id,
                 'provider' => $transaction->provider,
-                'provider_transaction_id' => $refundId !== 'pending' ? $refundId : 'REF_'.$transaction->provider_transaction_id,
+                'provider_transaction_id' => $this->hasNoProviderRefundId($refundId) ? 'REF_'.$transaction->provider_transaction_id : $refundId,
                 'amount' => $transaction->amount,
                 'currency' => $transaction->currency,
                 'status' => 'succeeded',
@@ -220,9 +247,19 @@ final class EventRegistrationController extends Controller
                 'net_amount' => -$chargeEntry->net_amount,
                 'currency' => $chargeEntry->currency,
                 'provider' => $chargeEntry->provider,
-                'provider_reference' => $refundId !== 'pending' ? $refundId : 'REF_'.$chargeEntry->provider_reference,
+                'provider_reference' => $this->hasNoProviderRefundId($refundId) ? 'REF_'.$chargeEntry->provider_reference : $refundId,
             ]);
         }
+    }
+
+    /**
+     * True when the refund id is a local sentinel rather than a real
+     * provider-issued refund id, meaning ledger rows must fall back to a
+     * derived reference instead of recording it verbatim.
+     */
+    private function hasNoProviderRefundId(string $refundId): bool
+    {
+        return in_array($refundId, ['pending', self::REFUND_ALREADY_REVERSED_MARKER], true);
     }
 
     private function confirmOrInviteToPay(EventRegistration $registration, string $reason): void
