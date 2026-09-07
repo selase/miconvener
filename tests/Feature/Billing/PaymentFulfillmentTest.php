@@ -55,7 +55,7 @@ test('a token purchase is fulfilled by the webhook when the browser never return
             'amount' => 500,
             'currency' => 'USD',
             'customer' => ['email' => 'owner@example.com'],
-            'metadata' => ['type' => 'llm_token_purchase', 'tenant_id' => $tenant->id, 'pack_key' => 'starter'],
+            'metadata' => ['source' => 'miconvener', 'type' => 'llm_token_purchase', 'tenant_id' => $tenant->id, 'pack_key' => 'starter'],
         ],
     ])->assertOk();
 
@@ -73,7 +73,7 @@ test('a redelivered token purchase does not credit the pack twice', function ():
             'amount' => 500,
             'currency' => 'USD',
             'customer' => ['email' => 'owner@example.com'],
-            'metadata' => ['type' => 'llm_token_purchase', 'tenant_id' => $tenant->id, 'pack_key' => 'starter'],
+            'metadata' => ['source' => 'miconvener', 'type' => 'llm_token_purchase', 'tenant_id' => $tenant->id, 'pack_key' => 'starter'],
         ],
     ];
 
@@ -112,7 +112,7 @@ test('an invoice is marked paid by the webhook when the browser never returns', 
             'amount' => 12_000,
             'currency' => 'GHS',
             'customer' => ['email' => 'owner@example.com'],
-            'metadata' => ['type' => 'metered_invoice', 'invoice_id' => $invoice->id],
+            'metadata' => ['source' => 'miconvener', 'type' => 'metered_invoice', 'invoice_id' => $invoice->id],
         ],
     ])->assertOk();
 
@@ -135,7 +135,7 @@ test('a redelivered invoice payment does not record a second payment', function 
             'amount' => 12_000,
             'currency' => 'GHS',
             'customer' => ['email' => 'owner@example.com'],
-            'metadata' => ['type' => 'invoice_payment', 'invoice_id' => $invoice->id],
+            'metadata' => ['source' => 'miconvener', 'type' => 'invoice_payment', 'invoice_id' => $invoice->id],
         ],
     ];
 

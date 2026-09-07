@@ -15,7 +15,7 @@ final class LlmCheckoutController extends Controller
     public function store(Request $request, PaymentGateway $gateway, TenantContext $tenantContext)
     {
         $tenant = $tenantContext->getTenant();
-        if (!$tenant instanceof \App\Models\Tenant) {
+        if (! $tenant instanceof \App\Models\Tenant) {
             abort(404, 'Tenant not found');
         }
 
@@ -45,6 +45,7 @@ final class LlmCheckoutController extends Controller
                 'tenant_id' => $tenant->id,
                 'pack_key' => $packKey,
                 'type' => 'llm_token_purchase',
+                'source' => config('services.paystack.metadata_source'),
                 'description' => "Purchase: {$pack['name']} ({$pack['tokens']} tokens)",
             ]
         );

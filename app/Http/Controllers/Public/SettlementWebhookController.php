@@ -54,12 +54,31 @@ final class SettlementWebhookController extends Controller
         $event = $request->input('event');
         $data = $request->input('data');
 
+        $metadata = (array) ($data['metadata'] ?? []);
+
+        // The platform's Paystack account is shared with other applications, so
+        // this one webhook URL receives their events too. Acting on a charge that
+        // is not ours would be quietly destructive: the billing handler resolves a
+        // tenant by customer email, so another application's payment from someone
+        // who also has an account here would provision them a subscription they
+        // never bought. Transfers are exempt because ownership is already proven
+        // by the payout reference, which only matches a payout this platform
+        // created.
+        if (! $this->isOurs($event, $metadata)) {
+            Log::info('Ignoring Paystack event belonging to another application', [
+                'event' => $event,
+                'source' => $metadata['source'] ?? null,
+            ]);
+
+            return response()->json(['status' => 'ignored']);
+        }
+
         // Only ticket charges and payout transfers belong to settlement. Anything
         // else is subscription billing, which was previously dropped on the floor
         // here: the match arm's default returned 200 and did nothing, so pointing
         // the account's single webhook URL at this endpoint silently discarded
         // every subscription event.
-        if (! $this->isSettlementEvent($event, (array) ($data['metadata'] ?? []))) {
+        if (! $this->isSettlementEvent($event, $metadata)) {
             return $billing->handlePaystack($request, $provisioningService);
         }
 
@@ -71,7 +90,7 @@ final class SettlementWebhookController extends Controller
 
         try {
             match ($event) {
-                'charge.success' => $this->confirmPlatformDefaultCharge((array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
+                'charge.success' => $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
                 'transfer.success', 'transfer.failed' => $this->confirmTransfer($event, (string) ($data['reference'] ?? ''), $data),
                 default => null,
             };
@@ -82,6 +101,24 @@ final class SettlementWebhookController extends Controller
         }
 
         return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * Whether this event was started by this application.
+     *
+     * A transfer carries no metadata of ours, but its reference is one this
+     * platform generated, and confirmTransfer() already ignores a reference that
+     * matches no payout here -- so transfers are safe without a marker.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    private function isOurs(?string $event, array $metadata): bool
+    {
+        if ($event === 'transfer.success' || $event === 'transfer.failed') {
+            return true;
+        }
+
+        return ($metadata['source'] ?? null) === config('services.paystack.metadata_source');
     }
 
     /**

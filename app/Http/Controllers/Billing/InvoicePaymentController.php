@@ -15,7 +15,7 @@ final class InvoicePaymentController extends Controller
     public function checkout(Request $request, PaymentGateway $gateway, TenantContext $tenantContext): \Illuminate\Routing\Redirector|\Illuminate\Http\RedirectResponse
     {
         $tenant = $tenantContext->getTenant();
-        if (!$tenant instanceof \App\Models\Tenant) {
+        if (! $tenant instanceof \App\Models\Tenant) {
             abort(404, 'Tenant context not found.');
         }
 
@@ -50,6 +50,7 @@ final class InvoicePaymentController extends Controller
             [
                 'invoice_id' => $invoice->id,
                 'type' => 'metered_invoice',
+                'source' => config('services.paystack.metadata_source'),
                 'description' => "Invoice #{$invoice->number} for {$tenant->name}",
             ]
         );

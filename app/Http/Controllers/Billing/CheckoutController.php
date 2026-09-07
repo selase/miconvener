@@ -23,7 +23,7 @@ final class CheckoutController extends Controller
     ): RedirectResponse {
         $tenant = $tenantContext->getTenant();
 
-        if (!$tenant instanceof \App\Models\Tenant) {
+        if (! $tenant instanceof \App\Models\Tenant) {
             abort(404, 'Tenant not found');
         }
 
@@ -54,6 +54,7 @@ final class CheckoutController extends Controller
             [
                 'invoice_id' => $invoice->id,
                 'type' => 'invoice_payment',
+                'source' => config('services.paystack.metadata_source'),
                 'description' => "Invoice #{$invoice->number}",
             ]
         );
@@ -135,6 +136,7 @@ final class CheckoutController extends Controller
             route('billing.callback'),
             [
                 'type' => 'plan_subscription',
+                'source' => config('services.paystack.metadata_source'),
                 'plan_slug' => $newPackage->slug,
                 'interval' => $interval,
                 'tenant_id' => $tenant->id,

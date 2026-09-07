@@ -40,6 +40,15 @@ return [
     ],
 
     'paystack' => [
+        /*
+         * Stamped into the metadata of every transaction this application starts,
+         * and required before the webhook will act on one. The platform's Paystack
+         * account is shared with other applications, so a single webhook URL
+         * receives their events too: without a marker of our own, a charge
+         * belonging to another application whose customer email happens to match a
+         * user here would be read as one of ours.
+         */
+        'metadata_source' => env('PAYSTACK_METADATA_SOURCE', 'miconvener'),
         'public_key' => env('PAYSTACK_PUBLIC_KEY'),
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'merchant_email' => env('PAYSTACK_MERCHANT_EMAIL'),

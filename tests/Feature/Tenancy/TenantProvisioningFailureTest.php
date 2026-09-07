@@ -25,9 +25,13 @@ test('a failing tenant migration makes tenants:migrate exit non-zero', function 
         'name' => 'Broken Migrations',
         'slug' => 'broken-migrations',
         'isolation_mode' => 'db_per_tenant',
-        'db_driver' => 'pgsql',
+        'db_driver' => 'sqlite',
         'settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY,
         'status' => 'active',
+        // A path under a directory that does not exist, so opening the tenant
+        // connection fails outright. The failure has to come from the connection
+        // rather than from a broken migration, or deleting a bad migration would
+        // silently turn this test green while proving nothing.
         'meta' => ['database' => '/nonexistent/path/tenant.sqlite'],
     ]);
 
@@ -44,9 +48,13 @@ test('provisioning throws when the tenant migrations fail', function (): void {
         'name' => 'Broken Provisioning',
         'slug' => 'broken-provisioning',
         'isolation_mode' => 'byo',
-        'db_driver' => 'pgsql',
+        'db_driver' => 'sqlite',
         'settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY,
         'status' => 'active',
+        // A path under a directory that does not exist, so opening the tenant
+        // connection fails outright. The failure has to come from the connection
+        // rather than from a broken migration, or deleting a bad migration would
+        // silently turn this test green while proving nothing.
         'meta' => ['database' => '/nonexistent/path/tenant.sqlite'],
     ]);
 

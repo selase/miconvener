@@ -97,7 +97,7 @@ test('a platform_default charge.success confirms the registration via tenant_id 
             'fees' => 150,
             'currency' => 'GHS',
             'customer' => ['email' => 'guest@example.com', 'first_name' => 'Paying', 'last_name' => 'Guest'],
-            'metadata' => ['event_registration_id' => $registration->id, 'tenant_id' => $tenant->id, 'type' => 'event_ticket'],
+            'metadata' => ['source' => 'miconvener', 'event_registration_id' => $registration->id, 'tenant_id' => $tenant->id, 'type' => 'event_ticket'],
         ],
     ];
     $body = json_encode($payload);
@@ -151,7 +151,7 @@ test('the settlement webhook verifies signatures using the platform secret key, 
             'fees' => 0,
             'currency' => 'GHS',
             'customer' => ['email' => 'guest@example.com', 'first_name' => 'Paying', 'last_name' => 'Guest'],
-            'metadata' => ['event_registration_id' => $registration->id, 'tenant_id' => $tenant->id, 'type' => 'event_ticket'],
+            'metadata' => ['source' => 'miconvener', 'event_registration_id' => $registration->id, 'tenant_id' => $tenant->id, 'type' => 'event_ticket'],
         ],
     ];
     $body = json_encode($payload);
@@ -187,6 +187,7 @@ test('a mail transport failure cannot fail the settlement webhook', function () 
             'fees' => 75,
             'currency' => 'GHS',
             'metadata' => [
+                'source' => 'miconvener',
                 'tenant_id' => $tenant->id,
                 'event_registration_id' => $registration->id,
                 'type' => 'event_ticket',

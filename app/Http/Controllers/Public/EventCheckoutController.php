@@ -66,6 +66,7 @@ final class EventCheckoutController extends Controller
                 'event_registration_id' => $registrationModel->id,
                 'tenant_id' => $tenant->id,
                 'type' => 'event_ticket',
+                'source' => config('services.paystack.metadata_source'),
             ]
         );
 
