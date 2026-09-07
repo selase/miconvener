@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Contracts\PaymentGateway;
 use App\Http\Controllers\Controller;
+use App\Models\EventLedgerEntry;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
@@ -30,6 +31,22 @@ final class FinanceController extends Controller
             abort(403);
         }
 
+        // A platform_default tenant's charges are collected on the platform's own
+        // Paystack account and never touch a TenantPaymentGateway, so they never
+        // produce a MerchantTransaction row — querying that table here always
+        // returned zero rows and zeroed-out stats for them. EventLedgerEntry is
+        // written for every event-ticket charge/refund regardless of settlement
+        // mode (see EventFinanceController), so it is the complete record for
+        // these tenants. An own_gateway tenant keeps reading MerchantTransaction
+        // so its figures are unaffected by this change and a single charge is
+        // never summed from both sources.
+        return $tenant->isPlatformDefaultSettlement()
+            ? $this->ledgerBackedIndex($request, $tenant)
+            : $this->merchantTransactionBackedIndex($request, $tenant);
+    }
+
+    private function merchantTransactionBackedIndex(Request $request, Tenant $tenant): Response
+    {
         $query = MerchantTransaction::where('tenant_id', $tenant->id)->latest();
 
         if ($request->filled('search')) {
@@ -64,6 +81,74 @@ final class FinanceController extends Controller
             'total_volume' => MerchantTransaction::where('tenant_id', $tenant->id)->where('status', 'succeeded')->sum('amount'),
             'transaction_count' => MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'payment')->count(),
             'refund_volume' => MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->sum('amount'),
+        ];
+
+        return Inertia::render('Tenant/Finance/Index', [
+            'transactions' => $transactions,
+            'stats' => $stats,
+            'filters' => $request->only(['search', 'status']),
+        ]);
+    }
+
+    /**
+     * Mirrors merchantTransactionBackedIndex() for platform_default tenants,
+     * reading EventLedgerEntry instead of MerchantTransaction. 'collected' and
+     * 'refunded' are computed exactly as EventFinanceController defines them
+     * (gross_amount summed by type) so the tenant-wide totals agree with the
+     * per-event panel they are rolling up.
+     */
+    private function ledgerBackedIndex(Request $request, Tenant $tenant): Response
+    {
+        $query = EventLedgerEntry::where('tenant_id', $tenant->id)
+            ->whereIn('type', [EventLedgerEntry::TYPE_CHARGE, EventLedgerEntry::TYPE_REFUND])
+            ->with('registration')
+            ->latest('created_at');
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search): void {
+                $q->where('provider_reference', 'like', "%{$search}%")
+                    ->orWhereHas('registration', function ($registrationQuery) use ($search): void {
+                        $registrationQuery->where('email', 'like', "%{$search}%")
+                            ->orWhere('full_name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('status')) {
+            $type = match ($request->input('status')) {
+                'succeeded' => EventLedgerEntry::TYPE_CHARGE,
+                'refunded' => EventLedgerEntry::TYPE_REFUND,
+                // 'pending' and 'failed' have no ledger equivalent: an entry is
+                // only ever written once a charge or refund has succeeded.
+                default => null,
+            };
+
+            $type !== null ? $query->where('type', $type) : $query->whereRaw('1 = 0');
+        }
+
+        $transactions = $query->paginate(15)->withQueryString()->through(fn (EventLedgerEntry $entry): array => [
+            'id' => $entry->id,
+            'provider_transaction_id' => $entry->provider_reference,
+            'customer_name' => $entry->registration?->full_name,
+            'customer_email' => $entry->registration?->email,
+            'amount' => $entry->gross_amount,
+            'amount_formatted' => number_format($entry->gross_amount / 100, 2),
+            'currency' => $entry->currency,
+            'status' => $entry->type === EventLedgerEntry::TYPE_REFUND ? 'refunded' : 'succeeded',
+            'type' => $entry->type === EventLedgerEntry::TYPE_REFUND ? 'refund' : 'payment',
+            'provider' => $entry->provider,
+            'created_at' => $entry->created_at->format('Y-m-d H:i'),
+            // Refunds for a platform-collected ticket are issued by cancelling
+            // the registration (see EventRegistrationController::cancel()), not
+            // through MerchantTransaction::refund() — this view never offers it.
+            'can_refund' => false,
+        ]);
+
+        $stats = [
+            'total_volume' => (int) EventLedgerEntry::where('tenant_id', $tenant->id)->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('gross_amount'),
+            'transaction_count' => EventLedgerEntry::where('tenant_id', $tenant->id)->where('type', EventLedgerEntry::TYPE_CHARGE)->count(),
+            'refund_volume' => (int) EventLedgerEntry::where('tenant_id', $tenant->id)->where('type', EventLedgerEntry::TYPE_REFUND)->sum('gross_amount'),
         ];
 
         return Inertia::render('Tenant/Finance/Index', [
