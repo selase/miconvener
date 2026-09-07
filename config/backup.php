@@ -128,8 +128,15 @@ return [
             /*
              * The disk names on which the backups will be stored.
              */
+            /*
+             * Object storage, not the local disk. Compute instances have an
+             * ephemeral filesystem that is wiped on every deploy and sized at a
+             * fraction of the instance's RAM, so a local backup is destroyed
+             * before it is ever needed and meanwhile competes for the disk the
+             * application is running on.
+             */
             'disks' => [
-                'local',
+                env('BACKUP_DISK', 'local'),
             ],
         ],
 
