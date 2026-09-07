@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Contracts\TenantMigratorContract;
 use App\Models\Tenant;
-use App\Services\Tenancy\TenantMigrator;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 
@@ -39,14 +39,17 @@ test('it runs migrations for active tenants', function () {
 test('it logs exception on failure', function () {
     $tenant = Tenant::create(['name' => 'Fail Tenant', 'slug' => 'fail-tenant', 'isolation_mode' => 'shared']);
 
-    $this->mock(TenantMigrator::class, function ($mock) {
+    $this->mock(TenantMigratorContract::class, function ($mock) {
         $mock->shouldReceive('migrate')
             ->once()
             ->andThrow(new Exception('Simulated Migration Failure'));
     });
 
+    // The command reports overall failure (exit code 1) whenever any tenant fails
+    // to migrate, so cron/CI runners can detect it; a single failed tenant must not
+    // be masked as an overall success.
     $this->artisan('tenants:migrate')
-        ->assertExitCode(0);
+        ->assertExitCode(1);
 
     $this->assertDatabaseHas('tenant_migration_runs', [
         'tenant_id' => $tenant->id,
@@ -93,7 +96,7 @@ test('it does not skip tenant if encryption is disabled', function () {
         $mock->shouldReceive('configure')->with(Mockery::on(fn ($t) => $t->id === $tenant->id))->once();
     });
 
-    $this->mock(TenantMigrator::class, function ($mock) {
+    $this->mock(TenantMigratorContract::class, function ($mock) {
         $mock->shouldReceive('migrate')
             ->once()
             ->andReturn(['exitCode' => 0, 'output' => 'Success']);
@@ -113,7 +116,7 @@ test('it continues after failure', function () {
     $tenant1 = Tenant::create(['name' => 'Tenant 1', 'slug' => 't1', 'isolation_mode' => 'shared']);
     $tenant2 = Tenant::create(['name' => 'Tenant 2', 'slug' => 't2', 'isolation_mode' => 'shared']);
 
-    $this->mock(TenantMigrator::class, function ($mock) {
+    $this->mock(TenantMigratorContract::class, function ($mock) {
         $mock->shouldReceive('migrate')
             ->once()
             ->andThrow(new Exception('Fail 1'));
@@ -123,7 +126,9 @@ test('it continues after failure', function () {
             ->andReturn(['exitCode' => 0, 'output' => 'Success']);
     });
 
-    $this->artisan('tenants:migrate')->assertExitCode(0);
+    // One tenant failing still taints the overall exit code, even though the loop
+    // continues on to migrate the remaining tenants.
+    $this->artisan('tenants:migrate')->assertExitCode(1);
 
     $this->assertDatabaseHas('tenant_migration_runs', ['tenant_id' => $tenant1->id, 'status' => 'failed'], 'landlord');
     $this->assertDatabaseHas('tenant_migration_runs', ['tenant_id' => $tenant2->id, 'status' => 'success'], 'landlord');

@@ -27,12 +27,10 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->tenant->users()->attach($this->user);
 
-    // Mock TenantContext
-    $this->mock(TenantContext::class, function ($mock) {
-        $mock->shouldReceive('getTenant')->andReturn($this->tenant);
-        $mock->shouldReceive('activeTenantId')->andReturn($this->tenant->id);
-        $mock->shouldReceive('setTenant')->zeroOrMoreTimes();
-    });
+    // TenantContext is a singleton in the container; set it directly rather than
+    // mocking. Requests through subdomain routes still re-resolve and overwrite it
+    // via the real ResolveTenant middleware, exercising the actual resolution path.
+    app(TenantContext::class)->setTenant($this->tenant);
 
     $this->actingAs($this->user);
 

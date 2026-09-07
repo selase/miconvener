@@ -79,10 +79,9 @@ test('tenant requiring 2fa redirects unconfigured user to profile', function () 
     $user = User::factory()->create()->refresh();
     $user->tenants()->attach($tenant);
 
-    // Mock the TenantContext to return this tenant
-    $this->mock(App\Services\Tenancy\TenantContext::class, function ($mock) use ($tenant) {
-        $mock->shouldReceive('getTenant')->andReturn($tenant);
-    });
+    // TenantContext is a singleton in the container; set it directly rather than
+    // mocking, since it is a plain data holder and mocking a final class is not possible.
+    app(App\Services\Tenancy\TenantContext::class)->setTenant($tenant);
 
     $response = $this->actingAs($user)
         ->get('/dashboard');
