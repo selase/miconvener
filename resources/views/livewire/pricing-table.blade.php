@@ -50,6 +50,10 @@ new class extends Component
                     $isPopular  = $plan['most_popular'] ?? false;
                     $isFree     = $plan['monthly_price'] === 0;
                     $priceLabel = $plan['price_label'] ?? null;
+                    // The symbol must come from what is actually charged. It was hardcoded
+                    // to $ while checkout billed the configured currency, so the page
+                    // advertised one amount and the customer was charged another.
+                    $currency   = config('services.paystack.currency', 'GHS');
                 @endphp
 
                 <div class="relative flex flex-col rounded-2xl border p-6 transition-all
@@ -82,17 +86,17 @@ new class extends Component
                         @else
                             <div class="flex items-end gap-1">
                                 <div class="pricing-heading text-4xl font-bold {{ $isPopular ? 'text-white' : 'text-slate-900' }}">
-                                    ${{ $interval === 'year' ? (int) round($plan['yearly_price'] / 12) : $plan['monthly_price'] }}
+                                    {{ $currency }} {{ $interval === 'year' ? (int) round($plan['yearly_price'] / 12) : $plan['monthly_price'] }}
                                 </div>
                                 <div class="mb-1.5 text-sm {{ $isPopular ? 'text-blue-200' : 'text-slate-400' }}">/mo</div>
                             </div>
                             @if ($interval === 'year')
                                 <div class="mt-1 text-xs font-medium {{ $isPopular ? 'text-blue-100' : 'text-emerald-600' }}">
-                                    ${{ $plan['yearly_price'] }} billed annually
+                                    {{ $currency }} {{ $plan['yearly_price'] }} billed annually
                                 </div>
                             @else
                                 <div class="mt-1 text-xs {{ $isPopular ? 'text-blue-200/70' : 'text-slate-400' }}">
-                                    ${{ (int) round($plan['yearly_price'] / 12) }}/mo with annual billing
+                                    {{ $currency }} {{ (int) round($plan['yearly_price'] / 12) }}/mo with annual billing
                                 </div>
                             @endif
                         @endif

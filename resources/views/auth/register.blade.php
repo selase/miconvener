@@ -58,7 +58,7 @@
                                         <div class="mt-0.5 text-[12px] text-slate-400 leading-snug">{{ $plan['description'] }}</div>
                                     </div>
                                     <div class="flex-none text-right">
-                                        <span class="brand-font text-[20px] font-bold text-slate-900">${{ $monthlyPrice }}</span>
+                                        <span class="brand-font text-[20px] font-bold text-slate-900">{{ config('services.paystack.currency', 'GHS') }} {{ $monthlyPrice }}</span>
                                         <span class="text-[12px] text-slate-400">/mo</span>
                                     </div>
                                 </div>
