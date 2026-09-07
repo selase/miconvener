@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Models\Event;
+use App\Models\EventLedgerEntry;
 use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
@@ -270,6 +271,106 @@ test('a pending-shaped paystack refund response still cancels and records the RE
     $refundRow = MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->firstOrFail();
     expect($refundRow->provider_transaction_id)->toBe('REF_paid_ref_pending')
         ->and($refundRow->meta)->toBe(['refund_id' => 'pending']);
+});
+
+test('cancellation completes and writes the ledger reversal when Paystack reports the transaction was already reversed', function () {
+    Http::fake([
+        'api.paystack.co/refund' => Http::response([
+            'status' => false,
+            'message' => 'Transaction has been fully reversed',
+            'code' => 'transaction_reversed',
+        ], 400),
+    ]);
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_already_reversed',
+    ]);
+
+    $charge = MerchantTransaction::create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'provider_transaction_id' => 'paid_ref_already_reversed',
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'status' => 'succeeded',
+        'type' => 'payment',
+        'customer_email' => 'guest@example.com',
+    ]);
+
+    $chargeEntry = EventLedgerEntry::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'provider_reference' => 'paid_ref_already_reversed',
+        'net_amount' => 4700,
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertOk();
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+    expect($charge->fresh()->status)->toBe('refunded');
+
+    $refundEntry = EventLedgerEntry::where('tenant_id', $tenant->id)
+        ->where('type', EventLedgerEntry::TYPE_REFUND)
+        ->firstOrFail();
+    expect($refundEntry->registration_id)->toBe($registration->id)
+        ->and($refundEntry->net_amount)->toBe(-4700)
+        ->and($refundEntry->provider_reference)->toBe('REF_paid_ref_already_reversed');
+
+    $refundRow = MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->firstOrFail();
+    expect($refundRow->provider_transaction_id)->toBe('REF_paid_ref_already_reversed');
+});
+
+test('cancellation is still aborted when the refund fails for a reason other than an already-reversed transaction', function () {
+    Http::fake([
+        'api.paystack.co/refund' => Http::response([
+            'status' => false,
+            'message' => 'Insufficient balance to fulfill this refund. Please top up.',
+            'code' => 'insufficient_balance',
+        ], 400),
+    ]);
+
+    [$tenant, $user] = cancelRefundHost('acme');
+    $host = cancelRefundSubdomain('acme');
+
+    TenantPaymentGateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'provider' => 'paystack',
+        'api_key_encrypted' => 'sk_test_123',
+        'is_active' => true,
+    ]);
+
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'currency' => 'GHS',
+        'payment_reference' => 'paid_ref_other_failure',
+    ]);
+
+    $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel", [], ['HTTP_HOST' => $host]);
+
+    $response->assertStatus(502);
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CONFIRMED);
+    expect(EventLedgerEntry::where('tenant_id', $tenant->id)->where('type', EventLedgerEntry::TYPE_REFUND)->count())->toBe(0);
 });
 
 test('a refund with no matching merchant transaction still cancels and logs a reconciliation warning', function () {
