@@ -464,49 +464,51 @@
     <livewire:pricing-table />
 
     {{-- ============================================================
-         TESTIMONIALS
+         TESTIMONIALS (only rendered once there are real customer quotes)
     ============================================================ --}}
-    <section class="bg-slate-50 py-20 md:py-28">
-        <div class="mx-auto max-w-7xl px-6">
+    @if (! empty(config('product-page.testimonials')))
+        <section class="bg-slate-50 py-20 md:py-28">
+            <div class="mx-auto max-w-7xl px-6">
 
-            <div class="text-center mb-12">
-                <div class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 mb-4">
-                    Customer Stories
-                </div>
-                <h2 class="section-heading text-[36px] font-bold leading-tight tracking-tight text-slate-900 md:text-[44px]">
-                    Trusted by teams who value their time
-                </h2>
-            </div>
-
-            <div class="grid gap-6 md:grid-cols-2">
-                @foreach (config('product-page.testimonials') as $t)
-                    <div class="rounded-2xl border border-slate-200 bg-white px-7 py-8 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
-                        {{-- Stars --}}
-                        <div class="flex gap-1 mb-5">
-                            @for ($i = 0; $i < 5; $i++)
-                                <svg class="h-4 w-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                </svg>
-                            @endfor
-                        </div>
-                        <p class="text-[17px] leading-[27px] text-slate-600 italic">
-                            "{{ $t['quote'] }}"
-                        </p>
-                        <div class="mt-6 flex items-center gap-3">
-                            <div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-emerald-100 border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-700">
-                                {{ strtoupper(substr($t['name'], 0, 1)) }}
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-slate-800">{{ $t['name'] }}</div>
-                                <div class="text-xs text-slate-400">{{ $t['role'] }} · {{ $t['company'] }}</div>
-                            </div>
-                        </div>
+                <div class="text-center mb-12">
+                    <div class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 mb-4">
+                        Customer Stories
                     </div>
-                @endforeach
-            </div>
+                    <h2 class="section-heading text-[36px] font-bold leading-tight tracking-tight text-slate-900 md:text-[44px]">
+                        Trusted by teams who value their time
+                    </h2>
+                </div>
 
-        </div>
-    </section>
+                <div class="grid gap-6 md:grid-cols-2">
+                    @foreach (config('product-page.testimonials') as $t)
+                        <div class="rounded-2xl border border-slate-200 bg-white px-7 py-8 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
+                            {{-- Stars --}}
+                            <div class="flex gap-1 mb-5">
+                                @for ($i = 0; $i < 5; $i++)
+                                    <svg class="h-4 w-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                @endfor
+                            </div>
+                            <p class="text-[17px] leading-[27px] text-slate-600 italic">
+                                "{{ $t['quote'] }}"
+                            </p>
+                            <div class="mt-6 flex items-center gap-3">
+                                <div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-emerald-100 border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-700">
+                                    {{ strtoupper(substr($t['name'], 0, 1)) }}
+                                </div>
+                                <div>
+                                    <div class="text-sm font-semibold text-slate-800">{{ $t['name'] }}</div>
+                                    <div class="text-xs text-slate-400">{{ $t['role'] }} · {{ $t['company'] }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+            </div>
+        </section>
+    @endif
 
     {{-- ============================================================
          FAQS

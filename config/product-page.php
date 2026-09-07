@@ -148,20 +148,10 @@ return [
         ],
     ],
 
-    'testimonials' => [
-        [
-            'quote' => 'MiConvener has completely transformed how we document our internal processes. We went from days to minutes.',
-            'name' => 'Kwame Asante',
-            'role' => 'Operations Head',
-            'company' => 'GoldStar Holdings',
-        ],
-        [
-            'quote' => 'The task tracking alone has improved our follow-through rate by 60%. The AI insights are a game changer.',
-            'name' => 'Sarah Chen',
-            'role' => 'Project Director',
-            'company' => 'TechBridge',
-        ],
-    ],
+    // No testimonials yet — the product has not launched and has no customers.
+    // Do not add fabricated quotes here; only real, attributable customer
+    // testimonials belong in this array.
+    'testimonials' => [],
 
     'deep_sections' => [
         [
