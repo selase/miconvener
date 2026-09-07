@@ -46,6 +46,7 @@ test('new users can register with a paid plan', function () {
             'password' => 'Password1!',
             'password_confirmation' => 'Password1!',
             'plan' => $plan->slug,
+            'slug' => 'acme-corp',
         ]);
 
     $response->assertRedirect(route('billing.confirm', ['plan' => 'starter', 'interval' => 'month']));
@@ -65,6 +66,7 @@ test('registration requires a paid plan', function () {
             'password' => 'Password1!',
             'password_confirmation' => 'Password1!',
             'plan' => $freePlan->slug,
+            'slug' => 'acme-free',
         ])
         ->assertSessionHasErrors('plan');
 });
@@ -82,6 +84,7 @@ test('registration creates a tenant for the new user', function () {
             'password' => 'Password1!',
             'password_confirmation' => 'Password1!',
             'plan' => $plan->slug,
+            'slug' => 'test-organization',
         ]);
 
     $user = App\Models\User::where('email', 'ada@test.com')->firstOrFail();
@@ -90,6 +93,8 @@ test('registration creates a tenant for the new user', function () {
 
     $tenant = $user->tenants()->first();
     expect($tenant->name)->toBe('Test Organization');
+    // The handle the organizer chose, not one derived from the name behind
+    // their back.
     expect($tenant->slug)->toBe('test-organization');
 
     // Signups share the landlord database. A dedicated database per signup would

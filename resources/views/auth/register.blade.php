@@ -126,6 +126,26 @@
                             placeholder="Acme Corp" />
                     </div>
 
+                    {{-- Workspace address --}}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5" for="slug">Workspace address</label>
+                        <div class="flex items-stretch rounded-xl border border-slate-200 bg-slate-50 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition">
+                            <input id="slug" type="text" name="slug" value="{{ old('slug') }}" required
+                                minlength="{{ App\Support\TenantHandle::MIN_LENGTH }}"
+                                maxlength="{{ App\Support\TenantHandle::MAX_LENGTH }}"
+                                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                                autocapitalize="none" autocorrect="off" spellcheck="false"
+                                class="min-w-0 flex-1 rounded-l-xl bg-transparent px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
+                                placeholder="accra-tech-week" />
+                            <span class="flex items-center rounded-r-xl border-l border-slate-200 bg-slate-100 px-3 text-[13px] text-slate-500 whitespace-nowrap">
+                                .{{ Illuminate\Support\Str::of(config('session.domain'))->ltrim('.') }}
+                            </span>
+                        </div>
+                        <p class="mt-1.5 text-[11px] text-slate-400 leading-snug">
+                            Guests reach your events here, and it appears on their tickets. Lowercase letters, numbers and hyphens.
+                        </p>
+                    </div>
+
                     {{-- Email --}}
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5" for="email">Work email</label>
@@ -172,5 +192,30 @@
         <a href="{{ route('login') }}" class="text-blue-600 hover:text-blue-700 font-medium">Sign in →</a>
     </p>
 </div>
+
+<script>
+    // Most organizers should never have to think about this field, so it fills
+    // itself from the organization name -- and stops the moment the visitor edits
+    // it, so a deliberate choice is never overwritten as they keep typing.
+    (function () {
+        const org = document.getElementById('organization_name');
+        const handle = document.getElementById('slug');
+        if (!org || !handle) return;
+
+        let touched = handle.value.trim() !== '';
+        handle.addEventListener('input', function () { touched = true; });
+
+        org.addEventListener('input', function () {
+            if (touched) return;
+            handle.value = org.value
+                .toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+/, '')
+                .slice(0, {{ App\Support\TenantHandle::MAX_LENGTH }})
+                .replace(/-+$/, '');
+        });
+    })();
+</script>
 
 @endsection

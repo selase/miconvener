@@ -10,6 +10,7 @@ use App\Models\Package;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Tenancy\TenantProvisioner;
+use App\Support\TenantHandle;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -18,7 +19,6 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -48,7 +48,8 @@ final class RegisteredUserController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'plan' => ['required', 'string', 'exists:packages,slug'],
-        ]);
+            'slug' => TenantHandle::rules(),
+        ], TenantHandle::messages());
 
         // Ensure the selected plan is not the free plan
         /** @var Package $package */
@@ -71,11 +72,9 @@ final class RegisteredUserController extends Controller
         event(new Registered($user));
 
         // Create tenant (organization)
-        $slug = $this->uniqueSlug($request->string('organization_name')->toString());
-
         $tenant = Tenant::query()->create([
             'name' => $request->string('organization_name')->toString(),
-            'slug' => $slug,
+            'slug' => $request->string('slug')->toString(),
             'email' => $request->string('email')->toString(),
             'status' => TenantStatusEnum::ACTIVE,
             'isolation_mode' => 'shared',
@@ -97,18 +96,5 @@ final class RegisteredUserController extends Controller
             'plan' => $package->slug,
             'interval' => 'month',
         ]);
-    }
-
-    private function uniqueSlug(string $name): string
-    {
-        $base = Str::slug($name);
-        $slug = $base;
-        $i = 2;
-
-        while (Tenant::where('slug', $slug)->exists()) {
-            $slug = $base.'-'.$i++;
-        }
-
-        return $slug;
     }
 }

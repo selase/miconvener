@@ -5,20 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Tenancy;
 
 use App\Models\Tenant;
+use App\Support\TenantHandle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class TenantResolver
 {
-    /**
-     * Hostnames that live alongside tenants on the same domain and must never be
-     * mistaken for one, or visiting them would 404 instead of serving the site.
-     *
-     * @var list<string>
-     */
-    private const array RESERVED_SUBDOMAINS = ['www'];
-
     /**
      * Resolve the active tenant from the request.
      *
@@ -68,7 +61,7 @@ final class TenantResolver
             }
         }
 
-        if ($subdomain && ! in_array($subdomain, self::RESERVED_SUBDOMAINS, true)) {
+        if ($subdomain && ! in_array($subdomain, TenantHandle::RESERVED, true)) {
             /** @var Tenant|null $tenant */
             $tenant = Tenant::where('slug', $subdomain)->first();
 
