@@ -53,19 +53,6 @@
                         </div>
                     </div>
 
-                    {{-- Testimonial --}}
-                    <div class="mt-10 border-l-4 border-blue-500 pl-6">
-                        <p class="text-slate-600 italic text-[17px] leading-7">
-                            "The automated tenant isolation and KMS-backed encryption allowed us to meet our compliance requirements in weeks, not months. A game-changer for enterprise readiness."
-                        </p>
-                        <div class="mt-4 flex items-center gap-3">
-                            <div class="h-9 w-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-sm font-bold">M</div>
-                            <div>
-                                <div class="text-sm font-semibold text-slate-900">Marc G.</div>
-                                <div class="text-xs text-slate-500">CTO at SecureLogix</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {{-- Right Side: Form Card --}}
