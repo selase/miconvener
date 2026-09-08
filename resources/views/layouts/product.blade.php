@@ -13,19 +13,21 @@
         rel="stylesheet">
     <style>
         :root {
-            /* An auditorium before doors open: deep indigo field, with the
-               warm marigold of a torn ticket stub kept for money moments. */
-            --ink: #191527;
-            --ink-2: #4a4459;
-            --muted: #7c7589;
-            --paper: #f7f6fb;
+            /* Descended from the product itself: a neutral ground with a teal
+               accent, and a saturated field of the same hue for the hero. */
+            --ink: #14181a;
+            --ink-2: #45504e;
+            --muted: #7b8785;
+            --paper: #f6f8f7;
             --surface: #ffffff;
-            --rule: #e4e1ec;
-            --indigo: #3d2bc4;
-            --indigo-deep: #2a1c94;
-            --peri: #b9aeff;
-            --marigold: #f2a33c;
-            --go: #0f7b5a;
+            --rule: #e2e8e6;
+            --field: #0e8a63;
+            --field-deep: #0a6b4d;
+            --mint: #8ff0cd;
+            --teal: #3f7d6c;
+            --teal-soft: #eaf3f0;
+            --amber: #b8791f;
+            --danger: #b3261e;
         }
         body { font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; color: var(--ink); }
         .section-heading, .pricing-heading, .display {
@@ -33,7 +35,7 @@
             letter-spacing: -0.02em;
         }
         .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
-        ::selection { background: var(--peri); color: var(--ink); }
+        ::selection { background: var(--mint); color: var(--ink); }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation: none !important; transition: none !important; }
         }
@@ -50,7 +52,7 @@
             <div class="flex h-16 items-center justify-between">
                 <div class="flex items-center gap-3">
                     <a href="{{ route('product.template') }}" class="flex items-center gap-3">
-                        <div class="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white" style="background: var(--indigo)">
+                        <div class="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white" style="background: var(--field)">
                             {{ config('product-page.brand.logo_text') }}
                         </div>
                         <span class="text-sm font-semibold text-slate-800">{{ config('product-page.brand.name') }}</span>
@@ -72,7 +74,7 @@
                         {{ config('product-page.nav.cta_secondary.label') }}
                     </a>
                     <a href="{{ config('product-page.nav.cta_primary.href') }}"
-                        class="inline-flex rounded-lg px-3.5 py-2 text-sm font-semibold text-white transition" style="background: var(--indigo)">
+                        class="inline-flex rounded-lg px-3.5 py-2 text-sm font-semibold text-white transition" style="background: var(--field)">
                         {{ config('product-page.nav.cta_primary.label') }}
                     </a>
                 </div>
