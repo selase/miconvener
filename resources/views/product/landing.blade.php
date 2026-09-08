@@ -8,8 +8,8 @@
     .field {
         background: var(--field);
         background-image:
-            radial-gradient(120% 90% at 50% -20%, #16a87a 0%, rgba(22,168,122,0) 62%),
-            radial-gradient(70% 60% at 88% 4%, rgba(143,240,205,.20) 0%, rgba(143,240,205,0) 70%);
+            radial-gradient(120% 90% at 50% -20%, #3b7bff 0%, rgba(59,123,255,0) 62%),
+            radial-gradient(70% 60% at 88% 4%, rgba(203,242,251,.18) 0%, rgba(203,242,251,0) 70%);
         position: relative; overflow: hidden;
     }
     .field::before {
@@ -23,33 +23,27 @@
     }
     .field > * { position: relative; }
 
-    .pill {
-        display: inline-flex; align-items: center; gap: .55rem;
-        padding: .38rem .95rem .38rem .5rem; border-radius: 999px;
-        background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22);
-        color: #eafff6; font-size: .84rem;
-    }
-    .pill .dot {
-        width: 1.3rem; height: 1.3rem; border-radius: 999px; background: var(--mint);
-        color: var(--field-deep); display: grid; place-items: center;
-        font-size: .7rem; font-weight: 800;
-    }
-
     .hero-title {
-        font-size: clamp(2.6rem, 6.6vw, 4.5rem); line-height: 1.03; font-weight: 800;
-        color: #fff; text-wrap: balance; margin: 1.35rem 0 0;
+        font-size: clamp(2.5rem, 6.2vw, 72px);
+        line-height: 1.056;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        color: #fff; text-wrap: balance; margin: 0;
     }
-    .hero-title em { font-style: normal; color: var(--mint); }
-    .hero-sub { margin: 1.25rem auto 0; max-width: 42rem; color: #cbeee0; font-size: 1.07rem; line-height: 1.6; }
+    .hero-title em { font-style: normal; color: var(--ice); }
+    .hero-sub {
+        margin: 1.6rem auto 0; max-width: 38rem;
+        color: #fff; font-size: 16px; line-height: 24px; font-weight: 300;
+    }
 
     .btn-solid {
         display: inline-flex; align-items: center; background: #fff; color: var(--field-deep);
-        font-weight: 700; padding: .85rem 1.7rem; border-radius: .75rem;
+        font-weight: 500; padding: .8rem 1.7rem; border-radius: .6rem;
         box-shadow: 0 12px 34px -14px rgba(0,0,0,.55); transition: transform .15s ease;
     }
     .btn-solid:hover { transform: translateY(-1px); }
     .btn-ghost {
-        display: inline-flex; align-items: center; color: #b9e8d6; font-weight: 600;
+        display: inline-flex; align-items: center; color: #c4d8ff; font-weight: 400;
         padding: .85rem 1.1rem; border-radius: .75rem; border: 1px solid rgba(255,255,255,.24);
     }
     .btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,.45); }
@@ -78,7 +72,7 @@
     .tiles > div { padding: .95rem 1.1rem; border-left: 1px solid var(--rule); }
     .tiles > div:first-child { border-left: none; }
     .tile-k { font-size: .78rem; color: var(--muted); }
-    .tile-v { font-size: 1.55rem; font-weight: 700; margin-top: .2rem; letter-spacing: -.01em; }
+    .tile-v { font-size: 1.5rem; font-weight: 500; margin-top: .2rem; letter-spacing: -.015em; }
     .tile-s { font-size: .72rem; color: var(--muted); margin-top: .15rem; }
     @media (max-width: 760px) {
         .tiles { grid-template-columns: repeat(2, 1fr); }
@@ -87,25 +81,25 @@
     }
 
     .bars { display: flex; align-items: flex-end; gap: 4px; height: 118px; }
-    .bars span { flex: 1; background: #7cb3a4; border-radius: 2px 2px 0 0; display: block; }
+    .bars span { flex: 1; background: #93b4f0; border-radius: 2px 2px 0 0; display: block; }
 
     .row { display: flex; align-items: center; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid var(--rule); }
     .row:last-child { border-bottom: none; }
-    .tick { width: 1.15rem; height: 1.15rem; border-radius: 3px; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; font-size: .68rem; font-weight: 700; }
+    .tick { width: 1.15rem; height: 1.15rem; border-radius: 3px; background: #e7f4ef; color: var(--go); display: grid; place-items: center; font-size: .68rem; font-weight: 700; }
     .tick.no { background: #fdeceb; color: var(--danger); }
     .chip { font-size: .68rem; padding: .1rem .45rem; border: 1px solid currentColor; border-radius: 4px; }
 
     /* ── Paper ────────────────────────────────────────────────────────── */
     .paper { background: var(--paper); }
-    .h2 { font-size: clamp(1.75rem, 3.2vw, 2.5rem); font-weight: 700; line-height: 1.14; text-wrap: balance; }
-    .lede { color: var(--ink-2); font-size: 1.04rem; max-width: 40rem; }
+    .h2 { font-size: clamp(1.7rem, 3vw, 2.35rem); font-weight: 500; line-height: 1.18; letter-spacing: -.018em; text-wrap: balance; }
+    .lede { color: var(--ink-2); font-size: 1.02rem; line-height: 1.6; font-weight: 300; max-width: 40rem; }
 
     .arc { display: grid; grid-template-columns: repeat(4, 1fr); }
     @media (max-width: 880px) { .arc { grid-template-columns: 1fr; } }
     .arc-step { padding: 1.5rem 1.35rem; border-left: 2px solid var(--rule); }
     .arc-step:first-child { border-left-color: var(--field); }
-    .arc-n { font-size: .76rem; color: var(--field); font-weight: 700; }
-    .arc-t { font-family: 'Gabarito', sans-serif; font-weight: 700; font-size: 1.1rem; margin-top: .3rem; }
+    .arc-n { font-size: .74rem; color: var(--field); font-weight: 500; }
+    .arc-t { font-weight: 500; font-size: 1.06rem; margin-top: .3rem; }
     .arc-b { color: var(--ink-2); font-size: .94rem; margin-top: .3rem; }
 
     .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
@@ -115,10 +109,10 @@
     @media (max-width: 900px) { .cap { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 580px) { .cap { grid-template-columns: 1fr; } }
     .cap > div { background: var(--surface); padding: 1.45rem 1.35rem; }
-    .cap h3 { font-family: 'Gabarito', sans-serif; font-weight: 700; font-size: 1rem; }
+    .cap h3 { font-weight: 500; font-size: 1rem; }
     .cap p { color: var(--ink-2); font-size: .92rem; margin-top: .3rem; }
 
-    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--ice); outline-offset: 2px; }
 </style>
 @endpush
 
@@ -126,9 +120,7 @@
 
 {{-- ══ HERO ══════════════════════════════════════════════════════════ --}}
 <section class="field">
-    <div class="mx-auto max-w-7xl px-6 pt-16 text-center md:pt-24">
-
-        <span class="pill"><span class="dot">✦</span> Free for your first event</span>
+    <div class="mx-auto max-w-7xl px-6 pt-24 text-center md:pt-32">
 
         <h1 class="hero-title display">
             Run the whole event<br><em>from one place</em>
@@ -144,7 +136,7 @@
             <a href="#pricing" class="btn-ghost">See pricing</a>
         </div>
 
-        <p class="mt-5 text-sm" style="color:#9fd9c4">One live event and 100 registrations, no card required.</p>
+        <p class="mt-5 text-sm" style="color:#b7cdf7; font-weight:300">One live event and 100 registrations, no card required.</p>
 
         {{-- Event-day overview. Swap for a real capture by replacing this block
              with <img src="/assets/img/marketing/overview.png" alt="…"> once the
@@ -158,7 +150,7 @@
                 <div class="shot-body">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="display text-[19px] font-extrabold">Overview</div>
+                            <div class="display text-[19px]">Overview</div>
                             <div class="text-[13px]" style="color:var(--muted)">Everything happening at the summit right now.</div>
                         </div>
                         <div class="hidden rounded-md border px-3 py-1.5 text-[12px] sm:block" style="border-color:var(--rule); color:var(--ink-2)">Export day report</div>
@@ -174,7 +166,7 @@
                             <div>
                                 <div class="tile-k">{{ $k }}</div>
                                 <div class="tile-v {{ $accent ? '' : '' }} {{ str_starts_with($v, 'GHS') ? 'mono' : '' }}"
-                                     style="{{ $accent ? 'color:var(--teal)' : '' }}">{{ $v }}</div>
+                                     style="{{ $accent ? 'color:var(--go)' : '' }}">{{ $v }}</div>
                                 <div class="tile-s">{{ $sub }}</div>
                             </div>
                         @endforeach
@@ -183,7 +175,7 @@
                     <div class="mt-4 grid gap-4 lg:grid-cols-2">
                         <div class="rounded-lg border p-4" style="border-color:var(--rule)">
                             <div class="flex items-baseline justify-between">
-                                <div class="text-[13px] font-semibold">Arrivals through the gates</div>
+                                <div class="text-[13px] font-medium">Arrivals through the gates</div>
                                 <div class="text-[11px]" style="color:var(--muted)">08:00 to 11:00</div>
                             </div>
                             <div class="bars mt-4">
@@ -198,7 +190,7 @@
 
                         <div class="rounded-lg border p-4" style="border-color:var(--rule)">
                             <div class="flex items-baseline justify-between">
-                                <div class="text-[13px] font-semibold">Needs a person</div>
+                                <div class="text-[13px] font-medium">Needs a person</div>
                                 <div class="text-[11px]" style="color:var(--muted)">Longest waiting first</div>
                             </div>
                             <div class="mt-2">
@@ -268,7 +260,7 @@
                         'Turns away a code that has already been used, and says why',
                     ] as $point)
                         <li class="flex items-start gap-3 text-[15px]" style="color:var(--ink-2)">
-                            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style="background:var(--teal)"></span>{{ $point }}
+                            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style="background:var(--field)"></span>{{ $point }}
                         </li>
                     @endforeach
                 </ul>
@@ -278,7 +270,7 @@
             <div class="panel">
                 <div class="panel-head">
                     <div>
-                        <div class="text-[13px] font-semibold">Check-in</div>
+                        <div class="text-[13px] font-medium">Check-in</div>
                         <div class="text-[11px]" style="color:var(--muted)">Scanning works without a network. Queued scans sync when you reconnect.</div>
                     </div>
                     <div class="hidden rounded-md border px-2.5 py-1 text-[11px] sm:block" style="border-color:var(--rule); color:var(--ink-2)">Export log</div>
@@ -287,20 +279,20 @@
                     <div class="border-b p-4 sm:border-b-0 sm:border-r" style="border-color:var(--rule)">
                         <div class="relative aspect-square rounded-md border" style="border-color:var(--rule)">
                             @foreach (['top-2 left-2 border-t-2 border-l-2','top-2 right-2 border-t-2 border-r-2','bottom-2 left-2 border-b-2 border-l-2','bottom-2 right-2 border-b-2 border-r-2'] as $corner)
-                                <span class="absolute h-5 w-5 {{ $corner }}" style="border-color:var(--teal)"></span>
+                                <span class="absolute h-5 w-5 {{ $corner }}" style="border-color:var(--field)"></span>
                             @endforeach
-                            <span class="absolute left-4 right-4 top-1/2 h-px" style="background:var(--teal)"></span>
+                            <span class="absolute left-4 right-4 top-1/2 h-px" style="background:var(--field)"></span>
                         </div>
                         <div class="mt-3 text-[11px]" style="color:var(--muted)">Point the camera at the entry code on the phone or badge.</div>
                         <div class="mt-3 flex gap-2">
                             <div class="mono flex-1 rounded-md border px-2 py-1.5 text-[11px]" style="border-color:var(--rule); color:var(--muted)">AHIS26-XXXX</div>
-                            <div class="rounded-md px-3 py-1.5 text-[11px] font-semibold text-white" style="background:var(--teal)">Check in</div>
+                            <div class="rounded-md px-3 py-1.5 text-[11px] font-semibold text-white" style="background:var(--field)">Check in</div>
                         </div>
                     </div>
 
                     <div class="p-4">
                         <div class="flex items-baseline justify-between">
-                            <div class="text-[13px] font-semibold">Last scans</div>
+                            <div class="text-[13px] font-medium">Last scans</div>
                             <div class="text-[11px]" style="color:var(--muted)">Main entrance, faculty desk, Volta Room</div>
                         </div>
                         <div class="mt-1">
@@ -343,7 +335,7 @@
         <div class="grid items-center gap-12 lg:grid-cols-2">
             <div class="panel order-2 lg:order-1">
                 <div class="panel-head">
-                    <div class="text-[13px] font-semibold">Settlement statement</div>
+                    <div class="text-[13px] font-medium">Settlement statement</div>
                     <div class="mono text-[11px]" style="color:var(--muted)">Accra Tech Week</div>
                 </div>
                 <div class="px-5 py-2">
@@ -355,7 +347,7 @@
                     ] as [$label, $amount, $net])
                         <div class="row">
                             <span class="text-[14px]" style="color:var(--ink-2)">{{ $label }}</span>
-                            <span class="mono text-[14px] font-semibold" style="{{ $net ? 'color:var(--teal)' : '' }}">{{ $amount }}</span>
+                            <span class="mono text-[14px] font-medium" style="{{ $net ? 'color:var(--go)' : '' }}">{{ $amount }}</span>
                         </div>
                     @endforeach
                 </div>
@@ -370,7 +362,7 @@
                 <div class="mt-7 grid gap-5 sm:grid-cols-3">
                     @foreach (config('product-page.deep_sections.0.features') as $f)
                         <div>
-                            <div class="font-semibold" style="font-family:'Gabarito',sans-serif">{{ $f['title'] }}</div>
+                            <div style="font-weight:500">{{ $f['title'] }}</div>
                             <div class="mt-1 text-[14px]" style="color:var(--ink-2)">{{ $f['body'] }}</div>
                         </div>
                     @endforeach
@@ -406,7 +398,7 @@
         <div class="mt-8 divide-y" style="border-color:var(--rule)">
             @foreach (config('product-page.faqs') as $faq)
                 <details class="group py-4">
-                    <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-4" style="font-weight:500">
                         {{ $faq['q'] }}
                         <span class="shrink-0 text-xl leading-none transition group-open:rotate-45" style="color:var(--field)">+</span>
                     </summary>
@@ -420,7 +412,7 @@
 {{-- ══ CLOSE ═════════════════════════════════════════════════════════ --}}
 <section class="field">
     <div class="mx-auto max-w-3xl px-6 py-20 text-center md:py-28">
-        <h2 class="display text-white" style="font-size:clamp(2rem,4.4vw,2.9rem); font-weight:800; line-height:1.08">
+        <h2 class="display text-white" style="font-size:clamp(1.9rem,4vw,2.7rem); font-weight:500; line-height:1.14; letter-spacing:-.018em">
             {{ config('product-page.final_cta.title') }}
         </h2>
         <p class="hero-sub">{{ config('product-page.final_cta.subtitle') }}</p>

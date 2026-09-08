@@ -9,30 +9,37 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@600;700;800&family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@300;400;500;600&display=swap"
         rel="stylesheet">
     <style>
         :root {
-            /* Descended from the product itself: a neutral ground with a teal
-               accent, and a saturated field of the same hue for the hero. */
-            --ink: #14181a;
-            --ink-2: #45504e;
-            --muted: #7b8785;
-            --paper: #f6f8f7;
+            --ink: #12161c;
+            --ink-2: #45505e;
+            --muted: #78838f;
+            --paper: #f6f8fa;
             --surface: #ffffff;
-            --rule: #e2e8e6;
-            --field: #0e8a63;
-            --field-deep: #0a6b4d;
-            --mint: #8ff0cd;
-            --teal: #3f7d6c;
-            --teal-soft: #eaf3f0;
+            --rule: #e3e8ee;
+            --field: #155dfc;
+            --field-deep: #0b3ea8;
+            --ice: oklch(0.95 0.055 207.08);
+            --accent: #155dfc;
+            --accent-soft: #eef3ff;
+            --go: #12795c;
             --amber: #b8791f;
             --danger: #b3261e;
         }
-        body { font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; color: var(--ink); }
+        body {
+            font-family: 'Public Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            color: var(--ink);
+            font-weight: 400;
+            -webkit-font-smoothing: antialiased;
+        }
+        /* One family throughout. Weight and size carry the hierarchy rather than
+           a second, heavier display face. */
         .section-heading, .pricing-heading, .display {
-            font-family: 'Gabarito', 'Public Sans', sans-serif;
-            letter-spacing: -0.02em;
+            font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+            font-weight: 500;
+            letter-spacing: -0.018em;
         }
         .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
         ::selection { background: var(--mint); color: var(--ink); }
