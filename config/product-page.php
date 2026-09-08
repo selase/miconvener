@@ -19,14 +19,14 @@ return [
     ],
 
     'hero' => [
-        'title' => "AI-powered insights\n& task automation",
-        'subtitle' => 'Capture your workflow from any device. Get AI-generated insights, extracted tasks, and full accountability — automatically.',
+        'title' => "Run the whole event\nfrom one place",
+        'subtitle' => 'Build your event page, sell tickets, check guests in at the door, and see exactly what you earned — without stitching five tools together.',
         'cta_primary' => ['label' => 'Start Free', 'href' => '/register'],
-        'cta_secondary' => ['label' => 'View Demo', 'href' => '#'],
+        'cta_secondary' => ['label' => 'See pricing', 'href' => '/#pricing'],
         'media' => [
             'type' => 'image',
             'src' => '/assets/img/marketing/hero.png',
-            'alt' => 'Workflow dashboard screenshot',
+            'alt' => 'Event dashboard showing registrations and ticket sales',
         ],
     ],
 
@@ -126,25 +126,25 @@ return [
 
     'intro' => [
         'eyebrow' => 'How it works',
-        'title' => 'From workflow to insights in minutes',
-        'body' => 'Stop wasting hours on manual documentation. MiConvener captures, analyzes, and generates actionable insights automatically.',
+        'title' => 'From first invite to final payout',
+        'body' => 'Set up an event in minutes, share a single link, and run the day from the same place you built it.',
         'cards' => [
-            ['kicker' => 'Capture', 'title' => 'Capture every detail', 'body' => 'Record from your phone or laptop — no hardware needed. Capture audio or text input instantly.'],
-            ['kicker' => 'Analyze', 'title' => 'AI-powered analysis', 'body' => 'Automatic analysis with speaker diarization, custom vocabulary, and confidence scoring.'],
-            ['kicker' => 'Deliver', 'title' => 'Insights & tasks', 'body' => 'AI generates structured insights and extracts tasks with owners and deadlines.'],
+            ['kicker' => 'Create', 'title' => 'Build your event page', 'body' => 'Add the schedule, speakers and ticket types, then publish to a link you can share anywhere.'],
+            ['kicker' => 'Sell', 'title' => 'Take payments', 'body' => 'Cards and mobile money. Guests get a ticket with a QR code the moment payment clears.'],
+            ['kicker' => 'Run', 'title' => 'Run the day', 'body' => 'Scan guests in, print badges, run live polls, and answer questions in the event forum.'],
         ],
     ],
 
     'capabilities' => [
-        'title' => 'Everything your team needs',
-        'subtitle' => 'Built for organizations that take data seriously.',
+        'title' => 'Everything an event needs',
+        'subtitle' => 'One place for the whole operation, from the first invite to the money landing in your account.',
         'items' => [
-            ['icon' => '📱', 'title' => 'Record Anywhere', 'body' => 'Use the iOS or Android app to capture any workflow. No special hardware required.'],
-            ['icon' => '📝', 'title' => 'AI Insights', 'body' => 'Automatic insights with decisions, tasks, and key outcomes.'],
-            ['icon' => '✅', 'title' => 'Task Tracking', 'body' => 'Track tasks with assignments, due dates, and status across all workflows.'],
-            ['icon' => '🔗', 'title' => 'Integrations', 'body' => 'Connect with Jira, Asana, Slack, Teams, Google Calendar, and Outlook.'],
-            ['icon' => '🔒', 'title' => 'Compliance', 'body' => 'Audit trails, legal holds, data retention policies, and e-discovery search.'],
-            ['icon' => '🎙', 'title' => 'Flexible Input', 'body' => 'Push-to-talk or open mic options. Structured queues for formal interaction.'],
+            ['icon' => '🎫', 'title' => 'Event pages', 'body' => 'Description, schedule, speakers and tickets on one shareable link.'],
+            ['icon' => '💳', 'title' => 'Ticketing', 'body' => 'Free, paid or tiered tickets with capacity limits, approvals and waitlists.'],
+            ['icon' => '📲', 'title' => 'Check-in', 'body' => 'Scan a QR code or search by name at the door, and print badges as guests arrive.'],
+            ['icon' => '🗓', 'title' => 'Programme', 'body' => 'Multi-session agendas, speaker portals, venue rooms and seat assignments.'],
+            ['icon' => '💬', 'title' => 'Engagement', 'body' => 'Live polls, quizzes with a leaderboard, a moderated forum and shared materials.'],
+            ['icon' => '📊', 'title' => 'Settlement', 'body' => 'Every payment, fee and refund on one statement, with payouts to your account.'],
         ],
     ],
 
@@ -155,39 +155,40 @@ return [
 
     'deep_sections' => [
         [
-            'eyebrow' => 'For Organizations',
-            'title' => 'Workflow governance made simple',
-            'body' => 'From boardrooms to team stand-ups, manage every process with structure, accountability, and compliance.',
+            'eyebrow' => 'Payments and settlement',
+            'title' => 'See exactly what you earned',
+            'body' => 'Every ticket sale is recorded with what the guest paid, what the payment provider took, and what settles to you. No guessing, and no waiting for a statement that never comes.',
             'features' => [
-                ['kicker' => 'Live Tagging', 'title' => 'Real-time Markers', 'body' => 'Tag decisions, tasks, and risks in real-time.'],
-                ['kicker' => 'Collaboration', 'title' => 'Permission Control', 'body' => 'Structured access and role-based permissions for all documentation.'],
-                ['kicker' => 'Governance', 'title' => 'Compliance Suite', 'body' => 'Audit trails, legal holds, and data retention for regulated industries.'],
+                ['kicker' => 'Ledger', 'title' => 'One statement per event', 'body' => 'Charges, refunds and payouts in one place, exportable whenever you need it.'],
+                ['kicker' => 'Payouts', 'title' => 'Paid to your account', 'body' => 'Request a payout to your bank or mobile money account and track it through to settlement.'],
+                ['kicker' => 'Payments', 'title' => 'However guests pay', 'body' => 'Cards and mobile money, so nobody is turned away at checkout.'],
             ],
             'media' => [
                 'type' => 'image',
                 'src' => '/assets/img/marketing/rbac.png',
-                'alt' => 'Workflow management dashboard',
+                'alt' => 'Settlement statement showing ticket revenue, fees and payouts',
             ],
         ],
     ],
 
     'faqs' => [
-        ['q' => 'How does the free plan work?', 'a' => 'The free plan includes up to 5 workflows per month with 3 team members. No credit card required. Upgrade anytime to unlock recording, analysis, and AI insights.'],
-        ['q' => 'Can I switch plans at any time?', 'a' => 'Yes! Upgrades take effect immediately with prorated billing. Downgrades take effect at the end of your current billing period.'],
-        ['q' => 'What payment methods do you accept?', 'a' => 'We accept all major credit/debit cards, mobile money, and bank transfers through Paystack. We support payments in USD and GHS.'],
-        ['q' => 'Is my data secure?', 'a' => 'Absolutely. Each organization gets isolated data storage. Enterprise plans include compliance features like audit trails, legal holds, and data retention policies.'],
-        ['q' => 'Do you offer annual billing?', 'a' => 'Yes! Save 17% with annual billing on all paid plans.'],
+        ['q' => 'How does the free plan work?', 'a' => 'The free plan covers one live event at a time, up to 100 registrations a month, and a single team seat. No card required. Upgrade whenever you need more.'],
+        ['q' => 'Can I switch plans at any time?', 'a' => 'Yes. Upgrades take effect immediately with prorated billing. Downgrades take effect at the end of your current billing period.'],
+        ['q' => 'How can my guests pay?', 'a' => 'Cards and mobile money, processed through Paystack.'],
+        ['q' => 'How and when do I get paid?', 'a' => 'Ticket revenue is tracked on a settlement statement for each event, showing what was collected, what the payment provider took, and what settles to you. Request a payout and track it through to completion.'],
+        ['q' => 'Is there a fee on ticket sales?', 'a' => 'Yes. Paid tickets carry a commission, and the rate falls as you move up plans. Each plan shows its rate in the pricing table above.'],
+        ['q' => 'Do you offer annual billing?', 'a' => 'Yes. Annual billing saves 17% on every paid plan.'],
     ],
 
     'final_cta' => [
-        'title' => 'Ready to transform your workflow?',
-        'subtitle' => 'Start free and upgrade when your team needs more. No credit card required.',
+        'title' => 'Ready to run your next event?',
+        'subtitle' => 'Start free with one event and up to 100 registrations. No card required.',
         'cta_primary' => ['label' => 'Start Free', 'href' => '/register'],
         'cta_secondary' => ['label' => 'Contact Sales', 'href' => '/contact'],
     ],
 
     'footer' => [
-        'tagline' => 'AI-powered insights and task tracking for modern organizations.',
+        'tagline' => 'Create, run and settle events — all in one place.',
         'columns' => [
             'Product' => [
                 ['label' => 'Features', 'href' => '/product-template#features'],

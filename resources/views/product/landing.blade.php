@@ -258,10 +258,10 @@
             {{-- Animated pipeline (desktop: horizontal) --}}
             <div class="hidden md:flex items-start justify-center gap-0 mb-16">
                 @foreach ([
-                    ['📱', '01', 'Record',          'From phone or laptop',       'from-blue-500/15 to-blue-600/5',   'border-blue-200'],
-                    ['🤖', '02', 'Transcribe',       'Speaker-aware AI',           'from-violet-500/15 to-violet-600/5','border-violet-200'],
-                    ['✨', '03', 'AI Minutes',       'Generated in seconds',       'from-emerald-500/15 to-emerald-600/5','border-emerald-200'],
-                    ['✅', '04', 'Track Actions',    'Assigned &amp; deadlined',   'from-amber-500/15 to-amber-600/5', 'border-amber-200'],
+                    ['🎫', '01', 'Create',    'Page, schedule, tickets',    'from-blue-500/15 to-blue-600/5',   'border-blue-200'],
+                    ['💳', '02', 'Sell',      'Cards and mobile money',     'from-violet-500/15 to-violet-600/5','border-violet-200'],
+                    ['📲', '03', 'Check in',  'Scan guests at the door',    'from-emerald-500/15 to-emerald-600/5','border-emerald-200'],
+                    ['📊', '04', 'Get paid',  'Statement &amp; payout',     'from-amber-500/15 to-amber-600/5', 'border-amber-200'],
                 ] as [$icon, $num, $title, $sub, $gradient, $border])
                     {{-- Node --}}
                     <div class="flex flex-col items-center text-center w-44">
@@ -295,10 +295,10 @@
             {{-- Mobile pipeline (vertical) --}}
             <div class="flex md:hidden flex-col items-center mb-14 gap-0">
                 @foreach ([
-                    ['📱', '01', 'Record',       'From phone or laptop',     'from-blue-500/15 to-blue-600/5',    'border-blue-200'],
-                    ['🤖', '02', 'Transcribe',    'Speaker-aware AI',         'from-violet-500/15 to-violet-600/5','border-violet-200'],
-                    ['✨', '03', 'AI Minutes',    'Generated in seconds',     'from-emerald-500/15 to-emerald-600/5','border-emerald-200'],
-                    ['✅', '04', 'Track Actions', 'Assigned & deadlined',    'from-amber-500/15 to-amber-600/5',  'border-amber-200'],
+                    ['🎫', '01', 'Create',    'Page, schedule, tickets',  'from-blue-500/15 to-blue-600/5',    'border-blue-200'],
+                    ['💳', '02', 'Sell',      'Cards and mobile money',   'from-violet-500/15 to-violet-600/5','border-violet-200'],
+                    ['📲', '03', 'Check in',  'Scan guests at the door',  'from-emerald-500/15 to-emerald-600/5','border-emerald-200'],
+                    ['📊', '04', 'Get paid',  'Statement and payout',     'from-amber-500/15 to-amber-600/5',  'border-amber-200'],
                 ] as [$icon, $num, $title, $sub, $gradient, $border])
                     <div class="flex items-center gap-4">
                         <div class="relative flex-none">
@@ -441,10 +441,10 @@
 
                         <div class="flex flex-wrap gap-2 pt-4 border-t border-white/5">
                             @foreach ([
-                                ['emerald', 'Audit Trail'],
-                                ['blue',    'Legal Hold Ready'],
-                                ['purple',  'GDPR Compliant'],
-                                ['amber',   'e-Discovery'],
+                                ['emerald', 'Per-organization data isolation'],
+                                ['blue',    'Role-based access'],
+                                ['purple',  'Activity logging'],
+                                ['amber',   'Encrypted payment credentials'],
                             ] as [$color, $label])
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-{{ $color }}-500/10 border border-{{ $color }}-500/20 px-2.5 py-1 text-[11px] text-{{ $color }}-300 font-medium">
                                     <span class="h-1.5 w-1.5 rounded-full bg-{{ $color }}-400"></span>{{ $label }}
