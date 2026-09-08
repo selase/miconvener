@@ -23,14 +23,25 @@ test('registration screen can be rendered', function () {
     $this->get('/register')
         ->assertStatus(200)
         ->assertSee("Start your {$appName} workspace")
-        ->assertSee('Choose a paid plan, create your account, and provision your first tenant.')
-        // Only paid, self-serve plans appear. Free is excluded because the
-        // controller rejects it; Enterprise is excluded because it has no
-        // numeric price and routes to a sales conversation instead.
+        // Every self-serve plan appears, Free included. Enterprise is excluded
+        // because it has no numeric price and routes to a sales conversation.
+        ->assertSee('Free')
         ->assertSee('Starter')
         ->assertSee('Growth')
-        ->assertDontSee('Enterprise')
-        ->assertDontSee('Free');
+        ->assertDontSee('Enterprise');
+});
+
+test('the registration screen preselects the plan the visitor arrived to choose', function () {
+    // The pricing table links to /register?plan=free. If the query string were
+    // ignored, that CTA would silently land on the paid default.
+    $this->get('/register?plan=free')
+        ->assertStatus(200)
+        ->assertSee('value="free" class="sr-only peer"', escape: false);
+
+    $html = $this->get('/register?plan=free')->getContent();
+    $freeInput = mb_substr($html, mb_strpos($html, 'value="free"'), 200);
+
+    expect($freeInput)->toContain('checked');
 });
 
 test('new users can register with a paid plan', function () {
@@ -53,7 +64,7 @@ test('new users can register with a paid plan', function () {
     $this->assertAuthenticated();
 });
 
-test('registration requires a paid plan', function () {
+test('new users can register on the free plan without paying', function () {
     $freePlan = Package::where('slug', 'free')->firstOrFail();
 
     $this
@@ -68,7 +79,37 @@ test('registration requires a paid plan', function () {
             'plan' => $freePlan->slug,
             'slug' => 'acme-free',
         ])
-        ->assertSessionHasErrors('plan');
+        // Straight into the product. A free signup never reaches the payment
+        // callback, so the plan is granted at signup instead.
+        ->assertRedirect(route('tenant.onboarding.wizard', ['subdomain' => 'acme-free']));
+
+    $this->assertAuthenticated();
+
+    $tenant = App\Models\Tenant::where('slug', 'acme-free')->firstOrFail();
+    expect((string) $tenant->package_id)->toBe((string) $freePlan->id);
+});
+
+test('a free signup gets the free plan limits it was promised', function () {
+    $this
+        ->withoutMiddleware(App\Http\Middleware\PreventRequestForgery::class)
+        ->post('/register', [
+            'first_name' => 'Ada',
+            'last_name' => 'Osei',
+            'organization_name' => 'Acme Corp',
+            'email' => 'ada@acmecorp.com',
+            'password' => 'Password1!',
+            'password_confirmation' => 'Password1!',
+            'plan' => 'free',
+            'slug' => 'acme-free',
+        ]);
+
+    $tenant = App\Models\Tenant::where('slug', 'acme-free')->firstOrFail();
+
+    // The advertised ceiling has to be the enforced one, not decoration.
+    expect($tenant->featureLimitValue('event_registrations'))->toBe(50);
+    expect($tenant->featureLimitValue('events_in_flight'))->toBe(1);
+    expect($tenant->planAllows('paid_tickets'))->toBeFalse();
+    expect($tenant->planAllows('event_materials'))->toBeFalse();
 });
 
 test('registration creates a tenant for the new user', function () {

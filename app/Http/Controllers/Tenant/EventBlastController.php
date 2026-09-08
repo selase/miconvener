@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\Events\SendEventBlastJob;
 use App\Models\Event;
 use App\Models\EventBlast;
+use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,18 @@ final class EventBlastController extends Controller
         }
 
         $recipientsCount = EventBlast::audienceQuery($eventModel, $validated['audience'])->count();
+
+        // A blast is the one action that can send hundreds of emails from a
+        // single click, and it was the only email path that never consulted the
+        // meter. Check before queueing so the organizer hears about it now.
+        $emailLimit = $tenant->featureLimitValue('email_credits');
+        if ($emailLimit !== null && ! app(FeatureMeteringService::class)->canUse($tenant, 'email_credits', $recipientsCount)) {
+            $usage = app(FeatureMeteringService::class)->getUsage($tenant, 'email_credits');
+
+            return response()->json([
+                'message' => "This blast needs {$recipientsCount} email credit(s) and your plan has {$usage['remaining']} left this month. Upgrade your plan, or choose a smaller audience.",
+            ], 422);
+        }
 
         $blast = $eventModel->blasts()->create([
             'tenant_id' => $tenant->id,

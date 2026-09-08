@@ -40,11 +40,11 @@ return [
             'yearly_price' => 0,
             'most_popular' => false,
             'features' => [
+                'Free events only — no ticket sales',
                 '1 live event at a time',
-                '100 registrations per month',
+                '50 registrations per month',
                 '1 team seat',
                 '200 email credits per month',
-                '5% commission on ticket sales',
             ],
             'cta' => [
                 'label' => 'Get Started Free',
@@ -59,12 +59,14 @@ return [
             'yearly_price' => 264,
             'most_popular' => true,
             'features' => [
+                'Sell paid tickets',
                 '3 live events at a time',
                 '500 registrations per month',
                 '3 team seats',
                 '1,000 email credits per month',
                 '100 SMS credits per month',
                 'CSV settlement export',
+                'Speaker material downloads',
                 '3.5% commission on ticket sales',
             ],
             'cta' => [

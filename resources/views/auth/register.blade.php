@@ -8,7 +8,7 @@
 
 <div>
     <h2 class="brand-font text-[24px] text-slate-900">Start your {{ config('app.name') }} workspace</h2>
-    <p class="mt-2 text-[14px] text-slate-500">Choose a paid plan, create your account, and provision your first tenant.</p>
+    <p class="mt-2 text-[14px] text-slate-500">Pick a plan, create your account, and we'll set up your workspace.</p>
 
     @if ($errors->any())
         <div class="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -32,14 +32,18 @@
                         @php
                             $monthlyPrice = $plan['monthly_price'] ?? null;
                         @endphp
-                        @if (! is_numeric($monthlyPrice) || $monthlyPrice <= 0)
+                        @if (! is_numeric($monthlyPrice))
                             @continue
                         @endif
-                        @php $isPopular = $plan['most_popular'] ?? false; @endphp
+                        @php
+                            $isPopular = $plan['most_popular'] ?? false;
+                            $isFreePlan = $monthlyPrice <= 0;
+                        @endphp
 
                         <label class="block cursor-pointer group">
                             <input type="radio" name="plan" value="{{ $plan['slug'] }}" class="sr-only peer"
-                                {{ old('plan', 'starter') === $plan['slug'] ? 'checked' : '' }} required>
+                                data-price="{{ $monthlyPrice }}"
+                                {{ old('plan', request('plan', 'starter')) === $plan['slug'] ? 'checked' : '' }} required>
                             <div class="relative rounded-2xl border-2 border-slate-200 p-4 transition-all
                                         peer-checked:border-[#155dfc] peer-checked:bg-blue-50/50
                                         hover:border-slate-300 hover:shadow-sm">
@@ -58,8 +62,12 @@
                                         <div class="mt-0.5 text-[12px] text-slate-400 leading-snug">{{ $plan['description'] }}</div>
                                     </div>
                                     <div class="flex-none text-right">
-                                        <span class="brand-font text-[20px] font-bold text-slate-900">{{ config('services.paystack.currency', 'GHS') }} {{ $monthlyPrice }}</span>
-                                        <span class="text-[12px] text-slate-400">/mo</span>
+                                        @if ($isFreePlan)
+                                            <span class="brand-font text-[20px] font-bold text-slate-900">Free</span>
+                                        @else
+                                            <span class="brand-font text-[20px] font-bold text-slate-900">{{ config('services.paystack.currency', 'GHS') }} {{ $monthlyPrice }}</span>
+                                            <span class="text-[12px] text-slate-400">/mo</span>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -92,7 +100,8 @@
                 </div>
 
                 <p class="mt-4 text-[11px] text-slate-400 leading-snug">
-                    Annual billing saves up to 17%. You can switch plans anytime after signing up.
+                    The free plan runs free events only. Annual billing saves up to 17% on paid plans, and you can
+                    switch plans anytime after signing up.
                 </p>
             </div>
 
@@ -171,7 +180,7 @@
                     </div>
 
                     {{-- Submit --}}
-                    <button type="submit"
+                    <button type="submit" id="submit-button"
                         class="w-full rounded-xl bg-[#155dfc] px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-[#155dfc]/25 hover:bg-[#0b3ea8] transition-all hover:shadow-md hover:shadow-blue-500/25 focus:outline-none focus:ring-2 focus:ring-[#155dfc] focus:ring-offset-2 mt-2">
                         Continue to payment →
                     </button>
@@ -194,10 +203,26 @@
 </div>
 
 <script>
-    // Most organizers should never have to think about this field, so it fills
-    // itself from the organization name -- and stops the moment the visitor edits
-    // it, so a deliberate choice is never overwritten as they keep typing.
     (function () {
+        // The button promises payment. On the free plan that promise is false.
+        const submit = document.getElementById('submit-button');
+        const planInputs = document.querySelectorAll('input[name="plan"]');
+
+        function syncSubmitLabel() {
+            if (!submit) return;
+            const chosen = document.querySelector('input[name="plan"]:checked');
+            const isFree = chosen && Number(chosen.dataset.price) <= 0;
+            submit.textContent = isFree ? 'Create my workspace' : 'Continue to payment →';
+        }
+
+        planInputs.forEach(function (input) {
+            input.addEventListener('change', syncSubmitLabel);
+        });
+        syncSubmitLabel();
+
+        // Most organizers should never have to think about the handle, so it fills
+        // itself from the organization name -- and stops the moment the visitor
+        // edits it, so a deliberate choice is never overwritten as they keep typing.
         const org = document.getElementById('organization_name');
         const handle = document.getElementById('slug');
         if (!org || !handle) return;

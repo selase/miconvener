@@ -343,6 +343,24 @@ final class Tenant extends Model
     }
 
     /**
+     * Whether the plan permits a boolean feature. A feature the tenant has no
+     * row for is treated as permitted: absence means the plan's features have
+     * never been synced, not that the capability was withdrawn. Only an
+     * explicitly disabled row closes the gate. Run `tenants:sync-features`
+     * after adding a feature key so absence stops standing in for permission.
+     */
+    public function planAllows(string $featureKey): bool
+    {
+        $feature = $this->features()->where('feature_key', $featureKey)->first();
+
+        if (! $feature) {
+            return true;
+        }
+
+        return (bool) $feature->enabled;
+    }
+
+    /**
      * Get the configured numeric limit for a limit-type feature, or null
      * when the feature is missing, disabled, not a limit type, or set to
      * unlimited (a negative stored value). Unlike canUse()/recordUsage(),

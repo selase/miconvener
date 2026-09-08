@@ -7,6 +7,7 @@ namespace App\Jobs\Events;
 use App\Mail\Events\EventBlastMail;
 use App\Models\EventBlast;
 use App\Models\EventBlastRecipient;
+use App\Services\Tenancy\FeatureMeteringService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,9 +31,11 @@ final class SendEventBlastJob implements ShouldQueue
         }
 
         $event = $this->blast->event;
+        $tenant = $this->blast->tenant;
+        $metering = app(FeatureMeteringService::class);
 
         EventBlast::audienceQuery($event, $this->blast->audience)
-            ->chunk(100, function ($registrations): void {
+            ->chunk(100, function ($registrations) use ($tenant, $metering): void {
                 foreach ($registrations as $registration) {
                     $recipient = EventBlastRecipient::firstOrCreate(
                         ['blast_id' => $this->blast->id, 'registration_id' => $registration->id],
@@ -40,6 +43,13 @@ final class SendEventBlastJob implements ShouldQueue
                     );
 
                     Mail::to($registration->email)->send(new EventBlastMail($this->blast, $registration->full_name, $recipient->id));
+
+                    // Charged per email actually sent: the audience can shrink
+                    // between scheduling and delivery, and a cancelled blast
+                    // should cost nothing.
+                    if ($tenant) {
+                        $metering->recordUsage($tenant, 'email_credits');
+                    }
                 }
             });
 

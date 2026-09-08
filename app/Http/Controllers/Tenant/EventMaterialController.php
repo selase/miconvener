@@ -37,6 +37,10 @@ final class EventMaterialController extends Controller
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
 
+        if (! $tenant->planAllows('event_materials')) {
+            return response()->json(['message' => 'Your plan does not include speaker materials. Upgrade to share files attendees can download.'], 422);
+        }
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'session_id' => ['nullable', 'exists:event_sessions,id'],

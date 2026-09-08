@@ -73,6 +73,16 @@ final class EventController extends Controller
 
         $validated = $this->validateEvent($request);
 
+        if (($validated['ticket_price'] ?? 0) > 0 && ! $tenant->planAllows('paid_tickets')) {
+            $message = 'Your plan runs free events only. Set the ticket price to 0, or upgrade to sell tickets.';
+
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return redirect()->back()->withErrors(['ticket_price' => $message]);
+        }
+
         if ($request->hasFile('hero_image')) {
             $validated['hero_image_path'] = Helper::processUploadedFile($request, 'hero_image', 'event_hero', 'events/hero', config('app.env') === 'production' ? 's3' : 'public');
         }
@@ -99,6 +109,16 @@ final class EventController extends Controller
         $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->with('ticketTypes')->firstOrFail();
 
         $validated = $this->validateEvent($request);
+
+        if (($validated['ticket_price'] ?? 0) > 0 && ! $tenant->planAllows('paid_tickets')) {
+            $message = 'Your plan runs free events only. Set the ticket price to 0, or upgrade to sell tickets.';
+
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return redirect()->back()->withErrors(['ticket_price' => $message]);
+        }
 
         $wouldBePaid = ($validated['ticket_price'] ?? 0) > 0
             || $eventModel->ticketTypes->where('is_active', true)->where('price', '>', 0)->isNotEmpty();

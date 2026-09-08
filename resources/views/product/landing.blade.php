@@ -132,11 +132,11 @@
         </p>
 
         <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a href="{{ route('register') }}" class="btn-solid">Start free</a>
+            <a href="{{ route('register', ['plan' => 'free']) }}" class="btn-solid">Start free</a>
             <a href="#pricing" class="btn-ghost">See pricing</a>
         </div>
 
-        <p class="mt-5 text-sm" style="color:#b7cdf7; font-weight:300">One live event and 100 registrations, no card required.</p>
+        <p class="mt-5 text-sm" style="color:#b7cdf7; font-weight:300">One free event and 50 registrations, no card required.</p>
 
         {{-- Event-day overview. Swap for a real capture by replacing this block
              with <img src="/assets/img/marketing/overview.png" alt="…"> once the

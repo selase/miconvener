@@ -15,9 +15,11 @@ use App\Models\EventRegistration;
 use App\Models\EventTicketType;
 use App\Models\Tenant;
 use App\Services\Events\QrCodeGenerator;
+use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -65,6 +67,23 @@ final class PublicEventController extends Controller
                 ? ['required', Rule::in($activeTicketTypes->pluck('id')->all())]
                 : ['nullable'],
         ]);
+
+        // The plan's registration ceiling. Checked before the registration row is
+        // written: usage only increments on confirmation, so an organizer at the
+        // ceiling is turned away rather than accumulating rows they cannot honour.
+        $registrationLimit = $tenant->featureLimitValue('event_registrations');
+        if ($registrationLimit !== null && ! app(FeatureMeteringService::class)->canUse($tenant, 'event_registrations')) {
+            Log::warning('Registration refused: tenant is at its plan registration limit', [
+                'tenant_id' => $tenant->id,
+                'event_id' => $eventModel->id,
+                'limit' => $registrationLimit,
+            ]);
+
+            return back()->with(
+                'error',
+                'Registration for this event is closed. Please contact the organizer.'
+            );
+        }
 
         $existingRegistration = EventRegistration::where('tenant_id', $tenant->id)
             ->where('event_id', $eventModel->id)
@@ -119,14 +138,14 @@ final class PublicEventController extends Controller
         if ($status === EventRegistration::STATUS_CONFIRMED) {
             $registration->issueTicket();
             $registration->save();
-            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
-            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
         } elseif ($status === EventRegistration::STATUS_WAITLISTED) {
-            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationWaitlisted($registration));
         } elseif ($status === EventRegistration::STATUS_PENDING_APPROVAL) {
-            app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationPendingApproval($registration));
         }
 
@@ -248,7 +267,7 @@ final class PublicEventController extends Controller
             return;
         }
 
-        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+        app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
         Mail::to($registration->email)->queue($mailable);
     }
 

@@ -51,15 +51,8 @@ final class RegisteredUserController extends Controller
             'slug' => TenantHandle::rules(),
         ], TenantHandle::messages());
 
-        // Ensure the selected plan is not the free plan
         /** @var Package $package */
         $package = Package::where('slug', $request->input('plan'))->firstOrFail();
-
-        if ($package->isFree()) {
-            throw ValidationException::withMessages([
-                'plan' => 'Please select a paid plan to continue.',
-            ]);
-        }
 
         // Create user
         $user = User::query()->create([
@@ -79,6 +72,10 @@ final class RegisteredUserController extends Controller
             'status' => TenantStatusEnum::ACTIVE,
             'isolation_mode' => 'shared',
             'db_driver' => 'pgsql',
+            // The free plan is granted here because nothing downstream will grant
+            // it: a free signup never reaches the payment callback that assigns a
+            // package on the paid path.
+            'package_id' => $package->isFree() ? $package->id : null,
         ]);
 
         // Provision tenant database and run migrations
@@ -91,6 +88,10 @@ final class RegisteredUserController extends Controller
         Auth::login($user);
 
         session(['active_tenant_id' => $tenant->id]);
+
+        if ($package->isFree()) {
+            return redirect()->route('tenant.onboarding.wizard', ['subdomain' => $tenant->slug]);
+        }
 
         return redirect()->route('billing.confirm', [
             'plan' => $package->slug,
