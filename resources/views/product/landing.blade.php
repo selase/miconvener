@@ -1,580 +1,449 @@
 @extends('layouts.product')
 
+@section('title', config('product-page.brand.name').' — run your whole event from one place')
+
 @push('styles')
 <style>
-    @@keyframes fade-up {
-        from { opacity: 0; transform: translateY(18px); }
-        to   { opacity: 1; transform: translateY(0); }
+    /* ── Field ─────────────────────────────────────────────────────────
+       The hero sits on a saturated indigo field. Everything below it is
+       paper, so the colour reads as the stage and the rest as the programme. */
+    .field {
+        background: var(--indigo);
+        background-image:
+            radial-gradient(120% 90% at 50% -10%, #5a45e6 0%, rgba(90,69,230,0) 60%),
+            radial-gradient(80% 60% at 90% 10%, rgba(185,174,255,.22) 0%, rgba(185,174,255,0) 70%);
+        position: relative;
+        overflow: hidden;
     }
-    @@keyframes fade-in {
-        from { opacity: 0; }
-        to   { opacity: 1; }
+    /* Faint seating-plan grid: the room, drawn once, never repeated elsewhere. */
+    .field::before {
+        content: "";
+        position: absolute; inset: 0;
+        background-image:
+            linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: radial-gradient(110% 80% at 50% 30%, #000 30%, transparent 78%);
+        pointer-events: none;
     }
-    @@keyframes wave-bar {
-        0%, 100% { transform: scaleY(0.3); }
-        50%      { transform: scaleY(1); }
+    .field > * { position: relative; }
+
+    .pill {
+        display: inline-flex; align-items: center; gap: .55rem;
+        padding: .4rem .9rem .4rem .55rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,.10);
+        border: 1px solid rgba(255,255,255,.18);
+        color: #efecff; font-size: .82rem;
     }
-    @@keyframes pulse-dot {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50%      { opacity: 0.4; transform: scale(0.85); }
-    }
-    @@keyframes flow-dash {
-        from { stroke-dashoffset: 20; }
-        to   { stroke-dashoffset: 0; }
+    .pill span.dot {
+        width: 1.35rem; height: 1.35rem; border-radius: 999px;
+        background: var(--marigold); color: #2a1c94;
+        display: grid; place-items: center; font-size: .72rem; font-weight: 800;
     }
 
-    .fade-up   { animation: fade-up 0.65s ease-out forwards; opacity: 0; }
-    .fade-in   { animation: fade-in 0.5s ease-out forwards; opacity: 0; }
-    .wave-bar  { animation: wave-bar 1.3s ease-in-out infinite; }
-    .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
-    .flow-dash { animation: flow-dash 0.6s linear infinite; }
+    .hero-title {
+        font-size: clamp(2.6rem, 7vw, 4.6rem);
+        line-height: 1.02;
+        font-weight: 800;
+        color: #fff;
+        text-wrap: balance;
+        margin: 1.4rem 0 0;
+    }
+    .hero-title em { font-style: normal; color: var(--peri); }
+    .hero-sub {
+        margin: 1.3rem auto 0; max-width: 44rem;
+        color: #d9d4f7; font-size: 1.08rem; line-height: 1.6;
+    }
+
+    .btn-solid {
+        display: inline-flex; align-items: center; gap: .5rem;
+        background: #fff; color: var(--indigo-deep);
+        font-weight: 700; padding: .85rem 1.6rem; border-radius: .8rem;
+        transition: transform .15s ease, box-shadow .15s ease;
+        box-shadow: 0 10px 30px -12px rgba(0,0,0,.5);
+    }
+    .btn-solid:hover { transform: translateY(-1px); }
+    .btn-ghost {
+        display: inline-flex; align-items: center;
+        color: #cfc8f5; font-weight: 600; padding: .85rem 1.1rem;
+        border-radius: .8rem; border: 1px solid rgba(255,255,255,.2);
+    }
+    .btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,.4); }
+
+    /* ── Product still-life ────────────────────────────────────────────
+       The page an organizer shares, and the ticket their guest receives.
+       Two real surfaces, composed — this is the one bold moment on the page. */
+    .stage { margin-top: 4rem; padding-bottom: 0; }
+    .surface {
+        background: var(--surface);
+        border-radius: 14px;
+        box-shadow: 0 40px 80px -30px rgba(20,10,70,.55), 0 0 0 1px rgba(255,255,255,.10);
+        overflow: hidden;
+        text-align: left;
+    }
+    .chrome {
+        display: flex; align-items: center; gap: .45rem;
+        padding: .7rem .9rem; border-bottom: 1px solid var(--rule);
+        background: #fbfaff;
+    }
+    .chrome i { width: .6rem; height: .6rem; border-radius: 999px; background: #ded9ec; display: block; }
+    .chrome .addr {
+        margin-left: .6rem; font-size: .72rem; color: var(--muted);
+        background: #f2f0f9; border-radius: 6px; padding: .2rem .6rem;
+    }
+
+    .ticket {
+        background: var(--surface);
+        border-radius: 12px;
+        box-shadow: 0 30px 60px -22px rgba(20,10,70,.6), 0 0 0 1px rgba(255,255,255,.12);
+        overflow: hidden;
+    }
+    /* The notch is what makes it read as a ticket rather than a card. */
+    .ticket .perf {
+        position: relative; height: 0; border-top: 2px dashed var(--rule); margin: 0 .9rem;
+    }
+    .ticket .perf::before, .ticket .perf::after {
+        content: ""; position: absolute; top: -11px; width: 20px; height: 20px;
+        border-radius: 999px; background: var(--indigo);
+    }
+    .ticket .perf::before { left: -19px; }
+    .ticket .perf::after { right: -19px; }
+
+    .qr {
+        width: 92px; height: 92px; border-radius: 8px;
+        background-color: #fff;
+        background-image:
+            linear-gradient(90deg, var(--ink) 1px, transparent 1px),
+            linear-gradient(var(--ink) 1px, transparent 1px);
+        background-size: 8px 8px;
+        box-shadow: inset 0 0 0 1px var(--rule);
+        position: relative;
+    }
+    .qr::before, .qr::after {
+        content: ""; position: absolute; width: 26px; height: 26px;
+        border: 5px solid var(--ink); border-radius: 4px; background: #fff;
+    }
+    .qr::before { top: 7px; left: 7px; }
+    .qr::after { top: 7px; right: 7px; }
+
+    /* ── Paper sections ───────────────────────────────────────────────── */
+    .paper { background: var(--paper); }
+    .h2 { font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 700; line-height: 1.12; text-wrap: balance; }
+    .lede { color: var(--ink-2); font-size: 1.05rem; max-width: 42rem; }
+
+    /* The arc is a real sequence, so it is numbered; nothing else on the
+       page is. */
+    .arc { display: grid; gap: 0; grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 860px) { .arc { grid-template-columns: 1fr; } }
+    .arc-step { padding: 1.6rem 1.4rem; border-left: 2px solid var(--rule); }
+    .arc-step:first-child { border-left-color: var(--indigo); }
+    .arc-n { font-size: .78rem; color: var(--indigo); font-weight: 700; }
+    .arc-t { font-family: 'Gabarito', sans-serif; font-weight: 700; font-size: 1.12rem; margin-top: .35rem; }
+    .arc-b { color: var(--ink-2); font-size: .95rem; margin-top: .35rem; }
+
+    .panel {
+        background: var(--surface); border: 1px solid var(--rule);
+        border-radius: 16px; overflow: hidden;
+    }
+    .stat-row { display: flex; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid var(--rule); font-size: .92rem; }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row b { font-weight: 600; }
+    .net { color: var(--go); font-weight: 700; }
+
+    .cap { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 880px) { .cap { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .cap { grid-template-columns: 1fr; } }
+    .cap > div { background: var(--surface); padding: 1.5rem 1.4rem; }
+    .cap h3 { font-family: 'Gabarito', sans-serif; font-weight: 700; font-size: 1.02rem; }
+    .cap p { color: var(--ink-2); font-size: .93rem; margin-top: .3rem; }
+
+    a:focus-visible, button:focus-visible { outline: 3px solid var(--peri); outline-offset: 2px; }
 </style>
 @endpush
 
 @section('content')
 
-    {{-- ============================================================
-         HERO
-    ============================================================ --}}
-    <section class="pt-10 md:pt-14 pb-10">
-        <div class="mx-auto max-w-7xl px-6">
+{{-- ══ HERO ══════════════════════════════════════════════════════════ --}}
+<section class="field">
+    <div class="mx-auto max-w-7xl px-6 pt-16 pb-0 text-center md:pt-24">
 
-            {{-- Headline --}}
-            <div class="text-center">
-                <h1 class="section-heading fade-up mx-auto max-w-4xl whitespace-pre-line text-[50px] font-bold leading-[1.05] tracking-[-0.025em] text-slate-900 md:text-[80px]" style="animation-delay:0.15s">
-                    {{ config('product-page.hero.title') }}
-                </h1>
+        <span class="pill">
+            <span class="dot">✦</span>
+            Free for your first event
+        </span>
 
-                <p class="fade-up mx-auto mt-6 max-w-2xl text-[19px] leading-[30px] text-slate-500" style="animation-delay:0.25s">
-                    {{ config('product-page.hero.subtitle') }}
-                </p>
+        <h1 class="hero-title display">
+            Run the whole event<br><em>from one place</em>
+        </h1>
 
-                <div class="fade-up mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row" style="animation-delay:0.35s">
-                    <a href="{{ config('product-page.hero.cta_primary.href') }}"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-500 transition-all hover:scale-[1.02] hover:shadow-blue-500/30">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        {{ config('product-page.hero.cta_primary.label') }}
-                    </a>
-                    <a href="{{ config('product-page.hero.cta_secondary.href') }}"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-all">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {{ config('product-page.hero.cta_secondary.label') }}
-                    </a>
-                </div>
+        <p class="hero-sub">
+            Build the page, sell the tickets, scan guests in at the door, and see exactly
+            what you earned — without stitching five tools together.
+        </p>
 
-                {{-- Device availability strip --}}
-                <div class="fade-up mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12px] text-slate-400" style="animation-delay:0.45s">
-                    <span class="flex items-center gap-1.5">
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        iOS & Android
-                    </span>
-                    <span class="h-1 w-1 rounded-full bg-slate-300"></span>
-                    <span class="flex items-center gap-1.5">
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        Web browser
-                    </span>
-                    <span class="h-1 w-1 rounded-full bg-slate-300"></span>
-                    <span>No conference room hardware needed</span>
-                </div>
-
-            </div>
-
-            {{-- CSS-only meeting dashboard mockup (stays dark — it's showing the app UI) --}}
-            <div class="fade-up mt-14 relative mx-auto max-w-5xl" style="animation-delay:0.45s">
-                {{-- Ambient shadow glow --}}
-                <div class="absolute -inset-4 bg-blue-400/10 blur-3xl rounded-full pointer-events-none"></div>
-
-                <div class="relative rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-300/50">
-                    <div class="rounded-xl bg-[#0d1117] overflow-hidden">
-
-                        {{-- Browser chrome --}}
-                        <div class="border-b border-white/5 px-4 py-2.5 flex items-center gap-3">
-                            <div class="flex gap-1.5">
-                                <div class="h-2.5 w-2.5 rounded-full bg-red-500/40"></div>
-                                <div class="h-2.5 w-2.5 rounded-full bg-amber-500/40"></div>
-                                <div class="h-2.5 w-2.5 rounded-full bg-emerald-500/40"></div>
-                            </div>
-                            <div class="flex-1 rounded-md bg-white/5 px-3 py-1 text-center">
-                                <span class="text-[11px] text-white/20 font-mono">app.xdataaudition.com / board-q1-review</span>
-                            </div>
-                        </div>
-
-                        {{-- Meeting UI --}}
-                        <div class="grid min-h-[320px] md:min-h-[400px]" style="grid-template-columns: 220px 1fr;">
-
-                            {{-- Left sidebar: participants --}}
-                            <div class="border-r border-white/5 p-4 hidden md:block">
-                                <div class="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-3">Participants · 4</div>
-
-                                @foreach ([
-                                    ['K', 'Kwame A.',  'Organizer', 'from-amber-500/25 to-orange-500/15 text-amber-300'],
-                                    ['S', 'Sarah C.',  'Secretary', 'from-blue-500/25 to-cyan-500/15 text-blue-300'],
-                                    ['M', 'Marcus T.', 'Member',    'from-purple-500/25 to-violet-500/15 text-purple-300'],
-                                    ['A', 'Adwoa B.',  'Member',    'from-emerald-500/25 to-teal-500/15 text-emerald-300'],
-                                ] as [$initial, $name, $role, $gradient])
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="h-7 w-7 rounded-full bg-gradient-to-br {{ $gradient }} border border-white/10 flex items-center justify-center text-[11px] font-bold flex-shrink-0">{{ $initial }}</div>
-                                        <div>
-                                            <div class="text-[12px] text-white/70 font-medium leading-none mb-0.5">{{ $name }}</div>
-                                            <div class="text-[10px] text-white/30">{{ $role }}</div>
-                                        </div>
-                                    </div>
-                                @endforeach
-
-                                <div class="mt-5 pt-4 border-t border-white/5">
-                                    <div class="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-2">Duration</div>
-                                    <div class="font-mono text-[22px] font-bold text-white/80 tracking-tight">47:23</div>
-                                    <div class="flex items-center gap-1.5 mt-2">
-                                        <div class="h-2 w-2 rounded-full bg-red-400 pulse-dot"></div>
-                                        <span class="text-[11px] text-red-300 font-semibold">Recording</span>
-                                    </div>
-                                </div>
-
-                                {{-- Audio waveform --}}
-                                <div class="mt-5 flex items-end gap-[2px] h-8">
-                                    @for ($i = 0; $i < 24; $i++)
-                                        @php $pct = [20, 40, 65, 90, 75, 50, 85, 30, 95, 60, 45, 80, 35, 70, 55, 100, 40, 75, 25, 88, 50, 65, 30, 70][$i]; @endphp
-                                        <div class="wave-bar flex-1 rounded-sm bg-blue-500/40 origin-bottom"
-                                             style="height:{{ $pct }}%; animation-delay:{{ $i * 0.055 }}s;"></div>
-                                    @endfor
-                                </div>
-                            </div>
-
-                            {{-- Right panel: transcript --}}
-                            <div class="p-5 overflow-hidden">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Live Transcript</div>
-                                    <div class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-[11px] text-emerald-300 font-semibold">
-                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707" />
-                                        </svg>
-                                        AI Processing
-                                    </div>
-                                </div>
-
-                                {{-- Transcript lines --}}
-                                <div class="space-y-4">
-                                    @foreach ([
-                                        ['K', 'Kwame A.',  'from-amber-500/25 to-orange-500/15 text-amber-300', "Let's review the Q1 budget allocation. We need to finalise the numbers before the board meeting next Thursday."],
-                                        ['S', 'Sarah C.',  'from-blue-500/25 to-cyan-500/15 text-blue-300',     "I've prepared the breakdown. Marketing is requesting a 15% increase for the digital campaign push this quarter."],
-                                        ['M', 'Marcus T.', 'from-purple-500/25 to-violet-500/15 text-purple-300', "We should review the ROI from last quarter first. Conversion rates improved by 23%, so the case is strong."],
-                                    ] as [$initial, $speaker, $gradient, $text])
-                                        <div class="fade-in" style="animation-delay:{{ $loop->index * 0.15 + 0.5 }}s">
-                                            <div class="flex items-center gap-2 mb-1">
-                                                <div class="h-5 w-5 rounded-full bg-gradient-to-br {{ $gradient }} border border-white/10 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{{ $initial }}</div>
-                                                <span class="text-[11px] text-white/40 font-semibold">{{ $speaker }}</span>
-                                            </div>
-                                            <div class="ml-7 text-[13px] leading-relaxed text-white/65">{{ $text }}</div>
-                                        </div>
-                                    @endforeach
-                                </div>
-
-                                {{-- AI-generated output preview --}}
-                                <div class="mt-5 rounded-xl bg-blue-600/8 border border-blue-500/20 p-4 fade-in" style="animation-delay:0.9s">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="h-5 w-5 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-                                            <svg class="h-3 w-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-                                            </svg>
-                                        </div>
-                                        <span class="text-[11px] text-blue-300 font-semibold uppercase tracking-wider">AI Action Items Detected</span>
-                                    </div>
-                                    <div class="space-y-2">
-                                        @foreach ([
-                                            ['Sarah C.',  'Share Q1 budget breakdown document by Friday EOD'],
-                                            ['Marcus T.', 'Prepare ROI analysis for digital campaign spend'],
-                                        ] as [$assignee, $task])
-                                            <div class="flex items-start gap-2.5">
-                                                <svg class="mt-0.5 h-4 w-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                <span class="text-[12px] text-white/60">{{ $task }}
-                                                    <span class="text-white/30"> → {{ $assignee }}</span>
-                                                </span>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+            <a href="{{ route('register') }}" class="btn-solid">Start free</a>
+            <a href="#pricing" class="btn-ghost">See pricing</a>
         </div>
-    </section>
 
-    {{-- ============================================================
-         SOCIAL PROOF STRIP
-    ============================================================ --}}
-    <section class="border-y border-slate-200 py-10 mt-8">
-        <div class="mx-auto max-w-7xl px-6">
-            <div class="grid grid-cols-2 gap-8 md:grid-cols-4">
-                @foreach ([
-                    ['10,000+',  'Meetings processed'],
-                    ['500+',     'Organizations'],
-                    ['< 5 min',  'Avg. minutes generation'],
-                    ['99%',      'Transcript accuracy'],
-                ] as [$stat, $label])
-                    <div class="text-center">
-                        <div class="section-heading text-2xl font-bold text-slate-900 md:text-3xl">{{ $stat }}</div>
-                        <div class="mt-1 text-sm text-slate-400">{{ $label }}</div>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    </section>
+        <p class="mt-5 text-sm" style="color:#b3aae8">
+            One live event and 100 registrations, no card required.
+        </p>
 
-    {{-- ============================================================
-         HOW IT WORKS — animated pipeline
-    ============================================================ --}}
-    <section class="bg-slate-50 py-20 md:py-28">
-        <div class="mx-auto max-w-7xl px-6">
+        {{-- The page you share, and the ticket your guest receives. --}}
+        <div class="stage grid gap-6 md:grid-cols-[1.55fr_1fr] md:items-end text-left">
 
-            {{-- Section header --}}
-            <div class="text-center mb-16">
-                <div class="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 mb-5">
-                    {{ config('product-page.intro.eyebrow') }}
+            <div class="surface">
+                <div class="chrome">
+                    <i></i><i></i><i></i>
+                    <span class="addr mono">accra-tech-week.miconvener.com/e/summit</span>
                 </div>
-                <h2 class="section-heading text-[36px] font-bold leading-tight tracking-tight text-slate-900 md:text-[46px]">
-                    {{ config('product-page.intro.title') }}
-                </h2>
-                <p class="mx-auto mt-5 max-w-2xl text-[17px] leading-[28px] text-slate-500">
-                    {{ config('product-page.intro.body') }}
-                </p>
-            </div>
+                <div class="p-6">
+                    <div class="text-[11px] font-semibold" style="color:var(--indigo)">Open to anyone</div>
+                    <div class="display mt-1 text-[26px] font-extrabold leading-tight">Accra Tech Week 2026</div>
+                    <div class="mt-1 text-sm" style="color:var(--muted)">Hosted by Accra Tech Collective</div>
 
-            {{-- Animated pipeline (desktop: horizontal) --}}
-            <div class="hidden md:flex items-start justify-center gap-0 mb-16">
-                @foreach ([
-                    ['🎫', '01', 'Create',    'Page, schedule, tickets',    'from-blue-500/15 to-blue-600/5',   'border-blue-200'],
-                    ['💳', '02', 'Sell',      'Cards and mobile money',     'from-violet-500/15 to-violet-600/5','border-violet-200'],
-                    ['📲', '03', 'Check in',  'Scan guests at the door',    'from-emerald-500/15 to-emerald-600/5','border-emerald-200'],
-                    ['📊', '04', 'Get paid',  'Statement &amp; payout',     'from-amber-500/15 to-amber-600/5', 'border-amber-200'],
-                ] as [$icon, $num, $title, $sub, $gradient, $border])
-                    {{-- Node --}}
-                    <div class="flex flex-col items-center text-center w-44">
-                        <div class="relative mb-4">
-                            <div class="h-[72px] w-[72px] rounded-2xl bg-gradient-to-br {{ $gradient }} border {{ $border }} flex items-center justify-center text-[28px] shadow-sm">
-                                {!! $icon !!}
-                            </div>
-                            <div class="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-white border border-slate-200 flex items-center justify-center">
-                                <span class="text-[9px] font-bold text-slate-500">{{ $num }}</span>
-                            </div>
-                        </div>
-                        <div class="text-[14px] font-semibold text-slate-800">{{ $title }}</div>
-                        <div class="mt-1 text-[12px] text-slate-400 leading-snug">{!! $sub !!}</div>
-                    </div>
-
-                    {{-- SVG dash connector (between nodes, not after last) --}}
-                    @if (! $loop->last)
-                        <div class="flex-none flex items-start pt-9">
-                            <svg width="56" height="24" viewBox="0 0 56 24" fill="none">
-                                <path d="M0 12 L44 12" stroke="#94a3b8" stroke-width="1.5"
-                                      stroke-dasharray="5 3.5" stroke-linecap="round"
-                                      class="flow-dash"/>
-                                <path d="M44 7 L54 12 L44 17" stroke="#94a3b8" stroke-width="1.5"
-                                      stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </div>
-                    @endif
-                @endforeach
-            </div>
-
-            {{-- Mobile pipeline (vertical) --}}
-            <div class="flex md:hidden flex-col items-center mb-14 gap-0">
-                @foreach ([
-                    ['🎫', '01', 'Create',    'Page, schedule, tickets',  'from-blue-500/15 to-blue-600/5',    'border-blue-200'],
-                    ['💳', '02', 'Sell',      'Cards and mobile money',   'from-violet-500/15 to-violet-600/5','border-violet-200'],
-                    ['📲', '03', 'Check in',  'Scan guests at the door',  'from-emerald-500/15 to-emerald-600/5','border-emerald-200'],
-                    ['📊', '04', 'Get paid',  'Statement and payout',     'from-amber-500/15 to-amber-600/5',  'border-amber-200'],
-                ] as [$icon, $num, $title, $sub, $gradient, $border])
-                    <div class="flex items-center gap-4">
-                        <div class="relative flex-none">
-                            <div class="h-14 w-14 rounded-2xl bg-gradient-to-br {{ $gradient }} border {{ $border }} flex items-center justify-center text-2xl shadow-sm">
-                                {{ $icon }}
-                            </div>
-                            <div class="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-white border border-slate-200 flex items-center justify-center">
-                                <span class="text-[9px] font-bold text-slate-500">{{ $num }}</span>
-                            </div>
+                    <div class="mt-5 grid grid-cols-3 gap-4 border-y py-4" style="border-color:var(--rule)">
+                        <div>
+                            <div class="text-[11px]" style="color:var(--muted)">When</div>
+                            <div class="mt-0.5 text-sm font-semibold">14 Oct 2026</div>
                         </div>
                         <div>
-                            <div class="text-[14px] font-semibold text-slate-800">{{ $title }}</div>
-                            <div class="text-[12px] text-slate-400">{{ $sub }}</div>
-                        </div>
-                    </div>
-                    @if (! $loop->last)
-                        <svg width="24" height="28" viewBox="0 0 24 28" fill="none" class="ml-7">
-                            <path d="M12 0 L12 20" stroke="#94a3b8" stroke-width="1.5"
-                                  stroke-dasharray="4 3" stroke-linecap="round"
-                                  class="flow-dash"/>
-                            <path d="M7 18 L12 26 L17 18" stroke="#94a3b8" stroke-width="1.5"
-                                  stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    @endif
-                @endforeach
-            </div>
-
-            {{-- Step cards (detail) --}}
-            <div class="grid gap-5 md:grid-cols-3">
-                @foreach (config('product-page.intro.cards') as $c)
-                    <div class="flex gap-4 rounded-2xl border border-slate-200 bg-white p-5 hover:shadow-md hover:border-slate-300 transition-all shadow-sm">
-                        <div class="h-9 w-9 flex-shrink-0 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-sm font-bold font-mono text-blue-600">
-                            0{{ $loop->index + 1 }}
+                            <div class="text-[11px]" style="color:var(--muted)">Where</div>
+                            <div class="mt-0.5 text-sm font-semibold">Accra Int’l Conference Centre</div>
                         </div>
                         <div>
-                            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">{{ $c['kicker'] }}</div>
-                            <div class="text-[15px] font-semibold text-slate-800">{{ $c['title'] }}</div>
-                            <div class="mt-1 text-[13px] leading-[21px] text-slate-500">{{ $c['body'] }}</div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-
-        </div>
-    </section>
-
-    {{-- ============================================================
-         CAPABILITIES GRID
-    ============================================================ --}}
-    <section class="py-20 md:py-28">
-        <div class="mx-auto max-w-7xl px-6">
-
-            <div class="text-center mb-12">
-                <h2 class="section-heading text-[36px] font-bold leading-tight tracking-tight text-slate-900 md:text-[46px]">
-                    {{ config('product-page.capabilities.title') }}
-                </h2>
-                <p class="mx-auto mt-4 max-w-2xl text-[17px] leading-[27px] text-slate-500">
-                    {{ config('product-page.capabilities.subtitle') }}
-                </p>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach (config('product-page.capabilities.items') as $it)
-                    <div class="group rounded-2xl border border-slate-200 bg-white p-5 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
-                        <div class="mb-4 h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-xl">
-                            {{ $it['icon'] }}
-                        </div>
-                        <div class="text-[15px] font-semibold text-slate-800 mb-1.5">{{ $it['title'] }}</div>
-                        <div class="text-[13px] leading-[21px] text-slate-500">{{ $it['body'] }}</div>
-                    </div>
-                @endforeach
-            </div>
-
-        </div>
-    </section>
-
-    {{-- ============================================================
-         DEEP SECTIONS
-    ============================================================ --}}
-    @foreach (config('product-page.deep_sections') as $sec)
-        <section class="bg-slate-50 py-20 md:py-28">
-            <div class="mx-auto max-w-7xl px-6">
-                <div class="grid gap-10 lg:grid-cols-2 lg:items-center">
-
-                    {{-- Text side --}}
-                    <div>
-                        <div class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                            {{ $sec['eyebrow'] }}
-                        </div>
-                        <h2 class="section-heading mt-5 max-w-xl text-[36px] font-bold leading-tight tracking-tight text-slate-900 md:text-[46px]">
-                            {{ $sec['title'] }}
-                        </h2>
-                        <p class="mt-5 max-w-xl text-[17px] leading-[28px] text-slate-500">
-                            {{ $sec['body'] }}
-                        </p>
-                        <div class="mt-8 space-y-3">
-                            @foreach ($sec['features'] as $f)
-                                <div class="flex gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 hover:bg-slate-50 transition-all shadow-sm">
-                                    <svg class="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <div>
-                                        @if (isset($f['kicker']))
-                                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{{ $f['kicker'] }}</div>
-                                        @endif
-                                        <div class="text-[14px] font-semibold text-slate-800">{{ $f['title'] }}</div>
-                                        <div class="mt-0.5 text-[13px] leading-[20px] text-slate-500">{{ $f['body'] }}</div>
-                                    </div>
-                                </div>
-                            @endforeach
+                            <div class="text-[11px]" style="color:var(--muted)">From</div>
+                            <div class="mt-0.5 text-sm font-semibold mono">GHS 20.00</div>
                         </div>
                     </div>
 
-                    {{-- CSS governance visualization (stays dark for contrast) --}}
-                    <div class="rounded-2xl border border-slate-800 bg-[#0d1117] p-6 shadow-xl">
-                        <div class="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-5">Meeting Governance · Audit Trail</div>
-
-                        <div class="space-y-0">
-                            @foreach ([
-                                ['emerald', 'Decision recorded',    'Budget increase approved in Q1 review',       '12:34 PM'],
-                                ['blue',    'Action item created',  'Prepare Q2 forecast → Sarah C.',              '12:36 PM'],
-                                ['purple',  'Minutes generated',    'AI-generated minutes ready for review',       '01:18 PM'],
-                                ['amber',   'Minutes signed',       'Approved & signed by Board Secretary',        '02:05 PM'],
-                            ] as [$color, $event, $detail, $time])
-                                <div class="flex gap-3">
-                                    <div class="flex flex-col items-center pt-1.5">
-                                        <div class="h-2.5 w-2.5 rounded-full bg-{{ $color }}-400 flex-shrink-0 ring-4 ring-{{ $color }}-400/10"></div>
-                                        @if (! $loop->last)
-                                            <div class="w-px flex-1 bg-white/6 my-1" style="min-height:24px;"></div>
-                                        @endif
-                                    </div>
-                                    <div class="pb-5">
-                                        <div class="text-[13px] font-semibold text-white/80">{{ $event }}</div>
-                                        <div class="text-[12px] text-white/40 mt-0.5">{{ $detail }}</div>
-                                        <div class="text-[11px] text-white/22 mt-0.5 font-mono">{{ $time }}</div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <div class="flex flex-wrap gap-2 pt-4 border-t border-white/5">
-                            @foreach ([
-                                ['emerald', 'Per-organization data isolation'],
-                                ['blue',    'Role-based access'],
-                                ['purple',  'Activity logging'],
-                                ['amber',   'Encrypted payment credentials'],
-                            ] as [$color, $label])
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-{{ $color }}-500/10 border border-{{ $color }}-500/20 px-2.5 py-1 text-[11px] text-{{ $color }}-300 font-medium">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-{{ $color }}-400"></span>{{ $label }}
-                                </span>
-                            @endforeach
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </section>
-    @endforeach
-
-    {{-- ============================================================
-         PRICING (Livewire component)
-    ============================================================ --}}
-    <livewire:pricing-table />
-
-    {{-- ============================================================
-         TESTIMONIALS (only rendered once there are real customer quotes)
-    ============================================================ --}}
-    @if (! empty(config('product-page.testimonials')))
-        <section class="bg-slate-50 py-20 md:py-28">
-            <div class="mx-auto max-w-7xl px-6">
-
-                <div class="text-center mb-12">
-                    <div class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 mb-4">
-                        Customer Stories
-                    </div>
-                    <h2 class="section-heading text-[36px] font-bold leading-tight tracking-tight text-slate-900 md:text-[44px]">
-                        Trusted by teams who value their time
-                    </h2>
-                </div>
-
-                <div class="grid gap-6 md:grid-cols-2">
-                    @foreach (config('product-page.testimonials') as $t)
-                        <div class="rounded-2xl border border-slate-200 bg-white px-7 py-8 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
-                            {{-- Stars --}}
-                            <div class="flex gap-1 mb-5">
-                                @for ($i = 0; $i < 5; $i++)
-                                    <svg class="h-4 w-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                @endfor
+                    <div class="mt-4 space-y-2">
+                        <div class="flex items-center justify-between rounded-xl border px-4 py-3"
+                             style="border-color:var(--indigo); background:#f4f2ff">
+                            <div>
+                                <div class="text-sm font-semibold">General Admission</div>
+                                <div class="text-[12px]" style="color:var(--muted)">312 of 400 remaining</div>
                             </div>
-                            <p class="text-[17px] leading-[27px] text-slate-600 italic">
-                                "{{ $t['quote'] }}"
-                            </p>
-                            <div class="mt-6 flex items-center gap-3">
-                                <div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-emerald-100 border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-700">
-                                    {{ strtoupper(substr($t['name'], 0, 1)) }}
-                                </div>
+                            <div class="mono text-sm font-semibold">GHS 20.00</div>
+                        </div>
+                        <div class="flex items-center justify-between rounded-xl border px-4 py-3" style="border-color:var(--rule)">
+                            <div>
+                                <div class="text-sm font-semibold">Workshop pass</div>
+                                <div class="text-[12px]" style="color:var(--muted)">Includes both afternoon tracks</div>
+                            </div>
+                            <div class="mono text-sm font-semibold">GHS 75.00</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 rounded-xl px-4 py-3 text-center text-sm font-bold text-white" style="background:var(--indigo)">
+                        Continue to payment
+                    </div>
+                </div>
+            </div>
+
+            {{-- What the guest gets back --}}
+            <div class="ticket mb-2">
+                <div class="px-5 pt-5 pb-4">
+                    <div class="text-[11px] font-semibold" style="color:var(--go)">Confirmed</div>
+                    <div class="display mt-1 text-[19px] font-extrabold leading-tight">Ama Mensah</div>
+                    <div class="text-[13px]" style="color:var(--muted)">Accra Tech Week 2026</div>
+                </div>
+                <div class="perf"></div>
+                <div class="flex items-center gap-4 px-5 pb-5 pt-5">
+                    <div class="qr" role="img" aria-label="Entry QR code"></div>
+                    <div class="min-w-0">
+                        <div class="text-[11px]" style="color:var(--muted)">Entry code</div>
+                        <div class="mono text-[15px] font-semibold">EVT-WMQQ-251</div>
+                        <div class="mt-2 text-[11px]" style="color:var(--muted)">Ticket</div>
+                        <div class="text-[13px] font-semibold">General Admission</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+{{-- ══ THE ARC ═══════════════════════════════════════════════════════ --}}
+<section class="paper border-b" style="border-color:var(--rule)">
+    <div class="mx-auto max-w-7xl px-6 py-16 md:py-20">
+        <h2 class="h2 display">{{ config('product-page.intro.title') }}</h2>
+        <p class="lede mt-3">{{ config('product-page.intro.body') }}</p>
+
+        <div class="arc mt-10">
+            @foreach ([
+                ['Create', 'Build the page', 'Schedule, speakers and ticket types on one link you can share anywhere.'],
+                ['Sell', 'Take payments', 'Cards and mobile money. The ticket arrives the moment payment clears.'],
+                ['Check in', 'Run the door', 'Scan a code or search by name, and print badges as guests arrive.'],
+                ['Settle', 'Get paid', 'One statement per event, then a payout to your account.'],
+            ] as $i => [$step, $title, $body])
+                <div class="arc-step">
+                    <div class="arc-n mono">{{ str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT) }} · {{ $step }}</div>
+                    <div class="arc-t">{{ $title }}</div>
+                    <div class="arc-b">{{ $body }}</div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+</section>
+
+{{-- ══ CHECK-IN ══════════════════════════════════════════════════════ --}}
+<section>
+    <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
+        <div class="grid items-center gap-12 md:grid-cols-2">
+            <div>
+                <h2 class="h2 display">The door is the hardest part.<br>It takes one scan.</h2>
+                <p class="lede mt-4">
+                    Point a phone at the guest’s code, or search by name if they left it at home.
+                    Capacity, ticket type and duplicate entries are all checked before you wave them through.
+                </p>
+                <ul class="mt-6 space-y-3">
+                    @foreach ([
+                        'Works on any phone — no scanner hardware to hire',
+                        'Prints a badge for the guest as they arrive',
+                        'Flags a code that has already been used',
+                    ] as $point)
+                        <li class="flex items-start gap-3 text-[15px]" style="color:var(--ink-2)">
+                            <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style="background:var(--indigo)"></span>
+                            {{ $point }}
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+
+            {{-- Check-in surface --}}
+            <div class="panel">
+                <div class="flex items-center justify-between border-b px-5 py-4" style="border-color:var(--rule); background:#fbfaff">
+                    <div class="text-sm font-semibold">Check-in · Accra Tech Week</div>
+                    <div class="mono text-[12px]" style="color:var(--muted)">218 / 400 in</div>
+                </div>
+                <div class="p-5">
+                    <div class="rounded-xl border p-4" style="border-color:rgba(15,123,90,.35); background:rgba(15,123,90,.06)">
+                        <div class="flex items-center gap-3">
+                            <div class="grid h-9 w-9 place-items-center rounded-full text-white" style="background:var(--go)">✓</div>
+                            <div>
+                                <div class="font-semibold">Ama Mensah</div>
+                                <div class="text-[12px]" style="color:var(--muted)">General Admission · checked in just now</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 space-y-2">
+                        @foreach ([
+                            ['Kwabena Owusu', 'Workshop pass', 'in', '09:12'],
+                            ['Efua Sarpong', 'General Admission', 'in', '09:10'],
+                            ['Yaw Boateng', 'General Admission', 'expected', '—'],
+                        ] as [$name, $ticket, $state, $time])
+                            <div class="flex items-center justify-between rounded-lg border px-4 py-2.5" style="border-color:var(--rule)">
                                 <div>
-                                    <div class="text-sm font-semibold text-slate-800">{{ $t['name'] }}</div>
-                                    <div class="text-xs text-slate-400">{{ $t['role'] }} · {{ $t['company'] }}</div>
+                                    <div class="text-[14px] font-medium">{{ $name }}</div>
+                                    <div class="text-[12px]" style="color:var(--muted)">{{ $ticket }}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-[12px] font-semibold" style="color:{{ $state === 'in' ? 'var(--go)' : 'var(--muted)' }}">
+                                        {{ $state === 'in' ? 'Checked in' : 'Expected' }}
+                                    </div>
+                                    <div class="mono text-[11px]" style="color:var(--muted)">{{ $time }}</div>
                                 </div>
                             </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ══ SETTLEMENT ════════════════════════════════════════════════════ --}}
+<section class="paper border-y" style="border-color:var(--rule)">
+    <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
+        <div class="grid items-center gap-12 md:grid-cols-2">
+
+            {{-- Statement surface, using the real ledger shape --}}
+            <div class="panel order-2 md:order-1">
+                <div class="flex items-center justify-between border-b px-5 py-4" style="border-color:var(--rule); background:#fbfaff">
+                    <div class="text-sm font-semibold">Settlement statement</div>
+                    <div class="mono text-[12px]" style="color:var(--muted)">Accra Tech Week</div>
+                </div>
+                <div class="px-5 py-4">
+                    <div class="stat-row"><span style="color:var(--ink-2)">Collected</span><b class="mono">GHS 20.00</b></div>
+                    <div class="stat-row"><span style="color:var(--ink-2)">Payment provider fee</span><b class="mono">− GHS 0.39</b></div>
+                    <div class="stat-row"><span style="color:var(--ink-2)">Commission</span><b class="mono">− GHS 1.00</b></div>
+                    <div class="stat-row"><span style="color:var(--ink-2)">Settles to you</span><b class="mono net">GHS 18.61</b></div>
+                </div>
+                <div class="border-t px-5 py-3.5 text-[12px]" style="border-color:var(--rule); color:var(--muted)">
+                    Every charge, refund and payout, per event — exportable whenever you need it.
+                </div>
+            </div>
+
+            <div class="order-1 md:order-2">
+                <h2 class="h2 display">{{ config('product-page.deep_sections.0.title') }}</h2>
+                <p class="lede mt-4">{{ config('product-page.deep_sections.0.body') }}</p>
+                <div class="mt-7 grid gap-5 sm:grid-cols-3">
+                    @foreach (config('product-page.deep_sections.0.features') as $f)
+                        <div>
+                            <div class="font-semibold" style="font-family:'Gabarito',sans-serif">{{ $f['title'] }}</div>
+                            <div class="mt-1 text-[14px]" style="color:var(--ink-2)">{{ $f['body'] }}</div>
                         </div>
                     @endforeach
                 </div>
-
-            </div>
-        </section>
-    @endif
-
-    {{-- ============================================================
-         FAQS
-    ============================================================ --}}
-    <section class="py-20 md:py-28">
-        <div class="mx-auto max-w-7xl px-6">
-
-            <div class="text-center mb-12">
-                <h2 class="section-heading text-[36px] font-bold leading-tight tracking-tight text-slate-900 md:text-[44px]">
-                    Frequently asked questions
-                </h2>
-            </div>
-
-            <div class="mx-auto max-w-3xl space-y-3">
-                @foreach (config('product-page.faqs') as $faq)
-                    <details class="group rounded-2xl border border-slate-200 bg-white p-5 open:bg-slate-50 open:border-slate-300 transition-all shadow-sm">
-                        <summary class="flex cursor-pointer list-none items-center justify-between gap-4">
-                            <span class="text-[15px] font-medium text-slate-800">{{ $faq['q'] }}</span>
-                            <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400 group-open:rotate-45 transition-transform duration-200">+</span>
-                        </summary>
-                        <div class="mt-3 pr-10 text-[14px] leading-[23px] text-slate-500">
-                            {{ $faq['a'] }}
-                        </div>
-                    </details>
-                @endforeach
-            </div>
-
-        </div>
-    </section>
-
-    {{-- ============================================================
-         FINAL CTA — rich blue for contrast on the light page
-    ============================================================ --}}
-    <section class="pb-24 pt-8">
-        <div class="mx-auto max-w-7xl px-6">
-            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-blue-800 to-slate-900 p-10 text-center md:p-16">
-
-                {{-- Radial glow --}}
-                <div class="pointer-events-none absolute inset-0">
-                    <div class="absolute top-0 left-1/2 -translate-x-1/2 h-40 w-96 bg-blue-400/30 blur-3xl rounded-full"></div>
-                </div>
-
-                <h2 class="section-heading relative mx-auto max-w-3xl text-[34px] font-bold leading-tight tracking-tight text-white md:text-[48px]">
-                    {{ config('product-page.final_cta.title') }}
-                </h2>
-                <p class="relative mx-auto mt-4 max-w-2xl text-[17px] leading-[28px] text-blue-100">
-                    {{ config('product-page.final_cta.subtitle') }}
-                </p>
-
-                <div class="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <a href="{{ config('product-page.final_cta.cta_primary.href') }}"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-7 py-3.5 text-sm font-bold text-blue-900 shadow-lg hover:bg-blue-50 transition-all hover:scale-[1.02]">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        {{ config('product-page.final_cta.cta_primary.label') }}
-                    </a>
-                    <a href="{{ config('product-page.final_cta.cta_secondary.href') }}"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-7 py-3.5 text-sm font-medium text-white/85 hover:bg-white/15 hover:text-white transition-all">
-                        {{ config('product-page.final_cta.cta_secondary.label') }}
-                    </a>
-                </div>
-
-                <p class="relative mt-5 text-xs text-blue-200/60">No credit card required · Free plan available · Cancel anytime</p>
             </div>
         </div>
-    </section>
+    </div>
+</section>
+
+{{-- ══ CAPABILITIES ══════════════════════════════════════════════════ --}}
+<section id="features">
+    <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
+        <h2 class="h2 display">{{ config('product-page.capabilities.title') }}</h2>
+        <p class="lede mt-3">{{ config('product-page.capabilities.subtitle') }}</p>
+
+        <div class="cap mt-10">
+            @foreach (config('product-page.capabilities.items') as $item)
+                <div>
+                    <h3>{{ $item['title'] }}</h3>
+                    <p>{{ $item['body'] }}</p>
+                </div>
+            @endforeach
+        </div>
+    </div>
+</section>
+
+{{-- ══ PRICING ═══════════════════════════════════════════════════════ --}}
+<livewire:pricing-table />
+
+{{-- ══ FAQ ═══════════════════════════════════════════════════════════ --}}
+<section class="paper border-t" style="border-color:var(--rule)">
+    <div class="mx-auto max-w-3xl px-6 py-16 md:py-24">
+        <h2 class="h2 display">Questions organizers ask</h2>
+        <div class="mt-8 divide-y" style="border-color:var(--rule)">
+            @foreach (config('product-page.faqs') as $faq)
+                <details class="group py-4">
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
+                        {{ $faq['q'] }}
+                        <span class="shrink-0 text-xl leading-none transition group-open:rotate-45" style="color:var(--indigo)">+</span>
+                    </summary>
+                    <p class="mt-3 text-[15px]" style="color:var(--ink-2)">{{ $faq['a'] }}</p>
+                </details>
+            @endforeach
+        </div>
+    </div>
+</section>
+
+{{-- ══ CLOSE ═════════════════════════════════════════════════════════ --}}
+<section class="field">
+    <div class="mx-auto max-w-3xl px-6 py-20 text-center md:py-28">
+        <h2 class="display text-white" style="font-size:clamp(2rem,4.6vw,3rem); font-weight:800; line-height:1.08">
+            {{ config('product-page.final_cta.title') }}
+        </h2>
+        <p class="hero-sub">{{ config('product-page.final_cta.subtitle') }}</p>
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <a href="{{ route('register') }}" class="btn-solid">{{ config('product-page.final_cta.cta_primary.label') }}</a>
+            <a href="{{ route('product.enterprise') }}" class="btn-ghost">Talk to us</a>
+        </div>
+    </div>
+</section>
 
 @endsection

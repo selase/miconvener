@@ -23,11 +23,6 @@ return [
         'subtitle' => 'Build your event page, sell tickets, check guests in at the door, and see exactly what you earned — without stitching five tools together.',
         'cta_primary' => ['label' => 'Start Free', 'href' => '/register'],
         'cta_secondary' => ['label' => 'See pricing', 'href' => '/#pricing'],
-        'media' => [
-            'type' => 'image',
-            'src' => '/assets/img/marketing/hero.png',
-            'alt' => 'Event dashboard showing registrations and ticket sales',
-        ],
     ],
 
     /*
@@ -162,11 +157,6 @@ return [
                 ['kicker' => 'Ledger', 'title' => 'One statement per event', 'body' => 'Charges, refunds and payouts in one place, exportable whenever you need it.'],
                 ['kicker' => 'Payouts', 'title' => 'Paid to your account', 'body' => 'Request a payout to your bank or mobile money account and track it through to settlement.'],
                 ['kicker' => 'Payments', 'title' => 'However guests pay', 'body' => 'Cards and mobile money, so nobody is turned away at checkout.'],
-            ],
-            'media' => [
-                'type' => 'image',
-                'src' => '/assets/img/marketing/rbac.png',
-                'alt' => 'Settlement statement showing ticket revenue, fees and payouts',
             ],
         ],
     ],
