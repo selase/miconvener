@@ -5,7 +5,7 @@
 @section('content')
 
 <div>
-    <h2 class="brand-font text-[26px] font-bold text-slate-900 tracking-tight">Welcome back</h2>
+    <h2 class="brand-font text-[26px] text-slate-900">Welcome back</h2>
     <p class="mt-2 text-[14px] text-slate-500">Sign in to your {{ config('app.name') }} account.</p>
 
     @if (session('status'))
@@ -36,7 +36,7 @@
             <div class="flex items-center justify-between mb-1.5">
                 <label class="block text-sm font-medium text-slate-700" for="password">Password</label>
                 @if (Route::has('password.request'))
-                    <a href="{{ route('password.request') }}" class="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                    <a href="{{ route('password.request') }}" class="text-xs text-[#155dfc] hover:text-[#0b3ea8] font-medium">
                         Forgot password?
                     </a>
                 @endif
@@ -49,13 +49,13 @@
         {{-- Remember me --}}
         <label class="flex items-center gap-2.5 cursor-pointer">
             <input type="checkbox" name="remember" id="remember_me"
-                class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0">
+                class="h-4 w-4 rounded border-slate-300 text-[#155dfc] focus:ring-[#155dfc] focus:ring-offset-0">
             <span class="text-sm text-slate-600">Keep me signed in</span>
         </label>
 
         {{-- Submit --}}
         <button type="submit"
-            class="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 hover:bg-blue-500 transition-all hover:shadow-md hover:shadow-blue-500/25 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            class="w-full rounded-xl bg-[#155dfc] px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-[#155dfc]/25 hover:bg-[#0b3ea8] transition-all hover:shadow-md hover:shadow-blue-500/25 focus:outline-none focus:ring-2 focus:ring-[#155dfc] focus:ring-offset-2">
             Sign in →
         </button>
     </form>
@@ -63,7 +63,7 @@
     @if (config('app.system_setting.allow_registration'))
         <p class="mt-8 text-center text-sm text-slate-500">
             Don't have an account?
-            <a href="{{ route('register') }}" class="text-blue-600 hover:text-blue-700 font-medium">Create one →</a>
+            <a href="{{ route('register') }}" class="text-[#155dfc] hover:text-[#0b3ea8] font-medium">Create one →</a>
         </p>
     @endif
 </div>

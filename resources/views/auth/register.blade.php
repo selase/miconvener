@@ -7,7 +7,7 @@
 @section('content')
 
 <div>
-    <h2 class="brand-font text-[24px] font-bold text-slate-900 tracking-tight">Start your {{ config('app.name') }} workspace</h2>
+    <h2 class="brand-font text-[24px] text-slate-900">Start your {{ config('app.name') }} workspace</h2>
     <p class="mt-2 text-[14px] text-slate-500">Choose a paid plan, create your account, and provision your first tenant.</p>
 
     @if ($errors->any())
@@ -41,12 +41,12 @@
                             <input type="radio" name="plan" value="{{ $plan['slug'] }}" class="sr-only peer"
                                 {{ old('plan', 'starter') === $plan['slug'] ? 'checked' : '' }} required>
                             <div class="relative rounded-2xl border-2 border-slate-200 p-4 transition-all
-                                        peer-checked:border-blue-500 peer-checked:bg-blue-50/50
+                                        peer-checked:border-[#155dfc] peer-checked:bg-blue-50/50
                                         hover:border-slate-300 hover:shadow-sm">
 
                                 @if ($isPopular)
                                     <div class="absolute -top-2.5 right-4">
-                                        <span class="rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-bold text-white tracking-wide">
+                                        <span class="rounded-full bg-[#155dfc] px-2.5 py-0.5 text-[10px] font-bold text-white tracking-wide">
                                             Most Popular
                                         </span>
                                     </div>
@@ -79,7 +79,7 @@
 
                                 {{-- Selection indicator --}}
                                 <div class="absolute top-4 right-4 h-5 w-5 rounded-full border-2 border-slate-200 bg-white
-                                            peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all hidden
+                                            peer-checked:border-[#155dfc] peer-checked:bg-[#155dfc] transition-all hidden
                                             [label:has(input:checked)_&]:flex items-center justify-center">
                                     <svg class="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -172,7 +172,7 @@
 
                     {{-- Submit --}}
                     <button type="submit"
-                        class="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 hover:bg-blue-500 transition-all hover:shadow-md hover:shadow-blue-500/25 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-2">
+                        class="w-full rounded-xl bg-[#155dfc] px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-[#155dfc]/25 hover:bg-[#0b3ea8] transition-all hover:shadow-md hover:shadow-blue-500/25 focus:outline-none focus:ring-2 focus:ring-[#155dfc] focus:ring-offset-2 mt-2">
                         Continue to payment →
                     </button>
 
@@ -189,7 +189,7 @@
 
     <p class="mt-8 text-center text-sm text-slate-500">
         Already have an account?
-        <a href="{{ route('login') }}" class="text-blue-600 hover:text-blue-700 font-medium">Sign in →</a>
+        <a href="{{ route('login') }}" class="text-[#155dfc] hover:text-[#0b3ea8] font-medium">Sign in →</a>
     </p>
 </div>
 

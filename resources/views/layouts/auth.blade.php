@@ -13,11 +13,12 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .brand-font { font-family: 'Space Grotesk', sans-serif; }
-        body { font-family: 'Instrument Sans', sans-serif; }
+        .brand-font { font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; font-weight: 500; letter-spacing: -0.018em; }
+        body { font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif; }
+        :root { --field: #155dfc; --field-deep: #0b3ea8; --ice: oklch(0.95 0.055 207.08); }
         @@keyframes flow-dash {
             from { stroke-dashoffset: 20; }
             to   { stroke-dashoffset: 0; }
@@ -35,12 +36,12 @@
 <div class="flex min-h-screen">
 
     {{-- ── Left branding panel (desktop only) ───────────────────────── --}}
-    <div class="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-none flex-col bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-10 xl:p-12 overflow-hidden relative">
+    <div class="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-none flex-col p-10 xl:p-12 overflow-hidden relative" style="background:#155dfc; background-image: radial-gradient(120% 80% at 20% 0%, #3b7bff 0%, rgba(59,123,255,0) 62%);">
 
         {{-- Background glow --}}
         <div class="pointer-events-none absolute inset-0">
-            <div class="absolute -top-20 -left-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl"></div>
-            <div class="absolute bottom-20 -right-20 h-64 w-64 rounded-full bg-blue-400/8 blur-3xl"></div>
+            <div class="absolute -top-20 -left-20 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
+            <div class="absolute bottom-20 -right-20 h-64 w-64 rounded-full bg-white/[.07] blur-3xl"></div>
         </div>
 
         {{-- Logo --}}
@@ -53,19 +54,19 @@
 
         {{-- Main copy (pushed to lower half) --}}
         <div class="relative mt-auto pb-10 z-10">
-            <h1 class="brand-font text-[30px] xl:text-[36px] font-bold text-white leading-tight tracking-[-0.02em]">
-                Build SaaS,<br>not boilerplate.
+            <h1 class="brand-font text-[30px] xl:text-[36px] text-white leading-[1.12]" style="font-weight:500">
+                Run the whole event<br><span style="color:var(--ice)">from one place</span>
             </h1>
-            <p class="mt-3 text-[14px] leading-[24px] text-white/45">
-                Multi-tenant Laravel scaffolding with billing, RBAC, and clean integration paths — out of the box.
+            <p class="mt-3 text-[14px] leading-[24px] text-white/70" style="font-weight:300">
+                Build the page, sell the tickets, scan guests in at the door, and see exactly what you earned.
             </p>
             {{-- Animated platform pipeline (vertical) --}}
             <div class="mt-10">
                 @foreach ([
-                    ['🏢', 'Provision',     'Spin up tenant databases on signup',           'from-blue-500/20 to-blue-600/10',     'border-blue-400/25'],
-                    ['🔐', 'Authenticate',  'SSO, 2FA, and tenant-scoped RBAC',             'from-violet-500/20 to-violet-600/10', 'border-violet-400/25'],
-                    ['💳', 'Bill',          'Stripe and Paystack with prorated invoicing',  'from-emerald-500/20 to-teal-600/10',  'border-emerald-400/25'],
-                    ['📊', 'Govern',        'Usage metering, audit logs, compliance ready', 'from-amber-500/20 to-orange-600/10',  'border-amber-400/25'],
+                    ['🎫', 'Create',    'Your event page, with tickets and a schedule', 'from-white/20 to-white/5', 'border-white/25'],
+                    ['💳', 'Sell',      'Cards and mobile money, settled in cedis',     'from-white/20 to-white/5', 'border-white/25'],
+                    ['📲', 'Check in',  'Scan guests in at the door from any phone',    'from-white/20 to-white/5', 'border-white/25'],
+                    ['📊', 'Get paid',  'One statement per event, then a payout',       'from-white/20 to-white/5', 'border-white/25'],
                 ] as [$icon, $title, $desc, $gradient, $border])
                     <div class="flex gap-3.5">
                         <div class="flex flex-col items-center">
