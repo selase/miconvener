@@ -5,7 +5,12 @@ declare(strict_types=1);
 return [
     'brand' => [
         'name' => 'MiConvener',
-        'logo_text' => 'MC',
+        // The real wordmark and its square "Mi" mark. logo_text remains only as
+        // the alt text and the last resort if an image fails to load.
+        'logo_text' => 'MiConvener',
+        'wordmark' => '/assets/img/brand/miconvener.png',
+        'wordmark_2x' => '/assets/img/brand/miconvener@2x.png',
+        'mark' => '/assets/img/brand/mark-512.png',
     ],
 
     'nav' => [

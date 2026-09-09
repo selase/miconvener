@@ -7,6 +7,10 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
+        <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/brand/mark-32.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/assets/img/brand/mark-512.png" />
+        <link rel="apple-touch-icon" href="/assets/img/brand/mark-180.png" />
+
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">

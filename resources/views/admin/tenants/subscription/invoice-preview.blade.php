@@ -17,7 +17,7 @@
                                 <div class="d-flex flex-stack pb-10">
                                     <!--begin::Logo-->
                                     <a href="#">
-                                        <img alt="Logo" src="{{ asset('assets/media/logos/omnichannel_logo@2x.png') }}" style="height: 45px" />
+                                        <img alt="{{ config('app.name') }}" src="{{ asset('assets/img/brand/miconvener.png') }}" style="height: 45px" />
                                     </a>
                                     <a href="#" class="btn btn-sm btn-success">Print</a>
                                 </div>

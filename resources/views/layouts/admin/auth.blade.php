@@ -29,7 +29,7 @@
 					<div class="d-flex flex-row-fluid flex-column text-center p-10 pt-lg-20">
 						<!--begin::Logo-->
 						<a href="javascript:void(0)" class="py-9 mb-5">
-							<img alt="Logo" src="{{ asset('assets/media/logos/logo-2.svg') }}" class="h-60px" />
+							<img alt="{{ config('app.name') }}" src="{{ asset('assets/img/brand/miconvener.png') }}" class="h-60px" />
 						</a>
 						<h1 class="fw-bolder fs-2qx pb-5 pb-md-10" style="color: #285a54;">Welcome to
 							{{ config('app.name') }}</h1>

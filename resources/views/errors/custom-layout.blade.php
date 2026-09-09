@@ -3,7 +3,7 @@
 	<head><base href="../../">
 		<title>{{ config('app.name') }} | @yield('title')</title>
 		<meta charset="utf-8" />
-		<link rel="shortcut icon" href="{{ asset('assets/media/logos/favicon.ico') }}" />
+		<link rel="icon" type="image/png" href="{{ asset('assets/img/brand/mark-32.png') }}" />
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700" />
 		<link href="{{ asset('assets/plugins/global/plugins.bundle.css') }}" rel="stylesheet" type="text/css" />
 		<link href="{{ asset('assets/css/style.bundle.css') }}" rel="stylesheet" type="text/css" />
@@ -13,7 +13,7 @@
 			<div class="d-flex flex-column flex-column-fluid">
 				<div class="d-flex flex-column flex-column-fluid text-center p-10 py-lg-15">
 					<a href="/" class="mb-10 pt-lg-10">
-						<img alt="Logo" src="{{ asset('assets/media/logos/logo-1.svg') }}" class="h-40px mb-5" />
+						<img alt="{{ config('app.name') }}" src="{{ asset('assets/img/brand/miconvener.png') }}" class="h-40px mb-5" />
 					</a>
 					<div class="pt-lg-10 mb-10">
 						<h1 class="fw-bolder fs-2qx text-gray-800 mb-10">@yield('code') @yield('title')</h1>

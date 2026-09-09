@@ -3,13 +3,13 @@
 <head>
     @php
         $brandName = config('app.name', 'MiConvener');
-        $brandMark = mb_strtoupper(mb_substr($brandName, 0, 2));
-        $favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Cpath d='M20 18h16c9.941 0 18 8.059 18 18s-8.059 18-18 18H20V18zm14 10H30v16h4c4.418 0 8-3.582 8-8s-3.582-8-8-8z' fill='%23fff'/%3E%3C/svg%3E";
     @endphp
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@yield('page-title', 'Sign in') · {{ config('app.name') }}</title>
-    <link rel="icon" type="image/svg+xml" href="{{ $favicon }}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/brand/mark-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/assets/img/brand/mark-512.png" />
+    <link rel="apple-touch-icon" href="/assets/img/brand/mark-180.png" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,11 +45,10 @@
         </div>
 
         {{-- Logo --}}
-        <a href="{{ route('product.template') }}" class="relative flex items-center gap-2.5 flex-none z-10">
-            <div class="h-8 w-8 grid place-items-center rounded-lg border border-white/12 bg-white/8 text-[11px] font-bold text-white brand-font">
-                {{ $brandMark }}
-            </div>
-            <span class="brand-font text-sm font-semibold text-white/80">{{ $brandName }}</span>
+        <a href="{{ route('product.template') }}" class="relative flex items-center flex-none z-10">
+            <img src="/assets/img/brand/miconvener-light.png"
+                 srcset="/assets/img/brand/miconvener-light.png 1x, /assets/img/brand/miconvener-light@2x.png 2x"
+                 alt="{{ $brandName }}" class="h-7 w-auto" width="1228" height="229" />
         </a>
 
         {{-- Main copy (pushed to lower half) --}}
@@ -100,11 +99,10 @@
     <div class="flex flex-1 flex-col min-h-screen">
 
         {{-- Mobile header --}}
-        <div class="flex items-center gap-2.5 px-6 py-5 border-b border-slate-100 lg:hidden">
-            <div class="h-8 w-8 grid place-items-center rounded-lg border border-slate-200 bg-slate-100 text-[11px] font-bold text-slate-700 brand-font">
-                {{ $brandMark }}
-            </div>
-            <span class="brand-font text-sm font-semibold text-slate-800">{{ $brandName }}</span>
+        <div class="flex items-center px-6 py-5 border-b border-slate-100 lg:hidden">
+            <img src="/assets/img/brand/miconvener.png"
+                 srcset="/assets/img/brand/miconvener.png 1x, /assets/img/brand/miconvener@2x.png 2x"
+                 alt="{{ $brandName }}" class="h-7 w-auto" width="1228" height="229" />
         </div>
 
         {{-- Form area --}}

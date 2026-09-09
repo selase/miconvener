@@ -26,7 +26,7 @@
                     <img alt="Logo" src="{{ app(\App\Services\Tenancy\TenantContext::class)->getTenant()->logoUrl }}"
                         class="h-30px" />
                 @else
-                    <img alt="Logo" src="{{ asset('assets/media/logos/logo-2.svg') }}" class="h-30px" />
+                    <img alt="{{ config('app.name') }}" src="{{ asset('assets/img/brand/miconvener.png') }}" class="h-30px" />
                 @endif
             </a>
         </div>

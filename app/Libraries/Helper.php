@@ -192,7 +192,9 @@ final class Helper
             return Storage::disk($disk)->url($tenant->logo);
         }
 
-        return asset('assets/media/logos/logo-1.svg');
+        // No tenant logo uploaded: fall back to the platform's own mark rather
+        // than the starter-kit placeholder this project shipped with.
+        return asset('assets/img/brand/mark-512.png');
     }
 
     public function limitCharacters($text, $length = 100)

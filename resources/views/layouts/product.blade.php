@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@yield('title', config('product-page.brand.name'))</title>
 
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/brand/mark-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/assets/img/brand/mark-512.png" />
+    <link rel="apple-touch-icon" href="/assets/img/brand/mark-180.png" />
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,11 +62,11 @@
         <div class="mx-auto max-w-7xl px-6">
             <div class="flex h-16 items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <a href="{{ route('product.template') }}" class="flex items-center gap-3">
-                        <div class="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white" style="background: var(--field)">
-                            {{ config('product-page.brand.logo_text') }}
-                        </div>
-                        <span class="text-sm font-semibold text-slate-800">{{ config('product-page.brand.name') }}</span>
+                    <a href="{{ route('product.template') }}" class="flex items-center">
+                        <img src="{{ config('product-page.brand.wordmark') }}"
+                             srcset="{{ config('product-page.brand.wordmark') }} 1x, {{ config('product-page.brand.wordmark_2x') }} 2x"
+                             alt="{{ config('product-page.brand.name') }}"
+                             class="h-7 w-auto" width="1228" height="229" />
                     </a>
                 </div>
 
@@ -98,14 +102,12 @@
         <div class="mx-auto max-w-7xl px-6">
             <div class="grid gap-10 md:grid-cols-5">
                 <div class="md:col-span-3">
-                    <div class="flex items-center gap-3">
-                        <div class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-blue-600 shadow-sm">
-                            {{ config('product-page.brand.logo_text') }}
-                        </div>
-                        <div>
-                            <div class="text-sm font-semibold text-slate-800">{{ config('product-page.brand.name') }}</div>
-                            <div class="text-xs text-slate-400">{{ config('product-page.footer.tagline') }}</div>
-                        </div>
+                    <div>
+                        <img src="{{ config('product-page.brand.wordmark') }}"
+                             srcset="{{ config('product-page.brand.wordmark') }} 1x, {{ config('product-page.brand.wordmark_2x') }} 2x"
+                             alt="{{ config('product-page.brand.name') }}"
+                             class="h-8 w-auto" width="1228" height="229" />
+                        <div class="mt-2 text-xs text-slate-400">{{ config('product-page.footer.tagline') }}</div>
                     </div>
                     <div class="mt-6 text-xs text-slate-400">
                         © {{ date('Y') }} {{ config('product-page.brand.name') }} · All rights reserved.
