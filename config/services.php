@@ -70,8 +70,16 @@ return [
             // Paystack has no separate webhook-signing secret (unlike
             // Stripe) — it signs webhooks with this same secret key, so
             // the settlement webhook verifies against secret_key too.
-            'secret_key' => env('SETTLEMENT_PAYSTACK_SECRET_KEY'),
-            'public_key' => env('SETTLEMENT_PAYSTACK_PUBLIC_KEY'),
+            //
+            // One Paystack account takes both the subscription revenue and the
+            // ticket money collected on a tenant's behalf, so settlement shares
+            // the platform's credentials rather than duplicating them. The
+            // override below exists only for the day settlement moves to its own
+            // account or provider. Leave it unset: two keys that must always be
+            // equal are a trap, because a mismatch is rejected only after the
+            // customer has already paid.
+            'secret_key' => env('SETTLEMENT_PAYSTACK_SECRET_KEY') ?: env('PAYSTACK_SECRET_KEY'),
+            'public_key' => env('SETTLEMENT_PAYSTACK_PUBLIC_KEY') ?: env('PAYSTACK_PUBLIC_KEY'),
         ],
     ],
 
