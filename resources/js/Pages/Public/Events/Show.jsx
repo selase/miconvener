@@ -10,7 +10,9 @@ import respondentToken from '@/lib/respondentToken';
 import { getRespondentName, setRespondentName } from '@/lib/respondentName';
 
 function formatDateRange(startsAt, endsAt, timezone) {
-    const sameDay = new Date(startsAt).toLocaleDateString('en-CA', { timeZone: timezone }) === new Date(endsAt).toLocaleDateString('en-CA', { timeZone: timezone });
+    const sameDay =
+        new Date(startsAt).toLocaleDateString('en-CA', { timeZone: timezone }) ===
+        new Date(endsAt).toLocaleDateString('en-CA', { timeZone: timezone });
     const dayOpts = { timeZone: timezone, day: 'numeric', month: 'short', year: 'numeric' };
     const start = new Date(startsAt).toLocaleDateString(undefined, dayOpts);
     const end = new Date(endsAt).toLocaleDateString(undefined, dayOpts);
@@ -43,7 +45,11 @@ function SpeakersSection({ speakers }) {
             {speakers.map((speaker) => (
                 <div key={speaker.id} className="flex gap-3.5">
                     {speaker.photo_url ? (
-                        <img src={speaker.photo_url} alt={speaker.name} className="h-16 w-16 shrink-0 rounded-full object-cover" />
+                        <img
+                            src={speaker.photo_url}
+                            alt={speaker.name}
+                            className="h-16 w-16 shrink-0 rounded-full object-cover"
+                        />
                     ) : (
                         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-ink-secondary">
                             <User className="h-6 w-6" strokeWidth={1.5} />
@@ -51,8 +57,14 @@ function SpeakersSection({ speakers }) {
                     )}
                     <div className="min-w-0">
                         <h3 className="text-[15px] font-medium text-ink">{speaker.name}</h3>
-                        <p className="mt-0.5 text-[13px] text-ink-secondary">{[speaker.title, speaker.organization].filter(Boolean).join(', ')}</p>
-                        {speaker.bio && <p className="mt-2 text-[13px] leading-relaxed text-ink-secondary">{speaker.bio}</p>}
+                        <p className="mt-0.5 text-[13px] text-ink-secondary">
+                            {[speaker.title, speaker.organization].filter(Boolean).join(', ')}
+                        </p>
+                        {speaker.bio && (
+                            <p className="mt-2 text-[13px] leading-relaxed text-ink-secondary">
+                                {speaker.bio}
+                            </p>
+                        )}
                     </div>
                 </div>
             ))}
@@ -74,15 +86,26 @@ function ScheduleSection({ sessions, timezone, icsUrl }) {
             )}
             <ul className="flex flex-col">
                 {sessions.map((session) => (
-                    <li key={session.id} className="flex items-baseline gap-4 border-t border-border py-3.5 first:border-t-0">
-                        <span className="w-32 shrink-0 font-mono text-[12px] text-ink-secondary">{formatSessionTime(session.starts_at, session.ends_at, timezone)}</span>
+                    <li
+                        key={session.id}
+                        className="flex items-baseline gap-4 border-t border-border py-3.5 first:border-t-0"
+                    >
+                        <span className="w-32 shrink-0 font-mono text-[12px] text-ink-secondary">
+                            {formatSessionTime(session.starts_at, session.ends_at, timezone)}
+                        </span>
                         <div className="min-w-0 flex-1">
                             <div className="text-[14px] text-ink">{session.title}</div>
                             {session.speaker_names?.length > 0 && (
-                                <div className="mt-0.5 text-[12px] text-ink-secondary">{session.speaker_names.join(', ')}</div>
+                                <div className="mt-0.5 text-[12px] text-ink-secondary">
+                                    {session.speaker_names.join(', ')}
+                                </div>
                             )}
                         </div>
-                        {session.location && <span className="shrink-0 text-[12px] text-ink-secondary">{session.location}</span>}
+                        {session.location && (
+                            <span className="shrink-0 text-[12px] text-ink-secondary">
+                                {session.location}
+                            </span>
+                        )}
                     </li>
                 ))}
             </ul>
@@ -92,7 +115,13 @@ function ScheduleSection({ sessions, timezone, icsUrl }) {
 
 function ForumSection({ event }) {
     const [threads, setThreads] = useState([]);
-    const [form, setForm] = useState({ title: '', body: '', author_name: '', author_email: '', is_anonymous: false });
+    const [form, setForm] = useState({
+        title: '',
+        body: '',
+        author_name: '',
+        author_email: '',
+        is_anonymous: false,
+    });
     const [attachment, setAttachment] = useState(null);
     const [submitted, setSubmitted] = useState(false);
     const [reported, setReported] = useState([]);
@@ -109,20 +138,34 @@ function ForumSection({ event }) {
     const submit = async (e) => {
         e.preventDefault();
         const formData = new FormData();
-        Object.entries(form).forEach(([key, value]) => formData.append(key, key === 'is_anonymous' ? (value ? '1' : '0') : value));
+        Object.entries(form).forEach(([key, value]) =>
+            formData.append(key, key === 'is_anonymous' ? (value ? '1' : '0') : value)
+        );
         if (attachment) formData.append('attachment', attachment);
 
-        const response = await csrfFetchFormData(route('public.events.forum.store', { event: event.slug }), formData);
+        const response = await csrfFetchFormData(
+            route('public.events.forum.store', { event: event.slug }),
+            formData
+        );
         if (response.ok) {
             setSubmitted(true);
-            setForm({ title: '', body: '', author_name: '', author_email: '', is_anonymous: false });
+            setForm({
+                title: '',
+                body: '',
+                author_name: '',
+                author_email: '',
+                is_anonymous: false,
+            });
             setAttachment(null);
             load();
         }
     };
 
     const toggleVote = async (thread) => {
-        const url = route(thread.voted_by_me ? 'public.events.forum.unvote' : 'public.events.forum.vote', { event: event.slug, thread: thread.id });
+        const url = route(
+            thread.voted_by_me ? 'public.events.forum.unvote' : 'public.events.forum.vote',
+            { event: event.slug, thread: thread.id }
+        );
         const response = await csrfFetch(url, {
             method: thread.voted_by_me ? 'DELETE' : 'POST',
             body: JSON.stringify({ respondent_token: respondentToken() }),
@@ -131,10 +174,13 @@ function ForumSection({ event }) {
     };
 
     const report = async (thread) => {
-        await csrfFetch(route('public.events.forum.report', { event: event.slug, thread: thread.id }), {
-            method: 'POST',
-            body: JSON.stringify({ reporter_token: respondentToken() }),
-        });
+        await csrfFetch(
+            route('public.events.forum.report', { event: event.slug, thread: thread.id }),
+            {
+                method: 'POST',
+                body: JSON.stringify({ reporter_token: respondentToken() }),
+            }
+        );
         setReported((prev) => [...prev, thread.id]);
     };
 
@@ -155,7 +201,12 @@ function ForumSection({ event }) {
                             </div>
                             <p className="mt-1 text-[13px] text-ink-secondary">{t.body}</p>
                             {t.attachment_url && (
-                                <a href={t.attachment_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-accent hover:underline">
+                                <a
+                                    href={t.attachment_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-1 inline-block text-xs text-accent hover:underline"
+                                >
                                     📎 {t.attachment_name}
                                 </a>
                             )}
@@ -164,12 +215,19 @@ function ForumSection({ event }) {
                                 {reported.includes(t.id) ? (
                                     <span>Reported</span>
                                 ) : (
-                                    <button onClick={() => report(t)} className="underline hover:text-ink">Report</button>
+                                    <button
+                                        onClick={() => report(t)}
+                                        className="underline hover:text-ink"
+                                    >
+                                        Report
+                                    </button>
                                 )}
                             </div>
                             {t.replies.map((r, i) => (
                                 <div key={i} className="mt-2 border-l-2 border-accent pl-3">
-                                    <div className="text-xs font-medium text-accent">{r.author_name} · organiser</div>
+                                    <div className="text-xs font-medium text-accent">
+                                        {r.author_name} · organiser
+                                    </div>
                                     <p className="text-[13px] text-ink">{r.body}</p>
                                 </div>
                             ))}
@@ -181,13 +239,27 @@ function ForumSection({ event }) {
             <div className="border border-border p-4">
                 <b className="text-sm font-medium text-ink">Ask a question</b>
                 {submitted ? (
-                    <p className="mt-2 text-[13px] text-ink-secondary">Thanks — your question has been posted.</p>
+                    <p className="mt-2 text-[13px] text-ink-secondary">
+                        Thanks — your question has been posted.
+                    </p>
                 ) : (
                     <form onSubmit={submit} className="mt-3 space-y-3">
-                        <Input label="Your name" value={form.author_name} onChange={(e) => setForm({ ...form, author_name: e.target.value })} required />
-                        <Input label="Question title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+                        <Input
+                            label="Your name"
+                            value={form.author_name}
+                            onChange={(e) => setForm({ ...form, author_name: e.target.value })}
+                            required
+                        />
+                        <Input
+                            label="Question title"
+                            value={form.title}
+                            onChange={(e) => setForm({ ...form, title: e.target.value })}
+                            required
+                        />
                         <div>
-                            <label className="mb-1.5 block text-sm font-medium text-ink">Details</label>
+                            <label className="mb-1.5 block text-sm font-medium text-ink">
+                                Details
+                            </label>
                             <textarea
                                 value={form.body}
                                 onChange={(e) => setForm({ ...form, body: e.target.value })}
@@ -197,14 +269,28 @@ function ForumSection({ event }) {
                             />
                         </div>
                         <div>
-                            <label className="mb-1.5 block text-sm font-medium text-ink">Attach a file (optional)</label>
-                            <input type="file" onChange={(e) => setAttachment(e.target.files[0] ?? null)} className="text-sm text-ink-secondary" />
+                            <label className="mb-1.5 block text-sm font-medium text-ink">
+                                Attach a file (optional)
+                            </label>
+                            <input
+                                type="file"
+                                onChange={(e) => setAttachment(e.target.files[0] ?? null)}
+                                className="text-sm text-ink-secondary"
+                            />
                         </div>
                         <label className="flex items-center gap-2 text-sm text-ink">
-                            <input type="checkbox" checked={form.is_anonymous} onChange={(e) => setForm({ ...form, is_anonymous: e.target.checked })} />
+                            <input
+                                type="checkbox"
+                                checked={form.is_anonymous}
+                                onChange={(e) =>
+                                    setForm({ ...form, is_anonymous: e.target.checked })
+                                }
+                            />
                             Ask without my name showing
                         </label>
-                        <Button type="submit" variant="primary">Post question</Button>
+                        <Button type="submit" variant="primary">
+                            Post question
+                        </Button>
                     </form>
                 )}
             </div>
@@ -222,7 +308,10 @@ function QuizLeaderboard({ event }) {
     const [rows, setRows] = useState([]);
 
     useEffect(() => {
-        const load = () => csrfFetch(route('public.events.quiz.leaderboard', { event: event.slug })).then((r) => r.json()).then(setRows);
+        const load = () =>
+            csrfFetch(route('public.events.quiz.leaderboard', { event: event.slug }))
+                .then((r) => r.json())
+                .then(setRows);
         load();
         const interval = setInterval(load, 6000);
         return () => clearInterval(interval);
@@ -240,7 +329,9 @@ function QuizLeaderboard({ event }) {
             <ol className="mt-3 space-y-1.5">
                 {rows.map((r, i) => (
                     <li key={i} className="flex items-center justify-between text-[13px]">
-                        <span className="text-ink">{i + 1}. {r.name}</span>
+                        <span className="text-ink">
+                            {i + 1}. {r.name}
+                        </span>
                         <span className="font-mono text-ink-secondary">{r.points} pts</span>
                     </li>
                 ))}
@@ -289,22 +380,30 @@ function LivePollSection({ event }) {
     }, [poll]);
 
     if (poll === undefined) return null;
-    if (poll === null) return <p className="text-sm text-ink-secondary">No poll is live right now — check back during a session.</p>;
+    if (poll === null)
+        return (
+            <p className="text-sm text-ink-secondary">
+                No poll is live right now — check back during a session.
+            </p>
+        );
 
     const timeUp = secondsLeft !== null && secondsLeft <= 0;
 
     const submit = async (e) => {
         e.preventDefault();
         if (poll.type === 'quiz') setRespondentName(name);
-        const response = await csrfFetch(route('public.events.poll.respond', { event: event.slug, poll: poll.id }), {
-            method: 'POST',
-            body: JSON.stringify({
-                option_id: poll.type !== 'open' ? selected : undefined,
-                response_text: poll.type === 'open' ? text : undefined,
-                respondent_name: poll.type === 'quiz' ? name || undefined : undefined,
-                respondent_token: respondentToken(),
-            }),
-        });
+        const response = await csrfFetch(
+            route('public.events.poll.respond', { event: event.slug, poll: poll.id }),
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    option_id: poll.type !== 'open' ? selected : undefined,
+                    response_text: poll.type === 'open' ? text : undefined,
+                    respondent_name: poll.type === 'quiz' ? name || undefined : undefined,
+                    respondent_token: respondentToken(),
+                }),
+            }
+        );
         const json = await response.json();
         if (response.ok) {
             setDone(true);
@@ -316,8 +415,12 @@ function LivePollSection({ event }) {
         return (
             <div>
                 {poll.type === 'quiz' && feedback ? (
-                    <p className={`text-sm ${feedback.is_correct ? 'text-accent' : 'text-ink-secondary'}`}>
-                        {feedback.is_correct ? `Correct! +${feedback.points_awarded} points.` : "Not quite — better luck on the next question."}
+                    <p
+                        className={`text-sm ${feedback.is_correct ? 'text-accent' : 'text-ink-secondary'}`}
+                    >
+                        {feedback.is_correct
+                            ? `Correct! +${feedback.points_awarded} points.`
+                            : 'Not quite — better luck on the next question.'}
                     </p>
                 ) : (
                     <p className="text-sm text-accent">Thanks for responding!</p>
@@ -333,7 +436,11 @@ function LivePollSection({ event }) {
                 <div className="flex items-baseline justify-between gap-3">
                     <b className="block text-[15px] text-ink">{poll.question}</b>
                     {secondsLeft !== null && (
-                        <span className={`shrink-0 font-mono text-sm ${secondsLeft <= 5 ? 'text-danger-fg' : 'text-ink-secondary'}`}>{secondsLeft}s</span>
+                        <span
+                            className={`shrink-0 font-mono text-sm ${secondsLeft <= 5 ? 'text-danger-fg' : 'text-ink-secondary'}`}
+                        >
+                            {secondsLeft}s
+                        </span>
                     )}
                 </div>
 
@@ -349,8 +456,18 @@ function LivePollSection({ event }) {
                 {poll.type === 'multiple_choice' || poll.type === 'quiz' ? (
                     <div className="space-y-2">
                         {poll.options.map((o) => (
-                            <label key={o.id} className={`flex cursor-pointer items-center gap-2.5 border px-3.5 py-2.5 text-[13.5px] ${selected === o.id ? 'border-accent bg-accent-soft' : 'border-border'}`}>
-                                <input type="radio" name="poll_option" value={o.id} checked={selected === o.id} onChange={(e) => setSelected(e.target.value)} required />
+                            <label
+                                key={o.id}
+                                className={`flex cursor-pointer items-center gap-2.5 border px-3.5 py-2.5 text-[13.5px] ${selected === o.id ? 'border-accent bg-accent-soft' : 'border-border'}`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="poll_option"
+                                    value={o.id}
+                                    checked={selected === o.id}
+                                    onChange={(e) => setSelected(e.target.value)}
+                                    required
+                                />
                                 {o.label}
                             </label>
                         ))}
@@ -364,7 +481,9 @@ function LivePollSection({ event }) {
                         className="w-full border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
                     />
                 )}
-                <Button type="submit" variant="primary" disabled={timeUp}>{timeUp ? "Time's up" : 'Submit response'}</Button>
+                <Button type="submit" variant="primary" disabled={timeUp}>
+                    {timeUp ? "Time's up" : 'Submit response'}
+                </Button>
             </form>
             {poll.type === 'quiz' && <QuizLeaderboard event={event} />}
         </div>
@@ -384,7 +503,9 @@ function RegistrationPanel({ event }) {
     });
     const [showExtras, setShowExtras] = useState(false);
 
-    const selectedTicketType = hasTicketTypes ? event.ticket_types.find((t) => t.id === data.ticket_type_id) : null;
+    const selectedTicketType = hasTicketTypes
+        ? event.ticket_types.find((t) => t.id === data.ticket_type_id)
+        : null;
     const price = selectedTicketType ? selectedTicketType.price : event.ticket_price;
 
     const submit = (e) => {
@@ -396,8 +517,16 @@ function RegistrationPanel({ event }) {
         <aside className="border border-border bg-surface p-5 lg:sticky lg:top-6">
             <h3 className="text-[15px] font-medium text-ink">Register</h3>
 
-            {flash?.error && <div className="mt-3 bg-danger-bg px-3.5 py-2.5 text-[13px] text-danger-fg">{flash.error}</div>}
-            {flash?.success && <div className="mt-3 bg-success-bg px-3.5 py-2.5 text-[13px] text-success-fg">{flash.success}</div>}
+            {flash?.error && (
+                <div className="mt-3 bg-danger-bg px-3.5 py-2.5 text-[13px] text-danger-fg">
+                    {flash.error}
+                </div>
+            )}
+            {flash?.success && (
+                <div className="mt-3 bg-success-bg px-3.5 py-2.5 text-[13px] text-success-fg">
+                    {flash.success}
+                </div>
+            )}
 
             <form onSubmit={submit} className="mt-4 space-y-4">
                 {hasTicketTypes && (
@@ -406,7 +535,9 @@ function RegistrationPanel({ event }) {
                             <label
                                 key={ticketType.id}
                                 className={`flex cursor-pointer items-center justify-between gap-3.5 bg-surface px-3.5 py-3 text-left ${
-                                    data.ticket_type_id === ticketType.id ? 'shadow-[inset_2px_0_0_var(--color-accent)]' : ''
+                                    data.ticket_type_id === ticketType.id
+                                        ? 'shadow-[inset_2px_0_0_var(--color-accent)]'
+                                        : ''
                                 }`}
                             >
                                 <span className="flex items-start gap-2.5">
@@ -419,22 +550,52 @@ function RegistrationPanel({ event }) {
                                         className="mt-0.5"
                                     />
                                     <span>
-                                        <span className="block text-[13.5px] text-ink">{ticketType.name}</span>
-                                        {ticketType.is_sold_out && <span className="block text-[11.5px] text-ink-secondary">Full — join the waitlist</span>}
+                                        <span className="block text-[13.5px] text-ink">
+                                            {ticketType.name}
+                                        </span>
+                                        {ticketType.is_sold_out && (
+                                            <span className="block text-[11.5px] text-ink-secondary">
+                                                Full — join the waitlist
+                                            </span>
+                                        )}
                                     </span>
                                 </span>
-                                <em className={`shrink-0 font-mono text-[14px] not-italic ${data.ticket_type_id === ticketType.id ? 'text-accent' : 'text-ink'}`}>
-                                    {ticketType.is_sold_out ? 'Waitlist' : formatMoney(ticketType.price, event.currency)}
+                                <em
+                                    className={`shrink-0 font-mono text-[14px] not-italic ${data.ticket_type_id === ticketType.id ? 'text-accent' : 'text-ink'}`}
+                                >
+                                    {ticketType.is_sold_out
+                                        ? 'Waitlist'
+                                        : formatMoney(ticketType.price, event.currency)}
                                 </em>
                             </label>
                         ))}
                     </div>
                 )}
-                {errors.ticket_type_id && <p className="text-[13px] text-danger-fg">{errors.ticket_type_id}</p>}
+                {errors.ticket_type_id && (
+                    <p className="text-[13px] text-danger-fg">{errors.ticket_type_id}</p>
+                )}
 
-                <Input label="Full name" type="text" value={data.full_name} onChange={(e) => setData('full_name', e.target.value)} error={errors.full_name} />
-                <Input label="Email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} error={errors.email} />
-                <Input label="Phone (optional)" type="tel" value={data.phone} onChange={(e) => setData('phone', e.target.value)} error={errors.phone} />
+                <Input
+                    label="Full name"
+                    type="text"
+                    value={data.full_name}
+                    onChange={(e) => setData('full_name', e.target.value)}
+                    error={errors.full_name}
+                />
+                <Input
+                    label="Email"
+                    type="email"
+                    value={data.email}
+                    onChange={(e) => setData('email', e.target.value)}
+                    error={errors.email}
+                />
+                <Input
+                    label="Phone (optional)"
+                    type="tel"
+                    value={data.phone}
+                    onChange={(e) => setData('phone', e.target.value)}
+                    error={errors.phone}
+                />
 
                 {showExtras ? (
                     <>
@@ -456,25 +617,119 @@ function RegistrationPanel({ event }) {
                         />
                     </>
                 ) : (
-                    <button type="button" onClick={() => setShowExtras(true)} className="text-[12.5px] text-ink-secondary underline hover:text-accent">
+                    <button
+                        type="button"
+                        onClick={() => setShowExtras(true)}
+                        className="text-[12.5px] text-ink-secondary underline hover:text-accent"
+                    >
                         Add dietary or accessibility needs
                     </button>
                 )}
 
-                <Button type="submit" disabled={processing} variant="primary" className="w-full justify-center">
-                    {selectedTicketType?.is_sold_out ? 'Join waitlist' : price > 0 ? `Continue to payment` : 'Register'}
+                <Button
+                    type="submit"
+                    disabled={processing}
+                    variant="primary"
+                    className="w-full justify-center"
+                >
+                    {selectedTicketType?.is_sold_out
+                        ? 'Join waitlist'
+                        : price > 0
+                          ? `Continue to payment`
+                          : 'Register'}
                 </Button>
             </form>
 
             <p className="mt-3.5 text-[11.5px] leading-relaxed text-ink-secondary">
-                Card and mobile money accepted where connected. Your entry code arrives by email the moment payment clears.
+                Card and mobile money accepted where connected. Your entry code arrives by email the
+                moment payment clears.
             </p>
+
+            <FindMyTicket event={event} />
         </aside>
     );
 }
 
+/**
+ * A ticket lives behind a link in an email, so losing the email loses the
+ * ticket. This sends it again rather than making anyone create an account.
+ */
+function FindMyTicket({ event }) {
+    const [open, setOpen] = useState(false);
+    const [email, setEmail] = useState('');
+    const [sending, setSending] = useState(false);
+    const [message, setMessage] = useState(null);
+
+    const submit = async (e) => {
+        e.preventDefault();
+        setSending(true);
+        const response = await csrfFetch(
+            route('public.events.find-ticket', { event: event.slug }),
+            {
+                method: 'POST',
+                body: JSON.stringify({ email }),
+            }
+        );
+        const json = await response.json().catch(() => ({}));
+        setSending(false);
+        setMessage(
+            response.ok ? json.message : 'Too many attempts just now. Try again in a minute.'
+        );
+    };
+
+    if (message) {
+        return (
+            <p className="mt-4 border-t border-border pt-3.5 text-[12px] text-ink-secondary">
+                {message}
+            </p>
+        );
+    }
+
+    return (
+        <div className="mt-4 border-t border-border pt-3.5">
+            {open ? (
+                <form onSubmit={submit} className="space-y-2">
+                    <label
+                        htmlFor="find-ticket-email"
+                        className="block text-[12px] text-ink-secondary"
+                    >
+                        The address you registered with
+                    </label>
+                    <input
+                        id="find-ticket-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        placeholder="you@example.com"
+                        className="w-full border border-border bg-surface px-3 py-2 text-[13px] text-ink focus:border-accent focus:outline-none"
+                    />
+                    <button
+                        type="submit"
+                        disabled={sending}
+                        className="text-[12.5px] text-accent underline disabled:opacity-60"
+                    >
+                        {sending ? 'Sending…' : 'Email me my ticket'}
+                    </button>
+                </form>
+            ) : (
+                <button
+                    type="button"
+                    onClick={() => setOpen(true)}
+                    className="text-[12px] text-ink-secondary underline hover:text-accent"
+                >
+                    Already registered? Find my ticket
+                </button>
+            )}
+        </div>
+    );
+}
+
 export default function Show({ event, org }) {
-    const workshops = useMemo(() => event.sessions.filter((s) => s.type === 'workshop'), [event.sessions]);
+    const workshops = useMemo(
+        () => event.sessions.filter((s) => s.type === 'workshop'),
+        [event.sessions]
+    );
 
     const sections = useMemo(() => {
         const list = [{ key: 'about', label: 'About' }];
@@ -493,7 +748,11 @@ export default function Show({ event, org }) {
     return (
         <PublicLayout>
             {event.hero_image_url ? (
-                <img src={event.hero_image_url} alt={event.name} className="h-56 w-full border-b border-border object-cover sm:h-72" />
+                <img
+                    src={event.hero_image_url}
+                    alt={event.name}
+                    className="h-56 w-full border-b border-border object-cover sm:h-72"
+                />
             ) : (
                 <CoverBars height={220} />
             )}
@@ -504,25 +763,35 @@ export default function Show({ event, org }) {
                     Open to anyone
                 </span>
 
-                <h1 className="mt-4 text-[clamp(32px,6vw,64px)] font-normal leading-[0.98] tracking-tighter text-ink">{event.name}</h1>
+                <h1 className="mt-4 text-[clamp(32px,6vw,64px)] font-normal leading-[0.98] tracking-tighter text-ink">
+                    {event.name}
+                </h1>
                 <p className="mt-3.5 text-[13.5px] text-ink-secondary">Hosted by {org.name}</p>
 
                 <div className="mt-8 grid grid-cols-2 border-t border-border sm:grid-cols-4">
                     <div className="border-r border-border py-4 pr-5">
                         <span className="block text-[11.5px] text-ink-tertiary">When</span>
-                        <b className="mt-1.5 block text-[14px] font-normal text-ink">{formatDateRange(event.starts_at, event.ends_at, event.timezone)}</b>
+                        <b className="mt-1.5 block text-[14px] font-normal text-ink">
+                            {formatDateRange(event.starts_at, event.ends_at, event.timezone)}
+                        </b>
                     </div>
                     <div className="border-r border-border py-4 pr-5 pl-5 sm:pl-0">
                         <span className="block text-[11.5px] text-ink-tertiary">Where</span>
-                        <b className="mt-1.5 block truncate text-[14px] font-normal text-ink">{event.location_type === 'virtual' ? 'Virtual' : event.address}</b>
+                        <b className="mt-1.5 block truncate text-[14px] font-normal text-ink">
+                            {event.location_type === 'virtual' ? 'Virtual' : event.address}
+                        </b>
                     </div>
                     <div className="border-r border-border py-4 pr-5 pl-5 sm:border-r sm:pl-5">
                         <span className="block text-[11.5px] text-ink-tertiary">Format</span>
-                        <b className="mt-1.5 block text-[14px] font-normal text-ink">{event.location_type === 'virtual' ? 'Online' : 'In person'}</b>
+                        <b className="mt-1.5 block text-[14px] font-normal text-ink">
+                            {event.location_type === 'virtual' ? 'Online' : 'In person'}
+                        </b>
                     </div>
                     <div className="py-4 pl-5">
                         <span className="block text-[11.5px] text-ink-tertiary">From</span>
-                        <b className="mt-1.5 block font-mono text-[14px] font-normal text-ink">{formatMoney(price, event.currency)}</b>
+                        <b className="mt-1.5 block font-mono text-[14px] font-normal text-ink">
+                            {formatMoney(price, event.currency)}
+                        </b>
                     </div>
                 </div>
 
@@ -533,7 +802,9 @@ export default function Show({ event, org }) {
                             type="button"
                             onClick={() => setActive(section.key)}
                             className={`-mb-px shrink-0 border-b px-4 py-3 text-[13px] transition-colors first:pl-0 ${
-                                active === section.key ? 'border-accent text-accent' : 'border-transparent text-ink-secondary hover:text-ink'
+                                active === section.key
+                                    ? 'border-accent text-accent'
+                                    : 'border-transparent text-ink-secondary hover:text-ink'
                             }`}
                         >
                             {section.label}
@@ -544,15 +815,25 @@ export default function Show({ event, org }) {
                 <div className="grid gap-14 py-11 lg:grid-cols-[1fr_330px]">
                     <div className="min-w-0">
                         {active === 'about' && event.description && (
-                            <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">{event.description}</p>
+                            <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
+                                {event.description}
+                            </p>
                         )}
                         {active === 'schedule' && (
-                            <ScheduleSection sessions={event.sessions} timezone={event.timezone} icsUrl={route('public.events.schedule.ics', { event: event.slug })} />
+                            <ScheduleSection
+                                sessions={event.sessions}
+                                timezone={event.timezone}
+                                icsUrl={route('public.events.schedule.ics', { event: event.slug })}
+                            />
                         )}
                         {active === 'speakers' && <SpeakersSection speakers={event.speakers} />}
-                        {active === 'workshops' && <ScheduleSection sessions={workshops} timezone={event.timezone} />}
+                        {active === 'workshops' && (
+                            <ScheduleSection sessions={workshops} timezone={event.timezone} />
+                        )}
                         {active === 'visit' && (
-                            <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">{event.plan_your_visit_content}</p>
+                            <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
+                                {event.plan_your_visit_content}
+                            </p>
                         )}
                         {active === 'qa' && <ForumSection event={event} />}
                         {active === 'live' && <LivePollSection event={event} />}
@@ -563,14 +844,22 @@ export default function Show({ event, org }) {
 
                 {event.sponsors.length > 0 && (
                     <div className="border-t border-border py-10">
-                        <p className="text-center text-[11px] uppercase tracking-wide text-ink-tertiary">Supported by</p>
+                        <p className="text-center text-[11px] uppercase tracking-wide text-ink-tertiary">
+                            Supported by
+                        </p>
                         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
                             {event.sponsors.map((sponsor) => (
                                 <div key={sponsor.id} title={sponsor.name}>
                                     {sponsor.logo_url ? (
-                                        <img src={sponsor.logo_url} alt={sponsor.name} className="h-9 max-w-35 object-contain" />
+                                        <img
+                                            src={sponsor.logo_url}
+                                            alt={sponsor.name}
+                                            className="h-9 max-w-35 object-contain"
+                                        />
                                     ) : (
-                                        <span className="text-[13px] text-ink-secondary">{sponsor.name}</span>
+                                        <span className="text-[13px] text-ink-secondary">
+                                            {sponsor.name}
+                                        </span>
                                     )}
                                 </div>
                             ))}
