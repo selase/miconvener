@@ -96,12 +96,20 @@ test('the dashboard reports the next event and its real registration counts', fu
         ->assertOk()
         ->viewData('page')['props'];
 
-    expect($props['focusEvent']['name'])->toBe('Accra Tech Summit');
-    expect($props['focusEvent']['registered'])->toBe(5);
-    expect($props['focusEvent']['confirmed'])->toBe(3);
-    expect($props['focusEvent']['awaiting_payment'])->toBe(2);
-    expect($props['focusEvent']['capacity'])->toBe(100);
-    expect($props['isLive'])->toBeFalse();
+    expect($props['liveEvent'])->toBeNull();
+    expect($props['nextEvent']['name'])->toBe('Accra Tech Summit');
+    expect($props['nextEvent']['registered'])->toBe(5);
+    expect($props['nextEvent']['confirmed'])->toBe(3);
+    expect($props['nextEvent']['awaiting_payment'])->toBe(2);
+
+    // Tenant-wide totals, not this one event's.
+    expect($props['totals']['upcoming_events'])->toBe(1);
+    expect($props['totals']['registrations'])->toBe(3);
+
+    // The event is reachable directly from the list.
+    expect($props['events'])->toHaveCount(1);
+    expect($props['events'][0]['name'])->toBe('Accra Tech Summit');
+    expect($props['events'][0]['url'])->toContain($event->id);
 });
 
 test('an event happening right now takes over the dashboard', function () {
@@ -122,8 +130,12 @@ test('an event happening right now takes over the dashboard', function () {
         ->assertOk()
         ->viewData('page')['props'];
 
-    expect($props['isLive'])->toBeTrue();
-    expect($props['focusEvent']['name'])->toBe('Happening Now');
+    expect($props['liveEvent']['name'])->toBe('Happening Now');
+    expect($props['nextEvent'])->toBeNull();
+
+    // Both events remain reachable from the list even while one is running.
+    expect(collect($props['events'])->pluck('name')->all())
+        ->toContain('Happening Now', 'Later Event');
 });
 
 test('the money panel reads from the ledger, not from registrations', function () {
@@ -161,8 +173,10 @@ test('a tenant with no events gets an empty state rather than a broken page', fu
         ->assertOk()
         ->viewData('page')['props'];
 
-    expect($props['focusEvent'])->toBeNull();
-    expect($props['isLive'])->toBeFalse();
+    expect($props['liveEvent'])->toBeNull();
+    expect($props['nextEvent'])->toBeNull();
+    expect($props['events'])->toBe([]);
+    expect($props['totals']['events'])->toBe(0);
     expect($props['needsAPerson'])->toBe([]);
     expect($props['money']['collected'])->toBe(0);
     expect($props['arrivals']['series'])->toBe([]);
@@ -200,9 +214,11 @@ test('arrivals are bucketed finely enough to show the shape of the door', functi
 test('pending approvals surface as work needing a person', function () {
     [$tenant, $user, $host] = dashboardActor('dash-approvals');
 
+    // Work waiting on a person is surfaced while the event is running, which is
+    // when anyone can act on it.
     $event = Event::factory()->published()->create([
         'tenant_id' => $tenant->id,
-        'starts_at' => now()->addDays(2), 'ends_at' => now()->addDays(2)->addHours(3),
+        'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(4),
     ]);
     EventRegistration::factory()->create([
         'tenant_id' => $tenant->id, 'event_id' => $event->id,

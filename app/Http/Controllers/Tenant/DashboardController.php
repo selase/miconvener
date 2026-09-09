@@ -26,7 +26,7 @@ final class DashboardController extends Controller
         // through the door and what is going wrong. Otherwise it is the next
         // event and the money.
         $liveEvent = $this->liveEvent($tenant);
-        $focusEvent = $liveEvent ?? $this->nextEvent($tenant);
+        $nextEvent = $liveEvent === null ? $this->nextEvent($tenant) : null;
 
         return Inertia::render('Tenant/Dashboard', [
             'checklist' => [
@@ -36,23 +36,100 @@ final class DashboardController extends Controller
                     || ! empty(data_get($tenant->meta, 'branding.primary_color'))
                     || ! empty(data_get($tenant->meta, 'primary_color'))),
             ],
-            'isLive' => $liveEvent !== null,
-            'focusEvent' => $focusEvent ? $this->focusPayload($focusEvent, $liveEvent !== null) : null,
+            'totals' => $this->totals($tenant),
             'money' => $this->money($tenant),
+            // The event-day view earns its place only while an event is running.
+            'liveEvent' => $liveEvent ? $this->focusPayload($liveEvent, true) : null,
+            'nextEvent' => $liveEvent === null && $nextEvent ? $this->focusPayload($nextEvent, false) : null,
             'arrivals' => $liveEvent ? $this->arrivals($liveEvent) : ['step' => 0, 'series' => []],
-            'registrationTrend' => $focusEvent ? $this->registrationTrend($focusEvent) : [],
-            'needsAPerson' => $focusEvent ? $this->needsAPerson($focusEvent) : [],
-            'upcoming' => $this->upcoming($tenant, $focusEvent?->id),
+            'needsAPerson' => $liveEvent ? $this->needsAPerson($liveEvent) : [],
+            'registrationTrend' => $this->registrationTrend($tenant),
+            'events' => $this->eventList($tenant),
             'links' => [
                 'branding' => route('tenant.settings.index'),
                 'team' => route('tenant.users.index'),
                 'finishOnboarding' => route('tenant.onboarding.finish'),
                 'events' => route('tenant.events.index'),
                 'finance' => route('tenant.finance.index'),
-                'event' => $focusEvent ? route('tenant.events.show', ['subdomain' => $tenant->slug, 'event' => $focusEvent->id]) : null,
+                'liveEvent' => $liveEvent ? route('tenant.events.show', ['subdomain' => $tenant->slug, 'event' => $liveEvent->id]) : null,
+                'nextEvent' => $liveEvent === null && $nextEvent ? route('tenant.events.show', ['subdomain' => $tenant->slug, 'event' => $nextEvent->id]) : null,
             ],
-            'currency' => $focusEvent?->currency ?? config('services.paystack.currency', 'GHS'),
+            'currency' => config('services.paystack.currency', 'GHS'),
         ]);
+    }
+
+    /**
+     * Everything the tenant runs, not just the event in front of them.
+     *
+     * @return array<string, int>
+     */
+    private function totals(Tenant $tenant): array
+    {
+        $eventIds = Event::query()->where('tenant_id', $tenant->id)->toBase()->pluck('id');
+
+        return [
+            'events' => $eventIds->count(),
+            'upcoming_events' => Event::query()
+                ->where('tenant_id', $tenant->id)
+                ->where('status', '!=', Event::STATUS_CANCELLED)
+                ->where('ends_at', '>=', now())
+                ->count(),
+            'registrations' => EventRegistration::query()
+                ->whereIn('event_id', $eventIds)
+                ->confirmed()
+                ->count(),
+            'checked_in' => EventRegistration::query()
+                ->whereIn('event_id', $eventIds)
+                ->where('status', EventRegistration::STATUS_CHECKED_IN)
+                ->count(),
+        ];
+    }
+
+    /**
+     * The tenant's events, soonest upcoming first and then most recent past, so
+     * the row someone wants is near the top whichever way they are looking.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function eventList(Tenant $tenant, int $limit = 20): array
+    {
+        $base = fn () => Event::query()
+            ->where('tenant_id', $tenant->id)
+            ->withCount([
+                'registrations as registered_count' => fn ($q) => $q->whereNotIn('status', [
+                    EventRegistration::STATUS_CANCELLED,
+                    EventRegistration::STATUS_REJECTED,
+                ]),
+                'registrations as checked_in_count' => fn ($q) => $q->where('status', EventRegistration::STATUS_CHECKED_IN),
+            ]);
+
+        $upcoming = $base()->where('ends_at', '>=', now())->orderBy('starts_at')->limit($limit)->get();
+        $past = $base()->where('ends_at', '<', now())->orderByDesc('starts_at')->limit($limit)->get();
+
+        $events = $upcoming->concat($past)->take($limit);
+
+        // One grouped query for the money rather than one per row.
+        $collected = EventLedgerEntry::query()
+            ->whereIn('event_id', $events->pluck('id'))
+            ->where('type', EventLedgerEntry::TYPE_CHARGE)
+            ->selectRaw('event_id, SUM(gross_amount) AS gross')
+            ->groupBy('event_id')
+            ->pluck('gross', 'event_id');
+
+        return $events->map(fn (Event $e): array => [
+            'id' => $e->id,
+            'name' => $e->name,
+            'status' => $e->status,
+            'starts_at' => $e->starts_at?->toIso8601String(),
+            'timezone' => $e->timezone,
+            'is_past' => $e->ends_at?->isPast() ?? false,
+            'is_live' => $e->starts_at?->isPast() && $e->ends_at?->isFuture(),
+            'capacity' => $e->capacity,
+            'registered' => (int) $e->registered_count,
+            'checked_in' => (int) $e->checked_in_count,
+            'collected' => (int) ($collected[$e->id] ?? 0),
+            'url' => route('tenant.events.show', ['subdomain' => $tenant->slug, 'event' => $e->id]),
+        ])->values()->all();
     }
 
     private function liveEvent(Tenant $tenant): ?Event
@@ -193,19 +270,20 @@ final class DashboardController extends Controller
     }
 
     /**
-     * Registrations per day since the event opened. The shape of this curve is
-     * what tells a host whether to push harder on marketing.
+     * Registrations per day across every event the tenant runs. The shape of
+     * this curve is what tells them whether to push harder on marketing.
      *
      * @return list<array{label: string, count: int}>
      */
-    private function registrationTrend(Event $event): array
+    private function registrationTrend(Tenant $tenant): array
     {
         $since = CarbonImmutable::now()->subDays(29)->startOfDay();
+        $eventIds = Event::query()->where('tenant_id', $tenant->id)->toBase()->pluck('id');
 
         // Same reason as arrivals(): count dates, do not hydrate a model per
         // registration just to bucket them.
         $counts = EventRegistration::query()
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $eventIds)
             ->where('created_at', '>=', $since)
             ->toBase()
             ->pluck('created_at')
@@ -268,31 +346,5 @@ final class DashboardController extends Controller
             ]);
 
         return $requests->concat($pendingApproval)->take(8)->values()->all();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function upcoming(Tenant $tenant, ?string $excludeId): array
-    {
-        return Event::query()
-            ->where('tenant_id', $tenant->id)
-            ->where('status', '!=', Event::STATUS_CANCELLED)
-            ->where('ends_at', '>=', now())
-            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
-            ->withCount(['registrations as confirmed_count' => fn ($q) => $q->confirmed()])
-            ->orderBy('starts_at')
-            ->limit(4)
-            ->get()
-            ->map(fn (Event $e): array => [
-                'id' => $e->id,
-                'name' => $e->name,
-                'starts_at' => $e->starts_at?->toIso8601String(),
-                'timezone' => $e->timezone,
-                'capacity' => $e->capacity,
-                'confirmed' => (int) $e->confirmed_count,
-                'status' => $e->status,
-            ])
-            ->all();
     }
 }
