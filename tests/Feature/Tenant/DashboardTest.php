@@ -4,7 +4,34 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tenant;
 
+use App\Models\Event;
+use App\Models\EventLedgerEntry;
+use App\Models\EventRegistration;
+use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
+
+/**
+ * The dashboard used to be a three-item setup checklist that never changed once
+ * completed. These assert it now answers the questions an organizer opens the
+ * app for, from real data.
+ */
+beforeEach(function () {
+    refreshTenantDatabases();
+    Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
+    Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+});
+
+function dashboardActor(string $slug): array
+{
+    $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+    $user = User::factory()->create(['tenant_id' => $tenant->id]);
+    setPermissionsTeamId($tenant->id);
+    $user->assignRole('Org Superadmin');
+    $tenant->users()->attach($user->id);
+
+    return [$tenant, $user, $slug.'.'.mb_ltrim((string) config('session.domain'), '.')];
+}
 
 test('tenant dashboard renders the Inertia component with tenant and checklist data', function () {
     $user = User::factory()->create();
@@ -42,4 +69,123 @@ test('guests are redirected away from the tenant dashboard', function () {
 
     $this->get(route('tenant.dashboard', ['subdomain' => $tenant->slug]))
         ->assertRedirect(route('login'));
+});
+
+test('the dashboard reports the next event and its real registration counts', function () {
+    [$tenant, $user, $host] = dashboardActor('dash-next');
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Accra Tech Summit',
+        'capacity' => 100,
+        'starts_at' => now()->addDays(10),
+        'ends_at' => now()->addDays(10)->addHours(6),
+    ]);
+
+    EventRegistration::factory()->count(3)->create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+    EventRegistration::factory()->count(2)->create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_PENDING_PAYMENT,
+    ]);
+
+    $props = $this->actingAs($user)
+        ->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['focusEvent']['name'])->toBe('Accra Tech Summit');
+    expect($props['focusEvent']['registered'])->toBe(5);
+    expect($props['focusEvent']['confirmed'])->toBe(3);
+    expect($props['focusEvent']['awaiting_payment'])->toBe(2);
+    expect($props['focusEvent']['capacity'])->toBe(100);
+    expect($props['isLive'])->toBeFalse();
+});
+
+test('an event happening right now takes over the dashboard', function () {
+    [$tenant, $user, $host] = dashboardActor('dash-live');
+
+    // A live event and a later one: the live one must win.
+    Event::factory()->published()->create([
+        'tenant_id' => $tenant->id, 'name' => 'Later Event',
+        'starts_at' => now()->addDays(5), 'ends_at' => now()->addDays(5)->addHours(3),
+    ]);
+    Event::factory()->published()->create([
+        'tenant_id' => $tenant->id, 'name' => 'Happening Now',
+        'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(5),
+    ]);
+
+    $props = $this->actingAs($user)
+        ->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['isLive'])->toBeTrue();
+    expect($props['focusEvent']['name'])->toBe('Happening Now');
+});
+
+test('the money panel reads from the ledger, not from registrations', function () {
+    [$tenant, $user, $host] = dashboardActor('dash-money');
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'starts_at' => now()->addDays(3), 'ends_at' => now()->addDays(3)->addHours(3),
+    ]);
+
+    EventLedgerEntry::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'type' => EventLedgerEntry::TYPE_CHARGE,
+        'gross_amount' => 20000, 'gateway_fee_amount' => 390,
+        'commission_amount' => 400, 'net_amount' => 19210,
+        'currency' => 'GHS', 'provider' => 'paystack', 'provider_reference' => 'ref-1',
+    ]);
+
+    $props = $this->actingAs($user)
+        ->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['money']['collected'])->toBe(20000);
+    expect($props['money']['commission'])->toBe(400);
+    expect($props['money']['settles_to_you'])->toBe(19210);
+    expect($props['money']['awaiting_payout'])->toBe(19210);
+});
+
+test('a tenant with no events gets an empty state rather than a broken page', function () {
+    [$tenant, $user, $host] = dashboardActor('dash-empty');
+
+    $props = $this->actingAs($user)
+        ->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['focusEvent'])->toBeNull();
+    expect($props['isLive'])->toBeFalse();
+    expect($props['needsAPerson'])->toBe([]);
+    expect($props['money']['collected'])->toBe(0);
+});
+
+test('pending approvals surface as work needing a person', function () {
+    [$tenant, $user, $host] = dashboardActor('dash-approvals');
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'starts_at' => now()->addDays(2), 'ends_at' => now()->addDays(2)->addHours(3),
+    ]);
+    EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'full_name' => 'Ama Mensah',
+        'status' => EventRegistration::STATUS_PENDING_APPROVAL,
+    ]);
+
+    $props = $this->actingAs($user)
+        ->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['needsAPerson'])->toHaveCount(1);
+    expect($props['needsAPerson'][0]['title'])->toBe('Ama Mensah');
+    expect($props['needsAPerson'][0]['tag'])->toBe('Approval');
 });
