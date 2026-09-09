@@ -154,6 +154,32 @@ final class EventController extends Controller
         return redirect()->back()->with('success', 'Event updated successfully.');
     }
 
+    /**
+     * Visibility on its own route rather than through the full event form: a
+     * host flipping this is making a confidentiality decision, and it should
+     * not require re-submitting every other field to take effect.
+     */
+    public function updateVisibility(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+
+        $validated = $request->validate([
+            'visibility' => ['required', Rule::in(Event::VISIBILITIES)],
+        ]);
+
+        $eventModel->update(['visibility' => $validated['visibility']]);
+
+        return response()->json([
+            'visibility' => $eventModel->visibility,
+            'message' => $eventModel->isPrivate()
+                ? 'This event is private. Speakers, the agenda and sponsors are hidden until someone has a confirmed registration.'
+                : 'This event is public. Anyone with the link sees the full page.',
+        ]);
+    }
+
     public function destroy(string $subdomain, string $event): JsonResponse|RedirectResponse
     {
         $this->authorize('delete event');
@@ -273,6 +299,7 @@ final class EventController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['required', Rule::in([Event::STATUS_DRAFT, Event::STATUS_PUBLISHED, Event::STATUS_CANCELLED])],
+            'visibility' => ['sometimes', Rule::in(Event::VISIBILITIES)],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'timezone' => ['required', 'string', 'max:64'],
@@ -321,6 +348,7 @@ final class EventController extends Controller
             'slug' => $event->slug,
             'description' => $event->description,
             'status' => $event->status,
+            'visibility' => $event->visibility,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),
             'timezone' => $event->timezone,

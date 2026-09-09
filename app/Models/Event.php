@@ -32,7 +32,33 @@ final class Event extends Model
 
     public const string LOCATION_VIRTUAL = 'virtual';
 
+    /**
+     * Anyone with the link sees the whole page: lineup, agenda, sponsors.
+     */
+    public const string VISIBILITY_PUBLIC = 'public';
+
+    /**
+     * The link reaches a registration form and little else. Speakers, sessions
+     * and sponsors appear only once a registration is confirmed, because for a
+     * closed event the lineup is the confidential part.
+     *
+     * There is deliberately no "unlisted" between these two: nothing in this
+     * application lists events publicly, so unlisted would behave identically
+     * to public and mean nothing.
+     */
+    public const string VISIBILITY_PRIVATE = 'private';
+
+    public const array VISIBILITIES = [self::VISIBILITY_PUBLIC, self::VISIBILITY_PRIVATE];
+
     protected $connection = 'landlord';
+
+    /**
+     * Public unless someone says otherwise, set here as well as in the schema so
+     * an unsaved instance answers isPrivate() correctly rather than null.
+     */
+    protected $attributes = [
+        'visibility' => self::VISIBILITY_PUBLIC,
+    ];
 
     protected $fillable = [
         'tenant_id',
@@ -53,6 +79,7 @@ final class Event extends Model
         'ticket_price',
         'currency',
         'hero_image_path',
+        'visibility',
         'plan_your_visit_content',
         'platform_fee_percentage',
     ];
@@ -93,6 +120,11 @@ final class Event extends Model
     public function blasts(): HasMany
     {
         return $this->hasMany(EventBlast::class);
+    }
+
+    public function isPrivate(): bool
+    {
+        return $this->visibility === self::VISIBILITY_PRIVATE;
     }
 
     public function materials(): HasMany

@@ -5,6 +5,7 @@ import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
 import StatusPill from '@/Components/Console/StatusPill';
 import CopyField from '@/Components/Console/CopyField';
+import SegmentedControl from '@/Components/Console/SegmentedControl';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { Download, Check, X, Pencil } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
@@ -64,7 +65,25 @@ function formatAmount(amount, currency) {
 }
 
 function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, publicUrl }) {
-    const confirmed = registrations.filter((r) => r.status === 'confirmed' || r.status === 'checked_in');
+    const confirmed = registrations.filter(
+        (r) => r.status === 'confirmed' || r.status === 'checked_in'
+    );
+
+    const [visibility, setVisibilityState] = useState(event.visibility ?? 'public');
+
+    // Persisted immediately: a host toggling this is making a confidentiality
+    // decision and should not have to find a save button to make it real. On
+    // failure it snaps back, so the control never claims a state the server
+    // does not hold.
+    const setVisibility = async (next) => {
+        const previous = visibility;
+        setVisibilityState(next);
+        const response = await csrfFetch(route('tenant.events.visibility', { event: event.id }), {
+            method: 'PATCH',
+            body: JSON.stringify({ visibility: next }),
+        });
+        if (!response.ok) setVisibilityState(previous);
+    };
     const confirmedCount = confirmed.length;
     const revenue = confirmed.reduce((sum, r) => sum + r.amount, 0);
     const platformFees = confirmed.reduce((sum, r) => sum + (r.platform_fee_amount ?? 0), 0);
@@ -73,7 +92,8 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
         <div className="space-y-6">
             {!event.is_free && !hasActiveGateway && (
                 <div className="rounded-md bg-warning-bg px-4 py-3 text-sm text-warning-fg">
-                    Connect a payment gateway under Settings → Payments before publishing this paid event.
+                    Connect a payment gateway under Settings → Payments before publishing this paid
+                    event.
                 </div>
             )}
 
@@ -84,15 +104,23 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
                 </div>
                 <div className="rounded-lg border border-border p-4">
                     <div className="text-xs text-ink-secondary">Collected</div>
-                    <div className="mt-1 text-2xl font-semibold text-ink">{formatAmount(revenue, event.currency)}</div>
+                    <div className="mt-1 text-2xl font-semibold text-ink">
+                        {formatAmount(revenue, event.currency)}
+                    </div>
                 </div>
                 <div className="rounded-lg border border-border p-4">
-                    <div className="text-xs text-ink-secondary">Platform fee ({event.effective_platform_fee_percentage}%)</div>
-                    <div className="mt-1 text-2xl font-semibold text-ink">{formatAmount(platformFees, event.currency)}</div>
+                    <div className="text-xs text-ink-secondary">
+                        Platform fee ({event.effective_platform_fee_percentage}%)
+                    </div>
+                    <div className="mt-1 text-2xl font-semibold text-ink">
+                        {formatAmount(platformFees, event.currency)}
+                    </div>
                 </div>
                 <div className="rounded-lg border border-border p-4">
                     <div className="text-xs text-ink-secondary">Capacity</div>
-                    <div className="mt-1 text-2xl font-semibold text-ink">{event.capacity ?? 'Unlimited'}</div>
+                    <div className="mt-1 text-2xl font-semibold text-ink">
+                        {event.capacity ?? 'Unlimited'}
+                    </div>
                 </div>
             </div>
 
@@ -105,15 +133,36 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
             <div>
                 <h3 className="mb-2 text-sm font-semibold text-ink">Public event page</h3>
                 <CopyField value={publicUrl} />
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <SegmentedControl
+                        value={visibility}
+                        onChange={setVisibility}
+                        options={[
+                            { value: 'public', label: 'Public' },
+                            { value: 'private', label: 'Private' },
+                        ]}
+                    />
+                    <p className="max-w-md text-xs text-ink-secondary">
+                        {visibility === 'private'
+                            ? 'Only the name, date and registration form are shown. Speakers, the agenda and sponsors appear once someone has a confirmed registration, and there is no public forum.'
+                            : 'Anyone with the link sees the full page, including speakers, the agenda and sponsors.'}
+                    </p>
+                </div>
             </div>
 
             <div>
                 <h3 className="mb-2 text-sm font-semibold text-ink">Previews</h3>
                 <div className="flex gap-2">
-                    <Button href={route('public.events.preview.attendee', { event: event.slug })} target="_blank">
+                    <Button
+                        href={route('public.events.preview.attendee', { event: event.slug })}
+                        target="_blank"
+                    >
                         Attendee portal
                     </Button>
-                    <Button href={route('public.events.preview.speaker', { event: event.slug })} target="_blank">
+                    <Button
+                        href={route('public.events.preview.speaker', { event: event.slug })}
+                        target="_blank"
+                    >
                         Speaker portal
                     </Button>
                 </div>
@@ -126,10 +175,16 @@ function GuestsTab({ event, registrations }) {
     const reload = () => router.reload({ only: ['registrations'] });
 
     const act = async (registration, action, body) => {
-        await csrfFetch(route(`tenant.events.registrations.${action}`, { event: event.id, registration: registration.id }), {
-            method: 'POST',
-            body: body ? JSON.stringify(body) : undefined,
-        });
+        await csrfFetch(
+            route(`tenant.events.registrations.${action}`, {
+                event: event.id,
+                registration: registration.id,
+            }),
+            {
+                method: 'POST',
+                body: body ? JSON.stringify(body) : undefined,
+            }
+        );
         reload();
     };
 
@@ -141,7 +196,10 @@ function GuestsTab({ event, registrations }) {
     return (
         <div>
             <div className="mb-4 flex justify-end">
-                <Button icon={Download} href={route('tenant.events.guests.export', { event: event.id })}>
+                <Button
+                    icon={Download}
+                    href={route('tenant.events.guests.export', { event: event.id })}
+                >
                     Export CSV
                 </Button>
             </div>
@@ -165,26 +223,49 @@ function GuestsTab({ event, registrations }) {
                                 <Td muted>{registration.email}</Td>
                                 <Td>
                                     <StatusPill status={STATUS_VARIANT[registration.status]}>
-                                        {registration.status === 'waitlisted' ? `Waitlisted, #${registration.waitlist_position}` : registration.status.replace('_', ' ')}
+                                        {registration.status === 'waitlisted'
+                                            ? `Waitlisted, #${registration.waitlist_position}`
+                                            : registration.status.replace('_', ' ')}
                                     </StatusPill>
                                 </Td>
                                 <Td muted>{registration.ticket_type_name ?? '—'}</Td>
                                 <Td muted>{registration.ticket_code ?? '—'}</Td>
-                                <Td muted>{registration.seat_label ? `${registration.seat_label} · ${registration.room_name}` : '—'}</Td>
-                                <Td muted>{registration.checked_in_at ? new Date(registration.checked_in_at).toLocaleString() : '—'}</Td>
+                                <Td muted>
+                                    {registration.seat_label
+                                        ? `${registration.seat_label} · ${registration.room_name}`
+                                        : '—'}
+                                </Td>
+                                <Td muted>
+                                    {registration.checked_in_at
+                                        ? new Date(registration.checked_in_at).toLocaleString()
+                                        : '—'}
+                                </Td>
                                 <Td align="right">
                                     {registration.status === 'pending_approval' && (
                                         <div className="flex justify-end gap-1.5">
-                                            <button onClick={() => act(registration, 'approve')} title="Approve" className="text-ink-secondary hover:text-success-fg">
+                                            <button
+                                                onClick={() => act(registration, 'approve')}
+                                                title="Approve"
+                                                className="text-ink-secondary hover:text-success-fg"
+                                            >
                                                 <Check className="h-4 w-4" strokeWidth={1.75} />
                                             </button>
-                                            <button onClick={() => reject(registration)} title="Reject" className="text-ink-secondary hover:text-danger-fg">
+                                            <button
+                                                onClick={() => reject(registration)}
+                                                title="Reject"
+                                                className="text-ink-secondary hover:text-danger-fg"
+                                            >
                                                 <X className="h-4 w-4" strokeWidth={1.75} />
                                             </button>
                                         </div>
                                     )}
-                                    {(registration.status === 'confirmed' || registration.status === 'checked_in' || registration.status === 'waitlisted') && (
-                                        <button onClick={() => act(registration, 'cancel')} className="text-xs text-ink-secondary hover:text-danger-fg">
+                                    {(registration.status === 'confirmed' ||
+                                        registration.status === 'checked_in' ||
+                                        registration.status === 'waitlisted') && (
+                                        <button
+                                            onClick={() => act(registration, 'cancel')}
+                                            className="text-xs text-ink-secondary hover:text-danger-fg"
+                                        >
                                             Cancel
                                         </button>
                                     )}
@@ -208,7 +289,10 @@ function GuestsTab({ event, registrations }) {
                     <tbody>
                         <tr>
                             <td colSpan={8}>
-                                <TableEmpty title="No guests yet" description="Share the event page to start collecting registrations." />
+                                <TableEmpty
+                                    title="No guests yet"
+                                    description="Share the event page to start collecting registrations."
+                                />
                             </td>
                         </tr>
                     </tbody>
@@ -218,7 +302,13 @@ function GuestsTab({ event, registrations }) {
     );
 }
 
-export default function Show({ event, registrations, hasActiveGateway, settlementMode, publicUrl }) {
+export default function Show({
+    event,
+    registrations,
+    hasActiveGateway,
+    settlementMode,
+    publicUrl,
+}) {
     const [tab, setTab] = useState('Overview');
     const [editing, setEditing] = useState(false);
 
@@ -226,7 +316,11 @@ export default function Show({ event, registrations, hasActiveGateway, settlemen
         <ConsoleLayout>
             <PageHeader
                 title={event.name}
-                actions={<Button icon={Pencil} onClick={() => setEditing(true)}>Edit event</Button>}
+                actions={
+                    <Button icon={Pencil} onClick={() => setEditing(true)}>
+                        Edit event
+                    </Button>
+                }
             />
 
             <div className="border-b border-border px-8">
@@ -237,7 +331,9 @@ export default function Show({ event, registrations, hasActiveGateway, settlemen
                             type="button"
                             onClick={() => setTab(label)}
                             className={`shrink-0 border-b-2 py-3 text-sm font-medium transition-colors ${
-                                tab === label ? 'border-accent text-ink' : 'border-transparent text-ink-secondary hover:text-ink'
+                                tab === label
+                                    ? 'border-accent text-ink'
+                                    : 'border-transparent text-ink-secondary hover:text-ink'
                             }`}
                         >
                             {label}
@@ -248,16 +344,35 @@ export default function Show({ event, registrations, hasActiveGateway, settlemen
 
             <div className="px-8 py-6">
                 {tab === 'Overview' && (
-                    <OverviewTab event={event} registrations={registrations} hasActiveGateway={hasActiveGateway} settlementMode={settlementMode} publicUrl={publicUrl} />
+                    <OverviewTab
+                        event={event}
+                        registrations={registrations}
+                        hasActiveGateway={hasActiveGateway}
+                        settlementMode={settlementMode}
+                        publicUrl={publicUrl}
+                    />
                 )}
                 {tab === 'Tickets' && (
-                    <TicketTypesPanel event={event} ticketTypes={event.ticket_types} onChange={() => router.reload({ only: ['event'] })} />
+                    <TicketTypesPanel
+                        event={event}
+                        ticketTypes={event.ticket_types}
+                        onChange={() => router.reload({ only: ['event'] })}
+                    />
                 )}
                 {tab === 'Speakers' && (
-                    <SpeakersPanel event={event} speakers={event.speakers} onChange={() => router.reload({ only: ['event'] })} />
+                    <SpeakersPanel
+                        event={event}
+                        speakers={event.speakers}
+                        onChange={() => router.reload({ only: ['event'] })}
+                    />
                 )}
                 {tab === 'Schedule' && (
-                    <SchedulePanel event={event} sessions={event.sessions} speakers={event.speakers} onChange={() => router.reload({ only: ['event'] })} />
+                    <SchedulePanel
+                        event={event}
+                        sessions={event.sessions}
+                        speakers={event.speakers}
+                        onChange={() => router.reload({ only: ['event'] })}
+                    />
                 )}
                 {tab === 'Guests' && <GuestsTab event={event} registrations={registrations} />}
                 {tab === 'Blasts' && <BlastsPanel event={event} />}
@@ -265,12 +380,19 @@ export default function Show({ event, registrations, hasActiveGateway, settlemen
                     <CheckInPanel
                         scanUrl={route('tenant.events.checkin.scan', { event: event.id })}
                         searchUrl={route('tenant.events.checkin.search', { event: event.id })}
-                        checkInUrlFor={(registrationId) => route('tenant.events.checkin', { event: event.id, registration: registrationId })}
+                        checkInUrlFor={(registrationId) =>
+                            route('tenant.events.checkin', {
+                                event: event.id,
+                                registration: registrationId,
+                            })
+                        }
                     />
                 )}
                 {tab === 'Venue' && <VenuePanel event={event} venueRooms={event.venue_rooms} />}
                 {tab === 'Requests' && <RequestsPanel event={event} />}
-                {tab === 'Materials' && <MaterialsPanel event={event} materials={event.materials} />}
+                {tab === 'Materials' && (
+                    <MaterialsPanel event={event} materials={event.materials} />
+                )}
                 {tab === 'Forum' && <ForumPanel event={event} />}
                 {tab === 'Live' && <EngagementPanel event={event} />}
                 {tab === 'Badges' && <BadgesPanel event={event} />}
@@ -279,7 +401,9 @@ export default function Show({ event, registrations, hasActiveGateway, settlemen
                 {tab === 'Reports' && <ReportsPanel event={event} />}
             </div>
 
-            {editing && <EventFormModal mode="edit" event={event} onClose={() => setEditing(false)} />}
+            {editing && (
+                <EventFormModal mode="edit" event={event} onClose={() => setEditing(false)} />
+            )}
         </ConsoleLayout>
     );
 }

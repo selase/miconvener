@@ -23,6 +23,13 @@ final class PublicForumController extends Controller
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
 
+        // The forum of a closed event is as revealing as its lineup: who is
+        // asking what, under their own names. There is no registration in this
+        // route to check against, so a private event has no public forum.
+        if ($eventModel->isPrivate()) {
+            abort(404);
+        }
+
         $respondentToken = (string) $request->query('respondent_token', '');
 
         $threads = $eventModel->forumThreads()->visible()->with(['replies', 'votes'])->get();
@@ -54,6 +61,13 @@ final class PublicForumController extends Controller
     {
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        // The forum of a closed event is as revealing as its lineup: who is
+        // asking what, under their own names. There is no registration in this
+        // route to check against, so a private event has no public forum.
+        if ($eventModel->isPrivate()) {
+            abort(404);
+        }
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -93,6 +107,13 @@ final class PublicForumController extends Controller
     {
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        // The forum of a closed event is as revealing as its lineup: who is
+        // asking what, under their own names. There is no registration in this
+        // route to check against, so a private event has no public forum.
+        if ($eventModel->isPrivate()) {
+            abort(404);
+        }
         $threadModel = $eventModel->forumThreads()->visible()->where('id', $thread)->firstOrFail();
 
         $validated = $request->validate(['respondent_token' => ['required', 'string', 'max:64']]);
@@ -111,6 +132,13 @@ final class PublicForumController extends Controller
     {
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        // The forum of a closed event is as revealing as its lineup: who is
+        // asking what, under their own names. There is no registration in this
+        // route to check against, so a private event has no public forum.
+        if ($eventModel->isPrivate()) {
+            abort(404);
+        }
         $threadModel = $eventModel->forumThreads()->visible()->where('id', $thread)->firstOrFail();
 
         $validated = $request->validate(['respondent_token' => ['required', 'string', 'max:64']]);
@@ -124,6 +152,13 @@ final class PublicForumController extends Controller
     {
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        // The forum of a closed event is as revealing as its lineup: who is
+        // asking what, under their own names. There is no registration in this
+        // route to check against, so a private event has no public forum.
+        if ($eventModel->isPrivate()) {
+            abort(404);
+        }
         $threadModel = $eventModel->forumThreads()->visible()->where('id', $thread)->firstOrFail();
 
         $validated = $request->validate([

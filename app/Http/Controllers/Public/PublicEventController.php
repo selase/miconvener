@@ -38,8 +38,10 @@ final class PublicEventController extends Controller
             ->firstOrFail();
 
         return Inertia::render('Public/Events/Show', [
-            'event' => $this->toPublicPayload($eventModel),
+            // A private event shows enough to register and nothing more.
+            'event' => $this->toPublicPayload($eventModel, revealDetails: ! $eventModel->isPrivate()),
             'org' => ['name' => $tenant->name],
+            'isPrivate' => $eventModel->isPrivate(),
         ]);
     }
 
@@ -197,7 +199,7 @@ final class PublicEventController extends Controller
         }
 
         return Inertia::render('Public/Events/Confirmation', [
-            'event' => $this->toPublicPayload($eventModel),
+            'event' => $this->toPublicPayload($eventModel, revealDetails: $registrationModel->isConfirmed()),
             'registration' => [
                 'id' => $registrationModel->id,
                 'full_name' => $registrationModel->full_name,
@@ -301,8 +303,16 @@ final class PublicEventController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function toPublicPayload(Event $event): array
+    /**
+     * @param  bool  $revealDetails  Whether the viewer has earned the full page.
+     *                               A private event's lineup, agenda and sponsors
+     *                               are withheld until they hold a confirmed
+     *                               registration.
+     */
+    private function toPublicPayload(Event $event, bool $revealDetails = true): array
     {
+        $withhold = $event->isPrivate() && ! $revealDetails;
+
         return [
             'name' => $event->name,
             'slug' => $event->slug,
@@ -326,7 +336,7 @@ final class PublicEventController extends Controller
                 'is_free' => $t->isFree(),
                 'is_sold_out' => $t->isSoldOut(),
             ])->values(),
-            'sessions' => $event->relationLoaded('sessions') ? $event->sessions->map(fn ($s): array => [
+            'sessions' => ! $withhold && $event->relationLoaded('sessions') ? $event->sessions->map(fn ($s): array => [
                 'id' => $s->id,
                 'title' => $s->title,
                 'description' => $s->description,
@@ -339,7 +349,7 @@ final class PublicEventController extends Controller
                 'signup_count' => $s->registrations_count ?? $s->signupCount(),
                 'speaker_names' => $s->speakers->pluck('name')->values(),
             ])->values() : [],
-            'speakers' => $event->relationLoaded('speakers') ? $event->speakers->map(fn ($s): array => [
+            'speakers' => ! $withhold && $event->relationLoaded('speakers') ? $event->speakers->map(fn ($s): array => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'title' => $s->title,
@@ -347,7 +357,7 @@ final class PublicEventController extends Controller
                 'bio' => $s->bio,
                 'photo_url' => $s->photo_path ? asset('storage/'.$s->photo_path) : null,
             ])->values() : [],
-            'sponsors' => $event->relationLoaded('sponsors') ? $event->sponsors->map(fn ($s): array => [
+            'sponsors' => ! $withhold && $event->relationLoaded('sponsors') ? $event->sponsors->map(fn ($s): array => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'tier' => $s->tier,

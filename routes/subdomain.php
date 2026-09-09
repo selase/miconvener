@@ -209,6 +209,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('events/{event}/reports/audit-log', [EventReportController::class, 'exportAuditLog'])->name('tenant.events.reports.audit-log');
     Route::get('events/{event}/reports/certificates', [EventReportController::class, 'exportCertificates'])->name('tenant.events.reports.certificates');
 
+    Route::patch('events/{event}/visibility', [EventController::class, 'updateVisibility'])->name('tenant.events.visibility');
     Route::get('events/{event}/speakers/{speaker}/portal-link', [EventSpeakerController::class, 'portalLink'])->name('tenant.events.speakers.portal-link');
 
 });
