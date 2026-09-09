@@ -125,32 +125,6 @@ export default function Dashboard({
                         : `Nothing scheduled yet for ${tenant?.name ?? 'your organization'}.`}
                 </p>
 
-                {!setupDone && (
-                    <div className="rounded-lg border border-border bg-surface p-6">
-                        <h2 className="text-[15px] font-semibold text-ink">Finish setting up</h2>
-                        <div className="mt-4 flex flex-wrap gap-8">
-                            <ChecklistItem
-                                done={checklist.branding}
-                                number={1}
-                                href={links.branding}
-                                label="Customize branding"
-                            />
-                            <ChecklistItem
-                                done={checklist.team}
-                                number={2}
-                                href={links.team}
-                                label="Add your team"
-                            />
-                            <ChecklistItem
-                                done={checklist.onboarding}
-                                number={3}
-                                label="Mark as setup complete"
-                                onClick={() => router.post(links.finishOnboarding)}
-                            />
-                        </div>
-                    </div>
-                )}
-
                 {focusEvent ? (
                     <div className="grid grid-cols-1 rounded-lg border border-border sm:grid-cols-2 lg:grid-cols-4">
                         <Stat
@@ -198,12 +172,41 @@ export default function Dashboard({
                     </div>
                 )}
 
+                {!setupDone && (
+                    <div className="rounded-lg border border-border bg-surface p-6">
+                        <h2 className="text-[15px] font-semibold text-ink">Finish setting up</h2>
+                        <div className="mt-4 flex flex-wrap gap-8">
+                            <ChecklistItem
+                                done={checklist.branding}
+                                number={1}
+                                href={links.branding}
+                                label="Customize branding"
+                            />
+                            <ChecklistItem
+                                done={checklist.team}
+                                number={2}
+                                href={links.team}
+                                label="Add your team"
+                            />
+                            <ChecklistItem
+                                done={checklist.onboarding}
+                                number={3}
+                                label="Mark as setup complete"
+                                onClick={() => router.post(links.finishOnboarding)}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {focusEvent && (
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         {isLive ? (
-                            <Panel title="Arrivals through the gates" note="Half-hour buckets">
-                                {arrivals.length > 0 ? (
-                                    <Bars series={arrivals} />
+                            <Panel
+                                title="Arrivals through the gates"
+                                note={arrivals.step ? `${arrivals.step}-minute buckets` : null}
+                            >
+                                {arrivals.series.length > 0 ? (
+                                    <Bars series={arrivals.series} />
                                 ) : (
                                     <EmptyPanelBody>Nobody has been scanned in yet.</EmptyPanelBody>
                                 )}

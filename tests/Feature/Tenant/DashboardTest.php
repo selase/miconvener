@@ -165,6 +165,36 @@ test('a tenant with no events gets an empty state rather than a broken page', fu
     expect($props['isLive'])->toBeFalse();
     expect($props['needsAPerson'])->toBe([]);
     expect($props['money']['collected'])->toBe(0);
+    expect($props['arrivals']['series'])->toBe([]);
+});
+
+test('arrivals are bucketed finely enough to show the shape of the door', function () {
+    [$tenant, $user, $host] = dashboardActor('dash-arrivals');
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'timezone' => 'Africa/Accra',
+        'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(6),
+    ]);
+
+    // A ninety-minute door. Half-hour buckets would render this as three bars.
+    foreach (range(0, 40) as $i) {
+        $r = EventRegistration::factory()->create([
+            'tenant_id' => $tenant->id, 'event_id' => $event->id,
+            'status' => EventRegistration::STATUS_CHECKED_IN,
+        ]);
+        $r->forceFill(['checked_in_at' => now()->startOfDay()->addHours(8)->addMinutes($i * 2)])->save();
+    }
+
+    $props = $this->actingAs($user)
+        ->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['arrivals']['step'])->toBeLessThanOrEqual(15);
+    expect(count($props['arrivals']['series']))->toBeGreaterThan(5);
+    // Every check-in lands in a bucket -- none silently dropped off the ends.
+    expect(collect($props['arrivals']['series'])->sum('count'))->toBe(41);
 });
 
 test('pending approvals surface as work needing a person', function () {

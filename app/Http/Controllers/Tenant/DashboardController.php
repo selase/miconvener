@@ -39,7 +39,7 @@ final class DashboardController extends Controller
             'isLive' => $liveEvent !== null,
             'focusEvent' => $focusEvent ? $this->focusPayload($focusEvent, $liveEvent !== null) : null,
             'money' => $this->money($tenant),
-            'arrivals' => $liveEvent ? $this->arrivals($liveEvent) : [],
+            'arrivals' => $liveEvent ? $this->arrivals($liveEvent) : ['step' => 0, 'series' => []],
             'registrationTrend' => $focusEvent ? $this->registrationTrend($focusEvent) : [],
             'needsAPerson' => $focusEvent ? $this->needsAPerson($focusEvent) : [],
             'upcoming' => $this->upcoming($tenant, $focusEvent?->id),
@@ -142,40 +142,54 @@ final class DashboardController extends Controller
      * Check-ins bucketed by half hour across the event day, so the shape of the
      * queue at the gate is visible rather than inferred from a single number.
      *
-     * @return list<array{label: string, count: int}>
+     * @return array{step: int, series: list<array{label: string, count: int}>}
      */
     private function arrivals(Event $event): array
     {
+        // toBase() so this reads timestamps rather than hydrating one Eloquent
+        // model per attendee -- a full house was pulling ~400 objects into
+        // memory to draw a bar chart.
         $checkIns = EventRegistration::query()
             ->where('event_id', $event->id)
             ->whereNotNull('checked_in_at')
+            ->toBase()
             ->pluck('checked_in_at');
 
         if ($checkIns->isEmpty()) {
-            return [];
+            return ['step' => 0, 'series' => []];
         }
 
-        $start = CarbonImmutable::parse($checkIns->min())->timezone($event->timezone)->startOfHour();
-        $end = CarbonImmutable::parse($checkIns->max())->timezone($event->timezone);
+        $first = CarbonImmutable::parse($checkIns->min())->timezone($event->timezone);
+        $last = CarbonImmutable::parse($checkIns->max())->timezone($event->timezone);
 
+        // Bucket width follows the span, so a two-hour door and an all-day one
+        // both land near two dozen bars instead of five fat ones.
+        $spanMinutes = max(1, (int) $first->diffInMinutes($last));
+        $step = collect([5, 10, 15, 30, 60])
+            ->first(fn (int $candidate): bool => $spanMinutes / $candidate <= 28) ?? 60;
+
+        $start = $first->startOfHour();
         $buckets = [];
-        for ($cursor = $start; $cursor <= $end; $cursor = $cursor->addMinutes(30)) {
+        for ($cursor = $start; $cursor <= $last; $cursor = $cursor->addMinutes($step)) {
             $buckets[$cursor->format('H:i')] = 0;
         }
 
         foreach ($checkIns as $at) {
             $slot = CarbonImmutable::parse($at)->timezone($event->timezone);
-            $slot = $slot->minute < 30 ? $slot->startOfHour() : $slot->startOfHour()->addMinutes(30);
-            $key = $slot->format('H:i');
+            $minute = (int) floor($slot->minute / $step) * $step;
+            $key = $slot->setTime($slot->hour, $minute)->format('H:i');
             if (array_key_exists($key, $buckets)) {
                 $buckets[$key]++;
             }
         }
 
-        return collect($buckets)
-            ->map(fn (int $count, string $label): array => ['label' => $label, 'count' => $count])
-            ->values()
-            ->all();
+        return [
+            'step' => $step,
+            'series' => collect($buckets)
+                ->map(fn (int $count, string $label): array => ['label' => $label, 'count' => $count])
+                ->values()
+                ->all(),
+        ];
     }
 
     /**
@@ -188,11 +202,14 @@ final class DashboardController extends Controller
     {
         $since = CarbonImmutable::now()->subDays(29)->startOfDay();
 
+        // Same reason as arrivals(): count dates, do not hydrate a model per
+        // registration just to bucket them.
         $counts = EventRegistration::query()
             ->where('event_id', $event->id)
             ->where('created_at', '>=', $since)
-            ->get(['created_at'])
-            ->groupBy(fn ($row): string => CarbonImmutable::parse($row->created_at)->format('Y-m-d'))
+            ->toBase()
+            ->pluck('created_at')
+            ->groupBy(fn ($at): string => CarbonImmutable::parse($at)->format('Y-m-d'))
             ->map->count();
 
         $days = [];
