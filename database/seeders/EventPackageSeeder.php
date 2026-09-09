@@ -24,7 +24,7 @@ final class EventPackageSeeder extends Seeder
         'remove_platform_branding' => ['name' => 'Remove Platform Branding', 'type' => 'boolean', 'description' => 'Hide platform branding on public event pages and emails.'],
         'custom-domains' => ['name' => 'Custom Domains', 'type' => 'boolean', 'description' => 'Use your own domain for your workspace.'],
         'csv_settlement_export' => ['name' => 'CSV Settlement Export', 'type' => 'boolean', 'description' => 'Export the settlement statement as CSV.'],
-        'white_label' => ['name' => 'White Label', 'type' => 'boolean', 'description' => 'Reserved: full custom branding on speaker/participant portals. Not enforced yet — portals are static previews only.'],
+        'white_label' => ['name' => 'White Label', 'type' => 'boolean', 'description' => 'Replace MiConvener branding with your own logo across the console, emails and tickets.'],
         'sso' => ['name' => 'SSO Integration', 'type' => 'boolean', 'description' => 'Reserved: Single Sign-On. Not enforced yet — no SAML/OIDC integration exists.'],
         'api_access' => ['name' => 'API Access', 'type' => 'boolean', 'description' => 'Reserved: self-service webhook/API management. Not enforced yet — no tenant-facing management UI exists.'],
     ];

@@ -67,8 +67,15 @@ final class EventRegistrationConfirmed extends Mailable
                 // strips SVG and Outlook cannot render it -- an SVG data URI
                 // reaches the attendee as a broken image. The SVG stays as the
                 // fallback for hosts with no raster backend.
-                'qrPng' => QrCodeGenerator::png($this->registration->qr_token),
-                'qrImage' => QrCodeGenerator::svgDataUri($this->registration->qr_token),
+                // A registration can legitimately have no token yet -- a free one
+                // awaiting email confirmation -- and a ticket email without a QR
+                // is better than a mailer that throws.
+                'qrPng' => $this->registration->qr_token
+                    ? QrCodeGenerator::png($this->registration->qr_token)
+                    : null,
+                'qrImage' => $this->registration->qr_token
+                    ? QrCodeGenerator::svgDataUri($this->registration->qr_token)
+                    : null,
                 'portalUrl' => route('public.events.confirmation', [
                     'subdomain' => $this->registration->tenant->slug,
                     'event' => $this->registration->event->slug,

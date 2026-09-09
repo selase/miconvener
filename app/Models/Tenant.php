@@ -349,6 +349,18 @@ final class Tenant extends Model
      * explicitly disabled row closes the gate. Run `tenants:sync-features`
      * after adding a feature key so absence stops standing in for permission.
      */
+    /**
+     * Whether the tenant may show their own logo in place of the platform's.
+     *
+     * This is white-labelling, which is an Enterprise capability. Everyone else
+     * runs on MiConvener's mark -- the branding is part of what the paid tiers
+     * do not buy.
+     */
+    public function canUseOwnLogo(): bool
+    {
+        return $this->planAllows('white_label');
+    }
+
     public function planAllows(string $featureKey): bool
     {
         $feature = $this->features()->where('feature_key', $featureKey)->first();

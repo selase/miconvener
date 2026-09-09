@@ -23,6 +23,7 @@ final class OnboardingController extends Controller
                 'name' => $tenant->name,
                 'primary_color' => data_get($tenant->meta, 'branding.primary_color', '#009EF7'),
                 'logo' => Helper::getTenantLogoUrl(),
+                'can_use_own_logo' => app(TenantContext::class)->getTenant()?->canUseOwnLogo() ?? false,
             ],
         ]);
     }
@@ -46,6 +47,12 @@ final class OnboardingController extends Controller
         ];
 
         if ($request->hasFile('logo')) {
+            if (! $tenant->canUseOwnLogo()) {
+                return back()->withErrors([
+                    'logo' => 'Your own logo is an Enterprise feature. Talk to us about upgrading to use it.',
+                ]);
+            }
+
             $updateData['logo'] = Helper::processUploadedFile(
                 $request,
                 'logo',

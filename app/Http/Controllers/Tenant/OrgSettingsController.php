@@ -30,6 +30,7 @@ final class OrgSettingsController extends Controller
                 'email' => $tenant->email,
                 'phone_number' => $tenant->phone_number,
                 'logo' => Helper::getTenantLogoUrl(),
+                'can_use_own_logo' => $tenant->canUseOwnLogo(),
                 'primary_color' => data_get($tenant->meta, 'primary_color', '#009EF7'),
                 'require_2fa' => (bool) $tenant->require_2fa,
                 'custom_domain' => $tenant->custom_domain,
@@ -61,13 +62,23 @@ final class OrgSettingsController extends Controller
         $tenant->phone_number = $validatedData['phone_number'];
         $tenant->require_2fa = $request->boolean('require_2fa');
 
-        if ($tenant->custom_domain !== $validatedData['custom_domain']) {
-            $tenant->custom_domain = $validatedData['custom_domain'];
+        // Nullable in the rules, so the key is absent when the form omits it --
+        // reading it directly threw for any submission without the field.
+        $submittedDomain = $validatedData['custom_domain'] ?? null;
+
+        if ($tenant->custom_domain !== $submittedDomain) {
+            $tenant->custom_domain = $submittedDomain;
             $tenant->custom_domain_status = 'pending';
             $tenant->custom_domain_verified_at = null;
         }
 
         if ($request->hasFile('logo')) {
+            if (! $tenant->canUseOwnLogo()) {
+                return back()->withErrors([
+                    'logo' => 'Your own logo is an Enterprise feature. Talk to us about upgrading to use it.',
+                ]);
+            }
+
             $disk = config('app.env') === 'production' ? 's3' : 'public';
             if ($tenant->logo) {
                 Helper::deleteFile($tenant->logo, $disk);

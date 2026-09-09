@@ -186,7 +186,11 @@ final class Helper
     {
         $tenant = app(\App\Services\Tenancy\TenantContext::class)->getTenant();
 
-        if ($tenant && $tenant->logo) {
+        // An uploaded logo is only shown on a plan that includes white-labelling.
+        // A tenant who uploaded one and later dropped off Enterprise keeps the
+        // file -- it simply stops being displayed -- so upgrading restores it
+        // rather than asking them to upload it again.
+        if ($tenant && $tenant->logo && $tenant->canUseOwnLogo()) {
             $disk = config('app.env') === 'production' ? 's3' : 'public';
 
             return Storage::disk($disk)->url($tenant->logo);

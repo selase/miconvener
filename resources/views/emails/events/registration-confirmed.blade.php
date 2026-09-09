@@ -9,7 +9,7 @@ Your registration for **{{ $event->name }}** is confirmed.
 
 @if ($qrPng)
 <img src="{{ $message->embedData($qrPng, 'ticket-qr.png', 'image/png') }}" alt="Your ticket QR code" width="200" height="200">
-@else
+@elseif ($qrImage)
 <img src="{{ $qrImage }}" alt="Your ticket QR code" width="200" height="200">
 @endif
 

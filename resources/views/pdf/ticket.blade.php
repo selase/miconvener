@@ -21,6 +21,9 @@
         .field .k { font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase; color: #6b7280; }
         .field .v { font-size: 14px; margin-top: 1px; }
         .note { margin-top: 30px; padding-top: 18px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 11.5px; }
+        .issuer { margin-top: 26px; }
+        .issuer img { height: 20px; width: auto; }
+        .issuer .by { font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase; color: #9ca3af; margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -39,7 +42,9 @@
     <table class="grid">
         <tr>
             <td class="qr-cell">
-                <img class="qr" src="{{ $qrDataUri }}" alt="Entry QR code">
+                @if ($qrDataUri)
+                    <img class="qr" src="{{ $qrDataUri }}" alt="Entry QR code">
+                @endif
                 <div class="code-label">Entry code</div>
                 <div class="code">{{ $registration->ticket_code }}</div>
             </td>
@@ -69,6 +74,13 @@
             </td>
         </tr>
     </table>
+
+    @if ($brandDataUri)
+        <div class="issuer">
+            <div class="by">Ticketing by</div>
+            <img src="{{ $brandDataUri }}" alt="{{ config('app.name') }}">
+        </div>
+    @endif
 
     <div class="note">
         Show the QR code at the entrance. If it will not scan, give your entry code

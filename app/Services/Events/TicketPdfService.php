@@ -27,7 +27,10 @@ final class TicketPdfService
             'tenant' => $registration->tenant,
             // dompdf reads a base64 data URI directly, so the image travels
             // inside the PDF with no outbound request when it is opened.
-            'qrDataUri' => $this->qrDataUri($registration->qr_token),
+            'qrDataUri' => $registration->qr_token ? $this->qrDataUri($registration->qr_token) : null,
+            // dompdf will not fetch over the network reliably, so the mark is
+            // embedded as data rather than linked.
+            'brandDataUri' => $this->fileDataUri(public_path('assets/img/brand/miconvener.png')),
         ])->setPaper('a4')->output();
     }
 
@@ -36,6 +39,15 @@ final class TicketPdfService
         $slug = str($registration->event->name)->slug()->limit(40, '')->toString();
 
         return "ticket-{$slug}-{$registration->ticket_code}.pdf";
+    }
+
+    private function fileDataUri(string $path): ?string
+    {
+        if (! is_file($path)) {
+            return null;
+        }
+
+        return 'data:image/png;base64,'.base64_encode((string) file_get_contents($path));
     }
 
     private function qrDataUri(string $token): string
