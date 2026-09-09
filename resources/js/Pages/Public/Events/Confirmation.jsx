@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import PublicLayout from '@/Layouts/PublicLayout';
-import { CheckCircle2, Clock, FileText, Download, Plus, Check, ListOrdered, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock,
+    FileText,
+    Download,
+    Plus,
+    Check,
+    ListOrdered,
+    XCircle,
+} from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 
 function formatSessionTime(startsAt, endsAt) {
@@ -13,34 +22,78 @@ function formatSessionTime(startsAt, endsAt) {
 
 function TicketTab({ event, registration }) {
     const [transferring, setTransferring] = useState(false);
-    const [form, setForm] = useState({ full_name: registration.full_name, email: registration.email, phone: registration.phone ?? '' });
+    // 'details' collects who it goes to; 'code' confirms it from the current
+    // holder's inbox. The ticket does not move until the second step.
+    const [stage, setStage] = useState('details');
+    const [form, setForm] = useState({ full_name: '', email: '', phone: '' });
+    const [code, setCode] = useState('');
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
+    const [error, setError] = useState(null);
 
     const canTransfer = registration.status !== 'checked_in';
 
-    const submitTransfer = async (e) => {
+    const post = async (routeName, body) => {
+        const response = await csrfFetch(
+            route(routeName, { event: event.slug, registration: registration.id }),
+            {
+                method: 'POST',
+                body: JSON.stringify(body),
+            }
+        );
+        return [response, await response.json()];
+    };
+
+    const requestTransfer = async (e) => {
         e.preventDefault();
         setSaving(true);
+        setError(null);
         setMessage(null);
-        const response = await csrfFetch(route('public.events.registrations.transfer', { event: event.slug, registration: registration.id }), {
-            method: 'POST',
-            body: JSON.stringify(form),
-        });
-        const json = await response.json();
+        const [response, json] = await post('public.events.registrations.transfer', form);
         setSaving(false);
         if (!response.ok) {
-            setMessage(json.message ?? 'Could not transfer this ticket.');
+            setError(json.message ?? 'Could not start this transfer.');
+            return;
+        }
+        setMessage(json.message);
+        setStage('code');
+    };
+
+    const confirmTransfer = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        setError(null);
+        const [response, json] = await post('public.events.registrations.transfer.confirm', {
+            code,
+        });
+        setSaving(false);
+        if (!response.ok) {
+            setError(json.message ?? 'Could not complete this transfer.');
             return;
         }
         setTransferring(false);
-        setMessage('Ticket transferred. A new confirmation has been emailed.');
+        setStage('details');
+        setCode('');
+        setMessage(json.message);
+        window.location.reload();
+    };
+
+    const cancelTransfer = () => {
+        setTransferring(false);
+        setStage('details');
+        setCode('');
+        setError(null);
+        setMessage(null);
     };
 
     return (
         <div className="flex flex-col gap-6 sm:flex-row">
             {registration.qr_image && (
-                <img src={registration.qr_image} alt="Your ticket QR code" className="mx-auto h-40 w-40 shrink-0 border border-border p-2 sm:mx-0" />
+                <img
+                    src={registration.qr_image}
+                    alt="Your ticket QR code"
+                    className="mx-auto h-40 w-40 shrink-0 border border-border p-2 sm:mx-0"
+                />
             )}
             <div className="min-w-0 flex-1 text-left">
                 <h2 className="text-lg font-medium text-ink">{registration.full_name}</h2>
@@ -50,7 +103,9 @@ function TicketTab({ event, registration }) {
                         ['Entry code', registration.ticket_code],
                         ['Ticket', registration.ticket_type_name ?? 'General admission'],
                         ['Status', registration.status],
-                        ...(registration.seat_label ? [['Seat', `${registration.seat_label} · ${registration.room_name}`]] : []),
+                        ...(registration.seat_label
+                            ? [['Seat', `${registration.seat_label} · ${registration.room_name}`]]
+                            : []),
                     ].map(([k, v]) => (
                         <div key={k} className="flex justify-between border-b border-border pb-2">
                             <dt className="text-ink-secondary">{k}</dt>
@@ -60,7 +115,10 @@ function TicketTab({ event, registration }) {
                 </dl>
 
                 <div className="mt-4 flex gap-2">
-                    <button disabled className="inline-flex h-control items-center gap-1.5 border border-border px-4 text-sm text-ink-tertiary opacity-60">
+                    <button
+                        disabled
+                        className="inline-flex h-control items-center gap-1.5 border border-border px-4 text-sm text-ink-tertiary opacity-60"
+                    >
                         <Download className="h-4 w-4" strokeWidth={1.75} />
                         Add to wallet
                     </button>
@@ -75,14 +133,21 @@ function TicketTab({ event, registration }) {
                 </div>
 
                 {message && <p className="mt-3 text-[13px] text-ink-secondary">{message}</p>}
+                {error && <p className="mt-3 text-[13px] text-danger-fg">{error}</p>}
 
-                {transferring && (
-                    <form onSubmit={submitTransfer} className="mt-4 space-y-2.5 border border-border p-4">
-                        <p className="text-xs text-ink-secondary">Give this ticket to someone else. They'll get a fresh confirmation email.</p>
+                {transferring && stage === 'details' && (
+                    <form
+                        onSubmit={requestTransfer}
+                        className="mt-4 space-y-2.5 border border-border p-4"
+                    >
+                        <p className="text-xs text-ink-secondary">
+                            Give this ticket to someone else. We'll email a code to your address
+                            first, so nobody can move it without you.
+                        </p>
                         <input
                             value={form.full_name}
                             onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                            placeholder="Full name"
+                            placeholder="Their full name"
                             required
                             className="w-full border border-border bg-surface px-3 py-2 text-[13px] text-ink focus:border-accent focus:outline-none"
                         />
@@ -90,19 +155,70 @@ function TicketTab({ event, registration }) {
                             type="email"
                             value={form.email}
                             onChange={(e) => setForm({ ...form, email: e.target.value })}
-                            placeholder="Email"
+                            placeholder="Their email"
                             required
                             className="w-full border border-border bg-surface px-3 py-2 text-[13px] text-ink focus:border-accent focus:outline-none"
                         />
                         <input
                             value={form.phone}
                             onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                            placeholder="Phone (optional)"
+                            placeholder="Their phone (optional)"
                             className="w-full border border-border bg-surface px-3 py-2 text-[13px] text-ink focus:border-accent focus:outline-none"
                         />
-                        <button type="submit" disabled={saving} className="inline-flex h-control items-center bg-accent px-4 text-sm text-accent-ink">
-                            {saving ? 'Transferring…' : 'Confirm transfer'}
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="inline-flex h-control items-center bg-accent px-4 text-sm text-accent-ink"
+                            >
+                                {saving ? 'Sending code…' : 'Send me a code'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelTransfer}
+                                className="inline-flex h-control items-center border border-border px-4 text-sm text-ink"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {transferring && stage === 'code' && (
+                    <form
+                        onSubmit={confirmTransfer}
+                        className="mt-4 space-y-2.5 border border-border p-4"
+                    >
+                        <p className="text-xs text-ink-secondary">
+                            Enter the code we emailed you to hand this ticket to{' '}
+                            <span className="text-ink">{form.full_name}</span> ({form.email}). This
+                            cannot be undone.
+                        </p>
+                        <input
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                            placeholder="6-digit code"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            required
+                            className="w-full border border-border bg-surface px-3 py-2 font-mono text-[15px] tracking-[0.3em] text-ink focus:border-accent focus:outline-none"
+                        />
+                        <div className="flex gap-2">
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="inline-flex h-control items-center bg-accent px-4 text-sm text-accent-ink"
+                            >
+                                {saving ? 'Transferring…' : 'Complete transfer'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelTransfer}
+                                className="inline-flex h-control items-center border border-border px-4 text-sm text-ink"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </form>
                 )}
             </div>
@@ -122,7 +238,9 @@ function AgendaTab({ event, registration, agendaIds, setAgendaIds }) {
             session: session.id,
         });
         await csrfFetch(url, { method: inAgenda ? 'DELETE' : 'POST' });
-        setAgendaIds((prev) => (inAgenda ? prev.filter((id) => id !== session.id) : [...prev, session.id]));
+        setAgendaIds((prev) =>
+            inAgenda ? prev.filter((id) => id !== session.id) : [...prev, session.id]
+        );
     };
 
     return (
@@ -130,15 +248,23 @@ function AgendaTab({ event, registration, agendaIds, setAgendaIds }) {
             <ul className="mb-4 space-y-2">
                 {event.sessions.map((session) => {
                     const added = agendaIds.includes(session.id);
-                    const isFull = session.capacity !== null && session.signup_count >= session.capacity;
+                    const isFull =
+                        session.capacity !== null && session.signup_count >= session.capacity;
                     return (
-                        <li key={session.id} className="flex items-center gap-4 border border-border px-4 py-3">
-                            <span className="w-24 shrink-0 font-mono text-[12px] text-ink-secondary">{formatSessionTime(session.starts_at, session.ends_at)}</span>
+                        <li
+                            key={session.id}
+                            className="flex items-center gap-4 border border-border px-4 py-3"
+                        >
+                            <span className="w-24 shrink-0 font-mono text-[12px] text-ink-secondary">
+                                {formatSessionTime(session.starts_at, session.ends_at)}
+                            </span>
                             <div className="min-w-0 flex-1">
                                 <div className="text-[13.5px] text-ink">{session.title}</div>
                                 <div className="text-xs text-ink-secondary">
                                     {session.location}
-                                    {session.capacity && !added ? `${session.location ? ' · ' : ''}${Math.max(session.capacity - session.signup_count, 0)} seats left` : ''}
+                                    {session.capacity && !added
+                                        ? `${session.location ? ' · ' : ''}${Math.max(session.capacity - session.signup_count, 0)} seats left`
+                                        : ''}
                                 </div>
                             </div>
                             <button
@@ -146,7 +272,11 @@ function AgendaTab({ event, registration, agendaIds, setAgendaIds }) {
                                 disabled={!added && isFull}
                                 className={`flex shrink-0 items-center gap-1 border px-2.5 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${added ? 'border-accent text-accent' : 'border-border text-ink-secondary'}`}
                             >
-                                {added ? <Check className="h-3 w-3" strokeWidth={2} /> : <Plus className="h-3 w-3" strokeWidth={2} />}
+                                {added ? (
+                                    <Check className="h-3 w-3" strokeWidth={2} />
+                                ) : (
+                                    <Plus className="h-3 w-3" strokeWidth={2} />
+                                )}
                                 {added ? 'In my day' : isFull ? 'Full' : 'Add'}
                             </button>
                         </li>
@@ -154,7 +284,10 @@ function AgendaTab({ event, registration, agendaIds, setAgendaIds }) {
                 })}
             </ul>
             <a
-                href={route('public.events.agenda.ics', { event: event.slug, registration: registration.id })}
+                href={route('public.events.agenda.ics', {
+                    event: event.slug,
+                    registration: registration.id,
+                })}
                 className="inline-flex h-control items-center gap-1.5 border border-border px-3 text-xs text-ink-secondary hover:border-accent hover:text-accent"
             >
                 <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -175,7 +308,9 @@ const HELP_TYPES = [
 
 function HelpTab({ event, registration }) {
     const [type, setType] = useState('refreshment');
-    const [location, setLocation] = useState(registration.seat_label ? `${registration.seat_label}, ${registration.room_name}` : '');
+    const [location, setLocation] = useState(
+        registration.seat_label ? `${registration.seat_label}, ${registration.room_name}` : ''
+    );
     const [note, setNote] = useState('');
     const [saving, setSaving] = useState(false);
     const [sent, setSent] = useState(null);
@@ -183,10 +318,16 @@ function HelpTab({ event, registration }) {
     const submit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        const response = await csrfFetch(route('public.events.service-requests.store', { event: event.slug, registration: registration.id }), {
-            method: 'POST',
-            body: JSON.stringify({ type, location: location || null, note: note || null }),
-        });
+        const response = await csrfFetch(
+            route('public.events.service-requests.store', {
+                event: event.slug,
+                registration: registration.id,
+            }),
+            {
+                method: 'POST',
+                body: JSON.stringify({ type, location: location || null, note: note || null }),
+            }
+        );
         const json = await response.json();
         setSaving(false);
         setSent(json);
@@ -200,10 +341,17 @@ function HelpTab({ event, registration }) {
                     <b>Someone is coming</b>
                 </div>
                 <p className="mt-2 text-[13px] text-ink-secondary">
-                    Raised at {new Date(sent.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                    Raised at{' '}
+                    {new Date(sent.created_at).toLocaleTimeString(undefined, {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                    })}
                     {location ? ` for ${location}` : ''}. Usually under five minutes.
                 </p>
-                <button onClick={() => setSent(null)} className="mt-3 text-xs text-ink-secondary underline hover:text-accent">
+                <button
+                    onClick={() => setSent(null)}
+                    className="mt-3 text-xs text-ink-secondary underline hover:text-accent"
+                >
                     Raise another request
                 </button>
             </div>
@@ -215,7 +363,9 @@ function HelpTab({ event, registration }) {
             <p className="text-sm text-ink-secondary">Goes straight to the floor team.</p>
 
             <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink">What do you need</label>
+                <label className="mb-1.5 block text-sm font-medium text-ink">
+                    What do you need
+                </label>
                 <div className="flex flex-wrap gap-2">
                     {HELP_TYPES.map(([value, label]) => (
                         <button
@@ -251,7 +401,11 @@ function HelpTab({ event, registration }) {
                 />
             </div>
 
-            <button type="submit" disabled={saving} className="inline-flex h-control items-center bg-accent px-4 text-sm text-accent-ink">
+            <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex h-control items-center bg-accent px-4 text-sm text-accent-ink"
+            >
                 {saving ? 'Sending…' : 'Ask for help'}
             </button>
         </form>
@@ -260,7 +414,11 @@ function HelpTab({ event, registration }) {
 
 function DownloadsTab({ materials }) {
     if (materials.length === 0) {
-        return <p className="text-left text-sm text-ink-secondary">Materials released by the organizers will appear here.</p>;
+        return (
+            <p className="text-left text-sm text-ink-secondary">
+                Materials released by the organizers will appear here.
+            </p>
+        );
     }
 
     return (
@@ -268,19 +426,29 @@ function DownloadsTab({ materials }) {
             {materials.map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="flex min-w-0 items-center gap-2.5">
-                        <FileText className="h-4 w-4 shrink-0 text-ink-secondary" strokeWidth={1.5} />
+                        <FileText
+                            className="h-4 w-4 shrink-0 text-ink-secondary"
+                            strokeWidth={1.5}
+                        />
                         <div className="min-w-0">
                             <div className="truncate text-[13.5px] text-ink">{m.title}</div>
-                            <div className="text-xs text-ink-secondary">{m.remaining_attempts} of your attempts left</div>
+                            <div className="text-xs text-ink-secondary">
+                                {m.remaining_attempts} of your attempts left
+                            </div>
                         </div>
                     </div>
                     {m.remaining_attempts > 0 ? (
-                        <a href={m.download_url} className="flex shrink-0 items-center gap-1.5 border border-border px-3 py-1.5 text-xs text-ink hover:border-accent hover:text-accent">
+                        <a
+                            href={m.download_url}
+                            className="flex shrink-0 items-center gap-1.5 border border-border px-3 py-1.5 text-xs text-ink hover:border-accent hover:text-accent"
+                        >
                             <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
                             Download
                         </a>
                     ) : (
-                        <span className="shrink-0 text-xs text-ink-secondary">No attempts left</span>
+                        <span className="shrink-0 text-xs text-ink-secondary">
+                            No attempts left
+                        </span>
                     )}
                 </li>
             ))}
@@ -293,25 +461,30 @@ const STATUS_NOTICE = {
         icon: Clock,
         color: 'text-warning-fg',
         title: 'Payment pending',
-        description: (event) => `We're confirming your payment for ${event.name}. This page will show your ticket once it's confirmed — check your email shortly.`,
+        description: (event) =>
+            `We're confirming your payment for ${event.name}. This page will show your ticket once it's confirmed — check your email shortly.`,
     },
     pending_approval: {
         icon: Clock,
         color: 'text-warning-fg',
         title: 'Awaiting approval',
-        description: (event) => `The organizers of ${event.name} review registrations before confirming a spot. We'll email you as soon as yours is reviewed.`,
+        description: (event) =>
+            `The organizers of ${event.name} review registrations before confirming a spot. We'll email you as soon as yours is reviewed.`,
     },
     waitlisted: {
         icon: ListOrdered,
         color: 'text-warning-fg',
         title: "You're on the waitlist",
-        description: (event, registration) => `${event.name} is at capacity — you're number ${registration.waitlist_position} in line. We'll email you the moment a spot opens up.`,
+        description: (event, registration) =>
+            `${event.name} is at capacity — you're number ${registration.waitlist_position} in line. We'll email you the moment a spot opens up.`,
     },
     rejected: {
         icon: XCircle,
         color: 'text-danger-fg',
         title: 'Registration not approved',
-        description: (event, registration) => registration.approval_note || `The organizers of ${event.name} weren't able to confirm this registration.`,
+        description: (event, registration) =>
+            registration.approval_note ||
+            `The organizers of ${event.name} weren't able to confirm this registration.`,
     },
     cancelled: {
         icon: XCircle,
@@ -336,8 +509,13 @@ export default function Confirmation({ event, registration, materials = [] }) {
             <div className="mx-auto max-w-2xl px-6 py-16 sm:px-10">
                 {notice ? (
                     <div className="text-center">
-                        <notice.icon className={`mx-auto h-10 w-10 ${notice.color}`} strokeWidth={1.5} />
-                        <h1 className="mt-5 text-2xl font-normal tracking-tight text-ink">{notice.title}</h1>
+                        <notice.icon
+                            className={`mx-auto h-10 w-10 ${notice.color}`}
+                            strokeWidth={1.5}
+                        />
+                        <h1 className="mt-5 text-2xl font-normal tracking-tight text-ink">
+                            {notice.title}
+                        </h1>
                         <p className="mt-3 text-[13.5px] text-ink-secondary">
                             {notice.description(event, registration)}
                         </p>
@@ -345,9 +523,16 @@ export default function Confirmation({ event, registration, materials = [] }) {
                 ) : (
                     <>
                         <div className="text-center">
-                            <CheckCircle2 className="mx-auto h-10 w-10 text-accent" strokeWidth={1.5} />
-                            <h1 className="mt-5 text-2xl font-normal tracking-tight text-ink">You're confirmed, {registration.full_name}!</h1>
-                            <p className="mt-3 text-[13.5px] text-ink-secondary">Your ticket for {event.name} is ready. We've also emailed it to you.</p>
+                            <CheckCircle2
+                                className="mx-auto h-10 w-10 text-accent"
+                                strokeWidth={1.5}
+                            />
+                            <h1 className="mt-5 text-2xl font-normal tracking-tight text-ink">
+                                You're confirmed, {registration.full_name}!
+                            </h1>
+                            <p className="mt-3 text-[13.5px] text-ink-secondary">
+                                Your ticket for {event.name} is ready. We've also emailed it to you.
+                            </p>
                         </div>
 
                         <nav className="mt-9 mb-7 flex justify-center gap-1 border-b border-border">
@@ -362,8 +547,17 @@ export default function Confirmation({ event, registration, materials = [] }) {
                             ))}
                         </nav>
 
-                        {tab === 'ticket' && <TicketTab event={event} registration={registration} />}
-                        {tab === 'agenda' && <AgendaTab event={event} registration={registration} agendaIds={agendaIds} setAgendaIds={setAgendaIds} />}
+                        {tab === 'ticket' && (
+                            <TicketTab event={event} registration={registration} />
+                        )}
+                        {tab === 'agenda' && (
+                            <AgendaTab
+                                event={event}
+                                registration={registration}
+                                agendaIds={agendaIds}
+                                setAgendaIds={setAgendaIds}
+                            />
+                        )}
                         {tab === 'help' && <HelpTab event={event} registration={registration} />}
                         {tab === 'downloads' && <DownloadsTab materials={materials} />}
                     </>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Mail\Events\EventTicketTransferCode;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\EventSession;
@@ -52,12 +53,27 @@ test('an attendee can transfer their ticket to someone else, and a fresh confirm
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $response = $this->postJson("http://{$host}/e/{$event->slug}/registrations/{$registration->id}/transfer", [
+    // A transfer now takes two steps: requesting it only sends a code to the
+    // current holder, and the ticket moves once that code comes back. The
+    // one-step version let anyone with a forwarded link take the ticket.
+    $this->postJson("http://{$host}/e/{$event->slug}/registrations/{$registration->id}/transfer", [
         'full_name' => 'New Holder',
         'email' => 'new-holder@example.com',
-    ], ['HTTP_HOST' => $host]);
+    ], ['HTTP_HOST' => $host])->assertOk();
 
-    $response->assertOk();
+    expect($registration->fresh()->full_name)->toBe('Original Holder');
+
+    $code = null;
+    Mail::assertQueued(EventTicketTransferCode::class, function ($mail) use (&$code): bool {
+        $code = $mail->transfer->plainCode;
+
+        return true;
+    });
+
+    $this->postJson("http://{$host}/e/{$event->slug}/registrations/{$registration->id}/transfer/confirm", [
+        'code' => $code,
+    ], ['HTTP_HOST' => $host])->assertOk();
+
     expect($registration->fresh()->full_name)->toBe('New Holder');
     expect($registration->fresh()->email)->toBe('new-holder@example.com');
     Mail::assertQueued(EventRegistrationConfirmed::class, fn ($mail) => $mail->hasTo('new-holder@example.com'));

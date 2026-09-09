@@ -221,7 +221,8 @@ Route::get('/e/{event}/registrations/{registration}', [PublicEventController::cl
 Route::get('/e/{event}/registrations/{registration}/materials/{material}/download', [MaterialDownloadController::class, 'download'])->name('public.events.materials.download');
 Route::post('/e/{event}/registrations/{registration}/agenda/{session}', [AttendeePortalController::class, 'addToAgenda'])->name('public.events.agenda.add');
 Route::delete('/e/{event}/registrations/{registration}/agenda/{session}', [AttendeePortalController::class, 'removeFromAgenda'])->name('public.events.agenda.remove');
-Route::post('/e/{event}/registrations/{registration}/transfer', [AttendeePortalController::class, 'transfer'])->name('public.events.registrations.transfer');
+Route::post('/e/{event}/registrations/{registration}/transfer', [AttendeePortalController::class, 'transfer'])->middleware('throttle:public-registration')->name('public.events.registrations.transfer');
+Route::post('/e/{event}/registrations/{registration}/transfer/confirm', [AttendeePortalController::class, 'confirmTransfer'])->middleware('throttle:public-registration')->name('public.events.registrations.transfer.confirm');
 Route::post('/e/{event}/registrations/{registration}/service-requests', [PublicServiceRequestController::class, 'store'])->name('public.events.service-requests.store');
 Route::get('/e/{event}/schedule.ics', [ScheduleIcsController::class, 'programme'])->name('public.events.schedule.ics');
 Route::get('/e/{event}/registrations/{registration}/agenda.ics', [ScheduleIcsController::class, 'agenda'])->name('public.events.agenda.ics');
