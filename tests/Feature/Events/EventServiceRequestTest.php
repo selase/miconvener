@@ -30,7 +30,13 @@ function serviceRequestHost(): array
 
 test('an attendee can raise a service request from their ticket', function () {
     [$tenant] = serviceRequestHost();
-    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    // Service requests are only accepted while the event is running -- raising
+    // one weeks early would reach an empty room.
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(5),
+    ]);
     $registration = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
 
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
@@ -53,7 +59,13 @@ test('an attendee can raise a service request from their ticket', function () {
 
 test('a medical request is automatically raised at urgent priority', function () {
     [$tenant] = serviceRequestHost();
-    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    // Service requests are only accepted while the event is running -- raising
+    // one weeks early would reach an empty room.
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(5),
+    ]);
     $registration = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
 
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');

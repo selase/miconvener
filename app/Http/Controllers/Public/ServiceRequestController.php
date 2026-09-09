@@ -24,6 +24,17 @@ final class ServiceRequestController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        // Enforced here, not just hidden in the UI: a request raised weeks
+        // early reaches an empty room, and "Someone is on the way" would be a
+        // promise nobody is staffed to keep.
+        $eventIsRunning = $eventModel->starts_at?->isPast() && $eventModel->ends_at?->isFuture();
+
+        if (! $eventIsRunning && $registrationModel->checked_in_at === null) {
+            return response()->json([
+                'message' => 'Requests open when the event starts. Contact the organizer if you need something before then.',
+            ], 422);
+        }
+
         $validated = $request->validate([
             'type' => ['required', Rule::in(EventServiceRequest::TYPES)],
             'location' => ['nullable', 'string', 'max:255'],

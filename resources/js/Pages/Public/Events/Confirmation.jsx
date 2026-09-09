@@ -494,15 +494,22 @@ const STATUS_NOTICE = {
     },
 };
 
-export default function Confirmation({ event, registration, materials = [] }) {
+export default function Confirmation({
+    event,
+    registration,
+    materials = [],
+    canRequestHelp = false,
+}) {
     const notice = STATUS_NOTICE[registration.status];
     const [tab, setTab] = useState('ticket');
     const [agendaIds, setAgendaIds] = useState(registration.agenda_session_ids ?? []);
 
     const tabs = [['ticket', 'My ticket']];
     if (event.sessions.length > 0) tabs.push(['agenda', 'My day']);
-    tabs.push(['help', 'Get help']);
-    tabs.push(['downloads', 'Downloads']);
+    // Only offer what can actually be acted on: help while the event is
+    // running, downloads once something has been released.
+    if (canRequestHelp) tabs.push(['help', 'Get help']);
+    if (materials.length > 0) tabs.push(['downloads', 'Downloads']);
 
     return (
         <PublicLayout>

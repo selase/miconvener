@@ -214,8 +214,16 @@ final class PublicEventController extends Controller
                 'approval_note' => $registrationModel->approval_note,
                 'seat_label' => $registrationModel->seatAssignment?->seat_label,
                 'room_name' => $registrationModel->seatAssignment?->room?->name,
+                'checked_in' => $registrationModel->checked_in_at !== null,
             ],
             'materials' => $materials,
+            // Asking for water three weeks early reaches nobody: a service
+            // request is only answerable while there are staff in the room. The
+            // window opens when the event does, or as soon as the attendee is
+            // scanned in -- whichever happens first, since people arrive before
+            // the published start.
+            'canRequestHelp' => $registrationModel->checked_in_at !== null
+                || ($eventModel->starts_at?->isPast() && $eventModel->ends_at?->isFuture()),
         ]);
     }
 
