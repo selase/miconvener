@@ -555,7 +555,9 @@ export default function Confirmation({
                             )}
                         </div>
 
-                        <nav className="mt-9 mb-7 flex justify-center gap-1 border-b border-border">
+                        <nav
+                            className={`mt-9 mb-7 flex justify-center gap-1 ${tabs.length > 0 ? 'border-b border-border' : ''}`}
+                        >
                             {tabs.map(([key, label]) => (
                                 <button
                                     key={key}
@@ -567,7 +569,7 @@ export default function Confirmation({
                             ))}
                         </nav>
 
-                        {tab === 'ticket' && (
+                        {verified && tab === 'ticket' && (
                             <TicketTab event={event} registration={registration} />
                         )}
                         {tab === 'agenda' && (

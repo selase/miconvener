@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
-import { Globe, User, Download, Trophy } from 'lucide-react';
+import { Globe, Lock, User, Download, Trophy } from 'lucide-react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import CoverBars from '@/Components/Console/CoverBars';
 import Input from '@/Components/Console/Input';
@@ -725,7 +725,7 @@ function FindMyTicket({ event }) {
     );
 }
 
-export default function Show({ event, org }) {
+export default function Show({ event, org, isPrivate = false }) {
     const workshops = useMemo(
         () => event.sessions.filter((s) => s.type === 'workshop'),
         [event.sessions]
@@ -758,15 +758,30 @@ export default function Show({ event, org }) {
             )}
 
             <div className="mx-auto max-w-[1100px] px-6 pt-8 sm:px-10">
-                <span className="inline-flex items-center gap-1.5 border border-accent px-2 py-0.5 text-[11.5px] text-accent">
-                    <Globe className="h-3 w-3" strokeWidth={1.75} />
-                    Open to anyone
-                </span>
+                {/* The badge was hardcoded open, which on a private event told a
+                    visitor the opposite of the truth. */}
+                {isPrivate ? (
+                    <span className="inline-flex items-center gap-1.5 border border-border px-2 py-0.5 text-[11.5px] text-ink-secondary">
+                        <Lock className="h-3 w-3" strokeWidth={1.75} />
+                        Private event
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center gap-1.5 border border-accent px-2 py-0.5 text-[11.5px] text-accent">
+                        <Globe className="h-3 w-3" strokeWidth={1.75} />
+                        Open to anyone
+                    </span>
+                )}
 
                 <h1 className="mt-4 text-[clamp(32px,6vw,64px)] font-normal leading-[0.98] tracking-tighter text-ink">
                     {event.name}
                 </h1>
                 <p className="mt-3.5 text-[13.5px] text-ink-secondary">Hosted by {org.name}</p>
+                {isPrivate && (
+                    <p className="mt-2 max-w-xl text-[13px] text-ink-secondary">
+                        The speakers, programme and materials for this event are shown to registered
+                        guests only.
+                    </p>
+                )}
 
                 <div className="mt-8 grid grid-cols-2 border-t border-border sm:grid-cols-4">
                     <div className="border-r border-border py-4 pr-5">
