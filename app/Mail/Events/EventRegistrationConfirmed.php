@@ -33,6 +33,11 @@ final class EventRegistrationConfirmed extends Mailable
             with: [
                 'event' => $this->registration->event,
                 'registration' => $this->registration,
+                // A raster QR embedded as an inline attachment, because Gmail
+                // strips SVG and Outlook cannot render it -- an SVG data URI
+                // reaches the attendee as a broken image. The SVG stays as the
+                // fallback for hosts with no raster backend.
+                'qrPng' => QrCodeGenerator::png($this->registration->qr_token),
                 'qrImage' => QrCodeGenerator::svgDataUri($this->registration->qr_token),
                 'portalUrl' => route('public.events.confirmation', [
                     'subdomain' => $this->registration->tenant->slug,
