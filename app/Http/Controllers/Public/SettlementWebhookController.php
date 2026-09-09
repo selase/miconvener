@@ -160,6 +160,9 @@ final class SettlementWebhookController extends Controller
         $eventModel = $registration->event;
         $commissionAmount = (int) round($amount * $eventModel->effectivePlatformFeePercentage() / 100);
 
+        // Payment stands in for email verification: the checkout link was sent
+        // to this address and the gateway receipts it there too.
+        $registration->email_verified_at ??= now();
         $registration->issueTicket();
         $registration->fill([
             'status' => EventRegistration::STATUS_CONFIRMED,

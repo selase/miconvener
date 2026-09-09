@@ -504,12 +504,15 @@ export default function Confirmation({
     const [tab, setTab] = useState('ticket');
     const [agendaIds, setAgendaIds] = useState(registration.agenda_session_ids ?? []);
 
-    const tabs = [['ticket', 'My ticket']];
-    if (event.sessions.length > 0) tabs.push(['agenda', 'My day']);
+    // Nothing on these tabs is usable until the ticket exists, and it does not
+    // exist until the address behind a free registration has been confirmed.
+    const verified = registration.email_verified !== false;
+    const tabs = verified ? [['ticket', 'My ticket']] : [];
+    if (verified && event.sessions.length > 0) tabs.push(['agenda', 'My day']);
     // Only offer what can actually be acted on: help while the event is
     // running, downloads once something has been released.
-    if (canRequestHelp) tabs.push(['help', 'Get help']);
-    if (materials.length > 0) tabs.push(['downloads', 'Downloads']);
+    if (verified && canRequestHelp) tabs.push(['help', 'Get help']);
+    if (verified && materials.length > 0) tabs.push(['downloads', 'Downloads']);
 
     return (
         <PublicLayout>
@@ -535,11 +538,21 @@ export default function Confirmation({
                                 strokeWidth={1.5}
                             />
                             <h1 className="mt-5 text-2xl font-normal tracking-tight text-ink">
-                                You're confirmed, {registration.full_name}!
+                                {verified
+                                    ? `You're confirmed, ${registration.full_name}!`
+                                    : `Almost there, ${registration.full_name}`}
                             </h1>
                             <p className="mt-3 text-[13.5px] text-ink-secondary">
-                                Your ticket for {event.name} is ready. We've also emailed it to you.
+                                {verified
+                                    ? `Your ticket for ${event.name} is ready. We've also emailed it to you.`
+                                    : `We've emailed ${registration.email}. Confirm your address there and your ticket is issued straight away.`}
                             </p>
+                            {!verified && (
+                                <p className="mt-5 border border-border bg-surface px-5 py-4 text-[13px] text-ink-secondary">
+                                    Can't find it? Check your spam folder, or register again with
+                                    the same address and we'll send the link once more.
+                                </p>
+                            )}
                         </div>
 
                         <nav className="mt-9 mb-7 flex justify-center gap-1 border-b border-border">

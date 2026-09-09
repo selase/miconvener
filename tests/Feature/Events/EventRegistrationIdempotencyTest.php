@@ -6,6 +6,7 @@ namespace Tests\Feature\Events;
 
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationPaymentInvite;
+use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
@@ -56,7 +57,9 @@ test('submitting the public registration form twice for the same email does not 
     $second->assertSessionHas('success');
     expect($second->headers->get('Location'))->not->toContain((string) $registration->id);
 
-    Mail::assertQueued(EventRegistrationConfirmed::class, 2);
+    // Both submissions send the verification mail -- the second is the
+    // "we already have you, here is your link again" resend.
+    Mail::assertQueued(EventRegistrationVerifyEmail::class, 2);
 });
 
 test('resubmitting for a pending-payment registration re-sends the payment invite instead of exposing the checkout link', function () {

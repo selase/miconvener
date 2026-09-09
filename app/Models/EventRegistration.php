@@ -46,6 +46,7 @@ final class EventRegistration extends Model
         'ticket_type_id',
         'full_name',
         'email',
+        'email_verified_at',
         'phone',
         'dietary_requirements',
         'accessibility_needs',
@@ -67,6 +68,7 @@ final class EventRegistration extends Model
         'platform_fee_amount' => 'integer',
         'waitlist_position' => 'integer',
         'checked_in_at' => 'datetime',
+        'email_verified_at' => 'datetime',
     ];
 
     protected $hidden = [
@@ -151,6 +153,16 @@ final class EventRegistration extends Model
     public function scopeWaitlisted(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_WAITLISTED);
+    }
+
+    /**
+     * A paid ticket is verified by the payment itself -- the holder received a
+     * checkout link and a receipt at that address. A free one has nothing
+     * standing behind it but the click on a verification email.
+     */
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
     }
 
     public function issueTicket(): void

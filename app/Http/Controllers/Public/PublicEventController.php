@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationPendingApproval;
+use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Mail\Events\EventRegistrationWaitlisted;
 use App\Models\Event;
 use App\Models\EventMaterial;
@@ -138,11 +139,14 @@ final class PublicEventController extends Controller
         ]);
 
         if ($status === EventRegistration::STATUS_CONFIRMED) {
-            $registration->issueTicket();
-            $registration->save();
             app(FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-            Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
+
+            // A free registration costs nothing and proves nothing: anyone can
+            // type any address and be handed a valid ticket at it. The ticket is
+            // withheld until the address is confirmed. A paid registration needs
+            // no such step -- the payment itself was made against this address.
+            Mail::to($registration->email)->queue(new EventRegistrationVerifyEmail($registration));
         } elseif ($status === EventRegistration::STATUS_WAITLISTED) {
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationWaitlisted($registration));
@@ -164,6 +168,51 @@ final class PublicEventController extends Controller
             'event' => $eventModel->slug,
             'registration' => $registration->id,
         ]);
+    }
+
+    /**
+     * Confirms the address a free registration was made with, and only then
+     * issues the ticket. Reached from a signed link, so the URL cannot be forged
+     * and expires without anything needing to be stored or cleaned up.
+     */
+    public function verify(string $subdomain, string $event, string $registration): RedirectResponse
+    {
+        $tenant = $this->getTenant();
+
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('event_id', $eventModel->id)
+            ->where('id', $registration)
+            ->firstOrFail();
+
+        $portal = [
+            'subdomain' => $tenant->slug,
+            'event' => $eventModel->slug,
+            'registration' => $registrationModel->id,
+        ];
+
+        // Clicking twice -- a mail client prefetching, a forwarded link -- must
+        // not issue a second ticket or send a second email.
+        if ($registrationModel->hasVerifiedEmail()) {
+            return redirect()->route('public.events.confirmation', $portal);
+        }
+
+        $registrationModel->email_verified_at = now();
+
+        if ($registrationModel->isConfirmed() && ! $registrationModel->ticket_code) {
+            $registrationModel->issueTicket();
+        }
+
+        $registrationModel->save();
+
+        if ($registrationModel->isConfirmed()) {
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
+        }
+
+        return redirect()->route('public.events.confirmation', $portal)
+            ->with('success', 'Email confirmed. Your ticket is on its way.');
     }
 
     public function confirmation(string $subdomain, string $event, string $registration): Response
@@ -217,6 +266,7 @@ final class PublicEventController extends Controller
                 'seat_label' => $registrationModel->seatAssignment?->seat_label,
                 'room_name' => $registrationModel->seatAssignment?->room?->name,
                 'checked_in' => $registrationModel->checked_in_at !== null,
+                'email_verified' => $registrationModel->hasVerifiedEmail(),
             ],
             'materials' => $materials,
             // Asking for water three weeks early reaches nobody: a service
@@ -265,6 +315,17 @@ final class PublicEventController extends Controller
      */
     private function resendRegistrationLink(Tenant $tenant, EventRegistration $registration): void
     {
+        // Someone registering a second time has usually lost the first email.
+        // If they never confirmed their address there is no ticket to resend --
+        // sending "here is your ticket" with nothing in it would be worse than
+        // useless, so they get the verification link again.
+        if ($registration->isConfirmed() && ! $registration->hasVerifiedEmail() && ! $registration->ticket_code) {
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            Mail::to($registration->email)->queue(new EventRegistrationVerifyEmail($registration));
+
+            return;
+        }
+
         $mailable = match ($registration->status) {
             EventRegistration::STATUS_PENDING_PAYMENT => new EventRegistrationPaymentInvite($registration, 'approved'),
             EventRegistration::STATUS_PENDING_APPROVAL => new EventRegistrationPendingApproval($registration),

@@ -219,6 +219,7 @@ Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.e
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
 Route::post('/e/{event}/find-ticket', [App\Http\Controllers\Public\TicketRecoveryController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.find-ticket');
+Route::get('/e/{event}/registrations/{registration}/verify', [PublicEventController::class, 'verify'])->middleware('signed')->name('public.events.registrations.verify');
 Route::get('/e/{event}/registrations/{registration}', [PublicEventController::class, 'confirmation'])->name('public.events.confirmation');
 Route::get('/e/{event}/registrations/{registration}/materials/{material}/download', [MaterialDownloadController::class, 'download'])->name('public.events.materials.download');
 Route::post('/e/{event}/registrations/{registration}/agenda/{session}', [AttendeePortalController::class, 'addToAgenda'])->name('public.events.agenda.add');

@@ -266,6 +266,9 @@ final class EventRegistrationController extends Controller
     {
         if ($registration->amount === 0) {
             $registration->update(['status' => EventRegistration::STATUS_CONFIRMED, 'waitlist_position' => null]);
+            // Added or approved by the organizer, who is vouching for the
+            // guest -- there is nothing for the guest to confirm.
+            $registration->email_verified_at ??= now();
             $registration->issueTicket();
             $registration->save();
             Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));

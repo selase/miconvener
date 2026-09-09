@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\EventSeatAssignment;
@@ -60,7 +61,7 @@ test('host can create an event', function () {
     expect(Event::where('tenant_id', $tenant->id)->where('name', 'Annual Conference')->exists())->toBeTrue();
 });
 
-test('public free registration confirms instantly and emails a ticket', function () {
+test('public free registration is confirmed but withholds the ticket until the email is confirmed', function () {
     Mail::fake();
 
     [$tenant] = eventHost('acme');
@@ -78,7 +79,11 @@ test('public free registration confirms instantly and emails a ticket', function
 
     expect($registration)->not->toBeNull();
     expect($registration->status)->toBe(EventRegistration::STATUS_CONFIRMED);
-    expect($registration->ticket_code)->not->toBeNull();
+
+    // A free registration proves nothing about the address it was made with, so
+    // the ticket waits for that address to be confirmed.
+    expect($registration->ticket_code)->toBeNull();
+    expect($registration->email_verified_at)->toBeNull();
 
     $response->assertRedirect(route('public.events.confirmation', [
         'subdomain' => $tenant->slug,
@@ -86,7 +91,8 @@ test('public free registration confirms instantly and emails a ticket', function
         'registration' => $registration->id,
     ]));
 
-    Mail::assertQueued(EventRegistrationConfirmed::class);
+    Mail::assertQueued(EventRegistrationVerifyEmail::class);
+    Mail::assertNotQueued(EventRegistrationConfirmed::class);
 });
 
 test('a registrant can optionally record dietary requirements and accessibility needs', function () {
