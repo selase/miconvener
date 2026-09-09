@@ -133,7 +133,16 @@ final class EventController extends Controller
         }
 
         if ($request->hasFile('hero_image')) {
-            $validated['hero_image_path'] = Helper::processUploadedFile($request, 'hero_image', 'event_hero', 'events/hero', config('app.env') === 'production' ? 's3' : 'public');
+            $previousHeroImage = $eventModel->hero_image_path;
+
+            $validated['hero_image_path'] = Helper::processUploadedFile($request, 'hero_image', 'event_hero', 'events/hero', Event::uploadDisk());
+
+            // Replacing the image used to leave the old one on the disk forever,
+            // so an organizer iterating on artwork quietly accumulated files
+            // nothing referenced.
+            if ($previousHeroImage) {
+                Helper::deleteFile($previousHeroImage, Event::uploadDisk());
+            }
         }
 
         $eventModel->update($validated);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Libraries\Helper;
 use App\Traits\BelongsToTenant;
 use App\Traits\SpatieActivityLogs;
 use Illuminate\Database\Eloquent\Builder;
@@ -64,6 +65,15 @@ final class Event extends Model
         'ticket_price' => 'integer',
         'platform_fee_percentage' => 'float',
     ];
+
+    /**
+     * The disk event uploads live on, matching the convention used at every
+     * upload site.
+     */
+    public static function uploadDisk(): string
+    {
+        return config('app.env') === 'production' ? 's3' : 'public';
+    }
 
     public function tenant(): BelongsTo
     {
@@ -193,5 +203,27 @@ final class Event extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_PUBLISHED);
+    }
+
+    protected static function booted(): void
+    {
+        // event_materials cascades at the database level, so the rows that point
+        // at these files disappear the instant the event does -- taking with them
+        // the only record of what to delete. The files have to go first, and this
+        // lives on the model rather than the controller so every deletion path is
+        // covered, not just the one the UI happens to use.
+        self::deleting(function (self $event): void {
+            $disk = self::uploadDisk();
+
+            foreach ($event->materials()->pluck('file_path') as $path) {
+                if ($path) {
+                    Helper::deleteFile($path, $disk);
+                }
+            }
+
+            if ($event->hero_image_path) {
+                Helper::deleteFile($event->hero_image_path, $disk);
+            }
+        });
     }
 }

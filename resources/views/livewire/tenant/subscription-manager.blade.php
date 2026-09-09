@@ -309,6 +309,22 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- Consequences measured against this tenant's real data, not
+                             a generic list. Only rendered when something actually bites. --}}
+                        @if(count($this->pendingChangeWarnings) > 0)
+                            <div class="notice d-flex bg-light-danger rounded border-danger border border-dashed p-5 mb-2">
+                                <i class="fas fa-triangle-exclamation text-danger me-3 fs-4 mt-1"></i>
+                                <div>
+                                    <span class="fw-boldest text-dark d-block mb-2">This affects work already in progress:</span>
+                                    <ul class="text-gray-700 fw-bold fs-7 mb-0 ps-3">
+                                        @foreach($this->pendingChangeWarnings as $warning)
+                                            <li class="mb-1">{{ $warning }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                     <div class="modal-footer border-0 pt-0">
                         <button wire:click="dismissConfirmation" class="btn btn-light fw-boldest">
