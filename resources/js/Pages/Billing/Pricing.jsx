@@ -5,7 +5,7 @@ import PageHeader from '@/Components/Console/PageHeader';
 import SegmentedControl from '@/Components/Console/SegmentedControl';
 import Button from '@/Components/Console/Button';
 
-export default function Pricing({ packages, currentPackageSlug }) {
+export default function Pricing({ packages, currentPackageSlug, currency = 'GHS' }) {
     const [interval, setInterval] = useState('month');
 
     const choose = (pkg) => {
@@ -35,7 +35,7 @@ export default function Pricing({ packages, currentPackageSlug }) {
                             <div key={pkg.id} className="flex flex-col rounded-lg border border-border p-6">
                                 <h3 className="text-lg font-bold text-ink">{pkg.name}</h3>
                                 <div className="num mt-2 text-3xl font-extrabold text-ink">
-                                    {pkg.is_free ? 'Free' : `$${price.toFixed(2)}`}
+                                    {pkg.is_free ? 'Free' : `${currency} ${price.toFixed(2)}`}
                                     {!pkg.is_free && <span className="text-sm font-medium text-ink-secondary">/{interval}</span>}
                                 </div>
 

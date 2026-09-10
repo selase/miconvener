@@ -28,11 +28,11 @@
             </div>
             <div class="text-right flex-none">
                 @if ($interval === 'year')
-                    <div class="brand-font text-[22px] font-bold text-slate-900">${{ $package->yearly_price }}</div>
+                    <div class="brand-font text-[22px] font-bold text-slate-900">{{ config('services.paystack.currency', 'GHS') }} {{ number_format((float) $package->yearly_price, 2) }}</div>
                     <div class="text-[11px] text-slate-400">per year</div>
                     <div class="text-[11px] text-emerald-600 font-semibold mt-0.5">Save 17%</div>
                 @else
-                    <div class="brand-font text-[22px] font-bold text-slate-900">${{ $package->price }}</div>
+                    <div class="brand-font text-[22px] font-bold text-slate-900">{{ config('services.paystack.currency', 'GHS') }} {{ number_format((float) $package->price, 2) }}</div>
                     <div class="text-[11px] text-slate-400">per month</div>
                 @endif
             </div>

@@ -81,8 +81,16 @@ final class RegisteredUserController extends Controller
         // Provision tenant database and run migrations
         $this->provisioner->provision($tenant);
 
-        // Attach user to tenant
+        // Attach user to tenant and set primary tenant
+        $user->tenant_id = $tenant->id;
+        $user->save();
         $user->tenants()->attach($tenant->id);
+
+        $orgSuperadminRole = \App\Models\Role::where('name', 'Org Superadmin')->whereNull('tenant_id')->first();
+        if ($orgSuperadminRole) {
+            setPermissionsTeamId($tenant->id);
+            $user->assignRole($orgSuperadminRole);
+        }
 
         // Login and set active tenant in session
         Auth::login($user);

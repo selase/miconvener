@@ -35,7 +35,7 @@ final class BillingController extends Controller
                 'currency' => $transaction->currency,
                 'status' => $transaction->status,
                 'created_at' => $transaction->created_at->format('Y-m-d'),
-                'can_refund' => in_array($transaction->status, ['success', 'succeeded'], true),
+                'can_refund' => false,
             ]);
 
         $invoices = Invoice::where('tenant_id', $tenant->id)
@@ -82,6 +82,7 @@ final class BillingController extends Controller
             ] : null,
             'accruedMetered' => number_format($this->calculateAccruedMetered($tenant), 2),
             'monthlyStats' => $monthlyStats,
+            'currency' => (string) config('services.paystack.currency', 'GHS'),
         ]);
     }
 
@@ -101,6 +102,7 @@ final class BillingController extends Controller
                 'features' => $package->features->pluck('name'),
             ]),
             'currentPackageSlug' => $tenant->package?->slug,
+            'currency' => (string) config('services.paystack.currency', 'GHS'),
         ]);
     }
 

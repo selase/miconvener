@@ -14,6 +14,8 @@ beforeEach(function () {
         Position::make(['countryName' => 'Testland'])
     );
 
+    $this->seed(Database\Seeders\RoleSeeder::class);
+    $this->seed(Database\Seeders\PermissionsSeeder::class);
     $this->seed(EventPackageSeeder::class);
 });
 
@@ -142,6 +144,11 @@ test('registration creates a tenant for the new user', function () {
     // provision one Postgres database per tenant for tables the product does not
     // use, against the hosting provider's per-cluster database limit.
     expect($tenant->isolation_mode)->toBe('shared');
+    expect($user->tenant_id)->toBe($tenant->id);
+
+    setPermissionsTeamId($tenant->id);
+    expect($user->hasRole('Org Superadmin'))->toBeTrue();
+    expect($user->can('manage organization settings'))->toBeTrue();
 });
 
 test('registration requires all fields', function () {

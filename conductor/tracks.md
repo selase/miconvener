@@ -203,6 +203,14 @@ payout accounts verified by name-enquiry before use, and the payout send → tra
 `payouts:reconcile` (scheduled every 15 minutes) chases payouts whose transfer webhook never
 arrived, so a lost webhook cannot strand money that has already left the platform.
 
+## [x] Track: Tenant Owner Role Assignment, Currency Localization & Subscription Refund Policy
+
+- **Owner Permissions & Role Assignment on Signup**: Fixed `App\Http\Controllers\Auth\RegisteredUserController` so that newly registered tenant owners are automatically assigned their `tenant_id` and the `Org Superadmin` role scoped to their tenant via `setPermissionsTeamId($tenant->id)`. This prevents 403 Forbidden ("This action is unauthorized") errors when accessing Settings, Team, Roles, and Events console screens after subscribing.
+- **Production User State Repair**: Repaired `s.kwawu@yahoo.co.uk` on production (`ugmc` tenant `01a08c68-77d5-70ba-b69b-abcdf2c0023d`), assigning `Org Superadmin` in `model_has_roles` and resetting Spatie permission cache. Verified all 19 permissions active on production.
+- **Currency Localization**: Updated subscription checkout (`resources/views/billing/confirm-subscription.blade.php`), `Billing/Index.jsx`, and `Billing/Pricing.jsx` to dynamically use the configured payment currency (`GHS`) instead of hardcoded `$`.
+- **Subscription Refund Policy**: Disabled subscription refunds in `RefundController::store` with a 403 response, set `can_refund => false` in `BillingController::index`, and removed the refund action button and confirmation modal from `Billing/Index.jsx`.
+- **Verification**: Verified with 96 passing Pest tests (`tests/Feature/Billing/` and `tests/Feature/Auth/RegistrationTest.php`) and clean asset build via Vite.
+
 ## [ ] Track: Commerce gaps vs. `miconvener.md` §5
 
 Not started, and each is called for by the brief: promo codes, discounts and complimentary

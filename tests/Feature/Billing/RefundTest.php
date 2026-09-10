@@ -2,21 +2,16 @@
 
 declare(strict_types=1);
 
-use App\Contracts\PaymentGateway;
 use App\Models\Transaction;
 use App\Models\User;
 
 use function Pest\Laravel\actingAs;
-use function Pest\Laravel\mock;
 
 uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-test('admins can initiate a refund for a successful transaction', function () {
+test('refunds are disabled for subscription transactions', function () {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user);
-
-    // Assume user has permission (if using permissions, otherwise check role)
-    // For now, assuming any auth user in this test context is admin/owner
 
     $transaction = Transaction::factory()->create([
         'tenant_id' => $tenant->id,
@@ -25,45 +20,14 @@ test('admins can initiate a refund for a successful transaction', function () {
         'provider_transaction_id' => 'ch_test_123',
     ]);
 
-    // Mock Gateway
-    $gateway = mock(PaymentGateway::class);
-    $gateway->shouldReceive('refund')
-        ->with('ch_test_123')
-        ->once()
-        ->andReturn('re_test_refund_id');
-
-    // Bind mock
-    $this->app->instance(PaymentGateway::class, $gateway);
-
-    // Act
     $response = actingAs($user)
         ->post(route('billing.refund', ['transaction' => $transaction, 'subdomain' => $tenant->slug]));
 
-    // Assert
-    $response->assertRedirect();
-    $response->assertSessionHas('success', 'Refund initiated successfully.');
-
-    expect($transaction->refresh()->status)->toBe('refunded');
+    $response->assertStatus(403);
+    expect($transaction->refresh()->status)->toBe('success');
 });
 
-test('refunds cannot be initiated for failed transactions', function () {
-    $user = User::factory()->create();
-    $tenant = setActiveTenantForTest($user);
-
-    $transaction = Transaction::factory()->create([
-        'tenant_id' => $tenant->id,
-        'status' => 'failed',
-    ]);
-
-    // Act
-    $response = actingAs($user)
-        ->post(route('billing.refund', ['transaction' => $transaction, 'subdomain' => $tenant->slug]));
-
-    // Assert
-    $response->assertStatus(403); // Or 422
-});
-
-test('refund button is visible for success transactions', function () {
+test('refund button is disabled and can_refund is false on billing page', function () {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user);
 
@@ -77,6 +41,7 @@ test('refund button is visible for success transactions', function () {
 
     $response->assertInertia(fn ($page) => $page
         ->component('Billing/Index')
-        ->where('transactions.data.0.can_refund', true)
+        ->where('transactions.data.0.can_refund', false)
+        ->has('currency')
     );
 });
