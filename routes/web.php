@@ -213,4 +213,7 @@ Route::get('/billing/callback', App\Http\Controllers\Billing\CallbackController:
     ->middleware(['auth']) // Maybe? Or guest if flow allows? Usually auth if we redirect to dashboard.
     ->name('billing.callback');
 
+Route::get('/media/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*')->name('media.show');
+Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*');
+
 require __DIR__.'/auth.php';

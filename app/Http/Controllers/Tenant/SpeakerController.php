@@ -96,7 +96,7 @@ final class SpeakerController extends Controller
             'title' => $speaker->title,
             'organization' => $speaker->organization,
             'bio' => $speaker->bio,
-            'photo_url' => $speaker->photo_path ? asset('storage/'.$speaker->photo_path) : null,
+            'photo_url' => Helper::storageUrl($speaker->photo_path),
         ];
     }
 

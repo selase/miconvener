@@ -167,7 +167,7 @@ final class EventSponsorController extends Controller
             'contact_email' => $sponsor->contact_email,
             'amount' => $sponsor->amount,
             'currency' => $sponsor->currency,
-            'logo_url' => $sponsor->logo_path ? asset('storage/'.$sponsor->logo_path) : null,
+            'logo_url' => Helper::storageUrl($sponsor->logo_path),
             'deliverables' => $sponsor->deliverables->map(fn (EventSponsorDeliverable $d): array => [
                 'id' => $d->id,
                 'description' => $d->description,

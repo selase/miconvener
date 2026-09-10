@@ -102,6 +102,11 @@ final class Event extends Model
         return config('app.env') === 'production' ? 's3' : 'public';
     }
 
+    public function heroImageUrl(): ?string
+    {
+        return Helper::storageUrl($this->hero_image_path);
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

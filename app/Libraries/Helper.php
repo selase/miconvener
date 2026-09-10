@@ -105,6 +105,27 @@ final class Helper
         Storage::disk($disk)->delete($file_path);
     }
 
+    /**
+     * Resolve the public URL for an uploaded storage file.
+     */
+    public static function storageUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        $cleanPath = mb_ltrim($path, '/');
+        if (str_starts_with($cleanPath, 'storage/')) {
+            $cleanPath = mb_substr($cleanPath, 8);
+        }
+
+        return url('media/'.$cleanPath);
+    }
+
     public static function getReadableDate(DateTimeInterface|WeekDay|Month|string|int|float|null $date): string
     {
         return Date::parse($date)->diffForHumans();
@@ -191,9 +212,7 @@ final class Helper
         // file -- it simply stops being displayed -- so upgrading restores it
         // rather than asking them to upload it again.
         if ($tenant && $tenant->logo && $tenant->canUseOwnLogo()) {
-            $disk = config('app.env') === 'production' ? 's3' : 'public';
-
-            return Storage::disk($disk)->url($tenant->logo);
+            return self::storageUrl($tenant->logo) ?? asset('assets/img/brand/mark-512.png');
         }
 
         // No tenant logo uploaded: fall back to the platform's own mark rather

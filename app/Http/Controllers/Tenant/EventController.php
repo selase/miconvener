@@ -365,7 +365,7 @@ final class EventController extends Controller
             'requires_approval' => $event->requires_approval,
             'ticket_price' => $event->ticket_price,
             'currency' => $event->currency,
-            'hero_image_url' => $event->hero_image_path ? asset('storage/'.$event->hero_image_path) : null,
+            'hero_image_url' => Helper::storageUrl($event->hero_image_path),
             'plan_your_visit_content' => $event->plan_your_visit_content,
             'is_free' => $event->isFree(),
             'registrations_count' => $event->registrations_count ?? $event->registrations()->confirmed()->count(),
@@ -400,7 +400,7 @@ final class EventController extends Controller
                 'title' => $s->title,
                 'organization' => $s->organization,
                 'bio' => $s->bio,
-                'photo_url' => $s->photo_path ? asset('storage/'.$s->photo_path) : null,
+                'photo_url' => Helper::storageUrl($s->photo_path),
                 'role' => $s->pivot->role,
             ])->values() : [],
             'materials' => $event->relationLoaded('materials') ? $event->materials->map(fn ($m): array => [

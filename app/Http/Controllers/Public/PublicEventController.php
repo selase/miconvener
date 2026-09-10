@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Libraries\Helper;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationPendingApproval;
@@ -387,7 +388,7 @@ final class PublicEventController extends Controller
             'ticket_price' => $event->ticket_price,
             'currency' => $event->currency,
             'is_free' => $event->isFree(),
-            'hero_image_url' => $event->hero_image_path ? asset('storage/'.$event->hero_image_path) : null,
+            'hero_image_url' => Helper::storageUrl($event->hero_image_path),
             'plan_your_visit_content' => $event->plan_your_visit_content,
             'ticket_types' => $event->ticketTypes()->active()->get()->map(fn (EventTicketType $t): array => [
                 'id' => $t->id,
@@ -416,13 +417,13 @@ final class PublicEventController extends Controller
                 'title' => $s->title,
                 'organization' => $s->organization,
                 'bio' => $s->bio,
-                'photo_url' => $s->photo_path ? asset('storage/'.$s->photo_path) : null,
+                'photo_url' => Helper::storageUrl($s->photo_path),
             ])->values() : [],
             'sponsors' => ! $withhold && $event->relationLoaded('sponsors') ? $event->sponsors->map(fn ($s): array => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'tier' => $s->tier,
-                'logo_url' => $s->logo_path ? asset('storage/'.$s->logo_path) : null,
+                'logo_url' => Helper::storageUrl($s->logo_path),
             ])->values() : [],
         ];
     }

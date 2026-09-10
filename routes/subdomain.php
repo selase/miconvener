@@ -247,3 +247,6 @@ Route::post('/e/{event}/speaker-portal/{token}/confirm', [SpeakerPortalControlle
 Route::post('/e/{event}/speaker-portal/{token}/slides', [SpeakerPortalController::class, 'uploadSlides'])->name('public.events.speaker-portal.slides');
 
 Route::get('/blasts/{recipient}/open.gif', BlastOpenController::class)->name('public.blasts.open');
+
+Route::get('/media/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*')->name('tenant.media.show');
+Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*');

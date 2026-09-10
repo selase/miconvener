@@ -424,15 +424,7 @@ final class Tenant extends Model
     protected function logoUrl(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                if ($this->logo) {
-                    $disk = config('app.env') === 'production' ? 's3' : 'public';
-
-                    return \Illuminate\Support\Facades\Storage::disk($disk)->url($this->logo);
-                }
-
-                return null;
-            }
+            get: fn (): ?string => $this->logo ? Helper::storageUrl($this->logo) : null,
         );
     }
 

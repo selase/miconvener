@@ -71,6 +71,6 @@ final class EventForumThread extends Model
 
     public function attachmentUrl(): ?string
     {
-        return $this->attachment_path ? asset('storage/'.$this->attachment_path) : null;
+        return \App\Libraries\Helper::storageUrl($this->attachment_path);
     }
 }
