@@ -230,9 +230,18 @@ final class UsersController extends Controller
         // Assign user to role(s)
         $user->syncRoles($validatedData['roles']);
 
+        $tenant = ! empty($request->tenant_id) ? Tenant::find($request->tenant_id) : null;
+        $loginUrl = $tenant ? $tenant->url('/login') : route('login');
+
         // Send email to user
         Mail::to($user->email)
-            ->queue(new SendAccountDetails($user->first_name, $user->email, $password));
+            ->queue(new SendAccountDetails(
+                $user->first_name,
+                $user->email,
+                $password,
+                $loginUrl,
+                $tenant?->name
+            ));
 
         return response()->json([
             'status' => 'success',

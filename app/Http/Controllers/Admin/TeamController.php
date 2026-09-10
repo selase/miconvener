@@ -34,7 +34,7 @@ final class TeamController extends Controller
         // Resolve tenant ID if UUID is passed
         if (! is_int($tenantId) && \Illuminate\Support\Str::isUuid($tenantId)) {
             $tenant = Tenant::findByUuid($tenantId);
-            if (!$tenant instanceof \App\Models\Tenant) {
+            if (! $tenant instanceof Tenant) {
                 return response()->json(['error' => 'Tenant not found'], 404);
             }
             $tenantId = $tenant->id;
@@ -225,9 +225,17 @@ final class TeamController extends Controller
         // attach user to their tenants
         $user->tenants()->sync([$tenant->id]);
 
+        $loginUrl = $tenant->url('/login');
+
         // Send email to user
         Mail::to($user->email)
-            ->queue(new SendAccountDetails($user->first_name, $user->email, $password));
+            ->queue(new SendAccountDetails(
+                $user->first_name,
+                $user->email,
+                $password,
+                $loginUrl,
+                $tenant->name
+            ));
 
         return to_route('tenants.show', $id)->with([
             'status' => 'success',

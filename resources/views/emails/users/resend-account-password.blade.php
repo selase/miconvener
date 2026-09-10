@@ -6,7 +6,7 @@ To access the application, kindly use the information below.
 
 **Email:** {{ $data['email'] }} <br> **Password:** {{ $data['password'] }}
 
-<x-mail::button :url="route('login')">
+<x-mail::button :url="$data['login_url'] ?? route('login')">
 Login
 </x-mail::button>
 

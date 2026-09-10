@@ -21,7 +21,9 @@ final class SendAccountDetails extends Mailable
     public function __construct(
         public string $user,
         public string $email,
-        public string $password
+        public string $password,
+        public ?string $loginUrl = null,
+        public ?string $tenantName = null
     ) {
         //
     }
@@ -37,6 +39,8 @@ final class SendAccountDetails extends Mailable
             'user' => $this->user,
             'email' => $this->email,
             'password' => $this->password,
+            'loginUrl' => $this->loginUrl ?? route('login'),
+            'tenantName' => $this->tenantName,
         ])
             ->subject('Congratulations!!!');
     }

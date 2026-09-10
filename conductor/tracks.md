@@ -143,6 +143,20 @@ Verified on production (`env-a2ae4030-63cb-41a9-8281-36cffb804842`):
 - Automated test verification: 2 passing tests in `tests/Feature/Console/BackupConfigTest.php`
   verifying landlord database target, excluding mysql, and s3 disk integration.
 
+## [x] Track: Tenant Team Member Invitation & Dynamic URL Resolution
+
+Updated team member creation (`App\Http\Controllers\Tenant\UserController::store`, `Admin\TeamController::store`,
+and `Admin\UsersController::store`) and mailable `SendAccountDetails` to dynamically resolve the tenant login URL
+using `$tenant->url('/login')` instead of the previous hardcoded relative `/login` path which failed in email clients.
+The URL resolution is fully dynamic per tenant:
+- Resolves to `https://{custom_domain}/login` if the tenant has an active custom domain.
+- Resolves to the tenant's subdomain (`https://{slug}.miconvener.com/login` or `http://{slug}.localhost/login`).
+- Falls back to `route('login')` for global system administrators.
+- Included dynamic tenant name in the email body.
+- Also updated `ResendAccountPasswordController` to pass dynamic tenant login URL.
+Verified by `tests/Feature/Tenant/TeamMemberInvitationTest.php` (2 passing tests, 23 assertions) and
+`tests/Feature/Tenant/TeamIndexTest.php` / `UserRoleAssignmentTest.php` (4 passing tests).
+
 ---
 
 # Events domain (MiConvener)

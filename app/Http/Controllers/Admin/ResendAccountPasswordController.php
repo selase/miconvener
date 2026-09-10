@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
 use App\Mail\Users\ResendAccountPassword;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -25,11 +26,15 @@ final class ResendAccountPasswordController extends Controller
 
         $user->update(['password' => bcrypt($newPassword)]);
 
+        $tenant = $user->tenant_id ? Tenant::find($user->tenant_id) : null;
+        $loginUrl = $tenant ? $tenant->url('/login') : route('login');
+
         Mail::to($user)
             ->queue(new ResendAccountPassword([
                 'user' => $user->displayName(),
                 'email' => $user->email,
                 'password' => $newPassword,
+                'login_url' => $loginUrl,
             ]));
 
         return response()->json([

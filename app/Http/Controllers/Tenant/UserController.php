@@ -85,7 +85,15 @@ final class UserController extends Controller
             $user->assignRole($role);
             $user->tenants()->attach($tenant->id);
 
-            Mail::to($user->email)->queue(new SendAccountDetails($user->first_name, $user->email, $password));
+            $loginUrl = $tenant->url('/login');
+
+            Mail::to($user->email)->queue(new SendAccountDetails(
+                $user->first_name,
+                $user->email,
+                $password,
+                $loginUrl,
+                $tenant->name
+            ));
         });
 
         return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
