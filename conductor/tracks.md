@@ -129,6 +129,20 @@ Built and wired: `WebhookEndpoint` / `WebhookCall` models, `SendWebhookJob`
 an endpoint — rows can only be created directly in the database. Also unbuilt: delivery-log
 replay, dead-letter queue, and the webhook simulator.
 
+## [x] Track: Production Database Backups & Cloudflare R2 Storage
+
+Configured Spatie backup (`config/backup.php`) to target the `landlord` database connection
+(PostgreSQL on AWS RDS via Laravel Cloud) rather than the hardcoded `mysql` default, which
+previously caused `backup:run` to hang and fail attempting to connect to a local MySQL instance.
+Verified on production (`env-a2ae4030-63cb-41a9-8281-36cffb804842`):
+- Read, write, list, and delete permissions on the attached Cloudflare R2 bucket (`miconvener-backups`)
+  via the S3 driver.
+- Execution of `php artisan backup:run --only-db --no-interaction` completed successfully with exit code 0,
+  dumping PostgreSQL database `production` via `pg_dump`, creating an 81.8 KB archive, and storing it
+  in R2 at `MiConvener/2026-09-10-17-16-54.zip` (83,761 bytes).
+- Automated test verification: 2 passing tests in `tests/Feature/Console/BackupConfigTest.php`
+  verifying landlord database target, excluding mysql, and s3 disk integration.
+
 ---
 
 # Events domain (MiConvener)
