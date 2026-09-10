@@ -1,4 +1,6 @@
+import { useState, useRef, useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
+import { AlertCircle, ArrowUp } from 'lucide-react';
 import Modal from '@/Components/Console/Modal';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
@@ -9,6 +11,8 @@ const TITLES = {
     edit: 'Edit event',
 };
 
+const MAX_HERO_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+
 function toDateTimeLocal(iso) {
     if (!iso) return '';
     const date = new Date(iso);
@@ -17,6 +21,10 @@ function toDateTimeLocal(iso) {
 }
 
 export default function EventFormModal({ mode, event, onClose }) {
+    const formRef = useRef(null);
+    const [fileError, setFileError] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+
     const { data, setData, transform, post, put, processing, errors } = useForm({
         name: event?.name ?? '',
         description: event?.description ?? '',
@@ -35,8 +43,57 @@ export default function EventFormModal({ mode, event, onClose }) {
         hero_image: null,
     });
 
+    const activeErrors = {
+        ...(fileError ? { hero_image: fileError } : {}),
+        ...errors,
+    };
+    const errorCount = Object.keys(activeErrors).length;
+
+    const scrollToFirstError = () => {
+        setTimeout(() => {
+            const firstErrorEl = formRef.current?.querySelector('.text-danger-fg, [aria-invalid="true"]');
+            if (firstErrorEl) {
+                firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (formRef.current) {
+                formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 50);
+    };
+
+    useEffect(() => {
+        if (errorCount > 0) {
+            scrollToFirstError();
+        }
+    }, [errors, fileError]);
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0] ?? null;
+        if (file) {
+            if (file.size > MAX_HERO_SIZE_BYTES) {
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                setFileError(`The selected file "${file.name}" is ${sizeMb}MB, which exceeds the 20MB limit. Please choose a smaller image.`);
+                setData('hero_image', null);
+                setPreviewUrl(null);
+                e.target.value = '';
+                return;
+            }
+            setFileError(null);
+            setData('hero_image', file);
+            setPreviewUrl(URL.createObjectURL(file));
+        } else {
+            setFileError(null);
+            setData('hero_image', null);
+            setPreviewUrl(null);
+        }
+    };
+
     const submit = (submitEvent) => {
         submitEvent.preventDefault();
+
+        if (fileError) {
+            scrollToFirstError();
+            return;
+        }
 
         transform((formData) => ({
             ...formData,
@@ -45,16 +102,36 @@ export default function EventFormModal({ mode, event, onClose }) {
             ticket_price: Math.round(Number(formData.ticket_price) * 100),
         }));
 
+        const options = {
+            forceFormData: true,
+            onSuccess: onClose,
+            onError: () => scrollToFirstError(),
+        };
+
         if (mode === 'create') {
-            post(route('tenant.events.store'), { forceFormData: true, onSuccess: onClose });
+            post(route('tenant.events.store'), options);
         } else {
-            put(route('tenant.events.update', { event: event.id }), { forceFormData: true, onSuccess: onClose });
+            put(route('tenant.events.update', { event: event.id }), options);
         }
     };
 
     return (
         <Modal open onClose={onClose} title={TITLES[mode]} className="max-w-2xl">
-            <form onSubmit={submit} className="space-y-5">
+            <form ref={formRef} onSubmit={submit} className="space-y-5">
+                {errorCount > 0 && (
+                    <div className="flex items-start gap-3 rounded-lg border border-danger-border bg-danger-surface p-3.5 text-danger-fg">
+                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
+                        <div className="flex-1 text-sm">
+                            <div className="font-semibold">Please fix the following error{errorCount > 1 ? 's' : ''}:</div>
+                            <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs text-danger-fg">
+                                {Object.entries(activeErrors).map(([key, msg]) => (
+                                    <li key={key}>{msg}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
                 <Input
                     label="Event name"
                     type="text"
@@ -64,17 +141,34 @@ export default function EventFormModal({ mode, event, onClose }) {
                 />
 
                 <div>
-                    <label className="mb-1.5 block text-sm font-medium text-ink">Hero image</label>
+                    <div className="flex items-center justify-between">
+                        <label className="mb-1.5 block text-sm font-medium text-ink">Hero image</label>
+                        <span className="text-xs text-ink-secondary">Max 20MB</span>
+                    </div>
                     <input
                         type="file"
-                        accept="image/*"
-                        onChange={(e) => setData('hero_image', e.target.files[0] ?? null)}
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                        onChange={handleFileChange}
                         className="block w-full text-sm text-ink-secondary file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
                     />
-                    {event?.hero_image_url && !data.hero_image && (
-                        <img src={event.hero_image_url} alt="Current hero" className="mt-2 h-24 w-full rounded-md object-cover" />
+                    <p className="mt-1 text-xs text-ink-secondary">
+                        Supported formats: PNG, JPG, WebP, SVG. Recommended ratio: 16:9 (e.g. 1920×1080).
+                    </p>
+                    {previewUrl ? (
+                        <div className="mt-2">
+                            <img src={previewUrl} alt="Preview" className="h-28 w-full rounded-md object-cover border border-border" />
+                        </div>
+                    ) : event?.hero_image_url && !data.hero_image ? (
+                        <div className="mt-2">
+                            <img src={event.hero_image_url} alt="Current hero" className="h-28 w-full rounded-md object-cover border border-border" />
+                        </div>
+                    ) : null}
+                    {(fileError || errors.hero_image) && (
+                        <p className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-danger-fg">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <span>{fileError || errors.hero_image}</span>
+                        </p>
                     )}
-                    {errors.hero_image && <p className="mt-1 text-sm text-danger-fg">{errors.hero_image}</p>}
                 </div>
 
                 <div>
@@ -197,6 +291,25 @@ export default function EventFormModal({ mode, event, onClose }) {
                     <option value="published">Published</option>
                     <option value="cancelled">Cancelled</option>
                 </Select>
+
+                {errorCount > 0 && (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-surface p-3 text-sm text-danger-fg">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+                            <span>
+                                {errorCount} error{errorCount > 1 ? 's' : ''} found above. Please correct {errorCount > 1 ? 'them' : 'it'} before saving.
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={scrollToFirstError}
+                            className="flex items-center gap-1 text-xs font-semibold underline hover:opacity-80"
+                        >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                            Scroll to error
+                        </button>
+                    </div>
+                )}
 
                 <Button type="submit" disabled={processing}>
                     {mode === 'create' ? 'Create event' : 'Save changes'}

@@ -311,7 +311,13 @@ final class EventController extends Controller
             'ticket_price' => ['required', 'integer', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
             'plan_your_visit_content' => ['nullable', 'string'],
-            'hero_image' => ['nullable', 'image', 'max:4096'],
+            'hero_image' => ['nullable', 'image', 'max:20480'],
+        ], [
+            'hero_image.max' => 'The hero image must not be greater than 20MB.',
+            'hero_image.image' => 'The hero image must be a valid image file (JPG, PNG, WebP, GIF, or SVG).',
+            'ends_at.after' => 'The event end date and time must be after the start date and time.',
+            'address.required_if' => 'The address is required for in-person events.',
+            'virtual_link.required_if' => 'The virtual meeting link is required for virtual events.',
         ]);
 
         // platform_fee_percentage is deliberately NOT settable here — it's the
