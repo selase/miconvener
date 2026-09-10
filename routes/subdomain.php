@@ -248,5 +248,9 @@ Route::post('/e/{event}/speaker-portal/{token}/slides', [SpeakerPortalController
 
 Route::get('/blasts/{recipient}/open.gif', BlastOpenController::class)->name('public.blasts.open');
 
+Route::get('/deck', App\Http\Controllers\Marketing\PitchDeckController::class)->name('subdomain.marketing.deck');
+Route::get('/pitch', App\Http\Controllers\Marketing\PitchDeckController::class)->name('subdomain.marketing.pitch');
+Route::get('/slides', App\Http\Controllers\Marketing\PitchDeckController::class)->name('subdomain.marketing.slides');
+
 Route::get('/media/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*')->name('tenant.media.show');
 Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*');

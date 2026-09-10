@@ -49,6 +49,9 @@ Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadCon
 Route::get('/product-docs/{section?}', function (?string $section = 'start-guide') {
     return view('product.docs', ['section' => $section]);
 })->name('product.docs');
+Route::get('/deck', App\Http\Controllers\Marketing\PitchDeckController::class)->name('marketing.deck');
+Route::get('/pitch', App\Http\Controllers\Marketing\PitchDeckController::class)->name('marketing.pitch');
+Route::get('/slides', App\Http\Controllers\Marketing\PitchDeckController::class)->name('marketing.slides');
 
 Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function (): void {
     Route::get('/dashboard', DashboardController::class)

@@ -240,13 +240,40 @@ tickets; invite-only ticket types with access codes; `payout_schedules` (holdbac
 T+N-after-event automatic payouts — payouts are manual/on-demand only today); and a true
 double-entry ledger with balanced accounts, the current event ledger being single-sided.
 
-## [ ] Track: Executive Pitch Deck & Sales Presentation Route
+## [x] Track: Executive Pitch Deck & Sales Presentation Route
 
 Interactive, minimalist, and powerful slide deck route (`/deck`, `/pitch`, `/slides`)
-selling MiConvener to potential customers and subscribers. Dual perspective of a
-Production Manager (zero gate failure, offline-first PWA check-in, clash-proof programme,
-badge printing, in-seat SLA service dispatch) and Sales Tech Leader (conversion, mobile money
-and multi-currency payments, dual settlement, double-entry ledger, 65-80% software cost savings).
-Includes presenter notes, interactive ROI calculator, slide sorter grid, keyboard shortcuts,
-hash linking, and print/PDF formatting.
+selling MiConvener to potential customers and subscribers. Built from the dual perspectives
+of a Production Manager and Sales Tech Leader.
+Shipped:
+- `App\Http\Controllers\Marketing\PitchDeckController` serving `resources/views/marketing/deck.blade.php`.
+- Public routes `/deck`, `/pitch`, `/slides` in `routes/web.php` and `routes/subdomain.php`.
+- 12 minimalist high-impact slides covering automated notifications/reminders, pre-event email
+  comms, offline-first PWA check-in, name tag printing with canvas badge designer, dedicated
+  speaker portal for PowerPoint uploads and COI disclosures, food menu preference forms, in-seat
+  service requests (water, audio/mic assistance, AC) with SLA triage, during-event lunch entitlement
+  scanning, live quizzes with animated projector leaderboards, automated certificates of
+  participation, and 10 enterprise exports.
+- Interactive ROI & Cost Calculator widget with real-time sliders on Slide 11.
+- Presenter Talking Points drawer (`P` key) with tailored scripts for every slide.
+- Slide sorter overview grid (`O` key), keyboard navigation (`←`/`→`, `Space`, `J`/`K`, `F`, `T`),
+  hash-linking (`#slide-N`), and print/PDF export stylesheet (`@media print`).
+- Excluded SMS and WhatsApp messaging per instructions, and avoided "military grade" phrasing.
+Verified by:
+- Automated Pest feature test `tests/Feature/Marketing/PitchDeckTest.php` (3 passing tests, 22 assertions).
+- Full marketing test suite `tests/Feature/Marketing/` (14 passing tests, 67 assertions).
+- Clean code formatting via `vendor/bin/pint --dirty`.
+
+## [ ] Track: Tenant-Configurable Registration Forms, Conditional Fields & Dynamic Pricing
+
+- **Mandatory Core & Configurable Fields**: Title, First Name, Last Name, and Email required on all registrations; Phone, Dietary Requirements, and Accessibility Needs configurable per event (required/optional/disabled).
+- **Arbitrary Custom Form Fields**: Tenants can create unlimited custom fields with arbitrary labels, types (radio, select, text, textarea, checkbox, number), and options.
+- **Conditional Visibility & Dynamic Pricing Engine**: Conditional rules (show field B only when field A matches option X) and option-based pricing calculations evaluated server-side by `RegistrationPricingService`.
+- **Tenant Management UI**: `RegistrationFormPanel.jsx` in event console for configuring field requirements, options, prices, and dependencies.
+- **Public Form & Reactivity**: Public registration form on `/e/{slug}` with dynamic fields, real-time condition evaluation, and live price updates.
+- **Reporting & Badges**: Expose Title, First Name, Last Name, and custom form answers in attendee detail drawer, badge printing, and registration CSV exports.
+
+
+
+
 
