@@ -260,6 +260,28 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('events/{event}/certificates/{certificate}/download', [App\Http\Controllers\Tenant\EventCertificateController::class, 'download'])->name('tenant.events.certificates.download');
     Route::delete('events/{event}/certificates/{certificate}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'destroy'])->name('tenant.events.certificates.destroy');
 
+    // Dynamic Forms Engine
+    Route::get('events/{event}/dynamic-forms', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'index'])->name('tenant.events.dynamic-forms.index');
+    Route::post('events/{event}/dynamic-forms', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'store'])->name('tenant.events.dynamic-forms.store');
+    Route::get('events/{event}/dynamic-forms/{form}', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'show'])->name('tenant.events.dynamic-forms.show');
+    Route::put('events/{event}/dynamic-forms/{form}', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'update'])->name('tenant.events.dynamic-forms.update');
+    Route::delete('events/{event}/dynamic-forms/{form}', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'destroy'])->name('tenant.events.dynamic-forms.destroy');
+    Route::post('events/{event}/dynamic-forms/{form}/duplicate', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'duplicate'])->name('tenant.events.dynamic-forms.duplicate');
+    Route::get('events/{event}/dynamic-forms/{form}/submissions', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'submissions'])->name('tenant.events.dynamic-forms.submissions');
+    Route::get('events/{event}/dynamic-forms/{form}/submissions/export', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'exportSubmissionsCsv'])->name('tenant.events.dynamic-forms.submissions.export');
+    Route::get('events/{event}/dynamic-forms/{form}/export', [App\Http\Controllers\Tenant\EventDynamicFormController::class, 'exportSubmissionsCsv'])->name('tenant.events.dynamic-forms.export');
+
+    // Participant Stratification Groups
+    Route::get('events/{event}/participant-groups', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'index'])->name('tenant.events.participant-groups.index');
+    Route::post('events/{event}/participant-groups', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'store'])->name('tenant.events.participant-groups.store');
+    Route::get('events/{event}/participant-groups/{group}', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'show'])->name('tenant.events.participant-groups.show');
+    Route::put('events/{event}/participant-groups/{group}', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'update'])->name('tenant.events.participant-groups.update');
+    Route::delete('events/{event}/participant-groups/{group}', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'destroy'])->name('tenant.events.participant-groups.destroy');
+    Route::post('events/{event}/participant-groups/{group}/sync', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'sync'])->name('tenant.events.participant-groups.sync');
+    Route::post('events/{event}/participant-groups/{group}/members', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'addMemberManual'])->name('tenant.events.participant-groups.members.add');
+    Route::delete('events/{event}/participant-groups/{group}/members/{registration}', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'removeMember'])->name('tenant.events.participant-groups.members.remove');
+    Route::get('events/{event}/participant-groups/{group}/export', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'export'])->name('tenant.events.participant-groups.export');
+
 });
 
 // Public certificate verification
@@ -286,6 +308,11 @@ Route::get('/e/{event}/registrations/{registration}/agenda.ics', [ScheduleIcsCon
 Route::get('/e/{event}/abstracts/submit', [App\Http\Controllers\Public\AbstractSubmissionController::class, 'create'])->name('public.events.abstracts.create');
 Route::post('/e/{event}/abstracts/submit', [App\Http\Controllers\Public\AbstractSubmissionController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.abstracts.store');
 Route::get('/e/{event}/abstracts/{code}', [App\Http\Controllers\Public\AbstractSubmissionController::class, 'show'])->name('public.events.abstracts.show');
+
+// Public Dynamic Forms
+Route::get('/e/{event}/forms/{form}', [App\Http\Controllers\Public\PublicDynamicFormController::class, 'show'])->name('public.events.forms.show');
+Route::post('/e/{event}/forms/{form}/submit', [App\Http\Controllers\Public\PublicDynamicFormController::class, 'submit'])->middleware('throttle:public-registration')->name('public.events.forms.submit');
+
 Route::get('/e/{event}/preview/attendee-portal', [PublicEventController::class, 'attendeePortalPreview'])->name('public.events.preview.attendee');
 Route::get('/e/{event}/preview/speaker-portal', [PublicEventController::class, 'speakerPortalPreview'])->name('public.events.preview.speaker');
 

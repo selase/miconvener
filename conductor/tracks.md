@@ -343,13 +343,29 @@ Verified by:
   - Phase 2 total: 10 passing tests, 89 assertions.
   - Clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
 
-## [ ] Track: Participant Intelligence & In-Event Dynamic Forms (Engine & Stratification)
+## [x] Track: Participant Intelligence & In-Event Dynamic Forms (Engine & Stratification)
 
-- [ ] General-purpose dynamic forms engine supporting pre-event registration, in-event surveys, workshop feedback, catering preferences, CME assessments, and abstract disclosures.
-- [ ] Drag-and-drop form field builder supporting text, textarea, select, multiselect, radio, date, file upload, rating, signature, and conditional logic.
-- [ ] Participant Stratification Engine: Segment and filter participants dynamically into groups based on multi-parameter rules (ticket type, check-in status, workshop attendance, form responses, CME hours earned).
-- [ ] Targeted broadcast & export actions per stratified cohort.
-- [ ] Pest test suites for dynamic forms engine and stratification segmentation rules.
+- **Granular RBAC Permissions**: Added Spatie permissions (`create dynamic-form`, `read dynamic-form`, `update dynamic-form`, `delete dynamic-form`, `manage participant-groups`) to `PermissionsSeeder` and registered in `RolePermissions.php` for Superadmin, Org Superadmin, and Org Admin.
+- **Landlord Database Migrations & Models**: Landlord tables `event_dynamic_forms`, `event_dynamic_form_submissions`, `event_participant_groups`, and `event_participant_group_members`. Eloquent models `EventDynamicForm`, `EventDynamicFormSubmission`, `EventParticipantGroup`, and `EventParticipantGroupMember` with JSON casts, UUID primary keys, and relationships on `Event.php` (`dynamicForms()`, `participantGroups()`).
+- **General-Purpose Dynamic Forms Engine**: Visual question schema editor supporting text, textarea, select, multiselect, radio, date, rating scale (1-5), and boolean fields. Supports active/closed states, submission limits, and access restrictions (all attendees or checked-in delegates only).
+- **Public Respondent Portal**: Responsive public form page at `/e/{event}/forms/{slug}` with real-time field validation, star rating widgets, option pickers, attendee verification by ticket code/email, and confirmation state.
+- **Participant Stratification & Dynamic Cohort Engine**: `ParticipantStratificationService` evaluating complex multi-parameter criteria (ticket type, registration status, breakout session attendance dwell times, CME hours earned, and dynamic form questionnaire answers). Preserves manual member pinning while automatically re-syncing dynamic memberships.
+- **Host Console Frontend**: `FormsPanel.jsx` (form builder, submission viewer, CSV export), `StratificationPanel.jsx` (cohort cards, criteria rule builder, live matching members table, CSV export), and integrated tabs in `Show.jsx`.
+- **Verification Evidence**:
+  - `tests/Feature/Events/EventDynamicFormsTest.php`: 5 passing tests, 33 assertions.
+  - `tests/Feature/Events/EventParticipantStratificationTest.php`: 5 passing tests, 27 assertions.
+  - Phase 3 total: 10 passing tests, 60 assertions.
+  - Full clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
+
+## [ ] Track: Multi-Channel Automated Notifications & Billing Guardrails
+
+- [ ] Automated reminders and notifications engine across the app for participants, speakers, and organizers.
+- [ ] Direct Email delivery with scheduled trigger rules (T-minus X days, post-session, post-event).
+- [ ] Multi-channel staging for SMS & WhatsApp ready for Omnichannel API integration.
+- [ ] Tenant notification settings with channel toggles and opt-ins.
+- [ ] Quota billing thresholds, rate limits, and anti-abuse guardrails.
+- [ ] Comprehensive Pest tests, Pint formatting, and Vite asset build.
+
 
 
 

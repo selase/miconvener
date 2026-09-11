@@ -85,6 +85,11 @@ final class RolePermissions
             'update certificate',
             'delete certificate',
             'issue certificates',
+            'create dynamic-form',
+            'read dynamic-form',
+            'update dynamic-form',
+            'delete dynamic-form',
+            'manage participant-groups',
         ]);
     }
 
@@ -133,6 +138,11 @@ final class RolePermissions
             'update certificate',
             'delete certificate',
             'issue certificates',
+            'create dynamic-form',
+            'read dynamic-form',
+            'update dynamic-form',
+            'delete dynamic-form',
+            'manage participant-groups',
         ]);
     }
 
@@ -181,6 +191,11 @@ final class RolePermissions
             'update certificate',
             'delete certificate',
             'issue certificates',
+            'create dynamic-form',
+            'read dynamic-form',
+            'update dynamic-form',
+            'delete dynamic-form',
+            'manage participant-groups',
         ]);
     }
 }

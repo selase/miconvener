@@ -270,6 +270,16 @@ final class Event extends Model
         return $this->hasMany(EventCertificate::class)->latest('issued_at');
     }
 
+    public function dynamicForms(): HasMany
+    {
+        return $this->hasMany(EventDynamicForm::class)->latest('created_at');
+    }
+
+    public function participantGroups(): HasMany
+    {
+        return $this->hasMany(EventParticipantGroup::class)->orderBy('name');
+    }
+
     public function sessions(): HasMany
     {
         return $this->hasMany(EventSession::class)->orderBy('starts_at')->orderBy('sort_order');
