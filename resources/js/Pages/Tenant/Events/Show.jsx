@@ -27,6 +27,7 @@ import FinancePanel from './panels/FinancePanel';
 import RegistrationFormPanel from './panels/RegistrationFormPanel';
 import PromoCodePanel from './panels/PromoCodePanel';
 import SessionOccupancyPanel from './panels/SessionOccupancyPanel';
+import AbstractsPanel from './panels/AbstractsPanel';
 
 const TABS = [
     'Overview',
@@ -35,6 +36,7 @@ const TABS = [
     'Form',
     'Speakers',
     'Schedule',
+    'Abstracts',
     'Guests',
     'Blasts',
     'Check-in',
@@ -392,6 +394,7 @@ export default function Show({
                         onChange={() => router.reload({ only: ['event'] })}
                     />
                 )}
+                {tab === 'Abstracts' && <AbstractsPanel event={event} />}
                 {tab === 'Guests' && <GuestsTab event={event} registrations={registrations} />}
                 {tab === 'Blasts' && <BlastsPanel event={event} />}
                 {tab === 'Check-in' && (

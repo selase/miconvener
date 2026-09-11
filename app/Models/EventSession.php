@@ -18,7 +18,38 @@ final class EventSession extends Model
     use HasFactory;
     use HasUuids;
 
+    public const string TYPE_KEYNOTE = 'keynote';
+
+    public const string TYPE_PLENARY = 'plenary';
+
+    public const string TYPE_PANEL = 'panel';
+
     public const string TYPE_WORKSHOP = 'workshop';
+
+    public const string TYPE_ORAL_PRESENTATION = 'oral_presentation';
+
+    public const string TYPE_POSTER_SESSION = 'poster_session';
+
+    public const string TYPE_SIMULATION_SKILLS = 'simulation_skills';
+
+    public const string TYPE_BREAKOUT = 'breakout';
+
+    public const string TYPE_NETWORKING = 'networking';
+
+    public const string TYPE_SESSION = 'session';
+
+    public const array TYPES = [
+        self::TYPE_KEYNOTE,
+        self::TYPE_PLENARY,
+        self::TYPE_PANEL,
+        self::TYPE_WORKSHOP,
+        self::TYPE_ORAL_PRESENTATION,
+        self::TYPE_POSTER_SESSION,
+        self::TYPE_SIMULATION_SKILLS,
+        self::TYPE_BREAKOUT,
+        self::TYPE_NETWORKING,
+        self::TYPE_SESSION,
+    ];
 
     protected $connection = 'landlord';
 
@@ -32,6 +63,7 @@ final class EventSession extends Model
         'location',
         'track',
         'type',
+        'abstract_id',
         'capacity',
         'sort_order',
     ];
@@ -42,6 +74,11 @@ final class EventSession extends Model
         'capacity' => 'integer',
         'sort_order' => 'integer',
     ];
+
+    public function abstract(): BelongsTo
+    {
+        return $this->belongsTo(EventAbstract::class, 'abstract_id');
+    }
 
     public function event(): BelongsTo
     {

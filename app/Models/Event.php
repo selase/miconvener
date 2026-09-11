@@ -109,6 +109,11 @@ final class Event extends Model
         return Helper::storageUrl($this->hero_image_path);
     }
 
+    public function getTitleAttribute(): string
+    {
+        return $this->name;
+    }
+
     public function formFields(): HasMany
     {
         return $this->hasMany(EventFormField::class)->orderBy('sort_order')->orderBy('created_at');
@@ -228,6 +233,11 @@ final class Event extends Model
     public function promoCodes(): HasMany
     {
         return $this->hasMany(EventPromoCode::class);
+    }
+
+    public function abstracts(): HasMany
+    {
+        return $this->hasMany(EventAbstract::class)->orderByDesc('created_at');
     }
 
     public function payoutSchedule(): \Illuminate\Database\Eloquent\Relations\HasOne

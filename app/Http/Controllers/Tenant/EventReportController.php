@@ -435,6 +435,20 @@ final class EventReportController extends Controller
         return response()->download($zipPath, "{$eventModel->slug}-certificates.zip")->deleteFileAfterSend();
     }
 
+    public function exportAbstractBook(string $subdomain, string $event): \Symfony\Component\HttpFoundation\Response
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $pdf = app(\App\Services\Programme\AbstractBookService::class)->generatePdf($eventModel);
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$eventModel->slug.'-abstract-book.pdf"',
+        ]);
+    }
+
     /**
      * @param  \Illuminate\Support\Collection<int, string|null>  $values
      */

@@ -23,12 +23,12 @@ final class EventSessionController extends Controller
         $validated = $this->validateSession($request, $tenant->id);
 
         $session = $eventModel->sessions()->create([
-            ...collect($validated)->except('speaker_ids')->all(),
+            ...collect($validated)->except(['speaker_ids', 'speaker_roles'])->all(),
             'tenant_id' => $tenant->id,
         ]);
 
         if (isset($validated['speaker_ids'])) {
-            $session->speakers()->sync($this->pivotData($validated['speaker_ids']));
+            $session->speakers()->sync($this->pivotData($validated['speaker_ids'], $validated['speaker_roles'] ?? []));
         }
 
         return response()->json([
@@ -46,10 +46,10 @@ final class EventSessionController extends Controller
 
         $validated = $this->validateSession($request, $tenant->id);
 
-        $sessionModel->update(collect($validated)->except('speaker_ids')->all());
+        $sessionModel->update(collect($validated)->except(['speaker_ids', 'speaker_roles'])->all());
 
         if (isset($validated['speaker_ids'])) {
-            $sessionModel->speakers()->sync($this->pivotData($validated['speaker_ids']));
+            $sessionModel->speakers()->sync($this->pivotData($validated['speaker_ids'], $validated['speaker_roles'] ?? []));
         }
 
         return response()->json([
@@ -118,23 +118,33 @@ final class EventSessionController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
             'track' => ['nullable', 'string', 'max:100'],
-            'type' => ['required', Rule::in(['keynote', 'plenary', 'workshop', 'breakout', 'panel', 'break', 'networking', 'session'])],
+            'type' => ['required', Rule::in([
+                'keynote', 'plenary', 'workshop', 'breakout', 'panel', 'break', 'networking', 'session',
+                'oral_presentation', 'poster_session', 'simulation_skills',
+            ])],
+            'abstract_id' => ['nullable', 'exists:event_abstracts,id'],
             'capacity' => ['nullable', 'integer', 'min:1'],
             'sort_order' => ['integer'],
             'speaker_ids' => ['nullable', 'array'],
             'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenantId)],
+            'speaker_roles' => ['nullable', 'array'],
         ]);
     }
 
     /**
      * @param  array<int, string>  $speakerIds
+     * @param  array<string, string>  $speakerRoles
      * @return array<string, array<string, string>>
      */
-    private function pivotData(array $speakerIds): array
+    private function pivotData(array $speakerIds, array $speakerRoles = []): array
     {
         $pivot = [];
-        foreach ($speakerIds as $speakerId) {
-            $pivot[$speakerId] = ['id' => (string) Str::uuid()];
+        foreach ($speakerIds as $index => $speakerId) {
+            $pivot[$speakerId] = [
+                'id' => (string) Str::uuid(),
+                'role' => $speakerRoles[$speakerId] ?? 'speaker',
+                'sort_order' => $index,
+            ];
         }
 
         return $pivot;

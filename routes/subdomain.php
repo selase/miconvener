@@ -225,6 +225,18 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('events/{event}/reports/dietary-accessibility', [EventReportController::class, 'exportDietaryAccessibility'])->name('tenant.events.reports.dietary-accessibility');
     Route::get('events/{event}/reports/audit-log', [EventReportController::class, 'exportAuditLog'])->name('tenant.events.reports.audit-log');
     Route::get('events/{event}/reports/certificates', [EventReportController::class, 'exportCertificates'])->name('tenant.events.reports.certificates');
+    Route::get('events/{event}/reports/abstract-book', [EventReportController::class, 'exportAbstractBook'])->name('tenant.events.reports.abstract-book');
+
+    // Abstracts & Peer Review
+    Route::get('events/{event}/abstracts', [App\Http\Controllers\Tenant\EventAbstractController::class, 'index'])->name('tenant.events.abstracts.index');
+    Route::get('events/{event}/abstracts/{abstract}', [App\Http\Controllers\Tenant\EventAbstractController::class, 'show'])->name('tenant.events.abstracts.show');
+    Route::post('events/{event}/abstracts/{abstract}/assign-reviewer', [App\Http\Controllers\Tenant\EventAbstractController::class, 'assignReviewer'])->name('tenant.events.abstracts.assign-reviewer');
+    Route::delete('events/{event}/abstracts/{abstract}/reviews/{review}', [App\Http\Controllers\Tenant\EventAbstractController::class, 'removeReviewer'])->name('tenant.events.abstracts.remove-reviewer');
+    Route::post('events/{event}/abstracts/{abstract}/decision', [App\Http\Controllers\Tenant\EventAbstractController::class, 'recordDecision'])->name('tenant.events.abstracts.decision');
+    Route::post('events/{event}/abstracts/bulk-decision', [App\Http\Controllers\Tenant\EventAbstractController::class, 'bulkDecision'])->name('tenant.events.abstracts.bulk-decision');
+
+    Route::get('events/{event}/reviews', [App\Http\Controllers\Tenant\AbstractReviewController::class, 'index'])->name('tenant.events.reviews.index');
+    Route::post('events/{event}/abstracts/{abstract}/reviews', [App\Http\Controllers\Tenant\AbstractReviewController::class, 'submit'])->name('tenant.events.reviews.submit');
 
     Route::patch('events/{event}/visibility', [EventController::class, 'updateVisibility'])->name('tenant.events.visibility');
     Route::get('events/{event}/speakers/{speaker}/portal-link', [EventSpeakerController::class, 'portalLink'])->name('tenant.events.speakers.portal-link');
@@ -248,6 +260,9 @@ Route::post('/e/{event}/registrations/{registration}/transfer/confirm', [Attende
 Route::post('/e/{event}/registrations/{registration}/service-requests', [PublicServiceRequestController::class, 'store'])->name('public.events.service-requests.store');
 Route::get('/e/{event}/schedule.ics', [ScheduleIcsController::class, 'programme'])->name('public.events.schedule.ics');
 Route::get('/e/{event}/registrations/{registration}/agenda.ics', [ScheduleIcsController::class, 'agenda'])->name('public.events.agenda.ics');
+Route::get('/e/{event}/abstracts/submit', [App\Http\Controllers\Public\AbstractSubmissionController::class, 'create'])->name('public.events.abstracts.create');
+Route::post('/e/{event}/abstracts/submit', [App\Http\Controllers\Public\AbstractSubmissionController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.abstracts.store');
+Route::get('/e/{event}/abstracts/{code}', [App\Http\Controllers\Public\AbstractSubmissionController::class, 'show'])->name('public.events.abstracts.show');
 Route::get('/e/{event}/preview/attendee-portal', [PublicEventController::class, 'attendeePortalPreview'])->name('public.events.preview.attendee');
 Route::get('/e/{event}/preview/speaker-portal', [PublicEventController::class, 'speakerPortalPreview'])->name('public.events.preview.speaker');
 

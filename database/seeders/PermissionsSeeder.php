@@ -101,17 +101,41 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'api',
             ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'review abstract',
+                'guard_name' => 'web',
+                'category' => 'abstract',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'decide abstract',
+                'guard_name' => 'web',
+                'category' => 'abstract',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'assign abstract-reviewer',
+                'guard_name' => 'web',
+                'category' => 'abstract',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage scientific-programme',
+                'guard_name' => 'web',
+                'category' => 'programme',
+            ],
         ];
     }
 
     /**
-     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event')}[]
+     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event' | 'abstract' | 'programme')}[]
      */
     public function modelPermissions(): array
     {
         $data = [];
 
-        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team', 'event'];
+        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team', 'event', 'abstract'];
 
         foreach ($models as $value) {
             foreach ($this->crudActions($value) as $action) {

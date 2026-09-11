@@ -309,3 +309,21 @@ Verified by:
 - **Host Console Finance UI**: Enhanced `FinancePanel.jsx` with a real-time Double-Entry General Ledger card showing equilibrium status ("Equilibrium Balanced" green pill), account debit/credit breakdown, Payout Schedule & Holdback Policy overview, and a configuration modal to customize schedules, days, holdback percentages, and preferred payout accounts.
 - **General Ledger CSV Export**: Upgraded `exportSettlementStatement` to append the complete double-entry general ledger trial balance below the line-item reconciliation.
 - **Verification**: Verified with 6 passing tests in `tests/Feature/Events/EventLedgerAndPayoutScheduleTest.php` (43 assertions) and 28 passing tests across the entire financial suite. Clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
+
+## [x] Track: Academic & Scientific Core (Abstracts, Peer Review & Scientific Programme)
+
+- **Granular RBAC Permissions**: Added Spatie permissions (`create abstract`, `read abstract`, `update abstract`, `delete abstract`, `review abstract`, `decide abstract`, `assign abstract-reviewer`, `manage scientific-programme`) to `PermissionsSeeder` and assigned to Superadmin, Org Superadmin, and Org Admin in `RolePermissions.php`.
+- **Database Migrations & Models**: Landlord tables `event_abstracts`, `event_abstract_authors`, `event_abstract_reviews`, and `abstract_id` foreign keys on `event_sessions` and `event_session_speakers`. Eloquent models `EventAbstract`, `EventAbstractAuthor`, `EventAbstractReview`, with structured JSON casting, collision-resistant code generation (`ABS-XXXX`), and average score calculations.
+- **Public Submission Portal & Tracking**: Public route `/e/{event}/abstracts/submit` with multi-author affiliation builder, track categorization, structured abstract inputs (Background, Methods, Results, Conclusion), presentation preference (Oral / Poster / Either), conflict of interest declaration, and manuscript file upload. Authors track their submission status, committee notes, and scheduled presentations at `/e/{event}/abstracts/{code}`.
+- **Peer Review & Rubric Scoring**: Peer reviewer assignment engine with `pending` and `completed` status transitions, structured 4-point rubric scoring (1 to 5 scale on Novelty, Methodology, Relevance, Clarity), recommendation (`accept_oral`, `accept_poster`, `reject`), author feedback, and confidential committee notes.
+- **Scientific Decision Engine**: Decision workflow (`accepted_oral`, `accepted_poster`, `rejected`), committee feedback notes, and automated decision letter emails (`AbstractDecisionNotificationMail`). Supports single and bulk decisions.
+- **Scientific Programme Expansion**: Supported scientific session types (`keynote`, `plenary`, `panel`, `workshop`, `oral_presentation`, `poster_session`, `simulation_skills`, `breakout`, `networking`, `session`), speaker role associations (`speaker`, `moderator`, `panelist`, `keynote_speaker`, `chair`, `oral_presenter`, `discussant`), and direct linkage to accepted abstracts.
+- **Digital Programme & Abstract Book**: `AbstractBookService` and `EventReportController::exportAbstractBook` compiling all accepted abstracts and sessions into an index-linked, downloadable conference Abstract Book PDF (`pdf.abstract-book`).
+- **Host Console UI**: `AbstractsPanel.jsx` added to Event Console with metrics cards, status and track filters, search, reviewer assignment modal, evaluation viewer drawer, decision modal, and PDF abstract book download button.
+- **Verification Evidence**:
+  - `tests/Feature/Events/EventAbstractSubmissionTest.php`: 3 passing tests, 14 assertions.
+  - `tests/Feature/Events/EventAbstractReviewAndDecisionTest.php`: 5 passing tests, 29 assertions.
+  - `tests/Feature/Events/ScientificProgrammeAndAbstractBookTest.php`: 2 passing tests, 10 assertions.
+  - Full feature suite: 268 passing tests, 1,015 assertions across all event test files.
+  - Clean frontend asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
+

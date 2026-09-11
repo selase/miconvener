@@ -67,6 +67,14 @@ final class RolePermissions
             'read event',
             'update event',
             'delete event',
+            'create abstract',
+            'read abstract',
+            'update abstract',
+            'delete abstract',
+            'review abstract',
+            'decide abstract',
+            'assign abstract-reviewer',
+            'manage scientific-programme',
         ]);
     }
 
@@ -97,6 +105,14 @@ final class RolePermissions
             'read event',
             'update event',
             'delete event',
+            'create abstract',
+            'read abstract',
+            'update abstract',
+            'delete abstract',
+            'review abstract',
+            'decide abstract',
+            'assign abstract-reviewer',
+            'manage scientific-programme',
         ]);
     }
 
@@ -127,6 +143,14 @@ final class RolePermissions
             'read event',
             'update event',
             'delete event',
+            'create abstract',
+            'read abstract',
+            'update abstract',
+            'delete abstract',
+            'review abstract',
+            'decide abstract',
+            'assign abstract-reviewer',
+            'manage scientific-programme',
         ]);
     }
 }
