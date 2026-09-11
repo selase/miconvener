@@ -490,28 +490,249 @@ function LivePollSection({ event }) {
     );
 }
 
+function isConditionSatisfied(field, answers) {
+    if (!field.conditional_logic || !field.conditional_logic.depends_on_field) {
+        return true;
+    }
+    const parentVal = answers[field.conditional_logic.depends_on_field];
+    const expectedVal = field.conditional_logic.value;
+    const op = field.conditional_logic.operator || 'equals';
+
+    if (op === 'not_equals') {
+        return String(parentVal ?? '') !== String(expectedVal ?? '');
+    }
+    if (op === 'in') {
+        const list = Array.isArray(expectedVal) ? expectedVal : [expectedVal];
+        return list.map(String).includes(String(parentVal ?? ''));
+    }
+    return String(parentVal ?? '') === String(expectedVal ?? '');
+}
+
 function RegistrationPanel({ event }) {
     const { flash } = usePage().props;
-    const hasTicketTypes = event.ticket_types.length > 0;
+    const settings = event.registration_settings || {
+        phone: 'optional',
+        dietary_requirements: 'optional',
+        accessibility_needs: 'optional',
+    };
+    const formFields = event.form_fields || [];
+
+    const [unlockedTicketTypes, setUnlockedTicketTypes] = useState([]);
+    const [accessCodeInput, setAccessCodeInput] = useState('');
+    const [accessCodeError, setAccessCodeError] = useState('');
+    const [unlocking, setUnlocking] = useState(false);
+    const [showAccessCodeInput, setShowAccessCodeInput] = useState(false);
+
+    const [promoCodeInput, setPromoCodeInput] = useState('');
+    const [promoError, setPromoError] = useState('');
+    const [validatingPromo, setValidatingPromo] = useState(false);
+    const [appliedPromo, setAppliedPromo] = useState(null);
+    const [showPromoInput, setShowPromoInput] = useState(false);
+
+    // Merge standard public tickets with unlocked invite-only tickets
+    const availableTicketTypes = useMemo(() => {
+        const publicTickets = (event.ticket_types || []).filter((t) => !t.is_invite_only);
+        const combined = [...publicTickets];
+        unlockedTicketTypes.forEach((unlocked) => {
+            if (!combined.some((t) => t.id === unlocked.id)) {
+                combined.push(unlocked);
+            }
+        });
+        return combined;
+    }, [event.ticket_types, unlockedTicketTypes]);
+
+    const hasTicketTypes = availableTicketTypes.length > 0;
+
     const { data, setData, post, processing, errors } = useForm({
-        full_name: '',
+        title: '',
+        first_name: '',
+        last_name: '',
         email: '',
         phone: '',
         dietary_requirements: '',
         accessibility_needs: '',
-        ticket_type_id: hasTicketTypes ? event.ticket_types[0].id : '',
+        ticket_type_id: hasTicketTypes ? availableTicketTypes[0].id : '',
+        form_answers: {},
+        promo_code: '',
+        access_code: '',
     });
+
     const [showExtras, setShowExtras] = useState(false);
 
     const selectedTicketType = hasTicketTypes
-        ? event.ticket_types.find((t) => t.id === data.ticket_type_id)
+        ? availableTicketTypes.find((t) => t.id === data.ticket_type_id) || availableTicketTypes[0]
         : null;
-    const price = selectedTicketType ? selectedTicketType.price : event.ticket_price;
+    const basePrice = selectedTicketType ? selectedTicketType.price : (event.ticket_price || 0);
+
+    // Calculate dynamic price reactively based on visible fields, chosen options, and promo code
+    const calculatedPricing = useMemo(() => {
+        let modifierTotal = 0;
+        let override = null;
+        const breakdown = [];
+
+        formFields.forEach((field) => {
+            if (!isConditionSatisfied(field, data.form_answers)) {
+                return;
+            }
+            const selectedVal = data.form_answers[field.field_key];
+            if (selectedVal === undefined || selectedVal === null || selectedVal === '') {
+                return;
+            }
+
+            if (Array.isArray(field.options)) {
+                field.options.forEach((opt) => {
+                    if (String(opt.value) === String(selectedVal) && opt.price !== undefined && opt.price !== null && !isNaN(Number(opt.price))) {
+                        const optPrice = Number(opt.price);
+                        if (opt.is_override) {
+                            override = optPrice;
+                            breakdown.push({
+                                label: `${field.label}: ${opt.label}`,
+                                amount: optPrice,
+                                isOverride: true,
+                            });
+                        } else if (optPrice !== 0) {
+                            modifierTotal += optPrice;
+                            breakdown.push({
+                                label: `${field.label}: ${opt.label}`,
+                                amount: optPrice,
+                                isOverride: false,
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
+        const subtotal = Math.max(0, override !== null ? override + modifierTotal : basePrice + modifierTotal);
+        let promoDiscount = 0;
+
+        if (appliedPromo) {
+            if (appliedPromo.discount_type === 'percentage') {
+                promoDiscount = Math.round(subtotal * (Number(appliedPromo.discount_value) / 100));
+            } else if (appliedPromo.discount_type === 'fixed') {
+                promoDiscount = Math.min(subtotal, Number(appliedPromo.discount_value));
+            } else if (appliedPromo.discount_type === 'complimentary') {
+                promoDiscount = subtotal;
+            }
+
+            if (promoDiscount > 0 || appliedPromo.discount_type === 'complimentary') {
+                breakdown.push({
+                    label: `Promo (${appliedPromo.code})`,
+                    amount: promoDiscount,
+                    isDiscount: true,
+                    discountType: appliedPromo.discount_type,
+                });
+            }
+        }
+
+        const finalTotal = Math.max(0, subtotal - promoDiscount);
+
+        return {
+            subtotal,
+            total: finalTotal,
+            promoDiscount,
+            breakdown,
+            hasAdjustments: override !== null || modifierTotal !== 0 || promoDiscount > 0,
+        };
+    }, [basePrice, formFields, data.form_answers, appliedPromo]);
+
+    const handleAnswerChange = (fieldKey, value) => {
+        setData('form_answers', {
+            ...data.form_answers,
+            [fieldKey]: value,
+        });
+    };
+
+    const handleUnlockTickets = async (e) => {
+        e?.preventDefault();
+        if (!accessCodeInput.trim()) return;
+        setUnlocking(true);
+        setAccessCodeError('');
+        try {
+            const res = await fetch(route('public.events.unlock-tickets', { event: event.slug }), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({ access_code: accessCodeInput.trim() }),
+            });
+            const json = await res.json();
+            if (!res.ok) {
+                setAccessCodeError(json.message || 'Invalid access code');
+            } else {
+                const newlyUnlocked = json.ticket_types || [];
+                setUnlockedTicketTypes((prev) => [...prev, ...newlyUnlocked]);
+                if (newlyUnlocked.length > 0) {
+                    setData((prev) => ({
+                        ...prev,
+                        ticket_type_id: newlyUnlocked[0].id,
+                        access_code: accessCodeInput.trim().toUpperCase(),
+                    }));
+                }
+                setShowAccessCodeInput(false);
+                setAccessCodeInput('');
+            }
+        } catch (err) {
+            setAccessCodeError('Error unlocking tickets. Please try again.');
+        } finally {
+            setUnlocking(false);
+        }
+    };
+
+    const handleApplyPromo = async (e) => {
+        e?.preventDefault();
+        if (!promoCodeInput.trim()) return;
+        setValidatingPromo(true);
+        setPromoError('');
+        try {
+            const res = await fetch(route('public.events.validate-promo', { event: event.slug }), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    code: promoCodeInput.trim(),
+                    ticket_type_id: data.ticket_type_id || null,
+                    email: data.email || null,
+                    amount: basePrice,
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok) {
+                setPromoError(json.message || 'Invalid promo code');
+                setAppliedPromo(null);
+                setData('promo_code', '');
+            } else {
+                setAppliedPromo(json);
+                setData('promo_code', json.code);
+                setPromoError('');
+            }
+        } catch (err) {
+            setPromoError('Failed to validate promo code.');
+        } finally {
+            setValidatingPromo(false);
+        }
+    };
+
+    const handleRemovePromo = () => {
+        setAppliedPromo(null);
+        setPromoCodeInput('');
+        setPromoError('');
+        setData('promo_code', '');
+    };
 
     const submit = (e) => {
         e.preventDefault();
         post(route('public.events.register', { event: event.slug }));
     };
+
+    const titles = ['Mr', 'Mrs', 'Ms', 'Miss', 'Dr', 'Prof', 'Rev', 'Hon', 'Other'];
 
     return (
         <aside className="border border-border bg-surface p-5 lg:sticky lg:top-6">
@@ -530,100 +751,424 @@ function RegistrationPanel({ event }) {
 
             <form onSubmit={submit} className="mt-4 space-y-4">
                 {hasTicketTypes && (
-                    <div className="flex flex-col gap-px bg-border">
-                        {event.ticket_types.map((ticketType) => (
-                            <label
-                                key={ticketType.id}
-                                className={`flex cursor-pointer items-center justify-between gap-3.5 bg-surface px-3.5 py-3 text-left ${
-                                    data.ticket_type_id === ticketType.id
-                                        ? 'shadow-[inset_2px_0_0_var(--color-accent)]'
-                                        : ''
-                                }`}
-                            >
-                                <span className="flex items-start gap-2.5">
-                                    <input
-                                        type="radio"
-                                        name="ticket_type_id"
-                                        value={ticketType.id}
-                                        checked={data.ticket_type_id === ticketType.id}
-                                        onChange={(e) => setData('ticket_type_id', e.target.value)}
-                                        className="mt-0.5"
-                                    />
-                                    <span>
-                                        <span className="block text-[13.5px] text-ink">
-                                            {ticketType.name}
-                                        </span>
-                                        {ticketType.is_sold_out && (
-                                            <span className="block text-[11.5px] text-ink-secondary">
-                                                Full — join the waitlist
-                                            </span>
-                                        )}
-                                    </span>
-                                </span>
-                                <em
-                                    className={`shrink-0 font-mono text-[14px] not-italic ${data.ticket_type_id === ticketType.id ? 'text-accent' : 'text-ink'}`}
+                    <div className="space-y-2">
+                        <div className="flex flex-col gap-px bg-border">
+                            {availableTicketTypes.map((ticketType) => (
+                                <label
+                                    key={ticketType.id}
+                                    className={`flex cursor-pointer items-center justify-between gap-3.5 bg-surface px-3.5 py-3 text-left ${
+                                        data.ticket_type_id === ticketType.id
+                                            ? 'shadow-[inset_2px_0_0_var(--color-accent)]'
+                                            : ''
+                                    }`}
                                 >
-                                    {ticketType.is_sold_out
-                                        ? 'Waitlist'
-                                        : formatMoney(ticketType.price, event.currency)}
-                                </em>
-                            </label>
-                        ))}
+                                    <span className="flex items-start gap-2.5">
+                                        <input
+                                            type="radio"
+                                            name="ticket_type_id"
+                                            value={ticketType.id}
+                                            checked={data.ticket_type_id === ticketType.id}
+                                            onChange={(e) => setData('ticket_type_id', e.target.value)}
+                                            className="mt-0.5"
+                                        />
+                                        <span>
+                                            <span className="flex items-center gap-1.5 text-[13.5px] text-ink">
+                                                {ticketType.name}
+                                                {ticketType.is_invite_only && (
+                                                    <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-accent">
+                                                        Unlocked VIP
+                                                    </span>
+                                                )}
+                                            </span>
+                                            {ticketType.is_sold_out && (
+                                                <span className="block text-[11.5px] text-ink-secondary">
+                                                    Full — join the waitlist
+                                                </span>
+                                            )}
+                                        </span>
+                                    </span>
+                                    <em
+                                        className={`shrink-0 font-mono text-[14px] not-italic ${data.ticket_type_id === ticketType.id ? 'text-accent' : 'text-ink'}`}
+                                    >
+                                        {ticketType.is_sold_out
+                                            ? 'Waitlist'
+                                            : formatMoney(ticketType.price, event.currency)}
+                                    </em>
+                                </label>
+                            ))}
+                        </div>
+
+                        {/* Unlock Invite-only Tickets */}
+                        <div className="pt-1">
+                            {!showAccessCodeInput ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAccessCodeInput(true)}
+                                    className="text-[12px] text-ink-secondary hover:text-accent underline transition-colors"
+                                >
+                                    Have an access code for hidden tickets?
+                                </button>
+                            ) : (
+                                <div className="rounded border border-border p-2.5 bg-surface-alt/40 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11.5px] font-medium text-ink">Enter Access Code:</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAccessCodeInput(false)}
+                                            className="text-[11px] text-ink-muted hover:text-ink"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={accessCodeInput}
+                                            onChange={(e) => setAccessCodeInput(e.target.value.toUpperCase())}
+                                            placeholder="e.g. VIP2026"
+                                            className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleUnlockTickets}
+                                            disabled={unlocking || !accessCodeInput.trim()}
+                                        >
+                                            {unlocking ? 'Unlocking...' : 'Unlock'}
+                                        </Button>
+                                    </div>
+                                    {accessCodeError && (
+                                        <p className="text-[11px] text-danger-fg">{accessCodeError}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
                 {errors.ticket_type_id && (
                     <p className="text-[13px] text-danger-fg">{errors.ticket_type_id}</p>
                 )}
 
+                {/* Core Attendee Identity Fields */}
+                <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                        <label className="block text-[12.5px] font-medium text-ink mb-1">
+                            Title <span className="text-danger-fg">*</span>
+                        </label>
+                        <select
+                            value={data.title}
+                            onChange={(e) => setData('title', e.target.value)}
+                            className="w-full border border-border bg-surface px-2.5 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                            required
+                        >
+                            <option value="">Select...</option>
+                            {titles.map((t) => (
+                                <option key={t} value={t}>
+                                    {t}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.title && (
+                            <p className="mt-1 text-[11.5px] text-danger-fg">{errors.title}</p>
+                        )}
+                    </div>
+                    <div className="col-span-2">
+                        <Input
+                            label="First name *"
+                            type="text"
+                            value={data.first_name}
+                            onChange={(e) => setData('first_name', e.target.value)}
+                            error={errors.first_name}
+                            required
+                        />
+                    </div>
+                </div>
+
                 <Input
-                    label="Full name"
+                    label="Last name *"
                     type="text"
-                    value={data.full_name}
-                    onChange={(e) => setData('full_name', e.target.value)}
-                    error={errors.full_name}
+                    value={data.last_name}
+                    onChange={(e) => setData('last_name', e.target.value)}
+                    error={errors.last_name}
+                    required
                 />
+
                 <Input
-                    label="Email"
+                    label="Email *"
                     type="email"
                     value={data.email}
                     onChange={(e) => setData('email', e.target.value)}
                     error={errors.email}
-                />
-                <Input
-                    label="Phone (optional)"
-                    type="tel"
-                    value={data.phone}
-                    onChange={(e) => setData('phone', e.target.value)}
-                    error={errors.phone}
+                    required
                 />
 
-                {showExtras ? (
-                    <>
-                        <Input
-                            label="Dietary requirements (optional)"
-                            type="text"
-                            placeholder="e.g. Vegetarian, nut allergy"
-                            value={data.dietary_requirements}
-                            onChange={(e) => setData('dietary_requirements', e.target.value)}
-                            error={errors.dietary_requirements}
-                        />
-                        <Input
-                            label="Accessibility needs (optional)"
-                            type="text"
-                            placeholder="e.g. Step-free access, sign language"
-                            value={data.accessibility_needs}
-                            onChange={(e) => setData('accessibility_needs', e.target.value)}
-                            error={errors.accessibility_needs}
-                        />
-                    </>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setShowExtras(true)}
-                        className="text-[12.5px] text-ink-secondary underline hover:text-accent"
-                    >
-                        Add dietary or accessibility needs
-                    </button>
+                {/* Standard Configurable Requirements */}
+                {settings.phone !== 'hidden' && (
+                    <Input
+                        label={`Phone ${settings.phone === 'required' ? '*' : '(optional)'}`}
+                        type="tel"
+                        value={data.phone}
+                        onChange={(e) => setData('phone', e.target.value)}
+                        error={errors.phone}
+                        required={settings.phone === 'required'}
+                    />
+                )}
+
+                {/* Custom Event Form Fields (Conditional & Dynamic Pricing) */}
+                {formFields.map((field) => {
+                    const visible = isConditionSatisfied(field, data.form_answers);
+                    if (!visible) return null;
+
+                    const fieldError = errors[`form_answers.${field.field_key}`];
+                    const val = data.form_answers[field.field_key] ?? '';
+
+                    return (
+                        <div key={field.id} className="border-t border-border/60 pt-3">
+                            <label className="block text-[13px] font-medium text-ink">
+                                {field.label} {field.is_required && <span className="text-danger-fg">*</span>}
+                            </label>
+                            {field.help_text && (
+                                <p className="mt-0.5 text-[11.5px] text-ink-secondary">{field.help_text}</p>
+                            )}
+
+                            {field.field_type === 'select' && (
+                                <select
+                                    value={val}
+                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                    required={field.is_required}
+                                >
+                                    <option value="">Select an option...</option>
+                                    {(field.options || []).map((opt, i) => (
+                                        <option key={i} value={opt.value}>
+                                            {opt.label}
+                                            {opt.price ? ` (${opt.is_override ? 'Set to' : '+'} ${formatMoney(Number(opt.price), event.currency)})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+
+                            {field.field_type === 'radio' && (
+                                <div className="mt-2 space-y-1.5">
+                                    {(field.options || []).map((opt, i) => (
+                                        <label
+                                            key={i}
+                                            className="flex cursor-pointer items-center justify-between gap-2 border border-border/70 p-2 text-[13px] hover:bg-surface-sunken"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <input
+                                                    type="radio"
+                                                    name={`custom_${field.field_key}`}
+                                                    value={opt.value}
+                                                    checked={String(val) === String(opt.value)}
+                                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                                    required={field.is_required}
+                                                />
+                                                <span className="text-ink">{opt.label}</span>
+                                            </span>
+                                            {opt.price ? (
+                                                <span className="font-mono text-xs text-accent">
+                                                    {opt.is_override ? 'Total ' : '+'}
+                                                    {formatMoney(Number(opt.price), event.currency)}
+                                                </span>
+                                            ) : null}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+
+                            {field.field_type === 'text' && (
+                                <input
+                                    type="text"
+                                    value={val}
+                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                    required={field.is_required}
+                                />
+                            )}
+
+                            {field.field_type === 'textarea' && (
+                                <textarea
+                                    rows={2}
+                                    value={val}
+                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                    required={field.is_required}
+                                />
+                            )}
+
+                            {field.field_type === 'number' && (
+                                <input
+                                    type="number"
+                                    value={val}
+                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                    required={field.is_required}
+                                />
+                            )}
+
+                            {field.field_type === 'checkbox' && (
+                                <label className="mt-2 flex items-center gap-2 cursor-pointer text-[13px] text-ink">
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(val)}
+                                        onChange={(e) => handleAnswerChange(field.field_key, e.target.checked)}
+                                        required={field.is_required}
+                                    />
+                                    <span>{field.label}</span>
+                                </label>
+                            )}
+
+                            {fieldError && (
+                                <p className="mt-1 text-[11.5px] text-danger-fg">{fieldError}</p>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {/* Dietary and Accessibility standard options */}
+                {(settings.dietary_requirements !== 'hidden' || settings.accessibility_needs !== 'hidden') && (
+                    <div className="border-t border-border/60 pt-3">
+                        {settings.dietary_requirements === 'required' || settings.accessibility_needs === 'required' || showExtras ? (
+                            <div className="space-y-3">
+                                {settings.dietary_requirements !== 'hidden' && (
+                                    <Input
+                                        label={`Dietary requirements ${settings.dietary_requirements === 'required' ? '*' : '(optional)'}`}
+                                        type="text"
+                                        placeholder="e.g. Vegetarian, nut allergy"
+                                        value={data.dietary_requirements}
+                                        onChange={(e) => setData('dietary_requirements', e.target.value)}
+                                        error={errors.dietary_requirements}
+                                        required={settings.dietary_requirements === 'required'}
+                                    />
+                                )}
+                                {settings.accessibility_needs !== 'hidden' && (
+                                    <Input
+                                        label={`Accessibility needs ${settings.accessibility_needs === 'required' ? '*' : '(optional)'}`}
+                                        type="text"
+                                        placeholder="e.g. Step-free access, sign language"
+                                        value={data.accessibility_needs}
+                                        onChange={(e) => setData('accessibility_needs', e.target.value)}
+                                        error={errors.accessibility_needs}
+                                        required={settings.accessibility_needs === 'required'}
+                                    />
+                                )}
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setShowExtras(true)}
+                                className="text-[12.5px] text-ink-secondary underline hover:text-accent"
+                            >
+                                Add dietary or accessibility needs
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Promo / Discount Code Input Section */}
+                <div className="border-t border-border/60 pt-3">
+                    {appliedPromo ? (
+                        <div className="flex items-center justify-between rounded border border-success-fg/30 bg-success-bg/40 px-3 py-2 text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block h-2 w-2 rounded-full bg-success-fg animate-pulse"></span>
+                                <span className="font-semibold text-ink">Code: {appliedPromo.code}</span>
+                                <span className="text-[11px] text-success-fg">
+                                    ({appliedPromo.discount_type === 'complimentary'
+                                        ? 'Complimentary pass (100% OFF)'
+                                        : appliedPromo.discount_type === 'percentage'
+                                          ? `${appliedPromo.discount_value}% OFF`
+                                          : `-${formatMoney(appliedPromo.discount_value, event.currency)}`})
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleRemovePromo}
+                                className="text-[11px] text-danger-fg hover:underline"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    ) : !showPromoInput ? (
+                        <button
+                            type="button"
+                            onClick={() => setShowPromoInput(true)}
+                            className="text-[12px] text-ink-secondary hover:text-accent underline transition-colors"
+                        >
+                            Have a promo code?
+                        </button>
+                    ) : (
+                        <div className="rounded border border-border p-2.5 bg-surface-alt/40 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11.5px] font-medium text-ink">Promo Code:</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPromoInput(false)}
+                                    className="text-[11px] text-ink-muted hover:text-ink"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={promoCodeInput}
+                                    onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                                    placeholder="e.g. EARLYBIRD20"
+                                    className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleApplyPromo}
+                                    disabled={validatingPromo || !promoCodeInput.trim()}
+                                >
+                                    {validatingPromo ? 'Checking...' : 'Apply'}
+                                </Button>
+                            </div>
+                            {promoError && (
+                                <p className="text-[11px] text-danger-fg">{promoError}</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Dynamic Price Summary Box */}
+                {calculatedPricing.hasAdjustments && (
+                    <div className="rounded border border-accent/20 bg-accent-soft/30 p-3 text-xs space-y-1.5">
+                        <div className="flex justify-between font-medium text-ink">
+                            <span>Base Ticket:</span>
+                            <span>{formatMoney(basePrice, event.currency)}</span>
+                        </div>
+                        {calculatedPricing.breakdown.map((item, idx) => (
+                            <div
+                                key={idx}
+                                className={`flex justify-between ${
+                                    item.isDiscount ? 'font-medium text-success-fg' : 'text-ink-secondary'
+                                }`}
+                            >
+                                <span>{item.label}:</span>
+                                <span>
+                                    {item.isDiscount
+                                        ? `-${formatMoney(item.amount, event.currency)}`
+                                        : item.isOverride
+                                          ? 'Overrides to '
+                                          : '+'}
+                                    {!item.isDiscount && formatMoney(item.amount, event.currency)}
+                                </span>
+                            </div>
+                        ))}
+                        <div className="border-t border-accent/20 pt-1.5 flex justify-between font-bold text-sm text-accent">
+                            <span>Total Payable:</span>
+                            <span>
+                                {calculatedPricing.total > 0
+                                    ? formatMoney(calculatedPricing.total, event.currency)
+                                    : 'FREE (Complimentary)'}
+                            </span>
+                        </div>
+                    </div>
                 )}
 
                 <Button
@@ -634,9 +1179,11 @@ function RegistrationPanel({ event }) {
                 >
                     {selectedTicketType?.is_sold_out
                         ? 'Join waitlist'
-                        : price > 0
-                          ? `Continue to payment`
-                          : 'Register'}
+                        : calculatedPricing.total > 0
+                          ? `Continue to payment (${formatMoney(calculatedPricing.total, event.currency)})`
+                          : appliedPromo?.discount_type === 'complimentary'
+                            ? 'Complete Free Registration'
+                            : 'Register'}
                 </Button>
             </form>
 

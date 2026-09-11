@@ -44,6 +44,7 @@ final class EventTicketType extends Model
         'price',
         'capacity',
         'is_active',
+        'access_code',
         'sort_order',
     ];
 
@@ -53,6 +54,11 @@ final class EventTicketType extends Model
         'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
+
+    public function isInviteOnly(): bool
+    {
+        return ! empty($this->access_code);
+    }
 
     public function event(): BelongsTo
     {

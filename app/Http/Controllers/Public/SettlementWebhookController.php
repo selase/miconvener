@@ -186,6 +186,14 @@ final class SettlementWebhookController extends Controller
             'provider_reference' => $reference,
         ]);
 
+        app(\App\Services\Finance\LedgerService::class)->recordTicketSale(
+            $eventModel,
+            $registration,
+            $amount,
+            $commissionAmount,
+            $reference
+        );
+
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
 

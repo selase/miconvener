@@ -108,3 +108,25 @@ function refreshTenantDatabases(): void
         '--realpath' => true,
     ]);
 }
+
+if (! function_exists('eventSubdomainHost')) {
+    function eventSubdomainHost(string $slug): string
+    {
+        $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+
+        return "{$slug}.{$baseDomain}";
+    }
+}
+
+if (! function_exists('eventHost')) {
+    function eventHost(string $slug): array
+    {
+        $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        setPermissionsTeamId($tenant->id);
+        $user->assignRole('Org Superadmin');
+        $tenant->users()->attach($user->id);
+
+        return [$tenant, $user];
+    }
+}

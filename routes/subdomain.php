@@ -19,6 +19,7 @@ use App\Http\Controllers\Tenant\EventBlastController;
 use App\Http\Controllers\Tenant\EventCheckInController;
 use App\Http\Controllers\Tenant\EventController;
 use App\Http\Controllers\Tenant\EventFinanceController;
+use App\Http\Controllers\Tenant\EventFormFieldController;
 use App\Http\Controllers\Tenant\EventForumController;
 use App\Http\Controllers\Tenant\EventMaterialController;
 use App\Http\Controllers\Tenant\EventPollController;
@@ -139,6 +140,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::patch('events/{event}/sessions/reorder', [EventSessionController::class, 'reorder'])->name('tenant.events.sessions.reorder');
     Route::put('events/{event}/sessions/{session}', [EventSessionController::class, 'update'])->name('tenant.events.sessions.update');
     Route::delete('events/{event}/sessions/{session}', [EventSessionController::class, 'destroy'])->name('tenant.events.sessions.destroy');
+    Route::get('events/{event}/sessions/occupancy', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'occupancy'])->name('tenant.events.sessions.occupancy');
+    Route::post('events/{event}/sessions/{session}/scan', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'scan'])->name('tenant.events.sessions.scan');
+    Route::get('events/{event}/sessions/{session}/attendees', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'attendees'])->name('tenant.events.sessions.attendees');
 
     Route::post('events/{event}/speakers', [EventSpeakerController::class, 'store'])->name('tenant.events.speakers.store');
     Route::delete('events/{event}/speakers/{speaker}', [EventSpeakerController::class, 'destroy'])->name('tenant.events.speakers.destroy');
@@ -157,6 +161,18 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/venue/rooms/{room}/seats', [EventVenueController::class, 'assignSeat'])->name('tenant.events.venue.seats.assign');
     Route::delete('events/{event}/venue/rooms/{room}/seats/{assignment}', [EventVenueController::class, 'unassignSeat'])->name('tenant.events.venue.seats.unassign');
     Route::get('events/{event}/venue/unseated', [EventVenueController::class, 'searchUnseated'])->name('tenant.events.venue.unseated');
+
+    Route::get('events/{event}/form-fields', [EventFormFieldController::class, 'index'])->name('tenant.events.form-fields.index');
+    Route::post('events/{event}/form-fields', [EventFormFieldController::class, 'store'])->name('tenant.events.form-fields.store');
+    Route::put('events/{event}/form-fields/{field}', [EventFormFieldController::class, 'update'])->name('tenant.events.form-fields.update');
+    Route::delete('events/{event}/form-fields/{field}', [EventFormFieldController::class, 'destroy'])->name('tenant.events.form-fields.destroy');
+    Route::post('events/{event}/form-fields/reorder', [EventFormFieldController::class, 'reorder'])->name('tenant.events.form-fields.reorder');
+    Route::match(['post', 'put'], 'events/{event}/registration-settings', [EventFormFieldController::class, 'updateSettings'])->name('tenant.events.registration-settings.update');
+    Route::get('events/{event}/promo-codes', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'index'])->name('tenant.events.promo-codes.index');
+    Route::post('events/{event}/promo-codes', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'store'])->name('tenant.events.promo-codes.store');
+    Route::put('events/{event}/promo-codes/{promoCode}', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'update'])->name('tenant.events.promo-codes.update');
+    Route::delete('events/{event}/promo-codes/{promoCode}', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'destroy'])->name('tenant.events.promo-codes.destroy');
+    Route::patch('events/{event}/promo-codes/{promoCode}/toggle', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'toggle'])->name('tenant.events.promo-codes.toggle');
 
     Route::get('events/{event}/forum', [EventForumController::class, 'index'])->name('tenant.events.forum.index');
     Route::post('events/{event}/forum/{thread}/replies', [EventForumController::class, 'reply'])->name('tenant.events.forum.reply');
@@ -180,6 +196,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/badges/print-log', [EventBadgeController::class, 'logPrint'])->name('tenant.events.badges.print-log');
 
     Route::get('events/{event}/finance', [EventFinanceController::class, 'index'])->name('tenant.events.finance.index');
+    Route::post('events/{event}/finance/payout-schedule', [EventFinanceController::class, 'updatePayoutSchedule'])->name('tenant.events.finance.payout-schedule.update');
     Route::post('events/{event}/finance/payouts', [EventFinanceController::class, 'storePayout'])->name('tenant.events.finance.payouts.store');
     Route::patch('events/{event}/finance/payouts/{payout}', [EventFinanceController::class, 'updatePayoutStatus'])->name('tenant.events.finance.payouts.status');
     Route::post('events/{event}/finance/payouts/{payout}/send', [EventFinanceController::class, 'sendPayout'])->name('tenant.events.finance.payouts.send');
@@ -216,6 +233,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
 // Public event pages (no auth — attendees register here)
 Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.events.show');
+Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');
+Route::post('/e/{event}/unlock-tickets', [PublicEventController::class, 'unlockTicketTypes'])->name('public.events.unlock-tickets');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
 Route::post('/e/{event}/find-ticket', [App\Http\Controllers\Public\TicketRecoveryController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.find-ticket');

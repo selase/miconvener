@@ -82,6 +82,7 @@ final class Event extends Model
         'visibility',
         'plan_your_visit_content',
         'platform_fee_percentage',
+        'registration_settings',
     ];
 
     protected $casts = [
@@ -91,6 +92,7 @@ final class Event extends Model
         'requires_approval' => 'boolean',
         'ticket_price' => 'integer',
         'platform_fee_percentage' => 'float',
+        'registration_settings' => 'array',
     ];
 
     /**
@@ -105,6 +107,37 @@ final class Event extends Model
     public function heroImageUrl(): ?string
     {
         return Helper::storageUrl($this->hero_image_path);
+    }
+
+    public function formFields(): HasMany
+    {
+        return $this->hasMany(EventFormField::class)->orderBy('sort_order')->orderBy('created_at');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function effectiveRegistrationSettings(): array
+    {
+        $raw = $this->registration_settings ?? [];
+        $collectPhone = $raw['collect_phone'] ?? (isset($raw['phone']) ? $raw['phone'] !== 'hidden' : true);
+        $requirePhone = $raw['require_phone'] ?? (isset($raw['phone']) ? $raw['phone'] === 'required' : false);
+        $collectDietary = $raw['collect_dietary'] ?? (isset($raw['dietary_requirements']) ? $raw['dietary_requirements'] !== 'hidden' : true);
+        $requireDietary = $raw['require_dietary'] ?? (isset($raw['dietary_requirements']) ? $raw['dietary_requirements'] === 'required' : false);
+        $collectAccess = $raw['collect_accessibility'] ?? (isset($raw['accessibility_needs']) ? $raw['accessibility_needs'] !== 'hidden' : true);
+        $requireAccess = $raw['require_accessibility'] ?? (isset($raw['accessibility_needs']) ? $raw['accessibility_needs'] === 'required' : false);
+
+        return [
+            'collect_phone' => (bool) $collectPhone,
+            'require_phone' => (bool) $requirePhone,
+            'collect_dietary' => (bool) $collectDietary,
+            'require_dietary' => (bool) $requireDietary,
+            'collect_accessibility' => (bool) $collectAccess,
+            'require_accessibility' => (bool) $requireAccess,
+            'phone' => ! $collectPhone ? 'hidden' : ($requirePhone ? 'required' : 'optional'),
+            'dietary_requirements' => ! $collectDietary ? 'hidden' : ($requireDietary ? 'required' : 'optional'),
+            'accessibility_needs' => ! $collectAccess ? 'hidden' : ($requireAccess ? 'required' : 'optional'),
+        ];
     }
 
     public function tenant(): BelongsTo
@@ -190,6 +223,21 @@ final class Event extends Model
     public function ticketTypes(): HasMany
     {
         return $this->hasMany(EventTicketType::class)->orderBy('sort_order');
+    }
+
+    public function promoCodes(): HasMany
+    {
+        return $this->hasMany(EventPromoCode::class);
+    }
+
+    public function payoutSchedule(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EventPayoutSchedule::class);
+    }
+
+    public function ledgerTransactions(): HasMany
+    {
+        return $this->hasMany(LedgerTransaction::class);
     }
 
     public function sessions(): HasMany

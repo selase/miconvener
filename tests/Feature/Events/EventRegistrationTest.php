@@ -12,7 +12,6 @@ use App\Models\EventSeatAssignment;
 use App\Models\EventVenueRoom;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
-use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 
@@ -21,25 +20,6 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 });
-
-function eventSubdomainHost(string $slug): string
-{
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-
-    return "{$slug}.{$baseDomain}";
-}
-
-function eventHost(string $slug): array
-{
-    $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
-    $user = User::factory()->create(['tenant_id' => $tenant->id]);
-    setPermissionsTeamId($tenant->id);
-    $user->assignRole('Org Superadmin');
-    $tenant->users()->attach($user->id);
-
-    return [$tenant, $user];
-}
-
 test('host can create an event', function () {
     [$tenant, $user] = eventHost('acme');
     $host = eventSubdomainHost('acme');

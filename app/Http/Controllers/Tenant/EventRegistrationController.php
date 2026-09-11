@@ -236,6 +236,8 @@ final class EventRegistrationController extends Controller
         }
 
         if ($chargeEntry) {
+            $ref = $this->hasNoProviderRefundId($refundId) ? 'REF_'.$chargeEntry->provider_reference : $refundId;
+
             EventLedgerEntry::create([
                 'tenant_id' => $tenant->id,
                 'event_id' => $chargeEntry->event_id,
@@ -247,8 +249,16 @@ final class EventRegistrationController extends Controller
                 'net_amount' => -$chargeEntry->net_amount,
                 'currency' => $chargeEntry->currency,
                 'provider' => $chargeEntry->provider,
-                'provider_reference' => $this->hasNoProviderRefundId($refundId) ? 'REF_'.$chargeEntry->provider_reference : $refundId,
+                'provider_reference' => $ref,
             ]);
+
+            app(\App\Services\Finance\LedgerService::class)->recordRefund(
+                $registrationModel->event,
+                $registrationModel,
+                $chargeEntry->gross_amount,
+                $chargeEntry->commission_amount,
+                $ref
+            );
         }
     }
 

@@ -60,6 +60,35 @@ final class EventSession extends Model
         return $this->belongsToMany(EventRegistration::class, 'event_registration_sessions', 'session_id', 'registration_id');
     }
 
+    public function attendances(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(EventSessionAttendance::class, 'session_id');
+    }
+
+    public function activeAttendances(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(EventSessionAttendance::class, 'session_id')->whereNull('checked_out_at');
+    }
+
+    public function liveHeadcount(): int
+    {
+        return $this->activeAttendances()->count();
+    }
+
+    public function isRoomFull(): bool
+    {
+        return $this->capacity !== null && $this->liveHeadcount() >= $this->capacity;
+    }
+
+    public function occupancyPercentage(): int
+    {
+        if (! $this->capacity || $this->capacity <= 0) {
+            return 0;
+        }
+
+        return (int) min(100, round(($this->liveHeadcount() / $this->capacity) * 100));
+    }
+
     public function scopeWorkshops(Builder $query): Builder
     {
         return $query->where('type', self::TYPE_WORKSHOP);

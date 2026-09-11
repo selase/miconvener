@@ -9,7 +9,6 @@ use App\Models\Event;
 use App\Models\EventForumThread;
 use App\Models\EventPollResponse;
 use App\Models\EventRegistration;
-use App\Models\EventSession;
 use App\Services\Tenancy\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -42,6 +41,14 @@ final class EventReportController extends Controller
         'created_at' => 'Registered at',
     ];
 
+    private const array OPTIONAL_COLUMNS = [
+        'title' => 'Title',
+        'first_name' => 'First name',
+        'last_name' => 'Last name',
+        'dietary_requirements' => 'Dietary requirements',
+        'accessibility_needs' => 'Accessibility needs',
+    ];
+
     /**
      * @var string[]
      */
@@ -53,6 +60,17 @@ final class EventReportController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
+        $formFields = $eventModel->formFields()->ordered()->get();
+        $customColumns = $formFields->map(fn ($f): array => [
+            'key' => 'form_'.$f->field_key,
+            'label' => $f->label,
+        ]);
+
+        $availableColumns = collect(self::REGISTRATION_COLUMNS)
+            ->map(fn (string $label, string $key): array => ['key' => $key, 'label' => $label])
+            ->values()
+            ->concat($customColumns);
+
         return response()->json([
             'counts' => [
                 'registrations' => $eventModel->registrations()->confirmed()->count(),
@@ -60,7 +78,7 @@ final class EventReportController extends Controller
                 'forum_threads' => $eventModel->forumThreads()->count(),
                 'poll_responses' => EventPollResponse::whereIn('poll_id', $eventModel->polls()->pluck('id'))->count(),
             ],
-            'available_columns' => collect(self::REGISTRATION_COLUMNS)->map(fn (string $label, string $key): array => ['key' => $key, 'label' => $label])->values(),
+            'available_columns' => $availableColumns,
             'default_columns' => self::DEFAULT_REGISTRATION_COLUMNS,
         ]);
     }
@@ -71,22 +89,26 @@ final class EventReportController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
+        $formFields = $eventModel->formFields()->ordered()->get();
+        $customKeyToLabel = $formFields->mapWithKeys(fn ($f): array => ['form_'.$f->field_key => $f->label])->all();
+        $allPossibleColumns = array_merge(self::REGISTRATION_COLUMNS, self::OPTIONAL_COLUMNS, $customKeyToLabel);
+
         $validated = $request->validate([
             'columns' => ['sometimes', 'array'],
-            'columns.*' => [Rule::in(array_keys(self::REGISTRATION_COLUMNS))],
+            'columns.*' => [Rule::in(array_keys($allPossibleColumns))],
         ]);
 
         $columns = ! empty($validated['columns'])
-            ? array_values(array_intersect(array_keys(self::REGISTRATION_COLUMNS), $validated['columns']))
-            : self::DEFAULT_REGISTRATION_COLUMNS;
+            ? array_values(array_intersect(array_keys($allPossibleColumns), $validated['columns']))
+            : array_merge(self::DEFAULT_REGISTRATION_COLUMNS, array_keys($customKeyToLabel));
 
         $seatLabels = $eventModel->seatAssignments()->get(['registration_id', 'seat_label'])->keyBy('registration_id');
 
         $filename = "{$eventModel->slug}-registrations.csv";
 
-        return response()->streamDownload(function () use ($eventModel, $columns, $seatLabels): void {
+        return response()->streamDownload(function () use ($eventModel, $columns, $allPossibleColumns, $seatLabels): void {
             $handle = fopen('php://output', 'wb');
-            fputcsv($handle, array_map(fn (string $key): string => self::REGISTRATION_COLUMNS[$key], $columns));
+            fputcsv($handle, array_map(fn (string $key): string => $allPossibleColumns[$key] ?? $key, $columns));
 
             $eventModel->registrations()->with('ticketType:id,name')->orderBy('created_at')->chunk(200, function ($registrations) use ($handle, $columns, $seatLabels): void {
                 foreach ($registrations as $registration) {
@@ -223,9 +245,8 @@ final class EventReportController extends Controller
     }
 
     /**
-     * Reflects who added a session to their day (and, for capacity-gated
-     * workshops, actually signed up) — this app has no per-session
-     * scan-in/out device, so that is the strongest attendance signal it has.
+     * Exports verified breakout session & workshop attendances with scan-in,
+     * scan-out, dwell time, and CPD/CME contact hours calculation.
      */
     public function exportSessionAttendance(string $subdomain, string $event): StreamedResponse
     {
@@ -237,22 +258,87 @@ final class EventReportController extends Controller
 
         return response()->streamDownload(function () use ($eventModel): void {
             $handle = fopen('php://output', 'wb');
-            fputcsv($handle, ['Session', 'Starts at', 'Location', 'Capacity', 'Attendee name', 'Attendee email', 'Ticket type']);
+            fputcsv($handle, [
+                'Session Title',
+                'Location / Room',
+                'Track',
+                'Session Start',
+                'Session End',
+                'Attendee Title',
+                'Attendee Name',
+                'Attendee Email',
+                'Ticket Code',
+                'Status',
+                'Check-in Time',
+                'Check-out Time',
+                'Dwell Time (Mins)',
+                'CPD Contact Hours',
+            ]);
 
-            $eventModel->sessions()->with(['registrations.ticketType:id,name'])->orderBy('starts_at')->get()
-                ->each(function (EventSession $session) use ($handle): void {
-                    foreach ($session->registrations as $registration) {
-                        fputcsv($handle, [
-                            $session->title,
-                            $session->starts_at->toIso8601String(),
-                            $session->location,
-                            $session->capacity,
-                            $registration->full_name,
-                            $registration->email,
-                            $registration->ticketType?->name,
-                        ]);
+            $sessions = $eventModel->sessions()
+                ->with([
+                    'attendances.registration.ticketType:id,name',
+                    'registrations.ticketType:id,name',
+                ])
+                ->orderBy('starts_at')
+                ->get();
+
+            foreach ($sessions as $session) {
+                $scannedRegistrationIds = [];
+
+                // 1. Scanned attendances (verified scan-in / scan-out)
+                foreach ($session->attendances as $attendance) {
+                    $registration = $attendance->registration;
+                    if ($registration) {
+                        $scannedRegistrationIds[] = $registration->id;
                     }
-                });
+
+                    $dwellMinutes = $attendance->durationMinutes();
+                    $contactHours = $attendance->contactHoursEarned();
+                    $status = $attendance->isCurrentlyInRoom() ? 'In Room (Active)' : 'Completed';
+
+                    fputcsv($handle, [
+                        $session->title,
+                        $session->location ?: 'Main Hall',
+                        $session->track ?: 'General',
+                        $session->starts_at?->toIso8601String(),
+                        $session->ends_at?->toIso8601String(),
+                        $registration?->title,
+                        $registration?->full_name,
+                        $registration?->email,
+                        $registration?->ticket_code,
+                        $status,
+                        $attendance->checked_in_at?->toIso8601String(),
+                        $attendance->checked_out_at?->toIso8601String(),
+                        $dwellMinutes,
+                        $contactHours,
+                    ]);
+                }
+
+                // 2. Pre-registered attendees who haven't scanned in
+                foreach ($session->registrations as $reg) {
+                    if (in_array($reg->id, $scannedRegistrationIds, true)) {
+                        continue;
+                    }
+
+                    fputcsv($handle, [
+                        $session->title,
+                        $session->location ?: 'Main Hall',
+                        $session->track ?: 'General',
+                        $session->starts_at?->toIso8601String(),
+                        $session->ends_at?->toIso8601String(),
+                        $reg->title,
+                        $reg->full_name,
+                        $reg->email,
+                        $reg->ticket_code,
+                        'Registered (Absent)',
+                        '',
+                        '',
+                        0,
+                        0.00,
+                    ]);
+                }
+            }
 
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
@@ -365,10 +451,28 @@ final class EventReportController extends Controller
 
     private function resolveRegistrationColumn(string $key, EventRegistration $registration, ?string $seatLabel): string
     {
+        if (str_starts_with($key, 'form_')) {
+            $fieldKey = mb_substr($key, 5);
+            $answer = $registration->form_answers[$fieldKey] ?? null;
+            if (is_array($answer)) {
+                return implode(', ', array_map(fn ($item): string => (string) $item, $answer));
+            }
+            if (is_bool($answer)) {
+                return $answer ? 'Yes' : 'No';
+            }
+
+            return (string) ($answer ?? '');
+        }
+
         return (string) match ($key) {
+            'title' => $registration->title,
+            'first_name' => $registration->first_name,
+            'last_name' => $registration->last_name,
             'name' => $registration->full_name,
             'email' => $registration->email,
             'phone' => $registration->phone,
+            'dietary_requirements' => $registration->dietary_requirements,
+            'accessibility_needs' => $registration->accessibility_needs,
             'status' => $registration->status,
             'ticket_type' => $registration->ticketType?->name,
             'ticket_code' => $registration->ticket_code,

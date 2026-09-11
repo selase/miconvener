@@ -24,15 +24,21 @@ import MaterialsPanel from './panels/MaterialsPanel';
 import ReportsPanel from './panels/ReportsPanel';
 import SponsorsPanel from './panels/SponsorsPanel';
 import FinancePanel from './panels/FinancePanel';
+import RegistrationFormPanel from './panels/RegistrationFormPanel';
+import PromoCodePanel from './panels/PromoCodePanel';
+import SessionOccupancyPanel from './panels/SessionOccupancyPanel';
 
 const TABS = [
     'Overview',
     'Tickets',
+    'Promos',
+    'Form',
     'Speakers',
     'Schedule',
     'Guests',
     'Blasts',
     'Check-in',
+    'Occupancy',
     'Venue',
     'Requests',
     'Materials',
@@ -359,6 +365,18 @@ export default function Show({
                         onChange={() => router.reload({ only: ['event'] })}
                     />
                 )}
+                {tab === 'Promos' && (
+                    <PromoCodePanel
+                        event={event}
+                        onChange={() => router.reload({ only: ['event'] })}
+                    />
+                )}
+                {tab === 'Form' && (
+                    <RegistrationFormPanel
+                        event={event}
+                        onChange={() => router.reload({ only: ['event'] })}
+                    />
+                )}
                 {tab === 'Speakers' && (
                     <SpeakersPanel
                         event={event}
@@ -378,6 +396,8 @@ export default function Show({
                 {tab === 'Blasts' && <BlastsPanel event={event} />}
                 {tab === 'Check-in' && (
                     <CheckInPanel
+                        event={event}
+                        sessions={event.sessions || []}
                         scanUrl={route('tenant.events.checkin.scan', { event: event.id })}
                         searchUrl={route('tenant.events.checkin.search', { event: event.id })}
                         checkInUrlFor={(registrationId) =>
@@ -386,6 +406,12 @@ export default function Show({
                                 registration: registrationId,
                             })
                         }
+                    />
+                )}
+                {tab === 'Occupancy' && (
+                    <SessionOccupancyPanel
+                        event={event}
+                        onOpenScannerForSession={(session) => setTab('Check-in')}
                     />
                 )}
                 {tab === 'Venue' && <VenuePanel event={event} venueRooms={event.venue_rooms} />}

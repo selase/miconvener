@@ -14,3 +14,12 @@ declare(strict_types=1);
 */
 
 Broadcast::channel('App.Models.User.{id}', fn ($user, $id): bool => (int) $user->id === (int) $id);
+
+Broadcast::channel('event.{eventId}.sessions', function ($user, string $eventId): bool {
+    $event = App\Models\Event::find($eventId);
+    if (! $event) {
+        return false;
+    }
+
+    return (string) $user->tenant_id === (string) $event->tenant_id;
+});

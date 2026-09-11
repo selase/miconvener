@@ -45,17 +45,23 @@ final class EventRegistration extends Model
         'event_id',
         'ticket_type_id',
         'full_name',
+        'title',
+        'first_name',
+        'last_name',
         'email',
         'email_verified_at',
         'phone',
         'dietary_requirements',
         'accessibility_needs',
+        'form_answers',
         'status',
         'waitlist_position',
         'approval_note',
         'ticket_code',
         'qr_token',
+        'promo_code_id',
         'amount',
+        'discount_amount',
         'platform_fee_amount',
         'currency',
         'payment_reference',
@@ -65,10 +71,12 @@ final class EventRegistration extends Model
 
     protected $casts = [
         'amount' => 'integer',
+        'discount_amount' => 'integer',
         'platform_fee_amount' => 'integer',
         'waitlist_position' => 'integer',
         'checked_in_at' => 'datetime',
         'email_verified_at' => 'datetime',
+        'form_answers' => 'array',
     ];
 
     protected $hidden = [
@@ -118,6 +126,11 @@ final class EventRegistration extends Model
     public function ticketType(): BelongsTo
     {
         return $this->belongsTo(EventTicketType::class, 'ticket_type_id');
+    }
+
+    public function promoCode(): BelongsTo
+    {
+        return $this->belongsTo(EventPromoCode::class, 'promo_code_id');
     }
 
     public function checkedInBy(): BelongsTo

@@ -12,13 +12,16 @@ use App\Mail\Events\EventRegistrationPendingApproval;
 use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Mail\Events\EventRegistrationWaitlisted;
 use App\Models\Event;
+use App\Models\EventFormField;
 use App\Models\EventMaterial;
 use App\Models\EventRegistration;
 use App\Models\EventTicketType;
 use App\Models\Tenant;
 use App\Services\Events\QrCodeGenerator;
+use App\Services\Events\RegistrationPricingService;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -60,17 +63,52 @@ final class PublicEventController extends Controller
 
         $activeTicketTypes = $eventModel->ticketTypes->where('is_active', true);
         $usesTicketTypes = $activeTicketTypes->isNotEmpty();
+        $settings = $eventModel->effectiveRegistrationSettings();
 
         $validated = $request->validate([
-            'full_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:32'],
-            'dietary_requirements' => ['nullable', 'string', 'max:255'],
-            'accessibility_needs' => ['nullable', 'string', 'max:255'],
+            'title' => ['required_without:full_name', 'nullable', 'string', 'max:32'],
+            'first_name' => ['required_without:full_name', 'nullable', 'string', 'max:255'],
+            'last_name' => ['required_without:full_name', 'nullable', 'string', 'max:255'],
+            'full_name' => ['nullable', 'string', 'max:255'],
+            'phone' => [
+                $settings['require_phone'] ? 'required' : 'nullable',
+                'string',
+                'max:32',
+            ],
+            'dietary_requirements' => [
+                $settings['require_dietary'] ? 'required' : 'nullable',
+                'string',
+                'max:255',
+            ],
+            'accessibility_needs' => [
+                $settings['require_accessibility'] ? 'required' : 'nullable',
+                'string',
+                'max:255',
+            ],
             'ticket_type_id' => $usesTicketTypes
                 ? ['required', Rule::in($activeTicketTypes->pluck('id')->all())]
                 : ['nullable'],
+            'form_answers' => ['nullable', 'array'],
+            'promo_code' => ['nullable', 'string', 'max:64'],
+            'access_code' => ['nullable', 'string', 'max:64'],
         ]);
+
+        $cleanedFormAnswers = app(RegistrationPricingService::class)->validateAndCleanAnswers(
+            $eventModel,
+            (array) $request->input('form_answers', [])
+        );
+
+        $ticketType = $usesTicketTypes ? $activeTicketTypes->firstWhere('id', $validated['ticket_type_id']) : null;
+
+        if ($ticketType && $ticketType->isInviteOnly()) {
+            $providedAccessCode = mb_strtoupper(mb_trim((string) ($validated['access_code'] ?? '')));
+            if ($providedAccessCode !== mb_strtoupper(mb_trim((string) $ticketType->access_code))) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'access_code' => ['Invalid access code for this ticket type.'],
+                ]);
+            }
+        }
 
         // The plan's registration ceiling. Checked before the registration row is
         // written: usage only increments on confirmation, so an organizer at the
@@ -104,14 +142,41 @@ final class PublicEventController extends Controller
             );
         }
 
-        $ticketType = $usesTicketTypes ? $activeTicketTypes->firstWhere('id', $validated['ticket_type_id']) : null;
-
         $isFull = $usesTicketTypes
             ? $ticketType->isSoldOut()
             : ($eventModel->capacity !== null && $eventModel->registrations()->confirmed()->count() >= $eventModel->capacity);
 
-        $isFree = $ticketType ? $ticketType->isFree() : $eventModel->isFree();
-        $amount = $ticketType ? $ticketType->price : $eventModel->ticket_price;
+        $pricing = app(RegistrationPricingService::class)->calculatePrice(
+            $eventModel,
+            $ticketType,
+            $cleanedFormAnswers
+        );
+        $amount = $pricing['amount'];
+
+        $promoCodeModel = null;
+        $discountAmount = 0;
+
+        if (! empty($validated['promo_code'])) {
+            $promoResult = app(\App\Services\Events\PromoCodeService::class)->validateCode(
+                $eventModel,
+                (string) $validated['promo_code'],
+                $ticketType,
+                (string) $validated['email'],
+                $amount
+            );
+
+            if (! $promoResult['valid']) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'promo_code' => [$promoResult['error']],
+                ]);
+            }
+
+            $promoCodeModel = $promoResult['promo_code'];
+            $discountAmount = $promoResult['discount_amount'];
+            $amount = $promoResult['final_amount'];
+        }
+
+        $isFree = $amount === 0;
         $platformFeeAmount = $isFree ? 0 : (int) round($amount * $eventModel->effectivePlatformFeePercentage() / 100);
 
         $status = match (true) {
@@ -121,23 +186,47 @@ final class PublicEventController extends Controller
             default => EventRegistration::STATUS_PENDING_PAYMENT,
         };
 
+        $title = $validated['title'] ?? null;
+        $firstName = $validated['first_name'] ?? null;
+        $lastName = $validated['last_name'] ?? null;
+
+        if ((! $firstName || ! $lastName) && ! empty($validated['full_name'])) {
+            $parts = explode(' ', mb_trim((string) $validated['full_name']), 2);
+            $firstName = $firstName ?: ($parts[0] ?? '');
+            $lastName = $lastName ?: ($parts[1] ?? '');
+        }
+
+        $fullName = ! empty($validated['full_name'])
+            ? $validated['full_name']
+            : mb_trim(($title ? $title.' ' : '')."{$firstName} {$lastName}");
+
         $registration = EventRegistration::create([
-            'full_name' => $validated['full_name'],
+            'title' => $title,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'full_name' => $fullName,
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'dietary_requirements' => $validated['dietary_requirements'] ?? null,
             'accessibility_needs' => $validated['accessibility_needs'] ?? null,
+            'form_answers' => ! empty($cleanedFormAnswers) ? $cleanedFormAnswers : null,
             'tenant_id' => $tenant->id,
             'event_id' => $eventModel->id,
             'ticket_type_id' => $ticketType?->id,
+            'promo_code_id' => $promoCodeModel?->id,
+            'amount' => $amount,
+            'discount_amount' => $discountAmount,
+            'platform_fee_amount' => $platformFeeAmount,
+            'currency' => $eventModel->currency,
             'status' => $status,
             'waitlist_position' => $status === EventRegistration::STATUS_WAITLISTED
                 ? $this->nextWaitlistPosition($eventModel, $ticketType)
                 : null,
-            'amount' => $isFree ? 0 : $amount,
-            'platform_fee_amount' => $platformFeeAmount,
-            'currency' => $eventModel->currency,
         ]);
+
+        if ($promoCodeModel) {
+            app(\App\Services\Events\PromoCodeService::class)->recordRedemption($promoCodeModel);
+        }
 
         if ($status === EventRegistration::STATUS_CONFIRMED) {
             app(FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
@@ -308,6 +397,87 @@ final class PublicEventController extends Controller
         ]);
     }
 
+    public function validatePromo(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        $validated = $request->validate([
+            'code' => ['required', 'string'],
+            'ticket_type_id' => ['nullable', 'string'],
+            'email' => ['nullable', 'email'],
+            'amount' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $ticketType = ! empty($validated['ticket_type_id'])
+            ? $eventModel->ticketTypes()->where('id', $validated['ticket_type_id'])->first()
+            : null;
+
+        $amount = (int) ($validated['amount'] ?? ($ticketType ? $ticketType->price : $eventModel->ticket_price));
+
+        $result = app(\App\Services\Events\PromoCodeService::class)->validateCode(
+            $eventModel,
+            $validated['code'],
+            $ticketType,
+            (string) ($validated['email'] ?? ''),
+            $amount
+        );
+
+        if (! $result['valid']) {
+            return response()->json([
+                'valid' => false,
+                'message' => $result['error'],
+            ], 422);
+        }
+
+        $promo = $result['promo_code'];
+
+        return response()->json([
+            'valid' => true,
+            'code' => $promo->code,
+            'discount_type' => $promo->discount_type,
+            'discount_value' => $promo->discount_value,
+            'discount_amount' => $result['discount_amount'],
+            'final_amount' => $result['final_amount'],
+            'message' => $promo->discount_type === \App\Models\EventPromoCode::TYPE_COMPLIMENTARY
+                ? 'Complimentary pass applied!'
+                : 'Promo code applied successfully!',
+        ]);
+    }
+
+    public function unlockTicketTypes(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        $validated = $request->validate(['access_code' => ['required', 'string']]);
+        $code = mb_strtoupper(mb_trim($validated['access_code']));
+
+        $unlocked = $eventModel->ticketTypes()->active()
+            ->whereNotNull('access_code')
+            ->whereRaw('UPPER(access_code) = ?', [$code])
+            ->get()
+            ->map(fn (EventTicketType $t): array => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'description' => $t->description,
+                'price' => $t->price,
+                'is_free' => $t->isFree(),
+                'is_sold_out' => $t->isSoldOut(),
+                'is_invite_only' => true,
+                'access_code' => $code,
+            ]);
+
+        if ($unlocked->isEmpty()) {
+            return response()->json(['message' => 'No ticket types match this access code.'], 404);
+        }
+
+        return response()->json([
+            'message' => 'Access code accepted.',
+            'ticket_types' => $unlocked,
+        ]);
+    }
+
     /**
      * Re-sends the status-appropriate registration email to an address that
      * already holds a live registration for this event. The link is delivered
@@ -390,6 +560,17 @@ final class PublicEventController extends Controller
             'is_free' => $event->isFree(),
             'hero_image_url' => Helper::storageUrl($event->hero_image_path),
             'plan_your_visit_content' => $event->plan_your_visit_content,
+            'registration_settings' => $event->effectiveRegistrationSettings(),
+            'form_fields' => $event->formFields()->ordered()->get()->map(fn (EventFormField $f): array => [
+                'id' => $f->id,
+                'label' => $f->label,
+                'field_key' => $f->field_key,
+                'field_type' => $f->field_type,
+                'help_text' => $f->help_text,
+                'is_required' => (bool) $f->is_required,
+                'options' => $f->options,
+                'conditional_logic' => $f->conditional_logic,
+            ])->values(),
             'ticket_types' => $event->ticketTypes()->active()->get()->map(fn (EventTicketType $t): array => [
                 'id' => $t->id,
                 'name' => $t->name,
@@ -397,6 +578,7 @@ final class PublicEventController extends Controller
                 'price' => $t->price,
                 'is_free' => $t->isFree(),
                 'is_sold_out' => $t->isSoldOut(),
+                'is_invite_only' => $t->isInviteOnly(),
             ])->values(),
             'sessions' => ! $withhold && $event->relationLoaded('sessions') ? $event->sessions->map(fn ($s): array => [
                 'id' => $s->id,

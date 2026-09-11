@@ -30,6 +30,15 @@ final class EventRegistrationFactory extends Factory
         ];
     }
 
+    public function confirmed(): static
+    {
+        return $this->state([
+            'status' => EventRegistration::STATUS_CONFIRMED,
+            'ticket_code' => 'EVT-'.mb_strtoupper($this->faker->bothify('????-###')),
+            'qr_token' => bin2hex(random_bytes(16)),
+        ]);
+    }
+
     public function pendingPayment(): static
     {
         return $this->state([

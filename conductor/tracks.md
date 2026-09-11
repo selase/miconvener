@@ -233,12 +233,12 @@ arrived, so a lost webhook cannot strand money that has already left the platfor
 - **Route Registration & Legacy Fallback**: Registered `GET /media/{path}` and a `GET /storage/{path}` fallback route in both `routes/web.php` and `routes/subdomain.php`, ensuring direct media requests and any legacy `/storage/...` requests resolve seamlessly without 404s.
 - **Verification**: Verified with 7 passing tests in `tests/Feature/Media/MediaServeTest.php` and 85 passing tests in `tests/Feature/Events/`.
 
-## [ ] Track: Commerce gaps vs. `miconvener.md` §5
+## [x] Track: Commerce gaps vs. `miconvener.md` §5
 
-Not started, and each is called for by the brief: promo codes, discounts and complimentary
-tickets; invite-only ticket types with access codes; `payout_schedules` (holdback,
-T+N-after-event automatic payouts — payouts are manual/on-demand only today); and a true
-double-entry ledger with balanced accounts, the current event ledger being single-sided.
+Fulfilled across the three dedicated commerce tracks below:
+1. Promo codes, discounts and complimentary passes with invite-only access codes (`EventPromoCode`, `PromoCodeService`, `PromoCodePanel.jsx`).
+2. Multi-point breakout session check-in, real-time room occupancy gauges, Reverb broadcasting, and CPD accreditation reporting (`EventSessionAttendance`, `SessionOccupancyPanel.jsx`).
+3. True double-entry general ledger with balanced accounts ($\sum \text{Debits} == \sum \text{Credits}$), automated settlement reconciliation (`app:reconcile-payout-schedules`), escrow holdback retention/release, and settlement statement export (`LedgerService`, `EventPayoutSchedule`, `FinancePanel.jsx`).
 
 ## [x] Track: Executive Pitch Deck & Sales Presentation Route
 
@@ -264,16 +264,48 @@ Verified by:
 - Full marketing test suite `tests/Feature/Marketing/` (14 passing tests, 67 assertions).
 - Clean code formatting via `vendor/bin/pint --dirty`.
 
-## [ ] Track: Tenant-Configurable Registration Forms, Conditional Fields & Dynamic Pricing
+## [x] Track: Tenant-Configurable Registration Forms, Conditional Fields & Dynamic Pricing
 
-- **Mandatory Core & Configurable Fields**: Title, First Name, Last Name, and Email required on all registrations; Phone, Dietary Requirements, and Accessibility Needs configurable per event (required/optional/disabled).
-- **Arbitrary Custom Form Fields**: Tenants can create unlimited custom fields with arbitrary labels, types (radio, select, text, textarea, checkbox, number), and options.
-- **Conditional Visibility & Dynamic Pricing Engine**: Conditional rules (show field B only when field A matches option X) and option-based pricing calculations evaluated server-side by `RegistrationPricingService`.
-- **Tenant Management UI**: `RegistrationFormPanel.jsx` in event console for configuring field requirements, options, prices, and dependencies.
-- **Public Form & Reactivity**: Public registration form on `/e/{slug}` with dynamic fields, real-time condition evaluation, and live price updates.
-- **Reporting & Badges**: Expose Title, First Name, Last Name, and custom form answers in attendee detail drawer, badge printing, and registration CSV exports.
+- **Mandatory Core & Configurable Fields**: Title, First Name, Last Name, and Email required on all registrations; Phone, Dietary Requirements, and Accessibility Needs configurable per event (required/optional/hidden).
+- **Arbitrary Custom Form Fields**: Tenants can create unlimited custom fields with arbitrary labels, types (radio, select, text, textarea, checkbox, number), and options. Pre-built with options editor, price overrides, price additions, and sorting.
+- **Conditional Visibility & Dynamic Pricing Engine**: Conditional visibility rules (show field B only when field A matches option X) and option-based pricing calculations evaluated server-side by `RegistrationPricingService`, preventing ghost pricing or inactive options from affecting the total.
+- **Tenant Management UI**: `RegistrationFormPanel.jsx` in event console (`/events/{event}`) under dedicated "Form" tab with requirement toggles, interactive custom field builder, modal configuration, and live reactive preview.
+- **Public Form & Reactivity**: Public registration form on `/e/{slug}` with Title, First Name, Last Name, Email, configurable requirements, dynamic custom fields, reactive condition evaluation in React state, and real-time pricing breakdown.
+- **Reporting & Exports**: Added Title, First Name, Last Name, and dynamic custom form answers as exportable columns in registration CSV exports via `EventReportController`.
+- **Database Migrations**: Landlord migrations `2026_09_10_213000_add_name_parts_and_form_answers_to_event_registrations_table.php`, `2026_09_10_213001_add_registration_settings_to_events_table.php`, and `2026_09_10_213002_create_event_form_fields_table.php`.
+- **Verification**:
+  - `tests/Feature/Events/EventCustomFormFieldTest.php`: 6 passing tests, 51 assertions.
+  - `tests/Feature/Events/EventRegistrationTest.php`: 10 passing tests, 53 assertions.
+  - `tests/Feature/Events/EventReportTest.php`: 11 passing tests, 27 assertions.
+  - Full suite verified: 32 tests, 143 assertions passing.
+  - Frontend compiled cleanly with `npm run build`.
+  - Code formatted with `vendor/bin/pint --dirty`.
 
+## [x] Track: Promo Codes, Discounts & Complimentary Tickets
 
+- **Promo Codes & Usage Caps**: Support for fixed amount, percentage, and 100% complimentary pass coupon codes, with start/expiration dates, total redemption caps, per-attendee email limits, and ticket type constraints. Evaluated server-side by `PromoCodeService`.
+- **Complimentary Passes**: Full 100% discount zeroes out ticket cost, marks attendee registration as confirmed immediately, generates ticket QR codes, and bypasses the payment gateway.
+- **Invite-Only Ticket Types & Access Codes**: Ticket types can be designated with an `access_code` and hidden from the standard public event page until unlocked via `/e/{event}/unlock-tickets`.
+- **Tenant Management UI**: `PromoCodePanel.jsx` added to Event Console under the "Promos" tab with code generator, active/inactive toggles, usage limits, ticket type eligibility picker, and invite-only ticket summary.
+- **Public Checkout Reactivity**: Public registration panel on `/e/{event}` features collapsible access code unlocker, real-time promo code validation endpoint (`/e/{event}/validate-promo`), and dynamic price summary breakdown showing original price, discounts, and final total payable.
+- **Verification**: Verified by `tests/Feature/Events/EventPromoCodeTest.php` (6 passing tests, 31 assertions) covering CRUD, toggle, percentage and fixed discount calculations, complimentary zero-out, cap exhaustion, per-attendee limits, and access code unlocking. Clean build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
 
+## [x] Track: Breakout Session & Workshop Attendance Tracking (Live Room Headcount)
 
+- **Multi-Point Room Check-In & Headcount Engine**: Landlord migration `event_session_attendances` tracking check-in and check-out timestamps, dwell times in minutes, CPD/CME contact hours, scanning staff, and device names.
+- **Room Capacity Guard & Override**: Real-time room capacity check blocks entry with clear 422 alert when maximum room capacity is reached, while allowing authorized staff to toggle an override if needed.
+- **Live Broadcasting via Laravel Reverb**: `SessionAttendanceUpdated` broadcasts on private Reverb channel `event.{eventId}.sessions` as attendees enter and exit rooms, enabling instantaneous live updates without manual page reloads.
+- **Command Center Live Room Occupancy Grid**: `SessionOccupancyPanel.jsx` added to Event Console under the "Occupancy" tab. Features live room cards, headcount progress gauges (green, amber at 85%, red when full), live room roster drawer with dwell times, and instant scanner launch.
+- **Multi-Point Room Scanner Integration**: `CheckInPanel.jsx` upgraded with a "Breakout Room" scanning mode, room/session picker dropdown, Scan IN (Entry) vs. Scan OUT (Exit) directions, and live room capacity ticker.
+- **CPD/CME Accreditation Export**: Upgraded `exportSessionAttendance` in `EventReportController` to export comprehensive session attendance reports with check-in and check-out timestamps, dwell times in minutes, and calculated CPD/CME contact hours.
+- **Verification**: Verified by `tests/Feature/Events/EventSessionAttendanceTest.php` (5 passing tests, 32 assertions) covering occupancy API, room scanning, capacity blocking and override, check-out dwell time calculation, Reverb broadcast dispatch, and CPD CSV export. Clean frontend build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
 
+## [x] Track: Double-Entry Accounting Ledger & Payout Schedules
+
+- **True Double-Entry General Ledger**: Landlord tables `ledger_accounts`, `ledger_transactions`, `ledger_entries`, and standard chart-of-accounts (`1010` Payment Gateway Clearing, `1020` Cash/Bank, `2010` Organizer Payable, `2020` Holdback Reserve Escrow, `4010` Platform Commission Revenue, `5010` Payment Gateway Processing Fees).
+- **Strict Equilibrium Invariant**: `LedgerService` enforces that every transaction is balanced ($\sum \text{Debits} == \sum \text{Credits}$) at database commit time. Throws `InvalidArgumentException` if unbalanced.
+- **Wired Revenue & Refund Lifecycles**: Integrated into Paystack payment settlement webhooks (`SettlementWebhookController`), ticket cancellation & refunds (`EventRegistrationController`), and payout disbursements (`EventFinanceController`).
+- **Automated Settlement & Escrow Engine**: Command `app:reconcile-payout-schedules` enforces event payout schedules (`immediate` T+0, `post_event` T+N days, or `manual`), automatically retains holdback reserve buffers (e.g., 10%) during dispute risk periods, automatically releases escrow reserves upon maturity, and schedules automated disbursements when balances cross the minimum threshold.
+- **Host Console Finance UI**: Enhanced `FinancePanel.jsx` with a real-time Double-Entry General Ledger card showing equilibrium status ("Equilibrium Balanced" green pill), account debit/credit breakdown, Payout Schedule & Holdback Policy overview, and a configuration modal to customize schedules, days, holdback percentages, and preferred payout accounts.
+- **General Ledger CSV Export**: Upgraded `exportSettlementStatement` to append the complete double-entry general ledger trial balance below the line-item reconciliation.
+- **Verification**: Verified with 6 passing tests in `tests/Feature/Events/EventLedgerAndPayoutScheduleTest.php` (43 assertions) and 28 passing tests across the entire financial suite. Clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.

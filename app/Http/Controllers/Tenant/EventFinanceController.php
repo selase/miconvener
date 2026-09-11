@@ -45,8 +45,24 @@ final class EventFinanceController extends Controller
 
         $accounts = TenantPayoutAccount::where('tenant_id', $tenant->id)->orderByDesc('created_at')->get();
 
+        $ledgerService = app(\App\Services\Finance\LedgerService::class);
+        $trialBalance = $ledgerService->getTrialBalance($eventModel);
+        $payoutSchedule = $eventModel->payoutSchedule;
+
         return response()->json([
             'stats' => $stats,
+            'trial_balance' => $trialBalance,
+            'payout_schedule' => $payoutSchedule ? [
+                'id' => $payoutSchedule->id,
+                'schedule_type' => $payoutSchedule->schedule_type,
+                'days_after_event' => $payoutSchedule->days_after_event,
+                'holdback_percentage' => (float) $payoutSchedule->holdback_percentage,
+                'holdback_release_days' => $payoutSchedule->holdback_release_days,
+                'minimum_payout_amount' => $payoutSchedule->minimum_payout_amount,
+                'auto_payout_enabled' => $payoutSchedule->auto_payout_enabled,
+                'preferred_account_id' => $payoutSchedule->preferred_account_id,
+                'last_reconciled_at' => $payoutSchedule->last_reconciled_at?->toIso8601String(),
+            ] : null,
             'accounts' => $accounts->map(fn (TenantPayoutAccount $a): array => [
                 'id' => $a->id,
                 'type' => $a->type,
@@ -204,24 +220,79 @@ final class EventFinanceController extends Controller
             // A payout settled outside the platform still has to reach the ledger,
             // or it is missing from the settlement statement's line items while
             // still counting against the reconciliation totals.
-            if ($markingPaid && ! $payoutModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->exists()) {
-                EventLedgerEntry::create([
-                    'tenant_id' => $payoutModel->tenant_id,
-                    'event_id' => $payoutModel->event_id,
-                    'type' => EventLedgerEntry::TYPE_PAYOUT,
-                    'payout_id' => $payoutModel->id,
-                    'gross_amount' => $payoutModel->amount,
-                    'gateway_fee_amount' => 0,
-                    'commission_amount' => 0,
-                    'net_amount' => $payoutModel->amount,
-                    'currency' => $eventModel->currency,
-                    'provider' => 'manual',
-                    'provider_reference' => $payoutModel->provider_reference,
-                ]);
+            if ($markingPaid) {
+                if (! $payoutModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->exists()) {
+                    EventLedgerEntry::create([
+                        'tenant_id' => $payoutModel->tenant_id,
+                        'event_id' => $payoutModel->event_id,
+                        'type' => EventLedgerEntry::TYPE_PAYOUT,
+                        'payout_id' => $payoutModel->id,
+                        'gross_amount' => $payoutModel->amount,
+                        'gateway_fee_amount' => 0,
+                        'commission_amount' => 0,
+                        'net_amount' => $payoutModel->amount,
+                        'currency' => $eventModel->currency,
+                        'provider' => 'manual',
+                        'provider_reference' => $payoutModel->provider_reference,
+                    ]);
+                }
+
+                // Post into double-entry accounting ledger
+                app(\App\Services\Finance\LedgerService::class)->recordPayout(
+                    $eventModel,
+                    $payoutModel->amount,
+                    $payoutModel->provider_reference ?? ('PO-'.$payoutModel->id),
+                    $payoutModel
+                );
             }
 
             return response()->json(['message' => 'Payout updated.']);
         });
+    }
+
+    public function updatePayoutSchedule(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $validated = $request->validate([
+            'schedule_type' => ['required', Rule::in(['manual', 'immediate', 'post_event'])],
+            'days_after_event' => ['nullable', 'integer', 'min:0', 'max:90'],
+            'holdback_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+            'holdback_release_days' => ['nullable', 'integer', 'min:0', 'max:180'],
+            'minimum_payout_amount' => ['nullable', 'integer', 'min:0'],
+            'auto_payout_enabled' => ['boolean'],
+            'preferred_account_id' => ['nullable', Rule::exists('tenant_payout_accounts', 'id')->where('tenant_id', $tenant->id)],
+        ]);
+
+        $schedule = \App\Models\EventPayoutSchedule::updateOrCreate(
+            ['event_id' => $eventModel->id],
+            [
+                'tenant_id' => $tenant->id,
+                'schedule_type' => $validated['schedule_type'],
+                'days_after_event' => $validated['days_after_event'] ?? 0,
+                'holdback_percentage' => $validated['holdback_percentage'],
+                'holdback_release_days' => $validated['holdback_release_days'] ?? 14,
+                'minimum_payout_amount' => $validated['minimum_payout_amount'] ?? 0,
+                'auto_payout_enabled' => $validated['auto_payout_enabled'] ?? false,
+                'preferred_account_id' => $validated['preferred_account_id'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'message' => 'Payout schedule updated successfully.',
+            'payout_schedule' => [
+                'id' => $schedule->id,
+                'schedule_type' => $schedule->schedule_type,
+                'days_after_event' => $schedule->days_after_event,
+                'holdback_percentage' => (float) $schedule->holdback_percentage,
+                'holdback_release_days' => $schedule->holdback_release_days,
+                'minimum_payout_amount' => $schedule->minimum_payout_amount,
+                'auto_payout_enabled' => $schedule->auto_payout_enabled,
+                'preferred_account_id' => $schedule->preferred_account_id,
+            ],
+        ]);
     }
 
     public function exportSettlementStatement(string $subdomain, string $event): StreamedResponse
@@ -257,6 +328,33 @@ final class EventFinanceController extends Controller
             fputcsv($handle, ['Collected (gross)', $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('gross_amount')]);
             fputcsv($handle, ['Paid out', $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount')]);
             fputcsv($handle, ['Available balance', $eventModel->ledgerEntries()->whereIn('type', [EventLedgerEntry::TYPE_CHARGE, EventLedgerEntry::TYPE_REFUND])->sum('net_amount') - $eventModel->payouts()->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])->sum('amount')]);
+
+            fputcsv($handle, []);
+            fputcsv($handle, ['Double-Entry General Ledger (Trial Balance)']);
+            fputcsv($handle, ['Account Code', 'Account Name', 'Type', 'Total Debits', 'Total Credits', 'Net Balance']);
+
+            $ledgerService = app(\App\Services\Finance\LedgerService::class);
+            $trialBalance = $ledgerService->getTrialBalance($eventModel);
+
+            foreach ($trialBalance['accounts'] as $acc) {
+                fputcsv($handle, [
+                    $acc['code'],
+                    $acc['name'],
+                    $acc['type'],
+                    $acc['debits'],
+                    $acc['credits'],
+                    $acc['balance'],
+                ]);
+            }
+
+            fputcsv($handle, [
+                'TOTAL',
+                $trialBalance['is_balanced'] ? 'EQUILIBRIUM BALANCED' : 'UNBALANCED WARNING',
+                '',
+                $trialBalance['total_debits'],
+                $trialBalance['total_credits'],
+                $trialBalance['total_debits'] - $trialBalance['total_credits'],
+            ]);
 
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
