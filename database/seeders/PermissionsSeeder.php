@@ -125,17 +125,29 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'programme',
             ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage operation-pillars',
+                'guard_name' => 'web',
+                'category' => 'operations',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'issue certificates',
+                'guard_name' => 'web',
+                'category' => 'certificates',
+            ],
         ];
     }
 
     /**
-     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event' | 'abstract' | 'programme')}[]
+     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event' | 'abstract' | 'programme' | 'operations' | 'certificates' | 'event-operation' | 'certificate')}[]
      */
     public function modelPermissions(): array
     {
         $data = [];
 
-        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team', 'event', 'abstract'];
+        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team', 'event', 'abstract', 'event-operation', 'certificate'];
 
         foreach ($models as $value) {
             foreach ($this->crudActions($value) as $action) {

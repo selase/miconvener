@@ -250,6 +250,26 @@ final class Event extends Model
         return $this->hasMany(LedgerTransaction::class);
     }
 
+    public function operationPillars(): HasMany
+    {
+        return $this->hasMany(EventOperationPillar::class)->orderBy('sort_order');
+    }
+
+    public function operationTasks(): HasMany
+    {
+        return $this->hasMany(EventOperationTask::class)->orderBy('due_date');
+    }
+
+    public function certificateTemplates(): HasMany
+    {
+        return $this->hasMany(EventCertificateTemplate::class);
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(EventCertificate::class)->latest('issued_at');
+    }
+
     public function sessions(): HasMany
     {
         return $this->hasMany(EventSession::class)->orderBy('starts_at')->orderBy('sort_order');

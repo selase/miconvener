@@ -75,6 +75,16 @@ final class RolePermissions
             'decide abstract',
             'assign abstract-reviewer',
             'manage scientific-programme',
+            'create event-operation',
+            'read event-operation',
+            'update event-operation',
+            'delete event-operation',
+            'manage operation-pillars',
+            'create certificate',
+            'read certificate',
+            'update certificate',
+            'delete certificate',
+            'issue certificates',
         ]);
     }
 
@@ -113,6 +123,16 @@ final class RolePermissions
             'decide abstract',
             'assign abstract-reviewer',
             'manage scientific-programme',
+            'create event-operation',
+            'read event-operation',
+            'update event-operation',
+            'delete event-operation',
+            'manage operation-pillars',
+            'create certificate',
+            'read certificate',
+            'update certificate',
+            'delete certificate',
+            'issue certificates',
         ]);
     }
 
@@ -151,6 +171,16 @@ final class RolePermissions
             'decide abstract',
             'assign abstract-reviewer',
             'manage scientific-programme',
+            'create event-operation',
+            'read event-operation',
+            'update event-operation',
+            'delete event-operation',
+            'manage operation-pillars',
+            'create certificate',
+            'read certificate',
+            'update certificate',
+            'delete certificate',
+            'issue certificates',
         ]);
     }
 }

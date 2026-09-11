@@ -28,6 +28,8 @@ import RegistrationFormPanel from './panels/RegistrationFormPanel';
 import PromoCodePanel from './panels/PromoCodePanel';
 import SessionOccupancyPanel from './panels/SessionOccupancyPanel';
 import AbstractsPanel from './panels/AbstractsPanel';
+import OperationsPanel from './panels/OperationsPanel';
+import CertificatesPanel from './panels/CertificatesPanel';
 
 const TABS = [
     'Overview',
@@ -37,6 +39,7 @@ const TABS = [
     'Speakers',
     'Schedule',
     'Abstracts',
+    'Operations',
     'Guests',
     'Blasts',
     'Check-in',
@@ -47,6 +50,7 @@ const TABS = [
     'Forum',
     'Live',
     'Badges',
+    'Certificates',
     'Finance',
     'Sponsors',
     'Reports',
@@ -395,6 +399,7 @@ export default function Show({
                     />
                 )}
                 {tab === 'Abstracts' && <AbstractsPanel event={event} />}
+                {tab === 'Operations' && <OperationsPanel event={event} />}
                 {tab === 'Guests' && <GuestsTab event={event} registrations={registrations} />}
                 {tab === 'Blasts' && <BlastsPanel event={event} />}
                 {tab === 'Check-in' && (
@@ -425,6 +430,7 @@ export default function Show({
                 {tab === 'Forum' && <ForumPanel event={event} />}
                 {tab === 'Live' && <EngagementPanel event={event} />}
                 {tab === 'Badges' && <BadgesPanel event={event} />}
+                {tab === 'Certificates' && <CertificatesPanel event={event} />}
                 {tab === 'Finance' && <FinancePanel event={event} />}
                 {tab === 'Sponsors' && <SponsorsPanel event={event} />}
                 {tab === 'Reports' && <ReportsPanel event={event} />}

@@ -241,7 +241,30 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::patch('events/{event}/visibility', [EventController::class, 'updateVisibility'])->name('tenant.events.visibility');
     Route::get('events/{event}/speakers/{speaker}/portal-link', [EventSpeakerController::class, 'portalLink'])->name('tenant.events.speakers.portal-link');
 
+    // Operations & 8-Pillars Project Management
+    Route::get('events/{event}/operations', [App\Http\Controllers\Tenant\EventOperationController::class, 'index'])->name('tenant.events.operations.index');
+    Route::post('events/{event}/operations/pillars', [App\Http\Controllers\Tenant\EventOperationController::class, 'storePillar'])->name('tenant.events.operations.pillars.store');
+    Route::put('events/{event}/operations/pillars/{pillar}', [App\Http\Controllers\Tenant\EventOperationController::class, 'updatePillar'])->name('tenant.events.operations.pillars.update');
+    Route::delete('events/{event}/operations/pillars/{pillar}', [App\Http\Controllers\Tenant\EventOperationController::class, 'destroyPillar'])->name('tenant.events.operations.pillars.destroy');
+    Route::patch('events/{event}/operations/pillars/reorder', [App\Http\Controllers\Tenant\EventOperationController::class, 'reorderPillars'])->name('tenant.events.operations.pillars.reorder');
+    Route::post('events/{event}/operations/tasks', [App\Http\Controllers\Tenant\EventOperationController::class, 'storeTask'])->name('tenant.events.operations.tasks.store');
+    Route::put('events/{event}/operations/tasks/{task}', [App\Http\Controllers\Tenant\EventOperationController::class, 'updateTask'])->name('tenant.events.operations.tasks.update');
+    Route::patch('events/{event}/operations/tasks/{task}/status', [App\Http\Controllers\Tenant\EventOperationController::class, 'updateTaskStatus'])->name('tenant.events.operations.tasks.status');
+    Route::delete('events/{event}/operations/tasks/{task}', [App\Http\Controllers\Tenant\EventOperationController::class, 'destroyTask'])->name('tenant.events.operations.tasks.destroy');
+
+    // Multi-Role Electronic Certificates
+    Route::get('events/{event}/certificates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'index'])->name('tenant.events.certificates.index');
+    Route::post('events/{event}/certificates/templates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'storeTemplate'])->name('tenant.events.certificates.templates.store');
+    Route::put('events/{event}/certificates/templates/{template}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'updateTemplate'])->name('tenant.events.certificates.templates.update');
+    Route::post('events/{event}/certificates/issue', [App\Http\Controllers\Tenant\EventCertificateController::class, 'issue'])->name('tenant.events.certificates.issue');
+    Route::get('events/{event}/certificates/{certificate}/download', [App\Http\Controllers\Tenant\EventCertificateController::class, 'download'])->name('tenant.events.certificates.download');
+    Route::delete('events/{event}/certificates/{certificate}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'destroy'])->name('tenant.events.certificates.destroy');
+
 });
+
+// Public certificate verification
+Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'verify'])->name('public.certificates.verify');
+Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('public.certificates.download');
 
 // Public event pages (no auth — attendees register here)
 Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.events.show');

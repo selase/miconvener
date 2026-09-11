@@ -327,3 +327,29 @@ Verified by:
   - Full feature suite: 268 passing tests, 1,015 assertions across all event test files.
   - Clean frontend asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
 
+## [x] Track: Accreditation & Conference Operations (Certificates & 8-Pillar PM)
+
+- **Granular RBAC Permissions**: Added Spatie permissions (`create event-operation`, `read event-operation`, `update event-operation`, `delete event-operation`, `manage operation-pillars`, `create certificate`, `read certificate`, `update certificate`, `delete certificate`, `issue certificates`) to `PermissionsSeeder` and `RolePermissions.php`.
+- **Landlord Migrations & Models**: Landlord tables `event_operation_pillars`, `event_operation_tasks`, `event_certificate_templates`, `event_certificates`. Eloquent models `EventOperationPillar`, `EventOperationTask`, `EventCertificateTemplate`, `EventCertificate` with full relationship graphs, UUID keys, and auto-generation for verification tokens (`MC-XXXXXXXX`).
+- **8-Pillar Project Management Engine**: Pre-provisions 8 default academic operational pillars (`Programme & Speakers`, `Technology & Registration`, `Finance & Procurement`, `Sponsorship & Exhibition`, `Communications & Media`, `Venue & Logistics`, `Protocol & Hospitality`, `Post-Conference Reporting`), while allowing conference hosts to create new custom pillars on the fly, color-code, rename, and reorder them.
+- **Task & Budget Tracking**: Tasks with owner assignment from team members, deadlines, priority tags, status progression (`not_started`, `in_progress`, `blocked`, `done`), completion timestamps, task dependencies, and budget allocation vs. actual spend roll-up.
+- **Multi-Role Electronic Certificates**: Configurable templates for Delegates, Speakers, Presenters, and Volunteers. Dynamic body text with placeholders (`{name}`, `{event_name}`, `{date}`, `{hours}`, `{role}`), accredited CPD/CME contact hours, and issuer signatures.
+- **Issuance & Vector PDF Engine**: `CertificatePdfService` generating landscape vector PDFs with embedded cryptographic verification QR codes and codes. Bulk issuance actions for checked-in attendees, confirmed delegates, speakers, and presenters.
+- **Public Credential Verification**: High-trust public QR verification route `/verify/cert/{uuid}` and PDF download `/verify/cert/{uuid}/download` with PII masking, institutional authentication, and revocation checking.
+- **Host Console Frontend**: `OperationsPanel.jsx` (with Kanban board & List views, budget variance tracker, custom pillar builder) and `CertificatesPanel.jsx` (role template editor, issuance modal, issued certificate roster) integrated into `Show.jsx`.
+- **Verification Evidence**:
+  - `tests/Feature/Events/EventOperationsAndPillarsTest.php`: 4 passing tests, 32 assertions.
+  - `tests/Feature/Events/EventMultiRoleCertificatesTest.php`: 6 passing tests, 57 assertions.
+  - Phase 2 total: 10 passing tests, 89 assertions.
+  - Clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
+
+## [ ] Track: Participant Intelligence & In-Event Dynamic Forms (Engine & Stratification)
+
+- [ ] General-purpose dynamic forms engine supporting pre-event registration, in-event surveys, workshop feedback, catering preferences, CME assessments, and abstract disclosures.
+- [ ] Drag-and-drop form field builder supporting text, textarea, select, multiselect, radio, date, file upload, rating, signature, and conditional logic.
+- [ ] Participant Stratification Engine: Segment and filter participants dynamically into groups based on multi-parameter rules (ticket type, check-in status, workshop attendance, form responses, CME hours earned).
+- [ ] Targeted broadcast & export actions per stratified cohort.
+- [ ] Pest test suites for dynamic forms engine and stratification segmentation rules.
+
+
+
