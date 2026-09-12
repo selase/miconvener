@@ -203,7 +203,7 @@ final class NotificationGatewayService
 
     private function isRateLimited(string $eventId, ?string $email, ?string $phone, string $channel, int $cooldownMinutes): bool
     {
-        if ($cooldownMinutes <= 0) {
+        if ($cooldownMinutes <= 0 || (! $email && ! $phone)) {
             return false;
         }
 

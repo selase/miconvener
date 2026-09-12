@@ -259,9 +259,11 @@ final class ParticipantStratificationService
                     ? strcasecmp(mb_trim($actual), mb_trim($expected)) === 0
                     : $actual === $expected,
                 'not_equals' => $actual !== $expected,
-                'contains' => is_string($actual) && is_string($expected)
-                    ? str_contains(mb_strtolower($actual), mb_strtolower($expected))
-                    : false,
+                'contains' => is_array($actual)
+                    ? in_array($expected, $actual, true) || in_array(mb_strtolower((string) $expected), array_map(fn ($item) => is_string($item) ? mb_strtolower($item) : $item, $actual), true)
+                    : (is_string($actual) && is_string($expected)
+                        ? str_contains(mb_strtolower($actual), mb_strtolower($expected))
+                        : false),
                 'is_filled' => ! empty($actual),
                 'is_not_filled' => empty($actual),
                 default => false,
