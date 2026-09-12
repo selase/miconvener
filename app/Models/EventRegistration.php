@@ -63,6 +63,8 @@ final class EventRegistration extends Model
         'amount',
         'discount_amount',
         'platform_fee_amount',
+        'charged_amount',
+        'gateway_fee_amount',
         'currency',
         'payment_reference',
         'checked_in_at',
@@ -73,6 +75,8 @@ final class EventRegistration extends Model
         'amount' => 'integer',
         'discount_amount' => 'integer',
         'platform_fee_amount' => 'integer',
+        'charged_amount' => 'integer',
+        'gateway_fee_amount' => 'integer',
         'waitlist_position' => 'integer',
         'checked_in_at' => 'datetime',
         'email_verified_at' => 'datetime',
@@ -116,6 +120,15 @@ final class EventRegistration extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('system');
+    }
+
+    /**
+     * What the gateway was asked to collect. Registrations created before fee
+     * pass-through existed carry no value and were charged the ticket price.
+     */
+    public function effectiveChargedAmount(): int
+    {
+        return (int) ($this->charged_amount ?? $this->amount);
     }
 
     public function event(): BelongsTo

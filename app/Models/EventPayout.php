@@ -32,6 +32,8 @@ final class EventPayout extends Model
         'event_id',
         'payout_account_id',
         'amount',
+        'transfer_fee_amount',
+        'net_paid_amount',
         'status',
         'scheduled_at',
         'paid_at',
@@ -42,6 +44,8 @@ final class EventPayout extends Model
 
     protected $casts = [
         'amount' => 'integer',
+        'transfer_fee_amount' => 'integer',
+        'net_paid_amount' => 'integer',
         'scheduled_at' => 'datetime',
         'paid_at' => 'datetime',
     ];

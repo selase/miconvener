@@ -55,7 +55,7 @@ final class EventCheckoutController extends Controller
 
         $checkoutUrl = $paystack->createOneTimeCheckoutSession(
             $customerId,
-            $registrationModel->amount,
+            $registrationModel->effectiveChargedAmount(),
             $registrationModel->currency,
             route('public.events.confirmation', [
                 'subdomain' => $tenant->slug,

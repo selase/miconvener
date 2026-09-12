@@ -158,7 +158,18 @@ final class WebhookController extends Controller
         }
 
         $eventModel = $registration->event;
-        $commissionAmount = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $amount)->platformFee;
+        /*
+         * $amount is what the gateway actually collected. When the organizer
+         * bears the commission that is exactly the ticket price, but when the
+         * attendee bears it the receipt is larger by the commission — so the
+         * ticket price comes from the registration rather than the receipt,
+         * and must not be overwritten with it.
+         */
+        $ticketAmount = $eventModel->effectiveFeeBearer() === \App\Services\Finance\PlatformFeeResolver::BEARER_ATTENDEE
+            ? (int) $registration->amount
+            : $amount;
+
+        $commissionAmount = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $ticketAmount)->platformFee;
 
         // Payment stands in for email verification: the checkout link was sent
         // to this address and the gateway receipts it there too.
@@ -167,7 +178,8 @@ final class WebhookController extends Controller
         $registration->fill([
             'status' => EventRegistration::STATUS_CONFIRMED,
             'payment_reference' => $reference,
-            'amount' => $amount,
+            'amount' => $ticketAmount,
+            'charged_amount' => $amount,
             'currency' => $currency,
         ]);
         $registration->save();

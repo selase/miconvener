@@ -218,6 +218,7 @@ final class PublicEventController extends Controller
             'amount' => $amount,
             'discount_amount' => $discountAmount,
             'platform_fee_amount' => $platformFeeAmount,
+            'charged_amount' => $fees->chargedAmount,
             'currency' => $eventModel->currency,
             'status' => $status,
             'waitlist_position' => $status === EventRegistration::STATUS_WAITLISTED
