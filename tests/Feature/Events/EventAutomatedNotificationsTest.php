@@ -153,7 +153,12 @@ test('rule dispatch delivers direct emails with template placeholder interpolati
         ->postJson("http://{$host}/events/{$event->id}/notification-rules/{$rule->id}/dispatch", [], ['HTTP_HOST' => $host]);
 
     $dispatchResponse->assertOk();
-    $dispatchResponse->assertJsonPath('stats.sent_count', 1);
+    $dispatchResponse->assertJsonPath('stats.total_recipients', 1);
+
+    // The endpoint queues the send and reports who it will go to; the outcome
+    // is asserted on the log below rather than in the response.
+    expect(EventNotificationLog::where('event_id', $event->id)
+        ->where('status', EventNotificationLog::STATUS_SENT)->count())->toBe(1);
 
     // Verify email was sent with interpolated content. The gateway calls
     // sendNow() (see NotificationGatewayService::dispatch) precisely so this
@@ -221,7 +226,10 @@ test('multi-channel notification stages SMS and WhatsApp payloads ready for Omni
         ->postJson("http://{$host}/events/{$event->id}/notification-rules/{$rule->id}/dispatch", [], ['HTTP_HOST' => $host]);
 
     $dispatchResponse->assertOk();
-    $dispatchResponse->assertJsonPath('stats.staged_count', 2);
+    $dispatchResponse->assertJsonPath('stats.total_recipients', 1);
+
+    expect(EventNotificationLog::where('event_id', $event->id)
+        ->where('status', EventNotificationLog::STATUS_STAGED)->count())->toBe(2);
 
     $logs = EventNotificationLog::where('recipient_phone', '+233241234567')->get();
     expect($logs->count())->toBe(2);
@@ -286,7 +294,8 @@ test('quota guardrail suppresses delivery when free monthly email limit is excee
         ->postJson("http://{$host}/events/{$event->id}/notification-rules/{$rule->id}/dispatch", [], ['HTTP_HOST' => $host]);
 
     $dispatchResponse->assertOk();
-    $dispatchResponse->assertJsonPath('stats.suppressed_count', 1);
+    expect(EventNotificationLog::where('event_id', $event->id)
+        ->where('status', EventNotificationLog::STATUS_SUPPRESSED_QUOTA)->count())->toBe(1);
 
     // Assert mail was NOT dispatched
     Mail::assertNothingSent();
@@ -302,7 +311,8 @@ test('quota guardrail suppresses delivery when free monthly email limit is excee
         ->postJson("http://{$host}/events/{$event->id}/notification-rules/{$rule->id}/dispatch", [], ['HTTP_HOST' => $host]);
 
     $secondDispatch->assertOk();
-    $secondDispatch->assertJsonPath('stats.sent_count', 1);
+    expect(EventNotificationLog::where('event_id', $event->id)
+        ->where('status', EventNotificationLog::STATUS_SENT)->count())->toBe(1);
     // sendNow() is used deliberately (see NotificationGatewayService::dispatch).
     Mail::assertSent(AutomatedNotificationMail::class);
 });
@@ -346,14 +356,20 @@ test('anti-abuse cooldown prevents duplicate notification spamming to the same r
     // First dispatch succeeds
     $this->actingAs($user)
         ->postJson("http://{$host}/events/{$event->id}/notification-rules/{$rule->id}/dispatch", [], ['HTTP_HOST' => $host])
-        ->assertJsonPath('stats.sent_count', 1);
+        ->assertJsonPath('stats.total_recipients', 1);
+
+    expect(EventNotificationLog::where('event_id', $event->id)
+        ->where('status', EventNotificationLog::STATUS_SENT)->count())->toBe(1);
 
     // Immediate second dispatch is rate limited and suppressed
     $secondResponse = $this->actingAs($user)
         ->postJson("http://{$host}/events/{$event->id}/notification-rules/{$rule->id}/dispatch", [], ['HTTP_HOST' => $host]);
 
-    $secondResponse->assertJsonPath('stats.rate_limited_count', 1);
-    $secondResponse->assertJsonPath('stats.sent_count', 0);
+    $secondResponse->assertOk();
+
+    // A rate-limited recipient is suppressed before any row is written, so the
+    // proof is that the second dispatch added nothing.
+    expect(EventNotificationLog::where('event_id', $event->id)->count())->toBe(1);
 });
 
 test('scheduled console command scans and dispatches due notification rules', function () {

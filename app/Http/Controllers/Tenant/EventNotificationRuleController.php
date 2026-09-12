@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Notifications\DispatchNotificationRuleJob;
 use App\Models\Event;
 use App\Models\EventNotificationRule;
 use App\Models\TenantNotificationSetting;
@@ -159,11 +160,21 @@ final class EventNotificationRuleController extends Controller
     {
         Gate::authorize('create notification-rule');
 
-        $stats = $dispatcher->dispatchRule($rule);
+        // Resolving the list is one query and is worth doing here so the host
+        // gets a real number back. Sending is not: the gateway mails with
+        // sendNow(), so a rule aimed at a few hundred attendees would hold this
+        // request open for minutes and time out having already mailed some of
+        // them. The loop runs in a worker.
+        $recipientCount = count($dispatcher->resolveRecipients($rule, $event));
+
+        DispatchNotificationRuleJob::dispatch($rule);
 
         return response()->json([
-            'message' => "Rule dispatched to {$stats['total_recipients']} recipients ({$stats['sent_count']} emails, {$stats['staged_count']} SMS/WhatsApp).",
-            'stats' => $stats,
+            'message' => "Queued for {$recipientCount} recipient(s). Delivery runs in the background — results appear in the notification log.",
+            'stats' => [
+                'total_recipients' => $recipientCount,
+                'queued' => true,
+            ],
         ]);
     }
 
