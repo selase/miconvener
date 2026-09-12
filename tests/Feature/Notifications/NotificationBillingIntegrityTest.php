@@ -99,3 +99,35 @@ test('the anti-abuse cooldown still suppresses a staged repeat', function () {
     expect($second['sms']['status'])->toBe('rate_limited');
     expect(EventNotificationLog::where('event_id', $event->id)->count())->toBe(1);
 });
+
+test('a failed email does not consume the monthly quota', function () {
+    [$tenant, $event, $settings] = gatewayScenario('bill-refund');
+
+    // Force the send to throw by pointing the mailer at a transport that cannot
+    // exist, which is what a misconfigured SMTP looks like from here.
+    config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => '127.0.0.1', 'mail.mailers.smtp.port' => 1]);
+
+    app(NotificationGatewayService::class)->dispatch(
+        $event,
+        null,
+        ['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => null],
+        ['email'],
+        ['subject' => 'Doors open', 'body' => 'See you at 9.'],
+    );
+
+    $log = EventNotificationLog::where('event_id', $event->id)->firstOrFail();
+    expect($log->status)->toBe(EventNotificationLog::STATUS_FAILED);
+
+    // The allowance is the tenant's to spend on delivered mail. A bounce must
+    // not burn it.
+    expect((int) $settings->fresh()->email_used_this_month)->toBe(0);
+});
+
+test('refunding a channel never drives the counter below zero', function () {
+    [$tenant, $event, $settings] = gatewayScenario('bill-floor');
+
+    $settings->refundSend('email');
+    $settings->refundSend('email');
+
+    expect((int) $settings->fresh()->email_used_this_month)->toBe(0);
+});

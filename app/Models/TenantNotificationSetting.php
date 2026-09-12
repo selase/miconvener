@@ -120,6 +120,26 @@ final class TenantNotificationSetting extends Model
         return $cost;
     }
 
+    /**
+     * Reverse a send that was counted but never delivered.
+     *
+     * recordSend() increments before delivery is attempted, so a throw leaves
+     * the allowance spent on a message nobody received. Only email is metered;
+     * the other channels carry a per-message rate and no counter.
+     */
+    public function refundSend(string $channel): void
+    {
+        if ($channel !== 'email') {
+            return;
+        }
+
+        if ((int) $this->email_used_this_month <= 0) {
+            return;
+        }
+
+        $this->decrement('email_used_this_month');
+    }
+
     private function checkAndResetMonthly(): void
     {
         if (! $this->month_reset_at || $this->month_reset_at->isBefore(now()->startOfMonth())) {

@@ -140,6 +140,9 @@ final class NotificationGatewayService
                         'email' => $email,
                     ]);
 
+                    // The allowance was taken before the attempt; give it back.
+                    $settings->refundSend(EventNotificationLog::CHANNEL_EMAIL);
+
                     EventNotificationLog::create([
                         'tenant_id' => $event->tenant_id,
                         'event_id' => $event->id,
