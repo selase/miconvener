@@ -177,7 +177,8 @@ final class PublicEventController extends Controller
         }
 
         $isFree = $amount === 0;
-        $platformFeeAmount = $isFree ? 0 : (int) round($amount * $eventModel->effectivePlatformFeePercentage() / 100);
+        $fees = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $isFree ? 0 : $amount);
+        $platformFeeAmount = $fees->platformFee;
 
         $status = match (true) {
             $isFull => EventRegistration::STATUS_WAITLISTED,

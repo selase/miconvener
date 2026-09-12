@@ -158,7 +158,7 @@ final class SettlementWebhookController extends Controller
         }
 
         $eventModel = $registration->event;
-        $commissionAmount = (int) round($amount * $eventModel->effectivePlatformFeePercentage() / 100);
+        $commissionAmount = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $amount)->platformFee;
 
         // Payment stands in for email verification: the checkout link was sent
         // to this address and the gateway receipts it there too.

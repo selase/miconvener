@@ -239,6 +239,8 @@ final class EventController extends Controller
                 ...$this->toPayload($eventModel),
                 'platform_fee_percentage' => $eventModel->platform_fee_percentage,
                 'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
+                'effective_platform_fee_cap_amount' => $eventModel->effectivePlatformFeeCapAmount(),
+                'effective_fee_bearer' => $eventModel->effectiveFeeBearer(),
             ],
             'registrations' => $registrations,
             'hasActiveGateway' => $tenant->canAcceptPayments(),

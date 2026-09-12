@@ -64,12 +64,16 @@ return [
         'default_fee_percentage' => (float) env('PLATFORM_DEFAULT_FEE_PERCENTAGE', 5.0),
 
         /*
-         * Commission ceiling per ticket, in minor units. At the 2% Growth rate
-         * this binds above a GHS 1,000 ticket. Null means uncapped.
+         * Commission ceiling per ticket, in minor units, as a last resort.
+         *
+         * Null — uncapped — is deliberate. The paid tiers carry their own
+         * GHS 20 ceiling as a package default, so the only packages reaching
+         * this line are Enterprise, whose terms are negotiated on the tenant
+         * row. A number here would silently cap those negotiated deals.
          */
         'default_fee_cap_amount' => env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT') !== null
             ? (int) env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT')
-            : 2000,
+            : null,
 
         /*
          * Who pays the platform commission: 'organizer' absorbs it out of the

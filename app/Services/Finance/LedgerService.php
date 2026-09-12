@@ -187,7 +187,7 @@ final class LedgerService
                 'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
                 'direction' => LedgerEntry::DIRECTION_CREDIT,
                 'amount' => $platformFee,
-                'description' => "Platform commission fee ({$event->platform_fee_percentage}%)",
+                'description' => 'Platform commission fee ('.$event->effectivePlatformFeePercentage().'%)',
             ];
         }
 
