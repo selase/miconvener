@@ -56,9 +56,8 @@ test('an unreleased material is refused through the gated route but served by /m
     )->assertForbidden();
 
     // The same bytes, with no registration, no release check and no limit.
-    $direct = $this->get("http://{$host}/media/event-materials/material_secret.pdf", ['HTTP_HOST' => $host]);
-
-    expect($direct->getStatusCode())->not->toBe(200);
+    $this->get("http://{$host}/media/event-materials/material_secret.pdf", ['HTTP_HOST' => $host])
+        ->assertNotFound();
 });
 
 test('one tenant cannot stream another tenants material through /media', function () {
@@ -71,7 +70,6 @@ test('one tenant cannot stream another tenants material through /media', functio
 
     $host = 'media-other.'.mb_ltrim((string) config('session.domain'), '.');
 
-    $response = $this->get("http://{$host}/media/event-materials/material_victimdoc.pdf", ['HTTP_HOST' => $host]);
-
-    expect($response->getStatusCode())->not->toBe(200);
+    $this->get("http://{$host}/media/event-materials/material_victimdoc.pdf", ['HTTP_HOST' => $host])
+        ->assertNotFound();
 });

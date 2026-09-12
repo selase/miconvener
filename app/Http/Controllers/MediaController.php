@@ -22,8 +22,11 @@ final class MediaController extends Controller
      *  - event-materials/ : gated by MaterialDownloadController on confirmed
      *    registration, release date and per-registration download limit. Serving
      *    it here bypassed all three and ignored tenancy.
-     *  - users/           : nothing writes here; an open door onto a directory
-     *    with no legitimate traffic.
+     *
+     *  - users/ stays: admin and team profile photos are written here by
+     *    Admin\UsersController and Admin\TeamController and rendered through
+     *    Storage::url(), which resolves to this route. An avatar carries no
+     *    access-control story, the same as speakers/.
      */
     private const ALLOWED_PREFIXES = [
         'events/',
@@ -32,6 +35,7 @@ final class MediaController extends Controller
         'event-forum/',
         'tenant/',
         'logos/',
+        'users/',
     ];
 
     /**

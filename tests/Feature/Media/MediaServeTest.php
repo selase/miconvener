@@ -117,3 +117,16 @@ test('public event page provides hero_image_url pointing to media route', functi
     $page = $response->viewData('page');
     expect($page['props']['event']['hero_image_url'])->toContain('/media/events/hero/event_hero_sample.png');
 });
+
+test('media route still serves an admin profile photo', function () {
+    Storage::disk('public')->put('users/profile/user_photo_abc.jpg', 'PHOTO BYTES');
+
+    // Admin\UsersController and Admin\TeamController write here and the admin
+    // header renders it on every page; narrowing the allowlist must not 404 it.
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "media-test.{$baseDomain}";
+
+    $this->get("http://{$host}/media/users/profile/user_photo_abc.jpg", [
+        'HTTP_HOST' => $host,
+    ])->assertOk();
+});
