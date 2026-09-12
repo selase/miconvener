@@ -66,6 +66,7 @@ final class PaystackSettlementGateway implements SettlementGateway
             return [
                 'transfer_code' => (string) $response->json('data.transfer_code'),
                 'status' => (string) $response->json('data.status'),
+                'fee' => $response->json('data.fee_charged') ?? $response->json('data.fee'),
             ];
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
@@ -77,7 +78,10 @@ final class PaystackSettlementGateway implements SettlementGateway
         try {
             $response = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/transfer/verify/{$reference}")->throw();
 
-            return ['status' => (string) $response->json('data.status')];
+            return [
+                'status' => (string) $response->json('data.status'),
+                'fee' => $response->json('data.fee_charged') ?? $response->json('data.fee'),
+            ];
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
         }

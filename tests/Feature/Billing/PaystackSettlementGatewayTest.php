@@ -64,7 +64,9 @@ test('initiateTransfer returns the transfer code and status', function () {
     $gateway = app(PaystackSettlementGateway::class);
     $result = $gateway->initiateTransfer('RCP_test_123', 15_000, 'GHS', 'settlement_ref_1');
 
-    expect($result)->toBe(['transfer_code' => 'TRF_test_123', 'status' => 'pending']);
+    // 'fee' is null here because this fake reports none; the caller then falls
+    // back to the configured transfer-fee schedule.
+    expect($result)->toBe(['transfer_code' => 'TRF_test_123', 'status' => 'pending', 'fee' => null]);
     Http::assertSent(fn ($request): bool => $request['recipient'] === 'RCP_test_123'
         && $request['amount'] === 15_000
         && $request['reference'] === 'settlement_ref_1');
@@ -81,7 +83,7 @@ test('verifyTransfer returns the transfer status', function () {
     $gateway = app(PaystackSettlementGateway::class);
     $result = $gateway->verifyTransfer('settlement_ref_1');
 
-    expect($result)->toBe(['status' => 'success']);
+    expect($result)->toBe(['status' => 'success', 'fee' => null]);
 });
 
 test('listBanks returns a list of bank names and codes', function () {

@@ -122,13 +122,18 @@ final class EventFinanceController extends Controller
         });
     }
 
-    public function sendPayout(string $subdomain, string $event, string $payout, SettlementGateway $settlementGateway): JsonResponse
-    {
+    public function sendPayout(
+        string $subdomain,
+        string $event,
+        string $payout,
+        SettlementGateway $settlementGateway,
+        \App\Services\Finance\TransferFeeSchedule $transferFeeSchedule
+    ): JsonResponse {
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        return DB::transaction(function () use ($eventModel, $payout, $settlementGateway): JsonResponse {
+        return DB::transaction(function () use ($eventModel, $payout, $settlementGateway, $transferFeeSchedule): JsonResponse {
             // Lock the payout row for the whole check-send-write sequence so two
             // concurrent "send" requests for the same payout can't both pass the
             // status check and both fire a live Paystack transfer. Each retry
@@ -155,8 +160,23 @@ final class EventFinanceController extends Controller
                     $account->update(['recipient_code' => $recipientCode]);
                 }
 
+                /*
+                 * Paystack sends the recipient this amount and debits the
+                 * platform that amount plus its fee. Deducting the fee first
+                 * means the platform's balance falls by exactly what it owed,
+                 * and the organizer bears the cost of their own payout.
+                 */
+                $transferFee = $transferFeeSchedule->feeFor($account->type);
+                $netToSend = $payoutModel->amount - $transferFee;
+
+                if ($netToSend <= 0) {
+                    return response()->json([
+                        'message' => 'This balance is smaller than the transfer fee, so it cannot be sent on its own. It will be paid out with the next batch.',
+                    ], 422);
+                }
+
                 $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
-                $transfer = $settlementGateway->initiateTransfer($account->recipient_code, $payoutModel->amount, $currency, $reference);
+                $transfer = $settlementGateway->initiateTransfer($account->recipient_code, $netToSend, $currency, $reference);
             } catch (PaymentFailedException $e) {
                 return response()->json(['message' => 'Could not send payout: '.$e->getMessage()], 502);
             }
@@ -185,6 +205,8 @@ final class EventFinanceController extends Controller
                 'status' => EventPayout::STATUS_PROCESSING,
                 'provider_reference' => $reference,
                 'failure_reason' => null,
+                'transfer_fee_amount' => $transferFeeSchedule->feeFromProviderResponse($transfer) ?? $transferFee,
+                'net_paid_amount' => $netToSend,
             ]);
 
             return response()->json(['message' => 'Payout sent.', 'transfer_code' => $transfer['transfer_code']]);
