@@ -143,17 +143,23 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'stratification',
             ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage notification-settings',
+                'guard_name' => 'web',
+                'category' => 'notifications',
+            ],
         ];
     }
 
     /**
-     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event' | 'abstract' | 'programme' | 'operations' | 'certificates' | 'event-operation' | 'certificate' | 'dynamic-form' | 'stratification')}[]
+     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event' | 'abstract' | 'programme' | 'operations' | 'certificates' | 'event-operation' | 'certificate' | 'dynamic-form' | 'stratification' | 'notification-rule' | 'notifications')}[]
      */
     public function modelPermissions(): array
     {
         $data = [];
 
-        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team', 'event', 'abstract', 'event-operation', 'certificate', 'dynamic-form'];
+        $models = ['setting', 'role', 'permission', 'user', 'communication', 'tenant', 'team', 'event', 'abstract', 'event-operation', 'certificate', 'dynamic-form', 'notification-rule'];
 
         foreach ($models as $value) {
             foreach ($this->crudActions($value) as $action) {

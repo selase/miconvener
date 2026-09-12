@@ -90,6 +90,11 @@ final class RolePermissions
             'update dynamic-form',
             'delete dynamic-form',
             'manage participant-groups',
+            'create notification-rule',
+            'read notification-rule',
+            'update notification-rule',
+            'delete notification-rule',
+            'manage notification-settings',
         ]);
     }
 
@@ -143,6 +148,11 @@ final class RolePermissions
             'update dynamic-form',
             'delete dynamic-form',
             'manage participant-groups',
+            'create notification-rule',
+            'read notification-rule',
+            'update notification-rule',
+            'delete notification-rule',
+            'manage notification-settings',
         ]);
     }
 
@@ -196,6 +206,11 @@ final class RolePermissions
             'update dynamic-form',
             'delete dynamic-form',
             'manage participant-groups',
+            'create notification-rule',
+            'read notification-rule',
+            'update notification-rule',
+            'delete notification-rule',
+            'manage notification-settings',
         ]);
     }
 }

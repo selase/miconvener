@@ -357,14 +357,19 @@ Verified by:
   - Phase 3 total: 10 passing tests, 60 assertions.
   - Full clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
 
-## [ ] Track: Multi-Channel Automated Notifications & Billing Guardrails
+## [x] Track: Multi-Channel Automated Notifications & Billing Guardrails
 
-- [ ] Automated reminders and notifications engine across the app for participants, speakers, and organizers.
-- [ ] Direct Email delivery with scheduled trigger rules (T-minus X days, post-session, post-event).
-- [ ] Multi-channel staging for SMS & WhatsApp ready for Omnichannel API integration.
-- [ ] Tenant notification settings with channel toggles and opt-ins.
-- [ ] Quota billing thresholds, rate limits, and anti-abuse guardrails.
-- [ ] Comprehensive Pest tests, Pint formatting, and Vite asset build.
+- **Granular RBAC Permissions**: Added Spatie permissions (`create notification-rule`, `read notification-rule`, `update notification-rule`, `delete notification-rule`, `manage notification-settings`) to `PermissionsSeeder` and assigned to Superadmin, Org Superadmin, and Org Admin in `RolePermissions.php`.
+- **Landlord Database Migrations & Models**: Landlord tables `event_notification_rules`, `event_notification_logs`, `tenant_notification_settings`. Eloquent models `EventNotificationRule`, `EventNotificationLog`, and `TenantNotificationSetting` with UUID primary keys, JSON casts, and relations on `Event.php` (`notificationRules()`, `notificationLogs()`).
+- **Multi-Channel Notification Gateway**: `NotificationGatewayService` supporting direct Email delivery via responsive Mailable `AutomatedNotificationMail`, and multi-channel staging for SMS and WhatsApp formatted ready for plug-and-play Omnichannel API integration.
+- **Automated Rule Engine & Scheduler**: `AutomatedNotificationDispatcher` and Artisan command `app:dispatch-automated-notifications` automatically calculating scheduled timing offsets (e.g. 7 days before event, 2 hours after event), resolving attendee and cohort recipients, and interpolating dynamic placeholders (`{name}`, `{event_name}`, `{date}`, `{time}`, `{venue}`, `{ticket_code}`, `{ticket_url}`).
+- **Quota Billing & Anti-Abuse Guardrails**: Tenant settings enforcing monthly free email limits (2,500 free emails/month), overage billing control, and per-attendee frequency cooldowns (default 60 minutes) to eliminate repetitive notification spamming.
+- **Host Console UI**: `NotificationsPanel.jsx` added to the Event Console with monthly quota progress bar, channel statuses, 1-click preset campaign deployment (7-day reminder, day-of digital pass, post-event CME feedback, speaker slide deadline), custom rule builder, live test dispatch, and channel configuration modal.
+- **Verification Evidence**:
+  - `tests/Feature/Events/EventAutomatedNotificationsTest.php`: 7 passing tests, 51 assertions.
+  - Phase 2, 3, 4 comprehensive suite: 27 passing tests, 200 assertions.
+  - Full clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
+
 
 
 

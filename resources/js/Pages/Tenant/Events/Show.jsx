@@ -32,6 +32,7 @@ import OperationsPanel from './panels/OperationsPanel';
 import CertificatesPanel from './panels/CertificatesPanel';
 import FormsPanel from './panels/FormsPanel';
 import StratificationPanel from './panels/StratificationPanel';
+import NotificationsPanel from './panels/NotificationsPanel';
 
 const TABS = [
     'Overview',
@@ -46,6 +47,7 @@ const TABS = [
     'Operations',
     'Guests',
     'Blasts',
+    'Automations',
     'Check-in',
     'Occupancy',
     'Venue',
@@ -408,6 +410,7 @@ export default function Show({
                 {tab === 'Operations' && <OperationsPanel event={event} />}
                 {tab === 'Guests' && <GuestsTab event={event} registrations={registrations} />}
                 {tab === 'Blasts' && <BlastsPanel event={event} />}
+                {tab === 'Automations' && <NotificationsPanel event={event} />}
                 {tab === 'Check-in' && (
                     <CheckInPanel
                         event={event}

@@ -282,6 +282,16 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::delete('events/{event}/participant-groups/{group}/members/{registration}', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'removeMember'])->name('tenant.events.participant-groups.members.remove');
     Route::get('events/{event}/participant-groups/{group}/export', [App\Http\Controllers\Tenant\EventParticipantGroupController::class, 'export'])->name('tenant.events.participant-groups.export');
 
+    // Automated Notification Rules & Multi-Channel Delivery
+    Route::get('events/{event}/notification-rules', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'index'])->name('tenant.events.notification-rules.index');
+    Route::post('events/{event}/notification-rules', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'store'])->name('tenant.events.notification-rules.store');
+    Route::put('events/{event}/notification-rules/{rule}', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'update'])->name('tenant.events.notification-rules.update');
+    Route::delete('events/{event}/notification-rules/{rule}', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'destroy'])->name('tenant.events.notification-rules.destroy');
+    Route::patch('events/{event}/notification-rules/{rule}/toggle', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'toggle'])->name('tenant.events.notification-rules.toggle');
+    Route::post('events/{event}/notification-rules/{rule}/dispatch', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'dispatchNow'])->name('tenant.events.notification-rules.dispatch');
+    Route::post('events/{event}/notification-rules/test-send', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'testSend'])->name('tenant.events.notification-rules.test-send');
+    Route::put('events/{event}/notification-settings', [App\Http\Controllers\Tenant\EventNotificationRuleController::class, 'updateSettings'])->name('tenant.events.notification-settings.update');
+
 });
 
 // Public certificate verification

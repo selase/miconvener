@@ -280,6 +280,16 @@ final class Event extends Model
         return $this->hasMany(EventParticipantGroup::class)->orderBy('name');
     }
 
+    public function notificationRules(): HasMany
+    {
+        return $this->hasMany(EventNotificationRule::class)->latest('created_at');
+    }
+
+    public function notificationLogs(): HasMany
+    {
+        return $this->hasMany(EventNotificationLog::class)->latest('created_at');
+    }
+
     public function sessions(): HasMany
     {
         return $this->hasMany(EventSession::class)->orderBy('starts_at')->orderBy('sort_order');
