@@ -31,3 +31,6 @@ GEMINI.md
 
 # Local git worktrees
 /.worktrees
+
+# Subagent-driven-development scratch (ledgers, briefs, review packages)
+.superpowers
