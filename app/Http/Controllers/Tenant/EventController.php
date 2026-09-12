@@ -302,6 +302,10 @@ final class EventController extends Controller
             'description' => ['nullable', 'string'],
             'status' => ['required', Rule::in([Event::STATUS_DRAFT, Event::STATUS_PUBLISHED, Event::STATUS_CANCELLED])],
             'visibility' => ['sometimes', Rule::in(Event::VISIBILITIES)],
+            'fee_bearer' => ['nullable', Rule::in([
+                \App\Services\Finance\PlatformFeeResolver::BEARER_ORGANIZER,
+                \App\Services\Finance\PlatformFeeResolver::BEARER_ATTENDEE,
+            ])],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'timezone' => ['required', 'string', 'max:64'],
@@ -322,9 +326,13 @@ final class EventController extends Controller
             'virtual_link.required_if' => 'The virtual meeting link is required for virtual events.',
         ]);
 
-        // platform_fee_percentage is deliberately NOT settable here — it's the
-        // platform's own revenue lever, not something a host can self-discount.
-        // Superadmin-only, set via events:set-platform-fee for now.
+        // platform_fee_percentage and platform_fee_cap_amount are deliberately
+        // NOT settable here — they are the platform's own revenue levers, not
+        // something a host can self-discount. Application-superadmin only, via
+        // events:set-platform-fee, which has no web surface at all.
+        //
+        // fee_bearer is different: who absorbs the commission is the
+        // organizer's own pricing decision, so it belongs to them.
 
         unset($validated['hero_image']);
 
@@ -367,6 +375,7 @@ final class EventController extends Controller
             'requires_approval' => $event->requires_approval,
             'ticket_price' => $event->ticket_price,
             'currency' => $event->currency,
+            'fee_bearer' => $event->fee_bearer,
             'hero_image_url' => Helper::storageUrl($event->hero_image_path),
             'plan_your_visit_content' => $event->plan_your_visit_content,
             'is_free' => $event->isFree(),

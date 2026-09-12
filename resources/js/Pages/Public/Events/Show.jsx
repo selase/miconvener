@@ -625,16 +625,37 @@ function RegistrationPanel({ event }) {
             }
         }
 
-        const finalTotal = Math.max(0, subtotal - promoDiscount);
+        const ticketTotal = Math.max(0, subtotal - promoDiscount);
+
+        // When the organizer has chosen to pass the platform fee on, the buyer
+        // sees it as its own line. The server recomputes it authoritatively at
+        // registration; this mirrors that arithmetic so the two agree.
+        let serviceFee = 0;
+
+        if (ticketTotal > 0 && event.fee_bearer === 'attendee') {
+            const uncapped = Math.round((ticketTotal * Number(event.platform_fee_percentage || 0)) / 100);
+            serviceFee =
+                event.platform_fee_cap_amount === null || event.platform_fee_cap_amount === undefined
+                    ? uncapped
+                    : Math.min(uncapped, Number(event.platform_fee_cap_amount));
+
+            if (serviceFee > 0) {
+                breakdown.push({ label: 'Service fee', amount: serviceFee, isOverride: false });
+            }
+        }
+
+        const finalTotal = ticketTotal + serviceFee;
 
         return {
             subtotal,
             total: finalTotal,
             promoDiscount,
+            serviceFee,
             breakdown,
-            hasAdjustments: override !== null || modifierTotal !== 0 || promoDiscount > 0,
+            hasAdjustments:
+                override !== null || modifierTotal !== 0 || promoDiscount > 0 || serviceFee > 0,
         };
-    }, [basePrice, formFields, data.form_answers, appliedPromo]);
+    }, [basePrice, formFields, data.form_answers, appliedPromo, event.fee_bearer, event.platform_fee_percentage, event.platform_fee_cap_amount]);
 
     const handleAnswerChange = (fieldKey, value) => {
         setData('form_answers', {

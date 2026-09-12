@@ -39,6 +39,7 @@ export default function EventFormModal({ mode, event, onClose }) {
         requires_approval: event?.requires_approval ?? false,
         ticket_price: event ? event.ticket_price / 100 : 0,
         currency: event?.currency ?? 'GHS',
+        fee_bearer: event?.fee_bearer ?? 'organizer',
         plan_your_visit_content: event?.plan_your_visit_content ?? '',
         hero_image: null,
     });
@@ -257,6 +258,20 @@ export default function EventFormModal({ mode, event, onClose }) {
                 </div>
                 <p className="-mt-3 text-xs text-ink-secondary">
                     Default price is used only if this event has no ticket types. Add ticket types (e.g. In-Person / Virtual, each with its own price) from the event page after creating it.
+                </p>
+
+                <Select
+                    label="Who pays the platform fee"
+                    value={data.fee_bearer}
+                    onChange={(e) => setData('fee_bearer', e.target.value)}
+                    error={errors.fee_bearer}
+                >
+                    <option value="organizer">I do — it comes out of the ticket price</option>
+                    <option value="attendee">The attendee — it is added at checkout</option>
+                </Select>
+                <p className="-mt-3 text-xs text-ink-secondary">
+                    Choose &ldquo;the attendee&rdquo; and a GHS 100 ticket is sold for GHS 102, so you
+                    receive the full GHS 100. Payment processing is deducted either way.
                 </p>
 
                 <label className="flex items-center gap-2.5 text-sm text-ink">

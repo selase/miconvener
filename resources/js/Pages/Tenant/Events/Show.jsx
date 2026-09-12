@@ -128,7 +128,8 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
                 </div>
                 <div className="rounded-lg border border-border p-4">
                     <div className="text-xs text-ink-secondary">
-                        Platform fee ({event.effective_platform_fee_percentage}%)
+                        Platform fee ({event.effective_platform_fee_percentage}%
+                        {event.effective_fee_bearer === 'attendee' ? ', paid by attendees' : ''})
                     </div>
                     <div className="mt-1 text-2xl font-semibold text-ink">
                         {formatAmount(platformFees, event.currency)}
