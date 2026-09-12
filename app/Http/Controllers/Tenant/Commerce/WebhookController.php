@@ -186,6 +186,17 @@ final class WebhookController extends Controller
             'provider_reference' => $reference,
         ]);
 
+        // The platform-settled path posts to both ledgers; this one recorded
+        // only the old single-row entry, so an own_gateway tenant had no
+        // double-entry record of their ticket sales at all.
+        app(\App\Services\Finance\LedgerService::class)->recordTicketSale(
+            $eventModel,
+            $registration,
+            $amount,
+            $commissionAmount,
+            $reference
+        );
+
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
 

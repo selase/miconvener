@@ -100,6 +100,15 @@ final class ReconcileStuckPayouts extends Command
                         'provider' => 'paystack',
                         'provider_reference' => $locked->provider_reference,
                     ]);
+
+                    // Inside the same idempotency guard as the entry above, so
+                    // a re-run cannot double-post.
+                    app(\App\Services\Finance\LedgerService::class)->recordPayout(
+                        $locked->event,
+                        (int) $locked->amount,
+                        (string) $locked->provider_reference,
+                        $locked
+                    );
                 }
             });
 

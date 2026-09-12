@@ -233,6 +233,15 @@ final class SettlementWebhookController extends Controller
                 'provider_reference' => $reference,
             ]);
 
+            // Without this the organizer payable is only ever debited on paths
+            // that happen to be instrumented, so the balance drifts upward.
+            app(\App\Services\Finance\LedgerService::class)->recordPayout(
+                $payout->event,
+                (int) $payout->amount,
+                $reference,
+                $payout
+            );
+
             return;
         }
 
