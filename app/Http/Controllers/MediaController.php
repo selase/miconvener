@@ -12,19 +12,26 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 final class MediaController extends Controller
 {
     /**
-     * Allowed upload directory prefixes that can be publicly served.
+     * Directories this route may stream from.
      *
-     * @var array<int, string>
+     * Prefix matching answers "is this path shaped like a media file", which is
+     * a traversal defence, not an authorisation one. Only genuinely public
+     * assets belong here.
+     *
+     * Deliberately absent:
+     *  - event-materials/ : gated by MaterialDownloadController on confirmed
+     *    registration, release date and per-registration download limit. Serving
+     *    it here bypassed all three and ignored tenancy.
+     *  - users/           : nothing writes here; an open door onto a directory
+     *    with no legitimate traffic.
      */
     private const ALLOWED_PREFIXES = [
         'events/',
         'speakers/',
         'event-sponsors/',
-        'event-materials/',
         'event-forum/',
         'tenant/',
         'logos/',
-        'users/',
     ];
 
     /**
