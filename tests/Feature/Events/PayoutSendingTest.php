@@ -7,6 +7,9 @@ namespace Tests\Feature\Events;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
+use App\Models\LedgerAccount;
+use App\Models\LedgerEntry;
+use App\Models\LedgerTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPayoutAccount;
 use App\Models\User;
@@ -201,6 +204,7 @@ test('recording a payout paid twice does not double the ledger', function () {
     $this->actingAs($user)->patchJson($url, ['status' => 'paid'], ['HTTP_HOST' => $host])->assertOk();
 
     expect($payout->fresh()->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->count())->toBe(1);
+    expect(LedgerTransaction::where('event_id', $event->id)->count())->toBe(1);
 });
 
 test('a transfer.success webhook flips the payout to paid and writes one payout ledger row, idempotently', function () {
@@ -230,6 +234,15 @@ test('a transfer.success webhook flips the payout to paid and writes one payout 
 
     $ledgerEntry = EventLedgerEntry::where('payout_id', $payout->id)->where('type', EventLedgerEntry::TYPE_PAYOUT)->firstOrFail();
     expect($ledgerEntry->currency)->toBe('USD');
+
+    // The double-entry side of the same disbursement: this is what actually
+    // settles the organizer's payable in the accounting ledger, distinct from
+    // the single-row summary entry asserted above.
+    expect(LedgerTransaction::where('event_id', $event->id)->where('transaction_type', LedgerTransaction::TYPE_PAYOUT)->count())->toBe(1);
+
+    $organizerPayable = LedgerAccount::where('event_id', $event->id)->where('code', LedgerAccount::CODE_ORGANIZER_PAYABLE)->firstOrFail();
+    $debited = (int) $organizerPayable->entries()->where('direction', LedgerEntry::DIRECTION_DEBIT)->sum('amount');
+    expect($debited)->toBe(5_000);
 });
 
 test('a transfer.failed webhook flips the payout to failed with no ledger row', function () {

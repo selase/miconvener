@@ -221,6 +221,11 @@ final class EventFinanceController extends Controller
             // or it is missing from the settlement statement's line items while
             // still counting against the reconciliation totals.
             if ($markingPaid) {
+                // Both writes record the same event: the single-row summary
+                // entry and the double-entry ledger transaction. Guarding only
+                // the first let a second "mark as paid" post a second
+                // LedgerTransaction while looking idempotent from the
+                // EventLedgerEntry side alone.
                 if (! $payoutModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->exists()) {
                     EventLedgerEntry::create([
                         'tenant_id' => $payoutModel->tenant_id,
@@ -235,15 +240,15 @@ final class EventFinanceController extends Controller
                         'provider' => 'manual',
                         'provider_reference' => $payoutModel->provider_reference,
                     ]);
-                }
 
-                // Post into double-entry accounting ledger
-                app(\App\Services\Finance\LedgerService::class)->recordPayout(
-                    $eventModel,
-                    $payoutModel->amount,
-                    $payoutModel->provider_reference ?? ('PO-'.$payoutModel->id),
-                    $payoutModel
-                );
+                    // Post into double-entry accounting ledger
+                    app(\App\Services\Finance\LedgerService::class)->recordPayout(
+                        $eventModel,
+                        $payoutModel->amount,
+                        $payoutModel->provider_reference ?? ('PO-'.$payoutModel->id),
+                        $payoutModel
+                    );
+                }
             }
 
             return response()->json(['message' => 'Payout updated.']);
