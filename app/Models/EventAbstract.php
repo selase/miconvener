@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 final class EventAbstract extends Model
 {
@@ -73,13 +74,30 @@ final class EventAbstract extends Model
         'decided_by',
     ];
 
+    /**
+     * Whether a code is already taken anywhere.
+     *
+     * The code column carries a global unique index, so this deliberately drops
+     * the tenant scope: a probe that only sees the current tenant's rows would
+     * approve a code another tenant already holds, and the insert would then
+     * violate the index.
+     */
+    public static function codeExists(string $code): bool
+    {
+        return self::query()->withoutGlobalScopes()->where('code', $code)->exists();
+    }
+
     public static function generateCode(): string
     {
-        do {
+        foreach (range(1, 10) as $ignored) {
             $code = 'ABS-'.mb_strtoupper(Str::random(6));
-        } while (self::query()->where('code', $code)->exists());
 
-        return $code;
+            if (! self::codeExists($code)) {
+                return $code;
+            }
+        }
+
+        throw new RuntimeException('Could not generate a unique abstract code after 10 attempts.');
     }
 
     public function event(): BelongsTo

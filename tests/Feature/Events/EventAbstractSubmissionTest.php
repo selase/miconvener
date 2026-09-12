@@ -6,6 +6,8 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventAbstract;
+use App\Models\Tenant;
+use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
@@ -137,4 +139,27 @@ test('public user can track abstract status using code', function () {
     $response->assertJsonPath('abstract.code', 'ABS-TRACK1');
     $response->assertJsonPath('abstract.status', 'under_review');
     $response->assertJsonPath('abstract.authors.0.name', 'Ama Adjei');
+});
+
+test('abstract codes are unique across tenants, not just within one', function () {
+    $tenantA = Tenant::factory()->create(['slug' => 'code-a', 'isolation_mode' => 'shared']);
+    $tenantB = Tenant::factory()->create(['slug' => 'code-b', 'isolation_mode' => 'shared']);
+
+    $eventA = Event::factory()->published()->create(['tenant_id' => $tenantA->id]);
+
+    EventAbstract::create([
+        'tenant_id' => $tenantA->id,
+        'event_id' => $eventA->id,
+        'code' => 'ABS-TAKEN',
+        'title' => 'Existing',
+        'body' => 'Body',
+        'status' => EventAbstract::STATUS_SUBMITTED,
+    ]);
+
+    // The column is globally unique, so the probe must see across tenants. With
+    // the tenant scope applied it cannot, and hands back a code that will
+    // violate the index on insert.
+    app(TenantContext::class)->setTenant($tenantB);
+
+    expect(EventAbstract::codeExists('ABS-TAKEN'))->toBeTrue();
 });
