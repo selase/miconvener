@@ -137,7 +137,16 @@ final class TenantNotificationSetting extends Model
             return;
         }
 
-        $this->decrement('email_used_this_month');
+        // The in-memory guard above is a fast path, not the enforcement: two
+        // concurrent refunds could both pass it while the column is still 1.
+        // Re-checking the floor in the WHERE clause makes the decrement itself
+        // a no-op once another process has already brought it to zero.
+        self::query()
+            ->whereKey($this->getKey())
+            ->where('email_used_this_month', '>', 0)
+            ->decrement('email_used_this_month');
+
+        $this->refresh();
     }
 
     private function checkAndResetMonthly(): void
