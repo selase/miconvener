@@ -105,7 +105,14 @@ final class NotificationGatewayService
             // Channel delivery execution
             if ($channel === EventNotificationLog::CHANNEL_EMAIL) {
                 try {
-                    Mail::to($email)->send(new AutomatedNotificationMail(
+                    // AutomatedNotificationMail implements ShouldQueue, so
+                    // ->send() would only enqueue it and report success
+                    // immediately -- the catch below would never see a real
+                    // delivery failure, and STATUS_SENT/sent_at would be a
+                    // claim about work that hadn't happened yet. sendNow()
+                    // forces synchronous delivery so this block's status,
+                    // timestamp, and refund are all true statements.
+                    Mail::to($email)->sendNow(new AutomatedNotificationMail(
                         event: $event,
                         recipientName: $name,
                         emailSubject: $payload['subject'],

@@ -155,8 +155,10 @@ test('rule dispatch delivers direct emails with template placeholder interpolati
     $dispatchResponse->assertOk();
     $dispatchResponse->assertJsonPath('stats.sent_count', 1);
 
-    // Verify email was sent with interpolated content
-    Mail::assertQueued(AutomatedNotificationMail::class, function (AutomatedNotificationMail $mail) {
+    // Verify email was sent with interpolated content. The gateway calls
+    // sendNow() (see NotificationGatewayService::dispatch) precisely so this
+    // is a real send, not merely a queued job -- assertSent, not assertQueued.
+    Mail::assertSent(AutomatedNotificationMail::class, function (AutomatedNotificationMail $mail) {
         return $mail->hasTo('kwame@ghanahealth.gov') &&
                $mail->recipientName === 'Dr. Kwame Bediako' &&
                $mail->emailSubject === 'Welcome to African Healthcare Summit, Dr. Kwame Bediako!' &&
@@ -301,7 +303,8 @@ test('quota guardrail suppresses delivery when free monthly email limit is excee
 
     $secondDispatch->assertOk();
     $secondDispatch->assertJsonPath('stats.sent_count', 1);
-    Mail::assertQueued(AutomatedNotificationMail::class);
+    // sendNow() is used deliberately (see NotificationGatewayService::dispatch).
+    Mail::assertSent(AutomatedNotificationMail::class);
 });
 
 test('anti-abuse cooldown prevents duplicate notification spamming to the same recipient', function () {
@@ -399,7 +402,8 @@ test('scheduled console command scans and dispatches due notification rules', fu
 
     // Confirm rule dispatched
     expect($rule->fresh()->last_dispatched_at)->not->toBeNull();
-    Mail::assertQueued(AutomatedNotificationMail::class, function (AutomatedNotificationMail $mail) {
+    // sendNow() is used deliberately (see NotificationGatewayService::dispatch).
+    Mail::assertSent(AutomatedNotificationMail::class, function (AutomatedNotificationMail $mail) {
         return $mail->hasTo('ama@stem.org');
     });
 });

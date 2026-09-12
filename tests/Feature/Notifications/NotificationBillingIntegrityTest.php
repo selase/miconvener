@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\TenantNotificationSetting;
 use App\Services\Notifications\NotificationGatewayService;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Queue;
 
 /**
  * The gateway takes payment at the moment it decides to send, not at the moment
@@ -120,6 +121,31 @@ test('a failed email does not consume the monthly quota', function () {
 
     // The allowance is the tenant's to spend on delivered mail. A bounce must
     // not burn it.
+    expect((int) $settings->fresh()->email_used_this_month)->toBe(0);
+});
+
+test('a queued mailable still refunds quota when delivery fails', function () {
+    [$tenant, $event, $settings] = gatewayScenario('bill-queued');
+
+    // Production runs a queue; the test env pins sync. Faking the queue
+    // reproduces the real shape: if the mailable were merely enqueued, the
+    // send would "succeed", the row would claim sent_at, and the quota would
+    // never come back.
+    Queue::fake();
+    config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => '127.0.0.1', 'mail.mailers.smtp.port' => 1]);
+
+    app(NotificationGatewayService::class)->dispatch(
+        $event,
+        null,
+        ['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => null],
+        ['email'],
+        ['subject' => 'Doors open', 'body' => 'See you at 9.'],
+    );
+
+    $log = EventNotificationLog::where('event_id', $event->id)->firstOrFail();
+
+    expect($log->status)->toBe(EventNotificationLog::STATUS_FAILED);
+    expect($log->sent_at)->toBeNull();
     expect((int) $settings->fresh()->email_used_this_month)->toBe(0);
 });
 
