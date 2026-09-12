@@ -82,6 +82,8 @@ final class Event extends Model
         'visibility',
         'plan_your_visit_content',
         'platform_fee_percentage',
+        'platform_fee_cap_amount',
+        'fee_bearer',
         'registration_settings',
     ];
 
@@ -92,6 +94,7 @@ final class Event extends Model
         'requires_approval' => 'boolean',
         'ticket_price' => 'integer',
         'platform_fee_percentage' => 'float',
+        'platform_fee_cap_amount' => 'integer',
         'registration_settings' => 'array',
     ];
 
@@ -328,6 +331,32 @@ final class Event extends Model
             ?? $this->tenant?->platform_fee_percentage
             ?? $this->tenant?->package?->default_platform_fee_percentage
             ?? config('services.platform.default_fee_percentage'));
+    }
+
+    /**
+     * The commission ceiling for one ticket on this event, in minor units.
+     * Null means uncapped; a stored zero is a waiver and is honoured as one.
+     */
+    public function effectivePlatformFeeCapAmount(): ?int
+    {
+        $cap = $this->platform_fee_cap_amount
+            ?? $this->tenant?->platform_fee_cap_amount
+            ?? $this->tenant?->package?->default_platform_fee_cap_amount
+            ?? config('services.platform.default_fee_cap_amount');
+
+        return $cap === null ? null : (int) $cap;
+    }
+
+    /**
+     * Whether the organizer absorbs the platform commission or the attendee
+     * pays it on top of the ticket price.
+     */
+    public function effectiveFeeBearer(): string
+    {
+        return (string) ($this->fee_bearer
+            ?? $this->tenant?->fee_bearer
+            ?? $this->tenant?->package?->default_fee_bearer
+            ?? config('services.platform.default_fee_bearer'));
     }
 
     public function isPublished(): bool

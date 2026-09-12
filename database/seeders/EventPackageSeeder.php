@@ -30,7 +30,7 @@ final class EventPackageSeeder extends Seeder
     ];
 
     /**
-     * @var array<string, array{name: string, description: string, monthly: float, yearly: float, sort: int, is_free: bool, default_fee: float|null, features: array<string, int|bool>}>
+     * @var array<string, array{name: string, description: string, monthly: float, yearly: float, sort: int, is_free: bool, default_fee: float|null, default_cap: int|null, default_bearer: string, features: array<string, int|bool>}>
      */
     private array $packages = [
         'free' => [
@@ -41,6 +41,8 @@ final class EventPackageSeeder extends Seeder
             'sort' => 0,
             'is_free' => true,
             'default_fee' => 5.0,
+            'default_cap' => 2000,
+            'default_bearer' => 'organizer',
             'features' => [
                 'events_in_flight' => 1,
                 'event_registrations' => 50,
@@ -65,6 +67,8 @@ final class EventPackageSeeder extends Seeder
             'sort' => 1,
             'is_free' => false,
             'default_fee' => 3.5,
+            'default_cap' => 2000,
+            'default_bearer' => 'organizer',
             'features' => [
                 'events_in_flight' => 3,
                 'event_registrations' => 500,
@@ -89,6 +93,8 @@ final class EventPackageSeeder extends Seeder
             'sort' => 2,
             'is_free' => false,
             'default_fee' => 2.0,
+            'default_cap' => 2000,
+            'default_bearer' => 'organizer',
             'features' => [
                 'events_in_flight' => 15,
                 'event_registrations' => 3000,
@@ -113,6 +119,8 @@ final class EventPackageSeeder extends Seeder
             'sort' => 3,
             'is_free' => false,
             'default_fee' => null,
+            'default_cap' => null,
+            'default_bearer' => 'organizer',
             'features' => [
                 'events_in_flight' => -1,
                 'event_registrations' => -1,
@@ -169,6 +177,8 @@ final class EventPackageSeeder extends Seeder
                     'is_free' => $config['is_free'],
                     'sort_order' => $config['sort'],
                     'default_platform_fee_percentage' => $config['default_fee'],
+                    'default_platform_fee_cap_amount' => $config['default_cap'],
+                    'default_fee_bearer' => $config['default_bearer'],
                 ]
             );
 

@@ -65,6 +65,8 @@ final class Tenant extends Model
         'markup_percentage',
         'llm_topup_balance',
         'platform_fee_percentage',
+        'platform_fee_cap_amount',
+        'fee_bearer',
         'settlement_mode',
         'created_at',
         'updated_at',
@@ -81,6 +83,7 @@ final class Tenant extends Model
         'markup_percentage' => 'decimal:2',
         'llm_topup_balance' => 'integer',
         'platform_fee_percentage' => 'float',
+        'platform_fee_cap_amount' => 'integer',
     ];
 
     /**

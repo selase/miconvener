@@ -33,6 +33,8 @@ final class Package extends Model
         'sort_order',
         'markup_percentage',
         'default_platform_fee_percentage',
+        'default_platform_fee_cap_amount',
+        'default_fee_bearer',
         'paystack_plan_code',
         'paystack_yearly_plan_code',
         'stripe_price_id',
@@ -49,6 +51,7 @@ final class Package extends Model
         'sort_order' => 'integer',
         'markup_percentage' => 'decimal:2',
         'default_platform_fee_percentage' => 'decimal:2',
+        'default_platform_fee_cap_amount' => 'integer',
     ];
 
     public function isFree(): bool

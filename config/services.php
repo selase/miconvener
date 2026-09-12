@@ -62,6 +62,37 @@ return [
 
     'platform' => [
         'default_fee_percentage' => (float) env('PLATFORM_DEFAULT_FEE_PERCENTAGE', 5.0),
+
+        /*
+         * Commission ceiling per ticket, in minor units. At the 2% Growth rate
+         * this binds above a GHS 1,000 ticket. Null means uncapped.
+         */
+        'default_fee_cap_amount' => env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT') !== null
+            ? (int) env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT')
+            : 2000,
+
+        /*
+         * Who pays the platform commission: 'organizer' absorbs it out of the
+         * ticket price, 'attendee' pays it on top of what the ticket costs.
+         */
+        'default_fee_bearer' => env('PLATFORM_DEFAULT_FEE_BEARER', 'organizer'),
+
+        /*
+         * Paystack Ghana's published collection rate. Used only for the
+         * estimate shown before a sale — the ledger books the actual fee the
+         * webhook reports.
+         */
+        'gateway_fee_percentage' => (float) env('PLATFORM_GATEWAY_FEE_PERCENTAGE', 1.95),
+
+        /*
+         * Paystack Ghana transfer fees in minor units, keyed by the values of
+         * TenantPayoutAccount::TYPE_MOBILE_MONEY and TYPE_BANK so no mapping
+         * layer is needed between a payout account and its fee.
+         */
+        'transfer_fees' => [
+            'mobile_money' => (int) env('PLATFORM_TRANSFER_FEE_MOMO', 100),
+            'bank' => (int) env('PLATFORM_TRANSFER_FEE_BANK', 800),
+        ],
     ],
 
     'settlement' => [
