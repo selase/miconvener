@@ -7,6 +7,7 @@ namespace Tests\Feature\Events;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventRegistration;
+use App\Models\LedgerTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Models\User;
@@ -73,6 +74,11 @@ test('an own_gateway charge.success webhook writes a charge ledger entry with th
     expect($entry->commission_amount)->toBe(500); // 5% of 10,000
     expect($entry->net_amount)->toBe(9_350); // 10,000 - 150 - 500
     expect($entry->registration_id)->toBe($registration->id);
+
+    // The single-row EventLedgerEntry above is a summary; the double-entry
+    // LedgerTransaction is the record that actually moves the organizer
+    // payable and platform revenue accounts.
+    expect(LedgerTransaction::where('event_id', $event->id)->where('transaction_type', LedgerTransaction::TYPE_TICKET_SALE)->count())->toBe(1);
 });
 
 test('a platform_default charge.success confirms the registration via tenant_id in metadata and writes a charge ledger entry', function () {
