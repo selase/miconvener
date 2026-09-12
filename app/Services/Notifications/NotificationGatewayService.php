@@ -162,7 +162,10 @@ final class NotificationGatewayService
                     ];
                 }
             } elseif (in_array($channel, [EventNotificationLog::CHANNEL_SMS, EventNotificationLog::CHANNEL_WHATSAPP], true)) {
-                // Staged for Omnichannel Gateway integration
+                // Staged for Omnichannel Gateway integration. Nothing has been
+                // delivered, so nothing is billed and nothing claims to have
+                // been sent -- the rate is kept so the figure survives for when
+                // a real gateway is wired in.
                 $omnichannelPayload = [
                     'provider' => 'omnichannel',
                     'channel' => $channel,
@@ -172,6 +175,7 @@ final class NotificationGatewayService
                     'tenant_id' => $event->tenant_id,
                     'event_id' => $event->id,
                     'staged_at' => now()->toIso8601String(),
+                    'would_bill' => $cost,
                 ];
 
                 EventNotificationLog::create([
@@ -185,15 +189,15 @@ final class NotificationGatewayService
                     'status' => EventNotificationLog::STATUS_STAGED,
                     'subject' => $payload['subject'],
                     'message' => $payload['body'],
-                    'cost_billed' => $cost,
+                    'cost_billed' => 0,
                     'metadata' => $omnichannelPayload,
-                    'sent_at' => now(),
+                    'sent_at' => null,
                 ]);
 
                 $results[$channel] = [
                     'status' => EventNotificationLog::STATUS_STAGED,
-                    'message' => "Staged for Omnichannel {$channel} gateway dispatch.",
-                    'cost' => $cost,
+                    'message' => "Staged for Omnichannel {$channel} gateway dispatch. Not billed until delivered.",
+                    'cost' => 0,
                 ];
             }
         }
@@ -220,7 +224,10 @@ final class NotificationGatewayService
                     $query->orWhere('recipient_phone', $phone);
                 }
             })
-            ->where('sent_at', '>=', $since)
+            // created_at, not sent_at: a staged row has no sent_at, and the
+            // cooldown means "when did we last try", not "when did we last
+            // deliver".
+            ->where('created_at', '>=', $since)
             ->exists();
     }
 }
