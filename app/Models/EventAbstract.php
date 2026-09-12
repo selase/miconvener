@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Scopes\TenantScope;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -78,13 +79,14 @@ final class EventAbstract extends Model
      * Whether a code is already taken anywhere.
      *
      * The code column carries a global unique index, so this deliberately drops
-     * the tenant scope: a probe that only sees the current tenant's rows would
-     * approve a code another tenant already holds, and the insert would then
-     * violate the index.
+     * only the TenantScope: a probe that only sees the current tenant's rows
+     * would approve a code another tenant already holds, and the insert would
+     * then violate the index. Any other global scope the model gains later
+     * should still apply here.
      */
     public static function codeExists(string $code): bool
     {
-        return self::query()->withoutGlobalScopes()->where('code', $code)->exists();
+        return self::query()->withoutGlobalScope(TenantScope::class)->where('code', $code)->exists();
     }
 
     public static function generateCode(): string
