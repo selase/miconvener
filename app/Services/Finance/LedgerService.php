@@ -158,21 +158,35 @@ final class LedgerService
         EventRegistration $registration,
         int $grossAmount,
         int $platformFee,
-        string $reference
+        string $reference,
+        int $gatewayFee = 0
     ): ?LedgerTransaction {
         if ($grossAmount <= 0) {
             return null; // Free tickets do not move financial cash
         }
 
+        if ($gatewayFee < 0 || $gatewayFee >= $grossAmount) {
+            throw new InvalidArgumentException(
+                "Gateway fee ({$gatewayFee}) must be non-negative and smaller than the gross amount ({$grossAmount})."
+            );
+        }
+
         $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
-        $netAmount = $grossAmount - $platformFee;
+
+        /*
+         * Paystack nets its collection fee out before the money ever reaches
+         * the platform, so debiting the gross would book cash that never
+         * arrived and leave the organizer payable permanently unclearable.
+         */
+        $cashReceived = $grossAmount - $gatewayFee;
+        $netAmount = $cashReceived - $platformFee;
 
         $entries = [
             [
                 'code' => LedgerAccount::CODE_GATEWAY_CLEARING,
                 'direction' => LedgerEntry::DIRECTION_DEBIT,
-                'amount' => $grossAmount,
-                'description' => "Ticket payment: {$registration->full_name} ({$registration->email})",
+                'amount' => $cashReceived,
+                'description' => "Ticket payment net of processing fee: {$registration->full_name} ({$registration->email})",
             ],
             [
                 'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
@@ -214,14 +228,25 @@ final class LedgerService
         EventRegistration $registration,
         int $grossAmount,
         int $platformFee,
-        string $reference
+        string $reference,
+        int $gatewayFee = 0
     ): ?LedgerTransaction {
         if ($grossAmount <= 0) {
             return null;
         }
 
+        if ($gatewayFee < 0 || $gatewayFee >= $grossAmount) {
+            throw new InvalidArgumentException(
+                "Gateway fee ({$gatewayFee}) must be non-negative and smaller than the gross amount ({$grossAmount})."
+            );
+        }
+
         $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
-        $netAmount = $grossAmount - $platformFee;
+
+        // Paystack does not return its collection fee on a refund, so the
+        // cash reversed is the cash that originally arrived.
+        $cashReceived = $grossAmount - $gatewayFee;
+        $netAmount = $cashReceived - $platformFee;
 
         $entries = [
             [
@@ -233,7 +258,7 @@ final class LedgerService
             [
                 'code' => LedgerAccount::CODE_GATEWAY_CLEARING,
                 'direction' => LedgerEntry::DIRECTION_CREDIT,
-                'amount' => $grossAmount,
+                'amount' => $cashReceived,
                 'description' => "Refund disbursed to customer: {$registration->email}",
             ],
         ];
@@ -348,10 +373,18 @@ final class LedgerService
         Event $event,
         int $amount,
         string $reference,
-        ?EventPayout $payout = null
+        ?EventPayout $payout = null,
+        int $transferFee = 0,
+        bool $platformAbsorbsTransferFee = false
     ): LedgerTransaction {
         $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
 
+        /*
+         * When the organizer bears the transfer fee it is deducted from what
+         * they are sent, so the payable clears at its full amount and the fee
+         * is not the platform's expense. When the platform absorbs it instead,
+         * it is a real cost and is booked as one.
+         */
         $entries = [
             [
                 'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
@@ -359,12 +392,22 @@ final class LedgerService
                 'amount' => $amount,
                 'description' => 'Payout settlement deducted from organizer payable',
             ],
-            [
-                'code' => LedgerAccount::CODE_BANK,
-                'direction' => LedgerEntry::DIRECTION_CREDIT,
-                'amount' => $amount,
-                'description' => 'Cash transfer to organizer verified bank account',
-            ],
+        ];
+
+        if ($platformAbsorbsTransferFee && $transferFee > 0) {
+            $entries[] = [
+                'code' => LedgerAccount::CODE_GATEWAY_FEES,
+                'direction' => LedgerEntry::DIRECTION_DEBIT,
+                'amount' => $transferFee,
+                'description' => 'Transfer fee absorbed by the platform',
+            ];
+        }
+
+        $entries[] = [
+            'code' => LedgerAccount::CODE_BANK,
+            'direction' => LedgerEntry::DIRECTION_CREDIT,
+            'amount' => $platformAbsorbsTransferFee ? $amount + $transferFee : $amount,
+            'description' => 'Cash transfer to organizer verified bank account',
         ];
 
         return $this->postTransaction(

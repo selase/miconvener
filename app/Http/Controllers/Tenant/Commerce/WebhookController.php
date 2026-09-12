@@ -180,6 +180,7 @@ final class WebhookController extends Controller
             'payment_reference' => $reference,
             'amount' => $ticketAmount,
             'charged_amount' => $amount,
+            'gateway_fee_amount' => $gatewayFeeAmount,
             'currency' => $currency,
         ]);
         $registration->save();
@@ -206,7 +207,8 @@ final class WebhookController extends Controller
             $registration,
             $amount,
             $commissionAmount,
-            $reference
+            $reference,
+            $gatewayFeeAmount
         );
 
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');

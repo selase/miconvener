@@ -268,7 +268,9 @@ final class EventFinanceController extends Controller
                         $eventModel,
                         $payoutModel->amount,
                         $payoutModel->provider_reference ?? ('PO-'.$payoutModel->id),
-                        $payoutModel
+                        $payoutModel,
+                        (int) $payoutModel->transfer_fee_amount,
+                        false,
                     );
                 }
             }
