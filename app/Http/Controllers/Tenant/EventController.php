@@ -241,6 +241,14 @@ final class EventController extends Controller
                 'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
                 'effective_platform_fee_cap_amount' => $eventModel->effectivePlatformFeeCapAmount(),
                 'effective_fee_bearer' => $eventModel->effectiveFeeBearer(),
+                /**
+                 * What one ticket at the event's own price actually splits
+                 * into, so the organizer sees their net rather than inferring
+                 * it from a percentage.
+                 */
+                'fee_preview' => app(\App\Services\Finance\FeeCalculator::class)
+                    ->for($eventModel, (int) $eventModel->ticket_price)
+                    ->toArray(),
             ],
             'registrations' => $registrations,
             'hasActiveGateway' => $tenant->canAcceptPayments(),

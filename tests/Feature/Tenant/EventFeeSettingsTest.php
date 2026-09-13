@@ -125,3 +125,48 @@ test('the superadmin command sets a commission cap and clears it again', functio
     expect($event->refresh()->platform_fee_cap_amount)->toBeNull()
         ->and($event->refresh()->platform_fee_percentage)->toBeNull();
 });
+
+test('the event page shows the organizer what one ticket actually nets them', function () {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+
+    $tenant->update(['platform_fee_percentage' => 2.0]);
+
+    $event = Event::factory()->create([
+        'tenant_id' => $tenant->id,
+        'ticket_price' => 10000,
+        'fee_bearer' => 'organizer',
+        'currency' => 'GHS',
+    ]);
+
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page
+            ->where('event.fee_preview.ticket_amount', 10000)
+            ->where('event.fee_preview.charged_amount', 10000)
+            ->where('event.fee_preview.platform_fee', 200)
+            ->where('event.fee_preview.gateway_fee_estimate', 195)
+            ->where('event.fee_preview.organizer_net', 9605)
+        );
+});
+
+test('the preview shows a pass-through event charging the buyer more', function () {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+
+    $tenant->update(['platform_fee_percentage' => 2.0]);
+
+    $event = Event::factory()->create([
+        'tenant_id' => $tenant->id,
+        'ticket_price' => 10000,
+        'fee_bearer' => 'attendee',
+        'currency' => 'GHS',
+    ]);
+
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page
+            ->where('event.fee_preview.charged_amount', 10200)
+            ->where('event.fee_preview.organizer_net', 9801)
+        );
+});

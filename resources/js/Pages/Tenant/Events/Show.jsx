@@ -143,6 +143,18 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
                 </div>
             </div>
 
+            {event.fee_preview?.ticket_amount > 0 && (
+                <p className="text-xs text-ink-secondary">
+                    On a {formatAmount(event.fee_preview.ticket_amount, event.currency)} ticket the
+                    buyer pays {formatAmount(event.fee_preview.charged_amount, event.currency)}, and
+                    you receive {formatAmount(event.fee_preview.organizer_net, event.currency)} after
+                    the {event.fee_preview.percentage}% platform fee
+                    {event.fee_preview.cap_applied ? ' (capped)' : ''} and an estimated
+                    {' '}{formatAmount(event.fee_preview.gateway_fee_estimate, event.currency)} in
+                    payment processing.
+                </p>
+            )}
+
             <p className="text-xs text-ink-secondary">
                 {settlementMode === 'platform_default'
                     ? 'MiConvener collects payments for this event and pays out to your registered payout account. The platform fee above is deducted from what settles to you — see the Finance tab for the full breakdown.'
