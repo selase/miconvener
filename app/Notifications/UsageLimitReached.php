@@ -39,7 +39,7 @@ final class UsageLimitReached extends Notification implements ShouldQueue
             ->greeting("Hello, {$notifiable->first_name}!")
             ->line("Your organization **{$this->tenant->name}** has reached **{$percentFormatted}%** of its {$metricName} limit.")
             ->line("Limit: {$this->limit->limit_value} | Period: {$this->limit->period}")
-            ->when($this->limit->block_on_limit, fn(MailMessage $message) => $message->line('**Requests exceeding this limit will be blocked.** Please upgrade your plan or contact support.'))
+            ->when($this->limit->block_on_limit, fn (MailMessage $message) => $message->line('**Requests exceeding this limit will be blocked.** Please upgrade your plan or contact support.'))
             ->action('View Usage', config('app.url').'/settings/usage');
     }
 

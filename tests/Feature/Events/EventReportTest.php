@@ -63,7 +63,7 @@ test('the registrations export only includes the requested columns, in a fixed o
     $response = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/reports/registrations?columns[]=email&columns[]=name", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
-    $lines = explode("\n", trim($response->streamedContent()));
+    $lines = explode("\n", mb_trim($response->streamedContent()));
     expect($lines[0])->toBe('Name,Email'); // canonical column order, not request order
     expect($lines[1])->toContain('Kwame Asante');
     expect($lines[1])->toContain('kwame@example.com');
@@ -115,7 +115,7 @@ test('the attendee directory dedupes by email across every event the tenant has 
 
     $response = $this->actingAs($user)->get("http://{$host}/events/{$eventA->id}/reports/attendee-directory", ['HTTP_HOST' => $host]);
 
-    $rows = collect(explode("\n", trim($response->streamedContent())))
+    $rows = collect(explode("\n", mb_trim($response->streamedContent())))
         ->skip(1)
         ->filter()
         ->map(fn ($line) => str_getcsv($line))

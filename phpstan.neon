@@ -1,4 +1,9 @@
 includes:
+    # Errors that existed when PHPStan was first enforced in CI (1,586 at level 6,
+    # mostly missing generic/iterable types and Eloquent magic properties). CI
+    # fails on anything new. Shrink this file; regenerate it only to remove
+    # entries, never to hide a new error.
+    - phpstan-baseline.neon
     - vendor/larastan/larastan/extension.neon
     - vendor/nesbot/carbon/extension.neon
     - phar://phpstan.phar/conf/bleedingEdge.neon

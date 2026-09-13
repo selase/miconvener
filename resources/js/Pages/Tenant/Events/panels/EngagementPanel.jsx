@@ -225,7 +225,7 @@ function Leaderboard({ event }) {
         csrfFetch(route('tenant.events.quiz.leaderboard', { event: event.id }))
             .then((r) => r.json())
             .then(setRows);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Dependencies deliberately limited to the ids above (re-run only when they change).
     }, [event.id]);
 
     if (rows.length === 0) return null;

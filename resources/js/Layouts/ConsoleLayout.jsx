@@ -48,7 +48,7 @@ export default function ConsoleLayout({ children }) {
         } else if (flash?.success) {
             toast?.(flash.success);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Dependencies deliberately limited to the ids above (re-run only when they change).
     }, [flash?.success, flash?.error]);
 
     return (

@@ -17,9 +17,7 @@ final class ProcessSuccessfulPaystackCharge implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public array $payload)
-    {
-    }
+    public function __construct(public array $payload) {}
 
     /**
      * Execute the job.

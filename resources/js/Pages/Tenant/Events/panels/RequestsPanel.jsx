@@ -96,7 +96,7 @@ export default function RequestsPanel({ event }) {
         load();
         const interval = setInterval(load, 8000);
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Dependencies deliberately limited to the ids above (re-run only when they change).
     }, [event.id]);
 
     const active = sortActive(requests.filter((r) => ACTIVE_STATUSES.includes(r.status)));

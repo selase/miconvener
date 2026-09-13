@@ -34,7 +34,7 @@ final readonly class UsageListener
     /**
      * Record usage if a tenant ID is present.
      */
-    private function recordUsage(\Illuminate\Queue\Events\JobProcessed|\Illuminate\Queue\Events\JobFailed $event, bool $success): void
+    private function recordUsage(JobProcessed|JobFailed $event, bool $success): void
     {
         $job = $event->job;
         $payload = $job->payload();

@@ -45,7 +45,7 @@ final class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        \Illuminate\Support\Facades\Gate::define('access-superadmin-dashboard', fn($user) => \Illuminate\Support\Facades\Cache::remember("user_{$user->id}_is_superadmin", 3600, fn() => \Illuminate\Support\Facades\DB::table('model_has_roles')
+        \Illuminate\Support\Facades\Gate::define('access-superadmin-dashboard', fn ($user) => \Illuminate\Support\Facades\Cache::remember("user_{$user->id}_is_superadmin", 3600, fn () => \Illuminate\Support\Facades\DB::table('model_has_roles')
             ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
             ->where('model_has_roles.model_id', $user->id)
             ->where('model_has_roles.model_type', $user::class)

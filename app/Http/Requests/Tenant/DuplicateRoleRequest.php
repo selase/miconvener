@@ -33,7 +33,7 @@ final class DuplicateRoleRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('roles')->where(fn($query) => $query->where('tenant_id', $tenant->id)),
+                Rule::unique('roles')->where(fn ($query) => $query->where('tenant_id', $tenant->id)),
                 Rule::notIn(Role::SYSTEM_ROLES),
             ],
             'permissions' => ['required', 'array'],

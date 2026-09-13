@@ -17,9 +17,7 @@ final class PaymentFailedDunning extends Mailable
     /**
      * Create a new message instance.
      */
-    public function __construct(public \App\Models\Tenant $tenant)
-    {
-    }
+    public function __construct(public \App\Models\Tenant $tenant) {}
 
     /**
      * Get the message envelope.

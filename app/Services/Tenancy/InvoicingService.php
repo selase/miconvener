@@ -52,7 +52,7 @@ final readonly class InvoicingService implements \App\Contracts\InvoicingService
 
             // 3. Add Base Plan Charge
             $basePriceItem = $this->createBasePlanItem($tenant, $invoice);
-            if ($basePriceItem instanceof \App\Models\InvoiceItem) {
+            if ($basePriceItem instanceof InvoiceItem) {
                 $subtotal += (float) $basePriceItem->subtotal;
             }
 

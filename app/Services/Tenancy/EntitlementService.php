@@ -30,7 +30,8 @@ final readonly class EntitlementService
         if ($featureSlugs === []) {
             return true;
         }
-        return array_any($featureSlugs, fn(string $slug): bool => $this->isFeatureEnabledForTenant($tenantId, $slug));
+
+        return array_any($featureSlugs, fn (string $slug): bool => $this->isFeatureEnabledForTenant($tenantId, $slug));
     }
 
     /**

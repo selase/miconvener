@@ -46,8 +46,8 @@ final class IcsGenerator
     private static function escape(string $value): string
     {
         return str_replace(
-            ["\\", "\n", ',', ';'],
-            ["\\\\", '\\n', '\\,', '\\;'],
+            ['\\', "\n", ',', ';'],
+            ['\\\\', '\\n', '\\,', '\\;'],
             $value,
         );
     }

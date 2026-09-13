@@ -315,7 +315,7 @@ function QuizLeaderboard({ event }) {
         load();
         const interval = setInterval(load, 6000);
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Dependencies deliberately limited to the ids above (re-run only when they change).
     }, [event.slug]);
 
     if (rows.length === 0) return null;

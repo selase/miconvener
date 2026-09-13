@@ -12,7 +12,7 @@ final class TenantStatsService
 {
     public function getTotalActiveUsers(): int
     {
-        return \Illuminate\Support\Facades\Cache::remember('tenant_stats.active_users', 300, fn() => User::query()->where('status', User::STATUS_ACTIVE)->count());
+        return \Illuminate\Support\Facades\Cache::remember('tenant_stats.active_users', 300, fn () => User::query()->where('status', User::STATUS_ACTIVE)->count());
     }
 
     public function getNewUsersTrend(int $days): array

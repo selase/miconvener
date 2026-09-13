@@ -25,7 +25,7 @@ final readonly class EnforceUsageLimits
     {
         $tenant = $this->context->getTenant();
 
-        if (!$tenant instanceof \App\Models\Tenant) {
+        if (! $tenant instanceof \App\Models\Tenant) {
             return $next($request);
         }
         if (! $this->limitService->isWithinLimits($tenant, UsageMetric::REQUEST_COUNT)) {

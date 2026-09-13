@@ -27,7 +27,8 @@ final class UsageLimitService
         }
 
         $currentUsage = $this->getCurrentUsage($tenant, $metric, $limit->period);
-        return !($currentUsage + $additionalUsage > (float) $limit->limit_value && $limit->block_on_limit);
+
+        return ! ($currentUsage + $additionalUsage > (float) $limit->limit_value && $limit->block_on_limit);
     }
 
     /**
@@ -42,7 +43,7 @@ final class UsageLimitService
             $percent = ($usage / (float) $limit->limit_value) * 100;
 
             // Throttle alerts to once per day
-            if ($percent >= $limit->alert_threshold && (!$limit->last_alert_at || $limit->last_alert_at->isBefore(now()->startOfDay()))) {
+            if ($percent >= $limit->alert_threshold && (! $limit->last_alert_at || $limit->last_alert_at->isBefore(now()->startOfDay()))) {
                 $this->triggerAlert($tenant, $limit, $percent);
                 $limit->update(['last_alert_at' => now()]);
             }

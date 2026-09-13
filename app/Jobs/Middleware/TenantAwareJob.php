@@ -49,7 +49,7 @@ final class TenantAwareJob
                 app(\App\Services\Tenancy\UsageService::class)->recordJob(
                     $tenant,
                     $job::class,
-                    !$exception instanceof \Throwable,
+                    ! $exception instanceof Throwable,
                     $duration
                 );
             }

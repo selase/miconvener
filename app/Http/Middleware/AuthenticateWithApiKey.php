@@ -41,7 +41,7 @@ final readonly class AuthenticateWithApiKey
         }
 
         // IP Restriction Check
-        if ($apiKey->ip_restrictions && !empty($apiKey->ip_restrictions) && ! in_array($request->ip(), $apiKey->ip_restrictions)) {
+        if ($apiKey->ip_restrictions && ! empty($apiKey->ip_restrictions) && ! in_array($request->ip(), $apiKey->ip_restrictions)) {
             return response()->json(['message' => 'IP not allowed.'], 403);
         }
 
@@ -53,7 +53,7 @@ final readonly class AuthenticateWithApiKey
         }
 
         // Tenant-level IP Restriction Check
-        if ($tenant->allowed_ips && !empty($tenant->allowed_ips) && ! in_array($request->ip(), $tenant->allowed_ips)) {
+        if ($tenant->allowed_ips && ! empty($tenant->allowed_ips) && ! in_array($request->ip(), $tenant->allowed_ips)) {
             return response()->json(['message' => 'Tenant IP restriction: IP not allowed.'], 403);
         }
 

@@ -495,7 +495,7 @@ final class TenantController extends Controller
         return redirect()->to($target);
     }
 
-    private function syncUsagePrices(?\App\Models\Tenant $target, array $prices): void
+    private function syncUsagePrices(?Tenant $target, array $prices): void
     {
         foreach ($prices as $metricValue => $data) {
             if (empty($data['unit_price']) && empty($data['unit_quantity'])) {
