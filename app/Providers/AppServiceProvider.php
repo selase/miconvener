@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Opcodes\LogViewer\Facades\LogViewer;
@@ -121,12 +122,15 @@ final class AppServiceProvider extends ServiceProvider
                 : $rule;
         });
 
-        // Authorizing users to access the log-viewer
-        LogViewer::auth(fn ($request): bool => $request->user()
-            && in_array($request->user()->email, [
-                'hiselase@gmail.com',
-                'dev@wearepurpledot.com',
-            ]));
+        /*
+         * Production logs carry request data, errors and stack traces, so only
+         * the application superadmin may read them — the same gate as the
+         * superadmin dashboard. Never an email match: tenant admins set their
+         * team members' addresses and users.email is unique globally, so an
+         * unclaimed address on a list is a value any tenant can take.
+         */
+        LogViewer::auth(fn ($request): bool => $request->user() !== null
+            && Gate::forUser($request->user())->allows('access-superadmin-dashboard'));
 
         $this->configureQueue();
     }
