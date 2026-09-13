@@ -7,6 +7,7 @@ namespace App\Services\Tenancy;
 use App\Exceptions\TenantProvisioningException;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -45,26 +46,20 @@ final class TenantProvisioner
         Log::info("Creating database: {$dbName} for tenant {$tenant->id}");
 
         try {
-            if ($tenant->db_driver === 'sqlite') {
-                $dbPath = storage_path('tenants/'.$tenant->id.'.sqlite');
-                if (! file_exists(dirname($dbPath))) {
-                    mkdir(dirname($dbPath), 0755, true);
-                }
-                if (! file_exists($dbPath)) {
-                    touch($dbPath);
-                }
-                $dbName = $dbPath;
-            } elseif ($tenant->db_driver === 'pgsql') {
-                // PostgreSQL doesn't allow CREATE DATABASE in a transaction, and Laravel often wraps statements.
-                // We'll try to run it on the landlord connection.
-                // We also need to make sure the database doesn't already exist.
-                $exists = DB::connection('landlord')->select('SELECT 1 FROM pg_database WHERE datname = ?', [$dbName]);
-                if (empty($exists)) {
-                    DB::connection('landlord')->statement("CREATE DATABASE \"{$dbName}\"");
-                }
-            } else {
-                DB::connection('landlord')->statement("CREATE DATABASE IF NOT EXISTS `{$dbName}`");
+            /*
+             * PostgreSQL refuses CREATE DATABASE inside a transaction. It runs on
+             * a connection of its own, built from the landlord settings, so a
+             * transaction already open on the landlord connection — a caller's,
+             * or a test's — cannot make it fail.
+             */
+            /** @var \Illuminate\Database\Connection $admin */
+            $admin = DB::build(Config::get('database.connections.landlord'));
+
+            if (empty($admin->select('SELECT 1 FROM pg_database WHERE datname = ?', [$dbName]))) {
+                $admin->statement("CREATE DATABASE \"{$dbName}\"");
             }
+
+            $admin->disconnect();
 
             // Update the tenant's db_secret_ref if it was empty, or store it in meta.
             // For simplicity in this starter kit, if it's db_per_tenant without secret_ref,

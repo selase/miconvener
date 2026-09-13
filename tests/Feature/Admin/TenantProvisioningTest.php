@@ -8,19 +8,14 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
-    // Clear tenants storage if exists
-    if (file_exists(storage_path('tenants'))) {
-        $files = glob(storage_path('tenants/*.sqlite'));
-        foreach ($files as $file) {
-            if (is_file($file)) {
-                unlink($file);
-            }
-        }
-    }
-
     refreshTenantDatabases();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+});
+
+afterEach(function () {
+    // Dedicated databases live outside the test transaction, so drop the ones this test made.
+    dropTenantDatabases(...Tenant::query()->where('isolation_mode', 'db_per_tenant')->get());
 });
 
 test('creating a tenant with shared isolation mode does not create a database', function () {
@@ -39,7 +34,7 @@ test('creating a tenant with shared isolation mode does not create a database', 
         'status' => 'active',
         'subdomain' => 'shared',
         'isolation_mode' => 'shared',
-        'db_driver' => 'sqlite',
+        'db_driver' => 'pgsql',
     ]);
 
     $response->assertRedirect(route('tenants.index'));
@@ -49,7 +44,7 @@ test('creating a tenant with shared isolation mode does not create a database', 
     expect($tenant->meta['database'] ?? null)->toBeNull();
 });
 
-test('creating a tenant with dedicated isolation mode creates a sqlite database file', function () {
+test('creating a tenant with dedicated isolation mode creates a Postgres database', function () {
     $admin = User::factory()->create();
     $admin->assignRole('Superadmin');
 
@@ -65,7 +60,7 @@ test('creating a tenant with dedicated isolation mode creates a sqlite database 
         'status' => 'active',
         'subdomain' => 'dedicated',
         'isolation_mode' => 'db_per_tenant',
-        'db_driver' => 'sqlite',
+        'db_driver' => 'pgsql',
     ]);
 
     $response->assertRedirect(route('tenants.index'));
@@ -73,7 +68,7 @@ test('creating a tenant with dedicated isolation mode creates a sqlite database 
     $tenant = Tenant::where('slug', 'dedicated')->first();
     expect($tenant->isolation_mode)->toBe('db_per_tenant');
     expect($tenant->meta['database'])->not->toBeNull();
-    expect(file_exists($tenant->meta['database']))->toBeTrue();
+    expect(Illuminate\Support\Facades\DB::connection('landlord')->select('SELECT 1 FROM pg_database WHERE datname = ?', [$tenant->meta['database']]))->not->toBeEmpty();
 
     // Check if migrations were run
     app(App\Services\Tenancy\TenantDatabaseManager::class)->configure($tenant);

@@ -5,13 +5,9 @@ declare(strict_types=1);
 use App\Contracts\TenantMigratorContract;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Config;
 
 beforeEach(function () {
-    Config::set('database.connections.tenant', [
-        'driver' => 'sqlite',
-        'database' => ':memory:',
-    ]);
+    useLandlordAsTenantConnection();
 
     Artisan::call('migrate', [
         '--path' => 'database/migrations/landlord',
@@ -65,7 +61,7 @@ test('it skips encrypted tenant without kms key', function () {
         'isolation_mode' => 'db_per_tenant',
         'encryption_at_rest' => true,
         'kms_key_ref' => null, // Missing!
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
         'db_secret_ref' => 'secret',
     ]);
 
@@ -88,7 +84,7 @@ test('it does not skip tenant if encryption is disabled', function () {
         'isolation_mode' => 'db_per_tenant',
         'encryption_at_rest' => false,
         'kms_key_ref' => null,
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
         'db_secret_ref' => 'shared_db_secret',
     ]);
 

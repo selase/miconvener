@@ -9,10 +9,7 @@ use App\Services\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Config;
 
 beforeEach(function () {
-    Config::set('database.connections.tenant', [
-        'driver' => 'sqlite',
-        'database' => ':memory:',
-    ]);
+    useLandlordAsTenantConnection();
 });
 
 test('it restores tenant context', function () {
@@ -41,7 +38,7 @@ test('it configures database for dedicated tenant', function () {
         'name' => 'Dedicated Job Tenant',
         'slug' => 'dedicated-job-tenant',
         'isolation_mode' => 'db_per_tenant',
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
         'db_secret_ref' => 'job_db_secret',
     ]);
 
@@ -49,7 +46,7 @@ test('it configures database for dedicated tenant', function () {
         $mock->shouldReceive('getSecret')->with('job_db_secret')->andReturn([
             'type' => 'db',
             'host' => '1.2.3.4',
-            'port' => '3306',
+            'port' => '5432',
             'database' => 'job_db',
             'username' => 'job_user',
             'password' => 'job_pass',
@@ -65,7 +62,7 @@ test('it configures database for dedicated tenant', function () {
     $middleware = new TenantAwareJob();
 
     $middleware->handle($job, function ($processedJob) {
-        expect(Config::get('database.connections.tenant.driver'))->toBe('mysql');
+        expect(Config::get('database.connections.tenant.driver'))->toBe('pgsql');
         expect(Config::get('database.connections.tenant.host'))->toBe('1.2.3.4');
         expect(Config::get('database.connections.tenant.database'))->toBe('job_db');
     });

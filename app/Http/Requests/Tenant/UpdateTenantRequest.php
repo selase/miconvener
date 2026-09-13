@@ -42,7 +42,8 @@ final class UpdateTenantRequest extends FormRequest
             'logo' => ['nullable', 'file', 'mimes:png,jpg,svg'],
             'package_id' => ['nullable', 'exists:packages,id'],
             'isolation_mode' => ['required', Rule::in(['shared', 'db_per_tenant', 'byo'])],
-            'db_driver' => ['required', Rule::in(['mysql', 'pgsql', 'sqlite'])],
+            // MiConvener runs on PostgreSQL only.
+            'db_driver' => ['required', Rule::in(['pgsql'])],
             'db_secret_ref' => ['nullable', 'string', 'max:255'],
             'allowed_ips' => ['nullable', 'string'],
             'llm_models_whitelist' => ['nullable', 'array'],

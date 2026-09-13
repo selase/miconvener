@@ -18,32 +18,31 @@ final class ConsumerScenarioTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
+    protected function tearDown(): void
     {
-        parent::setUp();
-        // Since we are testing multi-DB with SQLite, we need to ensure local storage exists
-        if (! file_exists(storage_path('tenants'))) {
-            mkdir(storage_path('tenants'), 0755, true);
-        }
+        // Dedicated databases live outside the test transaction, so drop the ones this test made.
+        dropTenantDatabases(...Tenant::query()->where('isolation_mode', 'db_per_tenant')->get());
+
+        parent::tearDown();
     }
 
-    public function test_multi_database_isolation_with_sqlite()
+    public function test_multi_database_isolation_with_dedicated_postgres_databases()
     {
-        // 1. Create Tenant A (SQLite)
+        // 1. Create Tenant A with its own database
         $tenantA = Tenant::factory()->create([
             'name' => 'Tenant A',
             'slug' => 'tenant-a',
             'isolation_mode' => 'db_per_tenant',
-            'db_driver' => 'sqlite',
+            'db_driver' => 'pgsql',
         ]);
         app(TenantProvisioner::class)->provision($tenantA);
 
-        // 2. Create Tenant B (SQLite)
+        // 2. Create Tenant B with its own database
         $tenantB = Tenant::factory()->create([
             'name' => 'Tenant B',
             'slug' => 'tenant-b',
             'isolation_mode' => 'db_per_tenant',
-            'db_driver' => 'sqlite',
+            'db_driver' => 'pgsql',
         ]);
         app(TenantProvisioner::class)->provision($tenantB);
 
@@ -81,14 +80,10 @@ final class ConsumerScenarioTest extends TestCase
         app(TenantContext::class)->setTenant($tenantShared);
         app(TenantDatabaseManager::class)->configureShared();
 
-        // Force sharing the same PDO instance for SQLite memory to work across connections
-        if (DB::connection('landlord')->getDriverName() === 'sqlite') {
-            DB::purge('tenant');
-            Config::set('database.connections.tenant', Config::get('database.connections.landlord'));
-            DB::connection('tenant')->setPdo(DB::connection('landlord')->getPdo());
-        }
+        // Shared mode: the tenant connection is the landlord database. Share the PDO
+        // so it sees the tables and rows created inside this test's transaction.
+        useLandlordAsTenantConnection();
 
-        // In shared mode for SQLite memory, we must ensure migrations are in the same memory space.
         \Illuminate\Support\Facades\Artisan::call('migrate', [
             '--database' => 'landlord',
             '--path' => 'database/migrations/tenant',
@@ -127,7 +122,7 @@ final class ConsumerScenarioTest extends TestCase
             'tenant-db-ref' => [
                 'type' => 'db',
                 'host' => '1.2.3.4',
-                'port' => 3306,
+                'port' => 5432,
                 'database' => 'external_db',
                 'username' => 'ext_user',
                 'password' => 'ext_pass',
@@ -138,7 +133,7 @@ final class ConsumerScenarioTest extends TestCase
         // 2. Create BYO Tenant
         $tenant = Tenant::factory()->create([
             'isolation_mode' => 'byo',
-            'db_driver' => 'mysql',
+            'db_driver' => 'pgsql',
             'db_secret_ref' => 'tenant-db-ref',
         ]);
 

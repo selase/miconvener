@@ -6,13 +6,19 @@ use App\Exceptions\TenantProvisioningException;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantProvisioner;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Config;
 
 beforeEach(function (): void {
-    Config::set('database.connections.tenant', [
-        'driver' => 'sqlite',
-        'database' => ':memory:',
-    ]);
+    useLandlordAsTenantConnection();
+
+    $this->mock(App\Contracts\Secrets\SecretsProvider::class, function ($mock): void {
+        $mock->shouldReceive('getSecret')->with('unreachable-database')->andReturn([
+            'host' => '127.0.0.1',
+            'port' => 1,
+            'database' => 'unreachable',
+            'username' => 'nobody',
+            'password' => 'nothing',
+        ]);
+    });
 
     Artisan::call('migrate', [
         '--path' => 'database/migrations/landlord',
@@ -25,14 +31,16 @@ test('a failing tenant migration makes tenants:migrate exit non-zero', function 
         'name' => 'Broken Migrations',
         'slug' => 'broken-migrations',
         'isolation_mode' => 'db_per_tenant',
-        'db_driver' => 'sqlite',
+        'db_driver' => 'pgsql',
         'settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY,
         'status' => 'active',
-        // A path under a directory that does not exist, so opening the tenant
-        // connection fails outright. The failure has to come from the connection
-        // rather than from a broken migration, or deleting a bad migration would
-        // silently turn this test green while proving nothing.
-        'meta' => ['database' => '/nonexistent/path/tenant.sqlite'],
+        // Credentials for a port nothing listens on, so opening the tenant
+        // connection fails outright. A missing database name is not enough on
+        // Postgres: `migrate` creates a missing database rather than failing.
+        // The failure has to come from the connection rather than from a broken
+        // migration, or deleting a bad migration would silently turn this test
+        // green while proving nothing.
+        'db_secret_ref' => 'unreachable-database',
     ]);
 
     // The tenant points at an unreachable database, so the migrator fails. The
@@ -48,14 +56,16 @@ test('provisioning throws when the tenant migrations fail', function (): void {
         'name' => 'Broken Provisioning',
         'slug' => 'broken-provisioning',
         'isolation_mode' => 'byo',
-        'db_driver' => 'sqlite',
+        'db_driver' => 'pgsql',
         'settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY,
         'status' => 'active',
-        // A path under a directory that does not exist, so opening the tenant
-        // connection fails outright. The failure has to come from the connection
-        // rather than from a broken migration, or deleting a bad migration would
-        // silently turn this test green while proving nothing.
-        'meta' => ['database' => '/nonexistent/path/tenant.sqlite'],
+        // Credentials for a port nothing listens on, so opening the tenant
+        // connection fails outright. A missing database name is not enough on
+        // Postgres: `migrate` creates a missing database rather than failing.
+        // The failure has to come from the connection rather than from a broken
+        // migration, or deleting a bad migration would silently turn this test
+        // green while proving nothing.
+        'db_secret_ref' => 'unreachable-database',
     ]);
 
     expect(fn () => app(TenantProvisioner::class)->provision($tenant))

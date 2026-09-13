@@ -41,14 +41,7 @@ final class AppSetupDatabase extends Command
         // 2. Update .env file to match these credentials
         $this->updateEnvFile($database, $user, $password);
 
-        // 3. Ensure SQLite file exists for testing
-        $sqlitePath = database_path('database.sqlite');
-        if (! file_exists($sqlitePath)) {
-            $this->info('Creating SQLite database file for testing...');
-            touch($sqlitePath);
-        }
-
-        // 4. Create the PostgreSQL database
+        // 3. Create the PostgreSQL database
         try {
             $this->info("Connecting to PostgreSQL at $host:$port as $user...");
 

@@ -7,9 +7,7 @@ namespace Tests\Unit\Services;
 use App\Models\User;
 use App\Services\TenantStatsService;
 use Closure;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 final class TenantStatsServiceTest extends TestCase
@@ -22,32 +20,7 @@ final class TenantStatsServiceTest extends TestCase
     {
         parent::setUp();
 
-        // Configure 'landlord' connection to use the same sqlite database as default for testing
-        config(['database.connections.landlord' => config('database.connections.sqlite')]);
-
-        // Manually create tenants table to avoid migration path/connection issues in test env
-        if (! Schema::connection('landlord')->hasTable('tenants')) {
-            Schema::connection('landlord')->create('tenants', function (Blueprint $table) {
-                $table->uuid('id')->primary();
-                $table->string('name');
-                $table->string('slug')->unique();
-                $table->string('status')->default('active'); // Matches Enum default or likely values
-                $table->string('database')->nullable();
-                $table->string('domain')->nullable();
-                $table->timestamps();
-                // Add minimal columns needed for the model to save
-            });
-        }
-
-        // Similarly for tenant_user pivot if needed, but let's check if 'users' exists first (it should via RefreshDatabase)
-        if (! Schema::connection('landlord')->hasTable('tenant_user')) {
-            Schema::connection('landlord')->create('tenant_user', function (Blueprint $table) {
-                $table->id();
-                $table->foreignUuid('tenant_id');
-                $table->foreignId('user_id');
-                $table->timestamps();
-            });
-        }
+        refreshTenantDatabases();
 
         $this->service = new TenantStatsService();
     }

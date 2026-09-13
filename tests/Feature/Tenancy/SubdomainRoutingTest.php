@@ -29,7 +29,7 @@ test('subdomain routing resolves the correct tenant', function () {
     $tenant = Tenant::factory()->create([
         'slug' => 'acme',
         'isolation_mode' => 'shared',
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
     ]);
 
     // Mock TenantDatabaseManager to avoid reconfiguring the connection

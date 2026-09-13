@@ -36,7 +36,7 @@ test('superadmin can create a tenant with a package', function () {
             'subdomain' => 'testtenant',
             'package_id' => $package->id,
             'isolation_mode' => 'shared',
-            'db_driver' => 'mysql',
+            'db_driver' => 'pgsql',
         ]);
 
     $response->assertSessionHasNoErrors();
@@ -80,7 +80,7 @@ test('superadmin can update tenant package', function () {
             'subdomain' => 'existing',
             'package_id' => $package2->id,
             'isolation_mode' => 'shared',
-            'db_driver' => 'mysql',
+            'db_driver' => 'pgsql',
         ]);
 
     $response->assertSessionHasNoErrors();

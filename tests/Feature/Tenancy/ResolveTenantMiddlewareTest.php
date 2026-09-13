@@ -56,7 +56,7 @@ test('it configures dynamic db connection for dedicated db', function () {
         'name' => 'Dedicated Tenant',
         'slug' => 'dedicated-tenant',
         'isolation_mode' => 'db_per_tenant',
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
         'db_secret_ref' => 'dedicated_db_secret',
     ]);
     Session::put('active_tenant_id', $tenant->id);
@@ -65,7 +65,7 @@ test('it configures dynamic db connection for dedicated db', function () {
         $mock->shouldReceive('getSecret')->with('dedicated_db_secret')->andReturn([
             'type' => 'db',
             'host' => '1.2.3.4',
-            'port' => '3306',
+            'port' => '5432',
             'database' => 'dedicated_db',
             'username' => 'dedicated_user',
             'password' => 'dedicated_pass',
@@ -87,7 +87,7 @@ test('it configures dynamic db connection for dedicated db', function () {
     );
 
     $response = $middleware->handle($request, function ($req) {
-        expect(Config::get('database.connections.tenant.driver'))->toBe('mysql');
+        expect(Config::get('database.connections.tenant.driver'))->toBe('pgsql');
         expect(Config::get('database.connections.tenant.host'))->toBe('1.2.3.4');
         expect(Config::get('database.connections.tenant.database'))->toBe('dedicated_db');
 

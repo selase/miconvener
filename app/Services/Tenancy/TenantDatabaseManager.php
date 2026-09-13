@@ -35,18 +35,15 @@ class TenantDatabaseManager
         }
 
         Config::set('database.connections.tenant', [
-            'driver' => $tenant->db_driver,
+            'driver' => 'pgsql',
             'host' => $creds['host'],
             'port' => $creds['port'],
             'database' => $creds['database'],
             'username' => $creds['username'],
             'password' => $creds['password'],
-            'charset' => $tenant->db_driver === 'pgsql' ? 'utf8' : 'utf8mb4',
-            'collation' => $tenant->db_driver === 'pgsql' ? null : 'utf8mb4_unicode_ci',
+            'charset' => 'utf8',
             'prefix' => '',
             'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
             'search_path' => 'public',
             'sslmode' => 'prefer',
         ]);
@@ -59,15 +56,7 @@ class TenantDatabaseManager
         $landlordConfig = Config::get('database.connections.landlord');
         Config::set('database.connections.tenant', $landlordConfig);
 
-        // For SQLite :memory:, share the PDO to avoid destroying the in-memory database.
-        // Each purge creates a new PDO, which for :memory: means a new empty database.
-        if (($landlordConfig['driver'] ?? '') === 'sqlite' && ($landlordConfig['database'] ?? '') === ':memory:') {
-            app('db')->connection('tenant')->setPdo(
-                app('db')->connection('landlord')->getPdo()
-            );
-        } else {
-            app('db')->purge('tenant');
-        }
+        app('db')->purge('tenant');
     }
 
     public function purge(): void

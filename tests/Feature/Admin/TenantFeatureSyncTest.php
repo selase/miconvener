@@ -47,7 +47,7 @@ test('tenant features are synced when a package is assigned', function () {
         'subdomain' => 'synctenant',
         'package_id' => $package->id,
         'isolation_mode' => 'shared',
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
     ]);
 
     $response->assertSessionHasNoErrors();
@@ -84,7 +84,7 @@ test('tenant features are updated when package changes', function () {
         'status' => TenantStatusEnum::ACTIVE,
         'package_id' => $p1->id,
         'isolation_mode' => 'shared',
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
     ]);
     $tenant->syncFeaturesFromPackage();
 
@@ -105,7 +105,7 @@ test('tenant features are updated when package changes', function () {
         'subdomain' => 'updatesync',
         'package_id' => $p2->id,
         'isolation_mode' => 'shared',
-        'db_driver' => 'mysql',
+        'db_driver' => 'pgsql',
     ]);
 
     $response->assertSessionHasNoErrors();

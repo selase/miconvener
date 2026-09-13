@@ -40,6 +40,6 @@ Route::group(['prefix' => 'llm', 'middleware' => ['App\Http\Middleware\Authentic
     });
 });
 
-Route::post('/webhooks/paystack', [App\Http\Controllers\API\PaystackWebhookController::class, 'handle'])
+Route::post('/webhooks/paystack', [App\Http\Controllers\Api\PaystackWebhookController::class, 'handle'])
     ->middleware([App\Http\Middleware\VerifyPaystackSignature::class, 'throttle:webhooks'])
     ->name('api.webhooks.paystack');

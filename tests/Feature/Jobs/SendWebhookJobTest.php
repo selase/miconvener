@@ -5,25 +5,14 @@ declare(strict_types=1);
 use App\Jobs\SendWebhookJob;
 use App\Models\WebhookCall;
 use App\Models\WebhookEndpoint;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
-    /*
-     * WebhookCall uses BelongsToTenant, which puts it on the `tenant`
-     * connection. On the in-memory SQLite test database that is a separate,
-     * empty database, so this test used to create its own webhook tables —
-     * with a tenant_id column the real table did not have. The job failed on
-     * every insert in production and the test never saw it.
-     *
-     * A shared-isolation tenant's database is the landlord database, so the
-     * tenant connection now reuses the landlord's, and the real migrated
-     * schema is what gets tested.
-     */
-    Config::set('database.connections.tenant', Config::get('database.connections.landlord'));
-    DB::purge('tenant');
-    DB::connection('tenant')->setPdo(DB::connection('landlord')->getPdo());
+    // WebhookCall uses BelongsToTenant, which puts it on the `tenant` connection.
+    // A shared-isolation tenant's database is the landlord database. This test
+    // once built its own webhook tables for that connection — with a tenant_id
+    // column the real table lacked — and so never saw the job fail on insert.
+    useLandlordAsTenantConnection();
 });
 
 it('creates a webhook call record and sends HTTP request', function () {

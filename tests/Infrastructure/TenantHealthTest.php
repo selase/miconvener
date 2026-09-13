@@ -5,36 +5,19 @@ declare(strict_types=1);
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantHealthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
-// uses(RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->dbName = 'test_landlord_'.uniqid().'.sqlite';
-    $dbPath = database_path($this->dbName);
-    if (! file_exists($dbPath)) {
-        touch($dbPath);
-    }
-
-    Config::set('database.connections.landlord.database', $dbPath);
-    DB::purge('landlord');
-    Artisan::call('migrate', ['--database' => 'landlord', '--path' => 'database/migrations/landlord', '--realpath' => true]);
+    refreshTenantDatabases();
 
     $this->tenant = Tenant::factory()->create([
         'isolation_mode' => 'shared',
-        'db_driver' => 'sqlite',
+        'db_driver' => 'pgsql',
         'slug' => 'health-test-'.uniqid(),
     ]);
-});
-
-afterEach(function () {
-    $dbPath = database_path($this->dbName);
-    if (file_exists($dbPath)) {
-        unlink($dbPath);
-    }
 });
 
 it('can perform database health check', function () {

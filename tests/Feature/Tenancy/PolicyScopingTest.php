@@ -7,15 +7,11 @@ use App\Models\User;
 use App\Models\UserLoginHistory;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 beforeEach(function () {
-    Config::set('database.connections.tenant', [
-        'driver' => 'sqlite',
-        'database' => ':memory:',
-    ]);
+    useLandlordAsTenantConnection();
 
     Artisan::call('migrate', [
         '--path' => 'database/migrations/landlord',

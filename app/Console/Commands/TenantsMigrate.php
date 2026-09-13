@@ -41,7 +41,10 @@ final class TenantsMigrate extends Command
         }
 
         /** @var \Illuminate\Database\Eloquent\Collection<int, Tenant> $tenants */
-        $tenants = $query->get();
+        // Tenant ids are time-ordered UUIDs, so this is creation order. Postgres
+        // guarantees no order without one, and a run's log should read the same
+        // way twice.
+        $tenants = $query->orderBy('id')->get();
 
         $failed = false;
 

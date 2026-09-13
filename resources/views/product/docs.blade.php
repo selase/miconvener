@@ -157,7 +157,7 @@
                         </p>
                         <ul class="text-white/60 space-y-3 mb-8 list-disc pl-5">
                             <li>PHP 8.2 or higher</li>
-                            <li>PostgreSQL 14+ or MySQL 8.0+</li>
+                            <li>PostgreSQL 14+</li>
                             <li>Redis 6.0+ (highly recommended for performance)</li>
                             <li>Nginx or Apache with mod_rewrite enabled</li>
                         </ul>

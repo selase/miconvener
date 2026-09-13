@@ -242,7 +242,6 @@
                                                 Driver</label>
                                             <select name="db_driver" id="db_driver"
                                                 class="form-select form-select-solid mb-3 mb-lg-0 @error('db_driver') is-invalid @enderror">
-                                                <option value="mysql" {{ old('db_driver', $tenant->db_driver) == 'mysql' ? 'selected' : '' }}>MySQL</option>
                                                 <option value="pgsql" {{ old('db_driver', $tenant->db_driver) == 'pgsql' ? 'selected' : '' }}>PostgreSQL</option>
                                             </select>
                                             @error('db_driver')

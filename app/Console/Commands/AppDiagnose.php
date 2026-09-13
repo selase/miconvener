@@ -39,7 +39,7 @@ final class AppDiagnose extends Command
         $this->info('----------------------');
         $this->info('PHP Extensions');
 
-        $extensions = ['pdo_mysql', 'pdo_pgsql'];
+        $extensions = ['pdo_pgsql'];
         foreach ($extensions as $ext) {
             $status = extension_loaded($ext) ? 'Installed' : 'Not Installed';
             $this->line("$ext: $status");

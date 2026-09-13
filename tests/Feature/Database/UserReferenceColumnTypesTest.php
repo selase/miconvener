@@ -12,10 +12,9 @@ test('every column that references a user is an integer, like users.id', functio
     /*
      * users.id is a bigint. Four columns that store one were declared uuid,
      * and Postgres refused every insert into them — staff could not check
-     * anyone into a breakout session. SQLite, which the suite runs on, stores
-     * anything in any column, so no behavioural test here could notice. The
-     * column type survives even on SQLite: uuid() is a text column, id() and
-     * foreignId() are integers.
+     * anyone into a breakout session. The suite ran on SQLite then, which
+     * stores anything in any column, so no behavioural test noticed. It runs
+     * on Postgres now, but a schema check fails faster and names the column.
      */
     $userReference = '/^(?:[a-z_]+_by|user_id|owner_id|reviewer_id|assigned_to)$/';
     $problems = [];

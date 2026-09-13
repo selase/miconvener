@@ -583,7 +583,7 @@ parameters:
 			path: app/Http/Controllers/Admin/UsersController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\API\PaystackWebhookController::handle() has no return type specified.'
+			rawMessage: 'Method App\Http\Controllers\Api\PaystackWebhookController::handle() has no return type specified.'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Api/PaystackWebhookController.php

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Config;
 test('landlord database connection is defined', function () {
     $config = Config::get('database.connections.landlord');
     expect($config)->not->toBeNull()
-        ->and($config['driver'])->toBeIn(['mysql', 'pgsql', 'sqlite']);
+        ->and($config['driver'])->toBe('pgsql');
 });
 
 test('tenant database connection is defined', function () {

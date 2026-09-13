@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Tests\TestCase;
 
@@ -87,6 +88,37 @@ function setActiveTenantForTest(?User $user = null, array $overrides = []): Tena
     app(App\Services\Tenancy\TenantContext::class)->setTenant($tenant);
 
     return $tenant;
+}
+
+/**
+ * Point the tenant connection at the landlord database, as a shared-isolation
+ * tenant's is in production. The PDO is shared so the tenant connection sees
+ * rows written inside the test's RefreshDatabase transaction.
+ */
+function useLandlordAsTenantConnection(): void
+{
+    Config::set('database.connections.tenant', Config::get('database.connections.landlord'));
+    DB::purge('tenant');
+    DB::connection('tenant')->setPdo(DB::connection('landlord')->getPdo());
+}
+
+/**
+ * Drop the dedicated databases provisioned for these tenants during a test.
+ *
+ * Only the named tenants' databases are touched — never everything matching
+ * tenant_%, because a local Postgres server also holds development tenants.
+ */
+function dropTenantDatabases(Tenant ...$tenants): void
+{
+    DB::purge('tenant');
+    $admin = DB::build(Config::get('database.connections.landlord'));
+
+    foreach ($tenants as $tenant) {
+        $database = 'tenant_'.str_replace('-', '_', (string) $tenant->id);
+        $admin->statement("DROP DATABASE IF EXISTS \"{$database}\" WITH (FORCE)");
+    }
+
+    $admin->disconnect();
 }
 
 function refreshTenantDatabases(): void
