@@ -116,7 +116,7 @@ final class BillingController extends Controller
         $tenant->load(['usagePrices', 'package.usagePrices']);
 
         foreach ($metrics as $metric) {
-            $usageCount = $tenant->usage()
+            $usageCount = (float) $tenant->usage()
                 ->where('feature_slug', $metric->value)
                 ->where('period_start', '>=', $start)
                 ->sum('used_count');

@@ -6,41 +6,24 @@ use App\Jobs\SendWebhookJob;
 use App\Models\WebhookCall;
 use App\Models\WebhookEndpoint;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
-    // Ensure the tenant connection has a valid driver.
+    /*
+     * WebhookCall uses BelongsToTenant, which puts it on the `tenant`
+     * connection. On the in-memory SQLite test database that is a separate,
+     * empty database, so this test used to create its own webhook tables —
+     * with a tenant_id column the real table did not have. The job failed on
+     * every insert in production and the test never saw it.
+     *
+     * A shared-isolation tenant's database is the landlord database, so the
+     * tenant connection now reuses the landlord's, and the real migrated
+     * schema is what gets tested.
+     */
     Config::set('database.connections.tenant', Config::get('database.connections.landlord'));
-
-    // WebhookCall uses BelongsToTenant which sets the connection to 'tenant'.
-    // We need the webhook tables on that connection.
-    $schema = Illuminate\Support\Facades\Schema::connection('tenant');
-
-    if (! $schema->hasTable('webhook_endpoints')) {
-        $schema->create('webhook_endpoints', function ($table) {
-            $table->uuid('id')->primary();
-            $table->string('tenant_id');
-            $table->string('url');
-            $table->text('secret');
-            $table->json('events')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
-    }
-
-    if (! $schema->hasTable('webhook_calls')) {
-        $schema->create('webhook_calls', function ($table) {
-            $table->uuid('id')->primary();
-            $table->string('tenant_id')->nullable();
-            $table->uuid('webhook_endpoint_id');
-            $table->string('event_name');
-            $table->json('payload')->nullable();
-            $table->integer('status')->nullable();
-            $table->text('response')->nullable();
-            $table->text('exception')->nullable();
-            $table->timestamps();
-        });
-    }
+    DB::purge('tenant');
+    DB::connection('tenant')->setPdo(DB::connection('landlord')->getPdo());
 });
 
 it('creates a webhook call record and sends HTTP request', function () {

@@ -8,6 +8,7 @@ use App\Enum\UsageMetric;
 use App\Models\Tenant;
 use App\Models\UsageEvent;
 use App\Models\UsageRollup;
+use Illuminate\Support\Str;
 
 final class UsageService implements \App\Contracts\UsageServiceContract
 {
@@ -44,6 +45,13 @@ final class UsageService implements \App\Contracts\UsageServiceContract
      */
     public function recordJob(Tenant $tenant, string $jobClass, bool $success, int $runtimeMs): void
     {
+        /*
+         * An anonymous class is named "class@anonymous" followed by a NUL byte
+         * and its file path. Postgres will not store a NUL in text or JSON, so
+         * the write failed — and because the job middleware records usage in a
+         * finally block, that failure would replace the job's own exception.
+         */
+        $jobClass = Str::before($jobClass, "\0");
         $now = now();
         $metric = $success ? UsageMetric::JOB_COUNT : UsageMetric::JOB_FAILED_COUNT;
 

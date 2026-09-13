@@ -223,8 +223,8 @@ final class InvoiceController extends Controller
 
     private function recalculateTotals(Invoice $invoice): void
     {
-        $subtotal = $invoice->items()->sum('subtotal');
-        $taxCalc = Tax::calculateFor((float) $subtotal);
+        $subtotal = (float) $invoice->items()->sum('subtotal');
+        $taxCalc = Tax::calculateFor($subtotal);
 
         $invoice->update([
             'subtotal' => $subtotal,

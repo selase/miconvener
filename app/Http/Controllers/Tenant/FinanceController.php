@@ -132,9 +132,10 @@ final class FinanceController extends Controller
         ]);
 
         $stats = [
-            'total_volume' => MerchantTransaction::where('tenant_id', $tenant->id)->where('status', 'succeeded')->sum('amount'),
+            // Cast: Postgres returns SUM() as a numeric string, which JSON sends as text.
+            'total_volume' => (int) MerchantTransaction::where('tenant_id', $tenant->id)->where('status', 'succeeded')->sum('amount'),
             'transaction_count' => MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'payment')->count(),
-            'refund_volume' => MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->sum('amount'),
+            'refund_volume' => (int) MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->sum('amount'),
         ];
 
         return Inertia::render('Tenant/Finance/Index', [
