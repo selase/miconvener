@@ -14,12 +14,22 @@ interface SettlementGateway
     public function createRecipient(string $type, string $name, string $accountNumber, string $bankCode, string $currency): string;
 
     /**
-     * @return array{transfer_code: string, status: string}
+     * A status of 'otp' means the provider is holding the transfer until a
+     * one-time code is supplied to finalizeTransfer(). No money has moved.
+     *
+     * @return array{transfer_code: string, status: string, fee: int|null}
      */
     public function initiateTransfer(string $recipientCode, int $amount, string $currency, string $reference): array;
 
     /**
-     * @return array{status: string}
+     * Release a transfer the provider is holding for a one-time code.
+     *
+     * @return array{status: string, fee: int|null}
+     */
+    public function finalizeTransfer(string $transferCode, string $otp): array;
+
+    /**
+     * @return array{status: string, fee: int|null}
      */
     public function verifyTransfer(string $reference): array;
 

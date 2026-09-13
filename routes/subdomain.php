@@ -200,6 +200,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/finance/payouts', [EventFinanceController::class, 'storePayout'])->name('tenant.events.finance.payouts.store');
     Route::patch('events/{event}/finance/payouts/{payout}', [EventFinanceController::class, 'updatePayoutStatus'])->name('tenant.events.finance.payouts.status');
     Route::post('events/{event}/finance/payouts/{payout}/send', [EventFinanceController::class, 'sendPayout'])->name('tenant.events.finance.payouts.send');
+    Route::post('events/{event}/finance/payouts/{payout}/finalize', [EventFinanceController::class, 'finalizePayout'])->name('tenant.events.finance.payouts.finalize');
     Route::get('events/{event}/finance/settlement-statement', [EventFinanceController::class, 'exportSettlementStatement'])->name('tenant.events.finance.settlement-statement');
 
     Route::get('payout-accounts', [TenantPayoutAccountController::class, 'index'])->name('tenant.payout-accounts.index');

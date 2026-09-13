@@ -21,6 +21,12 @@ final class EventPayout extends Model
 
     public const string STATUS_PAID = 'paid';
 
+    /**
+     * The provider accepted the transfer but is holding it until a one-time
+     * code is supplied. No money has moved and none will without it.
+     */
+    public const string STATUS_AWAITING_OTP = 'awaiting_otp';
+
     public const string STATUS_PROCESSING = 'processing';
 
     public const string STATUS_FAILED = 'failed';
@@ -39,6 +45,7 @@ final class EventPayout extends Model
         'paid_at',
         'note',
         'provider_reference',
+        'provider_transfer_code',
         'failure_reason',
     ];
 

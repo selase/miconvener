@@ -268,11 +268,15 @@ test('a transfer.failed webhook flips the payout to failed with no ledger row', 
     expect(EventLedgerEntry::where('payout_id', $payout->id)->count())->toBe(0);
 });
 
-test('a transfer parked awaiting an OTP is recorded as failed, not as sent', function () {
+test('a transfer parked awaiting an OTP is never recorded as sent', function () {
     // Paystack accepts the request and answers with status "otp" when the platform
     // account still requires a one-time code per transfer. No money moves and no
     // webhook follows, so treating it as processing would tell the organizer they
     // had been paid and then freeze the record beyond manual correction.
+    //
+    // It is not a failure either: the transfer is real and waiting for a code,
+    // so the payout parks in a state that can be released rather than re-sent,
+    // which would create a second transfer against the same balance.
     Http::fake([
         'api.paystack.co/transferrecipient' => Http::response(['status' => true, 'data' => ['recipient_code' => 'RCP_otp_1']]),
         'api.paystack.co/transfer' => Http::response(['status' => true, 'data' => ['transfer_code' => 'TRF_otp_1', 'status' => 'otp']]),
@@ -293,13 +297,20 @@ test('a transfer parked awaiting an OTP is recorded as failed, not as sent', fun
 
     $response = $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host]);
 
-    $response->assertStatus(502);
+    $response->assertOk();
 
     $payout->refresh();
-    expect($payout->status)->toBe(EventPayout::STATUS_FAILED);
-    expect($payout->failure_reason)->toContain('one-time code');
 
-    // Failed payouts stay re-sendable, so the organizer can retry once the
-    // provider account is configured.
-    expect(in_array($payout->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true))->toBeTrue();
+    // The guarantee that matters is unchanged: a parked transfer must never be
+    // reported as sent or paid.
+    expect($payout->status)->not->toBe(EventPayout::STATUS_PROCESSING)
+        ->and($payout->status)->not->toBe(EventPayout::STATUS_PAID)
+        ->and($payout->status)->toBe(EventPayout::STATUS_AWAITING_OTP);
+
+    // The transfer code is kept so the payout can be released with the code.
+    expect($payout->provider_transfer_code)->toBe('TRF_otp_1');
+
+    // Nothing has moved, so nothing has been charged for moving it.
+    expect($payout->transfer_fee_amount)->toBe(0)
+        ->and($payout->net_paid_amount)->toBeNull();
 });

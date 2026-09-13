@@ -1,4 +1,25 @@
 import { useEffect, useState } from 'react';
+
+/**
+ * A payout has five states and the table used to render four of them as
+ * "Scheduled", which told the organizer a transfer was waiting when it had
+ * actually failed.
+ */
+const PAYOUT_LABEL = {
+    scheduled: 'Scheduled',
+    awaiting_otp: 'Awaiting code',
+    processing: 'Sending',
+    paid: 'Paid',
+    failed: 'Failed',
+};
+
+const PAYOUT_PILL = {
+    scheduled: 'pending',
+    awaiting_otp: 'pending',
+    processing: 'pending',
+    paid: 'success',
+    failed: 'danger',
+};
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
@@ -31,6 +52,8 @@ function NewAccountForm({ onDone }) {
     const [banks, setBanks] = useState([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
+    const [otpFor, setOtpFor] = useState(null);
+    const [otpCode, setOtpCode] = useState('');
 
     useEffect(() => {
         csrfFetch(route('tenant.payout-accounts.banks'))
@@ -347,6 +370,38 @@ export default function FinancePanel({ event }) {
         load();
     };
 
+    const sendPayout = async (payout) => {
+        setError(null);
+        const response = await csrfFetch(route('tenant.events.finance.payouts.send', { event: event.id, payout: payout.id }), {
+            method: 'POST',
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            setError(body.message || 'Could not send this payout.');
+            return;
+        }
+        if (body.status === 'awaiting_otp') {
+            setOtpFor(payout.id);
+        }
+        load();
+    };
+
+    const releasePayout = async (payout) => {
+        setError(null);
+        const response = await csrfFetch(route('tenant.events.finance.payouts.finalize', { event: event.id, payout: payout.id }), {
+            method: 'POST',
+            body: JSON.stringify({ otp: otpCode }),
+        });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            setError(body.message || 'Could not release this payout.');
+            return;
+        }
+        setOtpFor(null);
+        setOtpCode('');
+        load();
+    };
+
     if (!data) {
         return error
             ? <p className="text-[13px] text-danger-fg">{error}</p>
@@ -559,9 +614,48 @@ export default function FinancePanel({ event }) {
                                 payouts.map((p) => (
                                     <Tr key={p.id}>
                                         <Td muted>{p.payout_account_label} <span className="font-mono text-xs">{p.payout_account_masked_number}</span></Td>
-                                        <Td numeric className="font-semibold">{formatMoney(p.amount, event.currency)}</Td>
-                                        <Td><StatusPill status={p.status === 'paid' ? 'success' : 'pending'}>{p.status === 'paid' ? 'Paid' : 'Scheduled'}</StatusPill></Td>
-                                        <Td>{p.status !== 'paid' && <Button size="sm" onClick={() => markPaid(p)}>Mark paid</Button>}</Td>
+                                        <Td numeric className="font-semibold">
+                                            {formatMoney(p.amount, event.currency)}
+                                            {p.transfer_fee_amount > 0 && (
+                                                <div className="text-xs font-normal text-ink-secondary">
+                                                    {formatMoney(p.net_paid_amount, event.currency)} sent,
+                                                    {' '}{formatMoney(p.transfer_fee_amount, event.currency)} transfer fee
+                                                </div>
+                                            )}
+                                        </Td>
+                                        <Td>
+                                            <StatusPill status={PAYOUT_PILL[p.status] ?? 'pending'}>
+                                                {PAYOUT_LABEL[p.status] ?? p.status}
+                                            </StatusPill>
+                                        </Td>
+                                        <Td>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {(p.status === 'scheduled' || p.status === 'failed') && (
+                                                    <Button size="sm" onClick={() => sendPayout(p)}>Send</Button>
+                                                )}
+                                                {p.status === 'awaiting_otp' && otpFor !== p.id && (
+                                                    <Button size="sm" onClick={() => setOtpFor(p.id)}>Enter code</Button>
+                                                )}
+                                                {p.status === 'awaiting_otp' && otpFor === p.id && (
+                                                    <>
+                                                        <Input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            placeholder="One-time code"
+                                                            value={otpCode}
+                                                            onChange={(e) => setOtpCode(e.target.value)}
+                                                        />
+                                                        <Button size="sm" onClick={() => releasePayout(p)}>Release</Button>
+                                                    </>
+                                                )}
+                                                {p.status !== 'paid' && p.status !== 'awaiting_otp' && (
+                                                    <Button size="sm" variant="secondary" onClick={() => markPaid(p)}>Mark paid</Button>
+                                                )}
+                                            </div>
+                                            {p.failure_reason && (
+                                                <p className="mt-1 text-xs text-danger-fg">{p.failure_reason}</p>
+                                            )}
+                                        </Td>
                                     </Tr>
                                 ))
                             )}

@@ -73,6 +73,23 @@ final class PaystackSettlementGateway implements SettlementGateway
         }
     }
 
+    public function finalizeTransfer(string $transferCode, string $otp): array
+    {
+        try {
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/transfer/finalize_transfer", [
+                'transfer_code' => $transferCode,
+                'otp' => $otp,
+            ])->throw();
+
+            return [
+                'status' => (string) $response->json('data.status'),
+                'fee' => $response->json('data.fee_charged') ?? $response->json('data.fee'),
+            ];
+        } catch (Throwable $e) {
+            throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
+        }
+    }
+
     public function verifyTransfer(string $reference): array
     {
         try {
