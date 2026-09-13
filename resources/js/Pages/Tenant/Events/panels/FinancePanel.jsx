@@ -53,6 +53,7 @@ function NewAccountForm({ onDone }) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
     const [otpFor, setOtpFor] = useState(null);
+    const [busyPayout, setBusyPayout] = useState(null);
     const [otpCode, setOtpCode] = useState('');
 
     useEffect(() => {
@@ -372,9 +373,10 @@ export default function FinancePanel({ event }) {
 
     const sendPayout = async (payout) => {
         setError(null);
+        setBusyPayout(payout.id);
         const response = await csrfFetch(route('tenant.events.finance.payouts.send', { event: event.id, payout: payout.id }), {
             method: 'POST',
-        });
+        }).finally(() => setBusyPayout(null));
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
             setError(body.message || 'Could not send this payout.');
@@ -388,10 +390,11 @@ export default function FinancePanel({ event }) {
 
     const releasePayout = async (payout) => {
         setError(null);
+        setBusyPayout(payout.id);
         const response = await csrfFetch(route('tenant.events.finance.payouts.finalize', { event: event.id, payout: payout.id }), {
             method: 'POST',
             body: JSON.stringify({ otp: otpCode }),
-        });
+        }).finally(() => setBusyPayout(null));
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
             setError(body.message || 'Could not release this payout.');
@@ -631,7 +634,9 @@ export default function FinancePanel({ event }) {
                                         <Td>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 {(p.status === 'scheduled' || p.status === 'failed') && (
-                                                    <Button size="sm" onClick={() => sendPayout(p)}>Send</Button>
+                                                    <Button size="sm" disabled={busyPayout === p.id} onClick={() => sendPayout(p)}>
+                                                        {busyPayout === p.id ? 'Sending…' : 'Send'}
+                                                    </Button>
                                                 )}
                                                 {p.status === 'awaiting_otp' && otpFor !== p.id && (
                                                     <Button size="sm" onClick={() => setOtpFor(p.id)}>Enter code</Button>
@@ -641,11 +646,19 @@ export default function FinancePanel({ event }) {
                                                         <Input
                                                             type="text"
                                                             inputMode="numeric"
+                                                            autoComplete="one-time-code"
+                                                            aria-label="One-time code from Paystack"
                                                             placeholder="One-time code"
                                                             value={otpCode}
                                                             onChange={(e) => setOtpCode(e.target.value)}
                                                         />
-                                                        <Button size="sm" onClick={() => releasePayout(p)}>Release</Button>
+                                                        <Button
+                                                            size="sm"
+                                                            disabled={busyPayout === p.id || otpCode.trim() === ''}
+                                                            onClick={() => releasePayout(p)}
+                                                        >
+                                                            {busyPayout === p.id ? 'Releasing…' : 'Release'}
+                                                        </Button>
                                                     </>
                                                 )}
                                                 {p.status !== 'paid' && p.status !== 'awaiting_otp' && (

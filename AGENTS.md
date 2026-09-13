@@ -269,3 +269,16 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - IMPORTANT: Always use `search-docs` tool for version-specific Tailwind CSS documentation and updated code examples. Never rely on training data.
 - IMPORTANT: Activate `tailwindcss-development` every time you're working with a Tailwind CSS or styling-related task.
 </laravel-boost-guidelines>
+
+# MiConvener finance invariants
+
+These are enforced by tests. Breaking one is a bug, not a style choice.
+
+- **Money is integer minor units (pesewas).** Percentages are the only non-integer money-adjacent values.
+- **Commission terms resolve through one cascade:** event → tenant → package default → `config('services.platform.*')`. Use `PlatformFeeResolver` / `FeeCalculator`; never compute `amount * pct / 100` inline. A stored `0.00` percentage is a waiver.
+- **Only the application superadmin sets commission percentage or cap** — the `access-superadmin-dashboard` gate (global `Superadmin` role, null `tenant_id`), or `php artisan events:set-platform-fee`. Never authorize by email address: tenant admins control team members' emails and `users.email` is unique globally. Tenants may set only `fee_bearer`.
+- **`LedgerService` is the only writer of both ledgers.** Never call `EventLedgerEntry::create` from a controller, command or job — a test scans for it. `EventLedgerEntry` is the flat settlement-statement line organizers export; `LedgerTransaction`/`LedgerEntry` is the double-entry ledger.
+- **Ledger posting is idempotent by reference** (unique per tenant + reference + type). Re-posting a reference returns the existing transaction.
+- **The gateway fee is booked at sale** (clearing is debited with the cash that actually arrives), so `organizer_payable` clears to zero on payout. The transfer fee is passed through: the organizer is sent `amount − fee`, and it is recorded only when the transfer is actually released.
+- **Paystack per-transfer OTP is on.** A transfer answering `otp` parks the payout in `awaiting_otp` and is released via `finalizePayout`; a parked payout must never be re-sent.
+- **Commission rates are not public.** The public event payload includes the rate only when the attendee is the one paying it.

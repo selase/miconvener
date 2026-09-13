@@ -131,21 +131,23 @@ final class PaymentSettingsController extends Controller
         $validated = $request->validate([
             'platform_fee_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
             /*
-             * Minor units, matching the CLI. Leave it empty to clear the
-             * override so the package default applies.
+             * Major units (cedis) — a person typing into a form means GHS 20,
+             * not 20 pesewas. Stored in minor units like every other amount.
+             * Empty clears the override so the package default applies.
              *
-             * Zero is refused rather than accepted: a cap of nothing waives
-             * the commission entirely, which is almost never what someone
-             * typing "0" for "no cap" means. A deliberate waiver is a zero
-             * percentage, which reads as one.
+             * A zero cap is refused: it waives the commission entirely, which
+             * is almost never what "0" for "no cap" means. A deliberate waiver
+             * is a zero percentage, which reads as one.
              */
-            'platform_fee_cap_amount' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'platform_fee_cap' => ['sometimes', 'nullable', 'numeric', 'min:0.01'],
         ]);
 
         $attributes = ['platform_fee_percentage' => $validated['platform_fee_percentage']];
 
-        if ($request->has('platform_fee_cap_amount')) {
-            $attributes['platform_fee_cap_amount'] = $validated['platform_fee_cap_amount'];
+        if ($request->has('platform_fee_cap')) {
+            $attributes['platform_fee_cap_amount'] = $validated['platform_fee_cap'] === null
+                ? null
+                : (int) round((float) $validated['platform_fee_cap'] * 100);
         }
 
         $tenant->update($attributes);

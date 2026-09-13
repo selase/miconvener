@@ -270,8 +270,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                     <option value="attendee">The attendee — it is added at checkout</option>
                 </Select>
                 <p className="-mt-3 text-xs text-ink-secondary">
-                    Choose &ldquo;the attendee&rdquo; and a GHS 100 ticket is sold for GHS 102, so you
-                    receive the full GHS 100. Payment processing is deducted either way.
+                    Choose &ldquo;the attendee&rdquo; and the platform fee is added to what the buyer
+                    pays instead of coming out of your ticket price. Payment processing is deducted
+                    from your payout either way.
                 </p>
 
                 <label className="flex items-center gap-2.5 text-sm text-ink">

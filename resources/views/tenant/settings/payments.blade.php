@@ -65,7 +65,8 @@
                 </div>
             </div>
 
-            @if(auth()->user() && in_array(auth()->user()->email, ['hiselase@gmail.com', 'dev@wearepurpledot.com']))
+            {{-- Same gate as the endpoint: the global Superadmin role, never an email match. --}}
+            @can('access-superadmin-dashboard')
             <div class="row g-5 g-xl-10 mb-5">
                 <div class="col-12">
                     <div class="card card-flush">
@@ -79,8 +80,15 @@
                             <form action="{{ route('tenant.settings.payments.platform-fee') }}" method="POST">
                                 @csrf
                                 <div class="fv-row mb-5">
-                                    <label class="fw-bold fs-6 mb-2">Fee Percentage</label>
-                                    <input type="number" step="0.1" min="0" max="100" name="platform_fee_percentage" class="form-control form-control-solid" style="max-width: 200px" value="{{ $tenant->platform_fee_percentage }}" />
+                                    <label class="fw-bold fs-6 mb-2" for="platform_fee_percentage">Fee Percentage</label>
+                                    <input type="number" step="0.01" min="0" max="100" id="platform_fee_percentage" name="platform_fee_percentage" class="form-control form-control-solid" style="max-width: 200px" value="{{ $tenant->platform_fee_percentage }}" />
+                                    <div class="text-muted fs-7 mt-1">Set 0 to waive the commission for this organization.</div>
+                                </div>
+                                <div class="fv-row mb-5">
+                                    <label class="fw-bold fs-6 mb-2" for="platform_fee_cap">Commission cap per ticket (GHS)</label>
+                                    <input type="number" step="0.01" min="0.01" id="platform_fee_cap" name="platform_fee_cap" class="form-control form-control-solid" style="max-width: 200px" value="{{ $tenant->platform_fee_cap_amount !== null ? number_format($tenant->platform_fee_cap_amount / 100, 2, '.', '') : '' }}" />
+                                    <div class="text-muted fs-7 mt-1">Leave empty to use the package default.</div>
+                                    @error('platform_fee_cap')<div class="text-danger fs-7 mt-1">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="text-end">
                                     <button type="submit" class="btn btn-primary">Save Fee</button>
@@ -90,7 +98,7 @@
                     </div>
                 </div>
             </div>
-            @endif
+            @endcan
 
             <div class="row g-5 g-xl-10">
                 <!-- Stripe Configuration -->
