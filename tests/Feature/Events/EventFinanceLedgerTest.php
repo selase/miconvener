@@ -102,9 +102,7 @@ test('the settlement statement export shows the real gateway fee for platform-de
     $response = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/finance/settlement-statement", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
-    $content = $response->streamedContent();
-    expect($content)->toContain('275');
-    expect($content)->not->toContain('not tracked');
+    expect(settlementStatementGatewayFees($response->streamedContent()))->toBe(['275']);
 });
 
 test('the settlement statement export redacts the gateway fee to not tracked for own_gateway tenants', function () {
@@ -119,9 +117,7 @@ test('the settlement statement export redacts the gateway fee to not tracked for
     $response = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/finance/settlement-statement", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
-    $content = $response->streamedContent();
-    expect($content)->toContain('not tracked');
-    expect($content)->not->toContain('275');
+    expect(settlementStatementGatewayFees($response->streamedContent()))->toBe(['not tracked']);
 });
 
 test('the settlement statement export reconciliation footer matches the collected, paid out and available balance figures', function () {
@@ -151,3 +147,31 @@ test('the settlement statement export reconciliation footer matches the collecte
     expect($paidOutLine)->toContain('5000'); // the one paid payout
     expect($availableBalanceLine)->toContain('13700'); // 18,700 net collected - 5,000 already paid out
 });
+
+/**
+ * The Gateway fee column of each ledger row in a settlement statement CSV.
+ *
+ * Read by column rather than by searching the whole file: each row also carries
+ * a random provider reference, and `not->toContain('275')` failed whenever that
+ * reference happened to contain those digits.
+ *
+ * @return array<int, string>
+ */
+function settlementStatementGatewayFees(string $csv): array
+{
+    $rows = array_map('str_getcsv', explode("\n", mb_trim($csv)));
+    $header = array_shift($rows);
+    $column = array_search('Gateway fee', $header, true);
+    $fees = [];
+
+    foreach ($rows as $row) {
+        // Ledger rows end at the first blank line, where the reconciliation begins.
+        if ($row === [null] || $row === ['']) {
+            break;
+        }
+
+        $fees[] = (string) $row[$column];
+    }
+
+    return $fees;
+}
