@@ -823,10 +823,11 @@ export default function RegistrationFormPanel({ event, onChange }) {
             {/* Confirm Delete Modal */}
             {deleteTarget && (
                 <ConfirmModal
+                    open={Boolean(deleteTarget)}
                     title="Delete Form Field?"
-                    message={`Are you sure you want to delete "${deleteTarget.label}"? Any existing attendee answers for this field will remain in historical records.`}
-                    confirmText="Delete Field"
-                    destructive
+                    description={`Are you sure you want to delete "${deleteTarget.label}"? Any existing attendee answers for this field will remain in historical records.`}
+                    confirmLabel="Delete Field"
+                    danger
                     onConfirm={handleDeleteField}
                     onClose={() => setDeleteTarget(null)}
                 />

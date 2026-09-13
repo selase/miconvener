@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Button from '@/Components/Console/Button';
+import StatusBanner from '@/Components/Console/StatusBanner';
 import Modal from '@/Components/Console/Modal';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
@@ -35,6 +36,7 @@ const RULE_TYPES = [
 
 export default function StratificationPanel({ event }) {
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [groups, setGroups] = useState([]);
     const [meta, setMeta] = useState({ ticket_types: [], sessions: [], forms: [], total_attendees: 0 });
 
@@ -63,12 +65,17 @@ export default function StratificationPanel({ event }) {
 
     const loadData = async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const res = await csrfFetch(route('tenant.events.participant-groups.index', { event: event.id }));
             if (res.ok) {
                 const data = await res.json();
                 setGroups(data.groups || []);
                 setMeta(data.meta || { ticket_types: [], sessions: [], forms: [], total_attendees: 0 });
+            } else {
+                setLoadError(res.status === 403
+                    ? 'You do not have permission to view cohorts for this event.'
+                    : 'The cohorts for this event could not be loaded. Refresh to try again.');
             }
         } catch (err) {
             console.error('Failed to load participant groups:', err);
@@ -229,6 +236,9 @@ export default function StratificationPanel({ event }) {
 
     return (
         <div className="space-y-6">
+            {loadError && (
+                <StatusBanner status="failed" title="Could not load" description={loadError} />
+            )}
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -742,13 +752,13 @@ export default function StratificationPanel({ event }) {
 
             {/* Confirm Delete Group Modal */}
             <ConfirmModal
-                isOpen={!!deleteTarget}
+                open={!!deleteTarget}
                 title="Delete Participant Cohort?"
-                message={`Are you sure you want to delete the group "${deleteTarget?.name}"?`}
+                description={`Are you sure you want to delete the group "${deleteTarget?.name}"?`}
                 confirmLabel="Delete Group"
-                variant="danger"
+                danger
                 onConfirm={handleDeleteGroup}
-                onCancel={() => setDeleteTarget(null)}
+                onClose={() => setDeleteTarget(null)}
             />
         </div>
     );

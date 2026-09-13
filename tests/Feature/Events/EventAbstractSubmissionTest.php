@@ -6,10 +6,12 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventAbstract;
+use App\Models\EventSession;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -162,4 +164,32 @@ test('abstract codes are unique across tenants, not just within one', function (
     app(TenantContext::class)->setTenant($tenantB);
 
     expect(EventAbstract::codeExists('ABS-TAKEN'))->toBeTrue();
+});
+
+test('the public submission page lists session tracks with a query Postgres accepts', function () {
+    [$tenant] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    foreach (['Surgery', 'Pediatrics', 'Surgery'] as $track) {
+        EventSession::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'track' => $track]);
+    }
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    $this->get("http://{$host}/e/{$event->slug}/abstracts/submit", ['HTTP_HOST' => $host])->assertOk();
+
+    /*
+     * sessions() always orders by starts_at and sort_order. Distinct tracks
+     * taken through it produced SELECT DISTINCT track ... ORDER BY starts_at,
+     * which Postgres rejects: this public page returned 500 for every tenant
+     * in production. SQLite accepts the SQL, so the query itself is checked.
+     */
+    $rejectedByPostgres = array_filter($queries, fn (string $sql): bool => (bool) preg_match('/select distinct "track".*order by "(starts_at|sort_order|created_at)"/i', $sql));
+
+    expect($rejectedByPostgres)->toBe([]);
 });

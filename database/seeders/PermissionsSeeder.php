@@ -21,14 +21,17 @@ final class PermissionsSeeder extends Seeder
 
         $permissions = array_merge($this->modelPermissions(), $this->defaultPermissions());
 
+        /*
+         * Safe to re-run against a live database, which it must be: seeders do
+         * not run on deploy, so a permission added here reaches an existing
+         * environment only when this is run there. A permission that already
+         * exists keeps its uuid; only its category is brought up to date.
+         */
         foreach ($permissions as $permission) {
-            Permission::query()->updateOrCreate([
-                'name' => $permission['name'],
-            ], [
-                'uuid' => Str::uuid(),
-                'name' => $permission['name'],
-                'category' => $permission['category'],
-            ]);
+            $model = Permission::query()->firstOrNew(['name' => $permission['name']]);
+            $model->uuid ??= (string) Str::uuid();
+            $model->category = $permission['category'];
+            $model->save();
         }
 
         /** Assign created permissions to roles */

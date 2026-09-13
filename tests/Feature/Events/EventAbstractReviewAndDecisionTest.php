@@ -10,6 +10,7 @@ use App\Models\EventAbstract;
 use App\Models\EventAbstractReview;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
@@ -256,4 +257,44 @@ test('organizer can record bulk decisions on abstracts', function () {
     $response->assertOk();
     expect($abs1->fresh()->status)->toBe(EventAbstract::STATUS_ACCEPTED_POSTER);
     expect($abs2->fresh()->status)->toBe(EventAbstract::STATUS_ACCEPTED_POSTER);
+});
+
+test('the abstracts page lists distinct tracks with a query Postgres accepts', function () {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    foreach ([['ABS-T1', 'Surgery'], ['ABS-T2', 'Pediatrics'], ['ABS-T3', 'Surgery']] as [$code, $track]) {
+        EventAbstract::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'code' => $code,
+            'title' => "Abstract {$code}",
+            'track' => $track,
+            'presentation_preference' => 'oral',
+            'status' => EventAbstract::STATUS_SUBMITTED,
+        ]);
+    }
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    $this->actingAs($user)
+        ->getJson("http://{$host}/events/{$event->id}/abstracts", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertJsonPath('tracks', ['Pediatrics', 'Surgery']);
+
+    /*
+     * The abstracts() relation always orders by created_at. Taking distinct
+     * tracks through it produced SELECT DISTINCT track ... ORDER BY
+     * created_at, which Postgres rejects — the Abstracts tab returned 500 in
+     * production. SQLite accepts that SQL, so the response alone cannot catch
+     * it here; the query that ran has to be inspected.
+     */
+    $distinctWithForeignOrder = array_filter($queries, fn (string $sql): bool => (bool) preg_match('/select distinct "track".*order by "created_at"/i', $sql));
+
+    expect($distinctWithForeignOrder)->toBe([]);
 });

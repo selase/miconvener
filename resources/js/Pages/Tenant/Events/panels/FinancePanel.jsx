@@ -535,9 +535,9 @@ export default function FinancePanel({ event }) {
                                 <Th>Account Code</Th>
                                 <Th>Account Name</Th>
                                 <Th>Type</Th>
-                                <Th numeric>Total Debits</Th>
-                                <Th numeric>Total Credits</Th>
-                                <Th numeric>Net Balance</Th>
+                                <Th align="right">Total Debits</Th>
+                                <Th align="right">Total Credits</Th>
+                                <Th align="right">Net Balance</Th>
                             </Thead>
                             <tbody>
                                 {trial_balance.accounts.map((acc) => (
@@ -549,10 +549,10 @@ export default function FinancePanel({ event }) {
                                                 {acc.type}
                                             </span>
                                         </Td>
-                                        <Td numeric className="font-mono text-xs">{formatMoney(acc.debits, event.currency)}</Td>
-                                        <Td numeric className="font-mono text-xs">{formatMoney(acc.credits, event.currency)}</Td>
-                                        <Td numeric className="font-mono text-xs font-semibold">
-                                            {formatMoney(acc.balance, event.currency)}
+                                        <Td numeric align="right"><span className="font-mono text-xs">{formatMoney(acc.debits, event.currency)}</span></Td>
+                                        <Td numeric align="right"><span className="font-mono text-xs">{formatMoney(acc.credits, event.currency)}</span></Td>
+                                        <Td numeric align="right">
+                                            <span className="font-mono text-xs font-semibold">{formatMoney(acc.balance, event.currency)}</span>
                                         </Td>
                                     </Tr>
                                 ))}
@@ -617,8 +617,8 @@ export default function FinancePanel({ event }) {
                                 payouts.map((p) => (
                                     <Tr key={p.id}>
                                         <Td muted>{p.payout_account_label} <span className="font-mono text-xs">{p.payout_account_masked_number}</span></Td>
-                                        <Td numeric className="font-semibold">
-                                            {formatMoney(p.amount, event.currency)}
+                                        <Td numeric>
+                                            <span className="font-semibold">{formatMoney(p.amount, event.currency)}</span>
                                             {p.transfer_fee_amount > 0 && (
                                                 <div className="text-xs font-normal text-ink-secondary">
                                                     {formatMoney(p.net_paid_amount, event.currency)} sent,

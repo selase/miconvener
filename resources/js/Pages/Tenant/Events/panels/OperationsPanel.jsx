@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Button from '@/Components/Console/Button';
+import StatusBanner from '@/Components/Console/StatusBanner';
 import Modal from '@/Components/Console/Modal';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
@@ -43,6 +44,7 @@ const STATUS_CONFIG = {
 
 export default function OperationsPanel({ event }) {
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [pillars, setPillars] = useState([]);
     const [summary, setSummary] = useState(null);
     const [teamMembers, setTeamMembers] = useState([]);
@@ -78,6 +80,7 @@ export default function OperationsPanel({ event }) {
 
     const loadData = async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const res = await csrfFetch(route('tenant.events.operations.index', { event: event.id }));
             if (res.ok) {
@@ -85,6 +88,10 @@ export default function OperationsPanel({ event }) {
                 setPillars(data.pillars || []);
                 setSummary(data.summary || null);
                 setTeamMembers(data.team_members || []);
+            } else {
+                setLoadError(res.status === 403
+                    ? 'You do not have permission to view operations for this event.'
+                    : 'The operations for this event could not be loaded. Refresh to try again.');
             }
         } catch (err) {
             console.error('Failed to load operations data:', err);
@@ -264,6 +271,9 @@ export default function OperationsPanel({ event }) {
 
     return (
         <div className="space-y-6">
+            {loadError && (
+                <StatusBanner status="failed" title="Could not load" description={loadError} />
+            )}
             {/* Header and Quick Stats */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -892,24 +902,24 @@ export default function OperationsPanel({ event }) {
 
             {/* Confirm Delete Pillar Modal */}
             <ConfirmModal
-                isOpen={!!deletePillarTarget}
+                open={!!deletePillarTarget}
                 title="Delete Operational Pillar?"
-                message={`Are you sure you want to delete the pillar "${deletePillarTarget?.name}"? All associated tasks will also be deleted.`}
+                description={`Are you sure you want to delete the pillar "${deletePillarTarget?.name}"? All associated tasks will also be deleted.`}
                 confirmLabel="Delete Pillar"
-                variant="danger"
+                danger
                 onConfirm={handleDeletePillar}
-                onCancel={() => setDeletePillarTarget(null)}
+                onClose={() => setDeletePillarTarget(null)}
             />
 
             {/* Confirm Delete Task Modal */}
             <ConfirmModal
-                isOpen={!!deleteTaskTarget}
+                open={!!deleteTaskTarget}
                 title="Delete Task?"
-                message={`Are you sure you want to delete task "${deleteTaskTarget?.title}"?`}
+                description={`Are you sure you want to delete task "${deleteTaskTarget?.title}"?`}
                 confirmLabel="Delete Task"
-                variant="danger"
+                danger
                 onConfirm={handleDeleteTask}
-                onCancel={() => setDeleteTaskTarget(null)}
+                onClose={() => setDeleteTaskTarget(null)}
             />
         </div>
     );

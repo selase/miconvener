@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import StatusBanner from '@/Components/Console/StatusBanner';
 import csrfFetch from '@/lib/csrfFetch';
 
 export default function AbstractsPanel({ event }) {
@@ -14,6 +15,7 @@ export default function AbstractsPanel({ event }) {
     const [tracks, setTracks] = useState([]);
     const [reviewers, setReviewers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [statusFilter, setStatusFilter] = useState('all');
     const [trackFilter, setTrackFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -31,6 +33,7 @@ export default function AbstractsPanel({ event }) {
 
     const loadData = async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const url = new URL(route('tenant.events.abstracts.index', { event: event.id }));
             if (statusFilter !== 'all') url.searchParams.append('status', statusFilter);
@@ -44,6 +47,10 @@ export default function AbstractsPanel({ event }) {
                 setStats(data.stats || {});
                 setTracks(data.tracks || []);
                 setReviewers(data.reviewers || []);
+            } else {
+                setLoadError(res.status === 403
+                    ? 'You do not have permission to view abstracts for this event.'
+                    : 'The abstracts for this event could not be loaded. Refresh to try again.');
             }
         } catch (err) {
             console.error('Failed to load abstracts', err);
@@ -153,6 +160,9 @@ export default function AbstractsPanel({ event }) {
 
     return (
         <div className="space-y-6">
+            {loadError && (
+                <StatusBanner status="failed" title="Could not load" description={loadError} />
+            )}
             {/* Header & Metrics */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>

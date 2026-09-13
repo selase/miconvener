@@ -30,7 +30,18 @@ final class AbstractSubmissionController extends Controller
             ->firstOrFail();
 
         // Unique tracks extracted from sessions or predefined
-        $tracks = $eventModel->sessions()->whereNotNull('track')->distinct()->pluck('track')->values();
+        /*
+         * reorder() drops the relation's starts_at/sort_order ordering:
+         * Postgres rejects SELECT DISTINCT ordered by a column outside the
+         * select list, which took this public page down.
+         */
+        $tracks = $eventModel->sessions()
+            ->reorder()
+            ->whereNotNull('track')
+            ->distinct()
+            ->orderBy('track')
+            ->pluck('track')
+            ->values();
 
         return Inertia::render('Public/Events/AbstractSubmit', [
             'event' => [

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Button from '@/Components/Console/Button';
+import StatusBanner from '@/Components/Console/StatusBanner';
 import Modal from '@/Components/Console/Modal';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
@@ -44,6 +45,7 @@ const ROLE_BADGES = {
 
 export default function CertificatesPanel({ event }) {
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [templates, setTemplates] = useState([]);
     const [certificates, setCertificates] = useState([]);
     const [stats, setStats] = useState(null);
@@ -84,6 +86,7 @@ export default function CertificatesPanel({ event }) {
 
     const loadData = async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             let url = route('tenant.events.certificates.index', { event: event.id });
             const params = new URLSearchParams();
@@ -98,6 +101,10 @@ export default function CertificatesPanel({ event }) {
                 setCertificates(data.certificates?.data || []);
                 setStats(data.stats || null);
                 setEligible(data.eligible || null);
+            } else {
+                setLoadError(res.status === 403
+                    ? 'You do not have permission to view certificates for this event.'
+                    : 'The certificates for this event could not be loaded. Refresh to try again.');
             }
         } catch (err) {
             console.error('Failed to load certificates data:', err);
@@ -214,6 +221,9 @@ export default function CertificatesPanel({ event }) {
 
     return (
         <div className="space-y-6">
+            {loadError && (
+                <StatusBanner status="failed" title="Could not load" description={loadError} />
+            )}
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -740,13 +750,13 @@ export default function CertificatesPanel({ event }) {
 
             {/* Confirm Revoke Modal */}
             <ConfirmModal
-                isOpen={!!deleteCertTarget}
+                open={!!deleteCertTarget}
                 title="Revoke Certificate?"
-                message={`Are you sure you want to revoke the certificate for ${deleteCertTarget?.recipient_name} (${deleteCertTarget?.verification_code})? The QR code and verification link will no longer be valid.`}
+                description={`Are you sure you want to revoke the certificate for ${deleteCertTarget?.recipient_name} (${deleteCertTarget?.verification_code})? The QR code and verification link will no longer be valid.`}
                 confirmLabel="Revoke Certificate"
-                variant="danger"
+                danger
                 onConfirm={handleDeleteCertificate}
-                onCancel={() => setDeleteCertTarget(null)}
+                onClose={() => setDeleteCertTarget(null)}
             />
         </div>
     );

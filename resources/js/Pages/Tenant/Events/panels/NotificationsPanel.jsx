@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import csrfFetch from '@/lib/csrfFetch';
 import { 
     Bell, 
     Plus, 
@@ -68,8 +69,18 @@ export default function NotificationsPanel({ event }) {
     const fetchRules = async () => {
         try {
             setLoading(true);
-            const res = await fetch(route('tenant.events.notification-rules.index', { event: event.id }));
-            const data = await res.json();
+            const res = await csrfFetch(route('tenant.events.notification-rules.index', { event: event.id }));
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                // A refusal used to arrive as an HTML page, fail to parse, and
+                // leave the tab silently empty. Say what actually happened.
+                setActionError(
+                    res.status === 403
+                        ? 'You do not have permission to manage automations for this event.'
+                        : data.message || 'Automations could not be loaded. Refresh to try again.',
+                );
+                return;
+            }
             setRules(data.rules || []);
             setAudiences(data.audiences || []);
             setSettings(data.settings || null);
@@ -148,12 +159,8 @@ export default function NotificationsPanel({ event }) {
         const method = editingRule ? 'PUT' : 'POST';
 
         try {
-            const res = await fetch(url, {
+            const res = await csrfFetch(url, {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
                 body: JSON.stringify(ruleForm),
             });
             const data = await res.json();
@@ -171,11 +178,8 @@ export default function NotificationsPanel({ event }) {
 
     const handleToggleRule = async (ruleId) => {
         try {
-            const res = await fetch(route('tenant.events.notification-rules.toggle', { event: event.id, rule: ruleId }), {
+            const res = await csrfFetch(route('tenant.events.notification-rules.toggle', { event: event.id, rule: ruleId }), {
                 method: 'PATCH',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
             });
             if (res.ok) fetchRules();
         } catch (err) {
@@ -186,11 +190,8 @@ export default function NotificationsPanel({ event }) {
     const handleDeleteRule = async (ruleId) => {
         if (!confirm('Are you sure you want to delete this notification rule?')) return;
         try {
-            const res = await fetch(route('tenant.events.notification-rules.destroy', { event: event.id, rule: ruleId }), {
+            const res = await csrfFetch(route('tenant.events.notification-rules.destroy', { event: event.id, rule: ruleId }), {
                 method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
             });
             if (res.ok) fetchRules();
         } catch (err) {
@@ -201,11 +202,8 @@ export default function NotificationsPanel({ event }) {
     const handleDispatchNow = async (ruleId) => {
         if (!confirm('Dispatch this notification immediately to all matching recipients?')) return;
         try {
-            const res = await fetch(route('tenant.events.notification-rules.dispatch', { event: event.id, rule: ruleId }), {
+            const res = await csrfFetch(route('tenant.events.notification-rules.dispatch', { event: event.id, rule: ruleId }), {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
             });
             const data = await res.json();
             if (res.ok) {
@@ -222,12 +220,8 @@ export default function NotificationsPanel({ event }) {
     const handleSendTest = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(route('tenant.events.notification-rules.test-send', { event: event.id }), {
+            const res = await csrfFetch(route('tenant.events.notification-rules.test-send', { event: event.id }), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
                 body: JSON.stringify(testForm),
             });
             const data = await res.json();
@@ -246,12 +240,8 @@ export default function NotificationsPanel({ event }) {
     const handleSaveSettings = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(route('tenant.events.notification-settings.update', { event: event.id }), {
+            const res = await csrfFetch(route('tenant.events.notification-settings.update', { event: event.id }), {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
                 body: JSON.stringify(settingsForm),
             });
             const data = await res.json();

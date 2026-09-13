@@ -69,7 +69,17 @@ final class EventAbstractController extends Controller
             ->orderBy('first_name')
             ->get();
 
-        $tracks = $event->abstracts()->whereNotNull('track')->distinct()->pluck('track')->values();
+        /*
+         * reorder() drops the relation's created_at ordering: Postgres rejects
+         * SELECT DISTINCT ordered by a column outside the select list.
+         */
+        $tracks = $event->abstracts()
+            ->reorder()
+            ->whereNotNull('track')
+            ->distinct()
+            ->orderBy('track')
+            ->pluck('track')
+            ->values();
 
         $payload = [
             'event' => [

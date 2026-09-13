@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Button from '@/Components/Console/Button';
+import StatusBanner from '@/Components/Console/StatusBanner';
 import Modal from '@/Components/Console/Modal';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
@@ -51,6 +52,7 @@ const FIELD_TYPES = [
 
 export default function FormsPanel({ event }) {
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [forms, setForms] = useState([]);
     const [summary, setSummary] = useState(null);
     const [copiedSlug, setCopiedSlug] = useState(null);
@@ -81,12 +83,17 @@ export default function FormsPanel({ event }) {
 
     const loadData = async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const res = await csrfFetch(route('tenant.events.dynamic-forms.index', { event: event.id }));
             if (res.ok) {
                 const data = await res.json();
                 setForms(data.forms || []);
                 setSummary(data.summary || null);
+            } else {
+                setLoadError(res.status === 403
+                    ? 'You do not have permission to view forms for this event.'
+                    : 'The forms for this event could not be loaded. Refresh to try again.');
             }
         } catch (err) {
             console.error('Failed to load dynamic forms:', err);
@@ -252,6 +259,9 @@ export default function FormsPanel({ event }) {
 
     return (
         <div className="space-y-6">
+            {loadError && (
+                <StatusBanner status="failed" title="Could not load" description={loadError} />
+            )}
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -666,13 +676,13 @@ export default function FormsPanel({ event }) {
 
             {/* Confirm Delete Modal */}
             <ConfirmModal
-                isOpen={!!deleteTarget}
+                open={!!deleteTarget}
                 title="Delete Dynamic Form?"
-                message={`Are you sure you want to delete "${deleteTarget?.title}"? All submitted responses will be permanently removed.`}
+                description={`Are you sure you want to delete "${deleteTarget?.title}"? All submitted responses will be permanently removed.`}
                 confirmLabel="Delete Form"
-                variant="danger"
+                danger
                 onConfirm={handleDeleteForm}
-                onCancel={() => setDeleteTarget(null)}
+                onClose={() => setDeleteTarget(null)}
             />
         </div>
     );

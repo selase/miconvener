@@ -602,9 +602,9 @@ export default function PromoCodePanel({ event, onChange }) {
                     onClose={() => setDeleteTarget(null)}
                     onConfirm={handleDelete}
                     title="Delete Promo Code"
-                    message={`Are you sure you want to delete promo code "${deleteTarget.code}"? Past registrations will retain their applied discount.`}
+                    description={`Are you sure you want to delete promo code "${deleteTarget.code}"? Past registrations will retain their applied discount.`}
                     confirmLabel="Delete Code"
-                    variant="danger"
+                    danger
                 />
             )}
         </div>
