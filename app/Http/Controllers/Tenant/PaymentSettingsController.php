@@ -10,6 +10,7 @@ use App\Models\TenantPaymentGateway;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 final class PaymentSettingsController extends Controller
@@ -111,27 +112,47 @@ final class PaymentSettingsController extends Controller
     }
 
     /**
-     * Superadmin-only: set a tenant's platform fee percentage from the UI,
-     * writing to the same column php artisan events:set-platform-fee writes
-     * to. The CLI command remains for scripted/bulk use.
+     * Application-superadmin only: set a tenant's commission terms from the
+     * UI, writing the same columns php artisan events:set-platform-fee writes.
+     * The CLI command remains for scripted and bulk use.
+     *
+     * Authorization is the access-superadmin-dashboard gate, which requires
+     * the global Superadmin role with a null tenant_id. It deliberately does
+     * NOT key off the email column: tenant admins can set team members'
+     * email addresses, and users.email is unique globally rather than per
+     * tenant, so an address allowlist is a value the tenant controls.
      */
     public function updatePlatformFee(Request $request): RedirectResponse
     {
-        $tenant = $this->tenantContext->getTenant();
+        Gate::authorize('access-superadmin-dashboard');
 
-        if (! $request->user() || ! in_array($request->user()->email, ['hiselase@gmail.com', 'dev@wearepurpledot.com'], true)) {
-            abort(403);
-        }
+        $tenant = $this->tenantContext->getTenant();
 
         $validated = $request->validate([
             'platform_fee_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+            /*
+             * Minor units, matching the CLI. Leave it empty to clear the
+             * override so the package default applies.
+             *
+             * Zero is refused rather than accepted: a cap of nothing waives
+             * the commission entirely, which is almost never what someone
+             * typing "0" for "no cap" means. A deliberate waiver is a zero
+             * percentage, which reads as one.
+             */
+            'platform_fee_cap_amount' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ]);
 
-        $tenant->update(['platform_fee_percentage' => $validated['platform_fee_percentage']]);
+        $attributes = ['platform_fee_percentage' => $validated['platform_fee_percentage']];
+
+        if ($request->has('platform_fee_cap_amount')) {
+            $attributes['platform_fee_cap_amount'] = $validated['platform_fee_cap_amount'];
+        }
+
+        $tenant->update($attributes);
 
         return back()->with([
             'status' => 'success',
-            'message' => 'Platform fee percentage updated.',
+            'message' => 'Platform fee updated.',
         ]);
     }
 }

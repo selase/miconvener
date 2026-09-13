@@ -28,6 +28,12 @@ final class SetPlatformFee extends Command
             ? null
             : (int) $this->option('cap');
 
+        if ($this->option('cap') !== null && ! $clearing && (int) $this->option('cap') < 1) {
+            $this->error('A cap of 0 waives the commission entirely. Use a percentage of 0 to waive it, or omit --cap to leave the ceiling alone.');
+
+            return self::FAILURE;
+        }
+
         $attributes = ['platform_fee_percentage' => $percentage];
 
         if ($clearing || $this->option('cap') !== null) {

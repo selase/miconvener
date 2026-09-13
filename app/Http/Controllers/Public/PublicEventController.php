@@ -560,8 +560,19 @@ final class PublicEventController extends Controller
             'ticket_price' => $event->ticket_price,
             'currency' => $event->currency,
             'fee_bearer' => $event->effectiveFeeBearer(),
-            'platform_fee_percentage' => $event->effectivePlatformFeePercentage(),
-            'platform_fee_cap_amount' => $event->effectivePlatformFeeCapAmount(),
+            /*
+             * The commission rate is published only when the attendee is the
+             * one paying it — then it is a charge on their receipt and they
+             * are entitled to see how it was worked out.
+             *
+             * When the organizer absorbs it, it is a commercial term between
+             * them and the platform. Publishing it would put negotiated rates
+             * on a page anyone can open, including other tenants.
+             */
+            ...($event->effectiveFeeBearer() === \App\Services\Finance\PlatformFeeResolver::BEARER_ATTENDEE ? [
+                'platform_fee_percentage' => $event->effectivePlatformFeePercentage(),
+                'platform_fee_cap_amount' => $event->effectivePlatformFeeCapAmount(),
+            ] : []),
             'is_free' => $event->isFree(),
             'hero_image_url' => Helper::storageUrl($event->hero_image_path),
             'plan_your_visit_content' => $event->plan_your_visit_content,

@@ -93,3 +93,45 @@ test('the gateway is told to collect the charged amount, not the bare ticket pri
     Http::assertSent(fn ($request): bool => str_contains((string) $request->url(), 'transaction/initialize')
         && (int) $request['amount'] === 10200);
 });
+
+test('the public page does not publish the commission rate when the organizer absorbs it', function () {
+    [$tenant] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $tenant->update(['platform_fee_percentage' => 1.25]);
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'fee_bearer' => 'organizer',
+        'currency' => 'GHS',
+        'visibility' => 'public',
+    ]);
+
+    // A negotiated rate is a commercial term, not something to put on a page
+    // anyone — including another tenant — can open.
+    $this->get("http://{$host}/e/{$event->slug}", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page
+            ->where('event.fee_bearer', 'organizer')
+            ->missing('event.platform_fee_percentage')
+            ->missing('event.platform_fee_cap_amount')
+        );
+});
+
+test('the public page does publish the rate when the attendee is charged it', function () {
+    [$tenant] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $tenant->update(['platform_fee_percentage' => 2.0]);
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'fee_bearer' => 'attendee',
+        'currency' => 'GHS',
+        'visibility' => 'public',
+    ]);
+
+    $this->get("http://{$host}/e/{$event->slug}", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page
+            // JSON renders 2.0 as 2, so compare loosely on value, not type.
+            ->where('event.platform_fee_percentage', fn ($value) => (float) $value === 2.0)
+            ->has('event.platform_fee_cap_amount')
+        );
+});

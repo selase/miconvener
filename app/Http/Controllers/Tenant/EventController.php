@@ -203,6 +203,9 @@ final class EventController extends Controller
         $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
             ->with([
                 'ticketTypes',
+                // The fee cascade walks event -> tenant -> package, and the
+                // payload reads it three times.
+                'tenant.package',
                 'sessions' => fn ($query) => $query->withCount('registrations'),
                 'sessions.speakers',
                 'speakers',

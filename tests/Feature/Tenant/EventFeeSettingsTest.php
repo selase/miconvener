@@ -170,3 +170,20 @@ test('the preview shows a pass-through event charging the buyer more', function 
             ->where('event.fee_preview.organizer_net', 9801)
         );
 });
+
+test('the superadmin command refuses a zero cap that would silently waive commission', function () {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create([
+        'tenant_id' => $tenant->id,
+        'slug' => 'gala',
+        'platform_fee_cap_amount' => 2000,
+        'currency' => 'GHS',
+    ]);
+
+    $exit = Artisan::call('events:set-platform-fee', [
+        'tenant_slug' => $tenant->slug, 'percentage' => 2.0, '--event' => 'gala', '--cap' => 0,
+    ]);
+
+    expect($exit)->toBe(1)
+        ->and($event->refresh()->platform_fee_cap_amount)->toBe(2000);
+});
