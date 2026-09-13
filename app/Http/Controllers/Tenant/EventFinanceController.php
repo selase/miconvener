@@ -193,10 +193,26 @@ final class EventFinanceController extends Controller
              * code rather than re-sent, which would create a second transfer.
              */
             if ($transferStatus === 'otp') {
+                $transferCode = (string) ($transfer['transfer_code'] ?? '');
+
+                /*
+                 * Without a transfer code there is nothing to release, and a
+                 * parked payout cannot be re-sent — it would strand here. Fail
+                 * it instead, which keeps it re-sendable.
+                 */
+                if ($transferCode === '') {
+                    $payoutModel->update([
+                        'status' => EventPayout::STATUS_FAILED,
+                        'failure_reason' => 'The payment provider asked for a one-time code but returned no transfer to release. Send this payout again.',
+                    ]);
+
+                    return response()->json(['message' => $payoutModel->failure_reason], 502);
+                }
+
                 $payoutModel->update([
                     'status' => EventPayout::STATUS_AWAITING_OTP,
                     'provider_reference' => $reference,
-                    'provider_transfer_code' => (string) ($transfer['transfer_code'] ?? ''),
+                    'provider_transfer_code' => $transferCode,
                     'failure_reason' => null,
                 ]);
 
@@ -292,6 +308,13 @@ final class EventFinanceController extends Controller
             $account = $payoutModel->payoutAccount;
             $transferFee = $transferFeeSchedule->feeFor($account->type);
 
+            /*
+             * net_paid_amount follows the scheduled fee because that is what
+             * the transfer was actually requested for, while transfer_fee_amount
+             * records what the provider says it charged. They normally agree;
+             * when they do not, the provider has changed its pricing and the
+             * gap is worth seeing rather than papering over.
+             */
             $payoutModel->update([
                 'status' => EventPayout::STATUS_PROCESSING,
                 'failure_reason' => null,

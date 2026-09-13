@@ -137,3 +137,22 @@ test('a parked payout cannot be sent again, which would make a second transfer',
 
     Http::assertNothingSent();
 });
+
+test('an otp response with no transfer to release fails rather than stranding the payout', function () {
+    [$tenant, $user, $event, $payout, $host] = otpPayoutFixture();
+
+    Http::fake([
+        'api.paystack.co/transfer' => Http::response([
+            'status' => true,
+            'data' => ['status' => 'otp'],
+        ]),
+    ]);
+
+    $this->actingAs($user)
+        ->post("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host])
+        ->assertStatus(502);
+
+    // Parked payouts cannot be re-sent, so one with nothing to release must
+    // not park — it has to stay in a state the organizer can act on.
+    expect($payout->refresh()->status)->toBe(EventPayout::STATUS_FAILED);
+});
