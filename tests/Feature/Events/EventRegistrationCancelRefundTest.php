@@ -317,6 +317,12 @@ test('cancellation completes and writes the ledger reversal when Paystack report
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
         'provider_reference' => 'paid_ref_already_reversed',
+        // Coherent with the GHS 50 registration above: 5000 - 150 - 150 = 4700.
+        // The reversal is derived from these components, so a net that did not
+        // match them would describe a charge that never happened.
+        'gross_amount' => 5000,
+        'gateway_fee_amount' => 150,
+        'commission_amount' => 150,
         'net_amount' => 4700,
     ]);
 

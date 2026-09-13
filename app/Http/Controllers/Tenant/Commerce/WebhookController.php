@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Tenant\Commerce;
 
 use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
-use App\Models\EventLedgerEntry;
 use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
@@ -184,20 +183,6 @@ final class WebhookController extends Controller
             'currency' => $currency,
         ]);
         $registration->save();
-
-        EventLedgerEntry::create([
-            'tenant_id' => $tenant->id,
-            'event_id' => $eventModel->id,
-            'type' => EventLedgerEntry::TYPE_CHARGE,
-            'registration_id' => $registration->id,
-            'gross_amount' => $amount,
-            'gateway_fee_amount' => $gatewayFeeAmount,
-            'commission_amount' => $commissionAmount,
-            'net_amount' => $amount - $gatewayFeeAmount - $commissionAmount,
-            'currency' => $currency,
-            'provider' => 'paystack',
-            'provider_reference' => $reference,
-        ]);
 
         // The platform-settled path posts to both ledgers; this one recorded
         // only the old single-row entry, so an own_gateway tenant had no

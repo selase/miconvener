@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Finance;
 
 use App\Models\Event;
+use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
 use App\Models\EventRegistration;
 use App\Models\LedgerAccount;
@@ -159,7 +160,9 @@ final class LedgerService
         int $grossAmount,
         int $platformFee,
         string $reference,
-        int $gatewayFee = 0
+        int $gatewayFee = 0,
+        string $provider = 'paystack',
+        ?string $providerReference = null
     ): ?LedgerTransaction {
         if ($grossAmount <= 0) {
             return null; // Free tickets do not move financial cash
@@ -205,7 +208,7 @@ final class LedgerService
             ];
         }
 
-        return $this->postTransaction(
+        $transaction = $this->postTransaction(
             $tenant,
             $event,
             LedgerTransaction::TYPE_TICKET_SALE,
@@ -215,6 +218,22 @@ final class LedgerService
             null,
             $event->currency ?: 'GHS'
         );
+
+        EventLedgerEntry::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'type' => EventLedgerEntry::TYPE_CHARGE,
+            'registration_id' => $registration->id,
+            'gross_amount' => $grossAmount,
+            'gateway_fee_amount' => $gatewayFee,
+            'commission_amount' => $platformFee,
+            'net_amount' => $netAmount,
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => $provider,
+            'provider_reference' => $providerReference ?? $reference,
+        ]);
+
+        return $transaction;
     }
 
     /**
@@ -229,7 +248,9 @@ final class LedgerService
         int $grossAmount,
         int $platformFee,
         string $reference,
-        int $gatewayFee = 0
+        int $gatewayFee = 0,
+        string $provider = 'paystack',
+        ?string $providerReference = null
     ): ?LedgerTransaction {
         if ($grossAmount <= 0) {
             return null;
@@ -272,7 +293,7 @@ final class LedgerService
             ];
         }
 
-        return $this->postTransaction(
+        $transaction = $this->postTransaction(
             $tenant,
             $event,
             LedgerTransaction::TYPE_REFUND,
@@ -282,6 +303,27 @@ final class LedgerService
             null,
             $event->currency ?: 'GHS'
         );
+
+        EventLedgerEntry::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'type' => EventLedgerEntry::TYPE_REFUND,
+            'registration_id' => $registration->id,
+            /*
+             * Only the net is signed. The gross, the processing fee and the
+             * commission restate the original charge so the settlement
+             * statement can show what is being reversed.
+             */
+            'gross_amount' => $grossAmount,
+            'gateway_fee_amount' => $gatewayFee,
+            'commission_amount' => $platformFee,
+            'net_amount' => -$netAmount,
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => $provider,
+            'provider_reference' => $providerReference ?? $reference,
+        ]);
+
+        return $transaction;
     }
 
     /**
@@ -375,7 +417,8 @@ final class LedgerService
         string $reference,
         ?EventPayout $payout = null,
         int $transferFee = 0,
-        bool $platformAbsorbsTransferFee = false
+        bool $platformAbsorbsTransferFee = false,
+        string $provider = 'paystack'
     ): LedgerTransaction {
         $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
 
@@ -410,7 +453,7 @@ final class LedgerService
             'description' => 'Cash transfer to organizer verified bank account',
         ];
 
-        return $this->postTransaction(
+        $transaction = $this->postTransaction(
             $tenant,
             $event,
             LedgerTransaction::TYPE_PAYOUT,
@@ -420,6 +463,27 @@ final class LedgerService
             null,
             $event->currency ?: 'GHS'
         );
+
+        EventLedgerEntry::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'type' => EventLedgerEntry::TYPE_PAYOUT,
+            'payout_id' => $payout?->id,
+            'gross_amount' => $amount,
+            /*
+             * Zero, not the transfer fee: these columns describe collection,
+             * and the settlement statement renders them as such. What the
+             * payout cost to send lives on event_payouts.transfer_fee_amount.
+             */
+            'gateway_fee_amount' => 0,
+            'commission_amount' => 0,
+            'net_amount' => $amount,
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => $provider,
+            'provider_reference' => $payout?->provider_reference ?? $reference,
+        ]);
+
+        return $transaction;
     }
 
     /**

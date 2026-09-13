@@ -87,20 +87,6 @@ final class ReconcileStuckPayouts extends Command
                 $locked->update(['status' => EventPayout::STATUS_PAID, 'paid_at' => now()]);
 
                 if (! $locked->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->exists()) {
-                    EventLedgerEntry::create([
-                        'tenant_id' => $locked->tenant_id,
-                        'event_id' => $locked->event_id,
-                        'type' => EventLedgerEntry::TYPE_PAYOUT,
-                        'payout_id' => $locked->id,
-                        'gross_amount' => $locked->amount,
-                        'gateway_fee_amount' => 0,
-                        'commission_amount' => 0,
-                        'net_amount' => $locked->amount,
-                        'currency' => $locked->event->currency,
-                        'provider' => 'paystack',
-                        'provider_reference' => $locked->provider_reference,
-                    ]);
-
                     // Inside the same idempotency guard as the entry above, so
                     // a re-run cannot double-post.
                     app(\App\Services\Finance\LedgerService::class)->recordPayout(

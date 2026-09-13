@@ -249,20 +249,6 @@ final class EventFinanceController extends Controller
                 // LedgerTransaction while looking idempotent from the
                 // EventLedgerEntry side alone.
                 if (! $payoutModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->exists()) {
-                    EventLedgerEntry::create([
-                        'tenant_id' => $payoutModel->tenant_id,
-                        'event_id' => $payoutModel->event_id,
-                        'type' => EventLedgerEntry::TYPE_PAYOUT,
-                        'payout_id' => $payoutModel->id,
-                        'gross_amount' => $payoutModel->amount,
-                        'gateway_fee_amount' => 0,
-                        'commission_amount' => 0,
-                        'net_amount' => $payoutModel->amount,
-                        'currency' => $eventModel->currency,
-                        'provider' => 'manual',
-                        'provider_reference' => $payoutModel->provider_reference,
-                    ]);
-
                     // Post into double-entry accounting ledger
                     app(\App\Services\Finance\LedgerService::class)->recordPayout(
                         $eventModel,
@@ -271,6 +257,7 @@ final class EventFinanceController extends Controller
                         $payoutModel,
                         (int) $payoutModel->transfer_fee_amount,
                         false,
+                        'manual',
                     );
                 }
             }

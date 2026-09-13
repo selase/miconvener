@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Models\Event;
+use App\Models\EventLedgerEntry;
 use App\Models\EventPayoutSchedule;
 use App\Models\EventRegistration;
 use App\Models\LedgerAccount;
@@ -195,6 +196,45 @@ test('reconcile payout schedules command processes matured payouts and holdback 
     $payout = $payouts->first();
     expect($payout->payout_account_id)->toBe($account->id);
     expect($payout->amount)->toBe(8_500); // 9,500 net - 1,000 (10% of 10,000 gross) holdback
+});
+
+test('a payout the schedule command creates reaches the settlement statement', function () {
+    [$tenant] = ledgerScheduleHost();
+    $event = Event::factory()->create([
+        'tenant_id' => $tenant->id,
+        'currency' => 'GHS',
+        'starts_at' => now()->subDays(10),
+        'ends_at' => now()->subDays(8),
+    ]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true]);
+
+    EventPayoutSchedule::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'schedule_type' => 'post_event',
+        'days_after_event' => 3,
+        'holdback_percentage' => 10,
+        'holdback_release_days' => 14,
+        'minimum_payout_amount' => 1000,
+        'auto_payout_enabled' => true,
+        'preferred_account_id' => $account->id,
+    ]);
+
+    $reg = EventRegistration::factory()->create(['event_id' => $event->id, 'tenant_id' => $tenant->id]);
+    app(LedgerService::class)->recordTicketSale($event, $reg, 10_000, 500, 'PAY-STMT-1');
+
+    Artisan::call('app:reconcile-payout-schedules');
+
+    /*
+     * This command posted to the double-entry ledger and nowhere else, so a
+     * payout it created was missing from every settlement statement the
+     * organizer could export. One write path is what closes that.
+     */
+    $statementRow = EventLedgerEntry::where('event_id', $event->id)
+        ->where('type', EventLedgerEntry::TYPE_PAYOUT)
+        ->sole();
+
+    expect($statementRow->gross_amount)->toBe(8_500);
 });
 
 test('settlement statement export includes double-entry general ledger trial balance', function () {
