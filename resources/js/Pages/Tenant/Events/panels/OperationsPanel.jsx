@@ -672,7 +672,7 @@ export default function OperationsPanel({ event }) {
 
             {/* Pillar Create/Edit Modal */}
             <Modal
-                isOpen={pillarModalOpen}
+                open={pillarModalOpen}
                 onClose={() => setPillarModalOpen(false)}
                 title={editingPillar ? 'Edit Operational Pillar' : 'Create Custom Operational Pillar'}
             >
@@ -721,7 +721,8 @@ export default function OperationsPanel({ event }) {
 
             {/* Task Create/Edit Modal */}
             <Modal
-                isOpen={taskModalOpen}
+                open={taskModalOpen}
+                className="max-w-2xl"
                 onClose={() => setTaskModalOpen(false)}
                 title={editingTask ? 'Edit Task' : 'New Operational Task'}
             >

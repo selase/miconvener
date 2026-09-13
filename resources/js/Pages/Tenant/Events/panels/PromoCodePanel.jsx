@@ -452,7 +452,7 @@ export default function PromoCodePanel({ event, onChange }) {
                     open={modalOpen} 
                     onClose={() => setModalOpen(false)}
                     title={editingPromo ? `Edit Promo Code: ${editingPromo.code}` : 'Create New Promo Code'}
-                    maxWidth="max-w-lg"
+                    className="max-w-lg"
                 >
                     <form onSubmit={handleSave} className="space-y-4">
                         <div className="space-y-1.5">

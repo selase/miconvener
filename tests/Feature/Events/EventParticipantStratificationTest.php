@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventDynamicForm;
 use App\Models\EventParticipantGroup;
 use App\Models\EventRegistration;
+use App\Models\EventSession;
 use App\Models\EventTicketType;
 use Illuminate\Support\Facades\Artisan;
 
@@ -66,6 +67,34 @@ test('host can view cohorts and create a dynamic stratification group', function
     $group = $event->participantGroups()->where('slug', 'active-checked-in-consultants')->firstOrFail();
     expect($group->type)->toBe('dynamic')
         ->and(count($group->criteria))->toBe(2);
+});
+
+test('the cohort builder receives each session with its real location', function () {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    EventSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'title' => 'Opening Plenary',
+        'location' => 'Hall A',
+    ]);
+
+    /*
+     * The controller selected a `room_name` column that event_sessions has
+     * never had — the room lives in `location`. Postgres rejects that, so the
+     * Cohorts tab returned 500 in production. SQLite reads an unknown
+     * double-quoted identifier as a string literal and returns the text
+     * "room_name" for every row, so a test that only checked the response
+     * shape passed. Asserting the actual value is what fails on both.
+     */
+    $this->actingAs($user)
+        ->getJson("http://{$host}/events/{$event->id}/participant-groups", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertJsonPath('meta.sessions.0.title', 'Opening Plenary')
+        ->assertJsonPath('meta.sessions.0.location', 'Hall A');
 });
 
 test('dynamic rule engine accurately stratifies attendees by ticket type and check-in status', function () {

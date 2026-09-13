@@ -512,7 +512,8 @@ export default function CertificatesPanel({ event }) {
 
             {/* Template Editor Modal */}
             <Modal
-                isOpen={templateModalOpen}
+                open={templateModalOpen}
+                className="max-w-2xl"
                 onClose={() => setTemplateModalOpen(false)}
                 title={`Customize ${templateForm.role.toUpperCase()} Certificate Template`}
             >
@@ -621,7 +622,8 @@ export default function CertificatesPanel({ event }) {
 
             {/* Bulk Issuance Modal */}
             <Modal
-                isOpen={issueModalOpen}
+                open={issueModalOpen}
+                className="max-w-2xl"
                 onClose={() => setIssueModalOpen(false)}
                 title="Issue Accredited Certificates"
             >

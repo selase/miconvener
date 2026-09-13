@@ -26,7 +26,7 @@ final class EventParticipantGroupController extends Controller
             ->get();
 
         $ticketTypes = $event->ticketTypes()->get(['id', 'name']);
-        $sessions = $event->sessions()->get(['id', 'title', 'room_name']);
+        $sessions = $event->sessions()->get(['id', 'title', 'location']);
         $forms = $event->dynamicForms()->get(['id', 'title', 'schema']);
 
         return response()->json([

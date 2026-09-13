@@ -404,7 +404,8 @@ export default function StratificationPanel({ event }) {
 
             {/* Create/Edit Cohort Modal with Multi-Parameter Criteria Engine */}
             <Modal
-                isOpen={modalOpen}
+                open={modalOpen}
+                className="max-w-3xl"
                 onClose={() => setModalOpen(false)}
                 title={editingGroup ? 'Edit Participant Cohort' : 'Create Stratified Participant Cohort'}
             >
@@ -642,7 +643,8 @@ export default function StratificationPanel({ event }) {
 
             {/* Group Members Roster Drawer */}
             <Modal
-                isOpen={rosterModalOpen}
+                open={rosterModalOpen}
+                className="max-w-3xl"
                 onClose={() => setRosterModalOpen(false)}
                 title={`Cohort Roster: ${selectedGroup?.name || ''}`}
             >

@@ -613,6 +613,8 @@ export default function RegistrationFormPanel({ event, onChange }) {
             {/* Field Create/Edit Modal */}
             {modalOpen && (
                 <Modal
+                    open={modalOpen}
+                    className="max-w-2xl"
                     title={editingField ? 'Edit Registration Field' : 'Add Registration Field'}
                     onClose={() => setModalOpen(false)}
                 >
@@ -646,8 +648,11 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                 label="Field Input Type *"
                                 value={fieldForm.field_type}
                                 onChange={(e) => setFieldForm(prev => ({ ...prev, field_type: e.target.value }))}
-                                options={FIELD_TYPES}
-                            />
+                            >
+                                {FIELD_TYPES.map((type) => (
+                                    <option key={type.value} value={type.value}>{type.label}</option>
+                                ))}
+                            </Select>
 
                             <div className="pt-6">
                                 <label className="flex items-center gap-2 cursor-pointer text-sm text-ink">

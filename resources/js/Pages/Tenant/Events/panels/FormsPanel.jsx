@@ -414,7 +414,8 @@ export default function FormsPanel({ event }) {
 
             {/* Create/Edit Form Modal with Schema Builder */}
             <Modal
-                isOpen={modalOpen}
+                open={modalOpen}
+                className="max-w-2xl"
                 onClose={() => setModalOpen(false)}
                 title={editingForm ? 'Edit Dynamic Form' : 'Create General-Purpose Dynamic Form'}
             >
@@ -580,7 +581,8 @@ export default function FormsPanel({ event }) {
 
             {/* Submissions Viewer Modal */}
             <Modal
-                isOpen={submissionsModalOpen}
+                open={submissionsModalOpen}
+                className="max-w-3xl"
                 onClose={() => setSubmissionsModalOpen(false)}
                 title={`Submissions: ${selectedFormForSubmissions?.title || ''}`}
             >
