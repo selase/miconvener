@@ -12,6 +12,7 @@ use App\Models\LedgerAccount;
 use App\Models\LedgerEntry;
 use App\Models\LedgerTransaction;
 use App\Models\Tenant;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -115,37 +116,63 @@ final class LedgerService
             );
         }
 
+        /*
+         * A reference names one real movement of money, so the same reference
+         * arriving twice is a redelivery rather than a second event. Return
+         * what was already posted: a webhook must not get an exception it
+         * would answer with a 500, which only earns another retry.
+         */
+        $alreadyPosted = $this->findPostedTransaction($tenant, $reference, $transactionType);
+
+        if ($alreadyPosted) {
+            return $alreadyPosted;
+        }
+
         $accounts = $this->ensureAccountsExist($tenant, $event, $currency);
 
-        return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts): LedgerTransaction {
-            $transaction = LedgerTransaction::create([
-                'tenant_id' => $tenant->id,
-                'event_id' => $event?->id,
-                'reference' => $reference,
-                'description' => $description,
-                'transaction_type' => $transactionType,
-                'posted_at' => now(),
-                'created_by' => $userId,
-            ]);
+        try {
+            return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts): LedgerTransaction {
+                $transaction = LedgerTransaction::create([
+                    'tenant_id' => $tenant->id,
+                    'event_id' => $event?->id,
+                    'reference' => $reference,
+                    'description' => $description,
+                    'transaction_type' => $transactionType,
+                    'posted_at' => now(),
+                    'created_by' => $userId,
+                ]);
 
-            foreach ($entries as $entryData) {
-                $account = $accounts[$entryData['code']] ?? null;
-                if (! $account) {
-                    throw new InvalidArgumentException("Unknown account code: {$entryData['code']}");
+                foreach ($entries as $entryData) {
+                    $account = $accounts[$entryData['code']] ?? null;
+                    if (! $account) {
+                        throw new InvalidArgumentException("Unknown account code: {$entryData['code']}");
+                    }
+
+                    LedgerEntry::create([
+                        'transaction_id' => $transaction->id,
+                        'account_id' => $account->id,
+                        'direction' => $entryData['direction'],
+                        'amount' => (int) $entryData['amount'],
+                        'currency' => $currency,
+                        'description' => $entryData['description'] ?? null,
+                    ]);
                 }
 
-                LedgerEntry::create([
-                    'transaction_id' => $transaction->id,
-                    'account_id' => $account->id,
-                    'direction' => $entryData['direction'],
-                    'amount' => (int) $entryData['amount'],
-                    'currency' => $currency,
-                    'description' => $entryData['description'] ?? null,
-                ]);
+                return $transaction;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            /*
+             * Two deliveries raced past the check above. The one that lost is
+             * the duplicate, so hand back the row the winner wrote.
+             */
+            $posted = $this->findPostedTransaction($tenant, $reference, $transactionType);
+
+            if (! $posted) {
+                throw $e;
             }
 
-            return $transaction;
-        });
+            return $posted;
+        }
     }
 
     /**
@@ -219,10 +246,12 @@ final class LedgerService
             $event->currency ?: 'GHS'
         );
 
-        EventLedgerEntry::create([
+        EventLedgerEntry::firstOrCreate([
             'tenant_id' => $tenant->id,
-            'event_id' => $event->id,
             'type' => EventLedgerEntry::TYPE_CHARGE,
+            'provider_reference' => $providerReference ?? $reference,
+        ], [
+            'event_id' => $event->id,
             'registration_id' => $registration->id,
             'gross_amount' => $grossAmount,
             'gateway_fee_amount' => $gatewayFee,
@@ -230,7 +259,6 @@ final class LedgerService
             'net_amount' => $netAmount,
             'currency' => $event->currency ?: 'GHS',
             'provider' => $provider,
-            'provider_reference' => $providerReference ?? $reference,
         ]);
 
         return $transaction;
@@ -304,10 +332,12 @@ final class LedgerService
             $event->currency ?: 'GHS'
         );
 
-        EventLedgerEntry::create([
+        EventLedgerEntry::firstOrCreate([
             'tenant_id' => $tenant->id,
-            'event_id' => $event->id,
             'type' => EventLedgerEntry::TYPE_REFUND,
+            'provider_reference' => $providerReference ?? $reference,
+        ], [
+            'event_id' => $event->id,
             'registration_id' => $registration->id,
             /*
              * Only the net is signed. The gross, the processing fee and the
@@ -320,7 +350,6 @@ final class LedgerService
             'net_amount' => -$netAmount,
             'currency' => $event->currency ?: 'GHS',
             'provider' => $provider,
-            'provider_reference' => $providerReference ?? $reference,
         ]);
 
         return $transaction;
@@ -464,10 +493,12 @@ final class LedgerService
             $event->currency ?: 'GHS'
         );
 
-        EventLedgerEntry::create([
+        EventLedgerEntry::firstOrCreate([
             'tenant_id' => $tenant->id,
-            'event_id' => $event->id,
             'type' => EventLedgerEntry::TYPE_PAYOUT,
+            'provider_reference' => $payout?->provider_reference ?? $reference,
+        ], [
+            'event_id' => $event->id,
             'payout_id' => $payout?->id,
             'gross_amount' => $amount,
             /*
@@ -480,7 +511,6 @@ final class LedgerService
             'net_amount' => $amount,
             'currency' => $event->currency ?: 'GHS',
             'provider' => $provider,
-            'provider_reference' => $payout?->provider_reference ?? $reference,
         ]);
 
         return $transaction;
@@ -525,5 +555,17 @@ final class LedgerService
             'total_credits' => $totalCredits,
             'accounts' => $rows,
         ];
+    }
+
+    /**
+     * The transaction already posted for this reference and type, if any.
+     */
+    private function findPostedTransaction(Tenant $tenant, string $reference, string $transactionType): ?LedgerTransaction
+    {
+        return LedgerTransaction::on('landlord')
+            ->where('tenant_id', $tenant->id)
+            ->where('reference', $reference)
+            ->where('transaction_type', $transactionType)
+            ->first();
     }
 }
