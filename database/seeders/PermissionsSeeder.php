@@ -27,15 +27,32 @@ final class PermissionsSeeder extends Seeder
          * environment only when this is run there. A permission that already
          * exists keeps its uuid; only its category is brought up to date.
          */
+        $created = [];
+
         foreach ($permissions as $permission) {
             $model = Permission::query()->firstOrNew(['name' => $permission['name']]);
+
+            if (! $model->exists) {
+                $created[] = $permission['name'];
+            }
+
             $model->uuid ??= (string) Str::uuid();
             $model->category = $permission['category'];
             $model->save();
         }
 
-        /** Assign created permissions to roles */
-        RolePermissions::assign();
+        app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        /*
+         * Only permissions created on this run are granted. A fresh install
+         * creates all of them, so every built-in role gets its full set; a
+         * re-run on a live database — which happens on every deploy — grants
+         * only genuinely new ones, and never hands back a permission an
+         * administrator removed from a built-in role on purpose.
+         */
+        foreach (RolePermissions::assign($created) as $missingRole) {
+            $this->command?->warn("Built-in role [{$missingRole}] was not found; its new permissions were not granted.");
+        }
     }
 
     /**

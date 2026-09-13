@@ -238,7 +238,6 @@ export default function CertificatesPanel({ event }) {
                 <div className="flex items-center gap-2">
                     <Button
                         variant="primary"
-                        size="sm"
                         onClick={() => {
                             setIssueResult(null);
                             setIssueModalOpen(true);
@@ -620,7 +619,7 @@ export default function CertificatesPanel({ event }) {
                     )}
 
                     <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                        <Button variant="secondary" type="button" onClick={() => setTemplateModalOpen(false)}>
+                        <Button type="button" onClick={() => setTemplateModalOpen(false)}>
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={savingTemplate}>
@@ -738,7 +737,7 @@ export default function CertificatesPanel({ event }) {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                        <Button variant="secondary" type="button" onClick={() => setIssueModalOpen(false)}>
+                        <Button type="button" onClick={() => setIssueModalOpen(false)}>
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={issuing}>

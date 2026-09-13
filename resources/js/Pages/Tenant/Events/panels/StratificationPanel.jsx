@@ -251,7 +251,7 @@ export default function StratificationPanel({ event }) {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="primary" size="sm" onClick={openCreateModal}>
+                    <Button variant="primary" onClick={openCreateModal}>
                         <Plus className="w-4 h-4 mr-1.5" />
                         Create Group / Cohort
                     </Button>
@@ -295,7 +295,7 @@ export default function StratificationPanel({ event }) {
                     <p className="text-xs text-slate-500 max-w-md mx-auto">
                         Stratify participants automatically based on combined rules (e.g., specific ticket types, in-event check-ins, CME hours, or questionnaire answers).
                     </p>
-                    <Button variant="primary" size="sm" onClick={openCreateModal}>
+                    <Button variant="primary" onClick={openCreateModal}>
                         <Plus className="w-4 h-4 mr-1.5" />
                         Create First Cohort
                     </Button>
@@ -641,7 +641,7 @@ export default function StratificationPanel({ event }) {
                     )}
 
                     <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                        <Button variant="secondary" type="button" onClick={() => setModalOpen(false)}>
+                        <Button type="button" onClick={() => setModalOpen(false)}>
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={saving}>
@@ -743,7 +743,7 @@ export default function StratificationPanel({ event }) {
                     </div>
 
                     <div className="flex justify-end pt-2">
-                        <Button variant="secondary" onClick={() => setRosterModalOpen(false)}>
+                        <Button onClick={() => setRosterModalOpen(false)}>
                             Close
                         </Button>
                     </div>

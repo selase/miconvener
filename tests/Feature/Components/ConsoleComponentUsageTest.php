@@ -163,3 +163,32 @@ test('no console Select is given an options prop it would silently ignore', func
 
     expect($problems)->toBe([]);
 });
+
+test('every console Button uses a variant that exists and no size prop', function () {
+    /*
+     * Button forwards unknown props to the element, so the general test cannot
+     * see these. An unknown variant falls back to the default style without a
+     * word, and `size` is not a Button prop at all — it lands on the <button>
+     * as a meaningless attribute. The design system defines exactly the
+     * variants in Button's VARIANTS table and a single control height.
+     */
+    preg_match('/const VARIANTS = \{(.*?)\};/s', (string) file_get_contents(resource_path('js/Components/Console/Button.jsx')), $table);
+    preg_match_all('/^\s*(\w+):/m', $table[1], $variantNames);
+    $variants = $variantNames[1];
+
+    expect($variants)->not->toBeEmpty();
+
+    $problems = [];
+
+    foreach (consoleUsages('Button') as ['where' => $where, 'tag' => $tag]) {
+        if (preg_match('/\svariant\s*=\s*"(\w+)"/', $tag, $variant) && ! in_array($variant[1], $variants, true)) {
+            $problems[] = "{$where} uses variant `{$variant[1]}`, which Button does not have";
+        }
+
+        if (in_array('size', consolePropNames($tag), true)) {
+            $problems[] = "{$where} passes `size`, which Button does not support";
+        }
+    }
+
+    expect($problems)->toBe([]);
+});

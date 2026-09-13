@@ -14,7 +14,9 @@ final class GlobalLlmUsageController extends Controller
      */
     public function index(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
-        $this->authorize('read llm usage');
+        // Usage across every tenant is platform data: the same gate as the
+        // other superadmin screens, not a permission no role could be granted.
+        $this->authorize('access-superadmin-dashboard');
 
         $breadcrumbs = [
             ['link' => route('dashboard'), 'name' => __('Home')],

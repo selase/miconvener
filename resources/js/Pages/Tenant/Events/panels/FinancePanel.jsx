@@ -315,7 +315,7 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+                    <Button type="button" onClick={onClose} disabled={saving}>
                         Cancel
                     </Button>
                     <Button type="submit" variant="primary" disabled={saving}>
@@ -423,8 +423,6 @@ export default function FinancePanel({ event }) {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button 
-                        variant="outline" 
-                        size="sm" 
                         onClick={() => setScheduleModalOpen(true)}
                         className="gap-1.5"
                     >
@@ -498,7 +496,7 @@ export default function FinancePanel({ event }) {
                         </p>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setScheduleModalOpen(true)}>
+                <Button onClick={() => setScheduleModalOpen(true)}>
                     Change Settings
                 </Button>
             </div>
@@ -634,12 +632,12 @@ export default function FinancePanel({ event }) {
                                         <Td>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 {(p.status === 'scheduled' || p.status === 'failed') && (
-                                                    <Button size="sm" disabled={busyPayout === p.id} onClick={() => sendPayout(p)}>
+                                                    <Button disabled={busyPayout === p.id} onClick={() => sendPayout(p)}>
                                                         {busyPayout === p.id ? 'Sending…' : 'Send'}
                                                     </Button>
                                                 )}
                                                 {p.status === 'awaiting_otp' && otpFor !== p.id && (
-                                                    <Button size="sm" onClick={() => setOtpFor(p.id)}>Enter code</Button>
+                                                    <Button onClick={() => setOtpFor(p.id)}>Enter code</Button>
                                                 )}
                                                 {p.status === 'awaiting_otp' && otpFor === p.id && (
                                                     <>
@@ -653,7 +651,6 @@ export default function FinancePanel({ event }) {
                                                             onChange={(e) => setOtpCode(e.target.value)}
                                                         />
                                                         <Button
-                                                            size="sm"
                                                             disabled={busyPayout === p.id || otpCode.trim() === ''}
                                                             onClick={() => releasePayout(p)}
                                                         >
@@ -662,7 +659,7 @@ export default function FinancePanel({ event }) {
                                                     </>
                                                 )}
                                                 {p.status !== 'paid' && p.status !== 'awaiting_otp' && (
-                                                    <Button size="sm" variant="secondary" onClick={() => markPaid(p)}>Mark paid</Button>
+                                                    <Button onClick={() => markPaid(p)}>Mark paid</Button>
                                                 )}
                                             </div>
                                             {p.failure_reason && (

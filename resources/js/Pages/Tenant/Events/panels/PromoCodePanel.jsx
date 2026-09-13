@@ -259,7 +259,7 @@ export default function PromoCodePanel({ event, onChange }) {
                     <p className="text-xs text-ink-secondary mt-1 max-w-sm mx-auto">
                         Offer early-bird discounts, partner vouchers, or free VIP guest codes to boost event ticket sales.
                     </p>
-                    <Button variant="outline" onClick={openCreateModal} className="mt-4 inline-flex items-center gap-1.5 text-xs">
+                    <Button onClick={openCreateModal} className="mt-4 inline-flex items-center gap-1.5 text-xs">
                         <Plus className="h-3.5 w-3.5" />
                         Create your first promo code
                     </Button>
@@ -584,7 +584,7 @@ export default function PromoCodePanel({ event, onChange }) {
                         )}
 
                         <div className="pt-2 flex justify-end gap-2 border-t border-border">
-                            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
+                            <Button type="button" onClick={() => setModalOpen(false)}>
                                 Cancel
                             </Button>
                             <Button type="submit" variant="primary" disabled={saving}>

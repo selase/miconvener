@@ -287,8 +287,6 @@ export default function OperationsPanel({ event }) {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
-                        variant="secondary"
-                        size="sm"
                         onClick={() => {
                             setEditingPillar(null);
                             setPillarForm({ name: '', color: '#6366F1', icon: 'folder' });
@@ -300,7 +298,6 @@ export default function OperationsPanel({ event }) {
                     </Button>
                     <Button
                         variant="primary"
-                        size="sm"
                         onClick={() => openCreateTask()}
                     >
                         <Plus className="w-4 h-4 mr-1" />
@@ -719,7 +716,7 @@ export default function OperationsPanel({ event }) {
                         </div>
                     </div>
                     <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="secondary" type="button" onClick={() => setPillarModalOpen(false)}>
+                        <Button type="button" onClick={() => setPillarModalOpen(false)}>
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={savingPillar}>
@@ -890,7 +887,7 @@ export default function OperationsPanel({ event }) {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                        <Button variant="secondary" type="button" onClick={() => setTaskModalOpen(false)}>
+                        <Button type="button" onClick={() => setTaskModalOpen(false)}>
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={savingTask}>

@@ -4,30 +4,69 @@ declare(strict_types=1);
 
 namespace App\Libraries;
 
+use Spatie\Permission\Exceptions\RoleDoesNotExist;
 use Spatie\Permission\Models\Role;
 
 final class RolePermissions
 {
     /**
-     * Assign the permissions
+     * Permissions each built-in role receives, keyed by role name.
+     *
+     * @return array<string, array<int, string>>
      */
-    public static function assign(): void
+    public static function defaults(): array
     {
-        self::setSuperadminPermissions();
-
-        self::setOrganizationSuperadminPermissions();
-
-        self::setOrganizationAdminPermissions();
+        return [
+            'Superadmin' => self::superadminPermissions(),
+            'Org Superadmin' => self::organizationSuperadminPermissions(),
+            'Org Admin' => self::organizationAdminPermissions(),
+        ];
     }
 
     /**
-     * Set superadmin permissions
+     * Grant the built-in roles their default permissions.
+     *
+     * Pass $only to grant just those permissions — the seeder passes the ones
+     * it has just created, so a re-run on a live database adds new permissions
+     * without handing back one an administrator deliberately removed from a
+     * built-in role. Omit it to grant every default.
+     *
+     * A built-in role that cannot be found (renamed in the admin panel, say)
+     * is skipped and reported rather than thrown, because this runs during
+     * deploy and must not fail it.
+     *
+     * @param  array<int, string>|null  $only
+     * @return array<int, string> Names of the roles that could not be found.
      */
-    public static function setSuperadminPermissions(): void
+    public static function assign(?array $only = null): array
     {
-        $superadmin = Role::findByName('Superadmin');
+        $missingRoles = [];
 
-        $superadmin->givePermissionTo([
+        foreach (self::defaults() as $roleName => $permissions) {
+            $toGrant = $only === null ? $permissions : array_values(array_intersect($permissions, $only));
+
+            if ($toGrant === []) {
+                continue;
+            }
+
+            try {
+                Role::findByName($roleName)->givePermissionTo($toGrant);
+            } catch (RoleDoesNotExist) {
+                $missingRoles[] = $roleName;
+            }
+        }
+
+        return $missingRoles;
+    }
+
+    /**
+     * Default permissions for the built-in Superadmin role.
+     *
+     * @return array<int, string>
+     */
+    private static function superadminPermissions(): array
+    {
+        return [
             'create setting',
             'read setting',
             'update setting',
@@ -95,17 +134,17 @@ final class RolePermissions
             'update notification-rule',
             'delete notification-rule',
             'manage notification-settings',
-        ]);
+        ];
     }
 
     /**
-     * Set organization superadmin permissions
+     * Default permissions for the built-in Org Superadmin role.
+     *
+     * @return array<int, string>
      */
-    public static function setOrganizationSuperadminPermissions(): void
+    private static function organizationSuperadminPermissions(): array
     {
-        $organizationSuperadmin = Role::findByName('Org Superadmin');
-
-        $organizationSuperadmin->givePermissionTo([
+        return [
             'create communication',
             'read communication',
             'update communication',
@@ -153,17 +192,17 @@ final class RolePermissions
             'update notification-rule',
             'delete notification-rule',
             'manage notification-settings',
-        ]);
+        ];
     }
 
     /**
-     * Set organization admin permissions
+     * Default permissions for the built-in Org Admin role.
+     *
+     * @return array<int, string>
      */
-    public static function setOrganizationAdminPermissions(): void
+    private static function organizationAdminPermissions(): array
     {
-        $organizationAdmin = Role::findByName('Org Admin');
-
-        $organizationAdmin->givePermissionTo([
+        return [
             'create communication',
             'read communication',
             'update communication',
@@ -211,6 +250,6 @@ final class RolePermissions
             'update notification-rule',
             'delete notification-rule',
             'manage notification-settings',
-        ]);
+        ];
     }
 }

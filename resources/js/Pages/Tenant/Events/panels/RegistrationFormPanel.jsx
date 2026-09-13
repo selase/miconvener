@@ -389,8 +389,6 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             )}
                         </span>
                         <Button 
-                            variant="secondary" 
-                            size="sm" 
                             onClick={handleSaveSettings}
                             disabled={savingSettings}
                         >
@@ -412,7 +410,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             Add custom questions, attendance categories, professional cadres, and attach pricing or conditional rules.
                         </p>
                     </div>
-                    <Button icon={Plus} onClick={openCreateModal} size="sm">
+                    <Button icon={Plus} onClick={openCreateModal}>
                         Add Custom Field
                     </Button>
                 </div>
@@ -426,7 +424,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                         <p className="text-xs text-ink-secondary max-w-sm mx-auto mt-1 mb-4">
                             You can define custom questions, attendance types (In-Person / Virtual), roles (Doctor, Nurse, Student), and attach conditional pricing.
                         </p>
-                        <Button icon={Plus} onClick={openCreateModal} size="sm" variant="secondary">
+                        <Button icon={Plus} onClick={openCreateModal}>
                             Add First Custom Field
                         </Button>
                     </div>
@@ -681,7 +679,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     <label className="text-xs font-semibold text-ink uppercase tracking-wider">
                                         Choices & Pricing Rules
                                     </label>
-                                    <Button size="xs" variant="secondary" onClick={addOptionRow} type="button">
+                                    <Button onClick={addOptionRow} type="button">
                                         Add Choice
                                     </Button>
                                 </div>
@@ -809,7 +807,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
                         </div>
 
                         <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                            <Button variant="secondary" type="button" onClick={() => setModalOpen(false)}>
+                            <Button type="button" onClick={() => setModalOpen(false)}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={savingField}>

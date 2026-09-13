@@ -851,8 +851,6 @@ function RegistrationPanel({ event }) {
                                         />
                                         <Button
                                             type="button"
-                                            variant="secondary"
-                                            size="sm"
                                             onClick={handleUnlockTickets}
                                             disabled={unlocking || !accessCodeInput.trim()}
                                         >
@@ -1141,8 +1139,6 @@ function RegistrationPanel({ event }) {
                                 />
                                 <Button
                                     type="button"
-                                    variant="secondary"
-                                    size="sm"
                                     onClick={handleApplyPromo}
                                     disabled={validatingPromo || !promoCodeInput.trim()}
                                 >

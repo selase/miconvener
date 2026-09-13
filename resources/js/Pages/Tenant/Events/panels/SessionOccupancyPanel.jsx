@@ -151,8 +151,6 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
 
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
-                        variant="secondary"
-                        size="sm"
                         icon={RefreshCw}
                         onClick={() => fetchOccupancy()}
                         disabled={loading}
@@ -352,8 +350,6 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                 {/* Card Actions */}
                                 <div className="mt-4 flex items-center gap-2 border-t border-border/60 pt-3">
                                     <Button
-                                        variant="secondary"
-                                        size="sm"
                                         className="flex-1 justify-center text-xs"
                                         onClick={() => handleOpenRoster(session)}
                                     >
@@ -363,7 +359,6 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                     {onOpenScannerForSession && (
                                         <Button
                                             variant="primary"
-                                            size="sm"
                                             icon={QrCode}
                                             className="justify-center text-xs"
                                             onClick={() => onOpenScannerForSession(session)}
@@ -508,8 +503,6 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                 Total entries: {roster.length}
                             </span>
                             <Button
-                                variant="secondary"
-                                size="sm"
                                 onClick={() => setActiveRosterSession(null)}
                             >
                                 Close
