@@ -70,7 +70,6 @@ export default function AttendeePortalPreview({ event }) {
                                 ))}
                             </dl>
                             <div className="mt-4 flex gap-2">
-                                <Button icon={Download} disabled>Add to wallet</Button>
                                 <Button disabled>Transfer</Button>
                             </div>
                         </div>

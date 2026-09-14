@@ -10,10 +10,8 @@ use App\Models\Tenant;
 use App\Models\Transaction;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
-use App\Services\Billing\WalletService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use UnexpectedValueException;
 
@@ -159,45 +157,7 @@ final class WebhookController extends Controller
             return;
         }
 
-        // Metadata-driven wallet top-up
         $metaType = $metadata['type'] ?? null;
-        if ($metaType === 'wallet_topup') {
-            $packKey = $metadata['pack_key'] ?? null;
-            $packs = Config::get('meeting.wallet.topup_packs', []);
-
-            if ($packKey && isset($packs[$packKey])) {
-                $pack = $packs[$packKey];
-                $credits = (int) $pack['credits'];
-
-                $walletService = app(WalletService::class);
-                $walletService->deposit(
-                    $tenant,
-                    $credits,
-                    config('meeting.wallet.currency', 'USD'),
-                    "Top-up: {$pack['name']} pack ({$credits} credits)",
-                    ['pack_key' => $packKey],
-                );
-
-                Transaction::create([
-                    'tenant_id' => $tenant->id,
-                    'amount' => (int) round((float) $pack['price'] * 100),
-                    'currency' => config('meeting.wallet.currency', 'USD'),
-                    'status' => 'success',
-                    'type' => 'credit',
-                    'provider' => 'paystack',
-                    'provider_transaction_id' => (string) ($data['reference'] ?? $data['id']),
-                    'meta' => [
-                        'type' => 'wallet_topup',
-                        'pack_key' => $packKey,
-                        'credits' => $credits,
-                    ],
-                ]);
-
-                Log::info("Paystack: wallet top-up {$credits} credits for tenant {$tenant->id}");
-            }
-
-            return;
-        }
 
         // Token packs and invoices used to be fulfilled only when the customer's
         // browser came back from the provider. A mobile money payment is approved

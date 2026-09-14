@@ -115,13 +115,6 @@ function TicketTab({ event, registration }) {
                 </dl>
 
                 <div className="mt-4 flex gap-2">
-                    <button
-                        disabled
-                        className="inline-flex h-control items-center gap-1.5 border border-border px-4 text-sm text-ink-tertiary opacity-60"
-                    >
-                        <Download className="h-4 w-4" strokeWidth={1.75} />
-                        Add to wallet
-                    </button>
                     {canTransfer && (
                         <button
                             onClick={() => setTransferring(!transferring)}

@@ -12,7 +12,6 @@ use App\Models\Package;
 use App\Models\Transaction;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
-use App\Services\Billing\WalletService;
 use App\Services\Tenancy\TenantContext;
 use Carbon\Carbon;
 use Exception;
@@ -53,11 +52,6 @@ final class CallbackController extends Controller
                 $type = data_get($result, 'metadata.type');
                 if ($type === 'llm_token_purchase') {
                     return $this->handleLlmTokenFulfillment($result, $tenantContext);
-                }
-
-                // Wallet top-up
-                if ($type === 'wallet_topup') {
-                    return $this->handleWalletTopupFulfillment($result, $tenantContext);
                 }
 
                 // Metadata-driven plan subscription (no Paystack plan codes required)
@@ -240,49 +234,5 @@ final class CallbackController extends Controller
 
         return redirect()->route('tenant.llm-usage.index', ['subdomain' => $tenant->slug])
             ->with('success', 'Success! '.number_format($tokens).' tokens have been added to your balance.');
-    }
-
-    private function handleWalletTopupFulfillment(array $result, TenantContext $tenantContext)
-    {
-        $tenant = $tenantContext->getTenant();
-        $packKey = data_get($result, 'metadata.pack_key');
-        $packs = Config::get('meeting.wallet.topup_packs', []);
-
-        if (! isset($packs[$packKey])) {
-            Log::error("Invalid wallet pack {$packKey} on fulfillment for tenant {$tenant->id}");
-
-            return redirect()->route('tenant.wallet.index', ['subdomain' => $tenant->slug])
-                ->with('error', 'Invalid credit pack fulfillment.');
-        }
-
-        $pack = $packs[$packKey];
-        $credits = (int) $pack['credits'];
-
-        $walletService = app(WalletService::class);
-        $walletService->deposit(
-            $tenant,
-            $credits,
-            config('meeting.wallet.currency', 'USD'),
-            "Top-up: {$pack['name']} pack ({$credits} credits)",
-            ['pack_key' => $packKey],
-        );
-
-        Transaction::create([
-            'tenant_id' => $tenant->id,
-            'amount' => (int) round((float) $pack['price'] * 100),
-            'currency' => config('meeting.wallet.currency', 'USD'),
-            'status' => 'success',
-            'type' => 'credit',
-            'provider' => config('services.payment.default', 'paystack'),
-            'provider_transaction_id' => (string) ($result['transaction_id'] ?? 'wallet_topup_'.now()->timestamp),
-            'meta' => [
-                'type' => 'wallet_topup',
-                'pack_key' => $packKey,
-                'credits' => $credits,
-            ],
-        ]);
-
-        return redirect()->route('tenant.wallet.index', ['subdomain' => $tenant->slug])
-            ->with('success', 'Success! '.number_format($credits).' credits have been added to your wallet.');
     }
 }

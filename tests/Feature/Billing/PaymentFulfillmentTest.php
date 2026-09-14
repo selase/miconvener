@@ -144,3 +144,28 @@ test('a redelivered invoice payment does not record a second payment', function 
 
     expect(Transaction::query()->where('provider_transaction_id', 'ref_invoice_2')->count())->toBe(1);
 });
+
+test('a payment tagged with the removed wallet top-up type changes nothing', function (): void {
+    $tenant = fulfillmentTenant();
+
+    /*
+     * The wallet this type once topped up was never implemented here: its
+     * service, model and config did not exist, so its branch could only fail.
+     * With it removed, such a payment must fall through without crediting
+     * anything, recording a transaction, or provisioning a subscription.
+     */
+    signedBillingPost([
+        'event' => 'charge.success',
+        'data' => [
+            'reference' => 'ref_wallet_1',
+            'amount' => 500,
+            'currency' => 'GHS',
+            'customer' => ['email' => 'owner@example.com'],
+            'metadata' => ['source' => 'miconvener', 'type' => 'wallet_topup', 'tenant_id' => $tenant->id, 'pack_key' => 'starter'],
+        ],
+    ])->assertOk();
+
+    expect((int) $tenant->fresh()->llm_topup_balance)->toBe(0)
+        ->and(Transaction::query()->where('provider_transaction_id', 'ref_wallet_1')->exists())->toBeFalse()
+        ->and($tenant->subscriptions()->exists())->toBeFalse();
+});
