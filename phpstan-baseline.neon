@@ -583,12 +583,6 @@ parameters:
 			path: app/Http/Controllers/Admin/UsersController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\Api\PaystackWebhookController::handle() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Api/PaystackWebhookController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Auth\AuthenticatedSessionController::destroy() never returns Illuminate\Routing\Redirector so it can be removed from the return type.'
 			identifier: return.unusedType
 			count: 1
@@ -3755,72 +3749,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Resources/UserProfileResource.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::features().'
-			identifier: method.notFound
-			count: 1
-			path: app/Jobs/Billing/ProcessDisabledPaystackSubscription.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::syncFeaturesFromPackage().'
-			identifier: method.notFound
-			count: 1
-			path: app/Jobs/Billing/ProcessDisabledPaystackSubscription.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::users().'
-			identifier: method.notFound
-			count: 1
-			path: app/Jobs/Billing/ProcessDisabledPaystackSubscription.php
-
-		-
-			rawMessage: 'Method App\Jobs\Billing\ProcessDisabledPaystackSubscription::__construct() has parameter $payload with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Jobs/Billing/ProcessDisabledPaystackSubscription.php
-
-		-
-			rawMessage: 'Parameter #1 $tenant of class App\Mail\Billing\SubscriptionCancelled constructor expects App\Models\Tenant, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/Billing/ProcessDisabledPaystackSubscription.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$latestSubscription.
-			identifier: property.notFound
-			count: 1
-			path: app/Jobs/Billing/ProcessFailedPaystackCharge.php
-
-		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Model&object{pivot: Illuminate\Database\Eloquent\Relations\Pivot}::$email.'
-			identifier: property.notFound
-			count: 1
-			path: app/Jobs/Billing/ProcessFailedPaystackCharge.php
-
-		-
-			rawMessage: 'Method App\Jobs\Billing\ProcessFailedPaystackCharge::__construct() has parameter $payload with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Jobs/Billing/ProcessFailedPaystackCharge.php
-
-		-
-			rawMessage: 'Method App\Jobs\Billing\ProcessPaystackWebhookJob::__construct() has parameter $payload with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Jobs/Billing/ProcessPaystackWebhookJob.php
-
-		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Model&object{pivot: Illuminate\Database\Eloquent\Relations\Pivot}::$email.'
-			identifier: property.notFound
-			count: 1
-			path: app/Jobs/Billing/ProcessSuccessfulPaystackCharge.php
-
-		-
-			rawMessage: 'Method App\Jobs\Billing\ProcessSuccessfulPaystackCharge::__construct() has parameter $payload with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Jobs/Billing/ProcessSuccessfulPaystackCharge.php
 
 		-
 			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::notify().'
@@ -7295,12 +7223,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Services/Api/ApiKeyService.php
-
-		-
-			rawMessage: 'Method App\Services\Billing\PaystackSimulatorService::dispatchRawWebhook() has parameter $payload with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Services/Billing/PaystackSimulatorService.php
 
 		-
 			rawMessage: 'Method App\Services\Billing\SubscriptionProvisioningService::provision() has parameter $dto with no value type specified in iterable type array.'

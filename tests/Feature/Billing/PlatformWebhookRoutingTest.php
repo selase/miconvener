@@ -145,3 +145,37 @@ test('a transfer is accepted without a source marker', function (): void {
     $response->assertOk();
     expect($response->json('status'))->toBe('success');
 });
+
+test('a failed subscription invoice payment does not cancel or downgrade the subscription', function () {
+    /*
+     * The removed /api/webhooks/paystack chain had the only test of this event,
+     * which also sent a placeholder dunning email. The live handler only logs
+     * it; this keeps the guarantee that a failed charge is not treated as the
+     * end of the subscription — Paystack retries, and subscription.disable is
+     * what ends it.
+     */
+    Artisan::call('db:seed', ['--class' => 'EventPackageSeeder']);
+
+    $paid = Package::query()->where('slug', 'growth')->firstOrFail();
+    $tenant = Tenant::factory()->create(['isolation_mode' => 'shared', 'package_id' => $paid->id]);
+    $user = User::factory()->create(['tenant_id' => $tenant->id, 'email' => 'owner@example.com']);
+    $tenant->users()->attach($user->id);
+
+    signedPost('/webhooks/settlement/paystack', [
+        'event' => 'invoice.payment_failed',
+        'data' => [
+            'customer' => ['email' => 'owner@example.com'],
+            'subscription' => ['subscription_code' => 'SUB_failed_1', 'status' => 'active'],
+            'metadata' => ['source' => 'miconvener'],
+        ],
+    ], 'sk_billing_key')->assertOk();
+
+    expect((string) $tenant->fresh()->package_id)->toBe((string) $paid->id);
+});
+
+test('the removed /api/webhooks/paystack endpoint no longer exists', function () {
+    // Paystack is configured to call /webhooks/settlement/paystack. The old
+    // endpoint re-ran subscription renewal and reset AI token balances on any
+    // successful charge, ticket sales included.
+    $this->postJson('/api/webhooks/paystack', ['event' => 'charge.success', 'data' => []])->assertNotFound();
+});

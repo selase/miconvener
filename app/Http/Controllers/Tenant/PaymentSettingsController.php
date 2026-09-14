@@ -25,9 +25,10 @@ final class PaymentSettingsController extends Controller
         $this->authorize('manage organization settings');
         $tenant = $this->tenantContext->getTenant();
 
-        // Check if commerce feature is enabled
-        if (! $tenant->featureEnabled('commerce')) {
-            abort(403, 'The Commerce feature is not enabled for your organization.');
+        // The same check that lets a tenant sell paid tickets: whoever can take
+        // payment can configure how they are paid, and no one else.
+        if (! $tenant->planAllows('paid_tickets')) {
+            abort(403, 'Your plan does not include paid tickets.');
         }
 
         $gateways = TenantPaymentGateway::where('tenant_id', $tenant->id)->get();
@@ -56,8 +57,8 @@ final class PaymentSettingsController extends Controller
         $this->authorize('manage organization settings');
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->featureEnabled('commerce')) {
-            abort(403);
+        if (! $tenant->planAllows('paid_tickets')) {
+            abort(403, 'Your plan does not include paid tickets.');
         }
 
         $validated = $request->validate([

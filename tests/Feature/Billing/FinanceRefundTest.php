@@ -20,7 +20,6 @@ beforeEach(function () {
 function financeRefundHost(string $slug, string $role = 'Org Superadmin'): array
 {
     $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
     $user->assignRole($role);
@@ -149,7 +148,6 @@ test('a tenant user without the update event permission cannot issue a refund', 
     Http::preventStrayRequests();
 
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
     $tenant->users()->attach($user->id);
@@ -180,10 +178,11 @@ test('a tenant user without the update event permission cannot issue a refund', 
     expect($transaction->fresh()->status)->toBe('succeeded');
 });
 
-test('a refund is forbidden when the commerce feature is disabled for the tenant', function () {
+test('a refund is forbidden when the tenant plan does not include paid tickets', function () {
     Http::preventStrayRequests();
 
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
+    $tenant->features()->create(['feature_key' => 'paid_tickets', 'enabled' => false]);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
     $user->assignRole('Org Superadmin');

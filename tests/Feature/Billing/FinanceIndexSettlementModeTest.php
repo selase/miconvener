@@ -28,7 +28,6 @@ function financeIndexHost(string $settlementMode): array
         'isolation_mode' => 'shared',
         'settlement_mode' => $settlementMode,
     ]);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
     $user->assignRole('Org Superadmin');

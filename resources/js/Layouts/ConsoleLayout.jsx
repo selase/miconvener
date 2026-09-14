@@ -22,7 +22,7 @@ const NAV_ITEMS = [
     { label: 'Roles', href: 'tenant.roles.index', icon: ShieldCheck },
     { label: 'API Keys', href: 'tenant.api-keys.index', icon: KeyRound },
     { label: 'Billing', href: 'billing.index', icon: CreditCard },
-    { label: 'Finance', href: 'tenant.finance.index', icon: Wallet, feature: 'commerce' },
+    { label: 'Finance', href: 'tenant.finance.index', icon: Wallet, feature: 'paid_tickets' },
     { label: 'LLM Usage', href: 'tenant.llm-usage.index', icon: Sparkles },
     { label: 'LLM Config', href: 'tenant.llm-config.index', icon: SlidersHorizontal, feature: 'llm_byok' },
     { label: 'Settings', href: 'tenant.settings.index', icon: Settings },

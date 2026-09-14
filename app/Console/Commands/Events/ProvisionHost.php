@@ -50,8 +50,8 @@ final class ProvisionHost extends Command
             $user->assignRole('Org Superadmin');
         }
 
-        TenantFeature::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'feature_key' => 'commerce'],
+        TenantFeature::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'feature_key' => 'paid_tickets'],
             ['enabled' => true]
         );
 
@@ -59,7 +59,7 @@ final class ProvisionHost extends Command
         $this->info("User: {$user->email}");
         $this->info("Password: {$password}");
         $this->info('Roles: '.$user->roles->pluck('name')->implode(', '));
-        $this->info('Commerce enabled: '.($tenant->fresh()->featureEnabled('commerce') ? 'yes' : 'no'));
+        $this->info('Paid tickets enabled: '.($tenant->fresh()->planAllows('paid_tickets') ? 'yes' : 'no'));
 
         return self::SUCCESS;
     }

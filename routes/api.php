@@ -39,7 +39,3 @@ Route::group(['prefix' => 'llm', 'middleware' => ['App\Http\Middleware\Authentic
         return response()->json(['message' => 'Chat response']);
     });
 });
-
-Route::post('/webhooks/paystack', [App\Http\Controllers\Api\PaystackWebhookController::class, 'handle'])
-    ->middleware([App\Http\Middleware\VerifyPaystackSignature::class, 'throttle:webhooks'])
-    ->name('api.webhooks.paystack');

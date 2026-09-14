@@ -16,7 +16,6 @@ beforeEach(function () {
 
 test('a platform superadmin can set a tenant platform fee percentage from the settings screen', function () {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $user = User::factory()->create();
     setPermissionsTeamId(null);
     $user->assignRole('Superadmin');
@@ -35,7 +34,6 @@ test('a platform superadmin can set a tenant platform fee percentage from the se
 
 test('a non-platform-superadmin tenant user cannot set the platform fee percentage', function () {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $user = User::factory()->create(['tenant_id' => $tenant->id, 'email' => 'someone-else@example.com']);
     setPermissionsTeamId($tenant->id);
     $user->assignRole('Org Superadmin');
@@ -53,7 +51,6 @@ test('a non-platform-superadmin tenant user cannot set the platform fee percenta
 
 test('a tenant user cannot reach the platform fee by taking a privileged email address', function () {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $tenant->update(['platform_fee_percentage' => 2.0]);
 
     /*
@@ -78,7 +75,6 @@ test('a tenant user cannot reach the platform fee by taking a privileged email a
 
 test('a platform superadmin can set the commission cap alongside the percentage', function () {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
 
     $user = User::factory()->create();
     setPermissionsTeamId(null);
@@ -100,7 +96,6 @@ test('a platform superadmin can set the commission cap alongside the percentage'
 
 test('an empty cap clears the tenant override so the package default applies', function () {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared', 'platform_fee_cap_amount' => 5000]);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
 
     $user = User::factory()->create();
     setPermissionsTeamId(null);
@@ -119,7 +114,6 @@ test('an empty cap clears the tenant override so the package default applies', f
 
 test('the settings page offers the fee form to whoever the endpoint would accept, and to no one else', function () {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared', 'platform_fee_percentage' => 1.25]);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $host = 'acme.'.mb_ltrim((string) config('session.domain'), '.');
 
     $superadmin = User::factory()->create();

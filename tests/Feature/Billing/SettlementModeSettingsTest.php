@@ -17,7 +17,6 @@ beforeEach(function () {
 function settlementModeHost(): array
 {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
-    $tenant->features()->create(['feature_key' => 'commerce', 'enabled' => true]);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
     $user->assignRole('Org Superadmin');

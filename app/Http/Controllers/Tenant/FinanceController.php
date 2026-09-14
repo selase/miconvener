@@ -27,8 +27,8 @@ final class FinanceController extends Controller
     {
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->featureEnabled('commerce')) {
-            abort(403);
+        if (! $tenant->planAllows('paid_tickets')) {
+            abort(403, 'Your plan does not include paid tickets.');
         }
 
         // A platform_default tenant's charges are collected on the platform's own
@@ -51,8 +51,8 @@ final class FinanceController extends Controller
 
         $this->authorize('update event');
 
-        if (! $tenant->featureEnabled('commerce')) {
-            abort(403);
+        if (! $tenant->planAllows('paid_tickets')) {
+            abort(403, 'Your plan does not include paid tickets.');
         }
 
         if ($transaction->tenant_id !== $tenant->id) {
