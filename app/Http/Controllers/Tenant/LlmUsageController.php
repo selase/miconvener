@@ -51,6 +51,15 @@ final class LlmUsageController extends Controller
             ],
             'recentUsage' => $recentUsage,
             'topupBalance' => $tenant->llm_topup_balance,
+            'tokenPacks' => collect(config('llm.token_packs', []))
+                ->map(fn (array $pack, string $key): array => [
+                    'key' => $key,
+                    'name' => $pack['name'],
+                    'tokens' => (int) $pack['tokens'],
+                    'price' => $pack['currency'].' '.number_format((float) $pack['price'], 2),
+                ])
+                ->values()
+                ->all(),
         ]);
     }
 }

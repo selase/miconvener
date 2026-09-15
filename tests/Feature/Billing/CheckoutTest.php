@@ -203,3 +203,23 @@ it('redirects to provider for invoice payment', function () {
         'invoice_id' => $invoice->id,
     ])->assertRedirect('https://paystack.com/invoice-checkout');
 });
+
+it('sends the console, which posts through Inertia, to Paystack with a full page visit', function () {
+    /*
+     * The pricing page posts with Inertia's XHR router. A plain redirect to
+     * paystack.co is followed inside that XHR, fails cross-origin, and the
+     * button appears to do nothing.
+     */
+    $user = User::factory()->create();
+    makeProPackage();
+    $tenant = setActiveTenantForTest($user, ['meta' => ['paystack_id' => 'CUS_123']]);
+
+    $gateway = Mockery::mock(PaymentGateway::class);
+    $gateway->shouldReceive('createOneTimeCheckoutSession')->once()->andReturn('https://checkout.paystack.com/abc');
+    $this->swap(PaymentGateway::class, $gateway);
+
+    $this->actingAs($user)
+        ->post(route('billing.checkout', ['subdomain' => $tenant->slug]), ['plan' => 'pro', 'interval' => 'month'], ['X-Inertia' => 'true'])
+        ->assertStatus(409)
+        ->assertHeader('X-Inertia-Location', 'https://checkout.paystack.com/abc');
+});

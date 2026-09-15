@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
+use Inertia\Inertia;
 
 final class LlmCheckoutController extends Controller
 {
@@ -50,7 +51,7 @@ final class LlmCheckoutController extends Controller
             ]
         );
 
-        return redirect($checkoutUrl);
+        return Inertia::location($checkoutUrl);
     }
 
     private function getOrCreateCustomerId(Request $request, PaymentGateway $gateway, \App\Models\Tenant $tenant): string

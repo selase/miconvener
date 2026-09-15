@@ -10,8 +10,9 @@ use App\Models\Invoice;
 use App\Models\Package;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Tenancy\TenantContext;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 final class CheckoutController extends Controller
 {
@@ -20,7 +21,7 @@ final class CheckoutController extends Controller
         PaymentGateway $gateway,
         TenantContext $tenantContext,
         SubscriptionProvisioningService $provisioningService
-    ): RedirectResponse {
+    ): Response {
         $tenant = $tenantContext->getTenant();
 
         if (! $tenant instanceof \App\Models\Tenant) {
@@ -36,7 +37,7 @@ final class CheckoutController extends Controller
         return $this->handlePlanCheckout($request, $gateway, $tenant, $provisioningService);
     }
 
-    private function handleInvoiceCheckout(Request $request, PaymentGateway $gateway, mixed $tenant): RedirectResponse
+    private function handleInvoiceCheckout(Request $request, PaymentGateway $gateway, mixed $tenant): Response
     {
         $invoice = Invoice::where('tenant_id', $tenant->id)
             ->where('status', Invoice::STATUS_ISSUED)
@@ -59,7 +60,7 @@ final class CheckoutController extends Controller
             ]
         );
 
-        return redirect($checkoutUrl);
+        return Inertia::location($checkoutUrl);
     }
 
     private function handlePlanCheckout(
@@ -67,7 +68,7 @@ final class CheckoutController extends Controller
         PaymentGateway $gateway,
         mixed $tenant,
         SubscriptionProvisioningService $provisioningService
-    ): RedirectResponse {
+    ): Response {
         $validated = $request->validate([
             'plan' => 'required|string|exists:packages,slug',
             'interval' => 'sometimes|in:month,year',
@@ -143,7 +144,7 @@ final class CheckoutController extends Controller
             ]
         );
 
-        return redirect($checkoutUrl);
+        return Inertia::location($checkoutUrl);
     }
 
     private function getOrCreateCustomerId(Request $request, PaymentGateway $gateway, mixed $tenant): string
