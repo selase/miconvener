@@ -312,7 +312,8 @@ final class WebhookController extends Controller
             return;
         }
 
-        $previousPlan = $tenant->package?->is_free ? null : $tenant->package?->name;
+        $currentPlan = Package::query()->find($tenant->package_id);
+        $previousPlan = $currentPlan && ! $currentPlan->is_free ? $currentPlan->name : null;
 
         $provisioningService->switchToFree($tenant);
         Log::info("Paystack subscription.disable: switched tenant {$tenant->id} to free");

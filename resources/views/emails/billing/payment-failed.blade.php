@@ -3,7 +3,7 @@
 
 We couldn't take **{{ $amountDisplay }}** for the {{ config('app.name') }} subscription for **{{ $tenant->name }}**.
 
-Your plan is still active. Nothing has been cancelled.
+Your plan is still active. Nothing has been canceled.
 
 @if ($retryOn)
 Paystack will try the payment again on **{{ $retryOn }}**. To avoid an interruption, make sure your card or mobile money account can cover it before then.

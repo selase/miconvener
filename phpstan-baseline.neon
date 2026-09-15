@@ -7225,12 +7225,6 @@ parameters:
 			path: app/Services/Api/ApiKeyService.php
 
 		-
-			rawMessage: 'Method App\Services\Billing\SubscriptionProvisioningService::provision() has parameter $dto with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Services/Billing/SubscriptionProvisioningService.php
-
-		-
 			rawMessage: 'Parameter #3 $newPackage of method App\Services\Billing\SubscriptionProvisioningService::applyPendingDowngrade() expects App\Models\Package, Illuminate\Database\Eloquent\Model given.'
 			identifier: argument.type
 			count: 1

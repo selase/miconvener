@@ -12,7 +12,7 @@ Everything keeps working until the end of your current billing period. After tha
 Your events, registrations and records stay. Features the Free plan doesn't include, such as paid tickets, will switch off.
 
 <x-mail::button :url="$billingUrl">
-Keep my plan
+Review your plan
 </x-mail::button>
 
 If you meant to cancel, there's nothing more to do.

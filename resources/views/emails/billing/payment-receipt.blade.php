@@ -22,7 +22,7 @@ Your **{{ $activePlan }}** plan is active, and its features are available now.
 View billing
 </x-mail::button>
 
-Keep this email as your receipt. If anything here looks wrong, reply and we'll sort it out.
+Keep this email as your receipt.
 
 Thanks,<br>
 {{ config('app.name') }}

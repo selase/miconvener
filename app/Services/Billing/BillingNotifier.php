@@ -94,7 +94,7 @@ final class BillingNotifier
 
         $mail = new SubscriptionEndingMail(
             tenant: $tenant,
-            planName: $tenant->package?->name ?? 'current',
+            planName: Package::query()->whereKey($tenant->package_id)->value('name') ?? 'current',
             endsOn: $endsOn ? self::date($endsOn) : null,
             billingUrl: $this->billingUrl($tenant),
         );
