@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
+use App\Mail\Billing\PaymentFailedMail;
 use App\Mail\Billing\PaymentReceiptMail;
+use App\Mail\Billing\SubscriptionEndedMail;
+use App\Mail\Billing\SubscriptionEndingMail;
 use App\Models\BillingEmail;
 use App\Models\Invoice;
 use App\Models\Package;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
 use Carbon\CarbonImmutable;
@@ -32,6 +36,11 @@ final class BillingNotifier
         return mb_strtoupper($currency).' '.number_format($minor / 100, 2);
     }
 
+    public static function date(mixed $value): string
+    {
+        return CarbonImmutable::parse($value)->timezone((string) config('app.timezone'))->format('j F Y');
+    }
+
     /**
      * @param  array<string, mixed>  $provider
      */
@@ -48,6 +57,69 @@ final class BillingNotifier
             'bank', 'bank_transfer', 'dedicated_nuban' => 'Bank transfer',
             default => ucfirst(str_replace('_', ' ', (string) $provider['channel'])),
         };
+    }
+
+    /**
+     * Warn that a recurring subscription charge failed. The plan is not changed.
+     *
+     * @param  array<string, mixed>  $data  Paystack invoice.payment_failed data.
+     */
+    public function paymentFailed(Tenant $tenant, array $data, ?string $payerEmail): bool
+    {
+        $subscription = (array) ($data['subscription'] ?? []);
+        $amount = (int) ($data['amount'] ?? $subscription['amount'] ?? 0);
+        $retryOn = $subscription['next_payment_date'] ?? null;
+        $key = $data['invoice_code']
+            ?? ($subscription['subscription_code'] ?? $tenant->id).':'.$amount.':'.now()->toDateString();
+
+        $mail = new PaymentFailedMail(
+            tenant: $tenant,
+            amountDisplay: self::money($amount, (string) ($data['currency'] ?? $subscription['currency'] ?? 'GHS')),
+            retryOn: $retryOn ? self::date($retryOn) : null,
+            billingUrl: $this->billingUrl($tenant),
+        );
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_PAYMENT_FAILED, "payment_failed:{$key}", [$payerEmail, $tenant->email], $mail);
+    }
+
+    /**
+     * Tell the tenant their plan will not renew and when it ends.
+     *
+     * @param  array<string, mixed>  $data  Paystack subscription.not_renew data.
+     */
+    public function subscriptionEnding(Tenant $tenant, array $data, ?string $payerEmail): bool
+    {
+        $endsOn = $data['next_payment_date']
+            ?? Subscription::query()->where('tenant_id', $tenant->id)->latest()->value('current_period_end');
+
+        $mail = new SubscriptionEndingMail(
+            tenant: $tenant,
+            planName: $tenant->package?->name ?? 'current',
+            endsOn: $endsOn ? self::date($endsOn) : null,
+            billingUrl: $this->billingUrl($tenant),
+        );
+
+        $key = $data['subscription_code'] ?? $tenant->id.':'.now()->toDateString();
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_SUBSCRIPTION_ENDING, (string) $key, [$payerEmail, $tenant->email], $mail);
+    }
+
+    /**
+     * Tell the tenant their paid plan has ended and they are now on Free.
+     *
+     * @param  array<string, mixed>  $data  Paystack subscription.disable data.
+     */
+    public function subscriptionEnded(Tenant $tenant, array $data, ?string $payerEmail, ?string $previousPlan): bool
+    {
+        $mail = new SubscriptionEndedMail(
+            tenant: $tenant,
+            previousPlan: $previousPlan,
+            billingUrl: $this->billingUrl($tenant),
+        );
+
+        $key = $data['subscription_code'] ?? $tenant->id.':'.now()->toDateString();
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_SUBSCRIPTION_ENDED, (string) $key, [$payerEmail, $tenant->email], $mail);
     }
 
     /**
@@ -88,9 +160,7 @@ final class BillingNotifier
                 $hasProviderAmount ? (string) $provider['currency'] : (string) $transaction->currency,
             ),
             reference: $reference,
-            paidOn: CarbonImmutable::parse($provider['paid_at'] ?? $transaction->created_at)
-                ->timezone((string) config('app.timezone'))
-                ->format('j F Y'),
+            paidOn: self::date($provider['paid_at'] ?? $transaction->created_at),
             paymentMethod: self::paymentMethod($provider),
             activePlan: $plan?->name,
             billingUrl: $this->billingUrl($tenant),

@@ -166,3 +166,81 @@ test('the receipt renders in the branded layout with the payment details', funct
         ->toContain('Mobile money')
         ->toContain('plan is active');
 });
+
+test('a failed subscription payment warns once, says when it will be retried, and changes nothing', function (): void {
+    [$tenant] = billingEmailTenant();
+    $growth = App\Models\Package::query()->where('slug', 'growth')->firstOrFail();
+    $tenant->update(['package_id' => $growth->id]);
+    $failed = [
+        'invoice_code' => 'INV_fail_1',
+        'amount' => 9900,
+        'currency' => 'GHS',
+        'customer' => ['email' => 'owner@example.com'],
+        'subscription' => ['subscription_code' => 'SUB_fail', 'next_payment_date' => '2026-09-18T00:00:00Z'],
+    ];
+
+    billingWebhook('invoice.payment_failed', $failed);
+    billingWebhook('invoice.payment_failed', $failed);
+
+    Mail::assertQueuedCount(1);
+    Mail::assertQueued(App\Mail\Billing\PaymentFailedMail::class, fn ($mail): bool => $mail->hasTo('owner@example.com')
+        && $mail->hasTo('accounts@acme.test')
+        && $mail->amountDisplay === 'GHS 99.00'
+        && $mail->retryOn === '18 September 2026');
+    expect($tenant->fresh()->package_id)->toEqual($growth->id);
+});
+
+test('billing events for an address no tenant uses send nothing', function (): void {
+    billingEmailTenant();
+
+    billingWebhook('invoice.payment_failed', ['invoice_code' => 'INV_x', 'amount' => 100, 'customer' => ['email' => 'stranger@example.com']]);
+    billingWebhook('subscription.not_renew', ['subscription_code' => 'SUB_x', 'customer' => ['email' => 'stranger@example.com']]);
+    billingWebhook('subscription.disable', ['subscription_code' => 'SUB_x', 'customer' => ['email' => 'stranger@example.com']]);
+
+    Mail::assertNothingQueued();
+});
+
+test('a plan set not to renew sends one notice with the date it ends', function (): void {
+    [$tenant] = billingEmailTenant();
+    $tenant->update(['package_id' => App\Models\Package::query()->where('slug', 'growth')->value('id')]);
+    $data = ['subscription_code' => 'SUB_end_1', 'next_payment_date' => '2026-10-15T00:00:00Z', 'customer' => ['email' => 'owner@example.com']];
+
+    billingWebhook('subscription.not_renew', $data);
+    billingWebhook('subscription.not_renew', $data);
+
+    Mail::assertQueuedCount(1);
+    Mail::assertQueued(App\Mail\Billing\SubscriptionEndingMail::class, fn ($mail): bool => $mail->endsOn === '15 October 2026'
+        && $mail->planName === 'Growth');
+});
+
+test('a plan that has ended sends one notice naming the plan the tenant was on', function (): void {
+    [$tenant] = billingEmailTenant();
+    $tenant->update(['package_id' => App\Models\Package::query()->where('slug', 'growth')->value('id')]);
+    $data = ['subscription_code' => 'SUB_end_2', 'customer' => ['email' => 'owner@example.com']];
+
+    billingWebhook('subscription.disable', $data);
+    billingWebhook('subscription.disable', $data);
+
+    Mail::assertQueuedCount(1);
+    Mail::assertQueued(App\Mail\Billing\SubscriptionEndedMail::class, fn ($mail): bool => $mail->previousPlan === 'Growth');
+    expect($tenant->fresh()->package?->is_free)->toBeTrue();
+});
+
+test('every billing email renders in the branded layout', function (): void {
+    [$tenant] = billingEmailTenant();
+    $url = 'https://acme.example.test/billing';
+
+    $rendered = [
+        (new App\Mail\Billing\PaymentFailedMail($tenant, 'GHS 99.00', '18 September 2026', $url))->render(),
+        (new App\Mail\Billing\SubscriptionEndingMail($tenant, 'Growth', '15 October 2026', $url))->render(),
+        (new App\Mail\Billing\SubscriptionEndedMail($tenant, 'Growth', $url))->render(),
+    ];
+
+    foreach ($rendered as $html) {
+        expect($html)->toContain('miconvener@2x.png')->toContain('Acme Events')->toContain($url)->not->toContain('{{');
+    }
+
+    expect($rendered[0])->toContain('18 September 2026')
+        ->and($rendered[1])->toContain('15 October 2026')
+        ->and($rendered[2])->toContain('Free plan');
+});

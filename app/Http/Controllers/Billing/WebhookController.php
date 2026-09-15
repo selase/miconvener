@@ -295,6 +295,8 @@ final class WebhookController extends Controller
         }
 
         Log::info("Paystack subscription.not_renew: scheduled end for tenant {$tenant->id}");
+
+        app(BillingNotifier::class)->subscriptionEnding($tenant, $data, $customerEmail);
     }
 
     private function handlePaystackSubscriptionDisable(array $data, SubscriptionProvisioningService $provisioningService): void
@@ -310,8 +312,12 @@ final class WebhookController extends Controller
             return;
         }
 
+        $previousPlan = $tenant->package?->is_free ? null : $tenant->package?->name;
+
         $provisioningService->switchToFree($tenant);
         Log::info("Paystack subscription.disable: switched tenant {$tenant->id} to free");
+
+        app(BillingNotifier::class)->subscriptionEnded($tenant, $data, $customerEmail, $previousPlan);
     }
 
     private function handlePaystackInvoiceFailed(array $data): void
@@ -319,6 +325,15 @@ final class WebhookController extends Controller
         $customerEmail = $data['customer']['email'] ?? null;
         Log::warning("Paystack invoice.payment_failed for customer {$customerEmail}");
 
-        // Could send a payment failure notification here
+        if (! $customerEmail) {
+            return;
+        }
+
+        $tenant = Tenant::whereHas('users', fn ($q) => $q->where('email', $customerEmail))->first();
+        if (! $tenant) {
+            return;
+        }
+
+        app(BillingNotifier::class)->paymentFailed($tenant, $data, $customerEmail);
     }
 }
