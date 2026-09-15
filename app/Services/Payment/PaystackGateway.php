@@ -73,6 +73,46 @@ final class PaystackGateway implements PaymentGateway
         }
     }
 
+    /**
+     * Charge a saved, reusable authorization without the customer present.
+     *
+     * A declined charge is a normal answer (status "failed"), not an exception;
+     * only a rejected request (bad authorization, duplicate reference) throws.
+     *
+     * @param  array<string, mixed>  $metadata  Sent as an object so the webhook routes it by `source`.
+     * @return array{status: string, reference: string, gateway_response: ?string, authorization: array<string, mixed>, channel: ?string, paid_at: ?string, amount: int, currency: string}
+     */
+    public function chargeAuthorization(string $email, int $amountMinor, string $currency, string $authorizationCode, string $reference, array $metadata): array
+    {
+        try {
+            $response = Http::withToken($this->secret)->timeout(30)->post("{$this->baseUrl}/transaction/charge_authorization", [
+                'email' => $email,
+                'amount' => $amountMinor,
+                'currency' => $currency,
+                'authorization_code' => $authorizationCode,
+                'reference' => $reference,
+                'metadata' => $metadata,
+            ])->throw();
+        } catch (RequestException $e) {
+            throw PaymentFailedException::fromProvider('paystack', (string) ($e->response->json('message') ?? $e->getMessage()), previous: $e);
+        } catch (Throwable $e) {
+            throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
+        }
+
+        $data = (array) $response->json('data', []);
+
+        return [
+            'status' => (string) ($data['status'] ?? 'failed'),
+            'reference' => (string) ($data['reference'] ?? $reference),
+            'gateway_response' => $data['gateway_response'] ?? null,
+            'authorization' => (array) ($data['authorization'] ?? []),
+            'channel' => $data['channel'] ?? null,
+            'paid_at' => $data['paid_at'] ?? $data['transaction_date'] ?? null,
+            'amount' => (int) ($data['amount'] ?? $amountMinor),
+            'currency' => mb_strtoupper((string) ($data['currency'] ?? $currency)),
+        ];
+    }
+
     public function charge(string $customerId, int $amount, string $currency, array $options = []): string
     {
         if (! isset($options['authorization_code'])) {

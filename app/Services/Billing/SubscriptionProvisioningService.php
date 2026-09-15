@@ -162,6 +162,23 @@ final class SubscriptionProvisioningService
     }
 
     /**
+     * Put the tenant on a package now, logging the change when it is one.
+     */
+    public function moveToPackage(Tenant $tenant, Package $package, string $type): void
+    {
+        if ((string) $tenant->package_id === (string) $package->id) {
+            return;
+        }
+
+        $from = $tenant->package_id ? Package::find($tenant->package_id) : null;
+
+        $tenant->update(['package_id' => $package->id]);
+        $tenant->syncFeaturesFromPackage();
+
+        $this->logPlanChange($tenant, $from, $package, $type);
+    }
+
+    /**
      * @param  array<string, mixed>  $dto
      */
     private function applyPayment(Tenant $tenant, array $dto): void

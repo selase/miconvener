@@ -6,11 +6,13 @@ namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
 use App\Models\Package;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
 use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
+use App\Services\Billing\SubscriptionRenewalService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +20,22 @@ use UnexpectedValueException;
 
 final class WebhookController extends Controller
 {
+    /**
+     * Paystack returns metadata as an object for checkout payments but as a
+     * JSON string when it was sent that way (charge_authorization documents it
+     * as a string).
+     *
+     * @return array<string, mixed>
+     */
+    public static function metadata(mixed $metadata): array
+    {
+        if (is_string($metadata)) {
+            $metadata = json_decode($metadata, true);
+        }
+
+        return is_array($metadata) ? $metadata : [];
+    }
+
     public function handleStripe(Request $request, SubscriptionProvisioningService $provisioningService)
     {
         $payload = $request->getContent();
@@ -134,8 +152,14 @@ final class WebhookController extends Controller
     private function handlePaystackChargeSuccess(array $data, SubscriptionProvisioningService $provisioningService): void
     {
         $customerEmail = $data['customer']['email'] ?? null;
-        $metadata = $data['metadata'] ?? [];
+        $metadata = self::metadata($data['metadata'] ?? null);
         $planCode = $data['plan']['plan_code'] ?? null;
+
+        if (($metadata['type'] ?? null) === 'plan_renewal') {
+            $this->handlePaystackRenewal($data, $metadata, $customerEmail);
+
+            return;
+        }
 
         if (! $customerEmail) {
             return;
@@ -275,6 +299,34 @@ final class WebhookController extends Controller
     }
 
     /**
+     * A renewal is found by the subscription our own charge named, not by the
+     * payer's email, which may belong to someone no longer on the team.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $metadata
+     */
+    private function handlePaystackRenewal(array $data, array $metadata, ?string $customerEmail): void
+    {
+        $subscription = Subscription::query()->find($metadata['subscription_id'] ?? null);
+        $package = Package::query()->find($metadata['package_id'] ?? null);
+        $reference = (string) ($data['reference'] ?? '');
+
+        if (! $subscription || ! $package || $reference === '') {
+            Log::warning('Paystack plan_renewal charge names no known subscription or package', ['reference' => $reference]);
+
+            return;
+        }
+
+        $tenant = $subscription->tenant()->firstOrFail();
+
+        if (app(SubscriptionRenewalService::class)->recordRenewal($subscription, $package, $reference, (int) ($data['amount'] ?? 0), (string) ($data['currency'] ?? 'GHS'), $data)) {
+            Log::info("Paystack: renewed subscription {$subscription->id} for tenant {$tenant->id} via webhook");
+        }
+
+        app(BillingNotifier::class)->paymentReceived($tenant, $reference, $customerEmail, $data);
+    }
+
+    /**
      * The tenant a Paystack customer belongs to. Paystack returns the email as
      * the customer typed it, and Postgres compares strings case-sensitively.
      */
@@ -305,7 +357,7 @@ final class WebhookController extends Controller
         }
 
         // If there's a pending downgrade, it's already set; otherwise schedule free
-        $subscription = \App\Models\Subscription::where('tenant_id', $tenant->id)->latest()->first();
+        $subscription = Subscription::where('tenant_id', $tenant->id)->latest()->first();
         if ($subscription && ! $subscription->hasPendingChange()) {
             $provisioningService->cancelAtPeriodEnd($tenant);
         }

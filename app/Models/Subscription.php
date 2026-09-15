@@ -39,6 +39,7 @@ final class Subscription extends Model
         'authorization_label',
         'grace_ends_at',
         'renewal_attempts',
+        'renewal_attempted_at',
     ];
 
     /**
@@ -57,6 +58,7 @@ final class Subscription extends Model
         'authorization_code' => 'encrypted',
         'authorization_reusable' => 'boolean',
         'renewal_attempts' => 'integer',
+        'renewal_attempted_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo

@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string('authorization_label')->nullable();
             $table->timestamp('grace_ends_at')->nullable();
             $table->unsignedSmallInteger('renewal_attempts')->default(0);
+            $table->timestamp('renewal_attempted_at')->nullable();
         });
 
         Schema::connection('landlord')->table('tenants', function (Blueprint $table): void {
@@ -35,7 +36,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::connection('landlord')->table('subscriptions', function (Blueprint $table): void {
-            $table->dropColumn(['interval', 'authorization_code', 'authorization_reusable', 'authorization_email', 'authorization_label', 'grace_ends_at', 'renewal_attempts']);
+            $table->dropColumn(['interval', 'authorization_code', 'authorization_reusable', 'authorization_email', 'authorization_label', 'grace_ends_at', 'renewal_attempts', 'renewal_attempted_at']);
         });
 
         Schema::connection('landlord')->table('tenants', function (Blueprint $table): void {

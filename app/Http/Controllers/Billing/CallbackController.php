@@ -8,13 +8,16 @@ use App\Contracts\PaymentGateway;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Package;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
+use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Tenancy\TenantContext;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +49,7 @@ final class CallbackController extends Controller
              * one payment was fulfilled twice.
              */
             $result['reference'] = (string) ($result['reference'] ?? $result['transaction_id'] ?? $reference);
+            $result['metadata'] = WebhookController::metadata($result['metadata'] ?? null);
 
             if (in_array($result['status'], ['succeeded', 'success', 'paid'], true)) {
 
@@ -59,6 +63,10 @@ final class CallbackController extends Controller
                 $type = data_get($result, 'metadata.type');
                 if ($type === 'llm_token_purchase') {
                     return $this->handleLlmTokenFulfillment($result, $tenantContext);
+                }
+
+                if ($type === 'plan_renewal') {
+                    return $this->handleRenewalFulfillment($result, $tenantContext);
                 }
 
                 // Metadata-driven plan subscription (no Paystack plan codes required)
@@ -137,6 +145,29 @@ final class CallbackController extends Controller
 
         return redirect()->route('billing.index', ['subdomain' => $tenant->slug])
             ->with('success', "Welcome to {$package->name}! Your subscription is now active.");
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function handleRenewalFulfillment(array $result, TenantContext $tenantContext): RedirectResponse
+    {
+        $tenant = $tenantContext->getTenant();
+        $subscription = Subscription::query()->where('tenant_id', $tenant->id)->find(data_get($result, 'metadata.subscription_id'));
+        $package = Package::query()->find(data_get($result, 'metadata.package_id'));
+
+        if (! $subscription || ! $package) {
+            return redirect()->route('billing.index', ['subdomain' => $tenant->slug])
+                ->with('error', 'We could not match this payment to your plan. Contact support with reference '.$result['reference'].'.');
+        }
+
+        app(SubscriptionRenewalService::class)->recordRenewal($subscription, $package, $result['reference'], (int) ($result['amount'] ?? 0), (string) ($result['currency'] ?? 'GHS'), $result);
+        $this->sendReceipt($tenant, $result);
+
+        $renewedUntil = $subscription->fresh()?->current_period_end?->format('j F Y');
+
+        return redirect()->route('billing.index', ['subdomain' => $tenant->slug])
+            ->with('success', "Payment received. Your {$package->name} plan is renewed until {$renewedUntil}.");
     }
 
     private function handleSubscriptionFulfillment(

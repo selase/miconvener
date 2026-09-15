@@ -53,7 +53,7 @@ final class SettlementWebhookController extends Controller
         $event = $request->input('event');
         $data = $request->input('data');
 
-        $metadata = (array) ($data['metadata'] ?? []);
+        $metadata = BillingWebhookController::metadata($data['metadata'] ?? null);
 
         // The platform's Paystack account is shared with other applications, so
         // this one webhook URL receives their events too. Acting on a charge that
