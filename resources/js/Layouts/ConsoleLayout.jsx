@@ -21,7 +21,7 @@ const NAV_ITEMS = [
     { label: 'Team', href: 'tenant.users.index', icon: Users },
     { label: 'Roles', href: 'tenant.roles.index', icon: ShieldCheck },
     { label: 'API Keys', href: 'tenant.api-keys.index', icon: KeyRound },
-    { label: 'Billing', href: 'billing.index', icon: CreditCard },
+    { label: 'Billing', href: 'billing.index', icon: CreditCard, permission: 'manage_billing' },
     { label: 'Finance', href: 'tenant.finance.index', icon: Wallet, feature: 'paid_tickets' },
     { label: 'LLM Usage', href: 'tenant.llm-usage.index', icon: Sparkles },
     { label: 'LLM Config', href: 'tenant.llm-config.index', icon: SlidersHorizontal, feature: 'llm_byok' },
@@ -66,7 +66,11 @@ export default function ConsoleLayout({ children }) {
                 </div>
 
                 <nav className="flex flex-col py-2">
-                    {NAV_ITEMS.filter((item) => !item.feature || tenant?.features?.[item.feature]).map((item) => {
+                    {NAV_ITEMS.filter(
+                        (item) =>
+                            (!item.feature || tenant?.features?.[item.feature]) &&
+                            (!item.permission || auth?.can?.[item.permission]),
+                    ).map((item) => {
                         const href = route(item.href);
                         const isActive = currentPath === new URL(href).pathname;
                         const Icon = item.icon;

@@ -44,6 +44,11 @@ final class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                // Hides owner-only navigation and actions; every route still
+                // checks the permission itself.
+                'can' => [
+                    'manage_billing' => fn (): bool => (bool) $request->user()?->can('manage billing'),
+                ],
             ],
             'tenant' => $tenant ? [
                 'id' => $tenant->id,

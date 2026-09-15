@@ -12,6 +12,7 @@ uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 test('refunds are disabled for subscription transactions', function () {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user);
+    makeTenantOwner($user, $tenant);
 
     $transaction = Transaction::factory()->create([
         'tenant_id' => $tenant->id,
@@ -30,6 +31,7 @@ test('refunds are disabled for subscription transactions', function () {
 test('refund button is disabled and can_refund is false on billing page', function () {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user);
+    makeTenantOwner($user, $tenant);
 
     Transaction::factory()->create([
         'tenant_id' => $tenant->id,

@@ -23,6 +23,8 @@ final class BillingController extends Controller
 {
     public function index(Request $request, TenantContext $tenantContext): Response
     {
+        $this->authorize('manage billing');
+
         $tenant = $tenantContext->getTenant();
 
         if (! $tenant instanceof Tenant) {
@@ -86,6 +88,8 @@ final class BillingController extends Controller
 
     public function pricing(Request $request, TenantContext $tenantContext): Response
     {
+        $this->authorize('manage billing');
+
         $tenant = $tenantContext->getTenant();
         $packages = Package::where('is_active', true)->with('features')->orderBy('sort_order')->get();
 

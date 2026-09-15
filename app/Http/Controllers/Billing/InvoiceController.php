@@ -13,6 +13,8 @@ final class InvoiceController extends Controller
 {
     public function show(string $id, TenantContext $tenantContext): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
     {
+        $this->authorize('manage billing');
+
         $tenant = $tenantContext->getTenant();
 
         $invoice = Invoice::with('items')
@@ -25,6 +27,8 @@ final class InvoiceController extends Controller
 
     public function download(string $id, TenantContext $tenantContext, PdfInvoiceService $pdfService)
     {
+        $this->authorize('manage billing');
+
         $tenant = $tenantContext->getTenant();
 
         $invoice = Invoice::where('tenant_id', $tenant->id)

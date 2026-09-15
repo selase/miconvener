@@ -162,3 +162,19 @@ if (! function_exists('eventHost')) {
         return [$tenant, $user];
     }
 }
+
+/**
+ * Make the user the tenant's owner (Org Superadmin), seeding the built-in
+ * roles and permissions if this test has not.
+ */
+function makeTenantOwner(User $user, Tenant $tenant): void
+{
+    if (! App\Models\Role::query()->where('name', 'Org Superadmin')->exists()) {
+        Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
+        Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+    }
+
+    setPermissionsTeamId($tenant->id);
+    $user->assignRole('Org Superadmin');
+    app(Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+}

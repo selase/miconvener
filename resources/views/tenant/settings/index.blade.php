@@ -97,7 +97,9 @@
                                 <div class="text-muted fs-7 mb-5">
                                     Want more features? Upgrade your plan to unlock custom domains, commerce, and higher usage limits.
                                 </div>
-                                <a href="{{ route('tenant.pricing') }}" class="btn btn-sm btn-light-primary w-100">Choose Plan</a>
+                                @can('manage billing')
+                                    <a href="{{ route('tenant.pricing') }}" class="btn btn-sm btn-light-primary w-100">Choose Plan</a>
+                                @endcan
                             </div>
                         </div>
 

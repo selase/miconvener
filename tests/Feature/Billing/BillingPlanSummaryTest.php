@@ -22,6 +22,7 @@ function billingPageTenant(?array $subscription = null, array $tenant = []): arr
 {
     $user = User::factory()->create();
     $model = setActiveTenantForTest($user, $tenant + ['package_id' => Package::query()->where('slug', 'growth')->value('id')]);
+    makeTenantOwner($user, $model);
 
     if ($subscription !== null) {
         Subscription::query()->create($subscription + [

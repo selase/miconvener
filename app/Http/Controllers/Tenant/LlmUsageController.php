@@ -52,7 +52,7 @@ final class LlmUsageController extends Controller
             ],
             'recentUsage' => $recentUsage,
             'topupBalance' => $tenant->llm_topup_balance,
-            'tokenPacks' => collect(Config::array('llm.token_packs', []))
+            'tokenPacks' => ! $request->user()->can('manage billing') ? [] : collect(Config::array('llm.token_packs', []))
                 ->map(fn (array $pack, string $key): array => [
                     'key' => $key,
                     'name' => $pack['name'],

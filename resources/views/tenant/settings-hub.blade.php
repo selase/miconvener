@@ -156,6 +156,7 @@
                     <span class="text-muted fs-7">Manage your subscription, plans, and invoices.</span>
                 </div>
 
+                @can('manage billing')
                 <div class="col-md-6 col-xl-4">
                     <a href="{{ route('tenant.pricing') }}" class="card card-flush shadow-sm h-100 hover-elevate-up">
                         <div class="card-body d-flex align-items-center">
@@ -187,6 +188,8 @@
                         </div>
                     </a>
                 </div>
+
+                @endcan
 
                 <div class="col-md-6 col-xl-4">
                     <a href="{{ route('tenant.settings.usage') }}" class="card card-flush shadow-sm h-100 hover-elevate-up">

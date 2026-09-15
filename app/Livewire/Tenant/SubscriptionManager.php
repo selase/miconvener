@@ -34,6 +34,8 @@ final class SubscriptionManager extends Component
      */
     public function requestPlanChange(string $slug): void
     {
+        $this->authorize('manage billing');
+
         $tenant = app(TenantContext::class)->getTenant();
         $newPackage = Package::where('slug', $slug)->where('is_active', true)->firstOrFail();
         $currentPackage = $tenant->package;
@@ -58,6 +60,8 @@ final class SubscriptionManager extends Component
 
     public function openCancelConfirmation(): void
     {
+        $this->authorize('manage billing');
+
         $this->confirmingPlanSlug = 'free';
         $this->confirmationType = 'cancel';
     }
@@ -70,6 +74,8 @@ final class SubscriptionManager extends Component
 
     public function applyConfirmedChange(): void
     {
+        $this->authorize('manage billing');
+
         $tenant = app(TenantContext::class)->getTenant();
         $provisioningService = app(SubscriptionProvisioningService::class);
 

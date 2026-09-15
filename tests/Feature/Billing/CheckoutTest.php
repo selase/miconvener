@@ -30,6 +30,7 @@ it('redirects to paystack checkout for upgrade using one-time transaction with p
     $user = User::factory()->create();
     $package = makeProPackage();
     $tenant = setActiveTenantForTest($user, ['meta' => ['paystack_id' => 'CUS_123']]);
+    makeTenantOwner($user, $tenant);
 
     $gateway = Mockery::mock(PaymentGateway::class);
     $gateway->shouldReceive('createOneTimeCheckoutSession')
@@ -54,6 +55,7 @@ it('uses yearly price when interval is year', function () {
     $user = User::factory()->create();
     $package = makeProPackage();
     $tenant = setActiveTenantForTest($user, ['meta' => ['paystack_id' => 'CUS_123']]);
+    makeTenantOwner($user, $tenant);
 
     $gateway = Mockery::mock(PaymentGateway::class);
     $gateway->shouldReceive('createOneTimeCheckoutSession')
@@ -76,6 +78,7 @@ it('creates customer if missing before checkout', function () {
     $user = User::factory()->create();
     $package = makeProPackage();
     $tenant = setActiveTenantForTest($user, ['meta' => []]);
+    makeTenantOwner($user, $tenant);
 
     $gateway = Mockery::mock(PaymentGateway::class);
     $gateway->shouldReceive('createCustomer')->once()->andReturn('CUS_new_456');
@@ -99,6 +102,7 @@ it('creates customer if missing before checkout', function () {
 it('validates that plan slug must exist in packages', function () {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user);
+    makeTenantOwner($user, $tenant);
     $this->actingAs($user);
 
     $this->post(route('billing.checkout', ['subdomain' => $tenant->slug]), [
@@ -114,6 +118,7 @@ it('dev bypass provisions immediately without hitting paystack', function () {
     $user = User::factory()->create();
     $package = makeProPackage();
     $tenant = setActiveTenantForTest($user);
+    makeTenantOwner($user, $tenant);
 
     $this->actingAs($user);
 
@@ -138,6 +143,7 @@ it('switching to free plan provisions immediately without payment', function () 
     ]);
     $proPackage = makeProPackage();
     $tenant = setActiveTenantForTest($user, ['package_id' => $proPackage->id]);
+    makeTenantOwner($user, $tenant);
 
     $this->actingAs($user);
     $this->post(route('billing.checkout', ['subdomain' => $tenant->slug]), [
@@ -160,6 +166,7 @@ it('downgrade is scheduled without initiating payment', function () {
     ]);
     $proPackage = makeProPackage();
     $tenant = setActiveTenantForTest($user, ['package_id' => $bizPackage->id]);
+    makeTenantOwner($user, $tenant);
 
     Subscription::create([
         'tenant_id' => $tenant->id, 'name' => 'default',
@@ -183,6 +190,7 @@ it('redirects to provider for invoice payment', function () {
     Config::set('services.payment.default', 'paystack');
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user, ['meta' => ['paystack_id' => 'CUS_123']]);
+    makeTenantOwner($user, $tenant);
     $invoice = App\Models\Invoice::create([
         'tenant_id' => $tenant->id,
         'number' => 'INV-001',
@@ -213,6 +221,7 @@ it('sends the console, which posts through Inertia, to Paystack with a full page
     $user = User::factory()->create();
     makeProPackage();
     $tenant = setActiveTenantForTest($user, ['meta' => ['paystack_id' => 'CUS_123']]);
+    makeTenantOwner($user, $tenant);
 
     $gateway = Mockery::mock(PaymentGateway::class);
     $gateway->shouldReceive('createOneTimeCheckoutSession')->once()->andReturn('https://checkout.paystack.com/abc');

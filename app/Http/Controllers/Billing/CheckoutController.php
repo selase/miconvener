@@ -24,6 +24,8 @@ final class CheckoutController extends Controller
         TenantContext $tenantContext,
         SubscriptionProvisioningService $provisioningService
     ): Response {
+        $this->authorize('manage billing');
+
         $tenant = $tenantContext->getTenant();
 
         if (! $tenant instanceof \App\Models\Tenant) {
@@ -45,6 +47,8 @@ final class CheckoutController extends Controller
      */
     public function renew(Request $request, PaymentGateway $gateway, TenantContext $tenantContext, SubscriptionRenewalService $renewals): Response
     {
+        $this->authorize('manage billing');
+
         $tenant = $tenantContext->getTenant();
 
         if (! $tenant instanceof \App\Models\Tenant) {

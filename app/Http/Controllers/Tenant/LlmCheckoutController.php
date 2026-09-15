@@ -15,6 +15,8 @@ final class LlmCheckoutController extends Controller
 {
     public function store(Request $request, PaymentGateway $gateway, TenantContext $tenantContext)
     {
+        $this->authorize('manage billing');
+
         $tenant = $tenantContext->getTenant();
         if (! $tenant instanceof \App\Models\Tenant) {
             abort(404, 'Tenant not found');

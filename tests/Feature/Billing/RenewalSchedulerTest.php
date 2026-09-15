@@ -230,6 +230,7 @@ test('pretend lists the actions and changes nothing', function (): void {
 test('the pay link opens a Paystack charge for the next period as a renewal', function (): void {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user, ['package_id' => Package::query()->where('slug', 'growth')->value('id'), 'meta' => ['paystack_id' => 'CUS_1']]);
+    makeTenantOwner($user, $tenant);
     $subscription = Subscription::query()->create(['tenant_id' => $tenant->id, 'name' => 'default', 'provider_id' => 'ps_first', 'provider_status' => 'past_due', 'provider_plan' => 'growth_year', 'interval' => 'year', 'current_period_end' => now()->subDay()]);
 
     $gateway = Mockery::mock(PaymentGateway::class);

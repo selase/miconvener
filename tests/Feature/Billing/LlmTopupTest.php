@@ -26,6 +26,7 @@ beforeEach(function () {
     // Create user
     $this->user = User::factory()->create();
     $this->tenant->users()->attach($this->user);
+    makeTenantOwner($this->user, $this->tenant);
 
     // TenantContext is a singleton in the container; set it directly rather than
     // mocking. Requests through subdomain routes still re-resolve and overwrite it

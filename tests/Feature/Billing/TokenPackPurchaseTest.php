@@ -17,6 +17,7 @@ test('every token pack is priced in cedis', function (): void {
 test('buying a pack charges its cedi price and sends the console to Paystack', function (): void {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user, ['meta' => ['paystack_id' => 'CUS_123']]);
+    makeTenantOwner($user, $tenant);
     config(['services.payment.default' => 'paystack']);
 
     $gateway = Mockery::mock(PaymentGateway::class);
@@ -35,6 +36,7 @@ test('buying a pack charges its cedi price and sends the console to Paystack', f
 test('the AI usage page offers the packs with their cedi prices', function (): void {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user);
+    makeTenantOwner($user, $tenant);
 
     $this->actingAs($user)
         ->get(route('tenant.llm-usage.index', ['subdomain' => $tenant->slug]))

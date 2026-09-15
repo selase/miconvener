@@ -12,6 +12,7 @@ uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 test('billing dashboard displays last 6 months revenue analytics', function () {
     $user = User::factory()->create();
     $tenant = setActiveTenantForTest($user);
+    makeTenantOwner($user, $tenant);
 
     // Month 1 (Current): 5000 + 2000 = 7000
     Transaction::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000, 'status' => 'success', 'created_at' => now()]);

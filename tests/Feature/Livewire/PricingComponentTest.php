@@ -10,7 +10,7 @@ use Livewire\Livewire;
 beforeEach(function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    setActiveTenantForTest($user);
+    makeTenantOwner($user, setActiveTenantForTest($user));
 });
 
 it('defaults to monthly interval', function () {
@@ -24,6 +24,18 @@ it('can switch to yearly interval', function () {
         ->assertSet('interval', 'year')
         ->call('setInterval', 'month')
         ->assertSet('interval', 'month');
+});
+
+it('refuses plan changes from a team member who is not the owner', function () {
+    $admin = User::factory()->create();
+    $tenant = setActiveTenantForTest($admin, ['slug' => 'other-tenant']);
+    setPermissionsTeamId($tenant->id);
+    $admin->assignRole('Org Admin');
+    $this->actingAs($admin);
+
+    Livewire::test(SubscriptionManager::class)
+        ->call('openCancelConfirmation')
+        ->assertForbidden();
 });
 
 it('ignores invalid interval values', function () {
