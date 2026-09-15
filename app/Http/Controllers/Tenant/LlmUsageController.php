@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LlmTokenUsage;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -51,7 +52,7 @@ final class LlmUsageController extends Controller
             ],
             'recentUsage' => $recentUsage,
             'topupBalance' => $tenant->llm_topup_balance,
-            'tokenPacks' => collect(config('llm.token_packs', []))
+            'tokenPacks' => collect(Config::array('llm.token_packs', []))
                 ->map(fn (array $pack, string $key): array => [
                     'key' => $key,
                     'name' => $pack['name'],

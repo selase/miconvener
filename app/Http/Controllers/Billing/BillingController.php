@@ -112,18 +112,22 @@ final class BillingController extends Controller
     private function planSummary(Tenant $tenant): array
     {
         $package = Package::query()->find($tenant->package_id);
-        $subscription = Subscription::query()->where('tenant_id', $tenant->id)->where('provider_id', 'like', 'ps\_%')->latest('id')->first();
         $isFree = ! $package || $package->isFree();
-        $current = $subscription && ! $isFree && in_array($subscription->provider_status, [Subscription::STATUS_ACTIVE, Subscription::STATUS_PAST_DUE], true)
-            ? $subscription
-            : null;
+        $current = Subscription::query()
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('provider_status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_PAST_DUE])
+            ->latest('id')
+            ->first();
 
-        $renewPackage = $current && ! $tenant->billing_complimentary ? app(SubscriptionRenewalService::class)->packageToRenew($current) : null;
+        // Only plans paid through Paystack one-off charges are renewed here;
+        // another provider's subscription renews itself.
+        $renewable = $current !== null && str_starts_with((string) $current->provider_id, 'ps_') && ! $isFree && ! $tenant->billing_complimentary;
+        $renewPackage = $renewable ? app(SubscriptionRenewalService::class)->packageToRenew($current) : null;
         $daysLeft = $current?->current_period_end ? now()->startOfDay()->diffInDays($current->current_period_end->copy()->startOfDay(), false) : null;
         $autoRenews = $renewPackage !== null && $current->canBeChargedAutomatically();
 
         return [
-            'package_name' => $package?->name ?? 'Free',
+            'package_name' => $isFree ? ($package->name ?? 'Free') : $package->name,
             'is_free' => $isFree,
             'complimentary' => (bool) $tenant->billing_complimentary && ! $isFree,
             'status' => $current?->provider_status,
@@ -131,7 +135,7 @@ final class BillingController extends Controller
             'grace_ends_at' => $current?->grace_ends_at?->format('j F Y'),
             'auto_renews' => $autoRenews,
             'payment_method' => $current?->authorization_label,
-            'ends_at_period_end' => $current !== null && ! $tenant->billing_complimentary && $renewPackage === null,
+            'ends_at_period_end' => $renewable && $renewPackage === null,
             'can_pay_now' => $renewPackage !== null && ($current->isPastDue() || (! $autoRenews && $daysLeft !== null && $daysLeft <= RenewalScheduler::REMINDER_DAYS[0])),
             'renew_amount' => $renewPackage ? BillingNotifier::money($current->priceMinorFor($renewPackage), (string) config('services.paystack.currency', 'GHS')) : null,
         ];

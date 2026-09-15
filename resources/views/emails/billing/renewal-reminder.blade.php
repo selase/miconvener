@@ -23,7 +23,7 @@ The **{{ $planName }}** plan for **{{ $tenant->name }}** renews on **{{ $dueOn }
 Pay {{ $amountDisplay }}
 </x-mail::button>
 
-Pay with a card and future renewals can be charged automatically.
+If you pay by card, future renewals can usually be charged automatically.
 
 Thanks,<br>
 {{ config('app.name') }}

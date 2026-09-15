@@ -6409,12 +6409,6 @@ parameters:
 			path: app/Models/Subscription.php
 
 		-
-			rawMessage: 'Method App\Models\Subscription::pendingPackage() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Subscription.php
-
-		-
 			rawMessage: 'Method App\Models\Subscription::scopeActive() has parameter $query with generic class Illuminate\Database\Eloquent\Builder but does not specify its types: TModel'
 			identifier: missingType.generics
 			count: 1
@@ -6422,12 +6416,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\Subscription::scopeActive() return type with generic class Illuminate\Database\Eloquent\Builder does not specify its types: TModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Subscription.php
-
-		-
-			rawMessage: 'Method App\Models\Subscription::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Subscription.php
@@ -7223,12 +7211,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Services/Api/ApiKeyService.php
-
-		-
-			rawMessage: 'Parameter #3 $newPackage of method App\Services\Billing\SubscriptionProvisioningService::applyPendingDowngrade() expects App\Models\Package, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Services/Billing/SubscriptionProvisioningService.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ends_at.

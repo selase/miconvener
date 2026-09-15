@@ -61,11 +61,17 @@ final class Subscription extends Model
         'renewal_attempted_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<Tenant, $this>
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * @return BelongsTo<Package, $this>
+     */
     public function pendingPackage(): BelongsTo
     {
         return $this->belongsTo(Package::class, 'pending_package_id');
