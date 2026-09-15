@@ -107,6 +107,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Demo Environment
+    |--------------------------------------------------------------------------
+    |
+    | True only on the demo environment. Allows DemoSeeder to run, which fills
+    | the database with a sample organization, events and attendees.
+    |
+    */
+
+    'demo' => (bool) env('DEMO_MODE', false),
+
+    'demo_owner_email' => env('DEMO_OWNER_EMAIL', 'demo@miconvener.com'),
+
+    'demo_owner_password' => env('DEMO_OWNER_PASSWORD'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |
