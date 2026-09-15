@@ -9,7 +9,6 @@ use App\Http\Controllers\Controller;
 use App\Mail\SubscriptionConfirmedMail;
 use App\Models\Invoice;
 use App\Models\Package;
-use App\Models\Transaction;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Tenancy\TenantContext;
@@ -39,6 +38,14 @@ final class CallbackController extends Controller
 
         try {
             $result = $gateway->verifyTransaction($reference);
+
+            /*
+             * The webhook records every payment under the provider's reference.
+             * Paystack's verify response also carries a numeric id; keying on
+             * that instead meant neither path recognised the other's record and
+             * one payment was fulfilled twice.
+             */
+            $result['reference'] = (string) ($result['reference'] ?? $result['transaction_id'] ?? $reference);
 
             if (in_array($result['status'], ['succeeded', 'success', 'paid'], true)) {
 
@@ -108,13 +115,13 @@ final class CallbackController extends Controller
         $dto = [
             'package_id' => $package->id,
             'provider' => 'paystack',
-            'provider_subscription_id' => 'ps_'.($result['transaction_id'] ?? uniqid()),
+            'provider_subscription_id' => 'ps_'.$result['reference'],
             'provider_plan_id' => $planSlug.'_'.$interval,
             'status' => 'active',
             'current_period_end' => $interval === 'year' ? now()->addYear() : now()->addMonth(),
             'amount_paid' => $result['amount'] ?? 0,
             'currency' => $result['currency'] ?? 'ghs',
-            'transaction_id' => $result['transaction_id'],
+            'transaction_id' => $result['reference'],
         ];
 
         $provisioningService->provision($tenant, $dto);
@@ -150,13 +157,13 @@ final class CallbackController extends Controller
                 $dto = [
                     'package_id' => $package->id,
                     'provider' => 'paystack',
-                    'provider_subscription_id' => $result['subscription_code'] ?? $result['transaction_id'],
+                    'provider_subscription_id' => $result['subscription_code'] ?? $result['reference'],
                     'provider_plan_id' => $planId,
                     'status' => 'active',
                     'current_period_end' => Carbon::now()->addMonth(),
                     'amount_paid' => $result['amount'] ?? 0,
                     'currency' => mb_strtolower($result['currency'] ?? 'usd'),
-                    'transaction_id' => $result['transaction_id'],
+                    'transaction_id' => $result['reference'],
                 ];
 
                 $provisioningService->provision($tenant, $dto);
@@ -187,22 +194,13 @@ final class CallbackController extends Controller
         $tenant = $tenantContext->getTenant();
         $invoice = Invoice::where('tenant_id', $tenant->id)->findOrFail($invoiceId);
 
-        if ($invoice->status !== Invoice::STATUS_PAID) {
-            $invoice->update([
-                'status' => Invoice::STATUS_PAID,
-                'paid_at' => now(),
-            ]);
-
-            Transaction::create([
-                'tenant_id' => $tenant->id,
-                'invoice_id' => $invoice->id,
-                'amount' => $invoice->total * 100,
-                'currency' => $invoice->currency,
-                'status' => 'success',
-                'provider' => config('services.payment.default', 'paystack'),
-                'provider_transaction_id' => (string) ($result['transaction_id'] ?? $invoice->number),
-            ]);
-        }
+        app(PaymentFulfillmentService::class)->fulfillInvoice(
+            $tenant,
+            (string) $invoice->id,
+            $result['reference'],
+            (int) ($result['amount'] ?? (int) round((float) $invoice->total * 100)),
+            mb_strtoupper((string) ($result['currency'] ?? $invoice->currency)),
+        );
 
         return redirect()->route('billing.invoices.show', $invoice->id)
             ->with('success', 'Invoice paid successfully! Thank you for your payment.');
@@ -228,7 +226,7 @@ final class CallbackController extends Controller
         // webhook cannot credit it again after the browser already did.
         app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase(
             $tenant,
-            (string) ($result['transaction_id'] ?? ''),
+            $result['reference'],
             (array) data_get($result, 'metadata', []),
         );
 

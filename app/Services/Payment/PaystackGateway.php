@@ -151,9 +151,13 @@ final class PaystackGateway implements PaymentGateway
                 'status' => $data['status'],
                 'metadata' => $data['metadata'] ?? [],
                 'transaction_id' => $data['id'],
+                'reference' => (string) ($data['reference'] ?? $reference),
                 'type' => isset($data['plan']) && $data['plan'] ? 'subscription' : 'payment',
                 'amount' => $data['amount'] ?? 0,
                 'currency' => mb_strtolower($data['currency'] ?? 'ghs'),
+                'channel' => $data['channel'] ?? null,
+                'authorization' => (array) ($data['authorization'] ?? []),
+                'paid_at' => $data['paid_at'] ?? null,
             ];
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);

@@ -9,63 +9,39 @@ use App\Models\PlanChange;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 final class SubscriptionProvisioningService
 {
     /**
      * Provision a subscription after a successful payment (new or renewal).
+     *
+     * The browser callback and the webhook both report a payment, in either
+     * order and sometimes more than once. Everything here changes the plan and
+     * records money, so a payment already recorded changes nothing. Returns
+     * whether this call was the one that provisioned it.
+     *
+     * @param  array<string, mixed>  $dto
      */
-    public function provision(Tenant $tenant, array $dto): void
+    public function provision(Tenant $tenant, array $dto): bool
     {
-        // 1. Update Tenant Package
-        if (isset($dto['package_id'])) {
-            $from = $tenant->package_id ? Package::find($tenant->package_id) : null;
-            $to = Package::find($dto['package_id']);
+        $reference = (string) ($dto['transaction_id'] ?? '');
 
-            $tenant->update(['package_id' => $dto['package_id']]);
-            $tenant->syncFeaturesFromPackage();
+        try {
+            return DB::connection('landlord')->transaction(function () use ($tenant, $dto, $reference): bool {
+                if ($reference !== '' && Transaction::query()->where('provider_transaction_id', $reference)->exists()) {
+                    return false;
+                }
 
-            if ($to && optional($from)->id !== $to->id) {
-                $this->logPlanChange($tenant, $from, $to, 'upgrade');
-            }
+                $this->applyPayment($tenant, $dto);
+
+                return true;
+            });
+        } catch (UniqueConstraintViolationException) {
+            return false;
         }
-
-        // 2. Create/Update Subscription
-        $subscription = Subscription::updateOrCreate(
-            [
-                'tenant_id' => $tenant->id,
-                'provider_id' => $dto['provider_subscription_id'],
-            ],
-            [
-                'name' => 'default',
-                'provider_status' => $dto['status'],
-                'provider_plan' => $dto['provider_plan_id'],
-                'current_period_end' => $dto['current_period_end'],
-                'ends_at' => null,
-                'pending_package_id' => null,
-            ]
-        );
-
-        // 3. If a downgrade was pending and has been processed, apply it now
-        if ($subscription->wasRecentlyCreated === false && $subscription->hasPendingChange()) {
-            $pendingPackage = $subscription->pendingPackage;
-            if ($pendingPackage) {
-                $this->applyPendingDowngrade($tenant, $subscription, $pendingPackage);
-            }
-        }
-
-        // 4. Create Transaction record
-        Transaction::create([
-            'tenant_id' => $tenant->id,
-            'provider' => $dto['provider'],
-            'provider_transaction_id' => $dto['transaction_id'],
-            'amount' => $dto['amount_paid'],
-            'currency' => $dto['currency'],
-            'status' => 'success',
-            'type' => 'charge',
-            'meta' => $dto,
-        ]);
     }
 
     /**
@@ -158,6 +134,61 @@ final class SubscriptionProvisioningService
         $this->logPlanChange($tenant, $from, $freePackage, 'cancel');
 
         Log::info("Switched tenant {$tenant->id} to free plan");
+    }
+
+    /**
+     * @param  array<string, mixed>  $dto
+     */
+    private function applyPayment(Tenant $tenant, array $dto): void
+    {
+        // 1. Update Tenant Package
+        if (isset($dto['package_id'])) {
+            $from = $tenant->package_id ? Package::find($tenant->package_id) : null;
+            $to = Package::find($dto['package_id']);
+
+            $tenant->update(['package_id' => $dto['package_id']]);
+            $tenant->syncFeaturesFromPackage();
+
+            if ($to && optional($from)->id !== $to->id) {
+                $this->logPlanChange($tenant, $from, $to, 'upgrade');
+            }
+        }
+
+        // 2. Create/Update Subscription
+        $subscription = Subscription::updateOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'provider_id' => $dto['provider_subscription_id'],
+            ],
+            [
+                'name' => 'default',
+                'provider_status' => $dto['status'],
+                'provider_plan' => $dto['provider_plan_id'],
+                'current_period_end' => $dto['current_period_end'],
+                'ends_at' => null,
+                'pending_package_id' => null,
+            ]
+        );
+
+        // 3. If a downgrade was pending and has been processed, apply it now
+        if ($subscription->wasRecentlyCreated === false && $subscription->hasPendingChange()) {
+            $pendingPackage = $subscription->pendingPackage;
+            if ($pendingPackage) {
+                $this->applyPendingDowngrade($tenant, $subscription, $pendingPackage);
+            }
+        }
+
+        // 4. Create Transaction record
+        Transaction::create([
+            'tenant_id' => $tenant->id,
+            'provider' => $dto['provider'],
+            'provider_transaction_id' => $dto['transaction_id'],
+            'amount' => $dto['amount_paid'],
+            'currency' => $dto['currency'],
+            'status' => 'success',
+            'type' => 'charge',
+            'meta' => $dto,
+        ]);
     }
 
     /**

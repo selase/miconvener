@@ -7,6 +7,7 @@ namespace App\Services\Billing;
 use App\Models\Invoice;
 use App\Models\Tenant;
 use App\Models\Transaction;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -44,32 +45,12 @@ final class PaymentFulfillmentService
         $pack = $packs[$packKey];
         $tokens = (int) $pack['tokens'];
 
-        return DB::connection('landlord')->transaction(function () use ($tenant, $reference, $packKey, $pack, $tokens): bool {
-            if ($this->alreadyRecorded($reference)) {
-                return false;
-            }
-
-            DB::connection('landlord')->table('tenants')
-                ->where('id', $tenant->id)
-                ->increment('llm_topup_balance', $tokens);
-
-            Transaction::create([
-                'tenant_id' => $tenant->id,
-                'amount' => (int) round((float) $pack['price'] * 100),
-                'currency' => $pack['currency'],
-                'status' => 'success',
-                'type' => 'credit',
-                'provider' => config('services.payment.default', 'paystack'),
-                'provider_transaction_id' => $reference,
-                'meta' => [
-                    'type' => 'llm_token_purchase',
-                    'pack_key' => $packKey,
-                    'tokens' => $tokens,
-                ],
-            ]);
-
-            return true;
-        });
+        try {
+            return $this->creditTokenPack($tenant, $reference, $packKey, $pack, $tokens);
+        } catch (UniqueConstraintViolationException) {
+            // The other path recorded this payment between our check and our insert.
+            return false;
+        }
     }
 
     /**
@@ -111,6 +92,39 @@ final class PaymentFulfillmentService
                 'meta' => [
                     'type' => 'invoice_payment',
                     'invoice_id' => $invoiceId,
+                ],
+            ]);
+
+            return true;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $pack
+     */
+    private function creditTokenPack(Tenant $tenant, string $reference, string $packKey, array $pack, int $tokens): bool
+    {
+        return DB::connection('landlord')->transaction(function () use ($tenant, $reference, $packKey, $pack, $tokens): bool {
+            if ($this->alreadyRecorded($reference)) {
+                return false;
+            }
+
+            DB::connection('landlord')->table('tenants')
+                ->where('id', $tenant->id)
+                ->increment('llm_topup_balance', $tokens);
+
+            Transaction::create([
+                'tenant_id' => $tenant->id,
+                'amount' => (int) round((float) $pack['price'] * 100),
+                'currency' => $pack['currency'],
+                'status' => 'success',
+                'type' => 'credit',
+                'provider' => config('services.payment.default', 'paystack'),
+                'provider_transaction_id' => $reference,
+                'meta' => [
+                    'type' => 'llm_token_purchase',
+                    'pack_key' => $packKey,
+                    'tokens' => $tokens,
                 ],
             ]);
 
