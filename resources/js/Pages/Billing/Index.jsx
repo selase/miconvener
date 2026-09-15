@@ -40,6 +40,48 @@ function RevenueChart({ monthlyStats, currency = 'GHS' }) {
     );
 }
 
+function planLine(plan) {
+    if (plan.is_free) {
+        return null;
+    }
+    if (plan.complimentary) {
+        return 'Complimentary. You are not billed for this plan.';
+    }
+    if (plan.status === 'past_due') {
+        return plan.auto_renews
+            ? `Your renewal payment didn't go through. We'll retry daily until ${plan.grace_ends_at}, then your plan moves to Free.`
+            : `Your renewal was due on ${plan.period_end}. Pay by ${plan.grace_ends_at} to keep this plan.`;
+    }
+    if (plan.ends_at_period_end) {
+        return `Ends on ${plan.period_end}. Your organization then moves to the Free plan.`;
+    }
+    if (plan.auto_renews) {
+        return `Renews on ${plan.period_end}. We'll charge your ${plan.payment_method}.`;
+    }
+    if (plan.period_end) {
+        return `Renews on ${plan.period_end}. We'll email you a payment link before then.`;
+    }
+    return null;
+}
+
+function CurrentPlan({ plan }) {
+    const line = plan ? planLine(plan) : null;
+    const overdue = plan?.status === 'past_due';
+
+    return (
+        <div className={`rounded-lg border p-5 ${overdue ? 'border-danger-fg/40 bg-danger-bg' : 'border-border'}`}>
+            <div className="text-xs font-semibold uppercase text-ink-secondary">Current plan</div>
+            <div className="mt-1 text-2xl font-bold text-ink">{plan?.package_name ?? 'Free'}</div>
+            {line && <p className={`mt-1 text-sm ${overdue ? 'text-danger-fg' : 'text-ink-secondary'}`}>{line}</p>}
+            {plan?.can_pay_now && (
+                <Button className="mt-3" variant="primary" href={route('billing.renew')}>
+                    Pay {plan.renew_amount}
+                </Button>
+            )}
+        </div>
+    );
+}
+
 export default function Index({ transactions, invoices, subscription, accruedMetered, monthlyStats, currency = 'GHS' }) {
     return (
         <ConsoleLayout>
@@ -47,15 +89,7 @@ export default function Index({ transactions, invoices, subscription, accruedMet
 
             <div className="space-y-8 px-8 py-6">
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-lg border border-border p-5">
-                        <div className="text-xs font-semibold uppercase text-ink-secondary">Current plan</div>
-                        <div className="mt-1 text-2xl font-bold text-ink">
-                            {subscription?.package_name ?? 'Free'}
-                        </div>
-                        {subscription?.current_period_end && (
-                            <div className="mt-1 text-sm text-ink-secondary">Renews {subscription.current_period_end}</div>
-                        )}
-                    </div>
+                    <CurrentPlan plan={subscription} />
                     <div className="rounded-lg border border-border p-5">
                         <div className="text-xs font-semibold uppercase text-ink-secondary">Accrued this month</div>
                         <div className="num mt-1 text-2xl font-bold text-ink">{currency} {accruedMetered}</div>

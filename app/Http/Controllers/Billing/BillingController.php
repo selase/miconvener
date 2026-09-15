@@ -8,8 +8,12 @@ use App\Enum\UsageMetric;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Package;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
+use App\Services\Billing\BillingNotifier;
+use App\Services\Billing\RenewalScheduler;
+use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -50,8 +54,6 @@ final class BillingController extends Controller
                 'created_at' => $invoice->created_at->format('Y-m-d'),
             ]);
 
-        $subscription = $tenant->latestSubscription;
-
         // Analytics: Last 6 months revenue
         $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
         $monthlyData = Transaction::where('tenant_id', $tenant->id)
@@ -75,11 +77,7 @@ final class BillingController extends Controller
         return Inertia::render('Billing/Index', [
             'transactions' => $transactions,
             'invoices' => $invoices,
-            'subscription' => $subscription ? [
-                'package_name' => $tenant->package?->name,
-                'status' => $subscription->provider_status,
-                'current_period_end' => $subscription->current_period_end?->format('Y-m-d'),
-            ] : null,
+            'subscription' => $this->planSummary($tenant),
             'accruedMetered' => number_format($this->calculateAccruedMetered($tenant), 2),
             'monthlyStats' => $monthlyStats,
             'currency' => (string) config('services.paystack.currency', 'GHS'),
@@ -104,6 +102,39 @@ final class BillingController extends Controller
             'currentPackageSlug' => $tenant->package?->slug,
             'currency' => (string) config('services.paystack.currency', 'GHS'),
         ]);
+    }
+
+    /**
+     * What the tenant is on and what happens next, for the billing page.
+     *
+     * @return array{package_name: string, is_free: bool, complimentary: bool, status: ?string, period_end: ?string, grace_ends_at: ?string, auto_renews: bool, payment_method: ?string, ends_at_period_end: bool, can_pay_now: bool, renew_amount: ?string}
+     */
+    private function planSummary(Tenant $tenant): array
+    {
+        $package = Package::query()->find($tenant->package_id);
+        $subscription = Subscription::query()->where('tenant_id', $tenant->id)->where('provider_id', 'like', 'ps\_%')->latest('id')->first();
+        $isFree = ! $package || $package->isFree();
+        $current = $subscription && ! $isFree && in_array($subscription->provider_status, [Subscription::STATUS_ACTIVE, Subscription::STATUS_PAST_DUE], true)
+            ? $subscription
+            : null;
+
+        $renewPackage = $current && ! $tenant->billing_complimentary ? app(SubscriptionRenewalService::class)->packageToRenew($current) : null;
+        $daysLeft = $current?->current_period_end ? now()->startOfDay()->diffInDays($current->current_period_end->copy()->startOfDay(), false) : null;
+        $autoRenews = $renewPackage !== null && $current->canBeChargedAutomatically();
+
+        return [
+            'package_name' => $package?->name ?? 'Free',
+            'is_free' => $isFree,
+            'complimentary' => (bool) $tenant->billing_complimentary && ! $isFree,
+            'status' => $current?->provider_status,
+            'period_end' => $current?->current_period_end?->format('j F Y'),
+            'grace_ends_at' => $current?->grace_ends_at?->format('j F Y'),
+            'auto_renews' => $autoRenews,
+            'payment_method' => $current?->authorization_label,
+            'ends_at_period_end' => $current !== null && ! $tenant->billing_complimentary && $renewPackage === null,
+            'can_pay_now' => $renewPackage !== null && ($current->isPastDue() || (! $autoRenews && $daysLeft !== null && $daysLeft <= RenewalScheduler::REMINDER_DAYS[0])),
+            'renew_amount' => $renewPackage ? BillingNotifier::money($current->priceMinorFor($renewPackage), (string) config('services.paystack.currency', 'GHS')) : null,
+        ];
     }
 
     private function calculateAccruedMetered(Tenant $tenant): float
