@@ -52,7 +52,7 @@ final class DemoSeeder extends Seeder
         }
 
         if (Tenant::query()->where('slug', self::TENANT_SLUG)->exists()) {
-            $this->command?->info('Demo organization already exists; nothing to do.');
+            $this->command->info('Demo organization already exists; nothing to do.');
 
             return;
         }
@@ -102,7 +102,7 @@ final class DemoSeeder extends Seeder
         $this->sell($tenant, $past, [[$pastTier, 87]], checkedInShare: 0.82, pending: 0);
         $this->payOut($tenant, $past);
 
-        $this->command?->info("Seeded Kente Events at {$tenant->slug}. Sign in as ".config('app.demo_owner_email').'.');
+        $this->command->info("Seeded Kente Events at {$tenant->slug}. Sign in as ".config('app.demo_owner_email').'.');
     }
 
     private function member(Tenant $tenant, string $first, string $last, string $email, string $role, string $password): User
