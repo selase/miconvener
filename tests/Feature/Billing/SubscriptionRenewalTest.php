@@ -182,3 +182,10 @@ test('charging a saved authorization sends the reference and metadata Paystack r
         && $request['amount'] === 9900
         && $request['metadata']['type'] === 'plan_renewal');
 });
+
+test('a plan cancelled for the end of its period has nothing to renew', function (): void {
+    [, $subscription] = renewingTenant();
+    $subscription->update(['pending_package_id' => Package::query()->where('slug', 'free')->value('id')]);
+
+    expect(app(SubscriptionRenewalService::class)->packageToRenew($subscription))->toBeNull();
+});

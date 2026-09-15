@@ -24,6 +24,10 @@ final class BillingEmail extends Model
 
     public const string TYPE_SUBSCRIPTION_ENDED = 'subscription_ended';
 
+    public const string TYPE_RENEWAL_DUE = 'renewal_due';
+
+    public const string TYPE_RENEWAL_OVERDUE = 'renewal_overdue';
+
     protected $connection = 'landlord';
 
     protected $fillable = ['tenant_id', 'type', 'dedupe_key', 'recipients'];

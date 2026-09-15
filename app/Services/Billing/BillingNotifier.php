@@ -6,6 +6,7 @@ namespace App\Services\Billing;
 
 use App\Mail\Billing\PaymentFailedMail;
 use App\Mail\Billing\PaymentReceiptMail;
+use App\Mail\Billing\RenewalReminderMail;
 use App\Mail\Billing\SubscriptionEndedMail;
 use App\Mail\Billing\SubscriptionEndingMail;
 use App\Models\BillingEmail;
@@ -57,6 +58,79 @@ final class BillingNotifier
             'bank', 'bank_transfer', 'dedicated_nuban' => 'Bank transfer',
             default => ucfirst(str_replace('_', ' ', (string) $provider['channel'])),
         };
+    }
+
+    /**
+     * Ask for the next period's payment ahead of the renewal date. One email
+     * per threshold (7 and 3 days before), per period.
+     */
+    public function renewalDue(Tenant $tenant, Subscription $subscription, Package $package, int $amountMinor, int $threshold): bool
+    {
+        $mail = new RenewalReminderMail(
+            tenant: $tenant,
+            planName: $package->name,
+            amountDisplay: self::money($amountMinor, (string) config('services.paystack.currency', 'GHS')),
+            dueOn: self::date($subscription->current_period_end),
+            overdue: false,
+            movesToFreeOn: null,
+            payUrl: $this->renewUrl($tenant),
+        );
+
+        $key = "renewal_due:{$subscription->id}:{$subscription->current_period_end->toDateString()}:{$threshold}";
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_RENEWAL_DUE, $key, $this->subscriptionRecipients($tenant, $subscription), $mail);
+    }
+
+    /**
+     * Remind, once a day during grace, that the renewal hasn't been paid.
+     */
+    public function renewalOverdue(Tenant $tenant, Subscription $subscription, Package $package, int $amountMinor): bool
+    {
+        $mail = new RenewalReminderMail(
+            tenant: $tenant,
+            planName: $package->name,
+            amountDisplay: self::money($amountMinor, (string) config('services.paystack.currency', 'GHS')),
+            dueOn: self::date($subscription->current_period_end),
+            overdue: true,
+            movesToFreeOn: $subscription->grace_ends_at ? self::date($subscription->grace_ends_at) : null,
+            payUrl: $this->renewUrl($tenant),
+        );
+
+        $key = "renewal_overdue:{$subscription->id}:{$subscription->current_period_end->toDateString()}:".now()->toDateString();
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_RENEWAL_OVERDUE, $key, $this->subscriptionRecipients($tenant, $subscription), $mail);
+    }
+
+    /**
+     * A saved card was declined at renewal. Sent once per charge attempt.
+     */
+    public function renewalChargeFailed(Tenant $tenant, Subscription $subscription, int $amountMinor, string $reference, ?string $retryOn): bool
+    {
+        $mail = new PaymentFailedMail(
+            tenant: $tenant,
+            amountDisplay: self::money($amountMinor, (string) config('services.paystack.currency', 'GHS')),
+            retryOn: $retryOn ? self::date($retryOn) : null,
+            billingUrl: $this->renewUrl($tenant),
+            movesToFreeOn: $subscription->grace_ends_at ? self::date($subscription->grace_ends_at) : null,
+        );
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_PAYMENT_FAILED, "payment_failed:{$reference}", $this->subscriptionRecipients($tenant, $subscription), $mail);
+    }
+
+    /**
+     * The renewal was never paid and grace is over: the tenant is now on Free.
+     */
+    public function planLapsed(Tenant $tenant, Subscription $subscription, ?string $previousPlan): bool
+    {
+        $mail = new SubscriptionEndedMail(
+            tenant: $tenant,
+            previousPlan: $previousPlan,
+            billingUrl: $this->billingUrl($tenant),
+        );
+
+        $key = "lapsed:{$subscription->id}:{$subscription->current_period_end?->toDateString()}";
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_SUBSCRIPTION_ENDED, $key, $this->subscriptionRecipients($tenant, $subscription), $mail);
     }
 
     /**
@@ -197,6 +271,26 @@ final class BillingNotifier
         }
 
         return config('app.name').' payment';
+    }
+
+    /**
+     * The person who pays for the plan and the tenant's contact address. A plan
+     * paid before payer emails were kept falls back to the first team member,
+     * who created the organization.
+     *
+     * @return array<int, string|null>
+     */
+    private function subscriptionRecipients(Tenant $tenant, Subscription $subscription): array
+    {
+        $payer = $subscription->authorization_email
+            ?? $tenant->users()->orderBy('tenant_user.created_at')->value('users.email');
+
+        return [$payer, $tenant->email];
+    }
+
+    private function renewUrl(Tenant $tenant): string
+    {
+        return route('billing.renew', ['subdomain' => $tenant->slug]);
     }
 
     private function billingUrl(Tenant $tenant): string

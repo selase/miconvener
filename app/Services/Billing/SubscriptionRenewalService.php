@@ -90,14 +90,15 @@ final class SubscriptionRenewalService
     /**
      * The package a renewal of this subscription is charged for: a scheduled
      * downgrade to another paid plan takes effect at renewal; otherwise the
-     * tenant's current plan. Null when there is nothing to charge for.
+     * tenant's current plan. Null when there is nothing to charge for: the plan
+     * was cancelled for the end of its period, or the tenant is already on Free.
      */
     public function packageToRenew(Subscription $subscription): ?Package
     {
         $pending = $subscription->pending_package_id ? Package::query()->find($subscription->pending_package_id) : null;
 
-        if ($pending && ! $pending->isFree()) {
-            return $pending;
+        if ($pending) {
+            return $pending->isFree() ? null : $pending;
         }
 
         $current = Package::query()->find($subscription->tenant()->value('package_id'));

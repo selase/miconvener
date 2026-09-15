@@ -8,7 +8,9 @@ use App\Contracts\PaymentGateway;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Package;
+use App\Models\Subscription;
 use App\Services\Billing\SubscriptionProvisioningService;
+use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -35,6 +37,47 @@ final class CheckoutController extends Controller
 
         // Handle Plan Subscription
         return $this->handlePlanCheckout($request, $gateway, $tenant, $provisioningService);
+    }
+
+    /**
+     * The pay link in renewal emails: a one-off Paystack charge for the next
+     * period of the tenant's current plan, fulfilled as a renewal.
+     */
+    public function renew(Request $request, PaymentGateway $gateway, TenantContext $tenantContext, SubscriptionRenewalService $renewals): Response
+    {
+        $tenant = $tenantContext->getTenant();
+
+        if (! $tenant instanceof \App\Models\Tenant) {
+            abort(404, 'Tenant not found');
+        }
+
+        $subscription = Subscription::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('provider_id', 'like', 'ps\_%')
+            ->latest('id')
+            ->first();
+        $package = $subscription ? $renewals->packageToRenew($subscription) : null;
+
+        if (! $subscription || ! $package || $tenant->billing_complimentary) {
+            return redirect()->route('billing.index', ['subdomain' => $tenant->slug])
+                ->with('info', 'There is nothing to renew on this plan.');
+        }
+
+        $checkoutUrl = $gateway->createOneTimeCheckoutSession(
+            $this->getOrCreateCustomerId($request, $gateway, $tenant),
+            $subscription->priceMinorFor($package),
+            (string) config('services.paystack.currency', 'GHS'),
+            route('billing.callback'),
+            [
+                'type' => 'plan_renewal',
+                'source' => config('services.paystack.metadata_source'),
+                'tenant_id' => $tenant->id,
+                'subscription_id' => $subscription->id,
+                'package_id' => $package->id,
+            ]
+        );
+
+        return Inertia::location($checkoutUrl);
     }
 
     private function handleInvoiceCheckout(Request $request, PaymentGateway $gateway, mixed $tenant): Response

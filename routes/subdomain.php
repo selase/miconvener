@@ -67,6 +67,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('tenant.pricing');
     Route::post('/billing/checkout', [App\Http\Controllers\Billing\CheckoutController::class, 'store'])
         ->name('billing.checkout');
+    Route::get('/billing/renew', [App\Http\Controllers\Billing\CheckoutController::class, 'renew'])
+        ->name('billing.renew');
 
     Route::get('/settings', [OrgSettingsController::class, 'index'])
         ->name('tenant.settings.index');

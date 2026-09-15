@@ -22,6 +22,7 @@ final class PaymentFailedMail extends Mailable implements ShouldQueue
         public readonly string $amountDisplay,
         public readonly ?string $retryOn,
         public readonly string $billingUrl,
+        public readonly ?string $movesToFreeOn = null,
     ) {}
 
     public function envelope(): Envelope
