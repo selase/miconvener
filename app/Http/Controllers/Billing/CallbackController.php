@@ -6,9 +6,10 @@ namespace App\Http\Controllers\Billing;
 
 use App\Contracts\PaymentGateway;
 use App\Http\Controllers\Controller;
-use App\Mail\SubscriptionConfirmedMail;
 use App\Models\Invoice;
 use App\Models\Package;
+use App\Models\Tenant;
+use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Tenancy\TenantContext;
@@ -17,7 +18,6 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 final class CallbackController extends Controller
 {
@@ -125,11 +125,7 @@ final class CallbackController extends Controller
         ];
 
         $provisioningService->provision($tenant, $dto);
-
-        if (auth()->check()) {
-            Mail::to(auth()->user()->email)
-                ->queue(new SubscriptionConfirmedMail(auth()->user(), $tenant, $package));
-        }
+        $this->sendReceipt($tenant, $result);
 
         if (! $tenant->onboarding_completed_at) {
             return redirect()->route('tenant.onboarding.wizard', ['subdomain' => $tenant->slug])
@@ -167,12 +163,7 @@ final class CallbackController extends Controller
                 ];
 
                 $provisioningService->provision($tenant, $dto);
-
-                // Send confirmation email to the authenticated user
-                if (auth()->check()) {
-                    Mail::to(auth()->user()->email)
-                        ->queue(new SubscriptionConfirmedMail(auth()->user(), $tenant, $package));
-                }
+                $this->sendReceipt($tenant, $result);
 
                 // New tenants go to onboarding; returning customers go to billing
                 if (! $tenant->onboarding_completed_at) {
@@ -201,6 +192,7 @@ final class CallbackController extends Controller
             (int) ($result['amount'] ?? (int) round((float) $invoice->total * 100)),
             mb_strtoupper((string) ($result['currency'] ?? $invoice->currency)),
         );
+        $this->sendReceipt($tenant, $result);
 
         return redirect()->route('billing.invoices.show', $invoice->id)
             ->with('success', 'Invoice paid successfully! Thank you for your payment.');
@@ -229,8 +221,22 @@ final class CallbackController extends Controller
             $result['reference'],
             (array) data_get($result, 'metadata', []),
         );
+        $this->sendReceipt($tenant, $result);
 
         return redirect()->route('tenant.llm-usage.index', ['subdomain' => $tenant->slug])
             ->with('success', 'Success! '.number_format($tokens).' tokens have been added to your balance.');
+    }
+
+    /**
+     * The receipt doubles as the "your plan is active" email, and the webhook
+     * sends the same one: whichever path runs first sends it, once. A mail
+     * failure here is reported, not shown: the payment itself has gone through,
+     * and the webhook will still send the receipt.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function sendReceipt(Tenant $tenant, array $result): void
+    {
+        rescue(fn () => app(BillingNotifier::class)->paymentReceived($tenant, $result['reference'], auth()->user()?->email, $result));
     }
 }

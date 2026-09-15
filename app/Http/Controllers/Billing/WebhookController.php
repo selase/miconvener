@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Package;
 use App\Models\Tenant;
 use App\Models\Transaction;
+use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
 use Carbon\Carbon;
@@ -164,12 +165,21 @@ final class WebhookController extends Controller
         // on the customer's phone and that tab often never returns, which took the
         // money and delivered nothing. The webhook always arrives, so it fulfils
         // them here too; both routes are idempotent, so whichever lands first wins.
-        $reference = (string) ($data['reference'] ?? '');
+        $reference = (string) ($data['reference'] ?? $data['id'] ?? '');
+
+        /*
+         * The receipt is sent whether or not this delivery did the fulfilling:
+         * it is keyed on the reference, so a repeat is a no-op, and a receipt
+         * the browser callback failed to queue is still sent from here.
+         */
+        $sendReceipt = fn () => app(BillingNotifier::class)->paymentReceived($tenant, $reference, $customerEmail, $data);
 
         if ($metaType === 'llm_token_purchase') {
             if (app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase($tenant, $reference, $metadata)) {
                 Log::info("Paystack: fulfilled token purchase for tenant {$tenant->id} via webhook");
             }
+
+            $sendReceipt();
 
             return;
         }
@@ -189,6 +199,8 @@ final class WebhookController extends Controller
                 if ($paid) {
                     Log::info("Paystack: marked invoice {$invoiceId} paid for tenant {$tenant->id} via webhook");
                 }
+
+                $sendReceipt();
             }
 
             return;
@@ -206,17 +218,20 @@ final class WebhookController extends Controller
                     $dto = [
                         'package_id' => $package->id,
                         'provider' => 'paystack',
-                        'provider_subscription_id' => 'ps_'.($data['reference'] ?? $data['id']),
+                        'provider_subscription_id' => 'ps_'.$reference,
                         'provider_plan_id' => $planSlug.'_'.$interval,
                         'status' => 'active',
                         'current_period_end' => $interval === 'year' ? now()->addYear() : now()->addMonth(),
                         'amount_paid' => $data['amount'] ?? 0,
                         'currency' => mb_strtolower($data['currency'] ?? 'ghs'),
-                        'transaction_id' => $data['reference'] ?? $data['id'],
+                        'transaction_id' => $reference,
                     ];
 
-                    $provisioningService->provision($tenant, $dto);
-                    Log::info("Paystack: provisioned {$planSlug}/{$interval} for tenant {$tenant->id}");
+                    if ($provisioningService->provision($tenant, $dto)) {
+                        Log::info("Paystack: provisioned {$planSlug}/{$interval} for tenant {$tenant->id}");
+                    }
+
+                    $sendReceipt();
                 }
             }
 
@@ -242,11 +257,14 @@ final class WebhookController extends Controller
                     'current_period_end' => $nextPaymentDate,
                     'amount_paid' => $data['amount'] ?? 0,
                     'currency' => mb_strtolower($data['currency'] ?? 'usd'),
-                    'transaction_id' => $data['reference'] ?? $data['id'],
+                    'transaction_id' => $reference,
                 ];
 
-                $provisioningService->provision($tenant, $dto);
-                Log::info("Paystack: provisioned subscription for tenant {$tenant->id} → package {$package->slug}");
+                if ($provisioningService->provision($tenant, $dto)) {
+                    Log::info("Paystack: provisioned subscription for tenant {$tenant->id} → package {$package->slug}");
+                }
+
+                $sendReceipt();
             }
         }
     }
