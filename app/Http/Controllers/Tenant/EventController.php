@@ -110,7 +110,11 @@ final class EventController extends Controller
 
         $validated = $this->validateEvent($request);
 
-        if (($validated['ticket_price'] ?? 0) > 0 && ! $tenant->planAllows('paid_tickets')) {
+        // A grandfathered event was already selling when the plan changed, so
+        // the organizer can keep editing it; a smaller plan only stops new paid events.
+        $mayCharge = $tenant->planAllows('paid_tickets') || ($eventModel->isGrandfathered() && $eventModel->isPaid());
+
+        if (($validated['ticket_price'] ?? 0) > 0 && ! $mayCharge) {
             $message = 'Your plan runs free events only. Set the ticket price to 0, or upgrade to sell tickets.';
 
             if ($request->wantsJson()) {
@@ -122,6 +126,15 @@ final class EventController extends Controller
 
         $wouldBePaid = ($validated['ticket_price'] ?? 0) > 0
             || $eventModel->ticketTypes->where('is_active', true)->where('price', '>', 0)->isNotEmpty();
+
+        if ($wouldBePaid && $validated['status'] === Event::STATUS_PUBLISHED && ! $mayCharge) {
+            $message = 'Your plan runs free events only. Make its ticket types free, or upgrade, to publish it.';
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return redirect()->back()->with('error', $message);
+        }
 
         if ($wouldBePaid && $validated['status'] === Event::STATUS_PUBLISHED && ! $tenant->canAcceptPayments()) {
             $message = 'Connect a payment gateway under Settings → Payments before publishing a paid event.';

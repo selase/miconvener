@@ -55,8 +55,10 @@ final class HandleInertiaRequests extends Middleware
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
                 'features' => [
-                    // Gates the Finance link; the same check as selling paid tickets.
                     'paid_tickets' => $tenant->planAllows('paid_tickets'),
+                    // Gates the Finance link: selling paid tickets now, or money
+                    // from tickets sold before a lapse still to refund or pay out.
+                    'finance' => $tenant->handlesTicketMoney(),
                     'llm_byok' => $tenant->featureEnabled('llm_byok'),
                 ],
             ] : null,

@@ -172,6 +172,35 @@ test('a rejected saved card falls back to pay-link reminders', function (): void
     Http::assertSentCount(1);
 });
 
+test('a charge Paystack refuses for another reason keeps the card and retries tomorrow', function (): void {
+    [, $subscription] = scheduledTenant(cardOnFile());
+    Http::fake(['api.paystack.co/transaction/charge_authorization' => Http::sequence()
+        ->push(['status' => false, 'message' => 'Duplicate Transaction Reference'], 400)
+        ->push(['status' => true, 'data' => ['status' => 'success', 'reference' => 'renew-ok', 'amount' => 9900, 'currency' => 'GHS', 'channel' => 'card']])]);
+
+    $output = runRenewals('2026-10-11 07:00:00');
+
+    expect($output)->toContain('retrying tomorrow')
+        ->and($subscription->fresh()->canBeChargedAutomatically())->toBeTrue();
+    Mail::assertNotQueued(RenewalReminderMail::class);
+
+    runRenewals('2026-10-12 07:00:00');
+
+    expect($subscription->fresh()->provider_status)->toBe('active')
+        ->and(Http::recorded()->map(fn ($pair) => $pair[0]['reference'])->unique()->count())->toBe(2);
+});
+
+test('only a refusal about the saved authorization counts as the card being unusable', function (string $message, bool $rejected): void {
+    expect(App\Services\Billing\RenewalScheduler::authorizationRejected($message))->toBe($rejected);
+})->with([
+    ['Invalid authorization code', true],
+    ['Authorization code not found', true],
+    ['This authorization is not reusable', true],
+    ['Duplicate Transaction Reference', false],
+    ['cURL error 28: Operation timed out', false],
+    ['Server Error', false],
+]);
+
 test('a plan cancelled for the end of its period ends then, without a charge', function (): void {
     [$tenant, $subscription] = scheduledTenant(cardOnFile() + ['pending_package_id' => Package::query()->where('slug', 'free')->value('id')]);
     Http::fake();

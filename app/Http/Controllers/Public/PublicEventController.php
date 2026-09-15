@@ -113,7 +113,9 @@ final class PublicEventController extends Controller
         // The plan's registration ceiling. Checked before the registration row is
         // written: usage only increments on confirmation, so an organizer at the
         // ceiling is turned away rather than accumulating rows they cannot honour.
-        $registrationLimit = $tenant->featureLimitValue('event_registrations');
+        // An event that was live when its organizer moved to a smaller plan keeps
+        // registering until it ends; the smaller ceiling applies to new events.
+        $registrationLimit = $eventModel->isGrandfathered() ? null : $tenant->featureLimitValue('event_registrations');
         if ($registrationLimit !== null && ! app(FeatureMeteringService::class)->canUse($tenant, 'event_registrations')) {
             Log::warning('Registration refused: tenant is at its plan registration limit', [
                 'tenant_id' => $tenant->id,
@@ -177,6 +179,11 @@ final class PublicEventController extends Controller
         }
 
         $isFree = $amount === 0;
+
+        if (! $isFree && ! $eventModel->sellsPaidTickets()) {
+            return back()->with('error', 'This event is not selling paid tickets right now. Please contact the organizer.');
+        }
+
         $fees = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $isFree ? 0 : $amount);
         $platformFeeAmount = $fees->platformFee;
 

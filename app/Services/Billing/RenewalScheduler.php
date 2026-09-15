@@ -38,6 +38,16 @@ final class RenewalScheduler
     ) {}
 
     /**
+     * Whether Paystack refused the charge because of the saved authorization
+     * (invalid, not found, not reusable) rather than for any other reason.
+     */
+    public static function authorizationRejected(string $message): bool
+    {
+        return (bool) preg_match('/authori[sz]ation|not reusable|reusable/i', $message)
+            && ! preg_match('/duplicate/i', $message);
+    }
+
+    /**
      * @return list<string> one line per action taken, for the command's output
      */
     public function run(bool $pretend = false): array
@@ -174,9 +184,17 @@ final class RenewalScheduler
                 ],
             );
         } catch (PaymentFailedException $e) {
-            // Paystack refused the request itself, e.g. an authorization that is
-            // no longer valid. Retrying daily can't help; ask for a pay link.
-            Log::warning("Renewal charge rejected for subscription {$subscription->id}", ['error' => $e->getMessage()]);
+            Log::warning("Renewal charge not made for subscription {$subscription->id}", ['error' => $e->getMessage()]);
+
+            if (! self::authorizationRejected($e->getMessage())) {
+                // A timeout, an outage or a duplicate reference says nothing about
+                // the card. The attempt counter has moved on, so tomorrow's run
+                // retries under a new reference.
+                return 'charge could not be made ('.$e->getMessage().'); retrying tomorrow';
+            }
+
+            // The saved authorization itself is no longer usable. Retrying daily
+            // can't help; ask for a pay link.
             $subscription->update(['authorization_reusable' => false]);
             $this->notifier->renewalOverdue($tenant, $subscription->fresh() ?? $subscription, $package, $amount);
 

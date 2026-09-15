@@ -89,6 +89,8 @@ final class Event extends Model
 
     protected $casts = [
         'starts_at' => 'datetime',
+        'grandfathered_at' => 'datetime',
+        'terms_locked_at' => 'datetime',
         'ends_at' => 'datetime',
         'capacity' => 'integer',
         'requires_approval' => 'boolean',
@@ -327,6 +329,10 @@ final class Event extends Model
 
     public function effectivePlatformFeePercentage(): float
     {
+        if ($this->platform_fee_percentage === null && $this->terms_locked_at !== null) {
+            return (float) $this->locked_platform_fee_percentage;
+        }
+
         return (float) ($this->platform_fee_percentage
             ?? $this->tenant?->platform_fee_percentage
             ?? $this->tenant?->package?->default_platform_fee_percentage
@@ -339,6 +345,10 @@ final class Event extends Model
      */
     public function effectivePlatformFeeCapAmount(): ?int
     {
+        if ($this->platform_fee_cap_amount === null && $this->terms_locked_at !== null) {
+            return $this->locked_platform_fee_cap_amount === null ? null : (int) $this->locked_platform_fee_cap_amount;
+        }
+
         $cap = $this->platform_fee_cap_amount
             ?? $this->tenant?->platform_fee_cap_amount
             ?? $this->tenant?->package?->default_platform_fee_cap_amount
@@ -353,10 +363,48 @@ final class Event extends Model
      */
     public function effectiveFeeBearer(): string
     {
+        if ($this->fee_bearer === null && $this->terms_locked_at !== null && $this->locked_fee_bearer !== null) {
+            return (string) $this->locked_fee_bearer;
+        }
+
         return (string) ($this->fee_bearer
             ?? $this->tenant?->fee_bearer
             ?? $this->tenant?->package?->default_fee_bearer
             ?? config('services.platform.default_fee_bearer'));
+    }
+
+    /**
+     * Published and not over: the events a plan change must not break.
+     */
+    public function isLive(): bool
+    {
+        return $this->isPublished() && $this->ends_at->gte(now());
+    }
+
+    /**
+     * Whether this event was already live when its organizer moved to a
+     * smaller plan. It keeps registering and selling as it did until it ends.
+     */
+    public function isGrandfathered(): bool
+    {
+        return $this->grandfathered_at !== null;
+    }
+
+    /**
+     * Whether attendees may buy paid tickets for this event.
+     */
+    public function sellsPaidTickets(): bool
+    {
+        return $this->isGrandfathered() || (bool) Tenant::query()->find($this->tenant_id)?->planAllows('paid_tickets');
+    }
+
+    /**
+     * Whether the event charges anything: an event price or an active paid ticket type.
+     */
+    public function isPaid(): bool
+    {
+        return (int) $this->ticket_price > 0
+            || $this->ticketTypes()->where('is_active', true)->where('price', '>', 0)->exists();
     }
 
     public function isPublished(): bool

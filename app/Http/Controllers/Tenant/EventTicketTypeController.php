@@ -48,7 +48,11 @@ final class EventTicketTypeController extends Controller
 
         $validated = $this->validateTicketType($request);
 
-        if ($validated['price'] > 0 && ! $tenant->planAllows('paid_tickets')) {
+        // Editing a ticket that was already on sale when the plan lapsed is
+        // allowed; making a free ticket paid on a smaller plan is not.
+        $mayCharge = $tenant->planAllows('paid_tickets') || ($eventModel->isGrandfathered() && (int) $ticketTypeModel->getAttribute('price') > 0);
+
+        if ($validated['price'] > 0 && ! $mayCharge) {
             return response()->json(['message' => 'Your plan runs free events only. Upgrade to sell paid tickets.'], 422);
         }
 

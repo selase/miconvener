@@ -99,6 +99,26 @@ final class Tenant extends Model
         return filled(config('services.settlement.paystack.secret_key'));
     }
 
+    /**
+     * Whether the tenant has ticket money to look after: its plan sells paid
+     * tickets, or it sold them before a lapse. Refunds, payouts and payout
+     * settings must stay reachable for money already collected.
+     */
+    public function handlesTicketMoney(): bool
+    {
+        if ($this->planAllows('paid_tickets')) {
+            return true;
+        }
+
+        return Event::query()
+            ->withoutGlobalScope(\App\Scopes\TenantScope::class)
+            ->where('tenant_id', $this->id)
+            ->where(fn ($query) => $query
+                ->where('ticket_price', '>', 0)
+                ->orWhereHas('ticketTypes', fn ($types) => $types->withoutGlobalScope(\App\Scopes\TenantScope::class)->where('price', '>', 0)))
+            ->exists();
+    }
+
     public function requiresDedicatedDb(): bool
     {
         return in_array($this->isolation_mode, ['db_per_tenant', 'byo']);
@@ -400,6 +420,26 @@ final class Tenant extends Model
         $limit = (int) ($meta['value'] ?? 0);
 
         return $limit < 0 ? null : $limit;
+    }
+
+    /**
+     * A plan change is caught here rather than at each of its call sites
+     * (checkout, webhooks, renewals, the admin panel), so no path can move a
+     * tenant to a smaller plan without protecting the events already live.
+     */
+    protected static function booted(): void
+    {
+        self::updated(function (Tenant $tenant): void {
+            if (! $tenant->wasChanged('package_id')) {
+                return;
+            }
+
+            app(\App\Services\Billing\LiveEventProtection::class)->protect(
+                $tenant,
+                Package::query()->find($tenant->getOriginal('package_id')),
+                Package::query()->find($tenant->package_id),
+            );
+        });
     }
 
     /**

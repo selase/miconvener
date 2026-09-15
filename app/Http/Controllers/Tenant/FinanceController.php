@@ -27,7 +27,7 @@ final class FinanceController extends Controller
     {
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->planAllows('paid_tickets')) {
+        if (! $tenant->handlesTicketMoney()) {
             abort(403, 'Your plan does not include paid tickets.');
         }
 
@@ -51,7 +51,7 @@ final class FinanceController extends Controller
 
         $this->authorize('update event');
 
-        if (! $tenant->planAllows('paid_tickets')) {
+        if (! $tenant->handlesTicketMoney()) {
             abort(403, 'Your plan does not include paid tickets.');
         }
 

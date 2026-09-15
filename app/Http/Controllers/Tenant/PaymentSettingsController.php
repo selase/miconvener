@@ -27,7 +27,7 @@ final class PaymentSettingsController extends Controller
 
         // The same check that lets a tenant sell paid tickets: whoever can take
         // payment can configure how they are paid, and no one else.
-        if (! $tenant->planAllows('paid_tickets')) {
+        if (! $tenant->handlesTicketMoney()) {
             abort(403, 'Your plan does not include paid tickets.');
         }
 
@@ -57,7 +57,7 @@ final class PaymentSettingsController extends Controller
         $this->authorize('manage organization settings');
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->planAllows('paid_tickets')) {
+        if (! $tenant->handlesTicketMoney()) {
             abort(403, 'Your plan does not include paid tickets.');
         }
 
