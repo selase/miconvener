@@ -58,7 +58,7 @@ final class HealthServiceProvider extends ServiceProvider
              * If the check detects that the schedule is not run every minute, it will fail.
              * This check relies on cache.
              */
-            ScheduleCheck::new(),
+            ScheduleCheck::new()->heartbeatMaxAgeInMinutes(35),
 
             /**
              * This check will check if the PHP packages installed in your project have known security vulnerabilities.
@@ -76,9 +76,15 @@ final class HealthServiceProvider extends ServiceProvider
              * Using the OptimizedAppCheck you can make sure these things are actually cached.
              */
             OptimizedAppCheck::new()
-                ->unless(app()->isLocal()),
+                ->unless(app()->isLocal() || ! config('health.expect_optimized_app')),
 
             \App\Checks\TenantCustomDomainCheck::new(),
+
+            \App\Checks\RenewalRunCheck::new(),
+
+            \App\Checks\FailedJobsCheck::new(),
+
+            \App\Checks\PaystackWebhookCheck::new(),
         ]);
     }
 }

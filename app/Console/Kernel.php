@@ -20,6 +20,9 @@ final class Kernel extends ConsoleKernel
         // scheduler wakes it, so a per-minute task holds it awake continuously and
         // the scale-to-zero setting buys nothing. Aligned with payouts:reconcile so
         // both run in the same wake window rather than each causing its own.
+        // The heartbeat runs on the same fifteen-minute wake as the checks, so it
+        // proves the scheduler is alive without waking the environment more often.
+        $schedule->command('health:schedule-check-heartbeat')->everyFifteenMinutes();
         $schedule->command(RunHealthChecksCommand::class)->everyFifteenMinutes();
         $schedule->command('backup:clean')->daily()->at('01:00');
         $schedule->command('backup:run')->daily()->at('01:30');
@@ -38,6 +41,7 @@ final class Kernel extends ConsoleKernel
         // Invoicing
         $schedule->command('billing:generate-invoices')->monthlyOn(1, '05:00');
         $schedule->command('billing:process-renewals')->dailyAt('07:00')->withoutOverlapping();
+        $schedule->command('billing:daily-summary')->dailyAt('07:30');
 
         // Settlement — chase payouts whose transfer webhook never arrived, so a
         // lost webhook cannot strand money that has already left the platform.

@@ -11,6 +11,7 @@ use App\Models\EventPayout;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Billing\SubscriptionProvisioningService;
+use App\Services\Operations\OperationalSignals;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -46,6 +47,7 @@ final class SettlementWebhookController extends Controller
 
         if ($signature === '' || (! $settlementMatches && ! $billingMatches)) {
             Log::warning('Platform Paystack webhook signature verification failed');
+            app(OperationalSignals::class)->recordWebhookFailure('signature', $signature === '' ? 'missing signature' : 'signature matched neither key');
 
             return response()->json(['error' => 'Invalid signature'], 400);
         }
@@ -78,7 +80,13 @@ final class SettlementWebhookController extends Controller
         // the account's single webhook URL at this endpoint silently discarded
         // every subscription event.
         if (! $this->isSettlementEvent($event, $metadata)) {
-            return $billing->handlePaystack($request, $provisioningService);
+            try {
+                return $billing->handlePaystack($request, $provisioningService);
+            } catch (Throwable $e) {
+                app(OperationalSignals::class)->recordWebhookFailure('processing', "{$event}: {$e->getMessage()}");
+
+                throw $e;
+            }
         }
 
         if (! $settlementMatches) {
@@ -95,6 +103,7 @@ final class SettlementWebhookController extends Controller
             };
         } catch (Throwable $e) {
             Log::error('Settlement webhook processing failed', ['event' => $event, 'error' => $e->getMessage()]);
+            app(OperationalSignals::class)->recordWebhookFailure('processing', "{$event}: {$e->getMessage()}");
 
             return response()->json(['error' => 'Webhook processing failed'], 500);
         }

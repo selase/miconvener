@@ -41,6 +41,10 @@ Route::get('/health', function (): Illuminate\Http\JsonResponse {
     ], $db === 'ok' ? 200 : 503);
 })->name('health');
 
+Route::get('/health/scheduler', App\Http\Controllers\SchedulerHealthController::class)
+    ->middleware('throttle:60,1')
+    ->name('health.scheduler');
+
 Route::get('/', fn (): Factory|View => view('product.landing'))->name('home');
 Route::get('/sample-product', fn (): Factory|View => view('sample-product-page'));
 Route::get('/product-template', fn (): Factory|View => view('product.landing'))->name('product.template');

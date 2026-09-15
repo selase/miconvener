@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Spatie\Health\Models\HealthCheckResultHistoryItem;
 use Spatie\Health\Notifications\CheckFailedNotification;
-use Spatie\Health\Notifications\Notifiable;
 use Spatie\Health\ResultStores\EloquentHealthResultStore;
 
 return [
@@ -14,6 +13,13 @@ return [
      * `EloquentHealthResultStore` will save results in the database. You
      * can use multiple stores at the same time.
      */
+    /*
+     * Whether config, routes and events are expected to be cached. The deploy
+     * does not run `php artisan optimize` (duplicate route names would stop
+     * route caching), so the check would only ever report that, hourly.
+     */
+    'expect_optimized_app' => (bool) env('HEALTH_EXPECT_OPTIMIZED_APP', false),
+
     'result_stores' => [
         EloquentHealthResultStore::class => [
             'model' => HealthCheckResultHistoryItem::class,
@@ -42,7 +48,7 @@ return [
         /*
          * Notifications will only get sent if this option is set to `true`.
          */
-        'enabled' => false,
+        'enabled' => (bool) env('HEALTH_NOTIFICATIONS_ENABLED', env('APP_ENV') === 'production'),
 
         'notifications' => [
             CheckFailedNotification::class => ['mail'],
@@ -52,7 +58,7 @@ return [
          * Here you can specify the notifiable to which the notifications should be sent. The default
          * notifiable will use the variables specified in this config file.
          */
-        'notifiable' => Notifiable::class,
+        'notifiable' => App\Checks\SuperadminNotifiable::class,
 
         /*
          * When checks start failing, you could potentially end up getting
@@ -65,7 +71,7 @@ return [
         'throttle_notifications_key' => 'health:latestNotificationSentAt:',
 
         'mail' => [
-            'to' => 'your@example.com',
+            'to' => env('HEALTH_NOTIFICATION_EMAIL', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
 
             'from' => [
                 'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),

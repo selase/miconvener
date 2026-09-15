@@ -8,6 +8,7 @@ use App\Exceptions\PaymentFailedException;
 use App\Models\Package;
 use App\Models\Subscription;
 use App\Models\Tenant;
+use App\Services\Operations\OperationalSignals;
 use App\Services\Payment\PaystackGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +61,10 @@ final class RenewalScheduler
             if ($action !== null) {
                 $actions[] = $subscription->tenant->slug.': '.$action;
             }
+        }
+
+        if (! $pretend) {
+            app(OperationalSignals::class)->recordRenewalRun($actions);
         }
 
         return $actions;
