@@ -122,6 +122,9 @@ final class CallbackController extends Controller
             'amount_paid' => $result['amount'] ?? 0,
             'currency' => $result['currency'] ?? 'ghs',
             'transaction_id' => $result['reference'],
+            'interval' => $interval,
+            'authorization' => (array) ($result['authorization'] ?? []),
+            'customer_email' => $result['customer_email'] ?? auth()->user()?->email,
         ];
 
         $provisioningService->provision($tenant, $dto);

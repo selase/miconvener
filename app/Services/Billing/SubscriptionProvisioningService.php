@@ -16,6 +16,31 @@ use Illuminate\Support\Facades\Log;
 final class SubscriptionProvisioningService
 {
     /**
+     * Subscription columns describing how the customer paid, so a renewal can
+     * charge the same method. Without an authorization nothing is stored, and a
+     * renewal is paid by link instead.
+     *
+     * @param  array<string, mixed>|null  $authorization  Paystack's authorization object.
+     * @return array<string, mixed>
+     */
+    public static function authorizationAttributes(?array $authorization, ?string $customerEmail): array
+    {
+        if (! $authorization || blank($authorization['authorization_code'] ?? null)) {
+            return [];
+        }
+
+        return [
+            'authorization_code' => (string) $authorization['authorization_code'],
+            'authorization_reusable' => (bool) ($authorization['reusable'] ?? false),
+            'authorization_email' => $customerEmail ? mb_strtolower($customerEmail) : null,
+            'authorization_label' => BillingNotifier::paymentMethod([
+                'channel' => $authorization['channel'] ?? null,
+                'authorization' => $authorization,
+            ]),
+        ];
+    }
+
+    /**
      * Provision a subscription after a successful payment (new or renewal).
      *
      * The browser callback and the webhook both report a payment, in either
@@ -167,6 +192,10 @@ final class SubscriptionProvisioningService
                 'current_period_end' => $dto['current_period_end'],
                 'ends_at' => null,
                 'pending_package_id' => null,
+                'grace_ends_at' => null,
+                'renewal_attempts' => 0,
+                'interval' => $dto['interval'] ?? null,
+                ...self::authorizationAttributes($dto['authorization'] ?? null, $dto['customer_email'] ?? null),
             ]
         );
 

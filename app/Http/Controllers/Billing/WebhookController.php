@@ -149,7 +149,7 @@ final class WebhookController extends Controller
 
         // Fallback: find tenant whose owner email matches
         if (! $tenant) {
-            $tenant = Tenant::whereHas('users', fn ($q) => $q->where('email', $customerEmail))->first();
+            $tenant = $this->tenantForCustomerEmail($customerEmail);
         }
 
         if (! $tenant) {
@@ -225,6 +225,9 @@ final class WebhookController extends Controller
                         'amount_paid' => $data['amount'] ?? 0,
                         'currency' => mb_strtolower($data['currency'] ?? 'ghs'),
                         'transaction_id' => $reference,
+                        'interval' => $interval,
+                        'authorization' => (array) ($data['authorization'] ?? []),
+                        'customer_email' => $customerEmail,
                     ];
 
                     if ($provisioningService->provision($tenant, $dto)) {
@@ -258,6 +261,8 @@ final class WebhookController extends Controller
                     'amount_paid' => $data['amount'] ?? 0,
                     'currency' => mb_strtolower($data['currency'] ?? 'usd'),
                     'transaction_id' => $reference,
+                    'authorization' => (array) ($data['authorization'] ?? []),
+                    'customer_email' => $customerEmail,
                 ];
 
                 if ($provisioningService->provision($tenant, $dto)) {
@@ -267,6 +272,17 @@ final class WebhookController extends Controller
                 $sendReceipt();
             }
         }
+    }
+
+    /**
+     * The tenant a Paystack customer belongs to. Paystack returns the email as
+     * the customer typed it, and Postgres compares strings case-sensitively.
+     */
+    private function tenantForCustomerEmail(string $customerEmail): ?Tenant
+    {
+        return Tenant::query()
+            ->whereHas('users', fn ($q) => $q->whereRaw('lower(email) = ?', [mb_strtolower(mb_trim($customerEmail))]))
+            ->first();
     }
 
     private function handlePaystackSubscriptionCreate(array $data): void
@@ -283,7 +299,7 @@ final class WebhookController extends Controller
             return;
         }
 
-        $tenant = Tenant::whereHas('users', fn ($q) => $q->where('email', $customerEmail))->first();
+        $tenant = $this->tenantForCustomerEmail($customerEmail);
         if (! $tenant) {
             return;
         }
@@ -307,7 +323,7 @@ final class WebhookController extends Controller
             return;
         }
 
-        $tenant = Tenant::whereHas('users', fn ($q) => $q->where('email', $customerEmail))->first();
+        $tenant = $this->tenantForCustomerEmail($customerEmail);
         if (! $tenant) {
             return;
         }
@@ -330,7 +346,7 @@ final class WebhookController extends Controller
             return;
         }
 
-        $tenant = Tenant::whereHas('users', fn ($q) => $q->where('email', $customerEmail))->first();
+        $tenant = $this->tenantForCustomerEmail($customerEmail);
         if (! $tenant) {
             return;
         }

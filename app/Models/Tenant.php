@@ -84,6 +84,7 @@ final class Tenant extends Model
         'llm_topup_balance' => 'integer',
         'platform_fee_percentage' => 'float',
         'platform_fee_cap_amount' => 'integer',
+        'billing_complimentary' => 'boolean',
     ];
 
     /**
