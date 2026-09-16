@@ -9,16 +9,16 @@ use PragmaRX\Google2FA\Google2FA;
 
 uses(RefreshDatabase::class);
 
-test('user without 2fa can access dashboard normally', function () {
-    // dd(\Illuminate\Support\Facades\Schema::getColumnListing('users'));
+test('user without 2fa can access an authenticated page normally', function () {
+    // The subject here is 2FA, not dashboard access, so this hits the
+    // profile page instead: it needs only auth, no further permission, and
+    // /dashboard (the landlord-domain platform dashboard) now 403s a plain
+    // user regardless of 2FA -- see DashboardAccessTest.
     $user = User::factory()->create();
     $user->refresh();
 
-    App\Models\Permission::create(['name' => 'access dashboard', 'category' => 'test']);
-    $user->givePermissionTo('access dashboard');
-
     $response = $this->actingAs($user)
-        ->get('/dashboard');
+        ->get(route('profile.index', $user));
 
     $response->assertStatus(200);
 });

@@ -15,7 +15,12 @@ final class DashboardController extends Controller
 {
     public function __invoke(\Illuminate\Http\Request $request, \App\Services\TenantStatsService $tenantStatsService): Factory|View
     {
-        $this->authorize('access dashboard');
+        // This view reports cross-tenant figures (platform revenue, active
+        // subscriptions, other tenants' names and user counts), so it needs the
+        // same gate every sibling Admin\* controller uses -- not 'access
+        // dashboard', which every Org Superadmin and Org Admin holds on their
+        // own tenant and which let them see every other tenant's numbers too.
+        $this->authorize('access-superadmin-dashboard');
 
         $days = $request->integer('days', 7);
         // Ensure days is within reasonable bounds

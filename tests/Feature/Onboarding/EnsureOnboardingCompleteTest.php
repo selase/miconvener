@@ -23,10 +23,14 @@ beforeEach(function () {
 test('it does not force redirect but sets session flag when onboarding is incomplete', function () {
     $this->actingAs($this->user);
 
-    // setActiveTenantForTest already puts it in session
+    // setActiveTenantForTest already puts it in session. /dashboard (the
+    // landlord-domain platform dashboard) now 403s an Org Admin -- see
+    // DashboardAccessTest -- but the onboarding middleware runs before that
+    // authorization check and flashes the flag regardless of what the
+    // controller decides afterward.
     $response = $this->get('/dashboard');
 
-    $response->assertStatus(200);
+    $response->assertForbidden();
     $response->assertSessionHas('onboarding_incomplete', true);
 });
 
@@ -37,7 +41,7 @@ test('it does not set flag when onboarding is complete', function () {
 
     $response = $this->get('/dashboard');
 
-    $response->assertStatus(200);
+    $response->assertForbidden();
     $response->assertSessionMissing('onboarding_incomplete');
 });
 
