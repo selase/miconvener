@@ -144,8 +144,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('/billing/invoices/{invoice}/download', [App\Http\Controllers\Billing\InvoiceController::class, 'download'])
         ->name('billing.invoices.download');
 
+    // ->only(['show']): InvoiceController has no index() method (nothing has
+    // ever linked to billing.invoices.index; it would 500 if requested).
     Route::resource('/billing/invoices', App\Http\Controllers\Billing\InvoiceController::class)
-        ->only(['index', 'show'])
+        ->only(['show'])
         ->names('billing.invoices');
 
     // Developer Settings (API Tokens)
