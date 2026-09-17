@@ -172,6 +172,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('transactions.index');
         Route::get('subscriptions', [App\Http\Controllers\Admin\BillingController::class, 'subscriptions'])
             ->name('subscriptions.index');
+        Route::post('subscriptions/{tenant:uuid}/toggle-complimentary', [App\Http\Controllers\Admin\BillingController::class, 'toggleComplimentary'])
+            ->name('subscriptions.toggle-complimentary');
         Route::get('analytics', [App\Http\Controllers\Admin\AnalyticsController::class, 'index'])
             ->name('analytics.usage');
 

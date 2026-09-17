@@ -50,7 +50,7 @@
                     @forelse ($transactions as $transaction)
                         <tr>
                             <td>
-                                <span class="text-gray-800">{{ $transaction->transaction_id }}</span>
+                                <span class="text-gray-800">{{ $transaction->provider_transaction_id }}</span>
                             </td>
                             <td>
                                 <div class="d-flex flex-column">
@@ -65,7 +65,7 @@
                                 </div>
                             </td>
                             <td>
-                                {{ \App\Libraries\Helper::formatAmountWithCurrencySymbol($transaction->amount) }}
+                                {{ \App\Services\Billing\BillingNotifier::money($transaction->amount, $transaction->currency) }}
                             </td>
                             <td>
                                 @if($transaction->status === 'success' || $transaction->status === 'succeeded')

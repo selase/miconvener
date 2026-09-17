@@ -453,7 +453,7 @@
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.subscriptions.index') ? 'active' : '' }}" href="{{ route('admin.billing.subscriptions.index') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
-                                    <span class="menu-title">Subscriptions</span>
+                                    <span class="menu-title">Plan Renewals</span>
                                 </a>
                             </div>
                         </div>
