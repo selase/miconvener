@@ -3457,12 +3457,6 @@ parameters:
 			path: app/Http/Middleware/AuthenticateWithApiKey.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$latestSubscription.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/RequireActiveSubscription.php
-
-		-
 			rawMessage: Access to an undefined property App\Models\Tenant::$package.
 			identifier: property.notFound
 			count: 1
