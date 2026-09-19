@@ -131,13 +131,8 @@ final class BillingController extends Controller
 
         $tenant->forceFill(['billing_complimentary' => ! $tenant->billing_complimentary])->save();
 
-        // This layout's toast only reads 'message' + 'status'; a 'success' key
-        // (the convention several sibling admin controllers use) is never shown.
-        return back()->with([
-            'message' => $tenant->billing_complimentary
-                ? "{$tenant->name} is now complimentary."
-                : "{$tenant->name} is billed again.",
-            'status' => 'success',
-        ]);
+        return back()->with('success', $tenant->billing_complimentary
+            ? "{$tenant->name} is now complimentary."
+            : "{$tenant->name} is billed again.");
     }
 }

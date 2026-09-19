@@ -104,22 +104,17 @@ test('superadmin can make a tenant complimentary and bill them again from the ad
     $paid = Package::factory()->create(['is_free' => false]);
     $tenant = Tenant::factory()->create(['name' => 'Toggle Org', 'package_id' => $paid->id, 'billing_complimentary' => false]);
 
-    // The admin layout's toast only ever reads session('message') +
-    // session('status') -- a plain 'success' key, which several sibling admin
-    // controllers use, is silently dropped and never shown. Assert the keys
-    // that are actually rendered.
     $this->actingAs($this->superadmin)
         ->post(route('admin.billing.subscriptions.toggle-complimentary', $tenant->uuid))
         ->assertRedirect()
-        ->assertSessionHas('status', 'success')
-        ->assertSessionHas('message', 'Toggle Org is now complimentary.');
+        ->assertSessionHas('success', 'Toggle Org is now complimentary.');
 
     expect($tenant->fresh()->billing_complimentary)->toBeTrue();
 
     $this->actingAs($this->superadmin)
         ->post(route('admin.billing.subscriptions.toggle-complimentary', $tenant->uuid))
         ->assertRedirect()
-        ->assertSessionHas('message', 'Toggle Org is billed again.');
+        ->assertSessionHas('success', 'Toggle Org is billed again.');
 
     expect($tenant->fresh()->billing_complimentary)->toBeFalse();
 });
@@ -174,4 +169,31 @@ test('a tenant with no package assigned does not crash the renewals page', funct
     $response->assertOk();
     $response->assertSee('Unassigned Org');
     $response->assertSee('Free');
+});
+
+/**
+ * The admin layout's toast used to read only session('message') +
+ * session('status'), so every flash using Laravel's usual 'success' / 'error'
+ * key -- what RateCardController, FeatureController, PackageController,
+ * RoleController and others all flash -- was silently dropped and the user
+ * saw nothing after saving.
+ */
+test('the admin layout shows a flashed message from either convention', function (string $key, array $flash, string $expected): void {
+    $response = $this->actingAs($this->superadmin)
+        ->withSession($flash)
+        ->get(route('admin.billing.transactions.index'));
+
+    $response->assertOk();
+    $response->assertSee($expected, escape: false);
+})->with([
+    'conventional success' => ['success', ['success' => 'Tax rule updated successfully'], 'toastr["success"]("Tax rule updated successfully"'],
+    'conventional error' => ['error', ['error' => 'Could not save that'], 'toastr["error"]("Could not save that"'],
+    'legacy message + status' => ['message', ['message' => 'Package deleted', 'status' => 'warning'], 'toastr["warning"]("Package deleted"'],
+]);
+
+test('the admin layout renders no toast when nothing was flashed', function (): void {
+    $this->actingAs($this->superadmin)
+        ->get(route('admin.billing.transactions.index'))
+        ->assertOk()
+        ->assertDontSee('toastr[', escape: false);
 });

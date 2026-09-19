@@ -52,86 +52,37 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.3.3/dist/echarts.min.js"></script>
     @stack('vendor-scripts')
 
-    @if(session()->has('message'))
+    @php
+        // Controllers flash either ('message' + 'status') or Laravel's usual
+        // 'success' / 'error' / 'info' / 'warning' key. Only the first was read
+        // here, so every "saved successfully" from the second convention --
+        // rate cards, features, packages, roles and more -- was silently dropped.
+        $flashTypes = ['success', 'error', 'info', 'warning'];
+        $flashKey = collect($flashTypes)->first(fn (string $type): bool => session()->has($type));
+        $flashMessage = session('message') ?? ($flashKey ? session($flashKey) : null);
+        $flashType = session()->has('message') ? session('status', 'success') : $flashKey;
+        $flashType = in_array($flashType, $flashTypes, true) ? $flashType : 'success';
+    @endphp
+
+    @if(filled($flashMessage) && is_string($flashMessage))
         <script>
-            let type = "{{ Session::get('status', 'success') }}";
-            switch (type) {
-                case 'info':
-                    toastr.options = {
-                        "closeButton": true,
-                        "debug": false,
-                        "newestOnTop": true,
-                        "progressBar": true,
-                        "positionClass": "toastr-top-right",
-                        "preventDuplicates": false,
-                        "showDuration": "300",
-                        "hideDuration": "1000",
-                        "timeOut": "5000",
-                        "extendedTimeOut": "1000",
-                        "showEasing": "swing",
-                        "hideEasing": "linear",
-                        "showMethod": "fadeIn",
-                        "hideMethod": "fadeOut"
-                    };
-                    toastr.info("{{ Session::get('message') }}", "Information");
-                    break;
-                case 'warning':
-                    toastr.options = {
-                        "debug": false,
-                        "closeButton": true,
-                        "newestOnTop": true,
-                        "progressBar": true,
-                        "positionClass": "toastr-top-right",
-                        "preventDuplicates": false,
-                        "showDuration": "300",
-                        "hideDuration": "1000",
-                        "timeOut": "5000",
-                        "extendedTimeOut": "1000",
-                        "showEasing": "swing",
-                        "hideEasing": "linear",
-                        "showMethod": "fadeIn",
-                    };
-
-                    toastr.warning("{{ Session::get('message') }}", "Warning!!!");
-                    break;
-                case 'success':
-                    toastr.options = {
-                        "debug": false,
-                        "closeButton": true,
-                        "newestOnTop": true,
-                        "progressBar": true,
-                        "positionClass": "toastr-top-right",
-                        "preventDuplicates": false,
-                        "showDuration": "300",
-                        "hideDuration": "1000",
-                        "timeOut": "5000",
-                        "extendedTimeOut": "1000",
-                        "showEasing": "swing",
-                        "hideEasing": "linear",
-                        "showMethod": "fadeIn",
-                    };
-                    toastr.success("{{ Session::get('message') }}", "Success");
-                    break;
-                case 'error':
-                    toastr.options = {
-                        "debug": false,
-                        "closeButton": true,
-                        "newestOnTop": true,
-                        "progressBar": true,
-                        "positionClass": "toastr-top-right",
-                        "preventDuplicates": false,
-                        "showDuration": "300",
-                        "hideDuration": "1000",
-                        "timeOut": "5000",
-                        "extendedTimeOut": "1000",
-                        "showEasing": "swing",
-                        "hideEasing": "linear",
-                        "showMethod": "fadeIn",
-                    };
-                    toastr.error("{{ Session::get('message') }}", "Error");
-                    break;
-            }
-
+            toastr.options = {
+                "debug": false,
+                "closeButton": true,
+                "newestOnTop": true,
+                "progressBar": true,
+                "positionClass": "toastr-top-right",
+                "preventDuplicates": false,
+                "showDuration": "300",
+                "hideDuration": "1000",
+                "timeOut": "5000",
+                "extendedTimeOut": "1000",
+                "showEasing": "swing",
+                "hideEasing": "linear",
+                "showMethod": "fadeIn",
+                "hideMethod": "fadeOut"
+            };
+            toastr[@json($flashType)](@json($flashMessage), @json(ucfirst($flashType)));
         </script>
     @endif
 
