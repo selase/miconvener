@@ -1,8 +1,9 @@
-function Field({ label, error, children }) {
+function Field({ label, error, hint, children }) {
     return (
         <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">{label}</label>
             {children}
+            {hint && !error && <p className="mt-1 text-sm text-ink-secondary">{hint}</p>}
             {error && <p className="mt-1 text-sm text-danger-fg">{error}</p>}
         </div>
     );
@@ -11,7 +12,14 @@ function Field({ label, error, children }) {
 const inputClasses =
     'w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent';
 
-export default function TeamMemberForm({ data, setData, errors, roles, statuses }) {
+export default function TeamMemberForm({
+    data,
+    setData,
+    errors,
+    roles,
+    statuses,
+    roleLocked = false,
+}) {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
@@ -54,10 +62,19 @@ export default function TeamMemberForm({ data, setData, errors, roles, statuses 
             </Field>
 
             <div className="grid grid-cols-2 gap-4">
-                <Field label="Role" error={errors.role}>
+                <Field
+                    label="Role"
+                    error={errors.role}
+                    hint={
+                        roleLocked
+                            ? 'Your own role can only be changed by another administrator.'
+                            : undefined
+                    }
+                >
                     <select
                         value={data.role}
                         onChange={(event) => setData('role', event.target.value)}
+                        disabled={roleLocked}
                         className={inputClasses}
                     >
                         <option value="">Select a role</option>
