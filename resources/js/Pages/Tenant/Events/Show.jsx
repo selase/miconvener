@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import ConsoleLayout from '@/Layouts/ConsoleLayout';
-import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
 import StatusPill from '@/Components/Console/StatusPill';
 import CopyField from '@/Components/Console/CopyField';
@@ -10,6 +8,8 @@ import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table
 import { Download, Check, X, Pencil } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 import EventFormModal from './EventFormModal';
+import EventWorkspace from './Workspace/EventWorkspace';
+import { sectionHref } from './Workspace/sections';
 import CheckInPanel from './CheckInPanel';
 import TicketTypesPanel from './TicketTypesPanel';
 import SpeakersPanel from './SpeakersPanel';
@@ -33,34 +33,6 @@ import CertificatesPanel from './panels/CertificatesPanel';
 import FormsPanel from './panels/FormsPanel';
 import StratificationPanel from './panels/StratificationPanel';
 import NotificationsPanel from './panels/NotificationsPanel';
-
-const TABS = [
-    'Overview',
-    'Tickets',
-    'Promos',
-    'Form',
-    'Forms',
-    'Cohorts',
-    'Speakers',
-    'Schedule',
-    'Abstracts',
-    'Operations',
-    'Guests',
-    'Blasts',
-    'Automations',
-    'Check-in',
-    'Occupancy',
-    'Venue',
-    'Requests',
-    'Materials',
-    'Forum',
-    'Live',
-    'Badges',
-    'Certificates',
-    'Finance',
-    'Sponsors',
-    'Reports',
-];
 
 const STATUS_VARIANT = {
     pending_payment: 'pending',
@@ -339,156 +311,101 @@ export default function Show({
     hasActiveGateway,
     settlementMode,
     publicUrl,
+    sections,
+    section,
 }) {
-    // The open tab lives in the URL: on event day a refresh on the check-in
-    // screen dropped staff back to Overview, and a tab could not be linked.
-    const [tab, setTabState] = useState(() => {
-        const requested =
-            typeof window !== 'undefined'
-                ? new URLSearchParams(window.location.search).get('tab')
-                : null;
-        return TABS.includes(requested) ? requested : 'Overview';
-    });
-    const setTab = (label) => {
-        setTabState(label);
-        const url = new URL(window.location.href);
-        if (label === 'Overview') {
-            url.searchParams.delete('tab');
-        } else {
-            url.searchParams.set('tab', label);
-        }
-        // replaceState, not a visit: switching tabs is not a navigation, and
-        // Inertia keeps its own page state in history.state.
-        window.history.replaceState(window.history.state, '', url);
-    };
     const [editing, setEditing] = useState(false);
-    // Twenty-five tabs overflow a phone's width, so an active tab restored from
-    // the URL could sit off-screen with nothing showing which one is open.
-    const activeTabRef = useRef(null);
-    useEffect(() => {
-        activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }, [tab]);
+    const current = section ?? 'overview';
+    const hrefFor = (slug) => sectionHref(event.id, slug);
+    const reloadEvent = () => router.reload({ only: ['event'] });
 
-    return (
-        <ConsoleLayout>
-            <PageHeader
-                title={event.name}
-                actions={
-                    <Button icon={Pencil} onClick={() => setEditing(true)}>
-                        Edit event
-                    </Button>
+    // One entry per section in the server's menu (App\Services\Events\EventSections).
+    const panels = {
+        overview: () => (
+            <OverviewTab
+                event={event}
+                registrations={registrations}
+                hasActiveGateway={hasActiveGateway}
+                settlementMode={settlementMode}
+                publicUrl={publicUrl}
+            />
+        ),
+        guests: () => <GuestsTab event={event} registrations={registrations} />,
+        tickets: () => (
+            <TicketTypesPanel
+                event={event}
+                ticketTypes={event.ticket_types}
+                onChange={reloadEvent}
+            />
+        ),
+        'promo-codes': () => <PromoCodePanel event={event} onChange={reloadEvent} />,
+        'registration-form': () => <RegistrationFormPanel event={event} onChange={reloadEvent} />,
+        'attendee-groups': () => <StratificationPanel event={event} />,
+        schedule: () => (
+            <SchedulePanel
+                event={event}
+                sessions={event.sessions}
+                speakers={event.speakers}
+                onChange={reloadEvent}
+            />
+        ),
+        speakers: () => (
+            <SpeakersPanel event={event} speakers={event.speakers} onChange={reloadEvent} />
+        ),
+        abstracts: () => <AbstractsPanel event={event} />,
+        materials: () => <MaterialsPanel event={event} materials={event.materials} />,
+        announcements: () => <BlastsPanel event={event} />,
+        automations: () => <NotificationsPanel event={event} />,
+        surveys: () => <FormsPanel event={event} />,
+        'live-polls': () => <EngagementPanel event={event} />,
+        forum: () => <ForumPanel event={event} />,
+        'check-in': () => (
+            <CheckInPanel
+                event={event}
+                sessions={event.sessions || []}
+                scanUrl={route('tenant.events.checkin.scan', { event: event.id })}
+                searchUrl={route('tenant.events.checkin.search', { event: event.id })}
+                checkInUrlFor={(registrationId) =>
+                    route('tenant.events.checkin', {
+                        event: event.id,
+                        registration: registrationId,
+                    })
                 }
             />
+        ),
+        badges: () => <BadgesPanel event={event} />,
+        'room-headcount': () => (
+            <SessionOccupancyPanel
+                event={event}
+                onOpenScannerForSession={() => router.visit(hrefFor('check-in'))}
+            />
+        ),
+        'help-requests': () => <RequestsPanel event={event} />,
+        venue: () => <VenuePanel event={event} venueRooms={event.venue_rooms} />,
+        planning: () => <OperationsPanel event={event} />,
+        sponsors: () => <SponsorsPanel event={event} />,
+        finance: () => <FinancePanel event={event} />,
+        reports: () => <ReportsPanel event={event} />,
+        certificates: () => <CertificatesPanel event={event} />,
+    };
 
-            <div className="border-b border-border px-8">
-                <nav className="flex gap-6 overflow-x-auto">
-                    {TABS.map((label) => (
-                        <button
-                            key={label}
-                            ref={tab === label ? activeTabRef : undefined}
-                            type="button"
-                            aria-current={tab === label ? 'page' : undefined}
-                            onClick={() => setTab(label)}
-                            className={`shrink-0 border-b-2 py-3 text-sm font-medium transition-colors ${
-                                tab === label
-                                    ? 'border-accent text-ink'
-                                    : 'border-transparent text-ink-secondary hover:text-ink'
-                            }`}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                </nav>
-            </div>
-
-            <div className="px-8 py-6">
-                {tab === 'Overview' && (
-                    <OverviewTab
-                        event={event}
-                        registrations={registrations}
-                        hasActiveGateway={hasActiveGateway}
-                        settlementMode={settlementMode}
-                        publicUrl={publicUrl}
-                    />
-                )}
-                {tab === 'Tickets' && (
-                    <TicketTypesPanel
-                        event={event}
-                        ticketTypes={event.ticket_types}
-                        onChange={() => router.reload({ only: ['event'] })}
-                    />
-                )}
-                {tab === 'Promos' && (
-                    <PromoCodePanel
-                        event={event}
-                        onChange={() => router.reload({ only: ['event'] })}
-                    />
-                )}
-                {tab === 'Form' && (
-                    <RegistrationFormPanel
-                        event={event}
-                        onChange={() => router.reload({ only: ['event'] })}
-                    />
-                )}
-                {tab === 'Speakers' && (
-                    <SpeakersPanel
-                        event={event}
-                        speakers={event.speakers}
-                        onChange={() => router.reload({ only: ['event'] })}
-                    />
-                )}
-                {tab === 'Schedule' && (
-                    <SchedulePanel
-                        event={event}
-                        sessions={event.sessions}
-                        speakers={event.speakers}
-                        onChange={() => router.reload({ only: ['event'] })}
-                    />
-                )}
-                {tab === 'Forms' && <FormsPanel event={event} />}
-                {tab === 'Cohorts' && <StratificationPanel event={event} />}
-                {tab === 'Abstracts' && <AbstractsPanel event={event} />}
-                {tab === 'Operations' && <OperationsPanel event={event} />}
-                {tab === 'Guests' && <GuestsTab event={event} registrations={registrations} />}
-                {tab === 'Blasts' && <BlastsPanel event={event} />}
-                {tab === 'Automations' && <NotificationsPanel event={event} />}
-                {tab === 'Check-in' && (
-                    <CheckInPanel
-                        event={event}
-                        sessions={event.sessions || []}
-                        scanUrl={route('tenant.events.checkin.scan', { event: event.id })}
-                        searchUrl={route('tenant.events.checkin.search', { event: event.id })}
-                        checkInUrlFor={(registrationId) =>
-                            route('tenant.events.checkin', {
-                                event: event.id,
-                                registration: registrationId,
-                            })
-                        }
-                    />
-                )}
-                {tab === 'Occupancy' && (
-                    <SessionOccupancyPanel
-                        event={event}
-                        onOpenScannerForSession={(session) => setTab('Check-in')}
-                    />
-                )}
-                {tab === 'Venue' && <VenuePanel event={event} venueRooms={event.venue_rooms} />}
-                {tab === 'Requests' && <RequestsPanel event={event} />}
-                {tab === 'Materials' && (
-                    <MaterialsPanel event={event} materials={event.materials} />
-                )}
-                {tab === 'Forum' && <ForumPanel event={event} />}
-                {tab === 'Live' && <EngagementPanel event={event} />}
-                {tab === 'Badges' && <BadgesPanel event={event} />}
-                {tab === 'Certificates' && <CertificatesPanel event={event} />}
-                {tab === 'Finance' && <FinancePanel event={event} />}
-                {tab === 'Sponsors' && <SponsorsPanel event={event} />}
-                {tab === 'Reports' && <ReportsPanel event={event} />}
-            </div>
+    return (
+        <EventWorkspace
+            event={event}
+            sections={sections}
+            current={current}
+            hrefFor={hrefFor}
+            actions={
+                <Button icon={Pencil} onClick={() => setEditing(true)}>
+                    Edit event
+                </Button>
+            }
+        >
+            {(panels[current] ?? panels.overview)()}
 
             {editing && (
                 <EventFormModal mode="edit" event={event} onClose={() => setEditing(false)} />
             )}
-        </ConsoleLayout>
+        </EventWorkspace>
     );
 }

@@ -52,7 +52,12 @@ function initials(name) {
         .toUpperCase();
 }
 
-export default function ConsoleLayout({ children }) {
+/**
+ * @param {boolean} compact  Inside an event the main menu shrinks to an icon rail
+ *                          from md up, which pays for the event's own section
+ *                          column. The phone drawer is unchanged.
+ */
+export default function ConsoleLayout({ children, compact = false }) {
     const { tenant, auth, url, flash } = usePage().props;
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : url;
     const toast = useToast();
@@ -88,15 +93,17 @@ export default function ConsoleLayout({ children }) {
             )}
             <aside
                 id="console-nav"
-                className={`fixed inset-y-0 left-0 z-35 flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface transition-transform duration-200 ease-out motion-reduce:transition-none md:static md:z-auto md:w-56 md:translate-x-0 ${
+                className={`fixed inset-y-0 left-0 z-35 flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface transition-transform duration-200 ease-out motion-reduce:transition-none md:static md:z-auto ${compact ? 'md:w-14' : 'md:w-56'} md:translate-x-0 ${
                     navOpen ? 'translate-x-0' : '-translate-x-full'
                 }`}
             >
-                <div className="flex items-center gap-2.5 border-b border-border px-4.5 py-4">
+                <div
+                    className={`flex items-center gap-2.5 border-b border-border px-4.5 py-4 ${compact ? 'md:justify-center md:px-0' : ''}`}
+                >
                     <div className="grid h-8 w-8 shrink-0 place-items-center bg-inverse text-xs font-semibold text-inverse-ink">
                         {initials(tenant?.name ?? 'MC')}
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className={`min-w-0 flex-1 ${compact ? 'md:hidden' : ''}`}>
                         <div className="truncate text-[13px] font-medium text-ink">
                             {tenant?.name}
                         </div>
@@ -104,7 +111,9 @@ export default function ConsoleLayout({ children }) {
                             {auth?.user?.email}
                         </div>
                     </div>
-                    <ThemeToggle />
+                    <div className={compact ? 'md:hidden' : undefined}>
+                        <ThemeToggle />
+                    </div>
                     <button
                         type="button"
                         onClick={() => setNavOpen(false)}
@@ -122,7 +131,10 @@ export default function ConsoleLayout({ children }) {
                             (!item.permission || auth?.can?.[item.permission])
                     ).map((item) => {
                         const href = route(item.href);
-                        const isActive = currentPath === new URL(href).pathname;
+                        const itemPath = new URL(href).pathname;
+                        // Inside an event, Events stays lit: /events/{id} is still Events.
+                        const isActive =
+                            currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
                         const Icon = item.icon;
 
                         return (
@@ -131,14 +143,19 @@ export default function ConsoleLayout({ children }) {
                                 href={href}
                                 aria-current={isActive ? 'page' : undefined}
                                 onClick={() => setNavOpen(false)}
+                                title={compact ? item.label : undefined}
                                 className={`flex items-center gap-2.5 px-4.5 py-1.75 text-[13px] transition-colors duration-120 ease-out ${
+                                    compact ? 'md:justify-center md:px-0 md:py-2.5' : ''
+                                } ${
                                     isActive
                                         ? 'bg-surface-hover text-ink shadow-[inset_2px_0_0_var(--color-accent)]'
                                         : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                                 }`}
                             >
                                 <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-                                {item.label}
+                                <span className={compact ? 'md:sr-only' : undefined}>
+                                    {item.label}
+                                </span>
                             </Link>
                         );
                     })}
