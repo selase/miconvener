@@ -168,6 +168,16 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::resource('admin/leads', App\Http\Controllers\Admin\LeadController::class)
         ->names('admin.leads');
 
+    // Superadmin Operations: run the allowlisted maintenance commands
+    Route::group(['prefix' => 'admin/operations', 'as' => 'admin.operations.'], function (): void {
+        Route::get('/', [App\Http\Controllers\Admin\OperationsController::class, 'index'])
+            ->name('index');
+        Route::post('/', [App\Http\Controllers\Admin\OperationsController::class, 'store'])
+            ->name('store');
+        Route::get('/{run}', [App\Http\Controllers\Admin\OperationsController::class, 'show'])
+            ->name('show');
+    });
+
     // Superadmin Global Billing & Analytics
     Route::group(['prefix' => 'admin/billing', 'as' => 'admin.billing.'], function (): void {
         Route::get('transactions', [App\Http\Controllers\Admin\BillingController::class, 'transactions'])

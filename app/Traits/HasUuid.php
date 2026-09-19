@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Traits;
 
 use Illuminate\Support\Str;
+use Ramsey\Uuid\UuidInterface;
 
 trait HasUuid
 {
@@ -19,7 +20,7 @@ trait HasUuid
         });
     }
 
-    public static function generateUuid()
+    public static function generateUuid(): UuidInterface
     {
         return Str::uuid();
     }

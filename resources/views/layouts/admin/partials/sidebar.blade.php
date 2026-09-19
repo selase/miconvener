@@ -458,6 +458,20 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->is('admin/operations*') ? 'active' : '' }}" href="{{ route('admin.operations.index') }}">
+                            <span class="menu-icon">
+                                <span class="svg-icon svg-icon-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path opacity="0.3" d="M22 12C22 17.5 17.5 22 12 22C6.5 22 2 17.5 2 12C2 6.5 6.5 2 12 2C17.5 2 22 6.5 22 12Z" fill="currentColor" />
+                                        <path d="M12 7C11.4 7 11 7.4 11 8V12C11 12.3 11.1 12.5 11.3 12.7L14.1 15.5C14.5 15.9 15.1 15.9 15.5 15.5C15.9 15.1 15.9 14.5 15.5 14.1L13 11.6V8C13 7.4 12.6 7 12 7Z" fill="currentColor" />
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="menu-title">Operations</span>
+                        </a>
+                    </div>
                 @endif
 
                 @if(auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('read application health'))
