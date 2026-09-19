@@ -88,6 +88,24 @@ test('a free tenant appears in the renewals list with no toggle button', functio
     $response->assertDontSee('Make complimentary');
 });
 
+test('the free filter keeps tenants the list itself labels Free', function () {
+    // The list renders a tenant with no package as 'Free', so filtering for
+    // Free has to return it. Filtering on the package alone dropped it.
+    $free = Package::factory()->create(['name' => 'Free', 'is_free' => true]);
+    $paid = Package::factory()->create(['name' => 'Growth', 'is_free' => false]);
+    Tenant::factory()->create(['name' => 'Freebie Org', 'package_id' => $free->id]);
+    Tenant::factory()->create(['name' => 'Unassigned Org', 'package_id' => null]);
+    Tenant::factory()->create(['name' => 'Paying Org', 'package_id' => $paid->id]);
+
+    $response = $this->actingAs($this->superadmin)
+        ->get(route('admin.billing.subscriptions.index', ['status' => 'free']));
+
+    $response->assertOk();
+    $response->assertSee('Freebie Org');
+    $response->assertSee('Unassigned Org');
+    $response->assertDontSee('Paying Org');
+});
+
 test('the status filter narrows to complimentary tenants', function () {
     $paid = Package::factory()->create(['is_free' => false]);
     Tenant::factory()->create(['name' => 'Comped Org', 'package_id' => $paid->id, 'billing_complimentary' => true]);
