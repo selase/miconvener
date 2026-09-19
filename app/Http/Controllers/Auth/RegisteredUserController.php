@@ -60,6 +60,11 @@ final class RegisteredUserController extends Controller
             'last_name' => $request->string('last_name')->toString(),
             'email' => $request->string('email')->toString(),
             'password' => Hash::make($request->string('password')->toString()),
+            // Without this the owner of every self-registered organization was
+            // left with a null status, which reads as "not active" -- so the
+            // guard that refuses to remove the final active Org Superadmin
+            // never fired for exactly the person it exists to protect.
+            'status' => User::STATUS_ACTIVE,
         ]);
 
         event(new Registered($user));
