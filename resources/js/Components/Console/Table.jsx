@@ -1,6 +1,11 @@
 export function Table({ children }) {
+    // Tables scroll inside their own box. Without this, a table wider than a
+    // phone pushed the whole console pane sideways -- header and tabs with it
+    // -- and the right-most column, where row actions live, was off-screen.
     return (
-        <table className="w-full border-collapse text-left text-sm">{children}</table>
+        <div className="w-full overflow-x-auto">
+            <table className="w-full border-collapse text-left text-sm">{children}</table>
+        </div>
     );
 }
 

@@ -4,15 +4,35 @@ import { Download } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 
 const OTHER_EXPORTS = [
-    { key: 'settlement', label: 'Settlement statement', route: 'tenant.events.finance.settlement-statement' },
+    {
+        key: 'settlement',
+        label: 'Settlement statement',
+        route: 'tenant.events.finance.settlement-statement',
+    },
     { key: 'checkins', label: 'Check-in log', route: 'tenant.events.reports.checkins' },
     { key: 'forum', label: 'Forum activity', route: 'tenant.events.reports.forum' },
     { key: 'polls', label: 'Poll results', route: 'tenant.events.reports.polls' },
-    { key: 'attendee-directory', label: 'Attendee directory', route: 'tenant.events.reports.attendee-directory' },
-    { key: 'session-attendance', label: 'Session attendance', route: 'tenant.events.reports.session-attendance' },
-    { key: 'dietary-accessibility', label: 'Dietary & accessibility summary', route: 'tenant.events.reports.dietary-accessibility' },
+    {
+        key: 'attendee-directory',
+        label: 'Attendee directory',
+        route: 'tenant.events.reports.attendee-directory',
+    },
+    {
+        key: 'session-attendance',
+        label: 'Session attendance',
+        route: 'tenant.events.reports.session-attendance',
+    },
+    {
+        key: 'dietary-accessibility',
+        label: 'Dietary & accessibility summary',
+        route: 'tenant.events.reports.dietary-accessibility',
+    },
     { key: 'audit-log', label: 'Audit log', route: 'tenant.events.reports.audit-log' },
-    { key: 'certificates', label: 'Certificates (ZIP)', route: 'tenant.events.reports.certificates' },
+    {
+        key: 'certificates',
+        label: 'Certificates (ZIP)',
+        route: 'tenant.events.reports.certificates',
+    },
 ];
 
 export default function ReportsPanel({ event }) {
@@ -28,7 +48,8 @@ export default function ReportsPanel({ event }) {
             });
     }, [event.id]);
 
-    const toggleCol = (key) => setCols((prev) => (prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]));
+    const toggleCol = (key) =>
+        setCols((prev) => (prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]));
 
     if (!data) {
         return <p className="text-sm text-ink-secondary">Loading…</p>;
@@ -39,25 +60,35 @@ export default function ReportsPanel({ event }) {
     return (
         <div className="max-w-4xl">
             <div className="mb-5 flex items-center justify-between">
-                <p className="text-sm text-ink-secondary">Anything here can leave as a spreadsheet.</p>
+                <p className="text-sm text-ink-secondary">
+                    Anything here can leave as a spreadsheet.
+                </p>
             </div>
 
-            <div className="mb-5 grid grid-cols-4 gap-px bg-border">
+            <div className="mb-5 grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Registrations</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{data.counts.registrations}</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {data.counts.registrations}
+                    </div>
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Checked in</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{data.counts.checked_in}</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {data.counts.checked_in}
+                    </div>
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Forum threads</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{data.counts.forum_threads}</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {data.counts.forum_threads}
+                    </div>
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Poll responses</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{data.counts.poll_responses}</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {data.counts.poll_responses}
+                    </div>
                 </div>
             </div>
 
@@ -80,10 +111,13 @@ export default function ReportsPanel({ event }) {
 
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3.5">
                     <span className="text-xs text-ink-secondary">
-                        <span className="font-mono">{cols.length}</span> columns selected, about <span className="font-mono">{data.counts.registrations}</span> rows
+                        <span className="font-mono">{cols.length}</span> columns selected, about{' '}
+                        <span className="font-mono">{data.counts.registrations}</span> rows
                     </span>
                     <a href={registrationsUrl}>
-                        <Button icon={Download} variant="primary" disabled={cols.length === 0}>Download CSV</Button>
+                        <Button icon={Download} variant="primary" disabled={cols.length === 0}>
+                            Download CSV
+                        </Button>
                     </a>
                 </div>
             </div>

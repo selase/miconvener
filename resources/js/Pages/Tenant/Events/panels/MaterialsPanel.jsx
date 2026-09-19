@@ -35,7 +35,10 @@ export default function MaterialsPanel({ event, materials }) {
         if (form.release_at) body.append('release_at', form.release_at);
         body.append('file', form.file);
 
-        const response = await csrfFetchFormData(route('tenant.events.materials.store', { event: event.id }), body);
+        const response = await csrfFetchFormData(
+            route('tenant.events.materials.store', { event: event.id }),
+            body
+        );
 
         setSaving(false);
 
@@ -50,13 +53,16 @@ export default function MaterialsPanel({ event, materials }) {
     };
 
     const remove = async (material) => {
-        await csrfFetch(route('tenant.events.materials.destroy', { event: event.id, material: material.id }), { method: 'DELETE' });
+        await csrfFetch(
+            route('tenant.events.materials.destroy', { event: event.id, material: material.id }),
+            { method: 'DELETE' }
+        );
         reload();
     };
 
     return (
         <div className="max-w-4xl">
-            <div className="mb-5 grid grid-cols-3 gap-4">
+            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="border border-border p-4">
                     <div className="text-xs text-ink-secondary">Files</div>
                     <div className="mt-1 text-2xl font-semibold text-ink">{materials.length}</div>
@@ -85,10 +91,15 @@ export default function MaterialsPanel({ event, materials }) {
                             <Tr key={m.id}>
                                 <Td>
                                     <div className="flex items-center gap-2.5">
-                                        <FileText className="h-4 w-4 shrink-0 text-ink-secondary" strokeWidth={1.5} />
+                                        <FileText
+                                            className="h-4 w-4 shrink-0 text-ink-secondary"
+                                            strokeWidth={1.5}
+                                        />
                                         <div>
                                             <div className="text-ink">{m.title}</div>
-                                            <div className="text-xs text-ink-secondary">{formatSize(m.file_size)}</div>
+                                            <div className="text-xs text-ink-secondary">
+                                                {formatSize(m.file_size)}
+                                            </div>
                                         </div>
                                     </div>
                                 </Td>
@@ -100,7 +111,10 @@ export default function MaterialsPanel({ event, materials }) {
                                     </StatusPill>
                                 </Td>
                                 <Td align="right">
-                                    <button onClick={() => remove(m)} className="text-ink-secondary hover:text-danger-fg">
+                                    <button
+                                        onClick={() => remove(m)}
+                                        className="text-ink-secondary hover:text-danger-fg"
+                                    >
                                         <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                                     </button>
                                 </Td>
@@ -120,7 +134,10 @@ export default function MaterialsPanel({ event, materials }) {
                     <tbody>
                         <tr>
                             <td colSpan={5}>
-                                <TableEmpty title="No materials yet" description="Upload slides or handouts for attendees to download." />
+                                <TableEmpty
+                                    title="No materials yet"
+                                    description="Upload slides or handouts for attendees to download."
+                                />
                             </td>
                         </tr>
                     </tbody>
@@ -129,15 +146,41 @@ export default function MaterialsPanel({ event, materials }) {
 
             <form onSubmit={upload} className="mt-5 border border-border p-4">
                 <b className="text-sm font-medium text-ink">Upload material</b>
-                <div className="mt-3.5 grid grid-cols-3 gap-3.5">
-                    <Input label="Title (optional)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Uses filename if blank" />
-                    <Input label="Attempts each" type="number" min="1" value={form.download_limit} onChange={(e) => setForm({ ...form, download_limit: e.target.value })} />
-                    <Input label="Release (optional)" type="datetime-local" value={form.release_at} onChange={(e) => setForm({ ...form, release_at: e.target.value })} />
+                <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                    <Input
+                        label="Title (optional)"
+                        value={form.title}
+                        onChange={(e) => setForm({ ...form, title: e.target.value })}
+                        placeholder="Uses filename if blank"
+                    />
+                    <Input
+                        label="Attempts each"
+                        type="number"
+                        min="1"
+                        value={form.download_limit}
+                        onChange={(e) => setForm({ ...form, download_limit: e.target.value })}
+                    />
+                    <Input
+                        label="Release (optional)"
+                        type="datetime-local"
+                        value={form.release_at}
+                        onChange={(e) => setForm({ ...form, release_at: e.target.value })}
+                    />
                 </div>
                 <div className="mt-3.5">
-                    <input type="file" onChange={(e) => setForm({ ...form, file: e.target.files[0] ?? null })} className="text-sm text-ink-secondary" />
+                    <input
+                        type="file"
+                        onChange={(e) => setForm({ ...form, file: e.target.files[0] ?? null })}
+                        className="text-sm text-ink-secondary"
+                    />
                 </div>
-                <Button type="submit" icon={Upload} variant="primary" className="mt-3.5" disabled={saving || !form.file}>
+                <Button
+                    type="submit"
+                    icon={Upload}
+                    variant="primary"
+                    className="mt-3.5"
+                    disabled={saving || !form.file}
+                >
                     {saving ? 'Uploading…' : 'Upload material'}
                 </Button>
             </form>

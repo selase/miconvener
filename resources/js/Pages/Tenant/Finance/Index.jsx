@@ -50,16 +50,24 @@ export default function Index({ transactions, stats, filters }) {
     const [refunding, setRefunding] = useState(null);
 
     const applyFilters = (overrides = {}) => {
-        router.get(route('tenant.finance.index'), { search, status: filters.status, ...overrides }, { preserveState: true });
+        router.get(
+            route('tenant.finance.index'),
+            { search, status: filters.status, ...overrides },
+            { preserveState: true }
+        );
     };
 
     const confirmRefund = () => {
-        router.post(route('tenant.finance.refund', { transaction: refunding.id }), {}, {
-            onFinish: () => {
-                setRefunding(null);
-                setSelected(null);
-            },
-        });
+        router.post(
+            route('tenant.finance.refund', { transaction: refunding.id }),
+            {},
+            {
+                onFinish: () => {
+                    setRefunding(null);
+                    setSelected(null);
+                },
+            }
+        );
     };
 
     return (
@@ -68,10 +76,16 @@ export default function Index({ transactions, stats, filters }) {
 
             <div className="flex">
                 <div className="min-w-0 flex-1 space-y-6 px-8 py-6">
-                    <div className="grid grid-cols-3 gap-4">
-                        <StatCard label="Total volume" value={(stats.total_volume / 100).toLocaleString()} />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <StatCard
+                            label="Total volume"
+                            value={(stats.total_volume / 100).toLocaleString()}
+                        />
                         <StatCard label="Transactions" value={stats.transaction_count} />
-                        <StatCard label="Refunded" value={(stats.refund_volume / 100).toLocaleString()} />
+                        <StatCard
+                            label="Refunded"
+                            value={(stats.refund_volume / 100).toLocaleString()}
+                        />
                     </div>
 
                     <div className="flex flex-wrap gap-3">
@@ -111,23 +125,40 @@ export default function Index({ transactions, stats, filters }) {
                                     flagged={transaction.status === 'failed'}
                                 >
                                     <Td>
-                                        <div className="font-medium text-ink">{transaction.customer_name ?? '—'}</div>
-                                        <div className="text-xs text-ink-secondary">{transaction.customer_email}</div>
+                                        <div className="font-medium text-ink">
+                                            {transaction.customer_name ?? '—'}
+                                        </div>
+                                        <div className="text-xs text-ink-secondary">
+                                            {transaction.customer_email}
+                                        </div>
                                     </Td>
-                                    <Td align="right" numeric>{transaction.currency} {transaction.amount_formatted}</Td>
+                                    <Td align="right" numeric>
+                                        {transaction.currency} {transaction.amount_formatted}
+                                    </Td>
                                     <Td>
-                                        <StatusPill status={STATUS_MAP[transaction.status] ?? 'neutral'}>
+                                        <StatusPill
+                                            status={STATUS_MAP[transaction.status] ?? 'neutral'}
+                                        >
                                             {STATUS_WORD[transaction.status] ?? transaction.status}
                                         </StatusPill>
                                     </Td>
-                                    <Td muted><span className="num">{transaction.provider_transaction_id}</span></Td>
-                                    <Td muted align="right" numeric>{transaction.created_at}</Td>
+                                    <Td muted>
+                                        <span className="num">
+                                            {transaction.provider_transaction_id}
+                                        </span>
+                                    </Td>
+                                    <Td muted align="right" numeric>
+                                        {transaction.created_at}
+                                    </Td>
                                 </Tr>
                             ))}
                             {transactions.data.length === 0 && (
                                 <tr>
                                     <td colSpan={5}>
-                                        <TableEmpty title="No transactions found" description="Try widening your filters." />
+                                        <TableEmpty
+                                            title="No transactions found"
+                                            description="Try widening your filters."
+                                        />
                                     </td>
                                 </tr>
                             )}
@@ -143,7 +174,9 @@ export default function Index({ transactions, stats, filters }) {
                                     {selected.amount_formatted} {selected.currency}
                                 </div>
                                 {selected.can_refund && (
-                                    <Button icon={Undo2} onClick={() => setRefunding(selected)}>Refund</Button>
+                                    <Button icon={Undo2} onClick={() => setRefunding(selected)}>
+                                        Refund
+                                    </Button>
                                 )}
                             </div>
 
@@ -158,11 +191,17 @@ export default function Index({ transactions, stats, filters }) {
                             <div className="mt-5 space-y-5">
                                 <DetailCard title="Customer">
                                     <CopyField label="Name" value={selected.customer_name ?? '—'} />
-                                    <CopyField label="Email" value={selected.customer_email ?? '—'} />
+                                    <CopyField
+                                        label="Email"
+                                        value={selected.customer_email ?? '—'}
+                                    />
                                 </DetailCard>
 
                                 <DetailCard title="Payment info">
-                                    <CopyField label="Reference" value={selected.provider_transaction_id} />
+                                    <CopyField
+                                        label="Reference"
+                                        value={selected.provider_transaction_id}
+                                    />
                                     <CopyField label="Provider" value={selected.provider} />
                                     <CopyField label="Type" value={selected.type} />
                                     <CopyField label="Date" value={selected.created_at} />
@@ -178,7 +217,10 @@ export default function Index({ transactions, stats, filters }) {
                 onClose={() => setRefunding(null)}
                 onConfirm={confirmRefund}
                 title="Refund transaction"
-                description={refunding && `Refund ${refunding.currency} ${refunding.amount_formatted} to ${refunding.customer_email}?`}
+                description={
+                    refunding &&
+                    `Refund ${refunding.currency} ${refunding.amount_formatted} to ${refunding.customer_email}?`
+                }
                 confirmLabel="Refund"
                 danger
             />

@@ -52,7 +52,9 @@ export default function EventFormModal({ mode, event, onClose }) {
 
     const scrollToFirstError = () => {
         setTimeout(() => {
-            const firstErrorEl = formRef.current?.querySelector('.text-danger-fg, [aria-invalid="true"]');
+            const firstErrorEl = formRef.current?.querySelector(
+                '.text-danger-fg, [aria-invalid="true"]'
+            );
             if (firstErrorEl) {
                 firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             } else if (formRef.current) {
@@ -72,7 +74,9 @@ export default function EventFormModal({ mode, event, onClose }) {
         if (file) {
             if (file.size > MAX_HERO_SIZE_BYTES) {
                 const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-                setFileError(`The selected file "${file.name}" is ${sizeMb}MB, which exceeds the 20MB limit. Please choose a smaller image.`);
+                setFileError(
+                    `The selected file "${file.name}" is ${sizeMb}MB, which exceeds the 20MB limit. Please choose a smaller image.`
+                );
                 setData('hero_image', null);
                 setPreviewUrl(null);
                 e.target.value = '';
@@ -123,7 +127,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                     <div className="flex items-start gap-3 rounded-lg border border-danger-border bg-danger-surface p-3.5 text-danger-fg">
                         <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
                         <div className="flex-1 text-sm">
-                            <div className="font-semibold">Please fix the following error{errorCount > 1 ? 's' : ''}:</div>
+                            <div className="font-semibold">
+                                Please fix the following error{errorCount > 1 ? 's' : ''}:
+                            </div>
                             <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs text-danger-fg">
                                 {Object.entries(activeErrors).map(([key, msg]) => (
                                     <li key={key}>{msg}</li>
@@ -143,7 +149,9 @@ export default function EventFormModal({ mode, event, onClose }) {
 
                 <div>
                     <div className="flex items-center justify-between">
-                        <label className="mb-1.5 block text-sm font-medium text-ink">Hero image</label>
+                        <label className="mb-1.5 block text-sm font-medium text-ink">
+                            Hero image
+                        </label>
                         <span className="text-xs text-ink-secondary">Max 20MB</span>
                     </div>
                     <input
@@ -153,15 +161,24 @@ export default function EventFormModal({ mode, event, onClose }) {
                         className="block w-full text-sm text-ink-secondary file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
                     />
                     <p className="mt-1 text-xs text-ink-secondary">
-                        Supported formats: PNG, JPG, WebP, SVG. Recommended ratio: 16:9 (e.g. 1920×1080).
+                        Supported formats: PNG, JPG, WebP, SVG. Recommended ratio: 16:9 (e.g.
+                        1920×1080).
                     </p>
                     {previewUrl ? (
                         <div className="mt-2">
-                            <img src={previewUrl} alt="Preview" className="h-28 w-full rounded-md object-cover border border-border" />
+                            <img
+                                src={previewUrl}
+                                alt="Preview"
+                                className="h-28 w-full rounded-md object-cover border border-border"
+                            />
                         </div>
                     ) : event?.hero_image_url && !data.hero_image ? (
                         <div className="mt-2">
-                            <img src={event.hero_image_url} alt="Current hero" className="h-28 w-full rounded-md object-cover border border-border" />
+                            <img
+                                src={event.hero_image_url}
+                                alt="Current hero"
+                                className="h-28 w-full rounded-md object-cover border border-border"
+                            />
                         </div>
                     ) : null}
                     {(fileError || errors.hero_image) && (
@@ -180,7 +197,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                         rows={3}
                         className="w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     />
-                    {errors.description && <p className="mt-1 text-sm text-danger-fg">{errors.description}</p>}
+                    {errors.description && (
+                        <p className="mt-1 text-sm text-danger-fg">{errors.description}</p>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -228,7 +247,7 @@ export default function EventFormModal({ mode, event, onClose }) {
                     />
                 )}
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <Input
                         label="Capacity"
                         type="number"
@@ -257,7 +276,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                     />
                 </div>
                 <p className="-mt-3 text-xs text-ink-secondary">
-                    Default price is used only if this event has no ticket types. Add ticket types (e.g. In-Person / Virtual, each with its own price) from the event page after creating it.
+                    Default price is used only if this event has no ticket types. Add ticket types
+                    (e.g. In-Person / Virtual, each with its own price) from the event page after
+                    creating it.
                 </p>
 
                 <Select
@@ -270,9 +291,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                     <option value="attendee">The attendee — it is added at checkout</option>
                 </Select>
                 <p className="-mt-3 text-xs text-ink-secondary">
-                    Choose &ldquo;the attendee&rdquo; and the platform fee is added to what the buyer
-                    pays instead of coming out of your ticket price. Payment processing is deducted
-                    from your payout either way.
+                    Choose &ldquo;the attendee&rdquo; and the platform fee is added to what the
+                    buyer pays instead of coming out of your ticket price. Payment processing is
+                    deducted from your payout either way.
                 </p>
 
                 <label className="flex items-center gap-2.5 text-sm text-ink">
@@ -286,7 +307,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                 </label>
 
                 <div>
-                    <label className="mb-1.5 block text-sm font-medium text-ink">Plan your visit (optional)</label>
+                    <label className="mb-1.5 block text-sm font-medium text-ink">
+                        Plan your visit (optional)
+                    </label>
                     <textarea
                         value={data.plan_your_visit_content}
                         onChange={(e) => setData('plan_your_visit_content', e.target.value)}
@@ -294,7 +317,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                         placeholder="Venue directions, parking, visa letters, accommodation..."
                         className="w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     />
-                    <p className="mt-1 text-xs text-ink-secondary">Only shown on the public page if filled in.</p>
+                    <p className="mt-1 text-xs text-ink-secondary">
+                        Only shown on the public page if filled in.
+                    </p>
                 </div>
 
                 <Select
@@ -313,7 +338,8 @@ export default function EventFormModal({ mode, event, onClose }) {
                         <div className="flex items-center gap-2">
                             <AlertCircle className="h-4 w-4 shrink-0" strokeWidth={1.9} />
                             <span>
-                                {errorCount} error{errorCount > 1 ? 's' : ''} found above. Please correct {errorCount > 1 ? 'them' : 'it'} before saving.
+                                {errorCount} error{errorCount > 1 ? 's' : ''} found above. Please
+                                correct {errorCount > 1 ? 'them' : 'it'} before saving.
                             </span>
                         </div>
                         <button

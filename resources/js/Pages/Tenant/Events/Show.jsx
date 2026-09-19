@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
@@ -115,7 +115,7 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
                 </div>
             )}
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <div className="rounded-lg border border-border p-4">
                     <div className="text-xs text-ink-secondary">Registrations</div>
                     <div className="mt-1 text-2xl font-semibold text-ink">{confirmedCount}</div>
@@ -147,10 +147,10 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
                 <p className="text-xs text-ink-secondary">
                     On a {formatAmount(event.fee_preview.ticket_amount, event.currency)} ticket the
                     buyer pays {formatAmount(event.fee_preview.charged_amount, event.currency)}, and
-                    you receive {formatAmount(event.fee_preview.organizer_net, event.currency)} after
-                    the {event.fee_preview.percentage}% platform fee
-                    {event.fee_preview.cap_applied ? ' (capped)' : ''} and an estimated
-                    {' '}{formatAmount(event.fee_preview.gateway_fee_estimate, event.currency)} in
+                    you receive {formatAmount(event.fee_preview.organizer_net, event.currency)}{' '}
+                    after the {event.fee_preview.percentage}% platform fee
+                    {event.fee_preview.cap_applied ? ' (capped)' : ''} and an estimated{' '}
+                    {formatAmount(event.fee_preview.gateway_fee_estimate, event.currency)} in
                     payment processing.
                 </p>
             )}
@@ -340,8 +340,34 @@ export default function Show({
     settlementMode,
     publicUrl,
 }) {
-    const [tab, setTab] = useState('Overview');
+    // The open tab lives in the URL: on event day a refresh on the check-in
+    // screen dropped staff back to Overview, and a tab could not be linked.
+    const [tab, setTabState] = useState(() => {
+        const requested =
+            typeof window !== 'undefined'
+                ? new URLSearchParams(window.location.search).get('tab')
+                : null;
+        return TABS.includes(requested) ? requested : 'Overview';
+    });
+    const setTab = (label) => {
+        setTabState(label);
+        const url = new URL(window.location.href);
+        if (label === 'Overview') {
+            url.searchParams.delete('tab');
+        } else {
+            url.searchParams.set('tab', label);
+        }
+        // replaceState, not a visit: switching tabs is not a navigation, and
+        // Inertia keeps its own page state in history.state.
+        window.history.replaceState(window.history.state, '', url);
+    };
     const [editing, setEditing] = useState(false);
+    // Twenty-five tabs overflow a phone's width, so an active tab restored from
+    // the URL could sit off-screen with nothing showing which one is open.
+    const activeTabRef = useRef(null);
+    useEffect(() => {
+        activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }, [tab]);
 
     return (
         <ConsoleLayout>
@@ -359,7 +385,9 @@ export default function Show({
                     {TABS.map((label) => (
                         <button
                             key={label}
+                            ref={tab === label ? activeTabRef : undefined}
                             type="button"
+                            aria-current={tab === label ? 'page' : undefined}
                             onClick={() => setTab(label)}
                             className={`shrink-0 border-b-2 py-3 text-sm font-medium transition-colors ${
                                 tab === label
