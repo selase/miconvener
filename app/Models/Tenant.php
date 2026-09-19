@@ -13,8 +13,10 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Permission\Traits\HasRoles;
 
 final class Tenant extends Model
@@ -193,7 +195,10 @@ final class Tenant extends Model
         return $this->settlement_mode === self::SETTLEMENT_MODE_PLATFORM_DEFAULT;
     }
 
-    public function package()
+    /**
+     * @return BelongsTo<Package, $this>
+     */
+    public function package(): BelongsTo
     {
         return $this->belongsTo(Package::class);
     }
@@ -203,7 +208,10 @@ final class Tenant extends Model
         return $this->hasMany(Subscription::class);
     }
 
-    public function latestSubscription()
+    /**
+     * @return HasOne<Subscription, $this>
+     */
+    public function latestSubscription(): HasOne
     {
         return $this->hasOne(Subscription::class)->latestOfMany();
     }
@@ -301,6 +309,9 @@ final class Tenant extends Model
         return $this->hasMany(TenantFeatureUsage::class);
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\MorphMany<UsagePrice, $this>
+     */
     public function usagePrices(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         return $this->morphMany(UsagePrice::class, 'target');

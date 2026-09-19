@@ -9,6 +9,7 @@ use App\Traits\SpatieActivityLogs;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class WebhookCall extends Model
 {
@@ -22,7 +23,10 @@ final class WebhookCall extends Model
         'payload' => 'array',
     ];
 
-    public function endpoint()
+    /**
+     * @return BelongsTo<WebhookEndpoint, $this>
+     */
+    public function endpoint(): BelongsTo
     {
         return $this->belongsTo(WebhookEndpoint::class, 'webhook_endpoint_id');
     }
