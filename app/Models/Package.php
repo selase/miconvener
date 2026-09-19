@@ -8,6 +8,7 @@ use App\Traits\HasUuid;
 use App\Traits\SpatieActivityLogs;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 final class Package extends Model
 {
@@ -81,13 +82,19 @@ final class Package extends Model
         return $interval === 'year' ? (float) ($this->yearly_price ?? $this->price * 10) : (float) $this->price;
     }
 
-    public function features()
+    /**
+     * @return BelongsToMany<Feature, $this>
+     */
+    public function features(): BelongsToMany
     {
         return $this->belongsToMany(Feature::class, 'package_features')
             ->withPivot('value')
             ->withTimestamps();
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\MorphMany<UsagePrice, $this>
+     */
     public function usagePrices(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         return $this->morphMany(UsagePrice::class, 'target');

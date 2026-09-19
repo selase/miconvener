@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 
 final class Permission extends SpatiePermission
@@ -37,7 +38,10 @@ final class Permission extends SpatiePermission
 
     protected $connection = 'landlord';
 
-    public function features()
+    /**
+     * @return BelongsToMany<Feature, $this>
+     */
+    public function features(): BelongsToMany
     {
         return $this->belongsToMany(Feature::class, 'feature_permissions');
     }

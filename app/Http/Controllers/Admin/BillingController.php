@@ -12,6 +12,7 @@ use App\Models\Transaction;
 use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\SubscriptionRenewalService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -75,11 +76,12 @@ final class BillingController extends Controller
         if ($status === 'complimentary') {
             $query->where('billing_complimentary', true);
         } elseif ($status === 'free') {
-            // whereHas('package', ...) needs the relation's return type declared
-            // for PHPStan to recognize it; Tenant::package() isn't (a wider
-            // typing pass belongs in its own change), so this filters by a
-            // plain subquery on Package instead.
-            $query->whereIn('package_id', Package::query()->where('is_free', true)->select('id'));
+            // A tenant with no package at all is shown as 'Free' in the list
+            // below, so the filter has to match it too -- filtering on the
+            // package alone hid exactly the rows the page labels Free.
+            $query->where(fn (Builder $q) => $q
+                ->whereNull('package_id')
+                ->orWhereHas('package', fn (Builder $p) => $p->where('is_free', true)));
         } elseif (in_array($status, [Subscription::STATUS_ACTIVE, Subscription::STATUS_PAST_DUE], true)) {
             $query->where('billing_complimentary', false)
                 ->whereHas('subscriptions', fn ($q) => $q->where('provider_id', 'like', 'ps\_%')->where('provider_status', $status));

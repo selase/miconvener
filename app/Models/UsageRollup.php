@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enum\UsageMetric;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class UsageRollup extends Model
 {
@@ -34,7 +35,10 @@ final class UsageRollup extends Model
         return md5(json_encode($dimensions));
     }
 
-    public function tenant()
+    /**
+     * @return BelongsTo<Tenant, $this>
+     */
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }

@@ -8,6 +8,7 @@ use App\Traits\HasUuid;
 use App\Traits\SpatieActivityLogs;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 final class Feature extends Model
 {
@@ -23,14 +24,20 @@ final class Feature extends Model
         'description',
     ];
 
-    public function packages()
+    /**
+     * @return BelongsToMany<Package, $this>
+     */
+    public function packages(): BelongsToMany
     {
         return $this->belongsToMany(Package::class, 'package_features')
             ->withPivot('value')
             ->withTimestamps();
     }
 
-    public function permissions()
+    /**
+     * @return BelongsToMany<Permission, $this>
+     */
+    public function permissions(): BelongsToMany
     {
         return $this->belongsToMany(Permission::class, 'feature_permissions');
     }

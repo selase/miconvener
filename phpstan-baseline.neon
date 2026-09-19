@@ -217,12 +217,6 @@ parameters:
 			path: app/Http/Controllers/Admin/AuditTrailController.php
 
 		-
-			rawMessage: Relation 'tenant' is not found in App\Models\Transaction model.
-			identifier: larastan.relationExistence
-			count: 2
-			path: app/Http/Controllers/Admin/BillingController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Admin\FeatureController::destroy() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -243,12 +237,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Http\Controllers\Admin\FeatureController::update() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Admin/FeatureController.php
-
-		-
-			rawMessage: Relation 'permissions' is not found in App\Models\Feature model.
-			identifier: larastan.relationExistence
 			count: 1
 			path: app/Http/Controllers/Admin/FeatureController.php
 
@@ -369,12 +357,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Http\Controllers\Admin\PackageController::update() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Admin/PackageController.php
-
-		-
-			rawMessage: Relation 'features' is not found in App\Models\Package model.
-			identifier: larastan.relationExistence
 			count: 1
 			path: app/Http/Controllers/Admin/PackageController.php
 
@@ -523,12 +505,6 @@ parameters:
 			path: app/Http/Controllers/Admin/TenantController.php
 
 		-
-			rawMessage: Relation 'package' is not found in App\Models\Tenant model.
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Http/Controllers/Admin/TenantHealthController.php
-
-		-
 			rawMessage: Access to an undefined property App\Models\User::$gravatar.
 			identifier: property.notFound
 			count: 1
@@ -607,26 +583,8 @@ parameters:
 			path: app/Http/Controllers/Auth/VerifyEmailController.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Package::$features.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Billing/BillingController.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$package.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Billing/BillingController.php
-
-		-
 			rawMessage: Access to an undefined property App\Models\User::$latestTenant.
 			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Billing/BillingController.php
-
-		-
-			rawMessage: Relation 'features' is not found in App\Models\Package model.
-			identifier: larastan.relationExistence
 			count: 1
 			path: app/Http/Controllers/Billing/BillingController.php
 
@@ -3457,12 +3415,6 @@ parameters:
 			path: app/Http/Middleware/AuthenticateWithApiKey.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$package.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/ThrottleLlmRequests.php
-
-		-
 			rawMessage: 'Call to an undefined method Symfony\Component\HttpFoundation\Response::withHeaders().'
 			identifier: method.notFound
 			count: 1
@@ -4105,13 +4057,7 @@ parameters:
 			path: app/Listeners/WebhookEventSubscriber.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Package::$features.
-			identifier: property.notFound
-			count: 2
-			path: app/Livewire/Tenant/SubscriptionManager.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$package.
+			rawMessage: Access to an undefined property App\Models\Feature::$pivot.
 			identifier: property.notFound
 			count: 2
 			path: app/Livewire/Tenant/SubscriptionManager.php
@@ -4123,13 +4069,7 @@ parameters:
 			path: app/Livewire/Tenant/SubscriptionManager.php
 
 		-
-			rawMessage: Relation 'features' is not found in App\Models\Package model.
-			identifier: larastan.relationExistence
-			count: 2
-			path: app/Livewire/Tenant/SubscriptionManager.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$package.
+			rawMessage: Access to an undefined property App\Models\Feature::$pivot.
 			identifier: property.notFound
 			count: 1
 			path: app/Livewire/Tenant/UsageDashboard.php
@@ -5977,18 +5917,6 @@ parameters:
 			path: app/Models/Feature.php
 
 		-
-			rawMessage: 'Method App\Models\Feature::packages() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Feature.php
-
-		-
-			rawMessage: 'Method App\Models\Feature::permissions() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Feature.php
-
-		-
 			rawMessage: 'Class App\Models\Invoice uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -6247,28 +6175,10 @@ parameters:
 			path: app/Models/Package.php
 
 		-
-			rawMessage: 'Method App\Models\Package::features() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Package.php
-
-		-
 			rawMessage: 'Method App\Models\Package::generateUuid() has no return type specified.'
 			identifier: missingType.return
 			count: 1
 			path: app/Models/Package.php
-
-		-
-			rawMessage: 'Method App\Models\Package::usagePrices() return type with generic class Illuminate\Database\Eloquent\Relations\MorphMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Package.php
-
-		-
-			rawMessage: 'Method App\Models\Permission::features() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Permission.php
 
 		-
 			rawMessage: 'Method App\Models\Permission::generateUuid() has no return type specified.'
@@ -6439,9 +6349,9 @@ parameters:
 			path: app/Models/Tax.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$package.
+			rawMessage: Access to an undefined property App\Models\Feature::$pivot.
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/Tenant.php
 
 		-
@@ -6493,20 +6403,8 @@ parameters:
 			path: app/Models/Tenant.php
 
 		-
-			rawMessage: 'Method App\Models\Tenant::latestSubscription() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Tenant.php
-
-		-
 			rawMessage: 'Method App\Models\Tenant::logoUrl() return type with generic class Illuminate\Database\Eloquent\Casts\Attribute does not specify its types: TGet, TSet'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/Tenant.php
-
-		-
-			rawMessage: 'Method App\Models\Tenant::package() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/Tenant.php
 
@@ -6572,12 +6470,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\Tenant::usage() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Tenant.php
-
-		-
-			rawMessage: 'Method App\Models\Tenant::usagePrices() return type with generic class Illuminate\Database\Eloquent\Relations\MorphMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Tenant.php
@@ -6651,12 +6543,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Models\TenantFeatureUsage::scopeCurrentPeriod() has parameter $query with no type specified.'
 			identifier: missingType.parameter
-			count: 1
-			path: app/Models/TenantFeatureUsage.php
-
-		-
-			rawMessage: 'Method App\Models\TenantFeatureUsage::tenant() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/TenantFeatureUsage.php
 
@@ -6769,20 +6655,8 @@ parameters:
 			path: app/Models/Transaction.php
 
 		-
-			rawMessage: 'Method App\Models\Transaction::tenant() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Transaction.php
-
-		-
 			rawMessage: 'Class App\Models\UsageEvent uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/UsageEvent.php
-
-		-
-			rawMessage: 'Method App\Models\UsageEvent::tenant() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/UsageEvent.php
 
@@ -6831,12 +6705,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Models\UsageRollup::hashDimensions() has parameter $dimensions with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
-			count: 1
-			path: app/Models/UsageRollup.php
-
-		-
-			rawMessage: 'Method App\Models\UsageRollup::tenant() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/UsageRollup.php
 
@@ -6943,12 +6811,6 @@ parameters:
 			path: app/Models/WebhookCall.php
 
 		-
-			rawMessage: 'Method App\Models\WebhookCall::endpoint() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/WebhookCall.php
-
-		-
 			rawMessage: 'Method App\Models\WebhookCall::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -6957,18 +6819,6 @@ parameters:
 		-
 			rawMessage: 'Class App\Models\WebhookEndpoint uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/WebhookEndpoint.php
-
-		-
-			rawMessage: 'Method App\Models\WebhookEndpoint::calls() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/WebhookEndpoint.php
-
-		-
-			rawMessage: 'Method App\Models\WebhookEndpoint::tenant() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/WebhookEndpoint.php
 
@@ -7765,12 +7615,6 @@ parameters:
 			path: app/Services/Stratification/ParticipantStratificationService.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Permission::$features.
-			identifier: property.notFound
-			count: 2
-			path: app/Services/Tenancy/EntitlementService.php
-
-		-
 			rawMessage: 'Method App\Services\Tenancy\EntitlementService::getAllowedPermissionsForTenant() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
@@ -7783,22 +7627,10 @@ parameters:
 			path: app/Services/Tenancy/EntitlementService.php
 
 		-
-			rawMessage: Relation 'permissions' is not found in App\Models\Feature model.
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Services/Tenancy/EntitlementService.php
-
-		-
 			rawMessage: 'Method App\Services\Tenancy\FeatureMeteringService::getUsage() return type has no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Services/Tenancy/FeatureMeteringService.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$package.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Tenancy/InvoicingService.php
 
 		-
 			rawMessage: Access to an undefined property App\Models\UsageRollup::$total_value.
@@ -7823,12 +7655,6 @@ parameters:
 			identifier: missingType.return
 			count: 1
 			path: app/Services/Tenancy/PdfInvoiceService.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$package.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Tenancy/PricingService.php
 
 		-
 			rawMessage: 'Method App\Services\Tenancy\RoleDuplicationService::duplicateRole() has parameter $permissions with no value type specified in iterable type array.'
