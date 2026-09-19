@@ -55,6 +55,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('/account/two-factor/disable', [AccountController::class, 'disable'])
         ->middleware('throttle:two-factor')
         ->name('tenant.account.two-factor.disable');
+    Route::post('/account/two-factor/recovery-codes', [AccountController::class, 'regenerateRecoveryCodes'])
+        ->middleware('throttle:two-factor')
+        ->name('tenant.account.two-factor.recovery-codes');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('tenant.dashboard');

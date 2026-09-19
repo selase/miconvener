@@ -21,8 +21,16 @@ final class TwoFactorChallengeController extends Controller
         ]);
 
         $google2fa = app('pragmarx.google2fa');
+        $user = $request->user();
+        $submitted = (string) $request->input('one_time_password');
 
-        if ($google2fa->verifyKey($request->user()->two_factor_secret, $request->one_time_password)) {
+        // A recovery code is accepted in the same field: someone locked out of
+        // their authenticator is already having a bad day, and an organization
+        // that requires 2FA gives them no other way back in.
+        $passed = $google2fa->verifyKey($user->two_factor_secret, $submitted)
+            || $user->useTwoFactorRecoveryCode($submitted);
+
+        if ($passed) {
             $request->session()->put('google2fa', [
                 'auth_passed' => true,
                 'auth_time' => now(),

@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { ShieldCheck } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
@@ -6,9 +6,22 @@ import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 
 export default function Account({ account, setup }) {
+    const { flash } = usePage().props;
     const setupForm = useForm({});
     const confirmForm = useForm({ code: '' });
     const disableForm = useForm({ password: '' });
+    const recoveryForm = useForm({ password: '' });
+
+    // Shown once, on the response that generated them: nothing reads them back
+    // out of storage, so there is no second chance to see them.
+    const recoveryCodes = flash?.recovery_codes;
+
+    const regenerate = (event) => {
+        event.preventDefault();
+        recoveryForm.post(route('tenant.account.two-factor.recovery-codes'), {
+            onSuccess: () => recoveryForm.reset(),
+        });
+    };
 
     const confirm = (event) => {
         event.preventDefault();
@@ -63,6 +76,28 @@ export default function Account({ account, setup }) {
                         </p>
                     )}
 
+                    {recoveryCodes && (
+                        <div className="mt-5 rounded-lg border border-warning-fg/30 bg-warning-bg px-4 py-3">
+                            <p className="text-sm font-medium text-warning-fg">
+                                Save these recovery codes now
+                            </p>
+                            <p className="mt-1 text-sm text-warning-fg">
+                                Each one signs you in once if you lose your authenticator. This is
+                                the only time they are shown.
+                            </p>
+                            <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+                                {recoveryCodes.map((code) => (
+                                    <li
+                                        key={code}
+                                        className="select-all font-mono text-sm text-warning-fg"
+                                    >
+                                        {code}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     {account.two_factor_enabled ? (
                         <div className="mt-6 space-y-5">
                             <p className="text-sm font-medium text-success-fg">
@@ -71,6 +106,30 @@ export default function Account({ account, setup }) {
                                     ? ` on ${account.two_factor_confirmed_at}`
                                     : ''}
                             </p>
+
+                            <form
+                                onSubmit={regenerate}
+                                className="space-y-3 border-t border-border pt-5"
+                            >
+                                <p className="text-sm text-ink-secondary">
+                                    {account.has_recovery_codes
+                                        ? 'Generating new recovery codes replaces the ones you have now.'
+                                        : 'You have no recovery codes. Generate a set so losing your authenticator does not lock you out.'}
+                                </p>
+                                <Input
+                                    label="Password"
+                                    type="password"
+                                    value={recoveryForm.data.password}
+                                    onChange={(event) =>
+                                        recoveryForm.setData('password', event.target.value)
+                                    }
+                                    error={recoveryForm.errors.password}
+                                />
+                                <Button type="submit" disabled={recoveryForm.processing}>
+                                    Generate recovery codes
+                                </Button>
+                            </form>
+
                             {!account.two_factor_required && (
                                 <form
                                     onSubmit={disable}

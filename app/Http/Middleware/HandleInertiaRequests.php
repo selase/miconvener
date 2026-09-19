@@ -73,6 +73,9 @@ final class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'plainKey' => fn () => $request->session()->get('plainKey'),
+                // Two-factor recovery codes are shown on exactly the response
+                // that generated them; they are not readable afterwards.
+                'recovery_codes' => fn () => $request->session()->get('recovery_codes'),
             ],
         ];
     }
