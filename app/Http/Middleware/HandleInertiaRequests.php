@@ -48,6 +48,13 @@ final class HandleInertiaRequests extends Middleware
                 // checks the permission itself.
                 'can' => [
                     'manage_billing' => fn (): bool => (bool) $request->user()?->can('manage billing'),
+                    'read_finance' => fn (): bool => (bool) $request->user()?->can('read finance'),
+                    'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),
+                    'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
+                    'manage_payment_settings' => fn (): bool => (bool) $request->user()?->can('manage payment settings'),
+                    'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
+                    'update_user' => fn (): bool => (bool) $request->user()?->can('update user'),
+                    'delete_user' => fn (): bool => (bool) $request->user()?->can('delete user'),
                 ],
             ],
             'tenant' => $tenant ? [
@@ -66,6 +73,9 @@ final class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'plainKey' => fn () => $request->session()->get('plainKey'),
+                // Two-factor recovery codes are shown on exactly the response
+                // that generated them; they are not readable afterwards.
+                'recovery_codes' => fn () => $request->session()->get('recovery_codes'),
             ],
         ];
     }

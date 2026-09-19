@@ -149,6 +149,11 @@ test('registration creates a tenant for the new user', function () {
     setPermissionsTeamId($tenant->id);
     expect($user->hasRole('Org Superadmin'))->toBeTrue();
     expect($user->can('manage organization settings'))->toBeTrue();
+
+    // A null status reads as "not active", which made the owner invisible to
+    // every check that counts a tenant's active Org Superadmins -- including
+    // the one that refuses to remove the last of them.
+    expect($user->status)->toBe(App\Models\User::STATUS_ACTIVE);
 });
 
 test('registration requires all fields', function () {

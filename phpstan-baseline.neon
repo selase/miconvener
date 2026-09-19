@@ -391,12 +391,6 @@ parameters:
 			path: app/Http/Controllers/Admin/ResendAccountPasswordController.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Role::$tenant_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/RoleController.php
-
-		-
 			rawMessage: Access to an undefined property Spatie\Permission\Contracts\Role::$tenant_id.
 			identifier: property.notFound
 			count: 1
@@ -3325,12 +3319,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/LlmUsageController.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Role::$tenant_id.
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Tenant/RoleController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\RoleController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -3425,48 +3413,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Http/Requests/Auth/LoginRequest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Role|Illuminate\Database\Eloquent\Collection<int, App\Models\Role>::$tenant_id.'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Requests/Tenant/DuplicateRoleRequest.php
-
-		-
-			rawMessage: Access to an undefined property Spatie\Permission\Contracts\Role::$tenant_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Requests/Tenant/StoreTeamMemberRequest.php
-
-		-
-			rawMessage: 'Call to an undefined method Spatie\Permission\Contracts\Role::isSystemRole().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Requests/Tenant/StoreTeamMemberRequest.php
-
-		-
-			rawMessage: Negated boolean expression is always false.
-			identifier: booleanNot.alwaysFalse
-			count: 1
-			path: app/Http/Requests/Tenant/StoreTeamMemberRequest.php
-
-		-
-			rawMessage: Access to an undefined property Spatie\Permission\Contracts\Role::$tenant_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Requests/Tenant/UpdateTeamMemberRequest.php
-
-		-
-			rawMessage: 'Call to an undefined method Spatie\Permission\Contracts\Role::isSystemRole().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Requests/Tenant/UpdateTeamMemberRequest.php
-
-		-
-			rawMessage: Negated boolean expression is always false.
-			identifier: booleanNot.alwaysFalse
-			count: 1
-			path: app/Http/Requests/Tenant/UpdateTeamMemberRequest.php
 
 		-
 			rawMessage: Access to an undefined property Spatie\Permission\Contracts\Role::$tenant_id.
@@ -6269,12 +6215,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/PmIntegration.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Role::$tenant_id.
-			identifier: property.notFound
-			count: 2
-			path: app/Models/Role.php
 
 		-
 			rawMessage: 'Method App\Models\Role::clonedFromRole() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'

@@ -8,7 +8,7 @@
         <div class="text-center mb-10">
             <h1 class="text-dark mb-3">Two-Factor Authentication</h1>
             <div class="text-gray-400 fw-bold fs-4">
-                Please enter the 6-digit code from your authenticator app to complete the login process.
+                Enter the 6-digit code from your authenticator app. If you cannot reach it, enter one of your recovery codes instead.
             </div>
             
             @if ($errors->any())
@@ -23,14 +23,13 @@
         </div>
 
         <div class="fv-row mb-10">
-            <label class="form-label fs-6 fw-bolder text-dark">Authentication Code</label>
-            <input class="form-control form-control-lg form-control-solid text-center" 
-                type="text" 
-                name="one_time_password" 
-                inputmode="numeric" 
-                pattern="[0-9]*" 
-                autocomplete="one-time-code" 
-                placeholder="000000" 
+            <label class="form-label fs-6 fw-bolder text-dark">Authentication or recovery code</label>
+            {{-- No numeric pattern here: it would refuse to submit a recovery code. --}}
+            <input class="form-control form-control-lg form-control-solid text-center"
+                type="text"
+                name="one_time_password"
+                autocomplete="one-time-code"
+                placeholder="000000"
                 autofocus />
         </div>
 

@@ -144,13 +144,10 @@ test('a direct POST cannot refund a transaction that has already been refunded',
     expect(MerchantTransaction::where('tenant_id', $tenant->id)->where('type', 'refund')->count())->toBe(0);
 });
 
-test('a tenant user without the update event permission cannot issue a refund', function () {
+test('an org admin with event update access cannot issue a refund', function () {
     Http::preventStrayRequests();
 
-    $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
-    $user = User::factory()->create(['tenant_id' => $tenant->id]);
-    setPermissionsTeamId($tenant->id);
-    $tenant->users()->attach($user->id);
+    [$tenant, $user] = financeRefundHost('acme', 'Org Admin');
 
     $host = financeRefundSubdomain('acme');
 

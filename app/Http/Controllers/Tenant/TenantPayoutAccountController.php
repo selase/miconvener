@@ -18,7 +18,7 @@ final class TenantPayoutAccountController extends Controller
 {
     public function index(string $subdomain): JsonResponse
     {
-        $this->authorize('manage organization settings');
+        $this->authorize('manage payment settings');
         $tenant = $this->getTenant();
 
         $accounts = TenantPayoutAccount::where('tenant_id', $tenant->id)->orderByDesc('created_at')->get();
@@ -28,7 +28,7 @@ final class TenantPayoutAccountController extends Controller
 
     public function store(Request $request, string $subdomain, SettlementGateway $settlementGateway): JsonResponse
     {
-        $this->authorize('manage organization settings');
+        $this->authorize('manage payment settings');
         $tenant = $this->getTenant();
 
         $validated = $request->validate([
@@ -61,14 +61,14 @@ final class TenantPayoutAccountController extends Controller
 
     public function banks(string $subdomain, SettlementGateway $settlementGateway): JsonResponse
     {
-        $this->authorize('manage organization settings');
+        $this->authorize('manage payment settings');
 
         return response()->json($settlementGateway->listBanks());
     }
 
     public function destroy(string $subdomain, string $account): JsonResponse
     {
-        $this->authorize('manage organization settings');
+        $this->authorize('manage payment settings');
         $tenant = $this->getTenant();
 
         $accountModel = TenantPayoutAccount::where('tenant_id', $tenant->id)->where('id', $account)->firstOrFail();

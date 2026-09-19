@@ -22,7 +22,7 @@ final class PaymentSettingsController extends Controller
      */
     public function index(): View
     {
-        $this->authorize('manage organization settings');
+        $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
         // The same check that lets a tenant sell paid tickets: whoever can take
@@ -54,7 +54,7 @@ final class PaymentSettingsController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
-        $this->authorize('manage organization settings');
+        $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
         if (! $tenant->handlesTicketMoney()) {
@@ -93,7 +93,7 @@ final class PaymentSettingsController extends Controller
      */
     public function updateSettlementMode(Request $request): RedirectResponse
     {
-        $this->authorize('manage organization settings');
+        $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
         $validated = $request->validate([

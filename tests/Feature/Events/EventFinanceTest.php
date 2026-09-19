@@ -133,11 +133,14 @@ test('the settlement statement export only includes confirmed registrations', fu
     expect($content)->not->toContain('Should Not Appear');
 });
 
-test('a host without manage organization settings permission cannot add a payout account', function () {
+test('an org admin cannot add payout accounts or record payouts', function () {
     [$tenant] = financeHost();
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
-    $tenant->users()->attach($user->id); // no role assigned
+    $user->assignRole('Org Admin');
+    $tenant->users()->attach($user->id);
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
 
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
@@ -147,5 +150,11 @@ test('a host without manage organization settings permission cannot add a payout
         'label' => 'Test',
         'account_name' => 'Test',
         'account_number' => '1234',
+        'bank_code' => '030',
+    ], ['HTTP_HOST' => $host])->assertForbidden();
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts", [
+        'payout_account_id' => $account->id,
+        'amount' => 1000,
     ], ['HTTP_HOST' => $host])->assertForbidden();
 });

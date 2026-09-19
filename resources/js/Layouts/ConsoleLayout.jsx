@@ -12,6 +12,7 @@ import {
     Sparkles,
     SlidersHorizontal,
     Settings,
+    UserRound,
 } from 'lucide-react';
 import ThemeToggle from '@/Components/Console/ThemeToggle';
 
@@ -22,10 +23,22 @@ const NAV_ITEMS = [
     { label: 'Roles', href: 'tenant.roles.index', icon: ShieldCheck },
     { label: 'API Keys', href: 'tenant.api-keys.index', icon: KeyRound },
     { label: 'Billing', href: 'billing.index', icon: CreditCard, permission: 'manage_billing' },
-    { label: 'Finance', href: 'tenant.finance.index', icon: Wallet, feature: 'finance' },
+    {
+        label: 'Finance',
+        href: 'tenant.finance.index',
+        icon: Wallet,
+        feature: 'finance',
+        permission: 'read_finance',
+    },
     { label: 'LLM Usage', href: 'tenant.llm-usage.index', icon: Sparkles },
-    { label: 'LLM Config', href: 'tenant.llm-config.index', icon: SlidersHorizontal, feature: 'llm_byok' },
+    {
+        label: 'LLM Config',
+        href: 'tenant.llm-config.index',
+        icon: SlidersHorizontal,
+        feature: 'llm_byok',
+    },
     { label: 'Settings', href: 'tenant.settings.index', icon: Settings },
+    { label: 'My account', href: 'tenant.account', icon: UserRound },
 ];
 
 function initials(name) {
@@ -59,8 +72,12 @@ export default function ConsoleLayout({ children }) {
                         {initials(tenant?.name ?? 'MC')}
                     </div>
                     <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-medium text-ink">{tenant?.name}</div>
-                        <div className="truncate text-[11.5px] text-ink-secondary">{auth?.user?.email}</div>
+                        <div className="truncate text-[13px] font-medium text-ink">
+                            {tenant?.name}
+                        </div>
+                        <div className="truncate text-[11.5px] text-ink-secondary">
+                            {auth?.user?.email}
+                        </div>
                     </div>
                     <ThemeToggle />
                 </div>
@@ -69,7 +86,7 @@ export default function ConsoleLayout({ children }) {
                     {NAV_ITEMS.filter(
                         (item) =>
                             (!item.feature || tenant?.features?.[item.feature]) &&
-                            (!item.permission || auth?.can?.[item.permission]),
+                            (!item.permission || auth?.can?.[item.permission])
                     ).map((item) => {
                         const href = route(item.href);
                         const isActive = currentPath === new URL(href).pathname;

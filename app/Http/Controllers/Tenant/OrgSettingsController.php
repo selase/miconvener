@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\UpdateOrgSettingsRequest;
 use App\Libraries\Helper;
+use App\Services\Tenancy\FeatureService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -31,6 +32,7 @@ final class OrgSettingsController extends Controller
                 'phone_number' => $tenant->phone_number,
                 'logo' => Helper::getTenantLogoUrl(),
                 'can_use_own_logo' => $tenant->canUseOwnLogo(),
+                'can_use_custom_domain' => $tenant->featureEnabled(FeatureService::FEATURE_CUSTOM_DOMAINS),
                 'primary_color' => data_get($tenant->meta, 'primary_color', '#009EF7'),
                 'require_2fa' => (bool) $tenant->require_2fa,
                 'custom_domain' => $tenant->custom_domain,
@@ -42,34 +44,26 @@ final class OrgSettingsController extends Controller
     /**
      * Update the tenant settings.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(UpdateOrgSettingsRequest $request): RedirectResponse
     {
         $this->authorize('manage organization settings');
         $tenant = $this->tenantContext->getTenant();
 
-        $validatedData = $request->validate([
-            'name' => ['required', 'string', 'min:3', 'max:50'],
-            'email' => ['required', 'email'],
-            'phone_number' => ['required', 'string', 'max:16'],
-            'logo' => ['nullable', 'file', 'mimes:png,jpg,svg'],
-            'primary_color' => ['nullable', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
-            'require_2fa' => ['nullable', 'boolean'],
-            'custom_domain' => ['nullable', 'string', 'max:255', 'unique:tenants,custom_domain,'.$tenant->id],
-        ]);
+        $validatedData = $request->validated();
 
         $tenant->name = $validatedData['name'];
         $tenant->email = $validatedData['email'];
         $tenant->phone_number = $validatedData['phone_number'];
         $tenant->require_2fa = $request->boolean('require_2fa');
 
-        // Nullable in the rules, so the key is absent when the form omits it --
-        // reading it directly threw for any submission without the field.
-        $submittedDomain = $validatedData['custom_domain'] ?? null;
+        if (array_key_exists('custom_domain', $validatedData)) {
+            $submittedDomain = $validatedData['custom_domain'];
 
-        if ($tenant->custom_domain !== $submittedDomain) {
-            $tenant->custom_domain = $submittedDomain;
-            $tenant->custom_domain_status = 'pending';
-            $tenant->custom_domain_verified_at = null;
+            if ($tenant->custom_domain !== $submittedDomain) {
+                $tenant->custom_domain = $submittedDomain;
+                $tenant->custom_domain_status = 'pending';
+                $tenant->custom_domain_verified_at = null;
+            }
         }
 
         if ($request->hasFile('logo')) {
@@ -90,10 +84,6 @@ final class OrgSettingsController extends Controller
         $meta['primary_color'] = $validatedData['primary_color'] ?? $meta['primary_color'] ?? '#009EF7';
         $tenant->meta = $meta;
 
-        if ($request->filled('custom_domain') && $request->input('custom_domain') !== $tenant->custom_domain && ! \App\Facades\Feature::enabled(\App\Services\Tenancy\FeatureService::FEATURE_CUSTOM_DOMAINS)) {
-            return back()->withErrors(['custom_domain' => 'Your current plan does not support custom domains.']);
-        }
-
         $tenant->save();
 
         return back()->with([
@@ -107,6 +97,8 @@ final class OrgSettingsController extends Controller
         $this->authorize('manage organization settings');
         /** @var \App\Models\Tenant $tenant */
         $tenant = $this->tenantContext->getTenant();
+
+        abort_unless($tenant->featureEnabled(FeatureService::FEATURE_CUSTOM_DOMAINS), 403);
 
         if (! $tenant->custom_domain) {
             return back()->withErrors(['custom_domain' => 'No custom domain configured.']);

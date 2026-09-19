@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Propaganistas\LaravelPhone\Casts\E164PhoneNumberCast;
 use Spatie\Permission\Traits\HasRoles;
@@ -35,6 +36,12 @@ final class User extends Authenticatable
         self::STATUS_ACTIVE,
         self::STATUS_INACTIVE,
     ];
+
+    /**
+     * Single-use codes that stand in for the authenticator app, so losing a
+     * phone is not the same as losing the account.
+     */
+    public const int RECOVERY_CODE_COUNT = 8;
 
     /**
      * The attributes that are mass assignable.
@@ -84,8 +91,56 @@ final class User extends Authenticatable
         'last_login_at' => 'datetime',
         'phone_no' => E164PhoneNumberCast::class.':GH',
         'two_factor_confirmed_at' => 'datetime',
+        // The secret itself is deliberately left as-is: it is already stored
+        // plaintext for the accounts that enrolled before this, and encrypting
+        // the column would lock every one of them out.
+        'two_factor_recovery_codes' => 'encrypted:array',
         'notification_preferences' => 'array',
     ];
+
+    /**
+     * Issue a fresh set, replacing any that already exist.
+     *
+     * @return array<int, string> the plaintext codes, shown to the user once
+     */
+    public function generateTwoFactorRecoveryCodes(): array
+    {
+        $codes = collect(range(1, self::RECOVERY_CODE_COUNT))
+            ->map(fn (): string => Str::random(10).'-'.Str::random(10))
+            ->all();
+
+        $this->forceFill(['two_factor_recovery_codes' => $codes])->save();
+
+        return $codes;
+    }
+
+    /**
+     * Spend one code. Each works exactly once.
+     */
+    public function useTwoFactorRecoveryCode(string $code): bool
+    {
+        $codes = $this->two_factor_recovery_codes ?? [];
+
+        $matched = null;
+        foreach ($codes as $stored) {
+            if (is_string($stored) && hash_equals($stored, $code)) {
+                $matched = $stored;
+                break;
+            }
+        }
+
+        if ($matched === null) {
+            return false;
+        }
+
+        $this->forceFill([
+            'two_factor_recovery_codes' => array_values(
+                array_filter($codes, fn (mixed $stored): bool => $stored !== $matched)
+            ),
+        ])->save();
+
+        return true;
+    }
 
     public function tenants(): BelongsToMany
     {
@@ -116,6 +171,7 @@ final class User extends Authenticatable
             // Fix: The table uses 'model_id' and stores the INT ID of the user, not the UUID
             ->where('model_has_roles.model_id', (string) $this->id)
             ->where('roles.name', 'Superadmin')
+            ->whereNull('model_has_roles.tenant_id')
             ->exists();
     }
 

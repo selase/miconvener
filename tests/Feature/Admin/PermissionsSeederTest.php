@@ -60,6 +60,24 @@ test('a permission an administrator removed from a built-in role stays removed o
         ->and($orgAdmin->fresh()->hasPermissionTo('read dynamic-form'))->toBeTrue();
 });
 
+test('built-in tenant roles receive the intended finance permissions', function () {
+    Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+
+    $owner = Role::findByName('Org Superadmin');
+    $admin = Role::findByName('Org Admin');
+
+    expect($owner->hasPermissionTo('read finance'))->toBeTrue()
+        ->and($owner->hasPermissionTo('process refunds'))->toBeTrue()
+        ->and($owner->hasPermissionTo('manage payouts'))->toBeTrue()
+        ->and($owner->hasPermissionTo('manage payment settings'))->toBeTrue()
+        ->and($admin->hasPermissionTo('read finance'))->toBeTrue()
+        ->and($admin->hasPermissionTo('process refunds'))->toBeFalse()
+        ->and($admin->hasPermissionTo('manage payouts'))->toBeFalse()
+        ->and($admin->hasPermissionTo('manage payment settings'))->toBeFalse()
+        ->and(Permission::TENANT_SAFE)->toContain('read finance')
+        ->and(Permission::TENANT_SAFE)->not->toContain('process refunds', 'manage payouts', 'manage payment settings');
+});
+
 test('a renamed built-in role does not stop the seeder or the other roles', function () {
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 

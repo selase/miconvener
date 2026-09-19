@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role as SpatieRole;
 
+/**
+ * @property string|null $tenant_id Null for the system roles shared by every tenant.
+ */
 final class Role extends SpatieRole
 {
     use HasUuid;

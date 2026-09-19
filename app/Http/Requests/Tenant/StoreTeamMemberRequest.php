@@ -32,7 +32,9 @@ final class StoreTeamMemberRequest extends FormRequest
                 'required',
                 'exists:roles,id',
                 function (string $attribute, mixed $value, Closure $fail): void {
-                    $role = Role::findById($value);
+                    // findById() throws when the id is unknown, so the guard below never ran
+                    // and a bad id 500ed instead of failing validation.
+                    $role = Role::query()->whereKey($value)->first();
                     if (! $role) {
                         $fail('The selected role is invalid.');
 
@@ -44,13 +46,22 @@ final class StoreTeamMemberRequest extends FormRequest
                         $fail('You do not have permission to assign this role.');
                     }
 
-                    if ($role->isSystemRole() && $role->name === 'Superadmin' && ! $this->user()->isGlobalSuperAdmin()) {
-                        $fail('You are not authorized to assign the Superadmin role.');
+                    if ($role->isSystemRole() && $role->name === 'Superadmin') {
+                        $fail('The Superadmin role cannot be assigned within an organization.');
+                    }
+
+                    if ($role->isSystemRole() && $role->name === 'Org Superadmin' && ! $this->canAssignOrgSuperadmin()) {
+                        $fail('Only an Org Superadmin can assign the Org Superadmin role.');
                     }
                 },
             ],
             'status' => ['required', 'string'],
             'photo' => ['nullable', 'image', 'mimes:png,jpg,gif,svg', 'max:2048'],
         ];
+    }
+
+    private function canAssignOrgSuperadmin(): bool
+    {
+        return $this->user()->isGlobalSuperAdmin() || $this->user()->hasRole('Org Superadmin');
     }
 }

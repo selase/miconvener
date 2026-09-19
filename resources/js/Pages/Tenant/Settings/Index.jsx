@@ -6,15 +6,15 @@ import Input from '@/Components/Console/Input';
 import Checkbox from '@/Components/Console/Checkbox';
 
 export default function Settings({ org }) {
-    const { flash } = usePage().props;
+    const { flash, auth } = usePage().props;
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, transform, post, processing, errors } = useForm({
         name: org.name ?? '',
         email: org.email ?? '',
         phone_number: org.phone_number ?? '',
         primary_color: org.primary_color ?? '#009EF7',
         require_2fa: org.require_2fa ?? false,
-        custom_domain: org.custom_domain ?? '',
+        custom_domain: org.can_use_custom_domain ? (org.custom_domain ?? '') : '',
         logo: null,
     });
 
@@ -22,6 +22,11 @@ export default function Settings({ org }) {
 
     const submit = (event) => {
         event.preventDefault();
+        transform((values) => {
+            if (org.can_use_custom_domain) return values;
+            const { custom_domain, ...otherValues } = values;
+            return otherValues;
+        });
         post(route('tenant.settings.update'), { forceFormData: true });
     };
 
@@ -45,21 +50,32 @@ export default function Settings({ org }) {
                     </div>
                 )}
 
-                <form onSubmit={submit} className="space-y-6 rounded-lg border border-border bg-surface p-6">
+                <form
+                    onSubmit={submit}
+                    className="space-y-6 rounded-lg border border-border bg-surface p-6"
+                >
                     <div className="flex items-center gap-4">
-                        <img src={org.logo} alt="" className="h-16 w-16 rounded-lg border border-border object-cover" />
-                        <div>
-                            <label className="inline-block cursor-pointer rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink hover:bg-surface-sunken">
-                                Change logo
-                                <input
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/svg+xml"
-                                    className="hidden"
-                                    onChange={(event) => setData('logo', event.target.files[0])}
-                                />
-                            </label>
-                            {errors.logo && <p className="mt-1 text-sm text-danger-fg">{errors.logo}</p>}
-                        </div>
+                        <img
+                            src={org.logo}
+                            alt=""
+                            className="h-16 w-16 rounded-lg border border-border object-cover"
+                        />
+                        {org.can_use_own_logo && (
+                            <div>
+                                <label className="inline-block cursor-pointer rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink hover:bg-surface-sunken">
+                                    Change logo
+                                    <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/svg+xml"
+                                        className="hidden"
+                                        onChange={(event) => setData('logo', event.target.files[0])}
+                                    />
+                                </label>
+                                {errors.logo && (
+                                    <p className="mt-1 text-sm text-danger-fg">{errors.logo}</p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <Input
@@ -87,7 +103,9 @@ export default function Settings({ org }) {
                     />
 
                     <div>
-                        <label className="mb-1.5 block text-sm font-medium text-ink">Brand color</label>
+                        <label className="mb-1.5 block text-sm font-medium text-ink">
+                            Brand color
+                        </label>
                         <div className="flex items-center gap-3">
                             <input
                                 type="color"
@@ -97,40 +115,85 @@ export default function Settings({ org }) {
                             />
                             <span className="text-sm text-ink-secondary">{data.primary_color}</span>
                         </div>
-                        {errors.primary_color && <p className="mt-1 text-sm text-danger-fg">{errors.primary_color}</p>}
+                        {errors.primary_color && (
+                            <p className="mt-1 text-sm text-danger-fg">{errors.primary_color}</p>
+                        )}
                     </div>
 
                     <Checkbox
-                        label={<span className="text-sm font-medium text-ink">Require two-factor authentication for all members</span>}
+                        label={
+                            <span className="text-sm font-medium text-ink">
+                                Require two-factor authentication for all members
+                            </span>
+                        }
                         checked={data.require_2fa}
                         onChange={(event) => setData('require_2fa', event.target.checked)}
                     />
 
-                    <Button type="submit" disabled={processing}>Save changes</Button>
-                </form>
-
-                <div className="mt-6 space-y-4 rounded-lg border border-border bg-surface p-6">
-                    <h3 className="text-sm font-semibold text-ink">Custom domain</h3>
-
-                    <Input
-                        label="Domain"
-                        type="text"
-                        placeholder="events.example.com"
-                        value={data.custom_domain}
-                        onChange={(event) => setData('custom_domain', event.target.value)}
-                        error={errors.custom_domain}
-                    />
-
-                    {org.custom_domain && (
-                        <div className="flex items-center justify-between rounded-lg bg-surface-sunken px-4 py-3">
-                            <span className="text-sm text-ink-secondary">
-                                Status: <span className="font-medium text-ink">{org.custom_domain_status ?? 'pending'}</span>
-                            </span>
-                            <Button type="button" onClick={verifyDomain} disabled={domainForm.processing}>
-                                Verify domain
-                            </Button>
+                    {org.can_use_custom_domain && (
+                        <div className="space-y-4 border-t border-border pt-6">
+                            <div>
+                                <h2 className="text-sm font-semibold text-ink">Custom domain</h2>
+                                <p className="mt-1 text-sm text-ink-secondary">
+                                    Use your own domain for this organization.
+                                </p>
+                            </div>
+                            <Input
+                                label="Domain"
+                                type="text"
+                                placeholder="events.example.com"
+                                value={data.custom_domain}
+                                onChange={(event) => setData('custom_domain', event.target.value)}
+                                error={errors.custom_domain}
+                            />
+                            {org.custom_domain && (
+                                <div className="flex items-center justify-between rounded-lg bg-surface-sunken px-4 py-3">
+                                    <span className="text-sm text-ink-secondary">
+                                        Status:{' '}
+                                        <span className="font-medium text-ink">
+                                            {org.custom_domain_status ?? 'pending'}
+                                        </span>
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        onClick={verifyDomain}
+                                        disabled={domainForm.processing}
+                                    >
+                                        Verify domain
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
+
+                    <Button type="submit" disabled={processing}>
+                        Save changes
+                    </Button>
+                </form>
+
+                {/*
+                 * The old settings hub was the only way in to these pages, and it
+                 * now redirects here. Without these links, payment settings in
+                 * particular is reachable only by typing the URL.
+                 */}
+                <div className="mt-6 rounded-lg border border-border bg-surface p-6">
+                    <h2 className="text-sm font-medium text-ink">Other settings</h2>
+                    <div className="mt-4 flex flex-col gap-2">
+                        {auth?.can?.manage_payment_settings && (
+                            <a
+                                href={route('tenant.settings.payments.index')}
+                                className="text-sm text-accent hover:underline"
+                            >
+                                Payments and payouts
+                            </a>
+                        )}
+                        <a
+                            href={route('tenant.settings.usage')}
+                            className="text-sm text-accent hover:underline"
+                        >
+                            Plan usage
+                        </a>
+                    </div>
                 </div>
             </div>
         </ConsoleLayout>

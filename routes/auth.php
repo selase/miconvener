@@ -59,6 +59,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('two-factor-challenge', [App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'show'])
         ->name('two-factor.challenge');
 
+    // The login gate itself: a six-digit code with unlimited attempts is not a
+    // second factor.
     Route::post('two-factor-challenge', [App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'store'])
+        ->middleware('throttle:two-factor')
         ->name('two-factor.challenge.store');
 });

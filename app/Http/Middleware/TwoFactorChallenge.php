@@ -33,17 +33,18 @@ final class TwoFactorChallenge
             return redirect()->route('two-factor.challenge');
         }
 
-        // 2. If Tenant requires 2FA, and user hasn't set it up, redirect to profile to enable it
+        // 2. If Tenant requires 2FA, and user hasn't set it up, redirect to account security
         // We get tenant from TenantContext
         $tenant = app(\App\Services\Tenancy\TenantContext::class)->getTenant();
 
         if ($tenant &&
             $tenant->require_2fa &&
             (! $user->two_factor_secret || ! $user->two_factor_confirmed_at) &&
+            ! $request->is('account*') &&
             ! $request->is('profile*') &&
             ! $request->is('logout')
         ) {
-            return redirect()->route('profile.index', $user)
+            return redirect()->route('tenant.account', ['subdomain' => $tenant->slug])
                 ->with('warning', 'Your organization requires Two-Factor Authentication. Please enable it to continue.');
         }
 

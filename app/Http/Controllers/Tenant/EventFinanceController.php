@@ -23,7 +23,7 @@ final class EventFinanceController extends Controller
 {
     public function index(string $subdomain, string $event): JsonResponse
     {
-        $this->authorize('read event');
+        $this->authorize('read finance');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
@@ -89,7 +89,7 @@ final class EventFinanceController extends Controller
 
     public function storePayout(Request $request, string $subdomain, string $event): JsonResponse
     {
-        $this->authorize('update event');
+        $this->authorize('manage payouts');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
@@ -131,7 +131,7 @@ final class EventFinanceController extends Controller
         SettlementGateway $settlementGateway,
         \App\Services\Finance\TransferFeeSchedule $transferFeeSchedule
     ): JsonResponse {
-        $this->authorize('update event');
+        $this->authorize('manage payouts');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
@@ -261,7 +261,7 @@ final class EventFinanceController extends Controller
         SettlementGateway $settlementGateway,
         \App\Services\Finance\TransferFeeSchedule $transferFeeSchedule
     ): JsonResponse {
-        $this->authorize('update event');
+        $this->authorize('manage payouts');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
@@ -328,7 +328,7 @@ final class EventFinanceController extends Controller
 
     public function updatePayoutStatus(Request $request, string $subdomain, string $event, string $payout): JsonResponse
     {
-        $this->authorize('update event');
+        $this->authorize('manage payouts');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
@@ -381,7 +381,7 @@ final class EventFinanceController extends Controller
 
     public function updatePayoutSchedule(Request $request, string $subdomain, string $event): JsonResponse
     {
-        $this->authorize('update event');
+        $this->authorize('manage payouts');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
@@ -426,7 +426,7 @@ final class EventFinanceController extends Controller
 
     public function exportSettlementStatement(string $subdomain, string $event): StreamedResponse
     {
-        $this->authorize('update event');
+        $this->authorize('read finance');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
         $ownGateway = ! $tenant->isPlatformDefaultSettlement();
