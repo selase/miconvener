@@ -4117,12 +4117,6 @@ parameters:
 			path: app/Models/ChatIntegration.php
 
 		-
-			rawMessage: 'Method App\Models\ChatIntegration::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/ChatIntegration.php
-
-		-
 			rawMessage: 'Method App\Models\ChatIntegration::scopeActive() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -4173,12 +4167,6 @@ parameters:
 		-
 			rawMessage: 'Class App\Models\DataExportRequest uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/DataExportRequest.php
-
-		-
-			rawMessage: 'Method App\Models\DataExportRequest::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/DataExportRequest.php
 
@@ -5857,12 +5845,6 @@ parameters:
 			path: app/Models/Feature.php
 
 		-
-			rawMessage: 'Method App\Models\Feature::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Feature.php
-
-		-
 			rawMessage: 'Class App\Models\Invoice uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -6049,12 +6031,6 @@ parameters:
 			path: app/Models/LlmTokenUsage.php
 
 		-
-			rawMessage: 'Method App\Models\LlmTokenUsage::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/LlmTokenUsage.php
-
-		-
 			rawMessage: 'Method App\Models\LlmTokenUsage::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -6069,12 +6045,6 @@ parameters:
 		-
 			rawMessage: 'Class App\Models\LlmUsageSummary uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/LlmUsageSummary.php
-
-		-
-			rawMessage: 'Method App\Models\LlmUsageSummary::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/LlmUsageSummary.php
 
@@ -6121,26 +6091,8 @@ parameters:
 			path: app/Models/Package.php
 
 		-
-			rawMessage: 'Method App\Models\Package::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Package.php
-
-		-
-			rawMessage: 'Method App\Models\Permission::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Permission.php
-
-		-
 			rawMessage: 'Method App\Models\PlanChange::fromPackage() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/PlanChange.php
-
-		-
-			rawMessage: 'Method App\Models\PlanChange::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/PlanChange.php
 
@@ -6159,12 +6111,6 @@ parameters:
 		-
 			rawMessage: 'Class App\Models\PmIntegration uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/PmIntegration.php
-
-		-
-			rawMessage: 'Method App\Models\PmIntegration::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/PmIntegration.php
 
@@ -6225,12 +6171,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Models\Role::clones() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/Role.php
-
-		-
-			rawMessage: 'Method App\Models\Role::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/Role.php
 
@@ -6331,12 +6271,6 @@ parameters:
 			path: app/Models/Tenant.php
 
 		-
-			rawMessage: 'Method App\Models\Tenant::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Tenant.php
-
-		-
 			rawMessage: 'Method App\Models\Tenant::gravatar() return type with generic class Illuminate\Database\Eloquent\Casts\Attribute does not specify its types: TGet, TSet'
 			identifier: missingType.generics
 			count: 1
@@ -6427,12 +6361,6 @@ parameters:
 			path: app/Models/Tenant/Post.php
 
 		-
-			rawMessage: 'Method App\Models\Tenant\Post::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/Tenant/Post.php
-
-		-
 			rawMessage: 'Method App\Models\Tenant\Post::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -6441,12 +6369,6 @@ parameters:
 		-
 			rawMessage: 'Class App\Models\TenantApiKey uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/TenantApiKey.php
-
-		-
-			rawMessage: 'Method App\Models\TenantApiKey::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/TenantApiKey.php
 
@@ -6505,12 +6427,6 @@ parameters:
 			path: app/Models/TenantLlmConfig.php
 
 		-
-			rawMessage: 'Method App\Models\TenantLlmConfig::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/TenantLlmConfig.php
-
-		-
 			rawMessage: 'Method App\Models\TenantLlmConfig::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -6531,12 +6447,6 @@ parameters:
 		-
 			rawMessage: 'Class App\Models\TenantPaymentGateway uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
-			count: 1
-			path: app/Models/TenantPaymentGateway.php
-
-		-
-			rawMessage: 'Method App\Models\TenantPaymentGateway::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/TenantPaymentGateway.php
 
@@ -6655,12 +6565,6 @@ parameters:
 			path: app/Models/User.php
 
 		-
-			rawMessage: 'Method App\Models\User::generateUuid() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Models/User.php
-
-		-
 			rawMessage: 'Method App\Models\User::gravatar() return type with generic class Illuminate\Database\Eloquent\Casts\Attribute does not specify its types: TGet, TSet'
 			identifier: missingType.generics
 			count: 1
@@ -6711,12 +6615,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Models\UserLoginHistory::currentMonth() has parameter $query with no type specified.'
 			identifier: missingType.parameter
-			count: 1
-			path: app/Models/UserLoginHistory.php
-
-		-
-			rawMessage: 'Method App\Models\UserLoginHistory::generateUuid() has no return type specified.'
-			identifier: missingType.return
 			count: 1
 			path: app/Models/UserLoginHistory.php
 
