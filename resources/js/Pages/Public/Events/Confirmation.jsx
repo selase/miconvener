@@ -453,9 +453,15 @@ const STATUS_NOTICE = {
     pending_payment: {
         icon: Clock,
         color: 'text-warning-fg',
-        title: 'Payment pending',
-        description: (event) =>
-            `We're confirming your payment for ${event.name}. This page will show your ticket once it's confirmed — check your email shortly.`,
+        // Two different people land here. Someone who has paid is waiting on
+        // the gateway; someone just approved has not paid at all, and telling
+        // them their payment is being confirmed leaves them waiting forever.
+        title: (registration) =>
+            registration.awaiting_checkout ? 'One step left' : 'Payment pending',
+        description: (event, registration) =>
+            registration.awaiting_checkout
+                ? `Your place at ${event.name} is approved. Pay to secure it — your spot is held once the payment goes through.`
+                : `We're confirming your payment for ${event.name}. This page will show your ticket once it's confirmed — check your email shortly.`,
     },
     pending_approval: {
         icon: Clock,
@@ -517,11 +523,21 @@ export default function Confirmation({
                             strokeWidth={1.5}
                         />
                         <h1 className="mt-5 text-2xl font-normal tracking-tight text-ink">
-                            {notice.title}
+                            {typeof notice.title === 'function'
+                                ? notice.title(registration)
+                                : notice.title}
                         </h1>
                         <p className="mt-3 text-[13.5px] text-ink-secondary">
                             {notice.description(event, registration)}
                         </p>
+                        {registration.awaiting_checkout && registration.checkout_url && (
+                            <a
+                                href={registration.checkout_url}
+                                className="mt-6 inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90"
+                            >
+                                Complete payment
+                            </a>
+                        )}
                     </div>
                 ) : (
                     <>

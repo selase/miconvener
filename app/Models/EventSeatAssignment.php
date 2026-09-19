@@ -26,6 +26,9 @@ final class EventSeatAssignment extends Model
         'seat_label',
     ];
 
+    /**
+     * @return BelongsTo<EventVenueRoom, $this>
+     */
     public function room(): BelongsTo
     {
         return $this->belongsTo(EventVenueRoom::class, 'room_id');

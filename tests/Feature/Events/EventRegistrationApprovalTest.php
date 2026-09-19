@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Mail\Events\EventRegistrationNeedsApproval;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationPendingApproval;
 use App\Mail\Events\EventRegistrationRejected;
@@ -227,4 +228,95 @@ test('a host without update event permission cannot approve a registration', fun
 
     $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/approve", [], ['HTTP_HOST' => $host])
         ->assertForbidden();
+});
+
+test('the organizer is told when a registration needs their approval', function () {
+    // The registrant is promised a review. Nothing told the organizer there
+    // was one to do, so the promise depended on somebody happening to look.
+    Mail::fake();
+    [$tenant] = approvalHost();
+    $tenant->update(['email' => 'organizer@acme.test']);
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'requires_approval' => true,
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $this->post("http://{$host}/e/{$event->slug}/register", [
+        'full_name' => 'Ama Boateng',
+        'email' => 'ama@example.com',
+    ], ['HTTP_HOST' => $host])->assertRedirect();
+
+    Mail::assertQueued(
+        EventRegistrationNeedsApproval::class,
+        fn ($mail): bool => $mail->hasTo('organizer@acme.test')
+    );
+});
+
+test('a registration that needs no approval does not email the organizer', function () {
+    Mail::fake();
+    [$tenant] = approvalHost();
+    $tenant->update(['email' => 'organizer@acme.test']);
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'requires_approval' => false,
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $this->post("http://{$host}/e/{$event->slug}/register", [
+        'full_name' => 'Kwesi Mensah',
+        'email' => 'kwesi@example.com',
+    ], ['HTTP_HOST' => $host])->assertRedirect();
+
+    Mail::assertNotQueued(EventRegistrationNeedsApproval::class);
+});
+
+test('someone approved but not yet paying is offered a way to pay', function () {
+    // They were never going to pay from an email alone: if it is lost, the
+    // confirmation page was a dead end telling them to wait.
+    [$tenant] = approvalHost();
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_PENDING_PAYMENT,
+        'amount' => 200,
+        'payment_reference' => null,
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('registration.awaiting_checkout', true)
+            ->where('registration.checkout_url', route('public.events.checkout', [
+                'subdomain' => $tenant->slug,
+                'event' => $event->slug,
+                'registration' => $registration->id,
+            ])));
+});
+
+test('someone who has already started paying is not told to pay again', function () {
+    [$tenant] = approvalHost();
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_PENDING_PAYMENT,
+        'amount' => 200,
+        'payment_reference' => 'ps_already_started',
+    ]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('registration.awaiting_checkout', false));
 });

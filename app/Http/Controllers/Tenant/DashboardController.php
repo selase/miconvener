@@ -42,7 +42,14 @@ final class DashboardController extends Controller
             'liveEvent' => $liveEvent ? $this->focusPayload($liveEvent, true) : null,
             'nextEvent' => $liveEvent === null && $nextEvent ? $this->focusPayload($nextEvent, false) : null,
             'arrivals' => $liveEvent ? $this->arrivals($liveEvent) : ['step' => 0, 'series' => []],
-            'needsAPerson' => $liveEvent ? $this->needsAPerson($liveEvent) : [],
+            // Falls back to the next event: approvals are almost always done
+            // before the doors open, so gating this on a live event meant the
+            // queue was empty exactly when it mattered.
+            'needsAPerson' => match (true) {
+                $liveEvent !== null => $this->needsAPerson($liveEvent),
+                $nextEvent !== null => $this->needsAPerson($nextEvent),
+                default => [],
+            },
             'registrationTrend' => $this->registrationTrend($tenant),
             'events' => $this->eventList($tenant),
             'links' => [

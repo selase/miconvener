@@ -46,6 +46,9 @@ final class EventSessionAttendance extends Model
         return $this->belongsTo(EventSession::class, 'session_id');
     }
 
+    /**
+     * @return BelongsTo<EventRegistration, $this>
+     */
     public function registration(): BelongsTo
     {
         return $this->belongsTo(EventRegistration::class, 'registration_id');

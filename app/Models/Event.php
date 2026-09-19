@@ -160,6 +160,9 @@ final class Event extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * @return HasMany<EventRegistration, $this>
+     */
     public function registrations(): HasMany
     {
         return $this->hasMany(EventRegistration::class);
@@ -185,6 +188,9 @@ final class Event extends Model
         return $this->hasMany(EventVenueRoom::class)->orderBy('sort_order');
     }
 
+    /**
+     * @return HasMany<EventSeatAssignment, $this>
+     */
     public function seatAssignments(): HasMany
     {
         return $this->hasMany(EventSeatAssignment::class);
@@ -295,6 +301,9 @@ final class Event extends Model
         return $this->hasMany(EventNotificationLog::class)->latest('created_at');
     }
 
+    /**
+     * @return HasMany<EventSession, $this>
+     */
     public function sessions(): HasMany
     {
         return $this->hasMany(EventSession::class)->orderBy('starts_at')->orderBy('sort_order');

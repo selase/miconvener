@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Mail\Events\EventRegistrationNeedsApproval;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationPendingApproval;
 use App\Mail\Events\EventRegistrationVerifyEmail;
@@ -252,6 +253,14 @@ final class PublicEventController extends Controller
         } elseif ($status === EventRegistration::STATUS_PENDING_APPROVAL) {
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationPendingApproval($registration));
+
+            // The registrant has just been promised a review. Tell whoever has
+            // to do it -- nothing else did, and the console only surfaced
+            // pending approvals once the event was running, far too late.
+            if (filled($tenant->email)) {
+                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+                Mail::to($tenant->email)->queue(new EventRegistrationNeedsApproval($registration));
+            }
         }
 
         if ($status === EventRegistration::STATUS_PENDING_PAYMENT) {
@@ -366,6 +375,20 @@ final class PublicEventController extends Controller
                 'room_name' => $registrationModel->seatAssignment?->room?->name,
                 'checked_in' => $registrationModel->checked_in_at !== null,
                 'email_verified' => $registrationModel->hasVerifiedEmail(),
+                // Awaiting payment covers two very different people: someone
+                // who has paid and is waiting on the gateway, and someone just
+                // approved who has not started. Only the second needs a button,
+                // and telling them we are confirming a payment they never made
+                // leaves them waiting for nothing.
+                'awaiting_checkout' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
+                    && blank($registrationModel->payment_reference),
+                'checkout_url' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
+                    ? route('public.events.checkout', [
+                        'subdomain' => $tenant->slug,
+                        'event' => $eventModel->slug,
+                        'registration' => $registrationModel->id,
+                    ])
+                    : null,
             ],
             'materials' => $materials,
             // Asking for water three weeks early reaches nobody: a service

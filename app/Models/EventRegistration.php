@@ -131,11 +131,17 @@ final class EventRegistration extends Model
         return (int) ($this->charged_amount ?? $this->amount);
     }
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<EventTicketType, $this>
+     */
     public function ticketType(): BelongsTo
     {
         return $this->belongsTo(EventTicketType::class, 'ticket_type_id');
@@ -146,6 +152,9 @@ final class EventRegistration extends Model
         return $this->belongsTo(EventPromoCode::class, 'promo_code_id');
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function checkedInBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'checked_in_by');
@@ -156,6 +165,9 @@ final class EventRegistration extends Model
         return $this->belongsToMany(EventSession::class, 'event_registration_sessions', 'registration_id', 'session_id')->withTimestamps();
     }
 
+    /**
+     * @return HasOne<EventSeatAssignment, $this>
+     */
     public function seatAssignment(): HasOne
     {
         return $this->hasOne(EventSeatAssignment::class, 'registration_id');
