@@ -8,9 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\DuplicateRoleRequest;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Services\Authorization\PermissionCeiling;
 use App\Services\Tenancy\EntitlementService;
 use App\Services\Tenancy\RoleDuplicationService;
 use App\Services\Tenancy\TenantContext;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,6 +46,8 @@ final class RoleController extends Controller
             'name' => $role->name,
             'permissions' => $role->permissions->pluck('name')->values()->all(),
             'is_system' => $role->tenant_id === null,
+            'can_manage' => $role->tenant_id !== null
+                && app(PermissionCeiling::class)->canGrantRole(request()->user(), $role),
         ];
 
         $systemRoles = $allRoles->filter(fn (Role $role): bool => $role->tenant_id === null)->map($toPayload)->values();
@@ -72,7 +76,7 @@ final class RoleController extends Controller
                 Rule::unique('roles')->where(fn ($query) => $query->where('tenant_id', $tenant->id)),
                 Rule::notIn(Role::SYSTEM_ROLES),
             ],
-            'permissions' => 'array',
+            'permissions' => ['array', $this->withinCeiling()],
             'permissions.*' => [
                 'string',
                 Rule::in($allowedPermissionNames),
@@ -123,7 +127,7 @@ final class RoleController extends Controller
                 Rule::unique('roles')->ignore($role->id)->where(fn ($query) => $query->where('tenant_id', $tenant->id)),
                 Rule::notIn(Role::SYSTEM_ROLES),
             ],
-            'permissions' => 'array',
+            'permissions' => ['array', $this->withinCeiling()],
             'permissions.*' => [
                 'string',
                 Rule::in($allowedPermissionNames),
@@ -160,13 +164,12 @@ final class RoleController extends Controller
             ->with('permissions')
             ->firstOrFail();
 
-        $allowedPermissionNames = app(EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
-
-        // Pre-select permissions that the source role has (filtered to TENANT_SAFE)
+        // Pre-select the source role's permissions, bounded by TENANT_SAFE, the
+        // plan, and what the signed-in user can grant.
         $sourcePermissionNames = $sourceRole->permissions
             ->pluck('name')
             ->intersect(Permission::TENANT_SAFE)
-            ->intersect($allowedPermissionNames)
+            ->intersect($this->allowedPermissionNames())
             ->values()
             ->all();
 
@@ -175,7 +178,7 @@ final class RoleController extends Controller
                 'id' => $sourceRole->id,
                 'name' => $sourceRole->name,
             ],
-            'permissions' => Permission::whereIn('name', $allowedPermissionNames)->pluck('name')->values()->all(),
+            'permissions' => $this->allowedPermissionNames(),
             'sourcePermissionNames' => $sourcePermissionNames,
         ]);
     }
@@ -255,6 +258,28 @@ final class RoleController extends Controller
         $tenant = $this->getTenant();
         $allowedPermissionNames = app(EntitlementService::class)->getAllowedPermissionsForTenant($tenant->id);
 
-        return Permission::whereIn('name', $allowedPermissionNames)->pluck('name')->values()->all();
+        $names = Permission::whereIn('name', $allowedPermissionNames)->pluck('name')->values()->all();
+
+        // Offer only what the signed-in user could actually grant: anything
+        // else is refused on save, so showing it is just a trap.
+        $beyond = app(PermissionCeiling::class)->beyondReach(request()->user(), $names);
+
+        return array_values(array_diff($names, $beyond));
+    }
+
+    /**
+     * A role can only be built from permissions its author holds. Editing a
+     * role is the same act, so a role stronger than its editor cannot be
+     * changed by them at all.
+     */
+    private function withinCeiling(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            $beyond = app(PermissionCeiling::class)->beyondReach(request()->user(), (array) $value);
+
+            if ($beyond !== []) {
+                $fail('You can only grant permissions you hold yourself. Not held: '.implode(', ', $beyond).'.');
+            }
+        };
     }
 }

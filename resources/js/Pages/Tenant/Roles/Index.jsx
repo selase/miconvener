@@ -163,13 +163,17 @@ export default function Index({ systemRoles, customRoles, permissions }) {
                                     </Button>
                                 ) : (
                                     <>
-                                        <Button
-                                            onClick={() =>
-                                                setModal({ mode: 'edit', role: selected })
-                                            }
-                                        >
-                                            Edit
-                                        </Button>
+                                        {/* A role holding permissions you lack is not yours to edit:
+                                            the save would be refused. */}
+                                        {selected.can_manage && (
+                                            <Button
+                                                onClick={() =>
+                                                    setModal({ mode: 'edit', role: selected })
+                                                }
+                                            >
+                                                Edit
+                                            </Button>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={() => requestDelete(selected)}

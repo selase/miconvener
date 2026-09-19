@@ -12,6 +12,7 @@ use App\Mail\Users\SendAccountDetails;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Authorization\PermissionCeiling;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,7 @@ final class UserController extends Controller
         $actorCanManageOwners = $this->canManageOrgSuperadmins();
 
         $users = User::where('tenant_id', $tenant->id)
-            ->with('roles:id,name')
+            ->with(['roles:id,name', 'roles.permissions:id,name'])
             ->orderByDesc('created_at')
             ->paginate(20)
             ->through(fn (User $user): array => [
@@ -45,9 +46,13 @@ final class UserController extends Controller
                 'status' => $user->status,
                 'last_login_at' => $user->last_login_at?->diffForHumans(),
                 'created_at' => $user->created_at->format('Y-m-d'),
-                'can_edit' => $actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'),
+                'can_edit' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
+                    && $this->withinReach($user),
                 'can_remove' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
+                    && $this->withinReach($user)
                     && $user->id !== auth()->id(),
+                // Your own role is never yours to change.
+                'can_change_role' => $user->id !== auth()->id(),
             ]);
 
         return Inertia::render('Tenant/Team/Index', [
@@ -147,6 +152,10 @@ final class UserController extends Controller
             abort(403);
         }
 
+        if (! $this->withinReach($user)) {
+            abort(403);
+        }
+
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot remove your own account.');
         }
@@ -169,7 +178,7 @@ final class UserController extends Controller
     {
         $tenant = $this->getTenant();
 
-        $roles = Role::where(function ($query) use ($tenant): void {
+        $roles = Role::with('permissions')->where(function ($query) use ($tenant): void {
             $query->whereNull('tenant_id')
                 ->orWhere('tenant_id', $tenant->id);
         })->get();
@@ -179,6 +188,10 @@ final class UserController extends Controller
         if (! $this->canManageOrgSuperadmins()) {
             $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Org Superadmin');
         }
+
+        $ceiling = app(PermissionCeiling::class);
+        $actor = auth()->user();
+        $roles = $roles->filter(fn (Role $role): bool => $actor instanceof User && $ceiling->canGrantRole($actor, $role));
 
         return $roles->map(fn ($role): array => [
             'id' => $role->id,
@@ -255,5 +268,21 @@ final class UserController extends Controller
             ->where('model_has_roles.tenant_id', $tenantId)
             ->where('roles.name', $roleName)
             ->exists();
+    }
+
+    /**
+     * Whether every role this person holds is one the signed-in user could
+     * grant. Anyone stronger than you is not yours to edit or remove.
+     */
+    private function withinReach(User $user): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+
+        $ceiling = app(PermissionCeiling::class);
+
+        return $user->roles->every(fn (mixed $role): bool => $role instanceof Role && $ceiling->canGrantRole($actor, $role));
     }
 }

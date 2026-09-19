@@ -6,6 +6,7 @@ namespace App\Http\Requests\Tenant;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Authorization\PermissionCeiling;
 use App\Services\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,9 +23,19 @@ final class UpdateTeamMemberRequest extends FormRequest
 
         $target = $this->route('user');
 
-        return ! ($target instanceof User
-            && $target->hasRole('Org Superadmin')
-            && ! $this->canAssignOrgSuperadmin());
+        if (! $target instanceof User) {
+            return true;
+        }
+
+        if ($target->hasRole('Org Superadmin') && ! $this->canAssignOrgSuperadmin()) {
+            return false;
+        }
+
+        // Editing someone is a way to demote them, so a person whose role
+        // reaches beyond the editor's own is out of the editor's hands.
+        $ceiling = app(PermissionCeiling::class);
+
+        return $target->roles->every(fn (mixed $role): bool => $role instanceof Role && $ceiling->canGrantRole($this->user(), $role));
     }
 
     /**
@@ -61,6 +72,18 @@ final class UpdateTeamMemberRequest extends FormRequest
 
                     if ($role->isSystemRole() && $role->name === 'Org Superadmin' && ! $this->canAssignOrgSuperadmin()) {
                         $fail('Only an Org Superadmin can assign the Org Superadmin role.');
+                    }
+
+                    if (! app(PermissionCeiling::class)->canGrantRole($this->user(), $role)) {
+                        $fail('You can only assign a role whose permissions you hold yourself.');
+                    }
+
+                    $target = $this->route('user');
+                    if ($target instanceof User
+                        && $target->is($this->user())
+                        && ! $target->roles->contains('id', $role->id)
+                    ) {
+                        $fail('You cannot change your own role. Ask another administrator.');
                     }
                 },
             ],

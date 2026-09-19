@@ -24,9 +24,21 @@ export default function TeamFormModal({ mode, onClose, user, roles, statuses }) 
     };
 
     return (
-        <Modal open onClose={onClose} title={mode === 'edit' ? 'Edit team member' : 'Add team member'} className="max-w-2xl">
+        <Modal
+            open
+            onClose={onClose}
+            title={mode === 'edit' ? 'Edit team member' : 'Add team member'}
+            className="max-w-2xl"
+        >
             <form onSubmit={submit} className="space-y-6">
-                <TeamMemberForm data={data} setData={setData} errors={errors} roles={roles} statuses={statuses} />
+                <TeamMemberForm
+                    data={data}
+                    setData={setData}
+                    errors={errors}
+                    roles={roles}
+                    statuses={statuses}
+                    roleLocked={mode === 'edit' && user?.can_change_role === false}
+                />
 
                 {mode === 'create' && (
                     <p className="text-sm text-ink-secondary">
