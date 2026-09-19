@@ -25,6 +25,7 @@ final class FinanceController extends Controller
 
     public function index(Request $request): Response
     {
+        $this->authorize('read finance');
         $tenant = $this->tenantContext->getTenant();
 
         if (! $tenant->handlesTicketMoney()) {
@@ -49,7 +50,7 @@ final class FinanceController extends Controller
     {
         $tenant = $this->tenantContext->getTenant();
 
-        $this->authorize('update event');
+        $this->authorize('process refunds');
 
         if (! $tenant->handlesTicketMoney()) {
             abort(403, 'Your plan does not include paid tickets.');

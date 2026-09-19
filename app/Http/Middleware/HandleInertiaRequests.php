@@ -48,6 +48,13 @@ final class HandleInertiaRequests extends Middleware
                 // checks the permission itself.
                 'can' => [
                     'manage_billing' => fn (): bool => (bool) $request->user()?->can('manage billing'),
+                    'read_finance' => fn (): bool => (bool) $request->user()?->can('read finance'),
+                    'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),
+                    'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
+                    'manage_payment_settings' => fn (): bool => (bool) $request->user()?->can('manage payment settings'),
+                    'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
+                    'update_user' => fn (): bool => (bool) $request->user()?->can('update user'),
+                    'delete_user' => fn (): bool => (bool) $request->user()?->can('delete user'),
                 ],
             ],
             'tenant' => $tenant ? [

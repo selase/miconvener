@@ -16,10 +16,19 @@ const SUBMIT_LABELS = {
     duplicate: 'Create role',
 };
 
-export default function RoleFormModal({ mode, onClose, role, sourceRole, permissions, sourcePermissionNames }) {
+export default function RoleFormModal({
+    mode,
+    onClose,
+    role,
+    sourceRole,
+    permissions,
+    sourcePermissionNames,
+}) {
     const { data, setData, post, put, processing, errors } = useForm({
-        name: mode === 'edit' ? role.name : mode === 'duplicate' ? `${sourceRole.name} (Custom)` : '',
-        permissions: mode === 'edit' ? role.permissions : mode === 'duplicate' ? sourcePermissionNames : [],
+        name:
+            mode === 'edit' ? role.name : mode === 'duplicate' ? `${sourceRole.name} (Custom)` : '',
+        permissions:
+            mode === 'edit' ? role.permissions : mode === 'duplicate' ? sourcePermissionNames : [],
         ...(mode === 'duplicate' ? { source_role_id: sourceRole.id } : {}),
     });
 
@@ -31,7 +40,7 @@ export default function RoleFormModal({ mode, onClose, role, sourceRole, permiss
         } else if (mode === 'edit') {
             put(route('tenant.roles.update', { role: role.id }), { onSuccess: onClose });
         } else {
-            post(route('tenant.roles.duplicate'), { onSuccess: onClose });
+            post(route('tenant.roles.duplicate', { role: sourceRole.id }), { onSuccess: onClose });
         }
     };
 
@@ -40,7 +49,8 @@ export default function RoleFormModal({ mode, onClose, role, sourceRole, permiss
             <form onSubmit={submit} className="space-y-6">
                 {mode === 'duplicate' && (
                     <p className="text-sm text-ink-secondary">
-                        Creates a custom role you can edit freely, pre-filled from the permissions {sourceRole.name} normally has.
+                        Creates a custom role you can edit freely, pre-filled from the permissions{' '}
+                        {sourceRole.name} normally has.
                     </p>
                 )}
 
@@ -59,10 +69,14 @@ export default function RoleFormModal({ mode, onClose, role, sourceRole, permiss
                         selected={data.permissions}
                         onChange={(value) => setData('permissions', value)}
                     />
-                    {errors.permissions && <p className="mt-1 text-sm text-danger-fg">{errors.permissions}</p>}
+                    {errors.permissions && (
+                        <p className="mt-1 text-sm text-danger-fg">{errors.permissions}</p>
+                    )}
                 </div>
 
-                <Button type="submit" disabled={processing}>{SUBMIT_LABELS[mode]}</Button>
+                <Button type="submit" disabled={processing}>
+                    {SUBMIT_LABELS[mode]}
+                </Button>
             </form>
         </Modal>
     );

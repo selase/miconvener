@@ -15,7 +15,6 @@ use App\Models\User;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -27,6 +26,7 @@ final class UserController extends Controller
     {
         $this->authorize('read user');
         $tenant = $this->getTenant();
+        $actorCanManageOwners = $this->canManageOrgSuperadmins();
 
         $users = User::where('tenant_id', $tenant->id)
             ->with('roles:id,name')
@@ -45,6 +45,9 @@ final class UserController extends Controller
                 'status' => $user->status,
                 'last_login_at' => $user->last_login_at?->diffForHumans(),
                 'created_at' => $user->created_at->format('Y-m-d'),
+                'can_edit' => $actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'),
+                'can_remove' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
+                    && $user->id !== auth()->id(),
             ]);
 
         return Inertia::render('Tenant/Team/Index', [
@@ -110,6 +113,10 @@ final class UserController extends Controller
 
         $validated = $request->validated();
 
+        if ($this->wouldRemoveFinalActiveOrgSuperadmin($user, $validated['role'], $validated['status'], $tenant->id)) {
+            return back()->withErrors(['role' => 'Assign another active Org Superadmin before changing the final owner.']);
+        }
+
         $user->update([
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
@@ -136,8 +143,16 @@ final class UserController extends Controller
             abort(403);
         }
 
+        if ($this->userHasTenantRole($user, 'Org Superadmin', $tenant->id) && ! $this->canManageOrgSuperadmins()) {
+            abort(403);
+        }
+
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot remove your own account.');
+        }
+
+        if ($this->isFinalActiveOrgSuperadmin($user, $tenant->id)) {
+            return back()->with('error', 'Assign another active Org Superadmin before removing the final owner.');
         }
 
         $user->tenants()->detach($tenant->id);
@@ -159,8 +174,10 @@ final class UserController extends Controller
                 ->orWhere('tenant_id', $tenant->id);
         })->get();
 
-        if (! Gate::allows('access-superadmin-dashboard')) {
-            $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Superadmin');
+        $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Superadmin');
+
+        if (! $this->canManageOrgSuperadmins()) {
+            $roles = $roles->reject(fn ($role): bool => $role->isSystemRole() && $role->name === 'Org Superadmin');
         }
 
         return $roles->map(fn ($role): array => [
@@ -177,5 +194,66 @@ final class UserController extends Controller
         }
 
         return $tenant;
+    }
+
+    private function canManageOrgSuperadmins(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && ($user->isGlobalSuperAdmin() || $user->hasRole('Org Superadmin'));
+    }
+
+    private function wouldRemoveFinalActiveOrgSuperadmin(User $user, int|string $roleId, string $status, string $tenantId): bool
+    {
+        if (! $this->isFinalActiveOrgSuperadmin($user, $tenantId)) {
+            return false;
+        }
+
+        $selectedRole = Role::query()->find($roleId);
+
+        return $selectedRole?->name !== 'Org Superadmin' || $status !== User::STATUS_ACTIVE;
+    }
+
+    private function isFinalActiveOrgSuperadmin(User $user, string $tenantId): bool
+    {
+        if (! $this->userHasTenantRole($user, 'Org Superadmin', $tenantId) || $user->status !== User::STATUS_ACTIVE) {
+            return false;
+        }
+
+        $roleId = Role::whereNull('tenant_id')->where('name', 'Org Superadmin')->value('id');
+
+        // model_has_roles.model_id is varchar while users.id is bigint, so
+        // Postgres refuses to join the two columns directly. Collect the ids
+        // and cast them instead.
+        $ownerIds = DB::connection('landlord')
+            ->table(config('permission.table_names.model_has_roles'))
+            ->where('role_id', $roleId)
+            ->where('model_type', User::class)
+            ->where('tenant_id', $tenantId)
+            ->pluck('model_id')
+            ->map(fn (string $id): int => (int) $id)
+            ->all();
+
+        if ($ownerIds === []) {
+            return false;
+        }
+
+        return User::query()
+            ->whereIn('id', $ownerIds)
+            ->where('status', User::STATUS_ACTIVE)
+            ->count() <= 1;
+    }
+
+    private function userHasTenantRole(User $user, string $roleName, string $tenantId): bool
+    {
+        return DB::connection('landlord')
+            ->table(config('permission.table_names.model_has_roles'))
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', (string) $user->id)
+            ->where('model_has_roles.model_type', User::class)
+            ->where('model_has_roles.tenant_id', $tenantId)
+            ->where('roles.name', $roleName)
+            ->exists();
     }
 }

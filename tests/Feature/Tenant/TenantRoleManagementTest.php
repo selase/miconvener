@@ -84,6 +84,30 @@ test('tenant a cannot see roles from tenant b', function () {
     $response->assertDontSee('Secret Role');
 });
 
+test('tenant roles page excludes the platform superadmin but shows both organization roles', function () {
+    $this->actingAs($this->orgSuperadmin)
+        ->get(route('tenant.roles.index', ['subdomain' => $this->tenant->slug]))
+        ->assertInertia(fn ($page) => $page
+            ->component('Tenant/Roles/Index')
+            ->where('systemRoles', fn ($roles) => $roles->pluck('name')->sort()->values()->all() === ['Org Admin', 'Org Superadmin']));
+});
+
+test('tenant cannot duplicate the platform superadmin role', function () {
+    $platformRole = Role::where('name', 'Superadmin')->whereNull('tenant_id')->firstOrFail();
+
+    $this->actingAs($this->orgSuperadmin)
+        ->getJson(route('tenant.roles.duplicate.form', ['subdomain' => $this->tenant->slug, 'role' => $platformRole->id]))
+        ->assertNotFound();
+
+    $this->actingAs($this->orgSuperadmin)
+        ->postJson(route('tenant.roles.duplicate', ['subdomain' => $this->tenant->slug, 'role' => $platformRole->id]), [
+            'name' => 'Platform Copy',
+            'permissions' => ['read user'],
+            'source_role_id' => $platformRole->id,
+        ])
+        ->assertNotFound();
+});
+
 test('org superadmin cannot delete system roles', function () {
     $this->actingAs($this->orgSuperadmin);
 

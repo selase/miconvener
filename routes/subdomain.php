@@ -12,6 +12,7 @@ use App\Http\Controllers\Public\PublicPollController;
 use App\Http\Controllers\Public\ScheduleIcsController;
 use App\Http\Controllers\Public\ServiceRequestController as PublicServiceRequestController;
 use App\Http\Controllers\Public\SpeakerPortalController;
+use App\Http\Controllers\Tenant\AccountController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DesignSystemController;
 use App\Http\Controllers\Tenant\EventBadgeController;
@@ -46,19 +47,28 @@ Route::get('/tenant-test', function () {
 });
 
 Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function () {
+    Route::get('/account', [AccountController::class, 'index'])->name('tenant.account');
+    Route::post('/account/two-factor/setup', [AccountController::class, 'setup'])->name('tenant.account.two-factor.setup');
+    Route::post('/account/two-factor/confirm', [AccountController::class, 'confirm'])
+        ->middleware('throttle:two-factor')
+        ->name('tenant.account.two-factor.confirm');
+    Route::post('/account/two-factor/disable', [AccountController::class, 'disable'])
+        ->middleware('throttle:two-factor')
+        ->name('tenant.account.two-factor.disable');
+
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('tenant.dashboard');
 
     Route::get('/design-system', [DesignSystemController::class, 'index'])
         ->name('tenant.design-system');
 
-    Route::get('/settings/hub', fn (string $subdomain) => view('tenant.settings-hub'))
+    Route::get('/settings/hub', fn (string $subdomain) => redirect()->route('tenant.settings.index', ['subdomain' => $subdomain]))
         ->name('tenant.settings.hub');
 
     Route::get('/settings/usage', fn (string $subdomain) => view('tenant.usage'))
         ->name('tenant.settings.usage');
 
-    Route::get('/settings/notifications', fn (string $subdomain) => view('tenant.notifications'))
+    Route::get('/settings/notifications', fn (string $subdomain) => redirect()->route('tenant.account', ['subdomain' => $subdomain]))
         ->name('tenant.settings.notifications');
 
     Route::get('/billing', [App\Http\Controllers\Billing\BillingController::class, 'index'])

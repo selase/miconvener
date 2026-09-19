@@ -101,18 +101,22 @@
                             </div>
                         </div>
                         <div class="separator my-2"></div>
-                        <div class="menu-item px-5">
-                            <a href="{{ route('profile.index', Auth::user()->uuid) }}"
-                                class="menu-link px-5">Profile</a>
-                        </div>
-
                         @if(app(\App\Services\Tenancy\TenantContext::class)->getTenant())
                             <div class="menu-item px-5">
-                                <a href="{{ route('tenant.settings.hub') }}"
+                                <a href="{{ route('tenant.account') }}"
+                                    class="menu-link px-5">My account</a>
+                            </div>
+                            <div class="menu-item px-5">
+                                <a href="{{ route('tenant.settings.index') }}"
                                     class="menu-link px-5">
                                     <span class="menu-icon me-0"><i class="fas fa-cog fs-7 text-muted"></i></span>
                                     Settings
                                 </a>
+                            </div>
+                        @else
+                            <div class="menu-item px-5">
+                                <a href="{{ route('profile.index', Auth::user()->uuid) }}"
+                                    class="menu-link px-5">Profile</a>
                             </div>
                         @endif
 

@@ -3,7 +3,7 @@
 The running record of major tracks, per the SDD protocol in `.agent/rules/01-sdd-protocol.md`.
 Completed tracks are never deleted — this file is the history.
 
-Two things to know before you read it:
+Things to know before you read it:
 
 - **There are no per-track plan folders.** Earlier entries used to link to
   `conductor/tracks/<name>/plan.md`; none of those files were ever committed. The links
@@ -11,6 +11,12 @@ Two things to know before you read it:
 - **Tracks below the "Events domain" heading are the current product.** Everything above it
   is the multi-tenant SaaS starterkit MiConvener is built on (see `manual.md`), largely
   finished before the event platform work began.
+- **Completed entries record what was built at the time, not a fresh test run.** For current
+  behavior, follow the code and tests linked below. The event domain stores its models in
+  the `landlord` database with tenant scoping (`Event` and `BelongsToTenant`); dedicated
+  tenant connections remain part of the starterkit. The adopted product is a Laravel,
+  Inertia and React monolith with public event pages; the API-first design in
+  `miconvener.md` §1–3 remains unbuilt.
 
 ---
 
@@ -112,14 +118,21 @@ Two things to know before you read it:
 
 ## [x] Track: Entitlement & Authorization Bridge
 
-## [x] Track: Paystack Recurring Billing & Dunning
+## [x] Track: Paystack billing integration (current plan renewals are one-off charges)
 
-Verified by `tests/Feature/Billing/PaystackWebhookTest.php` (5 passing): signature rejection,
-`charge.success` extending `ends_at`, `invoice.payment_failed` sending dunning without
-cancelling, and `subscription.disable` reverting the tenant to the `free` package.
-Shipped: `VerifyPaystackSignature`, the three `app/Jobs/Billing/Process*` handlers,
-the three `app/Mail/Billing/` mailables, `RequireActiveSubscription` middleware, and
-`paystack:simulate` (`App\Services\Billing\PaystackSimulatorService`).
+The earlier Paystack-subscription implementation has been replaced for MiConvener plans.
+`billing:process-renewals` runs daily at 07:00 from `app/Console/Kernel.php` and uses
+`RenewalScheduler` to charge only reusable saved authorizations. Other payment methods get
+pay links and a seven-day grace period before a move to Free. `SubscriptionRenewalService`
+extends from the old period end and records each payment once by Paystack reference;
+`SubscriptionProvisioningService` handles initial plan payments. The callback and webhook
+both report payments, and `BillingNotifier` deduplicates transactional billing emails.
+Paystack subscription webhook handlers remain for legacy webhook event types, but Paystack subscriptions
+do not drive new plan renewals. See `tests/Feature/Billing/RenewalSchedulerTest.php`,
+`SubscriptionRenewalTest.php`, `PaymentReferenceConsistencyTest.php`, and
+`PlatformWebhookRoutingTest.php`. The old `PaystackWebhookTest.php`, billing jobs,
+`RequireActiveSubscription` middleware, and simulator named in the original entry are
+not present in the current tree.
 
 ## [-] Track: Outgoing Webhooks — delivery engine done, no console UI
 
@@ -196,10 +209,14 @@ dietary/accessibility, audit log, certificates, sponsor deliverables).
 
 The highest-risk area, and where the recent hardening commits concentrate. Two settlement
 modes per tenant (`platform_default` charges through the platform's own Paystack account;
-`own_gateway` uses the tenant's credentials), an append-only `event_ledger_entries` table
-(charge / refund / payout) that the finance screen and available-balance check read from,
-payout accounts verified by name-enquiry before use, and the payout send → transfer webhook →
-`paid` lifecycle with row locking on both the balance check and the send.
+`own_gateway` uses the tenant's credentials). `LedgerService` is the sole writer of both
+the flat `event_ledger_entries` settlement statement and the double-entry
+`ledger_transactions` / `ledger_entries` ledger. Finance reads the flat entries for
+collected amounts and available balance and the double-entry accounts for its trial
+balance. Payout accounts are verified by name enquiry before use. Sending a Paystack
+transfer can enter `awaiting_otp`; `finalizePayout` releases that same transfer. After
+release, the transfer webhook marks it `paid`. Row locks protect payout balance checks
+and sends.
 `payouts:reconcile` (scheduled every 15 minutes) chases payouts whose transfer webhook never
 arrived, so a lost webhook cannot strand money that has already left the platform.
 
@@ -238,7 +255,7 @@ arrived, so a lost webhook cannot strand money that has already left the platfor
 Fulfilled across the three dedicated commerce tracks below:
 1. Promo codes, discounts and complimentary passes with invite-only access codes (`EventPromoCode`, `PromoCodeService`, `PromoCodePanel.jsx`).
 2. Multi-point breakout session check-in, real-time room occupancy gauges, Reverb broadcasting, and CPD accreditation reporting (`EventSessionAttendance`, `SessionOccupancyPanel.jsx`).
-3. True double-entry general ledger with balanced accounts ($\sum \text{Debits} == \sum \text{Credits}$), automated settlement reconciliation (`app:reconcile-payout-schedules`), escrow holdback retention/release, and settlement statement export (`LedgerService`, `EventPayoutSchedule`, `FinancePanel.jsx`).
+3. True double-entry general ledger with balanced accounts ($\sum \text{Debits} == \sum \text{Credits}$), payout-schedule reconciliation command (`app:reconcile-payout-schedules`), escrow holdback retention/release, and settlement statement export (`LedgerService`, `EventPayoutSchedule`, `FinancePanel.jsx`). The command exists but is not scheduled in `app/Console/Kernel.php`.
 
 ## [x] Track: Executive Pitch Deck & Sales Presentation Route
 
@@ -254,6 +271,8 @@ Shipped:
   service requests (water, audio/mic assistance, AC) with SLA triage, during-event lunch entitlement
   scanning, live quizzes with animated projector leaderboards, automated certificates of
   participation, and 10 enterprise exports.
+- The deck is a marketing artifact. Its feature claims, including offline PWA scanning and
+  thermal printer integration, are not evidence that those capabilities shipped.
 - Interactive ROI & Cost Calculator widget with real-time sliders on Slide 11.
 - Presenter Talking Points drawer (`P` key) with tailored scripts for every slide.
 - Slide sorter overview grid (`O` key), keyboard navigation (`←`/`→`, `Space`, `J`/`K`, `F`, `T`),
@@ -303,9 +322,9 @@ Verified by:
 ## [x] Track: Double-Entry Accounting Ledger & Payout Schedules
 
 - **True Double-Entry General Ledger**: Landlord tables `ledger_accounts`, `ledger_transactions`, `ledger_entries`, and standard chart-of-accounts (`1010` Payment Gateway Clearing, `1020` Cash/Bank, `2010` Organizer Payable, `2020` Holdback Reserve Escrow, `4010` Platform Commission Revenue, `5010` Payment Gateway Processing Fees).
-- **Strict Equilibrium Invariant**: `LedgerService` enforces that every transaction is balanced ($\sum \text{Debits} == \sum \text{Credits}$) at database commit time. Throws `InvalidArgumentException` if unbalanced.
+- **Strict Equilibrium Invariant**: `LedgerService` checks that every transaction is balanced ($\sum \text{Debits} == \sum \text{Credits}$) before posting it. It throws `InvalidArgumentException` if unbalanced, and repeated tenant/reference/type combinations return the existing transaction.
 - **Wired Revenue & Refund Lifecycles**: Integrated into Paystack payment settlement webhooks (`SettlementWebhookController`), ticket cancellation & refunds (`EventRegistrationController`), and payout disbursements (`EventFinanceController`).
-- **Automated Settlement & Escrow Engine**: Command `app:reconcile-payout-schedules` enforces event payout schedules (`immediate` T+0, `post_event` T+N days, or `manual`), automatically retains holdback reserve buffers (e.g., 10%) during dispute risk periods, automatically releases escrow reserves upon maturity, and schedules automated disbursements when balances cross the minimum threshold.
+- **Payout Schedule & Escrow Command**: When invoked, `app:reconcile-payout-schedules` processes event payout schedules (`immediate` T+0, `post_event` T+N days, or `manual`), retains and releases holdback reserves, and creates scheduled payout records when thresholds are met. It does not send the transfer, and `app/Console/Kernel.php` does not currently schedule this command. The separately scheduled `payouts:reconcile` checks already-sent transfers.
 - **Host Console Finance UI**: Enhanced `FinancePanel.jsx` with a real-time Double-Entry General Ledger card showing equilibrium status ("Equilibrium Balanced" green pill), account debit/credit breakdown, Payout Schedule & Holdback Policy overview, and a configuration modal to customize schedules, days, holdback percentages, and preferred payout accounts.
 - **General Ledger CSV Export**: Upgraded `exportSettlementStatement` to append the complete double-entry general ledger trial balance below the line-item reconciliation.
 - **Verification**: Verified with 6 passing tests in `tests/Feature/Events/EventLedgerAndPayoutScheduleTest.php` (43 assertions) and 28 passing tests across the entire financial suite. Clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
@@ -362,15 +381,19 @@ Verified by:
 - **Granular RBAC Permissions**: Added Spatie permissions (`create notification-rule`, `read notification-rule`, `update notification-rule`, `delete notification-rule`, `manage notification-settings`) to `PermissionsSeeder` and assigned to Superadmin, Org Superadmin, and Org Admin in `RolePermissions.php`.
 - **Landlord Database Migrations & Models**: Landlord tables `event_notification_rules`, `event_notification_logs`, `tenant_notification_settings`. Eloquent models `EventNotificationRule`, `EventNotificationLog`, and `TenantNotificationSetting` with UUID primary keys, JSON casts, and relations on `Event.php` (`notificationRules()`, `notificationLogs()`).
 - **Multi-Channel Notification Gateway**: `NotificationGatewayService` supporting direct Email delivery via responsive Mailable `AutomatedNotificationMail`, and multi-channel staging for SMS and WhatsApp formatted ready for plug-and-play Omnichannel API integration.
-- **Automated Rule Engine & Scheduler**: `AutomatedNotificationDispatcher` and Artisan command `app:dispatch-automated-notifications` automatically calculating scheduled timing offsets (e.g. 7 days before event, 2 hours after event), resolving attendee and cohort recipients, and interpolating dynamic placeholders (`{name}`, `{event_name}`, `{date}`, `{time}`, `{venue}`, `{ticket_code}`, `{ticket_url}`).
-- **Quota Billing & Anti-Abuse Guardrails**: Tenant settings enforcing monthly free email limits (2,500 free emails/month), overage billing control, and per-attendee frequency cooldowns (default 60 minutes) to eliminate repetitive notification spamming.
+- **Automated Rule Engine & Command**: `AutomatedNotificationDispatcher` and Artisan command `app:dispatch-automated-notifications` calculate timing offsets (e.g. 7 days before event, 2 hours after event), resolve attendee and cohort recipients, and interpolate placeholders (`{name}`, `{event_name}`, `{date}`, `{time}`, `{venue}`, `{ticket_code}`, `{ticket_url}`). The command is not registered in `app/Console/Kernel.php`, so time-based dispatch requires an external invocation.
+- **Quota Billing & Anti-Abuse Guardrails**: `TenantNotificationSetting` defaults to a 2,500-email monthly setting and a 60-minute recipient cooldown, with overage control. Package `email_credits` limits are separately defined in `EventPackageSeeder`; 2,500 is not a universal plan allowance. Billing emails sent through `BillingNotifier` are transactional and do not use these credits.
+- **Delivery Scope**: Email is delivered by `NotificationGatewayService`. SMS and WhatsApp are staged as records for a future gateway; they are not sent or billed as delivered messages.
 - **Host Console UI**: `NotificationsPanel.jsx` added to the Event Console with monthly quota progress bar, channel statuses, 1-click preset campaign deployment (7-day reminder, day-of digital pass, post-event CME feedback, speaker slide deadline), custom rule builder, live test dispatch, and channel configuration modal.
 - **Verification Evidence**:
   - `tests/Feature/Events/EventAutomatedNotificationsTest.php`: 7 passing tests, 51 assertions.
   - Phase 2, 3, 4 comprehensive suite: 27 passing tests, 200 assertions.
   - Full clean asset build via `npm run build` and formatting via `vendor/bin/pint --dirty`.
 
+## [x] Track: Current billing, fee and live-event protection
 
-
-
-
+- Plan and token-pack payments use GHS and the Paystack reference as the idempotency key across callback, webhook, provisioning and `transactions.provider_transaction_id` (`PaymentReferenceConsistencyTest.php`). Billing pages, checkouts and invoices require `manage billing`; the payment callback remains open to record money already taken (`BillingAccessTest.php`).
+- Ticket money uses integer pesewas. `PlatformFeeResolver` / `FeeCalculator` apply event → tenant → package → config terms, including a stored zero-percent waiver. Only the global Superadmin gate or `events:set-platform-fee` sets percentages and caps; tenant settings may choose the fee bearer (`PlatformFeeSettingsTest.php`, `PackageDefaultFeeTest.php`).
+- `LedgerService` posts both ledgers once per reference. Gateway fees are booked at sale; transfer fees are passed through only when a transfer is released. OTP transfers stay parked for `finalizePayout` instead of being sent again (`LedgerIdempotencyTest.php`, `GatewayFeeLedgerTest.php`, `TransferFeePassThroughTest.php`, `PayoutOtpFlowTest.php`).
+- A downgrade or plan lapse grandfathers already-published, not-yet-ended events and locks commercial terms that would worsen. `Tenant::handlesTicketMoney()` keeps finance and refunds available for money already collected (`LapsedPlanEventsTest.php`).
+- `BillingNotifier` sends deduplicated transactional receipts, payment failures and plan-ending emails to the payer and tenant contact address (`BillingEmailsTest.php`).

@@ -123,6 +123,30 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'read finance',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'process refunds',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage payouts',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage payment settings',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'manage api keys',
                 'guard_name' => 'web',
                 'category' => 'api',
@@ -179,7 +203,7 @@ final class PermissionsSeeder extends Seeder
     }
 
     /**
-     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event' | 'abstract' | 'programme' | 'operations' | 'certificates' | 'event-operation' | 'certificate' | 'dynamic-form' | 'stratification' | 'notification-rule' | 'notifications')}[]
+     * @return array{name: mixed, category: ('communication' | 'permission' | 'role' | 'setting' | 'team' | 'tenant' | 'user' | 'event' | 'abstract' | 'programme' | 'operations' | 'certificates' | 'event-operation' | 'certificate' | 'dynamic-form' | 'stratification' | 'notification-rule' | 'notifications' | 'finance')}[]
      */
     public function modelPermissions(): array
     {

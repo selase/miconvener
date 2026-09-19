@@ -116,6 +116,7 @@ final class User extends Authenticatable
             // Fix: The table uses 'model_id' and stores the INT ID of the user, not the UUID
             ->where('model_has_roles.model_id', (string) $this->id)
             ->where('roles.name', 'Superadmin')
+            ->whereNull('model_has_roles.tenant_id')
             ->exists();
     }
 

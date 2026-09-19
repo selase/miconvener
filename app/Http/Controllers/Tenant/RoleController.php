@@ -21,6 +21,8 @@ use Inertia\Response;
 
 final class RoleController extends Controller
 {
+    private const array TENANT_VISIBLE_SYSTEM_ROLES = ['Org Superadmin', 'Org Admin'];
+
     public function index(string $subdomain): Response
     {
         $this->authorize('read role');
@@ -30,7 +32,12 @@ final class RoleController extends Controller
             ->where(function ($query) use ($tenant): void {
                 $query->where('tenant_id', $tenant->id)
                     ->orWhereNull('tenant_id');
-            })->get();
+            })
+            ->where(function ($query): void {
+                $query->whereNotNull('tenant_id')
+                    ->orWhereIn('name', self::TENANT_VISIBLE_SYSTEM_ROLES);
+            })
+            ->get();
 
         $toPayload = fn (Role $role): array => [
             'id' => $role->id,
@@ -148,6 +155,7 @@ final class RoleController extends Controller
         $tenant = $this->getTenant();
 
         $sourceRole = Role::whereNull('tenant_id')
+            ->whereIn('name', self::TENANT_VISIBLE_SYSTEM_ROLES)
             ->where('id', $role)
             ->with('permissions')
             ->firstOrFail();
@@ -179,6 +187,7 @@ final class RoleController extends Controller
 
         $source = Role::where('id', $validated['source_role_id'])
             ->whereNull('tenant_id')
+            ->whereIn('name', self::TENANT_VISIBLE_SYSTEM_ROLES)
             ->firstOrFail();
 
         $role = app(RoleDuplicationService::class)

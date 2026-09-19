@@ -14,6 +14,7 @@ final class BillingSettingsController extends Controller
 {
     public function index(TenantContext $tenantContext): View
     {
+        $this->authorize('manage billing');
         $tenant = $tenantContext->getTenant();
 
         return view('tenant.settings.billing', [
@@ -30,6 +31,7 @@ final class BillingSettingsController extends Controller
 
     public function update(Request $request, TenantContext $tenantContext): RedirectResponse
     {
+        $this->authorize('manage billing');
         $tenant = $tenantContext->getTenant();
 
         $validated = $request->validate([

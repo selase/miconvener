@@ -34,6 +34,7 @@ final class Permission extends SpatiePermission
         'update communication',
         'delete communication',
         'manage organization settings',
+        'read finance',
     ];
 
     protected $connection = 'landlord';

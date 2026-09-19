@@ -20,11 +20,13 @@ new class extends Component
 
     public function mount(User $user)
     {
+        abort_unless(auth()->id() === $user->id, 403);
         $this->user = $user;
     }
 
     public function enableTwoFactor()
     {
+        abort_unless(auth()->id() === $this->user->id, 403);
         $google2fa = app('pragmarx.google2fa');
 
         $this->secret = $google2fa->generateSecretKey();
@@ -39,6 +41,7 @@ new class extends Component
 
     public function confirmTwoFactor()
     {
+        abort_unless(auth()->id() === $this->user->id, 403);
         $this->validate([
             'code' => 'required|digits:6',
         ]);
@@ -62,6 +65,7 @@ new class extends Component
 
     public function disableTwoFactor()
     {
+        abort_unless(auth()->id() === $this->user->id, 403);
         $this->validate([
             'password' => 'required',
         ]);

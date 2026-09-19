@@ -60,6 +60,12 @@ final class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('billing', fn (Request $request) => Limit::perMinute(20)
             ->by($request->user()?->id ?: $request->ip()));
 
+        // Confirming or disabling 2FA checks a six-digit code or a password,
+        // so it is guessable and needs its own cap. Keyed by user, not IP:
+        // a whole organization can share one address.
+        RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(6)
+            ->by($request->user()?->id ?: $request->ip()));
+
         RateLimiter::for('api-key-management', fn (Request $request) => Limit::perMinute(10)
             ->by($request->user()?->id ?: $request->ip()));
 

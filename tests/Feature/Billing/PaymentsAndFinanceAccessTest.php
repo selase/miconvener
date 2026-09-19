@@ -66,3 +66,28 @@ test('the sidebar shows Finance exactly when the plan sells paid tickets', funct
     $this->actingAs($user)->get("http://{$host}/dashboard", ['HTTP_HOST' => $host])
         ->assertInertia(fn ($page) => $page->where('tenant.features.paid_tickets', false));
 });
+
+test('org admin can read finance but cannot manage payment settings', function () {
+    [$tenant, $owner, $host] = paymentsAccessTenant(paidTickets: true);
+    $admin = User::factory()->create(['tenant_id' => $tenant->id]);
+    setPermissionsTeamId($tenant->id);
+    $admin->assignRole('Org Admin');
+    $tenant->users()->attach($admin->id);
+
+    $this->actingAs($admin)
+        ->get("http://{$host}/finance", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('auth.can.read_finance', true)
+            ->where('auth.can.process_refunds', false)
+            ->where('auth.can.manage_payouts', false)
+            ->where('auth.can.manage_payment_settings', false));
+
+    $this->actingAs($admin)
+        ->get("http://{$host}/settings/payments", ['HTTP_HOST' => $host])
+        ->assertForbidden();
+
+    $this->actingAs($admin)
+        ->get("http://{$host}/settings/billing", ['HTTP_HOST' => $host])
+        ->assertForbidden();
+});
