@@ -817,12 +817,6 @@ parameters:
 			path: app/Http/Controllers/Public/AbstractSubmissionController.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::sessions().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Public/AttendeePortalController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Public\AttendeePortalController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -913,25 +907,7 @@ parameters:
 			path: app/Http/Controllers/Public/PublicDynamicFormController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$email.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicDynamicFormController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$first_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicDynamicFormController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Public/PublicDynamicFormController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$last_name.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Public/PublicDynamicFormController.php
@@ -944,12 +920,6 @@ parameters:
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicDynamicFormController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$status.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Public/PublicDynamicFormController.php
@@ -1003,33 +973,9 @@ parameters:
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$capacity.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$description.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ends_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$location.
-			identifier: property.notFound
-			count: 1
+			count: 3
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -1041,7 +987,7 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
 			identifier: property.notFound
-			count: 3
+			count: 2
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -1063,30 +1009,6 @@ parameters:
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$room.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$seat_label.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$speakers.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$starts_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$tier.
 			identifier: property.notFound
 			count: 1
@@ -1094,18 +1016,6 @@ parameters:
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$title.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$track.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$type.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Public/PublicEventController.php
@@ -1123,21 +1033,9 @@ parameters:
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::signupCount().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
 			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::active().'
 			identifier: method.notFound
 			count: 2
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
-			identifier: method.notFound
-			count: 1
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -1167,7 +1065,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: argument.unresolvableType
-			count: 3
+			count: 2
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -1203,7 +1101,7 @@ parameters:
 		-
 			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: method.unresolvableReturnType
-			count: 3
+			count: 2
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -1263,7 +1161,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #2 $sessions of static method App\Services\Events\IcsGenerator::forSessions() expects Illuminate\Support\Collection<int, App\Models\EventSession>, Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model> given.'
 			identifier: argument.type
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Public/ScheduleIcsController.php
 
 		-
@@ -1285,12 +1183,6 @@ parameters:
 			path: app/Http/Controllers/Public/ServiceRequestController.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::effectiveFeeBearer().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Public/SettlementWebhookController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Public\SettlementWebhookController::confirmPlatformDefaultCharge() has parameter $metadata with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
@@ -1309,19 +1201,7 @@ parameters:
 			path: app/Http/Controllers/Public/SettlementWebhookController.php
 
 		-
-			rawMessage: 'Parameter #1 $event of method App\Services\Finance\FeeCalculator::for() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Public/SettlementWebhookController.php
-
-		-
 			rawMessage: 'Parameter #1 $event of method App\Services\Finance\LedgerService::recordPayout() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Public/SettlementWebhookController.php
-
-		-
-			rawMessage: 'Parameter #1 $event of method App\Services\Finance\LedgerService::recordTicketSale() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Public/SettlementWebhookController.php
@@ -1471,12 +1351,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/ApiKeyController.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::effectiveFeeBearer().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/Commerce/WebhookController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\Commerce\WebhookController::confirmEventRegistrationIfApplicable() has parameter $metadata with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
@@ -1497,18 +1371,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\Commerce\WebhookController::recordTransaction() has parameter $data with no type specified.'
 			identifier: missingType.parameter
-			count: 1
-			path: app/Http/Controllers/Tenant/Commerce/WebhookController.php
-
-		-
-			rawMessage: 'Parameter #1 $event of method App\Services\Finance\FeeCalculator::for() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/Commerce/WebhookController.php
-
-		-
-			rawMessage: 'Parameter #1 $event of method App\Services\Finance\LedgerService::recordTicketSale() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Tenant/Commerce/WebhookController.php
 
@@ -1735,12 +1597,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventAbstractController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$badge_tier.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBadgeController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$first_name.
 			identifier: property.notFound
 			count: 1
@@ -1755,24 +1611,6 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$last_name.
 			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBadgeController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBadgeController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$seat_label.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBadgeController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
-			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventBadgeController.php
 
@@ -1891,27 +1729,9 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventCertificateController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$email.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventCertificateController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$first_name.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventCertificateController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Tenant/EventCertificateController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$last_name.
-			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Tenant/EventCertificateController.php
 
 		-
@@ -1927,46 +1747,10 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventCertificateController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$room.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$seat_label.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventCheckInController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventCheckInController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventCheckInController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Tenant/EventCheckInController.php
-
-		-
-			rawMessage: 'Parameter #1 $registration of method App\Http\Controllers\Tenant\EventCheckInController::markCheckedIn() expects App\Models\EventRegistration, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 2
-			path: app/Http/Controllers/Tenant/EventCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$amount.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$approval_note.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$badge_tier.
@@ -1983,47 +1767,17 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$capacity.
 			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$checked_in_at.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$created_at.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$currency.
-			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$description.
 			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$download_limit.
-			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$email.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ends_at.
+			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$download_limit.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventController.php
@@ -2035,25 +1789,13 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$full_name.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
-			count: 6
+			count: 4
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$is_active.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$location.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventController.php
@@ -2071,12 +1813,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$phone.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$photo_path.
 			identifier: property.notFound
 			count: 1
@@ -2089,19 +1825,7 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$platform_fee_amount.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$price.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$registrations_count.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventController.php
@@ -2116,12 +1840,6 @@ parameters:
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$rows.
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$seatAssignment.
-			identifier: property.notFound
-			count: 2
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
@@ -2143,57 +1861,9 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$speakers.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$starts_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$status.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ticketType.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ticket_code.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$title.
 			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$track.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$type.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$waitlist_position.
-			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
@@ -2227,12 +1897,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -2241,13 +1905,13 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: argument.unresolvableType
-			count: 6
+			count: 4
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
 			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: method.unresolvableReturnType
-			count: 6
+			count: 4
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
@@ -2467,12 +2131,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventFinanceController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -2635,18 +2293,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventOperationController.php
 
 		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$full_name.'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventParticipantGroupController.php
-
-		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventParticipantGroupController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$type.
 			identifier: property.notFound
 			count: 1
@@ -2719,62 +2365,8 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventPromoCodeController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$amount.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$email.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$payment_reference.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$status.
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ticket_type_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventRegistrationController::getTenant() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: 'Parameter #1 $event of method App\Services\Finance\LedgerService::recordRefund() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: 'Parameter #1 $registration of class App\Mail\Events\EventRegistrationRejected constructor expects App\Models\EventRegistration, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: 'Parameter #1 $registration of method App\Http\Controllers\Tenant\EventRegistrationController::confirmOrInviteToPay() expects App\Models\EventRegistration, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventRegistrationController.php
-
-		-
-			rawMessage: 'Parameter #2 $registrationModel of method App\Http\Controllers\Tenant\EventRegistrationController::refundPaidRegistration() expects App\Models\EventRegistration, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Tenant/EventRegistrationController.php
 
@@ -2797,61 +2389,7 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventReportController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$attendances.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$checkedInBy.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$checked_in_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ends_at.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$full_name.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$location.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$question.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$registrations.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventReportController.php
@@ -2860,36 +2398,6 @@ parameters:
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$responses.
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$seat_label.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$starts_at.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ticket_code.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$title.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$track.
-			identifier: property.notFound
-			count: 2
 			path: app/Http/Controllers/Tenant/EventReportController.php
 
 		-
@@ -2902,12 +2410,6 @@ parameters:
 			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::displayName().'
 			identifier: method.notFound
 			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
-			identifier: method.notFound
-			count: 2
 			path: app/Http/Controllers/Tenant/EventReportController.php
 
 		-
@@ -2930,12 +2432,6 @@ parameters:
 
 		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Support\Collection<int,Illuminate\Database\Eloquent\Model>::each() expects callable(Illuminate\Database\Eloquent\Model, int): mixed, Closure(App\Models\EventForumThread): void given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventReportController.php
-
-		-
-			rawMessage: 'Parameter #2 $registration of method App\Http\Controllers\Tenant\EventReportController::resolveRegistrationColumn() expects App\Models\EventRegistration, Illuminate\Database\Eloquent\Model given.'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Tenant/EventReportController.php
@@ -3001,78 +2497,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$capacity.
-			identifier: property.notFound
-			count: 5
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$email.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$full_name.
-			identifier: property.notFound
-			count: 11
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 10
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$location.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ticket_code.
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$title.
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::attendances().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::isConfirmed().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::isRoomFull().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::liveHeadcount().'
-			identifier: method.notFound
-			count: 5
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::occupancyPercentage().'
-			identifier: method.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
 			rawMessage: Left side of && is always true.
 			identifier: booleanAnd.leftAlwaysTrue
 			count: 1
@@ -3082,18 +2506,6 @@ parameters:
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventSessionCheckInController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() expects callable(Illuminate\Database\Eloquent\Model, int): array{id: string, title: string, location: non-falsy-string, track: string|null, type: string, starts_at: string, ends_at: string, capacity: int|null, registered_count: int<0, max>, live_headcount: int, occupancy_percentage: int, is_at_capacity: bool, is_live: bool, status: ''at_capacity''|''available''|''near_capacity''}, Closure(App\Models\EventSession): array{id: string, title: string, location: non-falsy-string, track: string|null, type: string, starts_at: string, ends_at: string, capacity: int|null, registered_count: int<0, max>, live_headcount: int, occupancy_percentage: int, is_at_capacity: bool, is_live: bool, status: ''at_capacity''|''available''|''near_capacity''} given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: 'Parameter #1 $session of class App\Events\SessionAttendanceUpdated constructor expects App\Models\EventSession, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 2
 			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
 
 		-
@@ -3107,30 +2519,6 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 3
 			path: app/Http/Controllers/Tenant/EventSessionCheckInController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$ends_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$starts_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventSessionController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::clashes().'
-			identifier: method.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventSessionController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::speakers().'
-			identifier: method.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventSessionController.php
 
 		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventSessionController::getTenant() has no return type specified.'
@@ -3224,12 +2612,6 @@ parameters:
 
 		-
 			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::seatLabels().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventVenueController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventVenueController.php
@@ -3685,12 +3067,6 @@ parameters:
 			path: app/Jobs/Events/SendEventBlastJob.php
 
 		-
-			rawMessage: 'Parameter #1 $tenant of method App\Services\Tenancy\FeatureMeteringService::recordUsage() expects App\Models\Tenant, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/Events/SendEventBlastJob.php
-
-		-
 			rawMessage: Instanceof between App\Models\Tenant and App\Models\Tenant will always evaluate to true.
 			identifier: instanceof.alwaysTrue
 			count: 1
@@ -4027,82 +3403,10 @@ parameters:
 			path: app/Livewire/Tenant/UsageDashboard.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventRegistrationConfirmed.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
-			identifier: property.notFound
-			count: 2
-			path: app/Mail/Events/EventRegistrationConfirmed.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventRegistrationPaymentInvite.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
-			identifier: property.notFound
-			count: 2
-			path: app/Mail/Events/EventRegistrationPaymentInvite.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventRegistrationPendingApproval.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventRegistrationRejected.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventRegistrationVerifyEmail.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
-			identifier: property.notFound
-			count: 2
-			path: app/Mail/Events/EventRegistrationVerifyEmail.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventRegistrationWaitlisted.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventTicketLink.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
-			identifier: property.notFound
-			count: 2
-			path: app/Mail/Events/EventTicketLink.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$event.
 			identifier: property.notFound
 			count: 1
 			path: app/Mail/Events/EventTicketTransferCode.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Mail/Events/EventTicketTransferred.php
 
 		-
 			rawMessage: 'Method App\Mail\Users\ResendAccountPassword::__construct() has parameter $data with no value type specified in iterable type array.'
@@ -4153,12 +3457,6 @@ parameters:
 			path: app/Models/ChatIntegration.php
 
 		-
-			rawMessage: 'Method App\Models\ChatIntegration::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/ChatIntegration.php
-
-		-
 			rawMessage: 'Method App\Models\ChatIntegration::user() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -4172,12 +3470,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\DataExportRequest::requestedBy() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/DataExportRequest.php
-
-		-
-			rawMessage: 'Method App\Models\DataExportRequest::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/DataExportRequest.php
@@ -4351,12 +3643,6 @@ parameters:
 			path: app/Models/Event.php
 
 		-
-			rawMessage: 'Method App\Models\Event::registrations() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Event.php
-
-		-
 			rawMessage: 'Method App\Models\Event::scopePublished() has parameter $query with generic class Illuminate\Database\Eloquent\Builder but does not specify its types: TModel'
 			identifier: missingType.generics
 			count: 1
@@ -4369,19 +3655,7 @@ parameters:
 			path: app/Models/Event.php
 
 		-
-			rawMessage: 'Method App\Models\Event::seatAssignments() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Event.php
-
-		-
 			rawMessage: 'Method App\Models\Event::serviceRequests() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Event.php
-
-		-
-			rawMessage: 'Method App\Models\Event::sessions() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Event.php
@@ -4495,12 +3769,6 @@ parameters:
 			path: app/Models/EventAbstract.php
 
 		-
-			rawMessage: 'Method App\Models\EventAbstract::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventAbstract.php
-
-		-
 			rawMessage: 'Method App\Models\EventAbstract::user() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -4537,12 +3805,6 @@ parameters:
 			path: app/Models/EventAbstractReview.php
 
 		-
-			rawMessage: 'Method App\Models\EventAbstractReview::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventAbstractReview.php
-
-		-
 			rawMessage: 'Class App\Models\EventBadgePrint uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -4567,33 +3829,15 @@ parameters:
 			path: app/Models/EventBadgePrint.php
 
 		-
-			rawMessage: 'Method App\Models\EventBadgePrint::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventBadgePrint.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Models/EventBlast.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
 			identifier: property.notFound
 			count: 1
-			path: app/Models/EventBlast.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$title.
-			identifier: property.notFound
-			count: 1
-			path: app/Models/EventBlast.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::confirmed().'
-			identifier: method.notFound
-			count: 3
 			path: app/Models/EventBlast.php
 
 		-
@@ -4627,12 +3871,6 @@ parameters:
 			path: app/Models/EventBlast.php
 
 		-
-			rawMessage: 'Method App\Models\EventBlast::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventBlast.php
-
-		-
 			rawMessage: 'Class App\Models\EventBlastRecipient uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -4646,12 +3884,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventBlastRecipient::registration() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventBlastRecipient.php
-
-		-
-			rawMessage: 'Method App\Models\EventBlastRecipient::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventBlastRecipient.php
@@ -4676,12 +3908,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventCertificate::template() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventCertificate.php
-
-		-
-			rawMessage: 'Method App\Models\EventCertificate::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventCertificate.php
@@ -4717,12 +3943,6 @@ parameters:
 			path: app/Models/EventCertificateTemplate.php
 
 		-
-			rawMessage: 'Method App\Models\EventCertificateTemplate::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventCertificateTemplate.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
 			identifier: property.notFound
 			count: 1
@@ -4747,12 +3967,6 @@ parameters:
 			path: app/Models/EventDynamicForm.php
 
 		-
-			rawMessage: 'Method App\Models\EventDynamicForm::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventDynamicForm.php
-
-		-
 			rawMessage: 'Class App\Models\EventDynamicFormSubmission uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -4772,12 +3986,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventDynamicFormSubmission::registration() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventDynamicFormSubmission.php
-
-		-
-			rawMessage: 'Method App\Models\EventDynamicFormSubmission::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventDynamicFormSubmission.php
@@ -4813,12 +4021,6 @@ parameters:
 			path: app/Models/EventFormField.php
 
 		-
-			rawMessage: 'Method App\Models\EventFormField::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventFormField.php
-
-		-
 			rawMessage: 'Class App\Models\EventForumBan uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -4826,12 +4028,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventForumBan::event() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventForumBan.php
-
-		-
-			rawMessage: 'Method App\Models\EventForumBan::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventForumBan.php
@@ -4849,12 +4045,6 @@ parameters:
 			path: app/Models/EventForumReply.php
 
 		-
-			rawMessage: 'Method App\Models\EventForumReply::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventForumReply.php
-
-		-
 			rawMessage: 'Method App\Models\EventForumReply::thread() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -4862,12 +4052,6 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\EventForumReport uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventForumReport.php
-
-		-
-			rawMessage: 'Method App\Models\EventForumReport::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventForumReport.php
@@ -4915,12 +4099,6 @@ parameters:
 			path: app/Models/EventForumThread.php
 
 		-
-			rawMessage: 'Method App\Models\EventForumThread::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventForumThread.php
-
-		-
 			rawMessage: 'Method App\Models\EventForumThread::votes() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -4928,12 +4106,6 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\EventForumVote uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventForumVote.php
-
-		-
-			rawMessage: 'Method App\Models\EventForumVote::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventForumVote.php
@@ -4969,12 +4141,6 @@ parameters:
 			path: app/Models/EventLedgerEntry.php
 
 		-
-			rawMessage: 'Method App\Models\EventLedgerEntry::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventLedgerEntry.php
-
-		-
 			rawMessage: 'Class App\Models\EventMaterial uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -4999,12 +4165,6 @@ parameters:
 			path: app/Models/EventMaterial.php
 
 		-
-			rawMessage: 'Method App\Models\EventMaterial::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventMaterial.php
-
-		-
 			rawMessage: 'Class App\Models\EventMaterialDownload uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5023,12 +4183,6 @@ parameters:
 			path: app/Models/EventMaterialDownload.php
 
 		-
-			rawMessage: 'Method App\Models\EventMaterialDownload::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventMaterialDownload.php
-
-		-
 			rawMessage: 'Class App\Models\EventNotificationLog uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5042,12 +4196,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventNotificationLog::rule() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventNotificationLog.php
-
-		-
-			rawMessage: 'Method App\Models\EventNotificationLog::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventNotificationLog.php
@@ -5077,12 +4225,6 @@ parameters:
 			path: app/Models/EventNotificationRule.php
 
 		-
-			rawMessage: 'Method App\Models\EventNotificationRule::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventNotificationRule.php
-
-		-
 			rawMessage: 'Class App\Models\EventOperationPillar uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5096,12 +4238,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventOperationPillar::tasks() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventOperationPillar.php
-
-		-
-			rawMessage: 'Method App\Models\EventOperationPillar::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventOperationPillar.php
@@ -5143,12 +4279,6 @@ parameters:
 			path: app/Models/EventOperationTask.php
 
 		-
-			rawMessage: 'Method App\Models\EventOperationTask::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventOperationTask.php
-
-		-
 			rawMessage: 'Class App\Models\EventParticipantGroup uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5168,12 +4298,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventParticipantGroup::registrations() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsToMany does not specify its types: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor (2-4 required)'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventParticipantGroup.php
-
-		-
-			rawMessage: 'Method App\Models\EventParticipantGroup::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventParticipantGroup.php
@@ -5203,12 +4327,6 @@ parameters:
 			path: app/Models/EventParticipantGroupMember.php
 
 		-
-			rawMessage: 'Method App\Models\EventParticipantGroupMember::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventParticipantGroupMember.php
-
-		-
 			rawMessage: 'Class App\Models\EventPayout uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5233,12 +4351,6 @@ parameters:
 			path: app/Models/EventPayout.php
 
 		-
-			rawMessage: 'Method App\Models\EventPayout::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventPayout.php
-
-		-
 			rawMessage: 'Class App\Models\EventPayoutSchedule uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5252,12 +4364,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventPayoutSchedule::preferredAccount() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventPayoutSchedule.php
-
-		-
-			rawMessage: 'Method App\Models\EventPayoutSchedule::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventPayoutSchedule.php
@@ -5299,12 +4405,6 @@ parameters:
 			path: app/Models/EventPoll.php
 
 		-
-			rawMessage: 'Method App\Models\EventPoll::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventPoll.php
-
-		-
 			rawMessage: 'Class App\Models\EventPollOption uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5323,12 +4423,6 @@ parameters:
 			path: app/Models/EventPollOption.php
 
 		-
-			rawMessage: 'Method App\Models\EventPollOption::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventPollOption.php
-
-		-
 			rawMessage: 'Class App\Models\EventPollResponse uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5342,12 +4436,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventPollResponse::poll() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventPollResponse.php
-
-		-
-			rawMessage: 'Method App\Models\EventPollResponse::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventPollResponse.php
@@ -5395,12 +4483,6 @@ parameters:
 			path: app/Models/EventPromoCode.php
 
 		-
-			rawMessage: 'Method App\Models\EventPromoCode::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventPromoCode.php
-
-		-
 			rawMessage: 'Class App\Models\EventRegistration uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5408,18 +4490,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventRegistration::badgePrints() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventRegistration.php
-
-		-
-			rawMessage: 'Method App\Models\EventRegistration::checkedInBy() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventRegistration.php
-
-		-
-			rawMessage: 'Method App\Models\EventRegistration::event() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventRegistration.php
@@ -5455,25 +4525,7 @@ parameters:
 			path: app/Models/EventRegistration.php
 
 		-
-			rawMessage: 'Method App\Models\EventRegistration::seatAssignment() return type with generic class Illuminate\Database\Eloquent\Relations\HasOne does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventRegistration.php
-
-		-
 			rawMessage: 'Method App\Models\EventRegistration::sessions() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsToMany does not specify its types: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor (2-4 required)'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventRegistration.php
-
-		-
-			rawMessage: 'Method App\Models\EventRegistration::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventRegistration.php
-
-		-
-			rawMessage: 'Method App\Models\EventRegistration::ticketType() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventRegistration.php
@@ -5497,12 +4549,6 @@ parameters:
 			path: app/Models/EventRegistrationTransfer.php
 
 		-
-			rawMessage: 'Method App\Models\EventRegistrationTransfer::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventRegistrationTransfer.php
-
-		-
 			rawMessage: 'Class App\Models\EventSeatAssignment uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5510,18 +4556,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventSeatAssignment::registration() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSeatAssignment.php
-
-		-
-			rawMessage: 'Method App\Models\EventSeatAssignment::room() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSeatAssignment.php
-
-		-
-			rawMessage: 'Method App\Models\EventSeatAssignment::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventSeatAssignment.php
@@ -5563,12 +4597,6 @@ parameters:
 			path: app/Models/EventServiceRequest.php
 
 		-
-			rawMessage: 'Method App\Models\EventServiceRequest::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventServiceRequest.php
-
-		-
 			rawMessage: 'Class App\Models\EventSession uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5587,19 +4615,7 @@ parameters:
 			path: app/Models/EventSession.php
 
 		-
-			rawMessage: 'Method App\Models\EventSession::attendances() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSession.php
-
-		-
 			rawMessage: 'Method App\Models\EventSession::event() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSession.php
-
-		-
-			rawMessage: 'Method App\Models\EventSession::registrations() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsToMany does not specify its types: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor (2-4 required)'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventSession.php
@@ -5618,12 +4634,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventSession::speakers() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsToMany does not specify its types: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor (2-4 required)'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSession.php
-
-		-
-			rawMessage: 'Method App\Models\EventSession::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventSession.php
@@ -5648,12 +4658,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventSessionAttendance::event() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSessionAttendance.php
-
-		-
-			rawMessage: 'Method App\Models\EventSessionAttendance::registration() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventSessionAttendance.php
@@ -5689,12 +4693,6 @@ parameters:
 			path: app/Models/EventSessionAttendance.php
 
 		-
-			rawMessage: 'Method App\Models\EventSessionAttendance::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSessionAttendance.php
-
-		-
 			rawMessage: Negated boolean expression is always false.
 			identifier: booleanNot.alwaysFalse
 			count: 1
@@ -5725,12 +4723,6 @@ parameters:
 			path: app/Models/EventSpeaker.php
 
 		-
-			rawMessage: 'Method App\Models\EventSpeaker::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSpeaker.php
-
-		-
 			rawMessage: 'Class App\Models\EventSponsor uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5749,12 +4741,6 @@ parameters:
 			path: app/Models/EventSponsor.php
 
 		-
-			rawMessage: 'Method App\Models\EventSponsor::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSponsor.php
-
-		-
 			rawMessage: 'Class App\Models\EventSponsorDeliverable uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5762,12 +4748,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventSponsorDeliverable::sponsor() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSponsorDeliverable.php
-
-		-
-			rawMessage: 'Method App\Models\EventSponsorDeliverable::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventSponsorDeliverable.php
@@ -5809,12 +4789,6 @@ parameters:
 			path: app/Models/EventTicketType.php
 
 		-
-			rawMessage: 'Method App\Models\EventTicketType::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventTicketType.php
-
-		-
 			rawMessage: 'Class App\Models\EventVenueRoom uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5828,12 +4802,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventVenueRoom::seatAssignments() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventVenueRoom.php
-
-		-
-			rawMessage: 'Method App\Models\EventVenueRoom::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventVenueRoom.php
@@ -5971,12 +4939,6 @@ parameters:
 			path: app/Models/LedgerAccount.php
 
 		-
-			rawMessage: 'Method App\Models\LedgerAccount::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/LedgerAccount.php
-
-		-
 			rawMessage: 'Class App\Models\LedgerEntry uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -6013,12 +4975,6 @@ parameters:
 			path: app/Models/LedgerTransaction.php
 
 		-
-			rawMessage: 'Method App\Models\LedgerTransaction::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/LedgerTransaction.php
-
-		-
 			rawMessage: 'Class App\Models\LlmTokenUsage uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -6026,12 +4982,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\LlmTokenUsage::apiKey() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/LlmTokenUsage.php
-
-		-
-			rawMessage: 'Method App\Models\LlmTokenUsage::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/LlmTokenUsage.php
@@ -6075,12 +5025,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Models\MerchantTransaction::scopeStatus() has parameter $status with no type specified.'
 			identifier: missingType.parameter
-			count: 1
-			path: app/Models/MerchantTransaction.php
-
-		-
-			rawMessage: 'Method App\Models\MerchantTransaction::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
 			count: 1
 			path: app/Models/MerchantTransaction.php
 
@@ -6151,12 +5095,6 @@ parameters:
 			path: app/Models/PmIntegration.php
 
 		-
-			rawMessage: 'Method App\Models\PmIntegration::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/PmIntegration.php
-
-		-
 			rawMessage: 'Method App\Models\PmIntegration::user() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -6176,12 +5114,6 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\Speaker uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Speaker.php
-
-		-
-			rawMessage: 'Method App\Models\Speaker::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Speaker.php
@@ -6361,12 +5293,6 @@ parameters:
 			path: app/Models/Tenant/Post.php
 
 		-
-			rawMessage: 'Method App\Models\Tenant\Post::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Tenant/Post.php
-
-		-
 			rawMessage: 'Class App\Models\TenantApiKey uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -6427,12 +5353,6 @@ parameters:
 			path: app/Models/TenantLlmConfig.php
 
 		-
-			rawMessage: 'Method App\Models\TenantLlmConfig::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/TenantLlmConfig.php
-
-		-
 			rawMessage: 'Class App\Models\TenantNotificationSetting uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -6463,12 +5383,6 @@ parameters:
 			path: app/Models/TenantPaymentGateway.php
 
 		-
-			rawMessage: 'Method App\Models\TenantPaymentGateway::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/TenantPaymentGateway.php
-
-		-
 			rawMessage: 'Class App\Models\TenantPayoutAccount uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -6476,12 +5390,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\TenantPayoutAccount::payouts() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/TenantPayoutAccount.php
-
-		-
-			rawMessage: 'Method App\Models\TenantPayoutAccount::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/TenantPayoutAccount.php
@@ -6619,12 +5527,6 @@ parameters:
 			path: app/Models/UserLoginHistory.php
 
 		-
-			rawMessage: 'Method App\Models\UserLoginHistory::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/UserLoginHistory.php
-
-		-
 			rawMessage: 'Method App\Models\UserLoginHistory::thisYear() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -6644,12 +5546,6 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\WebhookCall uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/WebhookCall.php
-
-		-
-			rawMessage: 'Method App\Models\WebhookCall::tenant() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/WebhookCall.php
@@ -7045,12 +5941,6 @@ parameters:
 			path: app/Services/Events/RegistrationPricingService.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Events/TicketPdfService.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
 			count: 3
@@ -7130,12 +6020,6 @@ parameters:
 
 		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() expects callable(Illuminate\Database\Eloquent\Model, int): array{name: string, email: mixed, phone: null, ticket_code: null, action_url: string, action_label: ''Speaker Programme''}, Closure(App\Models\Speaker): array{name: string, email: mixed, phone: null, ticket_code: null, action_url: string, action_label: ''Speaker Programme''} given.'
-			identifier: argument.type
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() expects callable(Illuminate\Database\Eloquent\Model, int): array{name: string, email: string, phone: string|null, ticket_code: string|null, action_url: string, action_label: ''View Digital Pass''}, Closure(App\Models\EventRegistration): array{name: string, email: string, phone: string|null, ticket_code: string|null, action_url: string, action_label: ''View Digital Pass''} given.'
 			identifier: argument.type
 			count: 1
 			path: app/Services/Notifications/AutomatedNotificationDispatcher.php

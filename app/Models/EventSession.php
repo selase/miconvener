@@ -92,11 +92,17 @@ final class EventSession extends Model
             ->orderBy('event_session_speakers.sort_order');
     }
 
+    /**
+     * @return BelongsToMany<EventRegistration, $this>
+     */
     public function registrations(): BelongsToMany
     {
         return $this->belongsToMany(EventRegistration::class, 'event_registration_sessions', 'session_id', 'registration_id');
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<EventSessionAttendance, $this>
+     */
     public function attendances(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(EventSessionAttendance::class, 'session_id');
