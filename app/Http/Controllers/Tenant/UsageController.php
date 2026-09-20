@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Feature;
+use App\Models\Package;
 use App\Models\TenantFeatureUsage;
 use App\Services\Tenancy\TenantContext;
 use Inertia\Inertia;
@@ -22,7 +23,11 @@ final class UsageController extends Controller
     public function index(string $subdomain): Response
     {
         $tenant = $this->tenantContext->getTenant();
-        $package = $tenant->package()->with('features')->first();
+        // A tenant on no plan has nothing to look up, so say so in one place
+        // rather than asking the database and handling a null answer.
+        $package = $tenant->package_id === null
+            ? null
+            : Package::query()->with('features')->find($tenant->package_id);
         $periodStart = now()->startOfMonth();
 
         $usageBySlug = TenantFeatureUsage::query()
@@ -33,7 +38,7 @@ final class UsageController extends Controller
             })
             ->pluck('used_count', 'feature_slug');
 
-        $features = $package?->features ?? collect();
+        $features = $package->features ?? collect();
 
         $limits = $features
             ->filter(fn (Feature $feature): bool => $feature->type === 'limit' && (int) data_get($feature, 'pivot.value') > 0)
@@ -53,7 +58,7 @@ final class UsageController extends Controller
         $seatFeature = $features->firstWhere('slug', 'team_seats');
 
         return Inertia::render('Tenant/Settings/Usage', [
-            'planName' => $package?->name ?? 'Free',
+            'planName' => $package->name ?? 'Free',
             'periodLabel' => $periodStart->format('F Y'),
             'limits' => $limits,
             'seats' => $seatFeature ? [

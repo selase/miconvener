@@ -1165,12 +1165,6 @@ parameters:
 			path: app/Http/Controllers/Public/ScheduleIcsController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$created_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/ServiceRequestController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Public\ServiceRequestController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
@@ -2467,33 +2461,9 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$resolved_at.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$status.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventServiceRequestController::getTenant() has no return type specified.'
 			identifier: missingType.return
 			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() expects callable(Illuminate\Database\Eloquent\Model, int): array<string, mixed>, Closure(App\Models\EventServiceRequest): array<string, mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
-			rawMessage: 'Parameter #1 $r of method App\Http\Controllers\Tenant\EventServiceRequestController::payload() expects App\Models\EventServiceRequest, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 2
 			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
 
 		-
@@ -3389,18 +3359,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Livewire/Tenant/SubscriptionManager.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Feature::$pivot.
-			identifier: property.notFound
-			count: 1
-			path: app/Livewire/Tenant/UsageDashboard.php
-
-		-
-			rawMessage: Using nullsafe property access "?->used_count" on left side of ?? is unnecessary. Use -> instead.
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Livewire/Tenant/UsageDashboard.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$event.
@@ -4808,12 +4766,6 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\Invoice uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Invoice.php
-
-		-
-			rawMessage: 'Method App\Models\Invoice::items() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Invoice.php

@@ -19,6 +19,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Permission\Traits\HasRoles;
 
+/**
+ * @property string|null $package_id Null until a plan is assigned; self-signups
+ *                                   on a paid plan have none until they pay.
+ */
 final class Tenant extends Model
 {
     use HasFactory;
