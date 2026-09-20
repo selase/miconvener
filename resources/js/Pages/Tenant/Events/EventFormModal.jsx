@@ -35,6 +35,7 @@ export default function EventFormModal({ mode, event, onClose }) {
         location_type: event?.location_type ?? 'in_person',
         address: event?.address ?? '',
         virtual_link: event?.virtual_link ?? '',
+        contact_email: event?.contact_email ?? '',
         capacity: event?.capacity ?? '',
         requires_approval: event?.requires_approval ?? false,
         ticket_price: event ? event.ticket_price / 100 : 0,
@@ -246,6 +247,16 @@ export default function EventFormModal({ mode, event, onClose }) {
                         error={errors.virtual_link}
                     />
                 )}
+
+                <Input
+                    label="Contact email"
+                    type="email"
+                    placeholder="Your organization email"
+                    value={data.contact_email}
+                    onChange={(e) => setData('contact_email', e.target.value)}
+                    error={errors.contact_email}
+                    hint="Where replies to this event's emails go. Leave blank to use your organization email."
+                />
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <Input

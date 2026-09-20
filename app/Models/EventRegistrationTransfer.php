@@ -54,6 +54,9 @@ final class EventRegistrationTransfer extends Model
         return mb_str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * @return BelongsTo<EventRegistration, $this>
+     */
     public function registration(): BelongsTo
     {
         return $this->belongsTo(EventRegistration::class, 'registration_id');

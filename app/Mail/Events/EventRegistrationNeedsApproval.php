@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
+use App\Models\Event;
 use App\Models\EventRegistration;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,6 +22,7 @@ use Illuminate\Queue\SerializesModels;
  */
 final class EventRegistrationNeedsApproval extends Mailable implements ShouldQueue
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -27,9 +30,7 @@ final class EventRegistrationNeedsApproval extends Mailable implements ShouldQue
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: "A registration for {$this->registration->event->name} needs your approval",
-        );
+        return $this->brandedEnvelope("A registration for {$this->registration->event->name} needs your approval");
     }
 
     public function content(): Content
@@ -45,5 +46,10 @@ final class EventRegistrationNeedsApproval extends Mailable implements ShouldQue
                 ),
             ],
         );
+    }
+
+    protected function brandingEvent(): ?Event
+    {
+        return $this->registration->event;
     }
 }

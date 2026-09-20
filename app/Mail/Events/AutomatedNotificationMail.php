@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
 use App\Models\Event;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,6 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class AutomatedNotificationMail extends Mailable implements ShouldQueue
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -28,9 +30,7 @@ final class AutomatedNotificationMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: $this->emailSubject,
-        );
+        return $this->brandedEnvelope($this->emailSubject);
     }
 
     public function content(): Content
@@ -38,5 +38,10 @@ final class AutomatedNotificationMail extends Mailable implements ShouldQueue
         return new Content(
             view: 'emails.events.automated-notification',
         );
+    }
+
+    protected function brandingEvent(): Event
+    {
+        return $this->event;
     }
 }

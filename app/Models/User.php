@@ -18,6 +18,12 @@ use Laravel\Sanctum\HasApiTokens;
 use Propaganistas\LaravelPhone\Casts\E164PhoneNumberCast;
 use Spatie\Permission\Traits\HasRoles;
 
+/**
+ * Attributes that exist only as accessors, so static analysis can see them.
+ *
+ * @property-read string $name
+ * @property-read string $gravatar
+ */
 final class User extends Authenticatable
 {
     use HasApiTokens;

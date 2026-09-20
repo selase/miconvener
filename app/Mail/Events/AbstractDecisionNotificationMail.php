@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
 use App\Models\Event;
 use App\Models\EventAbstract;
 use Illuminate\Bus\Queueable;
@@ -14,6 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class AbstractDecisionNotificationMail extends Mailable
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -32,9 +34,7 @@ final class AbstractDecisionNotificationMail extends Mailable
             default => 'Review Status Update',
         };
 
-        return new Envelope(
-            subject: "[{$this->event->title}] Abstract {$this->abstract->code}: {$statusText}",
-        );
+        return $this->brandedEnvelope("[{$this->event->title}] Abstract {$this->abstract->code}: {$statusText}");
     }
 
     public function content(): Content
@@ -47,5 +47,10 @@ final class AbstractDecisionNotificationMail extends Mailable
                 'notes' => $this->decisionNotes,
             ],
         );
+    }
+
+    protected function brandingEvent(): Event
+    {
+        return $this->event;
     }
 }

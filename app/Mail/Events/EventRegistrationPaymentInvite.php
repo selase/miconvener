@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
+use App\Models\Event;
 use App\Models\EventRegistration;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -13,6 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class EventRegistrationPaymentInvite extends Mailable
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -23,9 +26,7 @@ final class EventRegistrationPaymentInvite extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: "Complete your payment for {$this->registration->event->name}",
-        );
+        return $this->brandedEnvelope("Complete your payment for {$this->registration->event->name}");
     }
 
     public function content(): Content
@@ -43,5 +44,10 @@ final class EventRegistrationPaymentInvite extends Mailable
                 ]),
             ],
         );
+    }
+
+    protected function brandingEvent(): ?Event
+    {
+        return $this->registration->event;
     }
 }

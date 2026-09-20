@@ -150,6 +150,9 @@ final class Tenant extends Model
         return $query->where('isolation_mode', $mode);
     }
 
+    /**
+     * @return BelongsToMany<User, $this>
+     */
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class);

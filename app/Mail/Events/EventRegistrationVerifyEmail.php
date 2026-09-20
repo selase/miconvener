@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
+use App\Models\Event;
 use App\Models\EventRegistration;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\URL;
 
 final class EventRegistrationVerifyEmail extends Mailable
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -21,9 +24,7 @@ final class EventRegistrationVerifyEmail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: "Confirm your email for {$this->registration->event->name}",
-        );
+        return $this->brandedEnvelope("Confirm your email for {$this->registration->event->name}");
     }
 
     public function content(): Content
@@ -46,5 +47,10 @@ final class EventRegistrationVerifyEmail extends Mailable
                 ),
             ],
         );
+    }
+
+    protected function brandingEvent(): ?Event
+    {
+        return $this->registration->event;
     }
 }

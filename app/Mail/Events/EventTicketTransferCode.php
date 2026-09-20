@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
+use App\Models\Event;
 use App\Models\EventRegistrationTransfer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -13,6 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class EventTicketTransferCode extends Mailable
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -20,9 +23,7 @@ final class EventTicketTransferCode extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: 'Your code to transfer this ticket',
-        );
+        return $this->brandedEnvelope('Your code to transfer this ticket');
     }
 
     public function content(): Content
@@ -36,5 +37,10 @@ final class EventTicketTransferCode extends Mailable
                 'code' => $this->transfer->plainCode,
             ],
         );
+    }
+
+    protected function brandingEvent(): ?Event
+    {
+        return $this->transfer->registration?->event;
     }
 }

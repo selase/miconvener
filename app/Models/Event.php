@@ -74,6 +74,7 @@ final class Event extends Model
         'location_type',
         'address',
         'virtual_link',
+        'contact_email',
         'capacity',
         'requires_approval',
         'ticket_price',
@@ -150,6 +151,9 @@ final class Event extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Tenant, $this>
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
+use App\Models\Event;
 use App\Models\EventBlast;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,6 +16,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class EventBlastMail extends Mailable implements ShouldQueue
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -21,9 +24,7 @@ final class EventBlastMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: $this->blast->subject,
-        );
+        return $this->brandedEnvelope($this->blast->subject);
     }
 
     public function content(): Content
@@ -37,5 +38,10 @@ final class EventBlastMail extends Mailable implements ShouldQueue
                 'trackingUrl' => route('public.blasts.open', ['recipient' => $this->recipientId]),
             ],
         );
+    }
+
+    protected function brandingEvent(): ?Event
+    {
+        return $this->blast->event;
     }
 }

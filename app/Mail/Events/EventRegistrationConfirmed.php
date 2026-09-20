@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mail\Events;
 
+use App\Mail\Concerns\BrandedForTenant;
+use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\TicketPdfService;
@@ -17,6 +19,7 @@ use Throwable;
 
 final class EventRegistrationConfirmed extends Mailable
 {
+    use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
@@ -24,9 +27,7 @@ final class EventRegistrationConfirmed extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: "You're confirmed for {$this->registration->event->name}",
-        );
+        return $this->brandedEnvelope("You're confirmed for {$this->registration->event->name}");
     }
 
     /**
@@ -83,5 +84,10 @@ final class EventRegistrationConfirmed extends Mailable
                 ]),
             ],
         );
+    }
+
+    protected function brandingEvent(): ?Event
+    {
+        return $this->registration->event;
     }
 }
