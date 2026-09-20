@@ -2737,42 +2737,6 @@ parameters:
 			path: app/Http/Requests/Auth/LoginRequest.php
 
 		-
-			rawMessage: Access to an undefined property Spatie\Permission\Contracts\Role::$tenant_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Requests/User/StoreUserRequest.php
-
-		-
-			rawMessage: 'Call to an undefined method Spatie\Permission\Contracts\Role::isSystemRole().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Requests/User/StoreUserRequest.php
-
-		-
-			rawMessage: Negated boolean expression is always false.
-			identifier: booleanNot.alwaysFalse
-			count: 1
-			path: app/Http/Requests/User/StoreUserRequest.php
-
-		-
-			rawMessage: Access to an undefined property Spatie\Permission\Contracts\Role::$tenant_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Requests/User/UpdateUserRequest.php
-
-		-
-			rawMessage: 'Call to an undefined method Spatie\Permission\Contracts\Role::isSystemRole().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Requests/User/UpdateUserRequest.php
-
-		-
-			rawMessage: Negated boolean expression is always false.
-			identifier: booleanNot.alwaysFalse
-			count: 1
-			path: app/Http/Requests/User/UpdateUserRequest.php
-
-		-
 			rawMessage: Access to an undefined property App\Http\Resources\DiscussionLogEntryResource::$agendaItem.
 			identifier: property.notFound
 			count: 2
@@ -2963,24 +2927,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Resources/UserProfileResource.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::notify().'
-			identifier: method.notFound
-			count: 1
-			path: app/Jobs/BuildDataExportJob.php
-
-		-
-			rawMessage: 'Call to method buildExport() on an unknown class App\Services\Compliance\DataExportService.'
-			identifier: class.notFound
-			count: 1
-			path: app/Jobs/BuildDataExportJob.php
-
-		-
-			rawMessage: 'Parameter $exportService of method App\Jobs\BuildDataExportJob::handle() has invalid type App\Services\Compliance\DataExportService.'
-			identifier: class.notFound
-			count: 1
-			path: app/Jobs/BuildDataExportJob.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$email.
@@ -3365,18 +3311,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/ChatIntegration.php
-
-		-
-			rawMessage: 'Class App\Models\DataExportRequest uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/DataExportRequest.php
-
-		-
-			rawMessage: 'Method App\Models\DataExportRequest::requestedBy() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/DataExportRequest.php
 
 		-
 			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany::active().'
@@ -5381,24 +5315,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/WebhookEndpoint.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$email_sender_address.
-			identifier: property.notFound
-			count: 1
-			path: app/Notifications/DataExportReadyNotification.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Tenant::$email_sender_name.
-			identifier: property.notFound
-			count: 2
-			path: app/Notifications/DataExportReadyNotification.php
-
-		-
-			rawMessage: Using nullsafe property access "?->email_sender_name" on left side of ?? is unnecessary. Use -> instead.
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Notifications/DataExportReadyNotification.php
 
 		-
 			rawMessage: Property App\Providers\EventServiceProvider::$subscribe type has no value type specified in iterable type array.
