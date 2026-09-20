@@ -273,7 +273,7 @@ test('the guest list shows each registrant\'s assigned seat and room', function 
         'seat_label' => 'B-02',
     ]);
 
-    $response = $this->actingAs($user)->get("http://{$host}/events/{$event->id}", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/guests", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page

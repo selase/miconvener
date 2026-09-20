@@ -9,6 +9,7 @@ use App\Libraries\Helper;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Services\Events\EventSections;
+use App\Services\Events\EventWorkspaceSnapshot;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +21,21 @@ use Inertia\Response;
 
 final class EventController extends Controller
 {
+    /**
+     * The relations each workspace section reads from the event payload.
+     * Sections not listed load their own data from their JSON endpoints.
+     *
+     * @var array<string, list<string>>
+     */
+    private const array SECTION_RELATIONS = [
+        'tickets' => ['ticketTypes'],
+        'schedule' => ['sessions', 'sessions.speakers', 'speakers'],
+        'speakers' => ['speakers'],
+        'check-in' => ['sessions', 'sessions.speakers'],
+        'materials' => ['materials'],
+        'venue' => ['venueRooms.seatAssignments.registration:id,full_name'],
+    ];
+
     public function index(string $subdomain): Response
     {
         $this->authorize('read event');
@@ -209,79 +225,26 @@ final class EventController extends Controller
         return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', 'Event deleted successfully.');
     }
 
-    public function show(string $subdomain, string $event): Response
+    /**
+     * An event's workspace, opened on its overview.
+     */
+    public function show(string $subdomain, string $event): Response|RedirectResponse
     {
-        $this->authorize('read event');
-        $tenant = $this->getTenant();
-
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
-            ->with([
-                'ticketTypes',
-                // The fee cascade walks event -> tenant -> package, and the
-                // payload reads it three times.
-                'tenant.package',
-                'sessions' => fn ($query) => $query->withCount('registrations'),
-                'sessions.speakers',
-                'speakers',
-                'materials',
-                'venueRooms.seatAssignments.registration:id,full_name',
-            ])
-            ->firstOrFail();
-
-        // An unknown section, or one this user cannot open, falls back to the
-        // overview rather than showing a section they would be refused inside.
-        $sections = app(EventSections::class);
-        $section = (string) request()->query('section', EventSections::OVERVIEW);
-        if (! EventSections::exists($section) || ! $sections->allows(request()->user(), $tenant, $eventModel, $section)) {
-            $section = EventSections::OVERVIEW;
+        // Links written before sections had their own addresses.
+        $legacy = request()->query('section');
+        if (is_string($legacy) && $legacy !== EventSections::OVERVIEW && EventSections::exists($legacy)) {
+            return redirect()->route('tenant.events.section', ['event' => $event, 'section' => $legacy]);
         }
 
-        $registrations = $eventModel->registrations()
-            ->with(['ticketType:id,name', 'seatAssignment.room:id,name'])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn ($registration): array => [
-                'id' => $registration->id,
-                'full_name' => $registration->full_name,
-                'email' => $registration->email,
-                'phone' => $registration->phone,
-                'status' => $registration->status,
-                'waitlist_position' => $registration->waitlist_position,
-                'approval_note' => $registration->approval_note,
-                'ticket_code' => $registration->ticket_code,
-                'ticket_type_name' => $registration->ticketType?->name,
-                'amount' => $registration->amount,
-                'platform_fee_amount' => $registration->platform_fee_amount,
-                'currency' => $registration->currency,
-                'seat_label' => $registration->seatAssignment?->seat_label,
-                'room_name' => $registration->seatAssignment?->room?->name,
-                'checked_in_at' => $registration->checked_in_at?->toIso8601String(),
-                'created_at' => $registration->created_at->toIso8601String(),
-            ]);
+        return $this->workspace($event, EventSections::OVERVIEW);
+    }
 
-        return Inertia::render('Tenant/Events/Show', [
-            'event' => [
-                ...$this->toPayload($eventModel),
-                'platform_fee_percentage' => $eventModel->platform_fee_percentage,
-                'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
-                'effective_platform_fee_cap_amount' => $eventModel->effectivePlatformFeeCapAmount(),
-                'effective_fee_bearer' => $eventModel->effectiveFeeBearer(),
-                /**
-                 * What one ticket at the event's own price actually splits
-                 * into, so the organizer sees their net rather than inferring
-                 * it from a percentage.
-                 */
-                'fee_preview' => app(\App\Services\Finance\FeeCalculator::class)
-                    ->for($eventModel, (int) $eventModel->ticket_price)
-                    ->toArray(),
-            ],
-            'registrations' => $registrations,
-            'hasActiveGateway' => $tenant->canAcceptPayments(),
-            'settlementMode' => $tenant->settlement_mode,
-            'publicUrl' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]),
-            'sections' => $sections->menuFor(request()->user(), $tenant, $eventModel),
-            'section' => $section,
-        ]);
+    /**
+     * One section of an event's workspace, at its own address.
+     */
+    public function section(string $subdomain, string $event, string $section): Response
+    {
+        return $this->workspace($event, $section);
     }
 
     public function exportGuests(string $subdomain, string $event): \Symfony\Component\HttpFoundation\StreamedResponse
@@ -317,6 +280,32 @@ final class EventController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
+    /**
+     * Check-in with nothing else on screen, for whoever is on the door.
+     */
+    public function door(string $subdomain, string $event): Response
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
+            ->with(['sessions' => fn ($query) => $query->withCount('registrations'), 'sessions.speakers'])
+            ->firstOrFail();
+
+        // Same gate as the check-in section: every scan endpoint needs it.
+        abort_unless(app(EventSections::class)->allows(request()->user(), $tenant, $eventModel, 'check-in'), 403);
+
+        return Inertia::render('Tenant/Events/CheckInDoor', [
+            'event' => $this->toPayload($eventModel),
+            'counts' => [
+                'checked_in' => $eventModel->registrations()->where('status', EventRegistration::STATUS_CHECKED_IN)->count(),
+                'expected' => $eventModel->registrations()
+                    ->whereIn('status', [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN])
+                    ->count(),
+            ],
+        ]);
+    }
+
     protected function getTenant()
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -325,6 +314,122 @@ final class EventController extends Controller
         }
 
         return $tenant;
+    }
+
+    /**
+     * Renders the workspace for one section, loading only what that section
+     * shows. The page used to load every registration -- 587 of them on a real
+     * event -- whichever tab was open, including to show the schedule.
+     */
+    private function workspace(string $event, string $section): Response
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+
+        $relations = [];
+        foreach (self::SECTION_RELATIONS[$section] ?? [] as $relation) {
+            if ($relation === 'sessions') {
+                // Sessions carry their sign-up count, which the payload reads.
+                $relations['sessions'] = fn ($query) => $query->withCount('registrations');
+            } else {
+                $relations[] = $relation;
+            }
+        }
+
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
+            // The fee cascade walks event -> tenant -> package, and the payload
+            // reads it three times.
+            ->with(['tenant.package', ...$relations])
+            ->firstOrFail();
+
+        $sections = app(EventSections::class);
+        abort_unless($sections->allows(request()->user(), $tenant, $eventModel, $section), 403);
+
+        $snapshot = app(EventWorkspaceSnapshot::class);
+        $phase = $snapshot->phase($eventModel);
+        $hasActiveGateway = $tenant->canAcceptPayments();
+
+        return Inertia::render('Tenant/Events/Show', [
+            'event' => [
+                ...$this->toPayload($eventModel),
+                'platform_fee_percentage' => $eventModel->platform_fee_percentage,
+                'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
+                'effective_platform_fee_cap_amount' => $eventModel->effectivePlatformFeeCapAmount(),
+                'effective_fee_bearer' => $eventModel->effectiveFeeBearer(),
+                /**
+                 * What one ticket at the event's own price actually splits
+                 * into, so the organizer sees their net rather than inferring
+                 * it from a percentage.
+                 */
+                'fee_preview' => app(\App\Services\Finance\FeeCalculator::class)
+                    ->for($eventModel, (int) $eventModel->ticket_price)
+                    ->toArray(),
+            ],
+            'registrations' => $section === 'guests' ? $this->registrationRows($eventModel) : [],
+            'stats' => $section === EventSections::OVERVIEW ? $this->overviewStats($eventModel) : null,
+            'hasActiveGateway' => $hasActiveGateway,
+            'settlementMode' => $tenant->settlement_mode,
+            'publicUrl' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]),
+            'sections' => $sections->menuFor(request()->user(), $tenant, $eventModel),
+            'section' => $section,
+            'phase' => $phase,
+            'badges' => $snapshot->badges(request()->user(), $tenant, $eventModel, $phase),
+            'overview' => $section === EventSections::OVERVIEW
+                ? $snapshot->overview(request()->user(), $tenant, $eventModel, $phase, $hasActiveGateway)
+                : null,
+        ]);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function registrationRows(Event $event): array
+    {
+        return $event->registrations()
+            ->with(['ticketType:id,name', 'seatAssignment.room:id,name'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (EventRegistration $registration): array => [
+                'id' => $registration->id,
+                'full_name' => $registration->full_name,
+                'email' => $registration->email,
+                'phone' => $registration->phone,
+                'status' => $registration->status,
+                'waitlist_position' => $registration->waitlist_position,
+                'approval_note' => $registration->approval_note,
+                'ticket_code' => $registration->ticket_code,
+                'ticket_type_name' => $registration->ticketType?->name,
+                'amount' => $registration->amount,
+                'platform_fee_amount' => $registration->platform_fee_amount,
+                'currency' => $registration->currency,
+                'seat_label' => $registration->seatAssignment?->seat_label,
+                'room_name' => $registration->seatAssignment?->room?->name,
+                'checked_in_at' => $registration->checked_in_at?->toIso8601String(),
+                'created_at' => $registration->created_at->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The overview's figures, counted in the database rather than by loading
+     * every registration to add them up in the browser.
+     *
+     * @return array{confirmed: int, collected: int, platform_fees: int}
+     */
+    private function overviewStats(Event $event): array
+    {
+        $totals = $event->registrations()
+            ->whereIn('status', [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN])
+            ->selectRaw('count(*) as confirmed, coalesce(sum(amount), 0) as collected, coalesce(sum(platform_fee_amount), 0) as platform_fees')
+            ->toBase()
+            ->first();
+
+        return [
+            'confirmed' => (int) ($totals->confirmed ?? 0),
+            'collected' => (int) ($totals->collected ?? 0),
+            'platform_fees' => (int) ($totals->platform_fees ?? 0),
+        ];
     }
 
     /**

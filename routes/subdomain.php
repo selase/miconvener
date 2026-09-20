@@ -138,6 +138,15 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     // Events (host console)
     Route::resource('events', EventController::class)->names('tenant.events')->except(['create', 'edit']);
+    // Each section of an event's workspace has its own address, so refresh, the back
+    // button and bookmarks land where you were. Constrained to the known sections so
+    // it can never swallow an address meant for something else; the JSON feeds that
+    // shared a name with a section live under events/{event}/data/.
+    // Two segments, so it is never mistaken for a section.
+    Route::get('events/{event}/check-in/door', [EventController::class, 'door'])->name('tenant.events.checkin.door');
+    Route::get('events/{event}/{section}', [EventController::class, 'section'])
+        ->where('section', implode('|', array_diff(App\Services\Events\EventSections::slugs(), [App\Services\Events\EventSections::OVERVIEW])))
+        ->name('tenant.events.section');
     Route::get('events/{event}/guests/export', [EventController::class, 'exportGuests'])->name('tenant.events.guests.export');
     Route::post('events/{event}/registrations/{registration}/approve', [EventRegistrationController::class, 'approve'])->name('tenant.events.registrations.approve');
     Route::post('events/{event}/registrations/{registration}/reject', [EventRegistrationController::class, 'reject'])->name('tenant.events.registrations.reject');
@@ -183,13 +192,13 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::delete('events/{event}/form-fields/{field}', [EventFormFieldController::class, 'destroy'])->name('tenant.events.form-fields.destroy');
     Route::post('events/{event}/form-fields/reorder', [EventFormFieldController::class, 'reorder'])->name('tenant.events.form-fields.reorder');
     Route::match(['post', 'put'], 'events/{event}/registration-settings', [EventFormFieldController::class, 'updateSettings'])->name('tenant.events.registration-settings.update');
-    Route::get('events/{event}/promo-codes', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'index'])->name('tenant.events.promo-codes.index');
+    Route::get('events/{event}/data/promo-codes', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'index'])->name('tenant.events.promo-codes.index');
     Route::post('events/{event}/promo-codes', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'store'])->name('tenant.events.promo-codes.store');
     Route::put('events/{event}/promo-codes/{promoCode}', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'update'])->name('tenant.events.promo-codes.update');
     Route::delete('events/{event}/promo-codes/{promoCode}', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'destroy'])->name('tenant.events.promo-codes.destroy');
     Route::patch('events/{event}/promo-codes/{promoCode}/toggle', [App\Http\Controllers\Tenant\EventPromoCodeController::class, 'toggle'])->name('tenant.events.promo-codes.toggle');
 
-    Route::get('events/{event}/forum', [EventForumController::class, 'index'])->name('tenant.events.forum.index');
+    Route::get('events/{event}/data/forum', [EventForumController::class, 'index'])->name('tenant.events.forum.index');
     Route::post('events/{event}/forum/{thread}/replies', [EventForumController::class, 'reply'])->name('tenant.events.forum.reply');
     Route::patch('events/{event}/forum/{thread}', [EventForumController::class, 'moderate'])->name('tenant.events.forum.moderate');
     Route::delete('events/{event}/forum/{thread}', [EventForumController::class, 'destroy'])->name('tenant.events.forum.destroy');
@@ -207,10 +216,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::patch('events/{event}/polls/{poll}/responses/{response}', [EventPollController::class, 'moderateResponse'])->name('tenant.events.polls.responses.moderate');
     Route::get('events/{event}/quiz/leaderboard', [EventPollController::class, 'leaderboard'])->name('tenant.events.quiz.leaderboard');
 
-    Route::get('events/{event}/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
+    Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
     Route::post('events/{event}/badges/print-log', [EventBadgeController::class, 'logPrint'])->name('tenant.events.badges.print-log');
 
-    Route::get('events/{event}/finance', [EventFinanceController::class, 'index'])->name('tenant.events.finance.index');
+    Route::get('events/{event}/data/finance', [EventFinanceController::class, 'index'])->name('tenant.events.finance.index');
     Route::post('events/{event}/finance/payout-schedule', [EventFinanceController::class, 'updatePayoutSchedule'])->name('tenant.events.finance.payout-schedule.update');
     Route::post('events/{event}/finance/payouts', [EventFinanceController::class, 'storePayout'])->name('tenant.events.finance.payouts.store');
     Route::patch('events/{event}/finance/payouts/{payout}', [EventFinanceController::class, 'updatePayoutStatus'])->name('tenant.events.finance.payouts.status');
@@ -223,7 +232,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
 
-    Route::get('events/{event}/sponsors', [EventSponsorController::class, 'index'])->name('tenant.events.sponsors.index');
+    Route::get('events/{event}/data/sponsors', [EventSponsorController::class, 'index'])->name('tenant.events.sponsors.index');
     Route::post('events/{event}/sponsors', [EventSponsorController::class, 'store'])->name('tenant.events.sponsors.store');
     Route::delete('events/{event}/sponsors/{sponsor}', [EventSponsorController::class, 'destroy'])->name('tenant.events.sponsors.destroy');
     Route::post('events/{event}/sponsors/{sponsor}/deliverables', [EventSponsorController::class, 'storeDeliverable'])->name('tenant.events.sponsors.deliverables.store');
@@ -231,7 +240,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::delete('events/{event}/sponsors/{sponsor}/deliverables/{deliverable}', [EventSponsorController::class, 'destroyDeliverable'])->name('tenant.events.sponsors.deliverables.destroy');
     Route::get('events/{event}/sponsors/export', [EventSponsorController::class, 'exportDeliverables'])->name('tenant.events.sponsors.export');
 
-    Route::get('events/{event}/reports', [EventReportController::class, 'index'])->name('tenant.events.reports.index');
+    Route::get('events/{event}/data/reports', [EventReportController::class, 'index'])->name('tenant.events.reports.index');
     Route::get('events/{event}/reports/registrations', [EventReportController::class, 'exportRegistrations'])->name('tenant.events.reports.registrations');
     Route::get('events/{event}/reports/checkins', [EventReportController::class, 'exportCheckins'])->name('tenant.events.reports.checkins');
     Route::get('events/{event}/reports/forum', [EventReportController::class, 'exportForum'])->name('tenant.events.reports.forum');
@@ -244,7 +253,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('events/{event}/reports/abstract-book', [EventReportController::class, 'exportAbstractBook'])->name('tenant.events.reports.abstract-book');
 
     // Abstracts & Peer Review
-    Route::get('events/{event}/abstracts', [App\Http\Controllers\Tenant\EventAbstractController::class, 'index'])->name('tenant.events.abstracts.index');
+    Route::get('events/{event}/data/abstracts', [App\Http\Controllers\Tenant\EventAbstractController::class, 'index'])->name('tenant.events.abstracts.index');
     Route::get('events/{event}/abstracts/{abstract}', [App\Http\Controllers\Tenant\EventAbstractController::class, 'show'])->name('tenant.events.abstracts.show');
     Route::post('events/{event}/abstracts/{abstract}/assign-reviewer', [App\Http\Controllers\Tenant\EventAbstractController::class, 'assignReviewer'])->name('tenant.events.abstracts.assign-reviewer');
     Route::delete('events/{event}/abstracts/{abstract}/reviews/{review}', [App\Http\Controllers\Tenant\EventAbstractController::class, 'removeReviewer'])->name('tenant.events.abstracts.remove-reviewer');
@@ -269,7 +278,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::delete('events/{event}/operations/tasks/{task}', [App\Http\Controllers\Tenant\EventOperationController::class, 'destroyTask'])->name('tenant.events.operations.tasks.destroy');
 
     // Multi-Role Electronic Certificates
-    Route::get('events/{event}/certificates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'index'])->name('tenant.events.certificates.index');
+    Route::get('events/{event}/data/certificates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'index'])->name('tenant.events.certificates.index');
     Route::post('events/{event}/certificates/templates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'storeTemplate'])->name('tenant.events.certificates.templates.store');
     Route::put('events/{event}/certificates/templates/{template}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'updateTemplate'])->name('tenant.events.certificates.templates.update');
     Route::post('events/{event}/certificates/issue', [App\Http\Controllers\Tenant\EventCertificateController::class, 'issue'])->name('tenant.events.certificates.issue');

@@ -49,7 +49,7 @@ test('organizer can view abstracts dashboard and filter by track or status', fun
     ]);
 
     $response = $this->actingAs($user)
-        ->getJson("http://{$host}/events/{$event->id}/abstracts", ['HTTP_HOST' => $host]);
+        ->getJson("http://{$host}/events/{$event->id}/data/abstracts", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $response->assertJsonPath('stats.total', 2);
@@ -58,7 +58,7 @@ test('organizer can view abstracts dashboard and filter by track or status', fun
 
     // Test status filter
     $filterRes = $this->actingAs($user)
-        ->getJson("http://{$host}/events/{$event->id}/abstracts?status=accepted_poster", ['HTTP_HOST' => $host]);
+        ->getJson("http://{$host}/events/{$event->id}/data/abstracts?status=accepted_poster", ['HTTP_HOST' => $host]);
 
     $filterRes->assertOk();
     expect($filterRes->json('abstracts'))->toHaveCount(1);
@@ -283,7 +283,7 @@ test('the abstracts page lists distinct tracks with a query Postgres accepts', f
     });
 
     $this->actingAs($user)
-        ->getJson("http://{$host}/events/{$event->id}/abstracts", ['HTTP_HOST' => $host])
+        ->getJson("http://{$host}/events/{$event->id}/data/abstracts", ['HTTP_HOST' => $host])
         ->assertOk()
         ->assertJsonPath('tracks', ['Pediatrics', 'Surgery']);
 

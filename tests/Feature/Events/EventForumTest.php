@@ -138,7 +138,7 @@ test('an anonymous question shows as Anonymous publicly but the real name to the
     $publicListing = $this->getJson("http://{$host}/e/{$event->slug}/forum", ['HTTP_HOST' => $host]);
     expect($publicListing->json('0.author_name'))->toBe('Anonymous');
 
-    $hostListing = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/forum", ['HTTP_HOST' => $host]);
+    $hostListing = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/forum", ['HTTP_HOST' => $host]);
     expect($hostListing->json('threads.0.author_name'))->toBe('Efua Nyarko');
     expect($hostListing->json('threads.0.is_anonymous'))->toBeTrue();
 });
@@ -181,7 +181,7 @@ test('a report is deduped per reporter and does not appear in the public payload
     $publicListing = $this->getJson("http://{$host}/e/{$event->slug}/forum", ['HTTP_HOST' => $host]);
     expect($publicListing->json('0'))->not->toHaveKey('reports_count');
 
-    $hostListing = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/forum", ['HTTP_HOST' => $host]);
+    $hostListing = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/forum", ['HTTP_HOST' => $host]);
     expect($hostListing->json('threads.0.reports_count'))->toBe(1);
 });
 

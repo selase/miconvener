@@ -93,24 +93,86 @@ test('an empty group disappears rather than showing a heading with nothing under
         ->assertInertia(fn ($page) => $page->where('sections', fn ($menu): bool => collect($menu)->every(fn (array $group): bool => $group['sections'] !== [])));
 });
 
-test('the requested section is opened when the user can open it', function () {
+test('each section has its own address', function () {
     [, $user, $event, $host] = workspaceSetup('Org Superadmin');
 
     $this->actingAs($user)
-        ->get("http://{$host}/events/{$event->id}?section=guests", ['HTTP_HOST' => $host])
+        ->get("http://{$host}/events/{$event->id}/guests", ['HTTP_HOST' => $host])
+        ->assertOk()
         ->assertInertia(fn ($page) => $page->where('section', 'guests'));
 });
 
-test('an unknown or forbidden section falls back to the overview', function () {
-    [, $user, $event, $host] = workspaceSetup(['read event']);
-
-    $this->actingAs($user)
-        ->get("http://{$host}/events/{$event->id}?section=not-a-section", ['HTTP_HOST' => $host])
-        ->assertInertia(fn ($page) => $page->where('section', 'overview'));
+test('links written before sections had addresses still land in the right place', function () {
+    [, $user, $event, $host] = workspaceSetup('Org Superadmin');
 
     $this->actingAs($user)
         ->get("http://{$host}/events/{$event->id}?section=check-in", ['HTTP_HOST' => $host])
-        ->assertInertia(fn ($page) => $page->where('section', 'overview'));
+        ->assertRedirect("http://{$host}/events/{$event->id}/check-in");
+});
+
+test('a section you cannot open is refused, and an unknown one does not exist', function () {
+    [, $user, $event, $host] = workspaceSetup(['read event']);
+
+    // The menu never offers it; typing the address gets an honest refusal.
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}/check-in", ['HTTP_HOST' => $host])
+        ->assertForbidden();
+
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}/not-a-section", ['HTTP_HOST' => $host])
+        ->assertNotFound();
+});
+
+test('an event belonging to another organization cannot be opened through a section address', function () {
+    [, $user, , $host] = workspaceSetup('Org Superadmin');
+    $otherTenant = Tenant::factory()->create(['slug' => 'someone-else', 'isolation_mode' => 'shared']);
+    $theirs = Event::factory()->create(['tenant_id' => $otherTenant->id]);
+
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$theirs->id}/guests", ['HTTP_HOST' => $host])
+        ->assertNotFound();
+});
+
+test('each section loads only what it shows', function () {
+    [$tenant, $user, $event, $host] = workspaceSetup('Org Superadmin');
+    App\Models\EventRegistration::factory()->count(3)->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => App\Models\EventRegistration::STATUS_CONFIRMED,
+        'amount' => 5000,
+        'platform_fee_amount' => 100,
+    ]);
+
+    // The overview used to receive every registration to add them up in the
+    // browser. It now gets the totals, and no rows.
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page
+            ->where('registrations', [])
+            ->where('stats.confirmed', 3)
+            ->where('stats.collected', 15000)
+            ->where('stats.platform_fees', 300));
+
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}/guests", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page->has('registrations', 3)->where('stats', null));
+
+    // The schedule needs sessions, not registrations.
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}/schedule", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page->where('registrations', [])->has('event.sessions'));
+});
+
+test('the json feeds that shared a name with a section still answer at their new address', function () {
+    [, $user, $event, $host] = workspaceSetup('Org Superadmin');
+
+    // Same route name, so the frontend never noticed the move.
+    expect(route('tenant.events.forum.index', ['subdomain' => 'workspace', 'event' => $event->id], false))
+        ->toBe("/events/{$event->id}/data/forum");
+
+    $this->actingAs($user)
+        ->getJson("http://{$host}/events/{$event->id}/data/forum", ['HTTP_HOST' => $host])
+        ->assertOk();
 });
 
 test('materials is hidden on a plan without it, unless the event already has some', function () {

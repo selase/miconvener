@@ -47,7 +47,7 @@ test('finance stats expose the refunded gross total so the dashboard can show it
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/finance", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/finance", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $response->assertJsonPath('stats.collected', 30_000);
@@ -68,7 +68,7 @@ test('refunded is zero when nothing has been refunded', function () {
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/finance", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/finance", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $response->assertJsonPath('stats.refunded', 0);

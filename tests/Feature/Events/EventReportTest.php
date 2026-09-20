@@ -43,7 +43,7 @@ test('the reports summary reflects real counts', function () {
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/reports", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/reports", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $response->assertJsonPath('counts.registrations', 2); // confirmed + checked_in both count as confirmed

@@ -320,3 +320,17 @@ test('someone who has already started paying is not told to pay again', function
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('registration.awaiting_checkout', false));
 });
+
+test('the approval email takes the organizer straight to the guests section', function () {
+    [$tenant] = approvalHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id, 'requires_approval' => true]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_PENDING_APPROVAL,
+    ]);
+
+    // The approve buttons are on Guests; landing on the overview meant hunting for them.
+    expect((new EventRegistrationNeedsApproval($registration))->render())
+        ->toContain("/events/{$event->id}/guests");
+});

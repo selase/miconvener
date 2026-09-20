@@ -44,7 +44,7 @@ test('finance stats reflect confirmed registrations and paid payouts only', func
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/finance", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/finance", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $response->assertJsonPath('stats.collected', 30_000);

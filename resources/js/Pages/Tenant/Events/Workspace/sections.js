@@ -3,6 +3,7 @@
  * moving them is a change here and in routes, nowhere else.
  */
 export function sectionHref(eventId, slug) {
-    const base = route('tenant.events.show', { event: eventId });
-    return slug === 'overview' ? base : `${base}?section=${encodeURIComponent(slug)}`;
+    return slug === 'overview'
+        ? route('tenant.events.show', { event: eventId })
+        : route('tenant.events.section', { event: eventId, section: slug });
 }
