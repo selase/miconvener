@@ -98,7 +98,13 @@ final class HealthServiceProvider extends ServiceProvider
              */
             BackupsCheck::new()
                 ->onDisk(config('backup.backup.destination.disks')[0] ?? 'local')
-                ->locatedAt(config('backup.backup.name').'/*.zip')
+                /*
+                 * A directory, not a glob. On a real disk the check lists
+                 * contents rather than globbing, so a pattern like "Name/*.zip"
+                 * matches nothing and the check reports zero backups while the
+                 * bucket is full of them.
+                 */
+                ->locatedAt(config('backup.backup.name'))
                 /*
                  * Despite the name, this is a floor: the newest backup must be
                  * more recent than the date given. The nightly run starts at

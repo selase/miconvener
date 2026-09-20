@@ -8,6 +8,7 @@ use Spatie\Backup\Notifications\Notifications\BackupWasSuccessfulNotification;
 use Spatie\Backup\Notifications\Notifications\CleanupHasFailedNotification;
 use Spatie\Backup\Notifications\Notifications\UnhealthyBackupWasFoundNotification;
 use Spatie\Health\Checks\Checks\BackupsCheck;
+use Spatie\Health\Enums\Status;
 use Spatie\Health\Facades\Health;
 
 /**
@@ -73,12 +74,20 @@ test('the backup check looks at the bucket the backups are actually written to',
 
     expect($check)->not->toBeNull();
 
-    // A check pointed at the wrong disk, or at the wrong path on the right
-    // disk, reports healthy forever: it finds nothing wrong where nothing was
-    // ever written, and never looks where the backups actually are.
-    $disk = new ReflectionProperty(BackupsCheck::class, 'disk');
-    $locatedAt = new ReflectionProperty(BackupsCheck::class, 'locatedAt');
+    // Run it against a disk holding a backup shaped like a real one, rather
+    // than asserting how it is configured. An earlier version of this test
+    // checked that the path was a "Name/*.zip" glob and passed happily while
+    // the check reported zero backups in production: on a real disk it lists
+    // a directory instead of globbing, so the pattern matched nothing.
+    $disk = config('backup.backup.destination.disks')[0];
+    Storage::fake($disk);
+    Storage::disk($disk)->put(
+        config('backup.backup.name').'/2026-09-20-01-30-53.zip',
+        str_repeat('x', 2 * 1024 * 1024),
+    );
 
-    expect($disk->getValue($check))->toBe(Storage::disk(config('backup.backup.destination.disks')[0]));
-    expect($locatedAt->getValue($check))->toStartWith(config('backup.backup.name').'/');
+    // The registered check bound to the real disk when the provider booted, so
+    // point it at the fake. Everything else it was configured with -- above all
+    // the path it looks in -- is left exactly as the provider set it.
+    expect($check->onDisk($disk)->run()->status->value)->toBe(Status::ok()->value);
 });
