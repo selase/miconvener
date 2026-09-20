@@ -1,26 +1,26 @@
 import { useState, useEffect } from 'react';
 import csrfFetch from '@/lib/csrfFetch';
-import { 
-    Bell, 
-    Plus, 
-    Mail, 
-    MessageSquare, 
-    Phone, 
-    Clock, 
-    ShieldCheck, 
-    Send, 
-    CheckCircle2, 
-    AlertCircle, 
-    Trash2, 
-    Edit3, 
-    ToggleLeft, 
-    ToggleRight, 
-    Settings, 
-    Sparkles, 
-    Play, 
+import {
+    Bell,
+    Plus,
+    Mail,
+    MessageSquare,
+    Phone,
+    Clock,
+    ShieldCheck,
+    Send,
+    CheckCircle2,
+    AlertCircle,
+    Trash2,
+    Edit3,
+    ToggleLeft,
+    ToggleRight,
+    Settings,
+    Sparkles,
+    Play,
     Users,
     ChevronRight,
-    Zap
+    Zap,
 } from 'lucide-react';
 
 export default function NotificationsPanel({ event }) {
@@ -60,7 +60,8 @@ export default function NotificationsPanel({ event }) {
     const [testForm, setTestForm] = useState({
         channels: ['email'],
         subject: 'Test Conference Reminder',
-        body_template: 'Hello {name},\n\nThis is a live test notification for {event_name} at {venue}.\n\nTicket Code: {ticket_code}',
+        body_template:
+            'Hello {name},\n\nThis is a live test notification for {event_name} at {venue}.\n\nTicket Code: {ticket_code}',
     });
 
     const [actionMessage, setActionMessage] = useState('');
@@ -69,7 +70,9 @@ export default function NotificationsPanel({ event }) {
     const fetchRules = async () => {
         try {
             setLoading(true);
-            const res = await csrfFetch(route('tenant.events.notification-rules.index', { event: event.id }));
+            const res = await csrfFetch(
+                route('tenant.events.notification-rules.index', { event: event.id })
+            );
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 // A refusal used to arrive as an HTML page, fail to parse, and
@@ -77,7 +80,7 @@ export default function NotificationsPanel({ event }) {
                 setActionError(
                     res.status === 403
                         ? 'You do not have permission to manage automations for this event.'
-                        : data.message || 'Automations could not be loaded. Refresh to try again.',
+                        : data.message || 'Automations could not be loaded. Refresh to try again.'
                 );
                 return;
             }
@@ -154,7 +157,10 @@ export default function NotificationsPanel({ event }) {
         setActionError('');
 
         const url = editingRule
-            ? route('tenant.events.notification-rules.update', { event: event.id, rule: editingRule.id })
+            ? route('tenant.events.notification-rules.update', {
+                  event: event.id,
+                  rule: editingRule.id,
+              })
             : route('tenant.events.notification-rules.store', { event: event.id });
         const method = editingRule ? 'PUT' : 'POST';
 
@@ -178,9 +184,12 @@ export default function NotificationsPanel({ event }) {
 
     const handleToggleRule = async (ruleId) => {
         try {
-            const res = await csrfFetch(route('tenant.events.notification-rules.toggle', { event: event.id, rule: ruleId }), {
-                method: 'PATCH',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.notification-rules.toggle', { event: event.id, rule: ruleId }),
+                {
+                    method: 'PATCH',
+                }
+            );
             if (res.ok) fetchRules();
         } catch (err) {
             console.error(err);
@@ -190,9 +199,15 @@ export default function NotificationsPanel({ event }) {
     const handleDeleteRule = async (ruleId) => {
         if (!confirm('Are you sure you want to delete this notification rule?')) return;
         try {
-            const res = await csrfFetch(route('tenant.events.notification-rules.destroy', { event: event.id, rule: ruleId }), {
-                method: 'DELETE',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.notification-rules.destroy', {
+                    event: event.id,
+                    rule: ruleId,
+                }),
+                {
+                    method: 'DELETE',
+                }
+            );
             if (res.ok) fetchRules();
         } catch (err) {
             console.error(err);
@@ -202,9 +217,15 @@ export default function NotificationsPanel({ event }) {
     const handleDispatchNow = async (ruleId) => {
         if (!confirm('Dispatch this notification immediately to all matching recipients?')) return;
         try {
-            const res = await csrfFetch(route('tenant.events.notification-rules.dispatch', { event: event.id, rule: ruleId }), {
-                method: 'POST',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.notification-rules.dispatch', {
+                    event: event.id,
+                    rule: ruleId,
+                }),
+                {
+                    method: 'POST',
+                }
+            );
             const data = await res.json();
             if (res.ok) {
                 setActionMessage(data.message);
@@ -220,10 +241,13 @@ export default function NotificationsPanel({ event }) {
     const handleSendTest = async (e) => {
         e.preventDefault();
         try {
-            const res = await csrfFetch(route('tenant.events.notification-rules.test-send', { event: event.id }), {
-                method: 'POST',
-                body: JSON.stringify(testForm),
-            });
+            const res = await csrfFetch(
+                route('tenant.events.notification-rules.test-send', { event: event.id }),
+                {
+                    method: 'POST',
+                    body: JSON.stringify(testForm),
+                }
+            );
             const data = await res.json();
             if (res.ok) {
                 setActionMessage('Test notification sent to your profile email/phone.');
@@ -240,10 +264,13 @@ export default function NotificationsPanel({ event }) {
     const handleSaveSettings = async (e) => {
         e.preventDefault();
         try {
-            const res = await csrfFetch(route('tenant.events.notification-settings.update', { event: event.id }), {
-                method: 'PUT',
-                body: JSON.stringify(settingsForm),
-            });
+            const res = await csrfFetch(
+                route('tenant.events.notification-settings.update', { event: event.id }),
+                {
+                    method: 'PUT',
+                    body: JSON.stringify(settingsForm),
+                }
+            );
             const data = await res.json();
             if (res.ok) {
                 setActionMessage(data.message);
@@ -256,17 +283,17 @@ export default function NotificationsPanel({ event }) {
     };
 
     const insertVariable = (tag) => {
-        setRuleForm(prev => ({
+        setRuleForm((prev) => ({
             ...prev,
             body_template: prev.body_template + ' ' + tag,
         }));
     };
 
     const toggleChannel = (channel) => {
-        setRuleForm(prev => {
+        setRuleForm((prev) => {
             const current = prev.channels || [];
             const next = current.includes(channel)
-                ? current.filter(c => c !== channel)
+                ? current.filter((c) => c !== channel)
                 : [...current, channel];
             return { ...prev, channels: next.length > 0 ? next : ['email'] };
         });
@@ -285,7 +312,12 @@ export default function NotificationsPanel({ event }) {
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                         {actionMessage}
                     </span>
-                    <button onClick={() => setActionMessage('')} className="text-xs hover:underline">Dismiss</button>
+                    <button
+                        onClick={() => setActionMessage('')}
+                        className="text-xs hover:underline"
+                    >
+                        Dismiss
+                    </button>
                 </div>
             )}
             {actionError && (
@@ -294,7 +326,9 @@ export default function NotificationsPanel({ event }) {
                         <AlertCircle className="w-4 h-4 text-red-600" />
                         {actionError}
                     </span>
-                    <button onClick={() => setActionError('')} className="text-xs hover:underline">Dismiss</button>
+                    <button onClick={() => setActionError('')} className="text-xs hover:underline">
+                        Dismiss
+                    </button>
                 </div>
             )}
 
@@ -307,10 +341,13 @@ export default function NotificationsPanel({ event }) {
                         <span>{emailPct}%</span>
                     </div>
                     <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                        {emailUsed.toLocaleString()} <span className="text-xs font-normal text-slate-400">/ {emailLimit.toLocaleString()} free</span>
+                        {emailUsed.toLocaleString()}{' '}
+                        <span className="text-xs font-normal text-slate-400">
+                            / {emailLimit.toLocaleString()} free
+                        </span>
                     </div>
                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 mt-2.5 overflow-hidden">
-                        <div 
+                        <div
                             className={`h-full rounded-full transition-all ${emailPct > 90 ? 'bg-red-500' : emailPct > 70 ? 'bg-amber-500' : 'bg-indigo-600'}`}
                             style={{ width: `${emailPct}%` }}
                         />
@@ -319,37 +356,49 @@ export default function NotificationsPanel({ event }) {
 
                 {/* Channel Integrations */}
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">Channels & Omnichannel</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                        Channels & Omnichannel
+                    </div>
                     <div className="flex items-center gap-2 mt-1">
                         <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-medium">
                             <Mail className="w-3 h-3" /> Email
                         </span>
-                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${settings?.sms_enabled ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border-emerald-200' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'}`}>
+                        <span
+                            className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${settings?.sms_enabled ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border-emerald-200' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'}`}
+                        >
                             <Phone className="w-3 h-3" /> SMS
                         </span>
-                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${settings?.whatsapp_enabled ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border-emerald-200' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'}`}>
+                        <span
+                            className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${settings?.whatsapp_enabled ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border-emerald-200' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'}`}
+                        >
                             <MessageSquare className="w-3 h-3" /> WhatsApp
                         </span>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-indigo-500" /> Staged for Omnichannel Gateway
+                        <Sparkles className="w-3 h-3 text-indigo-500" /> Staged for Omnichannel
+                        Gateway
                     </p>
                 </div>
 
                 {/* Anti-Abuse Guardrails */}
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">Anti-Abuse Guardrails</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
+                        Anti-Abuse Guardrails
+                    </div>
                     <div className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
                         <ShieldCheck className="w-5 h-5 text-indigo-600" /> Active Protection
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                        {settings?.anti_abuse_cooldown_minutes || 60}m frequency cooldown per attendee
+                        {settings?.anti_abuse_cooldown_minutes || 60}m frequency cooldown per
+                        attendee
                     </div>
                 </div>
 
                 {/* Quick Controls */}
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Channel Configuration</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                        Channel Configuration
+                    </div>
                     <div className="flex items-center gap-2 mt-2">
                         <button
                             type="button"
@@ -392,7 +441,8 @@ export default function NotificationsPanel({ event }) {
                         >
                             <div>
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-1">
-                                    {preset.offset_amount} {preset.offset_unit} {preset.offset_direction}
+                                    {preset.offset_amount} {preset.offset_unit}{' '}
+                                    {preset.offset_direction}
                                 </span>
                                 <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-1 leading-snug">
                                     {preset.name}
@@ -425,45 +475,68 @@ export default function NotificationsPanel({ event }) {
                 {rules.length === 0 ? (
                     <div className="p-12 text-center text-sm text-slate-500 dark:text-slate-400">
                         <Bell className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">No automated rules configured yet</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">
+                            No automated rules configured yet
+                        </p>
                         <p className="text-xs mt-1 max-w-sm mx-auto">
-                            Deploy one of the recommended presets above or create a custom trigger to automate attendee communications.
+                            Deploy one of the recommended presets above or create a custom trigger
+                            to automate attendee communications.
                         </p>
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                         {rules.map((rule) => (
-                            <div key={rule.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all">
+                            <div
+                                key={rule.id}
+                                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all"
+                            >
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                                             {rule.name}
                                         </h4>
-                                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                                            rule.is_active 
-                                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
-                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                                        }`}>
+                                        <span
+                                            className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                                                rule.is_active
+                                                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                                            }`}
+                                        >
                                             {rule.is_active ? 'Active' : 'Paused'}
                                         </span>
                                         <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                                             <Clock className="w-3 h-3" />
-                                            {rule.offset_amount} {rule.offset_unit} {rule.offset_direction}
+                                            {rule.offset_amount} {rule.offset_unit}{' '}
+                                            {rule.offset_direction}
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1">
-                                        <span className="font-semibold text-slate-700 dark:text-slate-200">Subject:</span> {rule.subject}
+                                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                                            Subject:
+                                        </span>{' '}
+                                        {rule.subject}
                                     </p>
                                     <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap pt-0.5">
                                         <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                                            <Users className="w-3 h-3" /> Target: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{rule.target_audience}</strong>
+                                            <Users className="w-3 h-3" /> Target:{' '}
+                                            <strong className="text-slate-700 dark:text-slate-300 font-semibold">
+                                                {rule.target_audience}
+                                            </strong>
                                         </span>
                                         &bull;
-                                        <span>Channels: {(rule.channels || []).join(', ').toUpperCase()}</span>
+                                        <span>
+                                            Channels:{' '}
+                                            {(rule.channels || []).join(', ').toUpperCase()}
+                                        </span>
                                         {rule.last_dispatched_at && (
                                             <>
                                                 &bull;
-                                                <span>Last sent: {new Date(rule.last_dispatched_at).toLocaleString()}</span>
+                                                <span>
+                                                    Last sent:{' '}
+                                                    {new Date(
+                                                        rule.last_dispatched_at
+                                                    ).toLocaleString()}
+                                                </span>
                                             </>
                                         )}
                                     </div>
@@ -484,7 +557,11 @@ export default function NotificationsPanel({ event }) {
                                         className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
                                         title={rule.is_active ? 'Pause Rule' : 'Activate Rule'}
                                     >
-                                        {rule.is_active ? <ToggleRight className="w-4 h-4 text-emerald-600" /> : <ToggleLeft className="w-4 h-4 text-slate-400" />}
+                                        {rule.is_active ? (
+                                            <ToggleRight className="w-4 h-4 text-emerald-600" />
+                                        ) : (
+                                            <ToggleLeft className="w-4 h-4 text-slate-400" />
+                                        )}
                                     </button>
                                     <button
                                         type="button"
@@ -515,9 +592,16 @@ export default function NotificationsPanel({ event }) {
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full p-6 shadow-2xl space-y-4 my-8 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                {editingRule ? 'Edit Notification Rule' : 'Create Automated Notification Rule'}
+                                {editingRule
+                                    ? 'Edit Notification Rule'
+                                    : 'Create Automated Notification Rule'}
                             </h3>
-                            <button onClick={() => setIsRuleModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+                            <button
+                                onClick={() => setIsRuleModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+                            >
+                                &times;
+                            </button>
                         </div>
 
                         <form onSubmit={handleSaveRule} className="space-y-4">
@@ -528,7 +612,9 @@ export default function NotificationsPanel({ event }) {
                                 <input
                                     type="text"
                                     value={ruleForm.name}
-                                    onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
+                                    onChange={(e) =>
+                                        setRuleForm({ ...ruleForm, name: e.target.value })
+                                    }
                                     required
                                     placeholder="e.g. 7-Day Pre-Event Preparation"
                                     className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -543,7 +629,9 @@ export default function NotificationsPanel({ event }) {
                                     <select
                                         value={ruleForm.target_audience}
                                         onChange={(e) => {
-                                            const aud = audiences.find(a => a.key === e.target.value);
+                                            const aud = audiences.find(
+                                                (a) => a.key === e.target.value
+                                            );
                                             setRuleForm({
                                                 ...ruleForm,
                                                 target_audience: e.target.value,
@@ -601,17 +689,27 @@ export default function NotificationsPanel({ event }) {
                                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                                     Trigger Timing
                                 </label>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                     <input
                                         type="number"
                                         min="0"
                                         value={ruleForm.offset_amount}
-                                        onChange={(e) => setRuleForm({ ...ruleForm, offset_amount: parseInt(e.target.value) || 0 })}
+                                        onChange={(e) =>
+                                            setRuleForm({
+                                                ...ruleForm,
+                                                offset_amount: parseInt(e.target.value) || 0,
+                                            })
+                                        }
                                         className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
                                     />
                                     <select
                                         value={ruleForm.offset_unit}
-                                        onChange={(e) => setRuleForm({ ...ruleForm, offset_unit: e.target.value })}
+                                        onChange={(e) =>
+                                            setRuleForm({
+                                                ...ruleForm,
+                                                offset_unit: e.target.value,
+                                            })
+                                        }
                                         className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
                                     >
                                         <option value="days">Days</option>
@@ -620,7 +718,12 @@ export default function NotificationsPanel({ event }) {
                                     </select>
                                     <select
                                         value={ruleForm.offset_direction}
-                                        onChange={(e) => setRuleForm({ ...ruleForm, offset_direction: e.target.value })}
+                                        onChange={(e) =>
+                                            setRuleForm({
+                                                ...ruleForm,
+                                                offset_direction: e.target.value,
+                                            })
+                                        }
                                         className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
                                     >
                                         <option value="before">Before Event</option>
@@ -636,7 +739,9 @@ export default function NotificationsPanel({ event }) {
                                 <input
                                     type="text"
                                     value={ruleForm.subject}
-                                    onChange={(e) => setRuleForm({ ...ruleForm, subject: e.target.value })}
+                                    onChange={(e) =>
+                                        setRuleForm({ ...ruleForm, subject: e.target.value })
+                                    }
                                     required
                                     placeholder="Important conference update..."
                                     className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -649,8 +754,14 @@ export default function NotificationsPanel({ event }) {
                                         Message Template Body
                                     </label>
                                     <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                                        Insert: 
-                                        {['{name}', '{event_name}', '{venue}', '{date}', '{ticket_code}'].map(tag => (
+                                        Insert:
+                                        {[
+                                            '{name}',
+                                            '{event_name}',
+                                            '{venue}',
+                                            '{date}',
+                                            '{ticket_code}',
+                                        ].map((tag) => (
                                             <button
                                                 key={tag}
                                                 type="button"
@@ -665,7 +776,9 @@ export default function NotificationsPanel({ event }) {
                                 <textarea
                                     rows={5}
                                     value={ruleForm.body_template}
-                                    onChange={(e) => setRuleForm({ ...ruleForm, body_template: e.target.value })}
+                                    onChange={(e) =>
+                                        setRuleForm({ ...ruleForm, body_template: e.target.value })
+                                    }
                                     required
                                     className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                 />
@@ -683,7 +796,9 @@ export default function NotificationsPanel({ event }) {
                                     type="submit"
                                     className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm"
                                 >
-                                    {editingRule ? 'Update Campaign Rule' : 'Save & Activate Campaign'}
+                                    {editingRule
+                                        ? 'Update Campaign Rule'
+                                        : 'Save & Activate Campaign'}
                                 </button>
                             </div>
                         </form>
@@ -699,10 +814,16 @@ export default function NotificationsPanel({ event }) {
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                 Dispatch Test Notification
                             </h3>
-                            <button onClick={() => setIsTestModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+                            <button
+                                onClick={() => setIsTestModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+                            >
+                                &times;
+                            </button>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Dispatches a test message with interpolated sample data directly to your administrator email/phone.
+                            Dispatches a test message with interpolated sample data directly to your
+                            administrator email/phone.
                         </p>
 
                         <form onSubmit={handleSendTest} className="space-y-3">
@@ -713,7 +834,9 @@ export default function NotificationsPanel({ event }) {
                                 <input
                                     type="text"
                                     value={testForm.subject}
-                                    onChange={(e) => setTestForm({ ...testForm, subject: e.target.value })}
+                                    onChange={(e) =>
+                                        setTestForm({ ...testForm, subject: e.target.value })
+                                    }
                                     required
                                     className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
                                 />
@@ -725,7 +848,9 @@ export default function NotificationsPanel({ event }) {
                                 <textarea
                                     rows={4}
                                     value={testForm.body_template}
-                                    onChange={(e) => setTestForm({ ...testForm, body_template: e.target.value })}
+                                    onChange={(e) =>
+                                        setTestForm({ ...testForm, body_template: e.target.value })
+                                    }
                                     required
                                     className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-mono focus:outline-none"
                                 />
@@ -758,46 +883,78 @@ export default function NotificationsPanel({ event }) {
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">
                                 Notification Channel & Billing Settings
                             </h3>
-                            <button onClick={() => setIsSettingsModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+                            <button
+                                onClick={() => setIsSettingsModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+                            >
+                                &times;
+                            </button>
                         </div>
 
                         <form onSubmit={handleSaveSettings} className="space-y-4">
                             <div className="space-y-3">
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                                     <div>
-                                        <div className="text-xs font-bold text-slate-900 dark:text-white">Enable SMS Staging</div>
-                                        <div className="text-[11px] text-slate-500">Dispatch SMS alerts staged for Omnichannel Gateway</div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                            Enable SMS Staging
+                                        </div>
+                                        <div className="text-[11px] text-slate-500">
+                                            Dispatch SMS alerts staged for Omnichannel Gateway
+                                        </div>
                                     </div>
                                     <input
                                         type="checkbox"
                                         checked={settingsForm.sms_enabled}
-                                        onChange={(e) => setSettingsForm({ ...settingsForm, sms_enabled: e.target.checked })}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                sms_enabled: e.target.checked,
+                                            })
+                                        }
                                         className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                     />
                                 </label>
 
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                                     <div>
-                                        <div className="text-xs font-bold text-slate-900 dark:text-white">Enable WhatsApp Staging</div>
-                                        <div className="text-[11px] text-slate-500">Dispatch WhatsApp alerts staged for Omnichannel Gateway</div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                            Enable WhatsApp Staging
+                                        </div>
+                                        <div className="text-[11px] text-slate-500">
+                                            Dispatch WhatsApp alerts staged for Omnichannel Gateway
+                                        </div>
                                     </div>
                                     <input
                                         type="checkbox"
                                         checked={settingsForm.whatsapp_enabled}
-                                        onChange={(e) => setSettingsForm({ ...settingsForm, whatsapp_enabled: e.target.checked })}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                whatsapp_enabled: e.target.checked,
+                                            })
+                                        }
                                         className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                     />
                                 </label>
 
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                                     <div>
-                                        <div className="text-xs font-bold text-slate-900 dark:text-white">Email Overage Billing</div>
-                                        <div className="text-[11px] text-slate-500">Permit sends beyond 2,500 monthly limit billed to ledger</div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                            Email Overage Billing
+                                        </div>
+                                        <div className="text-[11px] text-slate-500">
+                                            Permit sends beyond 2,500 monthly limit billed to ledger
+                                        </div>
                                     </div>
                                     <input
                                         type="checkbox"
                                         checked={settingsForm.overage_billing_enabled}
-                                        onChange={(e) => setSettingsForm({ ...settingsForm, overage_billing_enabled: e.target.checked })}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                overage_billing_enabled: e.target.checked,
+                                            })
+                                        }
                                         className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                     />
                                 </label>
@@ -811,10 +968,19 @@ export default function NotificationsPanel({ event }) {
                                         min="5"
                                         max="1440"
                                         value={settingsForm.anti_abuse_cooldown_minutes}
-                                        onChange={(e) => setSettingsForm({ ...settingsForm, anti_abuse_cooldown_minutes: parseInt(e.target.value) || 60 })}
+                                        onChange={(e) =>
+                                            setSettingsForm({
+                                                ...settingsForm,
+                                                anti_abuse_cooldown_minutes:
+                                                    parseInt(e.target.value) || 60,
+                                            })
+                                        }
                                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
                                     />
-                                    <p className="text-[11px] text-slate-400 mt-1">Prevents repeated duplicate notifications to the same attendee.</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">
+                                        Prevents repeated duplicate notifications to the same
+                                        attendee.
+                                    </p>
                                 </div>
                             </div>
 

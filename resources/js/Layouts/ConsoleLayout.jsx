@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { useToast } from '@/Components/Console/Toast';
 import {
@@ -13,6 +13,8 @@ import {
     SlidersHorizontal,
     Settings,
     UserRound,
+    Menu,
+    X,
 } from 'lucide-react';
 import ThemeToggle from '@/Components/Console/ThemeToggle';
 
@@ -50,10 +52,26 @@ function initials(name) {
         .toUpperCase();
 }
 
-export default function ConsoleLayout({ children }) {
+/**
+ * @param {boolean} compact  Inside an event the main menu shrinks to an icon rail
+ *                          from md up, which pays for the event's own section
+ *                          column. The phone drawer is unchanged.
+ */
+export default function ConsoleLayout({ children, compact = false }) {
     const { tenant, auth, url, flash } = usePage().props;
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : url;
     const toast = useToast();
+    // Below md the sidebar is an off-canvas drawer. Fixed at 224px it left a
+    // phone about 165px of content: too little to reach a registration's
+    // approve button or read the check-in station names.
+    const [navOpen, setNavOpen] = useState(false);
+
+    useEffect(() => {
+        if (!navOpen) return undefined;
+        const onKey = (event) => event.key === 'Escape' && setNavOpen(false);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [navOpen]);
 
     useEffect(() => {
         if (flash?.error) {
@@ -66,12 +84,26 @@ export default function ConsoleLayout({ children }) {
 
     return (
         <div className="flex h-screen overflow-hidden bg-canvas font-console text-ink">
-            <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface">
-                <div className="flex items-center gap-2.5 border-b border-border px-4.5 py-4">
+            {navOpen && (
+                <div
+                    className="fixed inset-0 z-35 bg-ink/30 md:hidden"
+                    aria-hidden="true"
+                    onClick={() => setNavOpen(false)}
+                />
+            )}
+            <aside
+                id="console-nav"
+                className={`fixed inset-y-0 left-0 z-35 flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface transition-transform duration-200 ease-out motion-reduce:transition-none md:static md:z-auto ${compact ? 'md:w-14' : 'md:w-56'} md:translate-x-0 ${
+                    navOpen ? 'translate-x-0' : '-translate-x-full'
+                }`}
+            >
+                <div
+                    className={`flex items-center gap-2.5 border-b border-border px-4.5 py-4 ${compact ? 'md:justify-center md:px-0' : ''}`}
+                >
                     <div className="grid h-8 w-8 shrink-0 place-items-center bg-inverse text-xs font-semibold text-inverse-ink">
                         {initials(tenant?.name ?? 'MC')}
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className={`min-w-0 flex-1 ${compact ? 'md:hidden' : ''}`}>
                         <div className="truncate text-[13px] font-medium text-ink">
                             {tenant?.name}
                         </div>
@@ -79,7 +111,17 @@ export default function ConsoleLayout({ children }) {
                             {auth?.user?.email}
                         </div>
                     </div>
-                    <ThemeToggle />
+                    <div className={compact ? 'md:hidden' : undefined}>
+                        <ThemeToggle />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setNavOpen(false)}
+                        className="grid h-8 w-8 place-items-center text-ink-secondary hover:text-ink md:hidden"
+                        aria-label="Close navigation"
+                    >
+                        <X className="h-4 w-4" strokeWidth={1.75} />
+                    </button>
                 </div>
 
                 <nav className="flex flex-col py-2">
@@ -89,7 +131,10 @@ export default function ConsoleLayout({ children }) {
                             (!item.permission || auth?.can?.[item.permission])
                     ).map((item) => {
                         const href = route(item.href);
-                        const isActive = currentPath === new URL(href).pathname;
+                        const itemPath = new URL(href).pathname;
+                        // Inside an event, Events stays lit: /events/{id} is still Events.
+                        const isActive =
+                            currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
                         const Icon = item.icon;
 
                         return (
@@ -97,14 +142,20 @@ export default function ConsoleLayout({ children }) {
                                 key={item.href}
                                 href={href}
                                 aria-current={isActive ? 'page' : undefined}
+                                onClick={() => setNavOpen(false)}
+                                title={compact ? item.label : undefined}
                                 className={`flex items-center gap-2.5 px-4.5 py-1.75 text-[13px] transition-colors duration-120 ease-out ${
+                                    compact ? 'md:justify-center md:px-0 md:py-2.5' : ''
+                                } ${
                                     isActive
                                         ? 'bg-surface-hover text-ink shadow-[inset_2px_0_0_var(--color-accent)]'
                                         : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                                 }`}
                             >
                                 <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-                                {item.label}
+                                <span className={compact ? 'md:sr-only' : undefined}>
+                                    {item.label}
+                                </span>
                             </Link>
                         );
                     })}
@@ -112,6 +163,21 @@ export default function ConsoleLayout({ children }) {
             </aside>
 
             <div className="min-w-0 flex-1 overflow-y-auto bg-surface">
+                <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-2.5 md:hidden">
+                    <button
+                        type="button"
+                        onClick={() => setNavOpen(true)}
+                        className="grid h-9 w-9 place-items-center rounded-md text-ink hover:bg-surface-hover"
+                        aria-label="Open navigation"
+                        aria-controls="console-nav"
+                        aria-expanded={navOpen}
+                    >
+                        <Menu className="h-5 w-5" strokeWidth={1.75} />
+                    </button>
+                    <span className="truncate text-[13px] font-medium text-ink">
+                        {tenant?.name}
+                    </span>
+                </div>
                 <main>{children}</main>
             </div>
         </div>

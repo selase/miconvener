@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Services\Events\EventSections;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -227,6 +228,14 @@ final class EventController extends Controller
             ])
             ->firstOrFail();
 
+        // An unknown section, or one this user cannot open, falls back to the
+        // overview rather than showing a section they would be refused inside.
+        $sections = app(EventSections::class);
+        $section = (string) request()->query('section', EventSections::OVERVIEW);
+        if (! EventSections::exists($section) || ! $sections->allows(request()->user(), $tenant, $eventModel, $section)) {
+            $section = EventSections::OVERVIEW;
+        }
+
         $registrations = $eventModel->registrations()
             ->with(['ticketType:id,name', 'seatAssignment.room:id,name'])
             ->orderByDesc('created_at')
@@ -270,6 +279,8 @@ final class EventController extends Controller
             'hasActiveGateway' => $tenant->canAcceptPayments(),
             'settlementMode' => $tenant->settlement_mode,
             'publicUrl' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]),
+            'sections' => $sections->menuFor(request()->user(), $tenant, $eventModel),
+            'section' => $section,
         ]);
     }
 

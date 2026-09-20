@@ -27,19 +27,19 @@ import Checkbox from '@/Components/Console/Checkbox';
 import Modal from '@/Components/Console/Modal';
 import StatusPill from '@/Components/Console/StatusPill';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
-import { 
-    Download, 
-    Trash2, 
-    Landmark, 
-    Smartphone, 
-    Scale, 
-    ShieldCheck, 
-    Calendar, 
-    Clock, 
-    Settings2, 
-    CheckCircle2, 
+import {
+    Download,
+    Trash2,
+    Landmark,
+    Smartphone,
+    Scale,
+    ShieldCheck,
+    Calendar,
+    Clock,
+    Settings2,
+    CheckCircle2,
     AlertTriangle,
-    Coins
+    Coins,
 } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 
@@ -48,7 +48,13 @@ function formatMoney(amount, currency) {
 }
 
 function NewAccountForm({ onDone }) {
-    const [form, setForm] = useState({ type: 'bank', label: '', account_name: '', account_number: '', bank_code: '' });
+    const [form, setForm] = useState({
+        type: 'bank',
+        label: '',
+        account_name: '',
+        account_number: '',
+        bank_code: '',
+    });
     const [banks, setBanks] = useState([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
@@ -67,7 +73,10 @@ function NewAccountForm({ onDone }) {
         e.preventDefault();
         setSaving(true);
         setError(null);
-        const response = await csrfFetch(route('tenant.payout-accounts.store'), { method: 'POST', body: JSON.stringify(form) });
+        const response = await csrfFetch(route('tenant.payout-accounts.store'), {
+            method: 'POST',
+            body: JSON.stringify(form),
+        });
         setSaving(false);
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
@@ -81,26 +90,65 @@ function NewAccountForm({ onDone }) {
     return (
         <form onSubmit={submit} className="grid grid-cols-2 gap-3 border-t border-border p-4">
             {error && <p className="col-span-2 text-[13px] text-danger-fg">{error}</p>}
-            <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+            <Select
+                label="Type"
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+            >
                 <option value="bank">Bank account</option>
                 <option value="mobile_money">Mobile money</option>
             </Select>
-            <Select label="Bank" value={form.bank_code} onChange={(e) => setForm({ ...form, bank_code: e.target.value })} required>
+            <Select
+                label="Bank"
+                value={form.bank_code}
+                onChange={(e) => setForm({ ...form, bank_code: e.target.value })}
+                required
+            >
                 <option value="">Select a bank…</option>
                 {banks.map((b) => (
-                    <option key={b.code} value={b.code}>{b.name}</option>
+                    <option key={b.code} value={b.code}>
+                        {b.name}
+                    </option>
                 ))}
             </Select>
-            <Input label="Label" placeholder="e.g. Absa Bank Ghana — current" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} required />
-            <Input label="Account name" value={form.account_name} onChange={(e) => setForm({ ...form, account_name: e.target.value })} required />
-            <Input label="Account number" value={form.account_number} onChange={(e) => setForm({ ...form, account_number: e.target.value })} required />
-            <Button type="submit" variant="primary" disabled={saving} className="col-span-2 justify-center">Add account</Button>
+            <Input
+                label="Label"
+                placeholder="e.g. Absa Bank Ghana — current"
+                value={form.label}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                required
+            />
+            <Input
+                label="Account name"
+                value={form.account_name}
+                onChange={(e) => setForm({ ...form, account_name: e.target.value })}
+                required
+            />
+            <Input
+                label="Account number"
+                value={form.account_number}
+                onChange={(e) => setForm({ ...form, account_number: e.target.value })}
+                required
+            />
+            <Button
+                type="submit"
+                variant="primary"
+                disabled={saving}
+                className="col-span-2 justify-center"
+            >
+                Add account
+            </Button>
         </form>
     );
 }
 
 function NewPayoutForm({ event, accounts, onDone }) {
-    const [form, setForm] = useState({ payout_account_id: accounts[0]?.id ?? '', amount: '', scheduled_at: '', note: '' });
+    const [form, setForm] = useState({
+        payout_account_id: accounts[0]?.id ?? '',
+        amount: '',
+        scheduled_at: '',
+        note: '',
+    });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
 
@@ -108,41 +156,88 @@ function NewPayoutForm({ event, accounts, onDone }) {
         e.preventDefault();
         setSaving(true);
         setError(null);
-        const response = await csrfFetch(route('tenant.events.finance.payouts.store', { event: event.id }), {
-            method: 'POST',
-            body: JSON.stringify({
-                ...form,
-                amount: Math.round(Number(form.amount) * 100),
-                scheduled_at: form.scheduled_at || null,
-                note: form.note || null,
-            }),
-        });
+        const response = await csrfFetch(
+            route('tenant.events.finance.payouts.store', { event: event.id }),
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    ...form,
+                    amount: Math.round(Number(form.amount) * 100),
+                    scheduled_at: form.scheduled_at || null,
+                    note: form.note || null,
+                }),
+            }
+        );
         setSaving(false);
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
             setError(body.message || 'Could not record this payout.');
             return;
         }
-        setForm({ payout_account_id: accounts[0]?.id ?? '', amount: '', scheduled_at: '', note: '' });
+        setForm({
+            payout_account_id: accounts[0]?.id ?? '',
+            amount: '',
+            scheduled_at: '',
+            note: '',
+        });
         onDone();
     };
 
     if (accounts.length === 0) {
-        return <p className="border-t border-border p-4 text-[13px] text-ink-secondary">Add a payout account above before recording a payout.</p>;
+        return (
+            <p className="border-t border-border p-4 text-[13px] text-ink-secondary">
+                Add a payout account above before recording a payout.
+            </p>
+        );
     }
 
     return (
-        <form onSubmit={submit} className="grid grid-cols-4 gap-3 border-t border-border p-4">
-            {error && <p className="col-span-4 text-[13px] text-danger-fg">{error}</p>}
-            <Select label="To account" value={form.payout_account_id} onChange={(e) => setForm({ ...form, payout_account_id: e.target.value })}>
+        <form
+            onSubmit={submit}
+            className="grid grid-cols-2 gap-3 border-t border-border p-4 lg:grid-cols-4"
+        >
+            {error && (
+                <p className="col-span-2 text-[13px] text-danger-fg lg:col-span-4">{error}</p>
+            )}
+            <Select
+                label="To account"
+                value={form.payout_account_id}
+                onChange={(e) => setForm({ ...form, payout_account_id: e.target.value })}
+            >
                 {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>{a.label} ({a.masked_account_number})</option>
+                    <option key={a.id} value={a.id}>
+                        {a.label} ({a.masked_account_number})
+                    </option>
                 ))}
             </Select>
-            <Input label="Amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
-            <Input label="Scheduled for" type="date" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} />
-            <Input label="Note" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-            <Button type="submit" variant="primary" disabled={saving} className="col-span-4 justify-center">Record payout</Button>
+            <Input
+                label="Amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                required
+            />
+            <Input
+                label="Scheduled for"
+                type="date"
+                value={form.scheduled_at}
+                onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
+            />
+            <Input
+                label="Note"
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+            />
+            <Button
+                type="submit"
+                variant="primary"
+                disabled={saving}
+                className="col-span-2 justify-center lg:col-span-4"
+            >
+                Record payout
+            </Button>
         </form>
     );
 }
@@ -155,7 +250,9 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
         days_after_event: schedule?.days_after_event ?? 3,
         holdback_percentage: schedule?.holdback_percentage ?? 10,
         holdback_release_days: schedule?.holdback_release_days ?? 14,
-        minimum_payout_amount: schedule ? (schedule.minimum_payout_amount / 100).toFixed(2) : '10.00',
+        minimum_payout_amount: schedule
+            ? (schedule.minimum_payout_amount / 100).toFixed(2)
+            : '10.00',
         auto_payout_enabled: schedule?.auto_payout_enabled ?? true,
         preferred_account_id: schedule?.preferred_account_id || (accounts[0]?.id ?? ''),
     });
@@ -180,18 +277,23 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
         setError(null);
 
         try {
-            const res = await csrfFetch(route('tenant.events.finance.payout-schedule.update', { event: event.id }), {
-                method: 'POST',
-                body: JSON.stringify({
-                    schedule_type: form.schedule_type,
-                    days_after_event: parseInt(form.days_after_event, 10) || 0,
-                    holdback_percentage: parseFloat(form.holdback_percentage) || 0,
-                    holdback_release_days: parseInt(form.holdback_release_days, 10) || 0,
-                    minimum_payout_amount: Math.round(parseFloat(form.minimum_payout_amount || 0) * 100),
-                    auto_payout_enabled: !!form.auto_payout_enabled,
-                    preferred_account_id: form.preferred_account_id || null,
-                }),
-            });
+            const res = await csrfFetch(
+                route('tenant.events.finance.payout-schedule.update', { event: event.id }),
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        schedule_type: form.schedule_type,
+                        days_after_event: parseInt(form.days_after_event, 10) || 0,
+                        holdback_percentage: parseFloat(form.holdback_percentage) || 0,
+                        holdback_release_days: parseInt(form.holdback_release_days, 10) || 0,
+                        minimum_payout_amount: Math.round(
+                            parseFloat(form.minimum_payout_amount || 0) * 100
+                        ),
+                        auto_payout_enabled: !!form.auto_payout_enabled,
+                        preferred_account_id: form.preferred_account_id || null,
+                    }),
+                }
+            );
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
@@ -208,7 +310,12 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
     };
 
     return (
-        <Modal open={open} onClose={onClose} title="Configure Automated Payout & Holdback Policy" className="max-w-xl">
+        <Modal
+            open={open}
+            onClose={onClose}
+            title="Configure Automated Payout & Holdback Policy"
+            className="max-w-xl"
+        >
             <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                     <div className="rounded border border-danger-fg/30 bg-danger-fg/10 p-3 text-xs text-danger-fg">
@@ -255,7 +362,9 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
                             min="0"
                             max="50"
                             value={form.holdback_percentage}
-                            onChange={(e) => setForm({ ...form, holdback_percentage: e.target.value })}
+                            onChange={(e) =>
+                                setForm({ ...form, holdback_percentage: e.target.value })
+                            }
                             helpText="Retained temporarily in escrow for refund or chargeback claims."
                             required
                         />
@@ -266,7 +375,9 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
                             min="0"
                             max="180"
                             value={form.holdback_release_days}
-                            onChange={(e) => setForm({ ...form, holdback_release_days: e.target.value })}
+                            onChange={(e) =>
+                                setForm({ ...form, holdback_release_days: e.target.value })
+                            }
                             helpText="Days after event before the escrow reserve automatically unlocks."
                             required
                         />
@@ -285,14 +396,18 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
                             step="0.01"
                             min="0"
                             value={form.minimum_payout_amount}
-                            onChange={(e) => setForm({ ...form, minimum_payout_amount: e.target.value })}
+                            onChange={(e) =>
+                                setForm({ ...form, minimum_payout_amount: e.target.value })
+                            }
                             helpText="Batches will accumulate until this threshold is reached."
                         />
 
                         <Select
                             label="Default Payout Account"
                             value={form.preferred_account_id}
-                            onChange={(e) => setForm({ ...form, preferred_account_id: e.target.value })}
+                            onChange={(e) =>
+                                setForm({ ...form, preferred_account_id: e.target.value })
+                            }
                         >
                             <option value="">Auto-select first verified account</option>
                             {accounts.map((acc) => (
@@ -307,7 +422,9 @@ function PayoutScheduleModal({ open, onClose, event, schedule, accounts, onSaved
                         <Checkbox
                             id="auto_payout_enabled"
                             checked={form.auto_payout_enabled}
-                            onChange={(e) => setForm({ ...form, auto_payout_enabled: e.target.checked })}
+                            onChange={(e) =>
+                                setForm({ ...form, auto_payout_enabled: e.target.checked })
+                            }
                             label="Enable automated scheduled disbursements (Reconciliation Engine)"
                             description="When active, the system automatically disburses payable balances to the selected account upon reaching maturity."
                         />
@@ -348,7 +465,9 @@ export default function FinancePanel({ event }) {
 
     const removeAccount = async (id) => {
         setError(null);
-        const response = await csrfFetch(route('tenant.payout-accounts.destroy', { account: id }), { method: 'DELETE' });
+        const response = await csrfFetch(route('tenant.payout-accounts.destroy', { account: id }), {
+            method: 'DELETE',
+        });
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
             setError(body.message || 'Could not remove this account.');
@@ -359,10 +478,13 @@ export default function FinancePanel({ event }) {
 
     const markPaid = async (payout) => {
         setError(null);
-        const response = await csrfFetch(route('tenant.events.finance.payouts.status', { event: event.id, payout: payout.id }), {
-            method: 'PATCH',
-            body: JSON.stringify({ status: 'paid' }),
-        });
+        const response = await csrfFetch(
+            route('tenant.events.finance.payouts.status', { event: event.id, payout: payout.id }),
+            {
+                method: 'PATCH',
+                body: JSON.stringify({ status: 'paid' }),
+            }
+        );
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
             setError(body.message || 'Could not update this payout.');
@@ -374,9 +496,12 @@ export default function FinancePanel({ event }) {
     const sendPayout = async (payout) => {
         setError(null);
         setBusyPayout(payout.id);
-        const response = await csrfFetch(route('tenant.events.finance.payouts.send', { event: event.id, payout: payout.id }), {
-            method: 'POST',
-        }).finally(() => setBusyPayout(null));
+        const response = await csrfFetch(
+            route('tenant.events.finance.payouts.send', { event: event.id, payout: payout.id }),
+            {
+                method: 'POST',
+            }
+        ).finally(() => setBusyPayout(null));
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
             setError(body.message || 'Could not send this payout.');
@@ -391,10 +516,13 @@ export default function FinancePanel({ event }) {
     const releasePayout = async (payout) => {
         setError(null);
         setBusyPayout(payout.id);
-        const response = await csrfFetch(route('tenant.events.finance.payouts.finalize', { event: event.id, payout: payout.id }), {
-            method: 'POST',
-            body: JSON.stringify({ otp: otpCode }),
-        }).finally(() => setBusyPayout(null));
+        const response = await csrfFetch(
+            route('tenant.events.finance.payouts.finalize', { event: event.id, payout: payout.id }),
+            {
+                method: 'POST',
+                body: JSON.stringify({ otp: otpCode }),
+            }
+        ).finally(() => setBusyPayout(null));
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
             setError(body.message || 'Could not release this payout.');
@@ -406,9 +534,11 @@ export default function FinancePanel({ event }) {
     };
 
     if (!data) {
-        return error
-            ? <p className="text-[13px] text-danger-fg">{error}</p>
-            : <p className="text-sm text-ink-secondary">Loading…</p>;
+        return error ? (
+            <p className="text-[13px] text-danger-fg">{error}</p>
+        ) : (
+            <p className="text-sm text-ink-secondary">Loading…</p>
+        );
     }
 
     const { stats, accounts, payouts, trial_balance, payout_schedule } = data;
@@ -418,19 +548,23 @@ export default function FinancePanel({ event }) {
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h3 className="text-base font-semibold text-ink">Financial Management &amp; Double-Entry Ledger</h3>
-                    <p className="text-xs text-ink-secondary">Real-time balancing, automated settlement reconciliation, and escrow holdback.</p>
+                    <h3 className="text-base font-semibold text-ink">
+                        Financial Management &amp; Double-Entry Ledger
+                    </h3>
+                    <p className="text-xs text-ink-secondary">
+                        Real-time balancing, automated settlement reconciliation, and escrow
+                        holdback.
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button 
-                        onClick={() => setScheduleModalOpen(true)}
-                        className="gap-1.5"
-                    >
+                    <Button onClick={() => setScheduleModalOpen(true)} className="gap-1.5">
                         <Settings2 className="h-3.5 w-3.5" />
                         Payout Policy
                     </Button>
                     <a
-                        href={route('tenant.events.finance.settlement-statement', { event: event.id })}
+                        href={route('tenant.events.finance.settlement-statement', {
+                            event: event.id,
+                        })}
                         className="inline-flex h-9 items-center gap-2 border border-border px-3.5 text-xs font-medium text-ink hover:border-accent hover:text-accent transition-colors bg-surface shadow-xs"
                     >
                         <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -439,32 +573,52 @@ export default function FinancePanel({ event }) {
                 </div>
             </div>
 
-            {error && <p className="border border-danger-fg/30 px-4 py-3 text-[13px] text-danger-fg">{error}</p>}
+            {error && (
+                <p className="border border-danger-fg/30 px-4 py-3 text-[13px] text-danger-fg">
+                    {error}
+                </p>
+            )}
 
             {/* Financial Overview Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-border shadow-xs">
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Collected (Gross)</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.collected, event.currency)}</div>
-                    <div className="mt-0.5 text-xs text-ink-tertiary">{stats.confirmed_orders} orders</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {formatMoney(stats.collected, event.currency)}
+                    </div>
+                    <div className="mt-0.5 text-xs text-ink-tertiary">
+                        {stats.confirmed_orders} orders
+                    </div>
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Refunded</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.refunded, event.currency)}</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {formatMoney(stats.refunded, event.currency)}
+                    </div>
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Platform Fee</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.fees, event.currency)}</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {formatMoney(stats.fees, event.currency)}
+                    </div>
                 </div>
                 <div className="bg-surface p-4">
                     <div className="text-xs text-ink-secondary">Settles to Organizer</div>
-                    <div className="mt-1 text-xl font-semibold text-accent">{formatMoney(stats.net_collected, event.currency)}</div>
-                    <div className="mt-0.5 text-xs text-ink-tertiary">net of fees &amp; refunds</div>
+                    <div className="mt-1 text-xl font-semibold text-accent">
+                        {formatMoney(stats.net_collected, event.currency)}
+                    </div>
+                    <div className="mt-0.5 text-xs text-ink-tertiary">
+                        net of fees &amp; refunds
+                    </div>
                 </div>
                 <div className="bg-surface p-4 col-span-2 md:col-span-1">
                     <div className="text-xs text-ink-secondary">Available Payout</div>
-                    <div className="mt-1 text-xl font-semibold text-ink">{formatMoney(stats.available_balance, event.currency)}</div>
-                    <div className="mt-0.5 text-xs text-ink-tertiary">{formatMoney(stats.paid_out, event.currency)} disbursed</div>
+                    <div className="mt-1 text-xl font-semibold text-ink">
+                        {formatMoney(stats.available_balance, event.currency)}
+                    </div>
+                    <div className="mt-0.5 text-xs text-ink-tertiary">
+                        {formatMoney(stats.paid_out, event.currency)} disbursed
+                    </div>
                 </div>
             </div>
 
@@ -476,13 +630,15 @@ export default function FinancePanel({ event }) {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-semibold text-ink">Settlement Schedule &amp; Holdback</h4>
+                            <h4 className="text-sm font-semibold text-ink">
+                                Settlement Schedule &amp; Holdback
+                            </h4>
                             <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
-                                {payout_schedule?.schedule_type === 'immediate' 
-                                    ? 'Immediate (T+0)' 
-                                    : payout_schedule?.schedule_type === 'manual' 
-                                    ? 'Manual Batch' 
-                                    : `T+${payout_schedule?.days_after_event ?? 3} Days Post-Event`}
+                                {payout_schedule?.schedule_type === 'immediate'
+                                    ? 'Immediate (T+0)'
+                                    : payout_schedule?.schedule_type === 'manual'
+                                      ? 'Manual Batch'
+                                      : `T+${payout_schedule?.days_after_event ?? 3} Days Post-Event`}
                             </span>
                             {payout_schedule?.auto_payout_enabled && (
                                 <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
@@ -491,14 +647,26 @@ export default function FinancePanel({ event }) {
                             )}
                         </div>
                         <p className="mt-1 text-xs text-ink-secondary">
-                            Holdback reserve: <span className="font-semibold text-ink">{payout_schedule?.holdback_percentage ?? 10}%</span> retained for <span className="font-semibold text-ink">{payout_schedule?.holdback_release_days ?? 14} days</span> post-event. 
-                            Min threshold: <span className="font-semibold text-ink">{formatMoney(payout_schedule?.minimum_payout_amount ?? 1000, event.currency)}</span>.
+                            Holdback reserve:{' '}
+                            <span className="font-semibold text-ink">
+                                {payout_schedule?.holdback_percentage ?? 10}%
+                            </span>{' '}
+                            retained for{' '}
+                            <span className="font-semibold text-ink">
+                                {payout_schedule?.holdback_release_days ?? 14} days
+                            </span>{' '}
+                            post-event. Min threshold:{' '}
+                            <span className="font-semibold text-ink">
+                                {formatMoney(
+                                    payout_schedule?.minimum_payout_amount ?? 1000,
+                                    event.currency
+                                )}
+                            </span>
+                            .
                         </p>
                     </div>
                 </div>
-                <Button onClick={() => setScheduleModalOpen(true)}>
-                    Change Settings
-                </Button>
+                <Button onClick={() => setScheduleModalOpen(true)}>Change Settings</Button>
             </div>
 
             {/* Double-Entry General Ledger & Trial Balance */}
@@ -507,7 +675,9 @@ export default function FinancePanel({ event }) {
                     <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-border">
                         <div className="flex items-center gap-2">
                             <Scale className="h-4 w-4 text-accent" />
-                            <b className="text-sm font-semibold text-ink">Double-Entry Trial Balance</b>
+                            <b className="text-sm font-semibold text-ink">
+                                Double-Entry Trial Balance
+                            </b>
                             <span className="text-xs text-ink-tertiary">| General Ledger</span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -523,7 +693,14 @@ export default function FinancePanel({ event }) {
                                 </span>
                             )}
                             <div className="text-xs font-mono text-ink-secondary">
-                                Debits: <b className="text-ink">{formatMoney(trial_balance.total_debits, event.currency)}</b> | Credits: <b className="text-ink">{formatMoney(trial_balance.total_credits, event.currency)}</b>
+                                Debits:{' '}
+                                <b className="text-ink">
+                                    {formatMoney(trial_balance.total_debits, event.currency)}
+                                </b>{' '}
+                                | Credits:{' '}
+                                <b className="text-ink">
+                                    {formatMoney(trial_balance.total_credits, event.currency)}
+                                </b>
                             </div>
                         </div>
                     </div>
@@ -540,17 +717,33 @@ export default function FinancePanel({ event }) {
                             <tbody>
                                 {trial_balance.accounts.map((acc) => (
                                     <Tr key={acc.id || acc.code}>
-                                        <Td><span className="font-mono text-xs font-semibold text-ink-secondary">{acc.code}</span></Td>
-                                        <Td><span className="font-medium text-ink">{acc.name}</span></Td>
+                                        <Td>
+                                            <span className="font-mono text-xs font-semibold text-ink-secondary">
+                                                {acc.code}
+                                            </span>
+                                        </Td>
+                                        <Td>
+                                            <span className="font-medium text-ink">{acc.name}</span>
+                                        </Td>
                                         <Td>
                                             <span className="inline-block uppercase tracking-wider text-[10px] font-semibold px-2 py-0.5 rounded bg-surface-subtle text-ink-secondary border border-border">
                                                 {acc.type}
                                             </span>
                                         </Td>
-                                        <Td numeric align="right"><span className="font-mono text-xs">{formatMoney(acc.debits, event.currency)}</span></Td>
-                                        <Td numeric align="right"><span className="font-mono text-xs">{formatMoney(acc.credits, event.currency)}</span></Td>
                                         <Td numeric align="right">
-                                            <span className="font-mono text-xs font-semibold">{formatMoney(acc.balance, event.currency)}</span>
+                                            <span className="font-mono text-xs">
+                                                {formatMoney(acc.debits, event.currency)}
+                                            </span>
+                                        </Td>
+                                        <Td numeric align="right">
+                                            <span className="font-mono text-xs">
+                                                {formatMoney(acc.credits, event.currency)}
+                                            </span>
+                                        </Td>
+                                        <Td numeric align="right">
+                                            <span className="font-mono text-xs font-semibold">
+                                                {formatMoney(acc.balance, event.currency)}
+                                            </span>
                                         </Td>
                                     </Tr>
                                 ))}
@@ -572,23 +765,41 @@ export default function FinancePanel({ event }) {
                             {accounts.map((a) => (
                                 <li key={a.id} className="flex items-center gap-3 px-4 py-3">
                                     {a.type === 'mobile_money' ? (
-                                        <Smartphone className="h-4 w-4 shrink-0 text-ink-secondary" strokeWidth={1.5} />
+                                        <Smartphone
+                                            className="h-4 w-4 shrink-0 text-ink-secondary"
+                                            strokeWidth={1.5}
+                                        />
                                     ) : (
-                                        <Landmark className="h-4 w-4 shrink-0 text-ink-secondary" strokeWidth={1.5} />
+                                        <Landmark
+                                            className="h-4 w-4 shrink-0 text-ink-secondary"
+                                            strokeWidth={1.5}
+                                        />
                                     )}
                                     <div className="min-w-0 flex-1">
-                                        <div className="truncate text-[13px] font-medium text-ink">{a.label}</div>
-                                        <div className="font-mono text-xs text-ink-tertiary">{a.masked_account_number}</div>
+                                        <div className="truncate text-[13px] font-medium text-ink">
+                                            {a.label}
+                                        </div>
+                                        <div className="font-mono text-xs text-ink-tertiary">
+                                            {a.masked_account_number}
+                                        </div>
                                     </div>
-                                    <StatusPill status={a.is_verified ? 'success' : 'pending'}>{a.is_verified ? 'Verified' : 'Unverified'}</StatusPill>
-                                    <button onClick={() => removeAccount(a.id)} title="Remove" className="text-ink-secondary hover:text-danger-fg">
+                                    <StatusPill status={a.is_verified ? 'success' : 'pending'}>
+                                        {a.is_verified ? 'Verified' : 'Unverified'}
+                                    </StatusPill>
+                                    <button
+                                        onClick={() => removeAccount(a.id)}
+                                        title="Remove"
+                                        className="text-ink-secondary hover:text-danger-fg"
+                                    >
                                         <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                                     </button>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="px-4 py-3 text-[13px] text-ink-secondary">No payout accounts yet.</p>
+                        <p className="px-4 py-3 text-[13px] text-ink-secondary">
+                            No payout accounts yet.
+                        </p>
                     )}
                     <NewAccountForm onDone={load} />
                 </div>
@@ -608,19 +819,34 @@ export default function FinancePanel({ event }) {
                             {payouts.length === 0 ? (
                                 <tr>
                                     <td colSpan={4}>
-                                        <TableEmpty title="No payouts yet" description="Record one below once you're ready to send funds out." />
+                                        <TableEmpty
+                                            title="No payouts yet"
+                                            description="Record one below once you're ready to send funds out."
+                                        />
                                     </td>
                                 </tr>
                             ) : (
                                 payouts.map((p) => (
                                     <Tr key={p.id}>
-                                        <Td muted>{p.payout_account_label} <span className="font-mono text-xs">{p.payout_account_masked_number}</span></Td>
+                                        <Td muted>
+                                            {p.payout_account_label}{' '}
+                                            <span className="font-mono text-xs">
+                                                {p.payout_account_masked_number}
+                                            </span>
+                                        </Td>
                                         <Td numeric>
-                                            <span className="font-semibold">{formatMoney(p.amount, event.currency)}</span>
+                                            <span className="font-semibold">
+                                                {formatMoney(p.amount, event.currency)}
+                                            </span>
                                             {p.transfer_fee_amount > 0 && (
                                                 <div className="text-xs font-normal text-ink-secondary">
-                                                    {formatMoney(p.net_paid_amount, event.currency)} sent,
-                                                    {' '}{formatMoney(p.transfer_fee_amount, event.currency)} transfer fee
+                                                    {formatMoney(p.net_paid_amount, event.currency)}{' '}
+                                                    sent,{' '}
+                                                    {formatMoney(
+                                                        p.transfer_fee_amount,
+                                                        event.currency
+                                                    )}{' '}
+                                                    transfer fee
                                                 </div>
                                             )}
                                         </Td>
@@ -631,13 +857,19 @@ export default function FinancePanel({ event }) {
                                         </Td>
                                         <Td>
                                             <div className="flex flex-wrap items-center gap-2">
-                                                {(p.status === 'scheduled' || p.status === 'failed') && (
-                                                    <Button disabled={busyPayout === p.id} onClick={() => sendPayout(p)}>
+                                                {(p.status === 'scheduled' ||
+                                                    p.status === 'failed') && (
+                                                    <Button
+                                                        disabled={busyPayout === p.id}
+                                                        onClick={() => sendPayout(p)}
+                                                    >
                                                         {busyPayout === p.id ? 'Sending…' : 'Send'}
                                                     </Button>
                                                 )}
                                                 {p.status === 'awaiting_otp' && otpFor !== p.id && (
-                                                    <Button onClick={() => setOtpFor(p.id)}>Enter code</Button>
+                                                    <Button onClick={() => setOtpFor(p.id)}>
+                                                        Enter code
+                                                    </Button>
                                                 )}
                                                 {p.status === 'awaiting_otp' && otpFor === p.id && (
                                                     <>
@@ -648,22 +880,34 @@ export default function FinancePanel({ event }) {
                                                             aria-label="One-time code from Paystack"
                                                             placeholder="One-time code"
                                                             value={otpCode}
-                                                            onChange={(e) => setOtpCode(e.target.value)}
+                                                            onChange={(e) =>
+                                                                setOtpCode(e.target.value)
+                                                            }
                                                         />
                                                         <Button
-                                                            disabled={busyPayout === p.id || otpCode.trim() === ''}
+                                                            disabled={
+                                                                busyPayout === p.id ||
+                                                                otpCode.trim() === ''
+                                                            }
                                                             onClick={() => releasePayout(p)}
                                                         >
-                                                            {busyPayout === p.id ? 'Releasing…' : 'Release'}
+                                                            {busyPayout === p.id
+                                                                ? 'Releasing…'
+                                                                : 'Release'}
                                                         </Button>
                                                     </>
                                                 )}
-                                                {p.status !== 'paid' && p.status !== 'awaiting_otp' && (
-                                                    <Button onClick={() => markPaid(p)}>Mark paid</Button>
-                                                )}
+                                                {p.status !== 'paid' &&
+                                                    p.status !== 'awaiting_otp' && (
+                                                        <Button onClick={() => markPaid(p)}>
+                                                            Mark paid
+                                                        </Button>
+                                                    )}
                                             </div>
                                             {p.failure_reason && (
-                                                <p className="mt-1 text-xs text-danger-fg">{p.failure_reason}</p>
+                                                <p className="mt-1 text-xs text-danger-fg">
+                                                    {p.failure_reason}
+                                                </p>
                                             )}
                                         </Td>
                                     </Tr>
