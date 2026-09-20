@@ -562,7 +562,7 @@ function RegistrationPanel({ event }) {
     const selectedTicketType = hasTicketTypes
         ? availableTicketTypes.find((t) => t.id === data.ticket_type_id) || availableTicketTypes[0]
         : null;
-    const basePrice = selectedTicketType ? selectedTicketType.price : (event.ticket_price || 0);
+    const basePrice = selectedTicketType ? selectedTicketType.price : event.ticket_price || 0;
 
     // Calculate dynamic price reactively based on visible fields, chosen options, and promo code
     const calculatedPricing = useMemo(() => {
@@ -581,7 +581,12 @@ function RegistrationPanel({ event }) {
 
             if (Array.isArray(field.options)) {
                 field.options.forEach((opt) => {
-                    if (String(opt.value) === String(selectedVal) && opt.price !== undefined && opt.price !== null && !isNaN(Number(opt.price))) {
+                    if (
+                        String(opt.value) === String(selectedVal) &&
+                        opt.price !== undefined &&
+                        opt.price !== null &&
+                        !isNaN(Number(opt.price))
+                    ) {
                         const optPrice = Number(opt.price);
                         if (opt.is_override) {
                             override = optPrice;
@@ -603,7 +608,10 @@ function RegistrationPanel({ event }) {
             }
         });
 
-        const subtotal = Math.max(0, override !== null ? override + modifierTotal : basePrice + modifierTotal);
+        const subtotal = Math.max(
+            0,
+            override !== null ? override + modifierTotal : basePrice + modifierTotal
+        );
         let promoDiscount = 0;
 
         if (appliedPromo) {
@@ -633,9 +641,12 @@ function RegistrationPanel({ event }) {
         let serviceFee = 0;
 
         if (ticketTotal > 0 && event.fee_bearer === 'attendee') {
-            const uncapped = Math.round((ticketTotal * Number(event.platform_fee_percentage || 0)) / 100);
+            const uncapped = Math.round(
+                (ticketTotal * Number(event.platform_fee_percentage || 0)) / 100
+            );
             serviceFee =
-                event.platform_fee_cap_amount === null || event.platform_fee_cap_amount === undefined
+                event.platform_fee_cap_amount === null ||
+                event.platform_fee_cap_amount === undefined
                     ? uncapped
                     : Math.min(uncapped, Number(event.platform_fee_cap_amount));
 
@@ -655,7 +666,15 @@ function RegistrationPanel({ event }) {
             hasAdjustments:
                 override !== null || modifierTotal !== 0 || promoDiscount > 0 || serviceFee > 0,
         };
-    }, [basePrice, formFields, data.form_answers, appliedPromo, event.fee_bearer, event.platform_fee_percentage, event.platform_fee_cap_amount]);
+    }, [
+        basePrice,
+        formFields,
+        data.form_answers,
+        appliedPromo,
+        event.fee_bearer,
+        event.platform_fee_percentage,
+        event.platform_fee_cap_amount,
+    ]);
 
     const handleAnswerChange = (fieldKey, value) => {
         setData('form_answers', {
@@ -674,9 +693,12 @@ function RegistrationPanel({ event }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') || '',
                 },
                 body: JSON.stringify({ access_code: accessCodeInput.trim() }),
             });
@@ -713,9 +735,12 @@ function RegistrationPanel({ event }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') || '',
                 },
                 body: JSON.stringify({
                     code: promoCodeInput.trim(),
@@ -789,7 +814,9 @@ function RegistrationPanel({ event }) {
                                             name="ticket_type_id"
                                             value={ticketType.id}
                                             checked={data.ticket_type_id === ticketType.id}
-                                            onChange={(e) => setData('ticket_type_id', e.target.value)}
+                                            onChange={(e) =>
+                                                setData('ticket_type_id', e.target.value)
+                                            }
                                             className="mt-0.5"
                                         />
                                         <span>
@@ -832,7 +859,9 @@ function RegistrationPanel({ event }) {
                             ) : (
                                 <div className="rounded border border-border p-2.5 bg-surface-alt/40 space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11.5px] font-medium text-ink">Enter Access Code:</span>
+                                        <span className="text-[11.5px] font-medium text-ink">
+                                            Enter Access Code:
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={() => setShowAccessCodeInput(false)}
@@ -845,7 +874,9 @@ function RegistrationPanel({ event }) {
                                         <input
                                             type="text"
                                             value={accessCodeInput}
-                                            onChange={(e) => setAccessCodeInput(e.target.value.toUpperCase())}
+                                            onChange={(e) =>
+                                                setAccessCodeInput(e.target.value.toUpperCase())
+                                            }
                                             placeholder="e.g. VIP2026"
                                             className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
                                         />
@@ -858,7 +889,9 @@ function RegistrationPanel({ event }) {
                                         </Button>
                                     </div>
                                     {accessCodeError && (
-                                        <p className="text-[11px] text-danger-fg">{accessCodeError}</p>
+                                        <p className="text-[11px] text-danger-fg">
+                                            {accessCodeError}
+                                        </p>
                                     )}
                                 </div>
                             )}
@@ -945,16 +978,21 @@ function RegistrationPanel({ event }) {
                     return (
                         <div key={field.id} className="border-t border-border/60 pt-3">
                             <label className="block text-[13px] font-medium text-ink">
-                                {field.label} {field.is_required && <span className="text-danger-fg">*</span>}
+                                {field.label}{' '}
+                                {field.is_required && <span className="text-danger-fg">*</span>}
                             </label>
                             {field.help_text && (
-                                <p className="mt-0.5 text-[11.5px] text-ink-secondary">{field.help_text}</p>
+                                <p className="mt-0.5 text-[11.5px] text-ink-secondary">
+                                    {field.help_text}
+                                </p>
                             )}
 
                             {field.field_type === 'select' && (
                                 <select
                                     value={val}
-                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    onChange={(e) =>
+                                        handleAnswerChange(field.field_key, e.target.value)
+                                    }
                                     className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                     required={field.is_required}
                                 >
@@ -962,7 +1000,9 @@ function RegistrationPanel({ event }) {
                                     {(field.options || []).map((opt, i) => (
                                         <option key={i} value={opt.value}>
                                             {opt.label}
-                                            {opt.price ? ` (${opt.is_override ? 'Set to' : '+'} ${formatMoney(Number(opt.price), event.currency)})` : ''}
+                                            {opt.price
+                                                ? ` (${opt.is_override ? 'Set to' : '+'} ${formatMoney(Number(opt.price), event.currency)})`
+                                                : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -981,7 +1021,12 @@ function RegistrationPanel({ event }) {
                                                     name={`custom_${field.field_key}`}
                                                     value={opt.value}
                                                     checked={String(val) === String(opt.value)}
-                                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAnswerChange(
+                                                            field.field_key,
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     required={field.is_required}
                                                 />
                                                 <span className="text-ink">{opt.label}</span>
@@ -1001,7 +1046,9 @@ function RegistrationPanel({ event }) {
                                 <input
                                     type="text"
                                     value={val}
-                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    onChange={(e) =>
+                                        handleAnswerChange(field.field_key, e.target.value)
+                                    }
                                     className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                     required={field.is_required}
                                 />
@@ -1011,7 +1058,9 @@ function RegistrationPanel({ event }) {
                                 <textarea
                                     rows={2}
                                     value={val}
-                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    onChange={(e) =>
+                                        handleAnswerChange(field.field_key, e.target.value)
+                                    }
                                     className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                     required={field.is_required}
                                 />
@@ -1021,7 +1070,9 @@ function RegistrationPanel({ event }) {
                                 <input
                                     type="number"
                                     value={val}
-                                    onChange={(e) => handleAnswerChange(field.field_key, e.target.value)}
+                                    onChange={(e) =>
+                                        handleAnswerChange(field.field_key, e.target.value)
+                                    }
                                     className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                     required={field.is_required}
                                 />
@@ -1032,7 +1083,9 @@ function RegistrationPanel({ event }) {
                                     <input
                                         type="checkbox"
                                         checked={Boolean(val)}
-                                        onChange={(e) => handleAnswerChange(field.field_key, e.target.checked)}
+                                        onChange={(e) =>
+                                            handleAnswerChange(field.field_key, e.target.checked)
+                                        }
                                         required={field.is_required}
                                     />
                                     <span>{field.label}</span>
@@ -1047,9 +1100,12 @@ function RegistrationPanel({ event }) {
                 })}
 
                 {/* Dietary and Accessibility standard options */}
-                {(settings.dietary_requirements !== 'hidden' || settings.accessibility_needs !== 'hidden') && (
+                {(settings.dietary_requirements !== 'hidden' ||
+                    settings.accessibility_needs !== 'hidden') && (
                     <div className="border-t border-border/60 pt-3">
-                        {settings.dietary_requirements === 'required' || settings.accessibility_needs === 'required' || showExtras ? (
+                        {settings.dietary_requirements === 'required' ||
+                        settings.accessibility_needs === 'required' ||
+                        showExtras ? (
                             <div className="space-y-3">
                                 {settings.dietary_requirements !== 'hidden' && (
                                     <Input
@@ -1057,7 +1113,9 @@ function RegistrationPanel({ event }) {
                                         type="text"
                                         placeholder="e.g. Vegetarian, nut allergy"
                                         value={data.dietary_requirements}
-                                        onChange={(e) => setData('dietary_requirements', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('dietary_requirements', e.target.value)
+                                        }
                                         error={errors.dietary_requirements}
                                         required={settings.dietary_requirements === 'required'}
                                     />
@@ -1068,7 +1126,9 @@ function RegistrationPanel({ event }) {
                                         type="text"
                                         placeholder="e.g. Step-free access, sign language"
                                         value={data.accessibility_needs}
-                                        onChange={(e) => setData('accessibility_needs', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('accessibility_needs', e.target.value)
+                                        }
                                         error={errors.accessibility_needs}
                                         required={settings.accessibility_needs === 'required'}
                                     />
@@ -1092,13 +1152,17 @@ function RegistrationPanel({ event }) {
                         <div className="flex items-center justify-between rounded border border-success-fg/30 bg-success-bg/40 px-3 py-2 text-xs">
                             <div className="flex items-center gap-2">
                                 <span className="inline-block h-2 w-2 rounded-full bg-success-fg animate-pulse"></span>
-                                <span className="font-semibold text-ink">Code: {appliedPromo.code}</span>
+                                <span className="font-semibold text-ink">
+                                    Code: {appliedPromo.code}
+                                </span>
                                 <span className="text-[11px] text-success-fg">
-                                    ({appliedPromo.discount_type === 'complimentary'
+                                    (
+                                    {appliedPromo.discount_type === 'complimentary'
                                         ? 'Complimentary pass (100% OFF)'
                                         : appliedPromo.discount_type === 'percentage'
                                           ? `${appliedPromo.discount_value}% OFF`
-                                          : `-${formatMoney(appliedPromo.discount_value, event.currency)}`})
+                                          : `-${formatMoney(appliedPromo.discount_value, event.currency)}`}
+                                    )
                                 </span>
                             </div>
                             <button
@@ -1120,7 +1184,9 @@ function RegistrationPanel({ event }) {
                     ) : (
                         <div className="rounded border border-border p-2.5 bg-surface-alt/40 space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-[11.5px] font-medium text-ink">Promo Code:</span>
+                                <span className="text-[11.5px] font-medium text-ink">
+                                    Promo Code:
+                                </span>
                                 <button
                                     type="button"
                                     onClick={() => setShowPromoInput(false)}
@@ -1133,7 +1199,9 @@ function RegistrationPanel({ event }) {
                                 <input
                                     type="text"
                                     value={promoCodeInput}
-                                    onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                                    onChange={(e) =>
+                                        setPromoCodeInput(e.target.value.toUpperCase())
+                                    }
                                     placeholder="e.g. EARLYBIRD20"
                                     className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
                                 />
@@ -1163,7 +1231,9 @@ function RegistrationPanel({ event }) {
                             <div
                                 key={idx}
                                 className={`flex justify-between ${
-                                    item.isDiscount ? 'font-medium text-success-fg' : 'text-ink-secondary'
+                                    item.isDiscount
+                                        ? 'font-medium text-success-fg'
+                                        : 'text-ink-secondary'
                                 }`}
                             >
                                 <span>{item.label}:</span>

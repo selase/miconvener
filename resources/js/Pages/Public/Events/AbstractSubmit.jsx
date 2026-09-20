@@ -17,7 +17,15 @@ export default function AbstractSubmit({ event, org }) {
     const [file, setFile] = useState(null);
 
     const [authors, setAuthors] = useState([
-        { first_name: '', last_name: '', email: '', affiliation: '', country: '', is_presenting: true, is_corresponding: true }
+        {
+            first_name: '',
+            last_name: '',
+            email: '',
+            affiliation: '',
+            country: '',
+            is_presenting: true,
+            is_corresponding: true,
+        },
     ]);
 
     const [loading, setLoading] = useState(false);
@@ -42,7 +50,15 @@ export default function AbstractSubmit({ event, org }) {
     const addAuthor = () => {
         setAuthors([
             ...authors,
-            { first_name: '', last_name: '', email: '', affiliation: '', country: '', is_presenting: false, is_corresponding: false }
+            {
+                first_name: '',
+                last_name: '',
+                email: '',
+                affiliation: '',
+                country: '',
+                is_presenting: false,
+                is_corresponding: false,
+            },
         ]);
     };
 
@@ -50,7 +66,7 @@ export default function AbstractSubmit({ event, org }) {
         if (authors.length <= 1) return;
         const next = authors.filter((_, i) => i !== index);
         // Ensure at least one author is marked presenting
-        if (!next.some(a => a.is_presenting)) {
+        if (!next.some((a) => a.is_presenting)) {
             next[0].is_presenting = true;
         }
         setAuthors(next);
@@ -70,7 +86,10 @@ export default function AbstractSubmit({ event, org }) {
         formData.append('structured_abstract[results]', structuredAbstract.results);
         formData.append('structured_abstract[conclusion]', structuredAbstract.conclusion);
 
-        const keywords = keywordsText.split(',').map(k => k.trim()).filter(Boolean);
+        const keywords = keywordsText
+            .split(',')
+            .map((k) => k.trim())
+            .filter(Boolean);
         keywords.forEach((kw, idx) => {
             formData.append(`keywords[${idx}]`, kw);
         });
@@ -90,18 +109,26 @@ export default function AbstractSubmit({ event, org }) {
             formData.append(`authors[${idx}][affiliation]`, author.affiliation);
             if (author.country) formData.append(`authors[${idx}][country]`, author.country);
             formData.append(`authors[${idx}][is_presenting]`, author.is_presenting ? '1' : '0');
-            formData.append(`authors[${idx}][is_corresponding]`, author.is_corresponding ? '1' : '0');
+            formData.append(
+                `authors[${idx}][is_corresponding]`,
+                author.is_corresponding ? '1' : '0'
+            );
         });
 
         try {
-            const res = await csrfFetchFormData(route('public.events.abstracts.store', { event: event.slug }), formData);
+            const res = await csrfFetchFormData(
+                route('public.events.abstracts.store', { event: event.slug }),
+                formData
+            );
 
             const data = await res.json();
             if (res.ok && data.success) {
                 setSubmittedCode(data.code);
                 setTrackingUrl(data.tracking_url);
             } else {
-                setErrorMessage(data.message || 'Failed to submit abstract. Please check all required fields.');
+                setErrorMessage(
+                    data.message || 'Failed to submit abstract. Please check all required fields.'
+                );
             }
         } catch (err) {
             setErrorMessage('A network error occurred while submitting your abstract.');
@@ -130,9 +157,7 @@ export default function AbstractSubmit({ event, org }) {
                     <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-4">
                         Scientific Abstract Submission
                     </h1>
-                    <p className="text-sm text-slate-600 mt-1.5 font-medium">
-                        {event.title}
-                    </p>
+                    <p className="text-sm text-slate-600 mt-1.5 font-medium">{event.title}</p>
                     <div className="mt-3 text-xs text-slate-500 flex flex-wrap gap-4 border-t border-slate-100 pt-3">
                         <span>Official Call for Papers & Peer Review</span>
                         <span>Structured Format (Background, Methods, Results, Conclusion)</span>
@@ -143,20 +168,37 @@ export default function AbstractSubmit({ event, org }) {
                 {submittedCode ? (
                     <div className="bg-white rounded-2xl p-8 shadow-sm border border-emerald-200 text-center space-y-5">
                         <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
-                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            <svg
+                                className="w-8 h-8"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M5 13l4 4L19 7"
+                                />
                             </svg>
                         </div>
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-900">Abstract Submitted Successfully!</h2>
+                            <h2 className="text-2xl font-bold text-slate-900">
+                                Abstract Submitted Successfully!
+                            </h2>
                             <p className="text-sm text-slate-600 mt-2">
-                                Your submission has entered the peer review queue. Save your tracking code below:
+                                Your submission has entered the peer review queue. Save your
+                                tracking code below:
                             </p>
                         </div>
 
                         <div className="inline-block bg-slate-100 border border-slate-300 rounded-xl px-6 py-3">
-                            <div className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Tracking Code</div>
-                            <div className="text-2xl font-mono font-extrabold text-blue-700 mt-0.5">{submittedCode}</div>
+                            <div className="text-xs text-slate-500 uppercase tracking-widest font-semibold">
+                                Tracking Code
+                            </div>
+                            <div className="text-2xl font-mono font-extrabold text-blue-700 mt-0.5">
+                                {submittedCode}
+                            </div>
                         </div>
 
                         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -178,7 +220,10 @@ export default function AbstractSubmit({ event, org }) {
                     </div>
                 ) : (
                     /* Submission Form */
-                    <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-8">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-8"
+                    >
                         {errorMessage && (
                             <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm">
                                 {errorMessage}
@@ -221,14 +266,17 @@ export default function AbstractSubmit({ event, org }) {
 
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                        Presentation Preference <span className="text-rose-500">*</span>
+                                        Presentation Preference{' '}
+                                        <span className="text-rose-500">*</span>
                                     </label>
                                     <select
                                         value={presentationPreference}
                                         onChange={(e) => setPresentationPreference(e.target.value)}
                                         className="w-full text-sm rounded-xl border-slate-300 px-3.5 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
-                                        <option value="either">Either Oral or Poster (Recommended)</option>
+                                        <option value="either">
+                                            Either Oral or Poster (Recommended)
+                                        </option>
                                         <option value="oral">Oral Presentation Only</option>
                                         <option value="poster">Poster Presentation Only</option>
                                     </select>
@@ -253,10 +301,14 @@ export default function AbstractSubmit({ event, org }) {
 
                             <div className="space-y-4">
                                 {authors.map((author, index) => (
-                                    <div key={index} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                                    <div
+                                        key={index}
+                                        className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3"
+                                    >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                                                Author #{index + 1} {author.is_presenting ? '(Presenting Author)' : ''}
+                                                Author #{index + 1}{' '}
+                                                {author.is_presenting ? '(Presenting Author)' : ''}
                                             </span>
                                             {authors.length > 1 && (
                                                 <button
@@ -271,22 +323,38 @@ export default function AbstractSubmit({ event, org }) {
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">First Name *</label>
+                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                    First Name *
+                                                </label>
                                                 <input
                                                     type="text"
                                                     required
                                                     value={author.first_name}
-                                                    onChange={(e) => handleAuthorChange(index, 'first_name', e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAuthorChange(
+                                                            index,
+                                                            'first_name',
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     className="w-full text-xs rounded-lg border-slate-300 p-2"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Last Name *</label>
+                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                    Last Name *
+                                                </label>
                                                 <input
                                                     type="text"
                                                     required
                                                     value={author.last_name}
-                                                    onChange={(e) => handleAuthorChange(index, 'last_name', e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAuthorChange(
+                                                            index,
+                                                            'last_name',
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     className="w-full text-xs rounded-lg border-slate-300 p-2"
                                                 />
                                             </div>
@@ -294,22 +362,38 @@ export default function AbstractSubmit({ event, org }) {
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Email *</label>
+                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                    Email *
+                                                </label>
                                                 <input
                                                     type="email"
                                                     required
                                                     value={author.email}
-                                                    onChange={(e) => handleAuthorChange(index, 'email', e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAuthorChange(
+                                                            index,
+                                                            'email',
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     className="w-full text-xs rounded-lg border-slate-300 p-2"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Affiliation / Institution *</label>
+                                                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                                    Affiliation / Institution *
+                                                </label>
                                                 <input
                                                     type="text"
                                                     required
                                                     value={author.affiliation}
-                                                    onChange={(e) => handleAuthorChange(index, 'affiliation', e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAuthorChange(
+                                                            index,
+                                                            'affiliation',
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     placeholder="e.g. Dept of Medicine, University of Ghana"
                                                     className="w-full text-xs rounded-lg border-slate-300 p-2"
                                                 />
@@ -341,48 +425,76 @@ export default function AbstractSubmit({ event, org }) {
 
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Background & Objectives *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                        Background & Objectives *
+                                    </label>
                                     <textarea
                                         required
                                         rows="3"
                                         value={structuredAbstract.background}
-                                        onChange={(e) => setStructuredAbstract({ ...structuredAbstract, background: e.target.value })}
+                                        onChange={(e) =>
+                                            setStructuredAbstract({
+                                                ...structuredAbstract,
+                                                background: e.target.value,
+                                            })
+                                        }
                                         placeholder="State the clinical background, research problem, and study aim..."
                                         className="w-full text-xs rounded-xl border-slate-300 p-3 focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Methods *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                        Methods *
+                                    </label>
                                     <textarea
                                         required
                                         rows="3"
                                         value={structuredAbstract.methods}
-                                        onChange={(e) => setStructuredAbstract({ ...structuredAbstract, methods: e.target.value })}
+                                        onChange={(e) =>
+                                            setStructuredAbstract({
+                                                ...structuredAbstract,
+                                                methods: e.target.value,
+                                            })
+                                        }
                                         placeholder="Describe the study design, setting, participant criteria, and analytical methods..."
                                         className="w-full text-xs rounded-xl border-slate-300 p-3 focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Results *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                        Results *
+                                    </label>
                                     <textarea
                                         required
                                         rows="3"
                                         value={structuredAbstract.results}
-                                        onChange={(e) => setStructuredAbstract({ ...structuredAbstract, results: e.target.value })}
+                                        onChange={(e) =>
+                                            setStructuredAbstract({
+                                                ...structuredAbstract,
+                                                results: e.target.value,
+                                            })
+                                        }
                                         placeholder="Summarize key findings, statistical metrics, and outcomes observed..."
                                         className="w-full text-xs rounded-xl border-slate-300 p-3 focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Conclusion *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                        Conclusion *
+                                    </label>
                                     <textarea
                                         required
                                         rows="2"
                                         value={structuredAbstract.conclusion}
-                                        onChange={(e) => setStructuredAbstract({ ...structuredAbstract, conclusion: e.target.value })}
+                                        onChange={(e) =>
+                                            setStructuredAbstract({
+                                                ...structuredAbstract,
+                                                conclusion: e.target.value,
+                                            })
+                                        }
                                         placeholder="State the conclusions and primary scientific/clinical implications..."
                                         className="w-full text-xs rounded-xl border-slate-300 p-3 focus:ring-2 focus:ring-blue-500"
                                     />
@@ -442,7 +554,9 @@ export default function AbstractSubmit({ event, org }) {
                                 disabled={loading}
                                 className="w-full sm:w-auto px-8 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 shadow-md transition disabled:opacity-50"
                             >
-                                {loading ? 'Submitting Abstract...' : 'Submit Abstract for Peer Review'}
+                                {loading
+                                    ? 'Submitting Abstract...'
+                                    : 'Submit Abstract for Peer Review'}
                             </button>
                         </div>
                     </form>

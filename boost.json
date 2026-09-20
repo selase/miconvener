@@ -1,18 +1,8 @@
 {
-    "agents": [
-        "codex",
-        "opencode",
-        "gemini",
-        "claude_code",
-        "copilot"
-    ],
+    "agents": ["codex", "opencode", "gemini", "claude_code", "copilot"],
     "guidelines": true,
     "herd_mcp": true,
     "mcp": true,
     "sail": false,
-    "skills": [
-        "livewire-development",
-        "pest-testing",
-        "tailwindcss-development"
-    ]
+    "skills": ["livewire-development", "pest-testing", "tailwindcss-development"]
 }

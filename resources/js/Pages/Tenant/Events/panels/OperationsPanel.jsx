@@ -25,19 +25,36 @@ import {
     Kanban,
     List,
     AlertCircle,
-    FolderPlus
+    FolderPlus,
 } from 'lucide-react';
 
 const PRIORITY_BADGES = {
     low: { bg: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', label: 'Low' },
-    medium: { bg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300', label: 'Medium' },
-    high: { bg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', label: 'High' },
-    urgent: { bg: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300', label: 'Urgent' },
+    medium: {
+        bg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+        label: 'Medium',
+    },
+    high: {
+        bg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        label: 'High',
+    },
+    urgent: {
+        bg: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+        label: 'Urgent',
+    },
 };
 
 const STATUS_CONFIG = {
-    not_started: { label: 'Not Started', color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800' },
-    in_progress: { label: 'In Progress', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+    not_started: {
+        label: 'Not Started',
+        color: 'text-slate-500',
+        bg: 'bg-slate-100 dark:bg-slate-800',
+    },
+    in_progress: {
+        label: 'In Progress',
+        color: 'text-blue-600',
+        bg: 'bg-blue-50 dark:bg-blue-900/20',
+    },
     blocked: { label: 'Blocked', color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20' },
     done: { label: 'Done', color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
 };
@@ -82,16 +99,20 @@ export default function OperationsPanel({ event }) {
         setLoading(true);
         setLoadError(null);
         try {
-            const res = await csrfFetch(route('tenant.events.operations.index', { event: event.id }));
+            const res = await csrfFetch(
+                route('tenant.events.operations.index', { event: event.id })
+            );
             if (res.ok) {
                 const data = await res.json();
                 setPillars(data.pillars || []);
                 setSummary(data.summary || null);
                 setTeamMembers(data.team_members || []);
             } else {
-                setLoadError(res.status === 403
-                    ? 'You do not have permission to view operations for this event.'
-                    : 'The operations for this event could not be loaded. Refresh to try again.');
+                setLoadError(
+                    res.status === 403
+                        ? 'You do not have permission to view operations for this event.'
+                        : 'The operations for this event could not be loaded. Refresh to try again.'
+                );
             }
         } catch (err) {
             console.error('Failed to load operations data:', err);
@@ -110,7 +131,10 @@ export default function OperationsPanel({ event }) {
         setSavingPillar(true);
         try {
             const url = editingPillar
-                ? route('tenant.events.operations.pillars.update', { event: event.id, pillar: editingPillar.id })
+                ? route('tenant.events.operations.pillars.update', {
+                      event: event.id,
+                      pillar: editingPillar.id,
+                  })
                 : route('tenant.events.operations.pillars.store', { event: event.id });
             const method = editingPillar ? 'PUT' : 'POST';
 
@@ -135,9 +159,15 @@ export default function OperationsPanel({ event }) {
     const handleDeletePillar = async () => {
         if (!deletePillarTarget) return;
         try {
-            const res = await csrfFetch(route('tenant.events.operations.pillars.destroy', { event: event.id, pillar: deletePillarTarget.id }), {
-                method: 'DELETE',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.operations.pillars.destroy', {
+                    event: event.id,
+                    pillar: deletePillarTarget.id,
+                }),
+                {
+                    method: 'DELETE',
+                }
+            );
             if (res.ok) {
                 setDeletePillarTarget(null);
                 await loadData();
@@ -191,13 +221,18 @@ export default function OperationsPanel({ event }) {
         setSavingTask(true);
         try {
             const url = editingTask
-                ? route('tenant.events.operations.tasks.update', { event: event.id, task: editingTask.id })
+                ? route('tenant.events.operations.tasks.update', {
+                      event: event.id,
+                      task: editingTask.id,
+                  })
                 : route('tenant.events.operations.tasks.store', { event: event.id });
             const method = editingTask ? 'PUT' : 'POST';
 
             const payload = {
                 ...taskForm,
-                estimated_budget: taskForm.estimated_budget ? parseFloat(taskForm.estimated_budget) : 0,
+                estimated_budget: taskForm.estimated_budget
+                    ? parseFloat(taskForm.estimated_budget)
+                    : 0,
                 actual_budget: taskForm.actual_budget ? parseFloat(taskForm.actual_budget) : 0,
             };
 
@@ -221,10 +256,13 @@ export default function OperationsPanel({ event }) {
     // Quick Update Task Status
     const handleQuickStatusUpdate = async (task, newStatus) => {
         try {
-            const res = await csrfFetch(route('tenant.events.operations.tasks.status', { event: event.id, task: task.id }), {
-                method: 'PATCH',
-                body: JSON.stringify({ status: newStatus }),
-            });
+            const res = await csrfFetch(
+                route('tenant.events.operations.tasks.status', { event: event.id, task: task.id }),
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: newStatus }),
+                }
+            );
             if (res.ok) {
                 await loadData();
             }
@@ -237,9 +275,15 @@ export default function OperationsPanel({ event }) {
     const handleDeleteTask = async () => {
         if (!deleteTaskTarget) return;
         try {
-            const res = await csrfFetch(route('tenant.events.operations.tasks.destroy', { event: event.id, task: deleteTaskTarget.id }), {
-                method: 'DELETE',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.operations.tasks.destroy', {
+                    event: event.id,
+                    task: deleteTaskTarget.id,
+                }),
+                {
+                    method: 'DELETE',
+                }
+            );
             if (res.ok) {
                 setDeleteTaskTarget(null);
                 await loadData();
@@ -250,10 +294,9 @@ export default function OperationsPanel({ event }) {
     };
 
     // Filter tasks
-    const allPillarsTasks = pillars.flatMap(p => p.tasks || []);
-    const filteredPillars = activePillarFilter === 'all'
-        ? pillars
-        : pillars.filter(p => p.id === activePillarFilter);
+    const allPillarsTasks = pillars.flatMap((p) => p.tasks || []);
+    const filteredPillars =
+        activePillarFilter === 'all' ? pillars : pillars.filter((p) => p.id === activePillarFilter);
 
     const matchSearch = (task) => {
         if (!search.trim()) return true;
@@ -265,9 +308,10 @@ export default function OperationsPanel({ event }) {
         );
     };
 
-    const completionRate = summary && summary.total_tasks > 0
-        ? Math.round((summary.done_tasks / summary.total_tasks) * 100)
-        : 0;
+    const completionRate =
+        summary && summary.total_tasks > 0
+            ? Math.round((summary.done_tasks / summary.total_tasks) * 100)
+            : 0;
 
     return (
         <div className="space-y-6">
@@ -282,7 +326,8 @@ export default function OperationsPanel({ event }) {
                         8-Pillar Conference Operations & Project Management
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Orchestrate academic programme, technology, venue, protocol, budget and custom operational pillars.
+                        Orchestrate academic programme, technology, venue, protocol, budget and
+                        custom operational pillars.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -296,10 +341,7 @@ export default function OperationsPanel({ event }) {
                         <FolderPlus className="w-4 h-4 mr-1" />
                         Add Custom Pillar
                     </Button>
-                    <Button
-                        variant="primary"
-                        onClick={() => openCreateTask()}
-                    >
+                    <Button variant="primary" onClick={() => openCreateTask()}>
                         <Plus className="w-4 h-4 mr-1" />
                         New Task
                     </Button>
@@ -311,25 +353,38 @@ export default function OperationsPanel({ event }) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Completion Rate</span>
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Completion Rate
+                            </span>
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                         </div>
                         <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-slate-900 dark:text-white">{completionRate}%</span>
-                            <span className="text-xs text-slate-500">({summary.done_tasks}/{summary.total_tasks} done)</span>
+                            <span className="text-2xl font-black text-slate-900 dark:text-white">
+                                {completionRate}%
+                            </span>
+                            <span className="text-xs text-slate-500">
+                                ({summary.done_tasks}/{summary.total_tasks} done)
+                            </span>
                         </div>
                         <div className="mt-2 w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${completionRate}%` }}></div>
+                            <div
+                                className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                                style={{ width: `${completionRate}%` }}
+                            ></div>
                         </div>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">In Progress & Blocked</span>
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                In Progress & Blocked
+                            </span>
                             <Clock className="w-4 h-4 text-blue-500" />
                         </div>
                         <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-blue-600">{summary.in_progress_tasks}</span>
+                            <span className="text-2xl font-black text-blue-600">
+                                {summary.in_progress_tasks}
+                            </span>
                             <span className="text-xs text-slate-500">active</span>
                             {summary.blocked_tasks > 0 && (
                                 <span className="text-xs font-semibold text-rose-500 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.5 rounded">
@@ -337,34 +392,46 @@ export default function OperationsPanel({ event }) {
                                 </span>
                             )}
                         </div>
-                        <p className="mt-2 text-xs text-slate-400">{summary.not_started_tasks} queued tasks</p>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Budget Variance</span>
-                            <DollarSign className="w-4 h-4 text-emerald-500" />
-                        </div>
-                        <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-slate-900 dark:text-white">
-                                {event.currency || 'USD'} {(summary.total_actual_budget / 100).toFixed(2)}
-                            </span>
-                        </div>
-                        <p className="mt-2 text-xs text-slate-500">
-                            Est: {event.currency || 'USD'} {(summary.total_estimated_budget / 100).toFixed(2)}
+                        <p className="mt-2 text-xs text-slate-400">
+                            {summary.not_started_tasks} queued tasks
                         </p>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Operational Pillars</span>
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Budget Variance
+                            </span>
+                            <DollarSign className="w-4 h-4 text-emerald-500" />
+                        </div>
+                        <div className="mt-2 flex items-baseline gap-2">
+                            <span className="text-2xl font-black text-slate-900 dark:text-white">
+                                {event.currency || 'USD'}{' '}
+                                {(summary.total_actual_budget / 100).toFixed(2)}
+                            </span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">
+                            Est: {event.currency || 'USD'}{' '}
+                            {(summary.total_estimated_budget / 100).toFixed(2)}
+                        </p>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Operational Pillars
+                            </span>
                             <Layers className="w-4 h-4 text-indigo-500" />
                         </div>
                         <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-slate-900 dark:text-white">{summary.pillars_count}</span>
+                            <span className="text-2xl font-black text-slate-900 dark:text-white">
+                                {summary.pillars_count}
+                            </span>
                             <span className="text-xs text-slate-500">active pillars</span>
                         </div>
-                        <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium">Extensible On The Fly</p>
+                        <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                            Extensible On The Fly
+                        </p>
                     </div>
                 </div>
             )}
@@ -382,7 +449,7 @@ export default function OperationsPanel({ event }) {
                     >
                         All Pillars ({allPillarsTasks.length})
                     </button>
-                    {pillars.map(pillar => {
+                    {pillars.map((pillar) => {
                         const count = pillar.tasks ? pillar.tasks.length : 0;
                         return (
                             <button
@@ -394,7 +461,10 @@ export default function OperationsPanel({ event }) {
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
                                 }`}
                             >
-                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: pillar.color }}></span>
+                                <span
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: pillar.color }}
+                                ></span>
                                 {pillar.name} ({count})
                             </button>
                         );
@@ -440,22 +510,36 @@ export default function OperationsPanel({ event }) {
 
             {/* Pillars & Tasks Display */}
             {loading && pillars.length === 0 ? (
-                <div className="p-12 text-center text-slate-500">Loading operational pillars...</div>
+                <div className="p-12 text-center text-slate-500">
+                    Loading operational pillars...
+                </div>
             ) : viewMode === 'board' ? (
                 /* Board View: Columns for Pillars */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-                    {filteredPillars.map(pillar => {
+                    {filteredPillars.map((pillar) => {
                         const tasks = (pillar.tasks || []).filter(matchSearch);
-                        const pillarEst = tasks.reduce((sum, t) => sum + (t.estimated_budget || 0), 0);
+                        const pillarEst = tasks.reduce(
+                            (sum, t) => sum + (t.estimated_budget || 0),
+                            0
+                        );
                         const pillarAct = tasks.reduce((sum, t) => sum + (t.actual_budget || 0), 0);
 
                         return (
-                            <div key={pillar.id} className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col max-h-[750px] shadow-xs">
+                            <div
+                                key={pillar.id}
+                                className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col max-h-[750px] shadow-xs"
+                            >
                                 {/* Pillar Header */}
                                 <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: pillar.color }}></span>
-                                        <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={pillar.name}>
+                                        <span
+                                            className="w-3 h-3 rounded-full flex-shrink-0"
+                                            style={{ backgroundColor: pillar.color }}
+                                        ></span>
+                                        <h3
+                                            className="text-sm font-bold text-slate-900 dark:text-white truncate"
+                                            title={pillar.name}
+                                        >
                                             {pillar.name}
                                         </h3>
                                         <span className="text-xs bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold px-1.5 py-0.5 rounded-full">
@@ -473,7 +557,11 @@ export default function OperationsPanel({ event }) {
                                         <button
                                             onClick={() => {
                                                 setEditingPillar(pillar);
-                                                setPillarForm({ name: pillar.name, color: pillar.color, icon: pillar.icon || 'folder' });
+                                                setPillarForm({
+                                                    name: pillar.name,
+                                                    color: pillar.color,
+                                                    icon: pillar.icon || 'folder',
+                                                });
                                                 setPillarModalOpen(true);
                                             }}
                                             className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
@@ -500,9 +588,13 @@ export default function OperationsPanel({ event }) {
                                             No tasks in this pillar
                                         </div>
                                     ) : (
-                                        tasks.map(task => {
-                                            const status = STATUS_CONFIG[task.status] || STATUS_CONFIG.not_started;
-                                            const priority = PRIORITY_BADGES[task.priority] || PRIORITY_BADGES.medium;
+                                        tasks.map((task) => {
+                                            const status =
+                                                STATUS_CONFIG[task.status] ||
+                                                STATUS_CONFIG.not_started;
+                                            const priority =
+                                                PRIORITY_BADGES[task.priority] ||
+                                                PRIORITY_BADGES.medium;
 
                                             return (
                                                 <div
@@ -510,7 +602,9 @@ export default function OperationsPanel({ event }) {
                                                     className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 shadow-xs hover:border-indigo-400 transition group"
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
-                                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${priority.bg}`}>
+                                                        <span
+                                                            className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${priority.bg}`}
+                                                        >
                                                             {priority.label}
                                                         </span>
                                                         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition">
@@ -521,7 +615,9 @@ export default function OperationsPanel({ event }) {
                                                                 <Edit2 className="w-3.5 h-3.5" />
                                                             </button>
                                                             <button
-                                                                onClick={() => setDeleteTaskTarget(task)}
+                                                                onClick={() =>
+                                                                    setDeleteTaskTarget(task)
+                                                                }
                                                                 className="text-slate-400 hover:text-rose-600 p-0.5"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
@@ -543,7 +639,9 @@ export default function OperationsPanel({ event }) {
                                                     {task.dependency_task && (
                                                         <div className="mt-2 flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-800 truncate">
                                                             <LinkIcon className="w-3 h-3 text-indigo-500 flex-shrink-0" />
-                                                            <span className="truncate">After: {task.dependency_task.title}</span>
+                                                            <span className="truncate">
+                                                                After: {task.dependency_task.title}
+                                                            </span>
                                                         </div>
                                                     )}
 
@@ -558,7 +656,9 @@ export default function OperationsPanel({ event }) {
                                                         {task.due_date && (
                                                             <div className="flex items-center gap-1">
                                                                 <Calendar className="w-3 h-3 text-slate-400" />
-                                                                <span>{task.due_date.split('T')[0]}</span>
+                                                                <span>
+                                                                    {task.due_date.split('T')[0]}
+                                                                </span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -567,12 +667,23 @@ export default function OperationsPanel({ event }) {
                                                     <div className="mt-2">
                                                         <select
                                                             value={task.status}
-                                                            onChange={(e) => handleQuickStatusUpdate(task, e.target.value)}
+                                                            onChange={(e) =>
+                                                                handleQuickStatusUpdate(
+                                                                    task,
+                                                                    e.target.value
+                                                                )
+                                                            }
                                                             className={`w-full text-[11px] font-semibold py-1 px-2 rounded border border-slate-200 dark:border-slate-700 ${status.bg} ${status.color} focus:outline-none`}
                                                         >
-                                                            <option value="not_started">⚪ Not Started</option>
-                                                            <option value="in_progress">🔵 In Progress</option>
-                                                            <option value="blocked">🔴 Blocked</option>
+                                                            <option value="not_started">
+                                                                ⚪ Not Started
+                                                            </option>
+                                                            <option value="in_progress">
+                                                                🔵 In Progress
+                                                            </option>
+                                                            <option value="blocked">
+                                                                🔴 Blocked
+                                                            </option>
                                                             <option value="done">🟢 Done</option>
                                                         </select>
                                                     </div>
@@ -608,13 +719,18 @@ export default function OperationsPanel({ event }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                            {allPillarsTasks.filter(matchSearch).map(task => {
-                                const pillar = pillars.find(p => p.id === task.pillar_id);
-                                const status = STATUS_CONFIG[task.status] || STATUS_CONFIG.not_started;
-                                const priority = PRIORITY_BADGES[task.priority] || PRIORITY_BADGES.medium;
+                            {allPillarsTasks.filter(matchSearch).map((task) => {
+                                const pillar = pillars.find((p) => p.id === task.pillar_id);
+                                const status =
+                                    STATUS_CONFIG[task.status] || STATUS_CONFIG.not_started;
+                                const priority =
+                                    PRIORITY_BADGES[task.priority] || PRIORITY_BADGES.medium;
 
                                 return (
-                                    <tr key={task.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                                    <tr
+                                        key={task.id}
+                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
+                                    >
                                         <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
                                             {task.title}
                                             {task.dependency_task && (
@@ -625,7 +741,12 @@ export default function OperationsPanel({ event }) {
                                         </td>
                                         <td className="p-3.5">
                                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800">
-                                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: pillar?.color || '#3B82F6' }}></span>
+                                                <span
+                                                    className="w-2 h-2 rounded-full"
+                                                    style={{
+                                                        backgroundColor: pillar?.color || '#3B82F6',
+                                                    }}
+                                                ></span>
                                                 {pillar?.name || 'General'}
                                             </span>
                                         </td>
@@ -636,14 +757,18 @@ export default function OperationsPanel({ event }) {
                                             {task.due_date ? task.due_date.split('T')[0] : '—'}
                                         </td>
                                         <td className="p-3.5">
-                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${priority.bg}`}>
+                                            <span
+                                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${priority.bg}`}
+                                            >
                                                 {priority.label}
                                             </span>
                                         </td>
                                         <td className="p-3.5">
                                             <select
                                                 value={task.status}
-                                                onChange={(e) => handleQuickStatusUpdate(task, e.target.value)}
+                                                onChange={(e) =>
+                                                    handleQuickStatusUpdate(task, e.target.value)
+                                                }
                                                 className={`text-[11px] font-semibold py-0.5 px-2 rounded border border-slate-200 dark:border-slate-700 ${status.bg} ${status.color} focus:outline-none`}
                                             >
                                                 <option value="not_started">⚪ Not Started</option>
@@ -653,7 +778,8 @@ export default function OperationsPanel({ event }) {
                                             </select>
                                         </td>
                                         <td className="p-3.5 text-right font-mono">
-                                            {(task.estimated_budget / 100).toFixed(2)} / {(task.actual_budget / 100).toFixed(2)}
+                                            {(task.estimated_budget / 100).toFixed(2)} /{' '}
+                                            {(task.actual_budget / 100).toFixed(2)}
                                         </td>
                                         <td className="p-3.5 text-right space-x-1">
                                             <button
@@ -681,7 +807,9 @@ export default function OperationsPanel({ event }) {
             <Modal
                 open={pillarModalOpen}
                 onClose={() => setPillarModalOpen(false)}
-                title={editingPillar ? 'Edit Operational Pillar' : 'Create Custom Operational Pillar'}
+                title={
+                    editingPillar ? 'Edit Operational Pillar' : 'Create Custom Operational Pillar'
+                }
             >
                 <form onSubmit={handleSavePillar} className="space-y-4">
                     <div>
@@ -704,13 +832,17 @@ export default function OperationsPanel({ event }) {
                             <input
                                 type="color"
                                 value={pillarForm.color}
-                                onChange={(e) => setPillarForm({ ...pillarForm, color: e.target.value })}
+                                onChange={(e) =>
+                                    setPillarForm({ ...pillarForm, color: e.target.value })
+                                }
                                 className="w-9 h-9 rounded border border-slate-300 p-0.5 cursor-pointer"
                             />
                             <Input
                                 type="text"
                                 value={pillarForm.color}
-                                onChange={(e) => setPillarForm({ ...pillarForm, color: e.target.value })}
+                                onChange={(e) =>
+                                    setPillarForm({ ...pillarForm, color: e.target.value })
+                                }
                                 className="flex-1 font-mono text-xs"
                             />
                         </div>
@@ -720,7 +852,11 @@ export default function OperationsPanel({ event }) {
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={savingPillar}>
-                            {savingPillar ? 'Saving...' : (editingPillar ? 'Update Pillar' : 'Create Pillar')}
+                            {savingPillar
+                                ? 'Saving...'
+                                : editingPillar
+                                  ? 'Update Pillar'
+                                  : 'Create Pillar'}
                         </Button>
                     </div>
                 </form>
@@ -733,18 +869,25 @@ export default function OperationsPanel({ event }) {
                 onClose={() => setTaskModalOpen(false)}
                 title={editingTask ? 'Edit Task' : 'New Operational Task'}
             >
-                <form onSubmit={handleSaveTask} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                <form
+                    onSubmit={handleSaveTask}
+                    className="space-y-4 max-h-[75vh] overflow-y-auto pr-1"
+                >
                     <div>
                         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                             Pillar *
                         </label>
                         <Select
                             value={taskForm.pillar_id}
-                            onChange={(e) => setTaskForm({ ...taskForm, pillar_id: e.target.value })}
+                            onChange={(e) =>
+                                setTaskForm({ ...taskForm, pillar_id: e.target.value })
+                            }
                             required
                         >
-                            {pillars.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
+                            {pillars.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.name}
+                                </option>
                             ))}
                         </Select>
                     </div>
@@ -771,7 +914,9 @@ export default function OperationsPanel({ event }) {
                             className="w-full text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             placeholder="Detailed operational steps, deliverables, or checklist..."
                             value={taskForm.description}
-                            onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                            onChange={(e) =>
+                                setTaskForm({ ...taskForm, description: e.target.value })
+                            }
                         />
                     </div>
 
@@ -783,7 +928,9 @@ export default function OperationsPanel({ event }) {
                             <Select
                                 value={taskForm.owner_id}
                                 onChange={(e) => {
-                                    const member = teamMembers.find(m => String(m.id) === String(e.target.value));
+                                    const member = teamMembers.find(
+                                        (m) => String(m.id) === String(e.target.value)
+                                    );
                                     setTaskForm({
                                         ...taskForm,
                                         owner_id: e.target.value,
@@ -792,8 +939,10 @@ export default function OperationsPanel({ event }) {
                                 }}
                             >
                                 <option value="">Select Team Member</option>
-                                {teamMembers.map(m => (
-                                    <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
+                                {teamMembers.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.name} ({m.email})
+                                    </option>
                                 ))}
                             </Select>
                         </div>
@@ -804,7 +953,9 @@ export default function OperationsPanel({ event }) {
                             <Input
                                 type="date"
                                 value={taskForm.due_date}
-                                onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+                                onChange={(e) =>
+                                    setTaskForm({ ...taskForm, due_date: e.target.value })
+                                }
                             />
                         </div>
                     </div>
@@ -816,7 +967,9 @@ export default function OperationsPanel({ event }) {
                             </label>
                             <Select
                                 value={taskForm.priority}
-                                onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
+                                onChange={(e) =>
+                                    setTaskForm({ ...taskForm, priority: e.target.value })
+                                }
                             >
                                 <option value="low">Low</option>
                                 <option value="medium">Medium</option>
@@ -830,7 +983,9 @@ export default function OperationsPanel({ event }) {
                             </label>
                             <Select
                                 value={taskForm.status}
-                                onChange={(e) => setTaskForm({ ...taskForm, status: e.target.value })}
+                                onChange={(e) =>
+                                    setTaskForm({ ...taskForm, status: e.target.value })
+                                }
                             >
                                 <option value="not_started">Not Started</option>
                                 <option value="in_progress">In Progress</option>
@@ -846,12 +1001,14 @@ export default function OperationsPanel({ event }) {
                         </label>
                         <Select
                             value={taskForm.dependency_task_id}
-                            onChange={(e) => setTaskForm({ ...taskForm, dependency_task_id: e.target.value })}
+                            onChange={(e) =>
+                                setTaskForm({ ...taskForm, dependency_task_id: e.target.value })
+                            }
                         >
                             <option value="">No Dependency</option>
                             {allPillarsTasks
-                                .filter(t => !editingTask || t.id !== editingTask.id)
-                                .map(t => (
+                                .filter((t) => !editingTask || t.id !== editingTask.id)
+                                .map((t) => (
                                     <option key={t.id} value={t.id}>
                                         {t.title} ({t.status})
                                     </option>
@@ -869,7 +1026,9 @@ export default function OperationsPanel({ event }) {
                                 step="0.01"
                                 placeholder="0.00"
                                 value={taskForm.estimated_budget}
-                                onChange={(e) => setTaskForm({ ...taskForm, estimated_budget: e.target.value })}
+                                onChange={(e) =>
+                                    setTaskForm({ ...taskForm, estimated_budget: e.target.value })
+                                }
                             />
                         </div>
                         <div>
@@ -881,7 +1040,9 @@ export default function OperationsPanel({ event }) {
                                 step="0.01"
                                 placeholder="0.00"
                                 value={taskForm.actual_budget}
-                                onChange={(e) => setTaskForm({ ...taskForm, actual_budget: e.target.value })}
+                                onChange={(e) =>
+                                    setTaskForm({ ...taskForm, actual_budget: e.target.value })
+                                }
                             />
                         </div>
                     </div>
@@ -891,7 +1052,7 @@ export default function OperationsPanel({ event }) {
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={savingTask}>
-                            {savingTask ? 'Saving...' : (editingTask ? 'Update Task' : 'Create Task')}
+                            {savingTask ? 'Saving...' : editingTask ? 'Update Task' : 'Create Task'}
                         </Button>
                     </div>
                 </form>

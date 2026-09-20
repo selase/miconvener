@@ -1,21 +1,27 @@
 import { Head } from '@inertiajs/react';
-import { 
-    CheckCircle2, 
-    XCircle, 
-    Award, 
-    Calendar, 
-    Building2, 
-    Download, 
-    ShieldCheck, 
-    Clock, 
+import {
+    CheckCircle2,
+    XCircle,
+    Award,
+    Calendar,
+    Building2,
+    Download,
+    ShieldCheck,
+    Clock,
     User,
-    ExternalLink
+    ExternalLink,
 } from 'lucide-react';
 
 export default function Verify({ isValid, certificate, event }) {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-between font-sans antialiased text-slate-900 dark:text-slate-100">
-            <Head title={isValid ? `Verified: ${certificate.recipient_name} — ${certificate.title}` : 'Certificate Verification'} />
+            <Head
+                title={
+                    isValid
+                        ? `Verified: ${certificate.recipient_name} — ${certificate.title}`
+                        : 'Certificate Verification'
+                }
+            />
 
             {/* Top Navigation / Brand */}
             <header className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
@@ -25,7 +31,10 @@ export default function Verify({ isValid, certificate, event }) {
                             MC
                         </div>
                         <span className="font-bold text-sm tracking-tight text-slate-900 dark:text-white">
-                            MiConvener <span className="text-indigo-600 dark:text-indigo-400 font-normal">Accreditation</span>
+                            MiConvener{' '}
+                            <span className="text-indigo-600 dark:text-indigo-400 font-normal">
+                                Accreditation
+                            </span>
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
@@ -92,10 +101,13 @@ export default function Verify({ isValid, certificate, event }) {
                                     {certificate.cpd_hours > 0 ? (
                                         <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                                             <Clock className="w-3 h-3" />
-                                            {certificate.cpd_hours.toFixed(1)} CPD / CME Contact Hours
+                                            {certificate.cpd_hours.toFixed(1)} CPD / CME Contact
+                                            Hours
                                         </div>
                                     ) : (
-                                        <div className="text-[11px] text-slate-500">Accredited Participant</div>
+                                        <div className="text-[11px] text-slate-500">
+                                            Accredited Participant
+                                        </div>
                                     )}
                                 </div>
 
@@ -129,7 +141,10 @@ export default function Verify({ isValid, certificate, event }) {
                             {/* Signatory Note */}
                             {certificate.issuer_name && (
                                 <div className="text-center pt-2 text-xs text-slate-500">
-                                    Conferred under the authority of <span className="font-bold text-slate-800 dark:text-slate-200">{certificate.issuer_name}</span>
+                                    Conferred under the authority of{' '}
+                                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                                        {certificate.issuer_name}
+                                    </span>
                                     {certificate.issuer_title && ` (${certificate.issuer_title})`}.
                                 </div>
                             )}
@@ -155,7 +170,8 @@ export default function Verify({ isValid, certificate, event }) {
                             Credential Not Found or Revoked
                         </h1>
                         <p className="text-sm text-slate-500 max-w-md mx-auto">
-                            The certificate credential ID or QR verification token you scanned could not be validated against the active conference registry.
+                            The certificate credential ID or QR verification token you scanned could
+                            not be validated against the active conference registry.
                         </p>
                         <div className="pt-2">
                             <a
@@ -171,7 +187,10 @@ export default function Verify({ isValid, certificate, event }) {
 
             {/* Footer */}
             <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-400">
-                <p>&copy; {new Date().getFullYear()} MiConvener Academic & Conference Operations. All rights reserved.</p>
+                <p>
+                    &copy; {new Date().getFullYear()} MiConvener Academic & Conference Operations.
+                    All rights reserved.
+                </p>
             </footer>
         </div>
     );

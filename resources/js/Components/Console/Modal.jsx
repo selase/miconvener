@@ -26,7 +26,9 @@ export default function Modal({ open, onClose, title, children, className = 'max
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/30" onClick={onClose} />
 
-            <div className={`relative max-h-[85vh] w-full overflow-y-auto rounded-lg border border-border bg-surface p-6 shadow-float ${className}`}>
+            <div
+                className={`relative max-h-[85vh] w-full overflow-y-auto rounded-lg border border-border bg-surface p-6 shadow-float ${className}`}
+            >
                 <button
                     type="button"
                     onClick={onClose}

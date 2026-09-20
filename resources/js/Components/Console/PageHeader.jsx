@@ -15,7 +15,9 @@ export default function PageHeader({ title, tabs, activeTab, actions }) {
                             key={tab.key}
                             href={tab.href}
                             className={`relative pb-3 text-[15px] font-medium transition-colors duration-120 ease-out ${
-                                activeTab === tab.key ? 'text-ink' : 'text-ink-secondary hover:text-ink'
+                                activeTab === tab.key
+                                    ? 'text-ink'
+                                    : 'text-ink-secondary hover:text-ink'
                             }`}
                         >
                             {tab.label}

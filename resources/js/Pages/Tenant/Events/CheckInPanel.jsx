@@ -29,7 +29,8 @@ function CheckInResultBanner({ result }) {
             )}
             {result.duration_minutes !== undefined && (
                 <div className="mt-1 font-mono text-xs opacity-80">
-                    Dwell duration: {result.duration_minutes} min ({result.hours_earned || 0} hrs CPD credit)
+                    Dwell duration: {result.duration_minutes} min ({result.hours_earned || 0} hrs
+                    CPD credit)
                 </div>
             )}
         </div>
@@ -139,9 +140,14 @@ function ManualMode({ searchUrl, checkInUrlFor, onResult }) {
             {results.length > 0 && (
                 <ul className="mt-3 divide-y divide-border rounded-md border border-border">
                     {results.map((registration) => (
-                        <li key={registration.id} className="flex items-center justify-between px-4 py-2.5">
+                        <li
+                            key={registration.id}
+                            className="flex items-center justify-between px-4 py-2.5"
+                        >
                             <div>
-                                <div className="text-sm font-medium text-ink">{registration.full_name}</div>
+                                <div className="text-sm font-medium text-ink">
+                                    {registration.full_name}
+                                </div>
                                 <div className="text-xs text-ink-secondary">
                                     {registration.email} · {registration.ticket_code}
                                 </div>
@@ -164,7 +170,9 @@ export default function CheckInPanel({
     preselectedSessionId = null,
 }) {
     const [targetMode, setTargetMode] = useState(preselectedSessionId ? 'room' : 'event');
-    const [selectedSessionId, setSelectedSessionId] = useState(preselectedSessionId || (sessions[0]?.id || ''));
+    const [selectedSessionId, setSelectedSessionId] = useState(
+        preselectedSessionId || sessions[0]?.id || ''
+    );
     const [scanAction, setScanAction] = useState('check_in'); // 'check_in' | 'check_out'
     const [overrideCapacity, setOverrideCapacity] = useState(false);
     const [mode, setMode] = useState('scan');
@@ -260,7 +268,8 @@ export default function CheckInPanel({
                                 >
                                     {sessions.map((s) => (
                                         <option key={s.id} value={s.id}>
-                                            {s.title} ({s.location || 'Hall'}{s.capacity ? ` · Cap: ${s.capacity}` : ''})
+                                            {s.title} ({s.location || 'Hall'}
+                                            {s.capacity ? ` · Cap: ${s.capacity}` : ''})
                                         </option>
                                     ))}
                                 </select>
@@ -298,17 +307,24 @@ export default function CheckInPanel({
                             {selectedSession && (
                                 <div className="rounded bg-surface-sunken border border-border/80 p-2.5 text-xs">
                                     <div className="flex items-center justify-between">
-                                        <span className="font-semibold text-ink">{selectedSession.location || 'Room'} Headcount:</span>
+                                        <span className="font-semibold text-ink">
+                                            {selectedSession.location || 'Room'} Headcount:
+                                        </span>
                                         <span className="font-mono font-bold text-accent">
-                                            {selectedSession.live_headcount || 0}{selectedSession.capacity ? ` / ${selectedSession.capacity}` : ''}
+                                            {selectedSession.live_headcount || 0}
+                                            {selectedSession.capacity
+                                                ? ` / ${selectedSession.capacity}`
+                                                : ''}
                                         </span>
                                     </div>
-                                    {selectedSession.capacity && (selectedSession.live_headcount >= selectedSession.capacity) && (
-                                        <div className="mt-2 flex items-center gap-1.5 text-danger-fg text-[11px] font-medium">
-                                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                            <span>Room is at maximum capacity.</span>
-                                        </div>
-                                    )}
+                                    {selectedSession.capacity &&
+                                        selectedSession.live_headcount >=
+                                            selectedSession.capacity && (
+                                            <div className="mt-2 flex items-center gap-1.5 text-danger-fg text-[11px] font-medium">
+                                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                                <span>Room is at maximum capacity.</span>
+                                            </div>
+                                        )}
                                 </div>
                             )}
 

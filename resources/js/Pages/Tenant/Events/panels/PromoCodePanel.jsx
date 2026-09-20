@@ -6,30 +6,30 @@ import Select from '@/Components/Console/Select';
 import Checkbox from '@/Components/Console/Checkbox';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
 import csrfFetch from '@/lib/csrfFetch';
-import { 
-    Plus, 
-    Trash2, 
-    Edit2, 
-    Tag, 
-    Percent, 
-    DollarSign, 
-    Gift, 
-    Key, 
-    Lock, 
-    Unlock, 
-    Clock, 
-    Users, 
-    CheckCircle2, 
+import {
+    Plus,
+    Trash2,
+    Edit2,
+    Tag,
+    Percent,
+    DollarSign,
+    Gift,
+    Key,
+    Lock,
+    Unlock,
+    Clock,
+    Users,
+    CheckCircle2,
     AlertCircle,
     Copy,
-    RefreshCw
+    RefreshCw,
 } from 'lucide-react';
 
 export default function PromoCodePanel({ event, onChange }) {
     const [loading, setLoading] = useState(true);
     const [promoCodes, setPromoCodes] = useState([]);
     const [ticketTypes, setTicketTypes] = useState([]);
-    
+
     // Modal states
     const [modalOpen, setModalOpen] = useState(false);
     const [editingPromo, setEditingPromo] = useState(null);
@@ -56,7 +56,9 @@ export default function PromoCodePanel({ event, onChange }) {
     const loadData = async () => {
         setLoading(true);
         try {
-            const res = await csrfFetch(route('tenant.events.promo-codes.index', { event: event.id }));
+            const res = await csrfFetch(
+                route('tenant.events.promo-codes.index', { event: event.id })
+            );
             if (res.ok) {
                 const data = await res.json();
                 setPromoCodes(data.promo_codes || []);
@@ -83,7 +85,7 @@ export default function PromoCodePanel({ event, onChange }) {
         for (let i = 0; i < 6; i++) {
             result += chars.charAt(Math.floor(Math.random() * chars.length));
         }
-        setForm(prev => ({ ...prev, code: result }));
+        setForm((prev) => ({ ...prev, code: result }));
     };
 
     const openCreateModal = () => {
@@ -111,9 +113,10 @@ export default function PromoCodePanel({ event, onChange }) {
             code: promo.code,
             description: promo.description || '',
             discount_type: promo.discount_type,
-            discount_value: promo.discount_type === 'fixed_amount' 
-                ? (promo.discount_value / 100).toString() 
-                : promo.discount_value.toString(),
+            discount_value:
+                promo.discount_type === 'fixed_amount'
+                    ? (promo.discount_value / 100).toString()
+                    : promo.discount_value.toString(),
             max_redemptions: promo.max_redemptions !== null ? promo.max_redemptions.toString() : '',
             max_per_attendee: (promo.max_per_attendee || 1).toString(),
             starts_at: promo.starts_at ? promo.starts_at.slice(0, 16) : '',
@@ -131,11 +134,12 @@ export default function PromoCodePanel({ event, onChange }) {
         setSaving(true);
         setErrors({});
 
-        const discountVal = form.discount_type === 'complimentary'
-            ? 0
-            : form.discount_type === 'fixed_amount'
-                ? Math.round(parseFloat(form.discount_value || 0) * 100)
-                : parseInt(form.discount_value || 0, 10);
+        const discountVal =
+            form.discount_type === 'complimentary'
+                ? 0
+                : form.discount_type === 'fixed_amount'
+                  ? Math.round(parseFloat(form.discount_value || 0) * 100)
+                  : parseInt(form.discount_value || 0, 10);
 
         const payload = {
             code: form.code.trim().toUpperCase(),
@@ -146,15 +150,17 @@ export default function PromoCodePanel({ event, onChange }) {
             max_per_attendee: parseInt(form.max_per_attendee || 1, 10),
             starts_at: form.starts_at || null,
             expires_at: form.expires_at || null,
-            applicable_ticket_type_ids: form.applicable_ticket_type_ids.length > 0 
-                ? form.applicable_ticket_type_ids 
-                : null,
+            applicable_ticket_type_ids:
+                form.applicable_ticket_type_ids.length > 0 ? form.applicable_ticket_type_ids : null,
             is_active: form.is_active,
             is_global: form.is_global,
         };
 
         const url = editingPromo
-            ? route('tenant.events.promo-codes.update', { event: event.id, promoCode: editingPromo.id })
+            ? route('tenant.events.promo-codes.update', {
+                  event: event.id,
+                  promoCode: editingPromo.id,
+              })
             : route('tenant.events.promo-codes.store', { event: event.id });
         const method = editingPromo ? 'PUT' : 'POST';
 
@@ -180,9 +186,15 @@ export default function PromoCodePanel({ event, onChange }) {
     const handleDelete = async () => {
         if (!deleteTarget) return;
         try {
-            const res = await csrfFetch(route('tenant.events.promo-codes.destroy', { event: event.id, promoCode: deleteTarget.id }), {
-                method: 'DELETE',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.promo-codes.destroy', {
+                    event: event.id,
+                    promoCode: deleteTarget.id,
+                }),
+                {
+                    method: 'DELETE',
+                }
+            );
             if (res.ok) {
                 setDeleteTarget(null);
                 loadData();
@@ -195,9 +207,12 @@ export default function PromoCodePanel({ event, onChange }) {
 
     const handleToggle = async (promo) => {
         try {
-            const res = await csrfFetch(route('tenant.events.promo-codes.toggle', { event: event.id, promoCode: promo.id }), {
-                method: 'PATCH',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.promo-codes.toggle', { event: event.id, promoCode: promo.id }),
+                {
+                    method: 'PATCH',
+                }
+            );
             if (res.ok) {
                 loadData();
                 if (onChange) onChange();
@@ -208,13 +223,13 @@ export default function PromoCodePanel({ event, onChange }) {
     };
 
     const toggleTicketTypeSelection = (id) => {
-        setForm(prev => {
+        setForm((prev) => {
             const exists = prev.applicable_ticket_type_ids.includes(id);
             return {
                 ...prev,
                 applicable_ticket_type_ids: exists
-                    ? prev.applicable_ticket_type_ids.filter(item => item !== id)
-                    : [...prev.applicable_ticket_type_ids, id]
+                    ? prev.applicable_ticket_type_ids.filter((item) => item !== id)
+                    : [...prev.applicable_ticket_type_ids, id],
             };
         });
     };
@@ -242,10 +257,15 @@ export default function PromoCodePanel({ event, onChange }) {
                         Promo Codes & Discounts
                     </h3>
                     <p className="text-xs text-ink-secondary mt-1">
-                        Create percentage, fixed-amount, or 100% complimentary codes for marketing campaigns, VIPs, and partners.
+                        Create percentage, fixed-amount, or 100% complimentary codes for marketing
+                        campaigns, VIPs, and partners.
                     </p>
                 </div>
-                <Button variant="primary" onClick={openCreateModal} className="flex items-center gap-1.5 shrink-0">
+                <Button
+                    variant="primary"
+                    onClick={openCreateModal}
+                    className="flex items-center gap-1.5 shrink-0"
+                >
                     <Plus className="h-4 w-4" />
                     New Promo Code
                 </Button>
@@ -257,9 +277,13 @@ export default function PromoCodePanel({ event, onChange }) {
                     <Tag className="mx-auto h-8 w-8 text-ink-tertiary mb-3 stroke-[1.2]" />
                     <p className="text-sm font-medium text-ink">No promo codes created yet</p>
                     <p className="text-xs text-ink-secondary mt-1 max-w-sm mx-auto">
-                        Offer early-bird discounts, partner vouchers, or free VIP guest codes to boost event ticket sales.
+                        Offer early-bird discounts, partner vouchers, or free VIP guest codes to
+                        boost event ticket sales.
                     </p>
-                    <Button onClick={openCreateModal} className="mt-4 inline-flex items-center gap-1.5 text-xs">
+                    <Button
+                        onClick={openCreateModal}
+                        className="mt-4 inline-flex items-center gap-1.5 text-xs"
+                    >
                         <Plus className="h-3.5 w-3.5" />
                         Create your first promo code
                     </Button>
@@ -267,11 +291,14 @@ export default function PromoCodePanel({ event, onChange }) {
             ) : (
                 <div className="space-y-3">
                     {promoCodes.map((promo) => {
-                        const isExpired = promo.expires_at && new Date(promo.expires_at) < new Date();
-                        const isLimitReached = promo.max_redemptions && promo.redemptions_count >= promo.max_redemptions;
+                        const isExpired =
+                            promo.expires_at && new Date(promo.expires_at) < new Date();
+                        const isLimitReached =
+                            promo.max_redemptions &&
+                            promo.redemptions_count >= promo.max_redemptions;
 
                         return (
-                            <div 
+                            <div
                                 key={promo.id}
                                 className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-md border p-4 transition-colors ${
                                     !promo.is_active || isExpired || isLimitReached
@@ -295,22 +322,29 @@ export default function PromoCodePanel({ event, onChange }) {
                                         </button>
 
                                         {/* Discount Badge */}
-                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                            promo.discount_type === 'complimentary'
-                                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300'
-                                                : promo.discount_type === 'percentage'
-                                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300'
-                                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
-                                        }`}>
-                                            {promo.discount_type === 'complimentary' && <Gift className="h-3 w-3" />}
-                                            {promo.discount_type === 'percentage' && <Percent className="h-3 w-3" />}
-                                            {promo.discount_type === 'fixed_amount' && <DollarSign className="h-3 w-3" />}
-                                            {promo.discount_type === 'complimentary' 
+                                        <span
+                                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                                promo.discount_type === 'complimentary'
+                                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300'
+                                                    : promo.discount_type === 'percentage'
+                                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300'
+                                                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                                            }`}
+                                        >
+                                            {promo.discount_type === 'complimentary' && (
+                                                <Gift className="h-3 w-3" />
+                                            )}
+                                            {promo.discount_type === 'percentage' && (
+                                                <Percent className="h-3 w-3" />
+                                            )}
+                                            {promo.discount_type === 'fixed_amount' && (
+                                                <DollarSign className="h-3 w-3" />
+                                            )}
+                                            {promo.discount_type === 'complimentary'
                                                 ? '100% Free Pass'
                                                 : promo.discount_type === 'percentage'
-                                                    ? `${promo.discount_value}% Off`
-                                                    : `${formatMoney(promo.discount_value, promo.currency)} Off`
-                                            }
+                                                  ? `${promo.discount_value}% Off`
+                                                  : `${formatMoney(promo.discount_value, promo.currency)} Off`}
                                         </span>
 
                                         {/* Status badges */}
@@ -337,27 +371,35 @@ export default function PromoCodePanel({ event, onChange }) {
                                     </div>
 
                                     {promo.description && (
-                                        <p className="text-xs text-ink-secondary">{promo.description}</p>
+                                        <p className="text-xs text-ink-secondary">
+                                            {promo.description}
+                                        </p>
                                     )}
 
                                     <div className="flex items-center gap-4 text-[11.5px] text-ink-tertiary flex-wrap pt-0.5">
                                         <span className="flex items-center gap-1">
                                             <Users className="h-3 w-3" />
                                             Redeemed: <strong>{promo.redemptions_count}</strong>
-                                            {promo.max_redemptions ? ` / ${promo.max_redemptions}` : ' (unlimited)'}
+                                            {promo.max_redemptions
+                                                ? ` / ${promo.max_redemptions}`
+                                                : ' (unlimited)'}
                                         </span>
                                         {promo.expires_at && (
                                             <span className="flex items-center gap-1">
                                                 <Clock className="h-3 w-3" />
-                                                Expires: {new Date(promo.expires_at).toLocaleDateString()}
+                                                Expires:{' '}
+                                                {new Date(promo.expires_at).toLocaleDateString()}
                                             </span>
                                         )}
-                                        {promo.applicable_ticket_type_ids && promo.applicable_ticket_type_ids.length > 0 && (
-                                            <span className="flex items-center gap-1">
-                                                <Key className="h-3 w-3" />
-                                                Applies to: {promo.applicable_ticket_type_ids.length} ticket type(s)
-                                            </span>
-                                        )}
+                                        {promo.applicable_ticket_type_ids &&
+                                            promo.applicable_ticket_type_ids.length > 0 && (
+                                                <span className="flex items-center gap-1">
+                                                    <Key className="h-3 w-3" />
+                                                    Applies to:{' '}
+                                                    {promo.applicable_ticket_type_ids.length} ticket
+                                                    type(s)
+                                                </span>
+                                            )}
                                     </div>
                                 </div>
 
@@ -405,17 +447,20 @@ export default function PromoCodePanel({ event, onChange }) {
                             Invite-Only & Hidden Tickets
                         </h4>
                         <p className="text-xs text-ink-secondary mt-0.5">
-                            Ticket types locked with an access code are hidden from public view until the attendee provides the code.
+                            Ticket types locked with an access code are hidden from public view
+                            until the attendee provides the code.
                         </p>
                     </div>
                 </div>
 
                 <div className="space-y-2">
                     {ticketTypes.length === 0 ? (
-                        <p className="text-xs text-ink-tertiary">No ticket types configured for this event.</p>
+                        <p className="text-xs text-ink-tertiary">
+                            No ticket types configured for this event.
+                        </p>
                     ) : (
                         ticketTypes.map((ticket) => (
-                            <div 
+                            <div
                                 key={ticket.id}
                                 className="flex items-center justify-between gap-3 p-3 rounded border border-border bg-surface text-xs"
                             >
@@ -427,7 +472,9 @@ export default function PromoCodePanel({ event, onChange }) {
                                     )}
                                     <div>
                                         <strong className="text-ink">{ticket.name}</strong>
-                                        <span className="text-ink-secondary ml-2">({formatMoney(ticket.price)})</span>
+                                        <span className="text-ink-secondary ml-2">
+                                            ({formatMoney(ticket.price)})
+                                        </span>
                                     </div>
                                 </div>
 
@@ -437,7 +484,9 @@ export default function PromoCodePanel({ event, onChange }) {
                                             Access Code: {ticket.access_code}
                                         </span>
                                     ) : (
-                                        <span className="text-ink-tertiary text-[11px]">Publicly visible (No access code)</span>
+                                        <span className="text-ink-tertiary text-[11px]">
+                                            Publicly visible (No access code)
+                                        </span>
                                     )}
                                 </div>
                             </div>
@@ -448,10 +497,14 @@ export default function PromoCodePanel({ event, onChange }) {
 
             {/* Create / Edit Modal */}
             {modalOpen && (
-                <Modal 
-                    open={modalOpen} 
+                <Modal
+                    open={modalOpen}
                     onClose={() => setModalOpen(false)}
-                    title={editingPromo ? `Edit Promo Code: ${editingPromo.code}` : 'Create New Promo Code'}
+                    title={
+                        editingPromo
+                            ? `Edit Promo Code: ${editingPromo.code}`
+                            : 'Create New Promo Code'
+                    }
                     className="max-w-lg"
                 >
                     <form onSubmit={handleSave} className="space-y-4">
@@ -470,12 +523,16 @@ export default function PromoCodePanel({ event, onChange }) {
                             <input
                                 type="text"
                                 value={form.code}
-                                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                                onChange={(e) =>
+                                    setForm({ ...form, code: e.target.value.toUpperCase() })
+                                }
                                 placeholder="e.g. EARLYBIRD, VIPGUEST"
                                 className="w-full font-mono uppercase rounded border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
                                 required
                             />
-                            {errors.code && <p className="text-xs text-danger-fg">{errors.code[0]}</p>}
+                            {errors.code && (
+                                <p className="text-xs text-danger-fg">{errors.code[0]}</p>
+                            )}
                         </div>
 
                         <div>
@@ -490,14 +547,20 @@ export default function PromoCodePanel({ event, onChange }) {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-medium text-ink mb-1.5">Discount Type</label>
+                                <label className="block text-xs font-medium text-ink mb-1.5">
+                                    Discount Type
+                                </label>
                                 <select
                                     value={form.discount_type}
-                                    onChange={(e) => setForm({ ...form, discount_type: e.target.value })}
+                                    onChange={(e) =>
+                                        setForm({ ...form, discount_type: e.target.value })
+                                    }
                                     className="w-full rounded border border-border bg-surface px-3 py-2 text-xs text-ink focus:border-accent focus:outline-none"
                                 >
                                     <option value="percentage">Percentage (%) Off</option>
-                                    <option value="fixed_amount">Fixed Amount ({event.currency || 'GHS'}) Off</option>
+                                    <option value="fixed_amount">
+                                        Fixed Amount ({event.currency || 'GHS'}) Off
+                                    </option>
                                     <option value="complimentary">100% Free (Complimentary)</option>
                                 </select>
                             </div>
@@ -505,13 +568,21 @@ export default function PromoCodePanel({ event, onChange }) {
                             {form.discount_type !== 'complimentary' && (
                                 <div>
                                     <Input
-                                        label={form.discount_type === 'percentage' ? 'Percentage (1-100) *' : `Amount (${event.currency || 'GHS'}) *`}
+                                        label={
+                                            form.discount_type === 'percentage'
+                                                ? 'Percentage (1-100) *'
+                                                : `Amount (${event.currency || 'GHS'}) *`
+                                        }
                                         type="number"
                                         min="1"
-                                        max={form.discount_type === 'percentage' ? '100' : undefined}
+                                        max={
+                                            form.discount_type === 'percentage' ? '100' : undefined
+                                        }
                                         step={form.discount_type === 'percentage' ? '1' : '0.01'}
                                         value={form.discount_value}
-                                        onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                                        onChange={(e) =>
+                                            setForm({ ...form, discount_value: e.target.value })
+                                        }
                                         error={errors.discount_value?.[0]}
                                         required
                                     />
@@ -526,7 +597,9 @@ export default function PromoCodePanel({ event, onChange }) {
                                 min="1"
                                 placeholder="Unlimited if blank"
                                 value={form.max_redemptions}
-                                onChange={(e) => setForm({ ...form, max_redemptions: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({ ...form, max_redemptions: e.target.value })
+                                }
                                 error={errors.max_redemptions?.[0]}
                             />
                             <Input
@@ -534,7 +607,9 @@ export default function PromoCodePanel({ event, onChange }) {
                                 type="number"
                                 min="1"
                                 value={form.max_per_attendee}
-                                onChange={(e) => setForm({ ...form, max_per_attendee: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({ ...form, max_per_attendee: e.target.value })
+                                }
                                 error={errors.max_per_attendee?.[0]}
                                 required
                             />
@@ -542,20 +617,28 @@ export default function PromoCodePanel({ event, onChange }) {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-medium text-ink mb-1.5">Starts At (Optional)</label>
+                                <label className="block text-xs font-medium text-ink mb-1.5">
+                                    Starts At (Optional)
+                                </label>
                                 <input
                                     type="datetime-local"
                                     value={form.starts_at}
-                                    onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                                    onChange={(e) =>
+                                        setForm({ ...form, starts_at: e.target.value })
+                                    }
                                     className="w-full rounded border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-ink mb-1.5">Expires At (Optional)</label>
+                                <label className="block text-xs font-medium text-ink mb-1.5">
+                                    Expires At (Optional)
+                                </label>
                                 <input
                                     type="datetime-local"
                                     value={form.expires_at}
-                                    onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                                    onChange={(e) =>
+                                        setForm({ ...form, expires_at: e.target.value })
+                                    }
                                     className="w-full rounded border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
                                 />
                             </div>
@@ -565,18 +648,26 @@ export default function PromoCodePanel({ event, onChange }) {
                         {ticketTypes.length > 0 && (
                             <div>
                                 <label className="block text-xs font-medium text-ink mb-1.5">
-                                    Applicable Ticket Types (Leave all unchecked to apply to everything)
+                                    Applicable Ticket Types (Leave all unchecked to apply to
+                                    everything)
                                 </label>
                                 <div className="space-y-1.5 max-h-32 overflow-y-auto border border-border p-2 rounded bg-surface-sunken/40">
-                                    {ticketTypes.map(t => (
-                                        <label key={t.id} className="flex items-center gap-2 cursor-pointer text-xs text-ink">
+                                    {ticketTypes.map((t) => (
+                                        <label
+                                            key={t.id}
+                                            className="flex items-center gap-2 cursor-pointer text-xs text-ink"
+                                        >
                                             <input
                                                 type="checkbox"
-                                                checked={form.applicable_ticket_type_ids.includes(t.id)}
+                                                checked={form.applicable_ticket_type_ids.includes(
+                                                    t.id
+                                                )}
                                                 onChange={() => toggleTicketTypeSelection(t.id)}
                                                 className="rounded border-border text-accent"
                                             />
-                                            <span>{t.name} ({formatMoney(t.price)})</span>
+                                            <span>
+                                                {t.name} ({formatMoney(t.price)})
+                                            </span>
                                         </label>
                                     ))}
                                 </div>
@@ -588,7 +679,11 @@ export default function PromoCodePanel({ event, onChange }) {
                                 Cancel
                             </Button>
                             <Button type="submit" variant="primary" disabled={saving}>
-                                {saving ? 'Saving...' : editingPromo ? 'Update Promo Code' : 'Create Promo Code'}
+                                {saving
+                                    ? 'Saving...'
+                                    : editingPromo
+                                      ? 'Update Promo Code'
+                                      : 'Create Promo Code'}
                             </Button>
                         </div>
                     </form>

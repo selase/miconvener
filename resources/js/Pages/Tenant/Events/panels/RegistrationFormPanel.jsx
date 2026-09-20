@@ -6,19 +6,19 @@ import Select from '@/Components/Console/Select';
 import Checkbox from '@/Components/Console/Checkbox';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
 import csrfFetch from '@/lib/csrfFetch';
-import { 
-    Plus, 
-    Trash2, 
-    Edit2, 
-    ArrowUp, 
-    ArrowDown, 
-    Lock, 
-    HelpCircle, 
-    Sliders, 
-    Sparkles, 
-    Layers, 
+import {
+    Plus,
+    Trash2,
+    Edit2,
+    ArrowUp,
+    ArrowDown,
+    Lock,
+    HelpCircle,
+    Sliders,
+    Sparkles,
+    Layers,
     Eye,
-    CheckCircle2
+    CheckCircle2,
 } from 'lucide-react';
 
 const FIELD_TYPES = [
@@ -66,21 +66,23 @@ export default function RegistrationFormPanel({ event, onChange }) {
             is_required: false,
             options: [
                 { label: '', value: '', price: '' },
-                { label: '', value: '', price: '' }
+                { label: '', value: '', price: '' },
             ],
             has_condition: false,
             conditional_logic: {
                 depends_on: '',
                 operator: 'equals',
-                value: ''
-            }
+                value: '',
+            },
         };
     }
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const res = await csrfFetch(route('tenant.events.form-fields.index', { event: event.id }));
+            const res = await csrfFetch(
+                route('tenant.events.form-fields.index', { event: event.id })
+            );
             if (res.ok) {
                 const data = await res.json();
                 setFields(data.form_fields || []);
@@ -100,10 +102,13 @@ export default function RegistrationFormPanel({ event, onChange }) {
         setSavingSettings(true);
         setSettingsSuccess(false);
         try {
-            const res = await csrfFetch(route('tenant.events.registration-settings.update', { event: event.id }), {
-                method: 'POST',
-                body: JSON.stringify(settings),
-            });
+            const res = await csrfFetch(
+                route('tenant.events.registration-settings.update', { event: event.id }),
+                {
+                    method: 'POST',
+                    body: JSON.stringify(settings),
+                }
+            );
             if (res.ok) {
                 setSettingsSuccess(true);
                 setTimeout(() => setSettingsSuccess(false), 3000);
@@ -130,48 +135,55 @@ export default function RegistrationFormPanel({ event, onChange }) {
             field_type: field.field_type || 'select',
             help_text: field.help_text || '',
             is_required: Boolean(field.is_required),
-            options: field.options && field.options.length > 0 
-                ? field.options.map(o => ({
-                    label: o.label || '',
-                    value: o.value || '',
-                    price: o.price ? (o.price / 100).toString() : '',
-                    is_override: Boolean(o.is_override)
-                })) 
-                : [{ label: '', value: '', price: '' }],
+            options:
+                field.options && field.options.length > 0
+                    ? field.options.map((o) => ({
+                          label: o.label || '',
+                          value: o.value || '',
+                          price: o.price ? (o.price / 100).toString() : '',
+                          is_override: Boolean(o.is_override),
+                      }))
+                    : [{ label: '', value: '', price: '' }],
             has_condition: hasCond,
-            conditional_logic: hasCond ? {
-                depends_on: field.conditional_logic.depends_on || '',
-                operator: field.conditional_logic.operator || 'equals',
-                value: field.conditional_logic.value || ''
-            } : {
-                depends_on: '',
-                operator: 'equals',
-                value: ''
-            }
+            conditional_logic: hasCond
+                ? {
+                      depends_on: field.conditional_logic.depends_on || '',
+                      operator: field.conditional_logic.operator || 'equals',
+                      value: field.conditional_logic.value || '',
+                  }
+                : {
+                      depends_on: '',
+                      operator: 'equals',
+                      value: '',
+                  },
         });
         setFieldErrors({});
         setModalOpen(true);
     };
 
     const addOptionRow = () => {
-        setFieldForm(prev => ({
+        setFieldForm((prev) => ({
             ...prev,
-            options: [...prev.options, { label: '', value: '', price: '' }]
+            options: [...prev.options, { label: '', value: '', price: '' }],
         }));
     };
 
     const removeOptionRow = (index) => {
-        setFieldForm(prev => ({
+        setFieldForm((prev) => ({
             ...prev,
-            options: prev.options.filter((_, i) => i !== index)
+            options: prev.options.filter((_, i) => i !== index),
         }));
     };
 
     const updateOptionRow = (index, key, val) => {
-        setFieldForm(prev => {
+        setFieldForm((prev) => {
             const nextOpts = [...prev.options];
             nextOpts[index] = { ...nextOpts[index], [key]: val };
-            if (key === 'label' && (!nextOpts[index].value || nextOpts[index].value === slugify(nextOpts[index].label.slice(0, -1)))) {
+            if (
+                key === 'label' &&
+                (!nextOpts[index].value ||
+                    nextOpts[index].value === slugify(nextOpts[index].label.slice(0, -1)))
+            ) {
                 nextOpts[index].value = slugify(val);
             }
             return { ...prev, options: nextOpts };
@@ -179,7 +191,10 @@ export default function RegistrationFormPanel({ event, onChange }) {
     };
 
     const slugify = (text) => {
-        return text.toString().toLowerCase().trim()
+        return text
+            .toString()
+            .toLowerCase()
+            .trim()
             .replace(/\s+/g, '_')
             .replace(/[^\w-]+/g, '')
             .replace(/--+/g, '_');
@@ -198,20 +213,24 @@ export default function RegistrationFormPanel({ event, onChange }) {
             is_required: fieldForm.is_required,
             options: ['select', 'radio', 'checkbox'].includes(fieldForm.field_type)
                 ? fieldForm.options
-                    .filter(o => o.label.trim() !== '')
-                    .map(o => ({
-                        label: o.label.trim(),
-                        value: o.value.trim() || slugify(o.label),
-                        price: o.price !== '' && !isNaN(Number(o.price)) ? Math.round(Number(o.price) * 100) : null,
-                        is_override: Boolean(o.is_override)
-                    }))
+                      .filter((o) => o.label.trim() !== '')
+                      .map((o) => ({
+                          label: o.label.trim(),
+                          value: o.value.trim() || slugify(o.label),
+                          price:
+                              o.price !== '' && !isNaN(Number(o.price))
+                                  ? Math.round(Number(o.price) * 100)
+                                  : null,
+                          is_override: Boolean(o.is_override),
+                      }))
                 : null,
-            conditional_logic: fieldForm.has_condition && fieldForm.conditional_logic.depends_on
-                ? fieldForm.conditional_logic
-                : null
+            conditional_logic:
+                fieldForm.has_condition && fieldForm.conditional_logic.depends_on
+                    ? fieldForm.conditional_logic
+                    : null,
         };
 
-        const url = editingField 
+        const url = editingField
             ? route('tenant.events.form-fields.update', { event: event.id, field: editingField.id })
             : route('tenant.events.form-fields.store', { event: event.id });
         const method = editingField ? 'PUT' : 'POST';
@@ -219,7 +238,7 @@ export default function RegistrationFormPanel({ event, onChange }) {
         try {
             const res = await csrfFetch(url, {
                 method,
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
             });
 
             if (res.ok) {
@@ -238,9 +257,15 @@ export default function RegistrationFormPanel({ event, onChange }) {
     const handleDeleteField = async () => {
         if (!deleteTarget) return;
         try {
-            const res = await csrfFetch(route('tenant.events.form-fields.destroy', { event: event.id, field: deleteTarget.id }), {
-                method: 'DELETE'
-            });
+            const res = await csrfFetch(
+                route('tenant.events.form-fields.destroy', {
+                    event: event.id,
+                    field: deleteTarget.id,
+                }),
+                {
+                    method: 'DELETE',
+                }
+            );
             if (res.ok) {
                 setDeleteTarget(null);
                 loadData();
@@ -264,17 +289,20 @@ export default function RegistrationFormPanel({ event, onChange }) {
 
         await csrfFetch(route('tenant.events.form-fields.reorder', { event: event.id }), {
             method: 'POST',
-            body: JSON.stringify({ order: newOrder.map(f => f.id) })
+            body: JSON.stringify({ order: newOrder.map((f) => f.id) }),
         });
     };
 
     // Candidate parent fields for conditional logic (must be select or radio)
-    const eligibleParentFields = fields.filter(f => 
-        ['select', 'radio'].includes(f.field_type) && 
-        (!editingField || f.id !== editingField.id)
+    const eligibleParentFields = fields.filter(
+        (f) =>
+            ['select', 'radio'].includes(f.field_type) &&
+            (!editingField || f.id !== editingField.id)
     );
 
-    const selectedParent = eligibleParentFields.find(f => f.field_key === fieldForm.conditional_logic.depends_on);
+    const selectedParent = eligibleParentFields.find(
+        (f) => f.field_key === fieldForm.conditional_logic.depends_on
+    );
 
     return (
         <div className="space-y-8 max-w-5xl">
@@ -287,27 +315,38 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             Core Registration Identity Fields
                         </h3>
                         <p className="text-xs text-ink-secondary mt-1">
-                            MiConvener guarantees standard attendee verification for all registrations.
+                            MiConvener guarantees standard attendee verification for all
+                            registrations.
                         </p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
                     <div className="p-3 bg-canvas border border-border rounded flex items-center justify-between">
-                        <span className="text-sm font-medium text-ink">Title (Dr., Prof., etc.)</span>
-                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">Required</span>
+                        <span className="text-sm font-medium text-ink">
+                            Title (Dr., Prof., etc.)
+                        </span>
+                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">
+                            Required
+                        </span>
                     </div>
                     <div className="p-3 bg-canvas border border-border rounded flex items-center justify-between">
                         <span className="text-sm font-medium text-ink">First Name</span>
-                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">Required</span>
+                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">
+                            Required
+                        </span>
                     </div>
                     <div className="p-3 bg-canvas border border-border rounded flex items-center justify-between">
                         <span className="text-sm font-medium text-ink">Last Name</span>
-                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">Required</span>
+                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">
+                            Required
+                        </span>
                     </div>
                     <div className="p-3 bg-canvas border border-border rounded flex items-center justify-between">
                         <span className="text-sm font-medium text-ink">Email Address</span>
-                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">Required</span>
+                        <span className="text-[11px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded">
+                            Required
+                        </span>
                     </div>
                 </div>
 
@@ -318,15 +357,23 @@ export default function RegistrationFormPanel({ event, onChange }) {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Phone Number Requirement */}
                         <div className="p-3 border border-border rounded bg-surface">
-                            <label className="text-xs font-medium text-ink block mb-2">Phone Number</label>
-                            <select 
-                                value={!settings.collect_phone ? 'disabled' : (settings.require_phone ? 'required' : 'optional')}
+                            <label className="text-xs font-medium text-ink block mb-2">
+                                Phone Number
+                            </label>
+                            <select
+                                value={
+                                    !settings.collect_phone
+                                        ? 'disabled'
+                                        : settings.require_phone
+                                          ? 'required'
+                                          : 'optional'
+                                }
                                 onChange={(e) => {
                                     const val = e.target.value;
-                                    setSettings(prev => ({
+                                    setSettings((prev) => ({
                                         ...prev,
                                         collect_phone: val !== 'disabled',
-                                        require_phone: val === 'required'
+                                        require_phone: val === 'required',
                                     }));
                                 }}
                                 className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink focus:border-accent"
@@ -339,15 +386,23 @@ export default function RegistrationFormPanel({ event, onChange }) {
 
                         {/* Dietary Requirements */}
                         <div className="p-3 border border-border rounded bg-surface">
-                            <label className="text-xs font-medium text-ink block mb-2">Dietary Requirements</label>
-                            <select 
-                                value={!settings.collect_dietary ? 'disabled' : (settings.require_dietary ? 'required' : 'optional')}
+                            <label className="text-xs font-medium text-ink block mb-2">
+                                Dietary Requirements
+                            </label>
+                            <select
+                                value={
+                                    !settings.collect_dietary
+                                        ? 'disabled'
+                                        : settings.require_dietary
+                                          ? 'required'
+                                          : 'optional'
+                                }
                                 onChange={(e) => {
                                     const val = e.target.value;
-                                    setSettings(prev => ({
+                                    setSettings((prev) => ({
                                         ...prev,
                                         collect_dietary: val !== 'disabled',
-                                        require_dietary: val === 'required'
+                                        require_dietary: val === 'required',
                                     }));
                                 }}
                                 className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink focus:border-accent"
@@ -360,15 +415,23 @@ export default function RegistrationFormPanel({ event, onChange }) {
 
                         {/* Accessibility Needs */}
                         <div className="p-3 border border-border rounded bg-surface">
-                            <label className="text-xs font-medium text-ink block mb-2">Accessibility Needs</label>
-                            <select 
-                                value={!settings.collect_accessibility ? 'disabled' : (settings.require_accessibility ? 'required' : 'optional')}
+                            <label className="text-xs font-medium text-ink block mb-2">
+                                Accessibility Needs
+                            </label>
+                            <select
+                                value={
+                                    !settings.collect_accessibility
+                                        ? 'disabled'
+                                        : settings.require_accessibility
+                                          ? 'required'
+                                          : 'optional'
+                                }
                                 onChange={(e) => {
                                     const val = e.target.value;
-                                    setSettings(prev => ({
+                                    setSettings((prev) => ({
                                         ...prev,
                                         collect_accessibility: val !== 'disabled',
-                                        require_accessibility: val === 'required'
+                                        require_accessibility: val === 'required',
                                     }));
                                 }}
                                 className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink focus:border-accent"
@@ -384,14 +447,12 @@ export default function RegistrationFormPanel({ event, onChange }) {
                         <span className="text-xs text-ink-secondary">
                             {settingsSuccess && (
                                 <span className="text-success-fg font-medium flex items-center gap-1">
-                                    <CheckCircle2 className="h-3.5 w-3.5" /> Settings saved successfully!
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Settings saved
+                                    successfully!
                                 </span>
                             )}
                         </span>
-                        <Button 
-                            onClick={handleSaveSettings}
-                            disabled={savingSettings}
-                        >
+                        <Button onClick={handleSaveSettings} disabled={savingSettings}>
                             {savingSettings ? 'Saving...' : 'Save Requirements'}
                         </Button>
                     </div>
@@ -407,7 +468,8 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             Custom Registration Fields & Conditional Pricing
                         </h3>
                         <p className="text-xs text-ink-secondary mt-1">
-                            Add custom questions, attendance categories, professional cadres, and attach pricing or conditional rules.
+                            Add custom questions, attendance categories, professional cadres, and
+                            attach pricing or conditional rules.
                         </p>
                     </div>
                     <Button icon={Plus} onClick={openCreateModal}>
@@ -416,13 +478,16 @@ export default function RegistrationFormPanel({ event, onChange }) {
                 </div>
 
                 {loading ? (
-                    <div className="py-8 text-center text-xs text-ink-secondary">Loading form fields...</div>
+                    <div className="py-8 text-center text-xs text-ink-secondary">
+                        Loading form fields...
+                    </div>
                 ) : fields.length === 0 ? (
                     <div className="py-12 text-center">
                         <Layers className="h-8 w-8 text-ink-secondary/40 mx-auto mb-2" />
                         <p className="text-sm font-medium text-ink">No custom fields created yet</p>
                         <p className="text-xs text-ink-secondary max-w-sm mx-auto mt-1 mb-4">
-                            You can define custom questions, attendance types (In-Person / Virtual), roles (Doctor, Nurse, Student), and attach conditional pricing.
+                            You can define custom questions, attendance types (In-Person / Virtual),
+                            roles (Doctor, Nurse, Student), and attach conditional pricing.
                         </p>
                         <Button icon={Plus} onClick={openCreateModal}>
                             Add First Custom Field
@@ -431,10 +496,15 @@ export default function RegistrationFormPanel({ event, onChange }) {
                 ) : (
                     <div className="divide-y divide-border mt-2">
                         {fields.map((field, idx) => (
-                            <div key={field.id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div
+                                key={field.id}
+                                className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-3"
+                            >
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-sm font-medium text-ink">{field.label}</span>
+                                        <span className="text-sm font-medium text-ink">
+                                            {field.label}
+                                        </span>
                                         <code className="text-[11px] bg-canvas px-1.5 py-0.5 rounded text-ink-secondary border border-border">
                                             {field.field_key}
                                         </code>
@@ -456,11 +526,15 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     {field.options && field.options.length > 0 && (
                                         <div className="flex items-center gap-2 flex-wrap pt-1">
                                             {field.options.map((opt, oIdx) => (
-                                                <span key={oIdx} className="text-xs bg-canvas px-2 py-0.5 rounded border border-border text-ink flex items-center gap-1.5">
+                                                <span
+                                                    key={oIdx}
+                                                    className="text-xs bg-canvas px-2 py-0.5 rounded border border-border text-ink flex items-center gap-1.5"
+                                                >
                                                     <span>{opt.label}</span>
                                                     {opt.price ? (
                                                         <span className="font-mono text-accent font-semibold text-[11px]">
-                                                            {event.currency} {(opt.price / 100).toFixed(2)}
+                                                            {event.currency}{' '}
+                                                            {(opt.price / 100).toFixed(2)}
                                                         </span>
                                                     ) : null}
                                                 </span>
@@ -469,19 +543,24 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     )}
 
                                     {/* Conditional Logic Display */}
-                                    {field.conditional_logic && field.conditional_logic.depends_on && (
-                                        <div className="pt-1 flex items-center gap-1 text-[11px] text-accent">
-                                            <Sparkles className="h-3 w-3" />
-                                            <span>
-                                                Shown conditionally when <strong>{field.conditional_logic.depends_on}</strong> = "{field.conditional_logic.value}"
-                                            </span>
-                                        </div>
-                                    )}
+                                    {field.conditional_logic &&
+                                        field.conditional_logic.depends_on && (
+                                            <div className="pt-1 flex items-center gap-1 text-[11px] text-accent">
+                                                <Sparkles className="h-3 w-3" />
+                                                <span>
+                                                    Shown conditionally when{' '}
+                                                    <strong>
+                                                        {field.conditional_logic.depends_on}
+                                                    </strong>{' '}
+                                                    = "{field.conditional_logic.value}"
+                                                </span>
+                                            </div>
+                                        )}
                                 </div>
 
                                 <div className="flex items-center gap-1 shrink-0 self-end md:self-center">
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={() => handleMoveField(idx, -1)}
                                         disabled={idx === 0}
                                         className="p-1.5 text-ink-secondary hover:text-ink disabled:opacity-30"
@@ -489,8 +568,8 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     >
                                         <ArrowUp className="h-3.5 w-3.5" />
                                     </button>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={() => handleMoveField(idx, 1)}
                                         disabled={idx === fields.length - 1}
                                         className="p-1.5 text-ink-secondary hover:text-ink disabled:opacity-30"
@@ -498,16 +577,16 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     >
                                         <ArrowDown className="h-3.5 w-3.5" />
                                     </button>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={() => openEditModal(field)}
                                         className="p-1.5 text-ink-secondary hover:text-accent ml-1"
                                         title="Edit Field"
                                     >
                                         <Edit2 className="h-3.5 w-3.5" />
                                     </button>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={() => setDeleteTarget(field)}
                                         className="p-1.5 text-ink-secondary hover:text-danger-fg"
                                         title="Delete Field"
@@ -531,7 +610,8 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                 Interactive Form & Pricing Preview
                             </h3>
                             <p className="text-xs text-ink-secondary mt-1">
-                                Try out your form's conditional questions and verify that prices calculate as expected.
+                                Try out your form's conditional questions and verify that prices
+                                calculate as expected.
                             </p>
                         </div>
                     </div>
@@ -541,63 +621,107 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             {/* Standard Required Identity */}
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="text-[11px] text-ink-secondary">Title *</label>
-                                    <input disabled value="Dr." className="w-full bg-surface/50 border border-border rounded px-2.5 py-1.5 text-xs text-ink" />
+                                    <label className="text-[11px] text-ink-secondary">
+                                        Title *
+                                    </label>
+                                    <input
+                                        disabled
+                                        value="Dr."
+                                        className="w-full bg-surface/50 border border-border rounded px-2.5 py-1.5 text-xs text-ink"
+                                    />
                                 </div>
                                 <div>
-                                    <label className="text-[11px] text-ink-secondary">Full Name *</label>
-                                    <input disabled value="Kwame Mensah" className="w-full bg-surface/50 border border-border rounded px-2.5 py-1.5 text-xs text-ink" />
+                                    <label className="text-[11px] text-ink-secondary">
+                                        Full Name *
+                                    </label>
+                                    <input
+                                        disabled
+                                        value="Kwame Mensah"
+                                        className="w-full bg-surface/50 border border-border rounded px-2.5 py-1.5 text-xs text-ink"
+                                    />
                                 </div>
                             </div>
 
                             {/* Dynamic Fields */}
-                            {fields.map(field => {
+                            {fields.map((field) => {
                                 // Evaluate conditional rule
                                 if (field.conditional_logic && field.conditional_logic.depends_on) {
-                                    const parentVal = previewAnswers[field.conditional_logic.depends_on];
+                                    const parentVal =
+                                        previewAnswers[field.conditional_logic.depends_on];
                                     if (parentVal !== field.conditional_logic.value) {
                                         return null; // Hidden
                                     }
                                 }
 
                                 return (
-                                    <div key={field.id} className="p-2.5 rounded bg-surface border border-border">
+                                    <div
+                                        key={field.id}
+                                        className="p-2.5 rounded bg-surface border border-border"
+                                    >
                                         <label className="text-xs font-medium text-ink block mb-1">
-                                            {field.label} {field.is_required && <span className="text-accent">*</span>}
+                                            {field.label}{' '}
+                                            {field.is_required && (
+                                                <span className="text-accent">*</span>
+                                            )}
                                         </label>
                                         {field.help_text && (
-                                            <p className="text-[11px] text-ink-secondary mb-2">{field.help_text}</p>
+                                            <p className="text-[11px] text-ink-secondary mb-2">
+                                                {field.help_text}
+                                            </p>
                                         )}
 
                                         {['select', 'radio'].includes(field.field_type) ? (
                                             <div className="space-y-1.5">
                                                 {field.options?.map((opt, idx) => (
-                                                    <label key={idx} className="flex items-center justify-between gap-2 text-xs text-ink cursor-pointer p-1.5 rounded hover:bg-canvas">
+                                                    <label
+                                                        key={idx}
+                                                        className="flex items-center justify-between gap-2 text-xs text-ink cursor-pointer p-1.5 rounded hover:bg-canvas"
+                                                    >
                                                         <span className="flex items-center gap-2">
-                                                            <input 
-                                                                type="radio" 
+                                                            <input
+                                                                type="radio"
                                                                 name={field.field_key}
                                                                 value={opt.value}
-                                                                checked={previewAnswers[field.field_key] === opt.value}
-                                                                onChange={(e) => setPreviewAnswers(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                                                checked={
+                                                                    previewAnswers[
+                                                                        field.field_key
+                                                                    ] === opt.value
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setPreviewAnswers((prev) => ({
+                                                                        ...prev,
+                                                                        [field.field_key]:
+                                                                            e.target.value,
+                                                                    }))
+                                                                }
                                                             />
                                                             <span>{opt.label}</span>
                                                         </span>
                                                         {opt.price ? (
                                                             <span className="font-mono text-accent font-semibold text-[11px]">
-                                                                {event.currency} {(opt.price / 100).toFixed(2)}
+                                                                {event.currency}{' '}
+                                                                {(opt.price / 100).toFixed(2)}
                                                             </span>
                                                         ) : null}
                                                     </label>
                                                 ))}
                                             </div>
                                         ) : (
-                                            <input 
-                                                type={field.field_type === 'number' ? 'number' : 'text'}
+                                            <input
+                                                type={
+                                                    field.field_type === 'number'
+                                                        ? 'number'
+                                                        : 'text'
+                                                }
                                                 placeholder={`Enter ${field.label.toLowerCase()}`}
                                                 className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
                                                 value={previewAnswers[field.field_key] || ''}
-                                                onChange={(e) => setPreviewAnswers(prev => ({ ...prev, [field.field_key]: e.target.value }))}
+                                                onChange={(e) =>
+                                                    setPreviewAnswers((prev) => ({
+                                                        ...prev,
+                                                        [field.field_key]: e.target.value,
+                                                    }))
+                                                }
                                             />
                                         )}
                                     </div>
@@ -622,13 +746,18 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                 label="Field Label *"
                                 placeholder="e.g. Attendance Mode, Professional Cadre"
                                 value={fieldForm.label}
-                                onChange={(e) => setFieldForm(prev => ({
-                                    ...prev, 
-                                    label: e.target.value,
-                                    field_key: !editingField && (!prev.field_key || prev.field_key === slugify(prev.label))
-                                        ? slugify(e.target.value)
-                                        : prev.field_key
-                                }))}
+                                onChange={(e) =>
+                                    setFieldForm((prev) => ({
+                                        ...prev,
+                                        label: e.target.value,
+                                        field_key:
+                                            !editingField &&
+                                            (!prev.field_key ||
+                                                prev.field_key === slugify(prev.label))
+                                                ? slugify(e.target.value)
+                                                : prev.field_key,
+                                    }))
+                                }
                                 error={fieldErrors.label?.[0]}
                             />
 
@@ -636,7 +765,12 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                 label="Identifier / Key *"
                                 placeholder="e.g. attendance_mode, cadre"
                                 value={fieldForm.field_key}
-                                onChange={(e) => setFieldForm(prev => ({ ...prev, field_key: slugify(e.target.value) }))}
+                                onChange={(e) =>
+                                    setFieldForm((prev) => ({
+                                        ...prev,
+                                        field_key: slugify(e.target.value),
+                                    }))
+                                }
                                 error={fieldErrors.field_key?.[0]}
                             />
                         </div>
@@ -645,10 +779,17 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             <Select
                                 label="Field Input Type *"
                                 value={fieldForm.field_type}
-                                onChange={(e) => setFieldForm(prev => ({ ...prev, field_type: e.target.value }))}
+                                onChange={(e) =>
+                                    setFieldForm((prev) => ({
+                                        ...prev,
+                                        field_type: e.target.value,
+                                    }))
+                                }
                             >
                                 {FIELD_TYPES.map((type) => (
-                                    <option key={type.value} value={type.value}>{type.label}</option>
+                                    <option key={type.value} value={type.value}>
+                                        {type.label}
+                                    </option>
                                 ))}
                             </Select>
 
@@ -657,7 +798,12 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     <input
                                         type="checkbox"
                                         checked={fieldForm.is_required}
-                                        onChange={(e) => setFieldForm(prev => ({ ...prev, is_required: e.target.checked }))}
+                                        onChange={(e) =>
+                                            setFieldForm((prev) => ({
+                                                ...prev,
+                                                is_required: e.target.checked,
+                                            }))
+                                        }
                                         className="rounded border-border text-accent focus:ring-accent"
                                     />
                                     <span>Required Field (Attendee must answer)</span>
@@ -669,7 +815,9 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             label="Help Text / Hint (Optional)"
                             placeholder="Helpful instruction displayed under the question"
                             value={fieldForm.help_text}
-                            onChange={(e) => setFieldForm(prev => ({ ...prev, help_text: e.target.value }))}
+                            onChange={(e) =>
+                                setFieldForm((prev) => ({ ...prev, help_text: e.target.value }))
+                            }
                         />
 
                         {/* Options & Pricing (for select, radio, checkbox) */}
@@ -684,7 +832,8 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                     </Button>
                                 </div>
                                 <p className="text-[11px] text-ink-secondary">
-                                    Add your choices. If an option affects pricing (e.g. Doctor = 100, Nurse = 80), specify the amount in {event.currency}.
+                                    Add your choices. If an option affects pricing (e.g. Doctor =
+                                    100, Nurse = 80), specify the amount in {event.currency}.
                                 </p>
 
                                 <div className="space-y-2">
@@ -694,25 +843,37 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                                 type="text"
                                                 placeholder="Choice Label (e.g. Doctor)"
                                                 value={opt.label}
-                                                onChange={(e) => updateOptionRow(oIdx, 'label', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateOptionRow(oIdx, 'label', e.target.value)
+                                                }
                                                 className="flex-1 text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
                                             />
                                             <input
                                                 type="text"
                                                 placeholder="Value (e.g. doctor)"
                                                 value={opt.value}
-                                                onChange={(e) => updateOptionRow(oIdx, 'value', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateOptionRow(oIdx, 'value', e.target.value)
+                                                }
                                                 className="w-28 text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
                                             />
                                             <div className="flex items-center gap-1 w-32">
-                                                <span className="text-[11px] text-ink-secondary">{event.currency}</span>
+                                                <span className="text-[11px] text-ink-secondary">
+                                                    {event.currency}
+                                                </span>
                                                 <input
                                                     type="number"
                                                     step="0.01"
                                                     min="0"
                                                     placeholder="Price (opt)"
                                                     value={opt.price}
-                                                    onChange={(e) => updateOptionRow(oIdx, 'price', e.target.value)}
+                                                    onChange={(e) =>
+                                                        updateOptionRow(
+                                                            oIdx,
+                                                            'price',
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     className="w-full text-xs rounded border border-border bg-surface px-2 py-1.5 text-ink font-mono"
                                                 />
                                             </div>
@@ -736,7 +897,12 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                 <input
                                     type="checkbox"
                                     checked={fieldForm.has_condition}
-                                    onChange={(e) => setFieldForm(prev => ({ ...prev, has_condition: e.target.checked }))}
+                                    onChange={(e) =>
+                                        setFieldForm((prev) => ({
+                                            ...prev,
+                                            has_condition: e.target.checked,
+                                        }))
+                                    }
                                     className="rounded border-border text-accent focus:ring-accent"
                                 />
                                 <span>Conditional Visibility</span>
@@ -745,46 +911,71 @@ export default function RegistrationFormPanel({ event, onChange }) {
                             {fieldForm.has_condition && (
                                 <div className="space-y-3 pt-2">
                                     <p className="text-[11px] text-ink-secondary">
-                                        Only show this field if the attendee selected a specific answer on another question.
+                                        Only show this field if the attendee selected a specific
+                                        answer on another question.
                                     </p>
 
                                     {eligibleParentFields.length === 0 ? (
                                         <p className="text-xs text-warning-fg bg-warning-bg p-2 rounded">
-                                            Create a parent Dropdown or Radio question (such as Attendance Mode) first to use conditional logic.
+                                            Create a parent Dropdown or Radio question (such as
+                                            Attendance Mode) first to use conditional logic.
                                         </p>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div>
-                                                <label className="text-[11px] text-ink-secondary block mb-1">Parent Question</label>
+                                                <label className="text-[11px] text-ink-secondary block mb-1">
+                                                    Parent Question
+                                                </label>
                                                 <select
                                                     value={fieldForm.conditional_logic.depends_on}
-                                                    onChange={(e) => setFieldForm(prev => ({
-                                                        ...prev,
-                                                        conditional_logic: { ...prev.conditional_logic, depends_on: e.target.value, value: '' }
-                                                    }))}
+                                                    onChange={(e) =>
+                                                        setFieldForm((prev) => ({
+                                                            ...prev,
+                                                            conditional_logic: {
+                                                                ...prev.conditional_logic,
+                                                                depends_on: e.target.value,
+                                                                value: '',
+                                                            },
+                                                        }))
+                                                    }
                                                     className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
                                                 >
-                                                    <option value="">-- Select Parent Question --</option>
-                                                    {eligibleParentFields.map(f => (
-                                                        <option key={f.id} value={f.field_key}>{f.label} ({f.field_key})</option>
+                                                    <option value="">
+                                                        -- Select Parent Question --
+                                                    </option>
+                                                    {eligibleParentFields.map((f) => (
+                                                        <option key={f.id} value={f.field_key}>
+                                                            {f.label} ({f.field_key})
+                                                        </option>
                                                     ))}
                                                 </select>
                                             </div>
 
                                             <div>
-                                                <label className="text-[11px] text-ink-secondary block mb-1">When answer equals</label>
+                                                <label className="text-[11px] text-ink-secondary block mb-1">
+                                                    When answer equals
+                                                </label>
                                                 {selectedParent?.options ? (
                                                     <select
                                                         value={fieldForm.conditional_logic.value}
-                                                        onChange={(e) => setFieldForm(prev => ({
-                                                            ...prev,
-                                                            conditional_logic: { ...prev.conditional_logic, value: e.target.value }
-                                                        }))}
+                                                        onChange={(e) =>
+                                                            setFieldForm((prev) => ({
+                                                                ...prev,
+                                                                conditional_logic: {
+                                                                    ...prev.conditional_logic,
+                                                                    value: e.target.value,
+                                                                },
+                                                            }))
+                                                        }
                                                         className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
                                                     >
-                                                        <option value="">-- Select Choice --</option>
+                                                        <option value="">
+                                                            -- Select Choice --
+                                                        </option>
                                                         {selectedParent.options.map((opt, oIdx) => (
-                                                            <option key={oIdx} value={opt.value}>{opt.label}</option>
+                                                            <option key={oIdx} value={opt.value}>
+                                                                {opt.label}
+                                                            </option>
                                                         ))}
                                                     </select>
                                                 ) : (
@@ -792,10 +983,15 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                                         type="text"
                                                         placeholder="e.g. in_person"
                                                         value={fieldForm.conditional_logic.value}
-                                                        onChange={(e) => setFieldForm(prev => ({
-                                                            ...prev,
-                                                            conditional_logic: { ...prev.conditional_logic, value: e.target.value }
-                                                        }))}
+                                                        onChange={(e) =>
+                                                            setFieldForm((prev) => ({
+                                                                ...prev,
+                                                                conditional_logic: {
+                                                                    ...prev.conditional_logic,
+                                                                    value: e.target.value,
+                                                                },
+                                                            }))
+                                                        }
                                                         className="w-full text-xs rounded border border-border bg-surface px-2.5 py-1.5 text-ink"
                                                     />
                                                 )}
@@ -811,7 +1007,11 @@ export default function RegistrationFormPanel({ event, onChange }) {
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={savingField}>
-                                {savingField ? 'Saving...' : (editingField ? 'Update Field' : 'Create Field')}
+                                {savingField
+                                    ? 'Saving...'
+                                    : editingField
+                                      ? 'Update Field'
+                                      : 'Create Field'}
                             </Button>
                         </div>
                     </form>

@@ -26,16 +26,19 @@ export default function TicketTypesPanel({ event, ticketTypes, onChange }) {
         e.preventDefault();
         setSaving(true);
 
-        const response = await csrfFetch(route('tenant.events.ticket-types.store', { event: event.id }), {
-            method: 'POST',
-            body: JSON.stringify({
-                name: form.name,
-                price: Math.round(Number(form.price || 0) * 100),
-                capacity: form.capacity === '' ? null : Number(form.capacity),
-                badge_tier: form.badge_tier,
-                is_active: true,
-            }),
-        });
+        const response = await csrfFetch(
+            route('tenant.events.ticket-types.store', { event: event.id }),
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: form.name,
+                    price: Math.round(Number(form.price || 0) * 100),
+                    capacity: form.capacity === '' ? null : Number(form.capacity),
+                    badge_tier: form.badge_tier,
+                    is_active: true,
+                }),
+            }
+        );
 
         setSaving(false);
 
@@ -50,9 +53,15 @@ export default function TicketTypesPanel({ event, ticketTypes, onChange }) {
     };
 
     const removeTicketType = async (ticketType) => {
-        const response = await csrfFetch(route('tenant.events.ticket-types.destroy', { event: event.id, ticketType: ticketType.id }), {
-            method: 'DELETE',
-        });
+        const response = await csrfFetch(
+            route('tenant.events.ticket-types.destroy', {
+                event: event.id,
+                ticketType: ticketType.id,
+            }),
+            {
+                method: 'DELETE',
+            }
+        );
 
         if (!response.ok) {
             const json = await response.json();
@@ -64,10 +73,16 @@ export default function TicketTypesPanel({ event, ticketTypes, onChange }) {
     };
 
     const setBadgeTier = async (ticketType, badge_tier) => {
-        const response = await csrfFetch(route('tenant.events.ticket-types.badge-tier', { event: event.id, ticketType: ticketType.id }), {
-            method: 'PATCH',
-            body: JSON.stringify({ badge_tier }),
-        });
+        const response = await csrfFetch(
+            route('tenant.events.ticket-types.badge-tier', {
+                event: event.id,
+                ticketType: ticketType.id,
+            }),
+            {
+                method: 'PATCH',
+                body: JSON.stringify({ badge_tier }),
+            }
+        );
 
         if (!response.ok) {
             const json = await response.json();
@@ -83,12 +98,19 @@ export default function TicketTypesPanel({ event, ticketTypes, onChange }) {
             {ticketTypes.length > 0 ? (
                 <ul className="mb-6 divide-y divide-border rounded-md border border-border">
                     {ticketTypes.map((ticketType) => (
-                        <li key={ticketType.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <li
+                            key={ticketType.id}
+                            className="flex items-center justify-between gap-3 px-4 py-3"
+                        >
                             <div className="min-w-0">
-                                <div className="text-sm font-medium text-ink">{ticketType.name}</div>
+                                <div className="text-sm font-medium text-ink">
+                                    {ticketType.name}
+                                </div>
                                 <div className="text-xs text-ink-secondary">
                                     {formatMoney(ticketType.price, event.currency)}
-                                    {ticketType.capacity ? ` · ${ticketType.confirmed_count}/${ticketType.capacity} registered` : ` · ${ticketType.confirmed_count} registered`}
+                                    {ticketType.capacity
+                                        ? ` · ${ticketType.confirmed_count}/${ticketType.capacity} registered`
+                                        : ` · ${ticketType.confirmed_count} registered`}
                                     {ticketType.is_sold_out ? ' · Sold out' : ''}
                                 </div>
                             </div>
@@ -99,10 +121,16 @@ export default function TicketTypesPanel({ event, ticketTypes, onChange }) {
                                     className="w-32"
                                 >
                                     {Object.entries(BADGE_TIER_LABEL).map(([value, label]) => (
-                                        <option key={value} value={value}>{label} badge</option>
+                                        <option key={value} value={value}>
+                                            {label} badge
+                                        </option>
                                     ))}
                                 </Select>
-                                <button type="button" onClick={() => removeTicketType(ticketType)} className="text-ink-secondary hover:text-danger-fg">
+                                <button
+                                    type="button"
+                                    onClick={() => removeTicketType(ticketType)}
+                                    className="text-ink-secondary hover:text-danger-fg"
+                                >
                                     <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                                 </button>
                             </div>
@@ -111,20 +139,53 @@ export default function TicketTypesPanel({ event, ticketTypes, onChange }) {
                 </ul>
             ) : (
                 <p className="mb-6 text-sm text-ink-secondary">
-                    No ticket types yet — the event's default price applies to every registration until you add one.
+                    No ticket types yet — the event's default price applies to every registration
+                    until you add one.
                 </p>
             )}
 
-            <form onSubmit={addTicketType} className="grid grid-cols-[1fr_120px_120px_140px_auto] items-end gap-3">
-                <Input label="Name" placeholder="e.g. In-Person" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                <Input label="Price" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
-                <Input label="Capacity" type="number" min="1" placeholder="Unlimited" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
-                <Select label="Badge" value={form.badge_tier} onChange={(e) => setForm({ ...form, badge_tier: e.target.value })}>
+            <form
+                onSubmit={addTicketType}
+                className="grid grid-cols-[1fr_120px_120px_140px_auto] items-end gap-3"
+            >
+                <Input
+                    label="Name"
+                    placeholder="e.g. In-Person"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                />
+                <Input
+                    label="Price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    required
+                />
+                <Input
+                    label="Capacity"
+                    type="number"
+                    min="1"
+                    placeholder="Unlimited"
+                    value={form.capacity}
+                    onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                />
+                <Select
+                    label="Badge"
+                    value={form.badge_tier}
+                    onChange={(e) => setForm({ ...form, badge_tier: e.target.value })}
+                >
                     {Object.entries(BADGE_TIER_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
+                        <option key={value} value={value}>
+                            {label}
+                        </option>
                     ))}
                 </Select>
-                <Button type="submit" icon={Plus} disabled={saving}>Add</Button>
+                <Button type="submit" icon={Plus} disabled={saving}>
+                    Add
+                </Button>
             </form>
         </div>
     );

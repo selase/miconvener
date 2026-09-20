@@ -13,7 +13,15 @@
  */
 export default [
     {
-        ignores: ['vendor/**', 'public/**', 'node_modules/**', 'storage/**', 'bootstrap/cache/**', 'dist/**', '.worktrees/**'],
+        ignores: [
+            'vendor/**',
+            'public/**',
+            'node_modules/**',
+            'storage/**',
+            'bootstrap/cache/**',
+            'dist/**',
+            '.worktrees/**',
+        ],
     },
     {
         files: ['resources/js/**/*.{js,jsx}'],

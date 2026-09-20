@@ -25,9 +25,16 @@ export default function Wizard({ org }) {
                     Let&apos;s set up your organization&apos;s look before you dive in.
                 </p>
 
-                <form onSubmit={submit} className="space-y-6 rounded-lg border border-border bg-surface p-6">
+                <form
+                    onSubmit={submit}
+                    className="space-y-6 rounded-lg border border-border bg-surface p-6"
+                >
                     <div className="flex items-center gap-4">
-                        <img src={org.logo} alt="" className="h-16 w-16 rounded-lg border border-border object-cover" />
+                        <img
+                            src={org.logo}
+                            alt=""
+                            className="h-16 w-16 rounded-lg border border-border object-cover"
+                        />
                         <div>
                             <label className="inline-block cursor-pointer rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink hover:bg-surface-sunken">
                                 Upload logo
@@ -38,7 +45,9 @@ export default function Wizard({ org }) {
                                     onChange={(event) => setData('logo', event.target.files[0])}
                                 />
                             </label>
-                            {errors.logo && <p className="mt-1 text-sm text-danger-fg">{errors.logo}</p>}
+                            {errors.logo && (
+                                <p className="mt-1 text-sm text-danger-fg">{errors.logo}</p>
+                            )}
                         </div>
                     </div>
 
@@ -51,7 +60,9 @@ export default function Wizard({ org }) {
                     />
 
                     <div>
-                        <label className="mb-1.5 block text-sm font-medium text-ink">Brand color</label>
+                        <label className="mb-1.5 block text-sm font-medium text-ink">
+                            Brand color
+                        </label>
                         <div className="flex items-center gap-3">
                             <input
                                 type="color"
@@ -63,7 +74,9 @@ export default function Wizard({ org }) {
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={processing}>Continue</Button>
+                    <Button type="submit" disabled={processing}>
+                        Continue
+                    </Button>
                 </form>
             </div>
         </ConsoleLayout>

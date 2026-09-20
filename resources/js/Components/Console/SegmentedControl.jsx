@@ -8,7 +8,9 @@ export default function SegmentedControl({ options, value, onChange }) {
                     aria-selected={option.value === value}
                     onClick={() => onChange(option.value)}
                     className={`rounded-md px-4 py-2 text-[15px] font-medium transition-colors duration-120 ease-out ${
-                        option.value === value ? 'bg-surface text-ink shadow-raised' : 'text-ink-secondary'
+                        option.value === value
+                            ? 'bg-surface text-ink shadow-raised'
+                            : 'text-ink-secondary'
                     }`}
                 >
                     {option.label}

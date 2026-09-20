@@ -6,5 +6,9 @@ const VARIANTS = {
 };
 
 export default function StatusDot({ status = 'neutral' }) {
-    return <span className={`inline-block h-2 w-2 rounded-full ${VARIANTS[status] ?? VARIANTS.neutral}`} />;
+    return (
+        <span
+            className={`inline-block h-2 w-2 rounded-full ${VARIANTS[status] ?? VARIANTS.neutral}`}
+        />
+    );
 }

@@ -24,7 +24,7 @@ import {
     Send,
     Plus,
     Clock,
-    AlertCircle
+    AlertCircle,
 } from 'lucide-react';
 
 const ROLE_ICONS = {
@@ -36,11 +36,26 @@ const ROLE_ICONS = {
 };
 
 const ROLE_BADGES = {
-    delegate: { bg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300', label: 'Delegate' },
-    speaker: { bg: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300', label: 'Speaker' },
-    presenter: { bg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', label: 'Presenter' },
-    volunteer: { bg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', label: 'Volunteer' },
-    custom: { bg: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', label: 'Custom' },
+    delegate: {
+        bg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+        label: 'Delegate',
+    },
+    speaker: {
+        bg: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+        label: 'Speaker',
+    },
+    presenter: {
+        bg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        label: 'Presenter',
+    },
+    volunteer: {
+        bg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+        label: 'Volunteer',
+    },
+    custom: {
+        bg: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+        label: 'Custom',
+    },
 };
 
 export default function CertificatesPanel({ event }) {
@@ -102,9 +117,11 @@ export default function CertificatesPanel({ event }) {
                 setStats(data.stats || null);
                 setEligible(data.eligible || null);
             } else {
-                setLoadError(res.status === 403
-                    ? 'You do not have permission to view certificates for this event.'
-                    : 'The certificates for this event could not be loaded. Refresh to try again.');
+                setLoadError(
+                    res.status === 403
+                        ? 'You do not have permission to view certificates for this event.'
+                        : 'The certificates for this event could not be loaded. Refresh to try again.'
+                );
             }
         } catch (err) {
             console.error('Failed to load certificates data:', err);
@@ -139,7 +156,10 @@ export default function CertificatesPanel({ event }) {
         setSavingTemplate(true);
         try {
             const url = selectedTemplate
-                ? route('tenant.events.certificates.templates.update', { event: event.id, template: selectedTemplate.id })
+                ? route('tenant.events.certificates.templates.update', {
+                      event: event.id,
+                      template: selectedTemplate.id,
+                  })
                 : route('tenant.events.certificates.templates.store', { event: event.id });
             const method = selectedTemplate ? 'PUT' : 'POST';
 
@@ -175,14 +195,17 @@ export default function CertificatesPanel({ event }) {
 
             if (issueForm.target_group === 'custom') {
                 payload.custom_recipients = [
-                    { name: issueForm.custom_name, email: issueForm.custom_email }
+                    { name: issueForm.custom_name, email: issueForm.custom_email },
                 ];
             }
 
-            const res = await csrfFetch(route('tenant.events.certificates.issue', { event: event.id }), {
-                method: 'POST',
-                body: JSON.stringify(payload),
-            });
+            const res = await csrfFetch(
+                route('tenant.events.certificates.issue', { event: event.id }),
+                {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                }
+            );
 
             if (res.ok) {
                 const data = await res.json();
@@ -204,12 +227,15 @@ export default function CertificatesPanel({ event }) {
     const handleDeleteCertificate = async () => {
         if (!deleteCertTarget) return;
         try {
-            const res = await csrfFetch(route('tenant.events.certificates.destroy', {
-                event: event.id,
-                certificate: deleteCertTarget.id
-            }), {
-                method: 'DELETE',
-            });
+            const res = await csrfFetch(
+                route('tenant.events.certificates.destroy', {
+                    event: event.id,
+                    certificate: deleteCertTarget.id,
+                }),
+                {
+                    method: 'DELETE',
+                }
+            );
             if (res.ok) {
                 setDeleteCertTarget(null);
                 await loadData();
@@ -232,7 +258,8 @@ export default function CertificatesPanel({ event }) {
                         Multi-Role Electronic Certificates & Accreditation
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Generate and distribute verified digital certificates with CPD/CME hours and tamper-proof QR codes.
+                        Generate and distribute verified digital certificates with CPD/CME hours and
+                        tamper-proof QR codes.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -254,7 +281,9 @@ export default function CertificatesPanel({ event }) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Issued</span>
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Total Issued
+                            </span>
                             <Award className="w-4 h-4 text-amber-500" />
                         </div>
                         <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
@@ -267,7 +296,9 @@ export default function CertificatesPanel({ event }) {
 
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Delegates</span>
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Delegates
+                            </span>
                             <Users className="w-4 h-4 text-blue-500" />
                         </div>
                         <div className="mt-2 text-2xl font-black text-blue-600">
@@ -280,7 +311,9 @@ export default function CertificatesPanel({ event }) {
 
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Speakers</span>
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Speakers
+                            </span>
                             <Mic className="w-4 h-4 text-purple-500" />
                         </div>
                         <div className="mt-2 text-2xl font-black text-purple-600">
@@ -293,7 +326,9 @@ export default function CertificatesPanel({ event }) {
 
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Presenters</span>
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Presenters
+                            </span>
                             <FileText className="w-4 h-4 text-amber-500" />
                         </div>
                         <div className="mt-2 text-2xl font-black text-amber-600">
@@ -319,7 +354,7 @@ export default function CertificatesPanel({ event }) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {templates.map(tmpl => {
+                    {templates.map((tmpl) => {
                         const IconComponent = ROLE_ICONS[tmpl.role] || Award;
                         const badge = ROLE_BADGES[tmpl.role] || ROLE_BADGES.custom;
 
@@ -330,7 +365,9 @@ export default function CertificatesPanel({ event }) {
                             >
                                 <div>
                                     <div className="flex items-center justify-between">
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge.bg}`}>
+                                        <span
+                                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge.bg}`}
+                                        >
                                             {badge.label}
                                         </span>
                                         <IconComponent className="w-4 h-4 text-slate-400" />
@@ -381,7 +418,7 @@ export default function CertificatesPanel({ event }) {
                         >
                             All ({stats?.total_issued || 0})
                         </button>
-                        {['delegate', 'speaker', 'presenter', 'volunteer'].map(r => (
+                        {['delegate', 'speaker', 'presenter', 'volunteer'].map((r) => (
                             <button
                                 key={r}
                                 onClick={() => setRoleFilter(r)}
@@ -420,13 +457,18 @@ export default function CertificatesPanel({ event }) {
 
                 {/* Table Content */}
                 {loading && certificates.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500 text-xs">Loading certificates...</div>
+                    <div className="p-12 text-center text-slate-500 text-xs">
+                        Loading certificates...
+                    </div>
                 ) : certificates.length === 0 ? (
                     <div className="p-12 text-center space-y-2">
                         <Award className="w-8 h-8 text-slate-300 mx-auto" />
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No Certificates Issued Yet</p>
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            No Certificates Issued Yet
+                        </p>
                         <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                            Click "Issue Certificates" above to generate accredited credentials for your delegates, speakers, or presenters.
+                            Click "Issue Certificates" above to generate accredited credentials for
+                            your delegates, speakers, or presenters.
                         </p>
                     </div>
                 ) : (
@@ -443,11 +485,14 @@ export default function CertificatesPanel({ event }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                            {certificates.map(cert => {
+                            {certificates.map((cert) => {
                                 const badge = ROLE_BADGES[cert.role] || ROLE_BADGES.custom;
 
                                 return (
-                                    <tr key={cert.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                                    <tr
+                                        key={cert.id}
+                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
+                                    >
                                         <td className="p-3.5">
                                             <div className="font-bold text-slate-900 dark:text-white">
                                                 {cert.recipient_name}
@@ -457,7 +502,9 @@ export default function CertificatesPanel({ event }) {
                                             </div>
                                         </td>
                                         <td className="p-3.5">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.bg}`}>
+                                            <span
+                                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.bg}`}
+                                            >
                                                 {badge.label}
                                             </span>
                                         </td>
@@ -485,7 +532,7 @@ export default function CertificatesPanel({ event }) {
                                             <a
                                                 href={route('tenant.events.certificates.download', {
                                                     event: event.id,
-                                                    certificate: cert.id
+                                                    certificate: cert.id,
                                                 })}
                                                 className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
                                                 title="Download PDF"
@@ -526,7 +573,10 @@ export default function CertificatesPanel({ event }) {
                 onClose={() => setTemplateModalOpen(false)}
                 title={`Customize ${templateForm.role.toUpperCase()} Certificate Template`}
             >
-                <form onSubmit={handleSaveTemplate} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                <form
+                    onSubmit={handleSaveTemplate}
+                    className="space-y-4 max-h-[75vh] overflow-y-auto pr-1"
+                >
                     <div>
                         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                             Certificate Title *
@@ -536,7 +586,9 @@ export default function CertificatesPanel({ event }) {
                             required
                             placeholder="e.g. Certificate of Participation"
                             value={templateForm.title}
-                            onChange={(e) => setTemplateForm({ ...templateForm, title: e.target.value })}
+                            onChange={(e) =>
+                                setTemplateForm({ ...templateForm, title: e.target.value })
+                            }
                         />
                     </div>
 
@@ -554,7 +606,9 @@ export default function CertificatesPanel({ event }) {
                             required
                             className="w-full text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             value={templateForm.body_template}
-                            onChange={(e) => setTemplateForm({ ...templateForm, body_template: e.target.value })}
+                            onChange={(e) =>
+                                setTemplateForm({ ...templateForm, body_template: e.target.value })
+                            }
                         />
                     </div>
 
@@ -567,7 +621,12 @@ export default function CertificatesPanel({ event }) {
                                 type="text"
                                 placeholder="e.g. Prof. Kofi Mensah"
                                 value={templateForm.issuer_name}
-                                onChange={(e) => setTemplateForm({ ...templateForm, issuer_name: e.target.value })}
+                                onChange={(e) =>
+                                    setTemplateForm({
+                                        ...templateForm,
+                                        issuer_name: e.target.value,
+                                    })
+                                }
                             />
                         </div>
                         <div>
@@ -578,7 +637,12 @@ export default function CertificatesPanel({ event }) {
                                 type="text"
                                 placeholder="e.g. Chair, Academic Scientific Board"
                                 value={templateForm.issuer_title}
-                                onChange={(e) => setTemplateForm({ ...templateForm, issuer_title: e.target.value })}
+                                onChange={(e) =>
+                                    setTemplateForm({
+                                        ...templateForm,
+                                        issuer_title: e.target.value,
+                                    })
+                                }
                             />
                         </div>
                     </div>
@@ -588,7 +652,9 @@ export default function CertificatesPanel({ event }) {
                             <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                                 <Checkbox
                                     checked={templateForm.show_qr}
-                                    onChange={(checked) => setTemplateForm({ ...templateForm, show_qr: checked })}
+                                    onChange={(checked) =>
+                                        setTemplateForm({ ...templateForm, show_qr: checked })
+                                    }
                                 />
                                 Print Verification QR Code
                             </label>
@@ -597,7 +663,12 @@ export default function CertificatesPanel({ event }) {
                             <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                                 <Checkbox
                                     checked={templateForm.show_cpd_hours}
-                                    onChange={(checked) => setTemplateForm({ ...templateForm, show_cpd_hours: checked })}
+                                    onChange={(checked) =>
+                                        setTemplateForm({
+                                            ...templateForm,
+                                            show_cpd_hours: checked,
+                                        })
+                                    }
                                 />
                                 Include CPD/CME Hours Badge
                             </label>
@@ -613,7 +684,12 @@ export default function CertificatesPanel({ event }) {
                                 type="number"
                                 step="0.5"
                                 value={templateForm.default_cpd_hours}
-                                onChange={(e) => setTemplateForm({ ...templateForm, default_cpd_hours: e.target.value })}
+                                onChange={(e) =>
+                                    setTemplateForm({
+                                        ...templateForm,
+                                        default_cpd_hours: e.target.value,
+                                    })
+                                }
                             />
                         </div>
                     )}
@@ -652,7 +728,12 @@ export default function CertificatesPanel({ event }) {
                             value={issueForm.target_group}
                             onChange={(e) => {
                                 const tg = e.target.value;
-                                const defaultRole = tg === 'speakers' ? 'speaker' : (tg === 'presenters' ? 'presenter' : 'delegate');
+                                const defaultRole =
+                                    tg === 'speakers'
+                                        ? 'speaker'
+                                        : tg === 'presenters'
+                                          ? 'presenter'
+                                          : 'delegate';
                                 setIssueForm({
                                     ...issueForm,
                                     target_group: tg,
@@ -661,7 +742,8 @@ export default function CertificatesPanel({ event }) {
                             }}
                         >
                             <option value="checked_in_delegates">
-                                Checked-In Attendees Only ({eligible?.checked_in_delegates || 0} eligible)
+                                Checked-In Attendees Only ({eligible?.checked_in_delegates || 0}{' '}
+                                eligible)
                             </option>
                             <option value="all_delegates">
                                 All Confirmed Attendees ({eligible?.all_delegates || 0} eligible)
@@ -670,11 +752,10 @@ export default function CertificatesPanel({ event }) {
                                 Distinguished Speakers ({eligible?.speakers || 0} eligible)
                             </option>
                             <option value="presenters">
-                                Accepted Scientific Abstract Presenters ({eligible?.presenters || 0} eligible)
+                                Accepted Scientific Abstract Presenters ({eligible?.presenters || 0}{' '}
+                                eligible)
                             </option>
-                            <option value="custom">
-                                Custom Individual Entry
-                            </option>
+                            <option value="custom">Custom Individual Entry</option>
                         </Select>
                     </div>
 
@@ -689,7 +770,9 @@ export default function CertificatesPanel({ event }) {
                                     required
                                     placeholder="Full Name"
                                     value={issueForm.custom_name}
-                                    onChange={(e) => setIssueForm({ ...issueForm, custom_name: e.target.value })}
+                                    onChange={(e) =>
+                                        setIssueForm({ ...issueForm, custom_name: e.target.value })
+                                    }
                                 />
                             </div>
                             <div>
@@ -701,7 +784,9 @@ export default function CertificatesPanel({ event }) {
                                     required
                                     placeholder="email@example.com"
                                     value={issueForm.custom_email}
-                                    onChange={(e) => setIssueForm({ ...issueForm, custom_email: e.target.value })}
+                                    onChange={(e) =>
+                                        setIssueForm({ ...issueForm, custom_email: e.target.value })
+                                    }
                                 />
                             </div>
                         </div>
@@ -714,7 +799,9 @@ export default function CertificatesPanel({ event }) {
                             </label>
                             <Select
                                 value={issueForm.role}
-                                onChange={(e) => setIssueForm({ ...issueForm, role: e.target.value })}
+                                onChange={(e) =>
+                                    setIssueForm({ ...issueForm, role: e.target.value })
+                                }
                             >
                                 <option value="delegate">Delegate</option>
                                 <option value="speaker">Speaker</option>
@@ -731,7 +818,9 @@ export default function CertificatesPanel({ event }) {
                                 type="number"
                                 step="0.5"
                                 value={issueForm.cpd_hours}
-                                onChange={(e) => setIssueForm({ ...issueForm, cpd_hours: e.target.value })}
+                                onChange={(e) =>
+                                    setIssueForm({ ...issueForm, cpd_hours: e.target.value })
+                                }
                             />
                         </div>
                     </div>

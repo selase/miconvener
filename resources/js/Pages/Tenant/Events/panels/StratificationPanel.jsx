@@ -23,7 +23,7 @@ import {
     ChevronRight,
     SlidersHorizontal,
     Sparkles,
-    AlertCircle
+    AlertCircle,
 } from 'lucide-react';
 
 const RULE_TYPES = [
@@ -38,7 +38,12 @@ export default function StratificationPanel({ event }) {
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [groups, setGroups] = useState([]);
-    const [meta, setMeta] = useState({ ticket_types: [], sessions: [], forms: [], total_attendees: 0 });
+    const [meta, setMeta] = useState({
+        ticket_types: [],
+        sessions: [],
+        forms: [],
+        total_attendees: 0,
+    });
 
     // Group Create/Edit Modal
     const [modalOpen, setModalOpen] = useState(false);
@@ -67,15 +72,21 @@ export default function StratificationPanel({ event }) {
         setLoading(true);
         setLoadError(null);
         try {
-            const res = await csrfFetch(route('tenant.events.participant-groups.index', { event: event.id }));
+            const res = await csrfFetch(
+                route('tenant.events.participant-groups.index', { event: event.id })
+            );
             if (res.ok) {
                 const data = await res.json();
                 setGroups(data.groups || []);
-                setMeta(data.meta || { ticket_types: [], sessions: [], forms: [], total_attendees: 0 });
+                setMeta(
+                    data.meta || { ticket_types: [], sessions: [], forms: [], total_attendees: 0 }
+                );
             } else {
-                setLoadError(res.status === 403
-                    ? 'You do not have permission to view cohorts for this event.'
-                    : 'The cohorts for this event could not be loaded. Refresh to try again.');
+                setLoadError(
+                    res.status === 403
+                        ? 'You do not have permission to view cohorts for this event.'
+                        : 'The cohorts for this event could not be loaded. Refresh to try again.'
+                );
             }
         } catch (err) {
             console.error('Failed to load participant groups:', err);
@@ -97,9 +108,7 @@ export default function StratificationPanel({ event }) {
             icon: 'users',
             type: 'dynamic',
         });
-        setCriteriaRules([
-            { type: 'status', operator: 'is', value: 'checked_in' },
-        ]);
+        setCriteriaRules([{ type: 'status', operator: 'is', value: 'checked_in' }]);
         setModalOpen(true);
     };
 
@@ -119,7 +128,7 @@ export default function StratificationPanel({ event }) {
     const addRule = () => {
         setCriteriaRules([
             ...criteriaRules,
-            { type: 'ticket_type', operator: 'is', value: meta.ticket_types[0]?.id || '' }
+            { type: 'ticket_type', operator: 'is', value: meta.ticket_types[0]?.id || '' },
         ]);
     };
 
@@ -138,7 +147,10 @@ export default function StratificationPanel({ event }) {
         setSaving(true);
         try {
             const url = editingGroup
-                ? route('tenant.events.participant-groups.update', { event: event.id, group: editingGroup.id })
+                ? route('tenant.events.participant-groups.update', {
+                      event: event.id,
+                      group: editingGroup.id,
+                  })
                 : route('tenant.events.participant-groups.store', { event: event.id });
             const method = editingGroup ? 'PUT' : 'POST';
 
@@ -167,10 +179,13 @@ export default function StratificationPanel({ event }) {
     const handleSync = async (group) => {
         setSyncingGroupId(group.id);
         try {
-            const res = await csrfFetch(route('tenant.events.participant-groups.sync', {
-                event: event.id,
-                group: group.id,
-            }), { method: 'POST' });
+            const res = await csrfFetch(
+                route('tenant.events.participant-groups.sync', {
+                    event: event.id,
+                    group: group.id,
+                }),
+                { method: 'POST' }
+            );
             if (res.ok) {
                 await loadData();
             }
@@ -184,10 +199,13 @@ export default function StratificationPanel({ event }) {
     const handleDeleteGroup = async () => {
         if (!deleteTarget) return;
         try {
-            const res = await csrfFetch(route('tenant.events.participant-groups.destroy', {
-                event: event.id,
-                group: deleteTarget.id,
-            }), { method: 'DELETE' });
+            const res = await csrfFetch(
+                route('tenant.events.participant-groups.destroy', {
+                    event: event.id,
+                    group: deleteTarget.id,
+                }),
+                { method: 'DELETE' }
+            );
             if (res.ok) {
                 setDeleteTarget(null);
                 await loadData();
@@ -202,10 +220,12 @@ export default function StratificationPanel({ event }) {
         setRosterModalOpen(true);
         setLoadingMembers(true);
         try {
-            const res = await csrfFetch(route('tenant.events.participant-groups.show', {
-                event: event.id,
-                group: group.id,
-            }));
+            const res = await csrfFetch(
+                route('tenant.events.participant-groups.show', {
+                    event: event.id,
+                    group: group.id,
+                })
+            );
             if (res.ok) {
                 const data = await res.json();
                 setMembers(data.members?.data || []);
@@ -220,13 +240,16 @@ export default function StratificationPanel({ event }) {
     const removeMember = async (registrationId) => {
         if (!selectedGroup) return;
         try {
-            const res = await csrfFetch(route('tenant.events.participant-groups.members.remove', {
-                event: event.id,
-                group: selectedGroup.id,
-                registration: registrationId,
-            }), { method: 'DELETE' });
+            const res = await csrfFetch(
+                route('tenant.events.participant-groups.members.remove', {
+                    event: event.id,
+                    group: selectedGroup.id,
+                    registration: registrationId,
+                }),
+                { method: 'DELETE' }
+            );
             if (res.ok) {
-                setMembers(members.filter(m => m.registration_id !== registrationId));
+                setMembers(members.filter((m) => m.registration_id !== registrationId));
                 await loadData();
             }
         } catch (err) {
@@ -247,7 +270,8 @@ export default function StratificationPanel({ event }) {
                         Participant Stratification & Dynamic Cohort Engine
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Segment attendees into tailored groups using multi-parameter rules: ticket tier, attendance, room check-in, CPD hours, and questionnaire responses.
+                        Segment attendees into tailored groups using multi-parameter rules: ticket
+                        tier, attendance, room check-in, CPD hours, and questionnaire responses.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -261,7 +285,9 @@ export default function StratificationPanel({ event }) {
             {/* Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Cohorts</span>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Active Cohorts
+                    </span>
                     <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
                         {groups.length}
                     </div>
@@ -269,7 +295,9 @@ export default function StratificationPanel({ event }) {
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Stratified Members</span>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Total Stratified Members
+                    </span>
                     <div className="mt-2 text-2xl font-black text-indigo-600">
                         {groups.reduce((sum, g) => sum + (g.member_count || 0), 0)}
                     </div>
@@ -277,7 +305,9 @@ export default function StratificationPanel({ event }) {
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Conference Attendees</span>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Total Conference Attendees
+                    </span>
                     <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
                         {meta.total_attendees}
                     </div>
@@ -287,13 +317,18 @@ export default function StratificationPanel({ event }) {
 
             {/* Groups Grid */}
             {loading ? (
-                <div className="p-12 text-center text-xs text-slate-500">Loading stratification cohorts...</div>
+                <div className="p-12 text-center text-xs text-slate-500">
+                    Loading stratification cohorts...
+                </div>
             ) : groups.length === 0 ? (
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center space-y-3">
                     <Users className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No Participant Cohorts Created Yet</p>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                        No Participant Cohorts Created Yet
+                    </p>
                     <p className="text-xs text-slate-500 max-w-md mx-auto">
-                        Stratify participants automatically based on combined rules (e.g., specific ticket types, in-event check-ins, CME hours, or questionnaire answers).
+                        Stratify participants automatically based on combined rules (e.g., specific
+                        ticket types, in-event check-ins, CME hours, or questionnaire answers).
                     </p>
                     <Button variant="primary" onClick={openCreateModal}>
                         <Plus className="w-4 h-4 mr-1.5" />
@@ -302,7 +337,7 @@ export default function StratificationPanel({ event }) {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {groups.map(group => {
+                    {groups.map((group) => {
                         const isSyncing = syncingGroupId === group.id;
                         const criteriaCount = (group.criteria || []).length;
 
@@ -314,16 +349,21 @@ export default function StratificationPanel({ event }) {
                                 <div>
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-2">
-                                            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }}></span>
+                                            <span
+                                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: group.color }}
+                                            ></span>
                                             <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                                                 {group.name}
                                             </span>
                                         </div>
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                                            group.type === 'dynamic'
-                                                ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                        }`}>
+                                        <span
+                                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                                                group.type === 'dynamic'
+                                                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                            }`}
+                                        >
                                             {group.type}
                                         </span>
                                     </div>
@@ -342,8 +382,12 @@ export default function StratificationPanel({ event }) {
                                                 Matching Criteria ({criteriaCount} rules):
                                             </div>
                                             {(group.criteria || []).map((rule, rIdx) => (
-                                                <div key={rIdx} className="truncate pl-3 border-l-2 border-indigo-400">
-                                                    {rule.type}: {rule.operator} {String(rule.value || '')}
+                                                <div
+                                                    key={rIdx}
+                                                    className="truncate pl-3 border-l-2 border-indigo-400"
+                                                >
+                                                    {rule.type}: {rule.operator}{' '}
+                                                    {String(rule.value || '')}
                                                 </div>
                                             ))}
                                         </div>
@@ -374,7 +418,9 @@ export default function StratificationPanel({ event }) {
                                                 className="text-xs text-slate-500 hover:text-slate-800 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
                                                 title="Recalculate dynamic membership"
                                             >
-                                                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
+                                                <RefreshCw
+                                                    className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`}
+                                                />
                                             </button>
                                         )}
                                         <a
@@ -417,9 +463,16 @@ export default function StratificationPanel({ event }) {
                 open={modalOpen}
                 className="max-w-3xl"
                 onClose={() => setModalOpen(false)}
-                title={editingGroup ? 'Edit Participant Cohort' : 'Create Stratified Participant Cohort'}
+                title={
+                    editingGroup
+                        ? 'Edit Participant Cohort'
+                        : 'Create Stratified Participant Cohort'
+                }
             >
-                <form onSubmit={handleSaveGroup} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                <form
+                    onSubmit={handleSaveGroup}
+                    className="space-y-4 max-h-[75vh] overflow-y-auto pr-1"
+                >
                     <div className="grid grid-cols-2 gap-3">
                         <div className="col-span-2 sm:col-span-1">
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -441,13 +494,17 @@ export default function StratificationPanel({ event }) {
                                 <input
                                     type="color"
                                     value={formData.color}
-                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, color: e.target.value })
+                                    }
                                     className="w-9 h-9 rounded border border-slate-300 p-0.5 cursor-pointer"
                                 />
                                 <Input
                                     type="text"
                                     value={formData.color}
-                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, color: e.target.value })
+                                    }
                                     className="flex-1 font-mono text-xs"
                                 />
                             </div>
@@ -476,7 +533,9 @@ export default function StratificationPanel({ event }) {
                             placeholder="Purpose of this cohort (e.g. targeted blast for hands-on simulation workshop)..."
                             className="w-full text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            onChange={(e) =>
+                                setFormData({ ...formData, description: e.target.value })
+                            }
                         />
                     </div>
 
@@ -505,7 +564,9 @@ export default function StratificationPanel({ event }) {
                                         className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2 relative"
                                     >
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold text-slate-400">Rule {idx + 1}</span>
+                                            <span className="text-[10px] font-bold text-slate-400">
+                                                Rule {idx + 1}
+                                            </span>
                                             <button
                                                 type="button"
                                                 onClick={() => removeRule(idx)}
@@ -522,10 +583,17 @@ export default function StratificationPanel({ event }) {
                                                 </label>
                                                 <Select
                                                     value={rule.type}
-                                                    onChange={(e) => updateRule(idx, { type: e.target.value, value: '' })}
+                                                    onChange={(e) =>
+                                                        updateRule(idx, {
+                                                            type: e.target.value,
+                                                            value: '',
+                                                        })
+                                                    }
                                                 >
-                                                    {RULE_TYPES.map(rt => (
-                                                        <option key={rt.value} value={rt.value}>{rt.label}</option>
+                                                    {RULE_TYPES.map((rt) => (
+                                                        <option key={rt.value} value={rt.value}>
+                                                            {rt.label}
+                                                        </option>
                                                     ))}
                                                 </Select>
                                             </div>
@@ -536,25 +604,47 @@ export default function StratificationPanel({ event }) {
                                                 </label>
                                                 <Select
                                                     value={rule.operator || 'is'}
-                                                    onChange={(e) => updateRule(idx, { operator: e.target.value })}
+                                                    onChange={(e) =>
+                                                        updateRule(idx, {
+                                                            operator: e.target.value,
+                                                        })
+                                                    }
                                                 >
                                                     {rule.type === 'cme_hours' ? (
                                                         <>
-                                                            <option value="gte">Greater Than or Equal (&gt;=)</option>
-                                                            <option value="lte">Less Than or Equal (&lt;=)</option>
-                                                            <option value="gt">Greater Than (&gt;)</option>
+                                                            <option value="gte">
+                                                                Greater Than or Equal (&gt;=)
+                                                            </option>
+                                                            <option value="lte">
+                                                                Less Than or Equal (&lt;=)
+                                                            </option>
+                                                            <option value="gt">
+                                                                Greater Than (&gt;)
+                                                            </option>
                                                         </>
                                                     ) : rule.type === 'session_attendance' ? (
                                                         <>
-                                                            <option value="attended">Attended Room</option>
-                                                            <option value="not_attended">Did Not Attend</option>
-                                                            <option value="min_minutes">Min Minutes Dwell</option>
+                                                            <option value="attended">
+                                                                Attended Room
+                                                            </option>
+                                                            <option value="not_attended">
+                                                                Did Not Attend
+                                                            </option>
+                                                            <option value="min_minutes">
+                                                                Min Minutes Dwell
+                                                            </option>
                                                         </>
                                                     ) : rule.type === 'form_answer' ? (
                                                         <>
-                                                            <option value="equals">Equals Exactly</option>
-                                                            <option value="contains">Contains Word</option>
-                                                            <option value="is_filled">Has Responded</option>
+                                                            <option value="equals">
+                                                                Equals Exactly
+                                                            </option>
+                                                            <option value="contains">
+                                                                Contains Word
+                                                            </option>
+                                                            <option value="is_filled">
+                                                                Has Responded
+                                                            </option>
                                                         </>
                                                     ) : (
                                                         <>
@@ -572,22 +662,40 @@ export default function StratificationPanel({ event }) {
                                                 {rule.type === 'ticket_type' ? (
                                                     <Select
                                                         value={rule.value}
-                                                        onChange={(e) => updateRule(idx, { value: e.target.value })}
+                                                        onChange={(e) =>
+                                                            updateRule(idx, {
+                                                                value: e.target.value,
+                                                            })
+                                                        }
                                                     >
                                                         <option value="">Select Ticket Type</option>
-                                                        {meta.ticket_types.map(tt => (
-                                                            <option key={tt.id} value={tt.id}>{tt.name}</option>
+                                                        {meta.ticket_types.map((tt) => (
+                                                            <option key={tt.id} value={tt.id}>
+                                                                {tt.name}
+                                                            </option>
                                                         ))}
                                                     </Select>
                                                 ) : rule.type === 'status' ? (
                                                     <Select
                                                         value={rule.value}
-                                                        onChange={(e) => updateRule(idx, { value: e.target.value })}
+                                                        onChange={(e) =>
+                                                            updateRule(idx, {
+                                                                value: e.target.value,
+                                                            })
+                                                        }
                                                     >
-                                                        <option value="checked_in">Checked In</option>
-                                                        <option value="confirmed">Confirmed (Not Checked In)</option>
-                                                        <option value="waitlisted">Waitlisted</option>
-                                                        <option value="pending_approval">Pending Approval</option>
+                                                        <option value="checked_in">
+                                                            Checked In
+                                                        </option>
+                                                        <option value="confirmed">
+                                                            Confirmed (Not Checked In)
+                                                        </option>
+                                                        <option value="waitlisted">
+                                                            Waitlisted
+                                                        </option>
+                                                        <option value="pending_approval">
+                                                            Pending Approval
+                                                        </option>
                                                     </Select>
                                                 ) : rule.type === 'cme_hours' ? (
                                                     <Input
@@ -595,14 +703,22 @@ export default function StratificationPanel({ event }) {
                                                         step="0.5"
                                                         placeholder="e.g. 5.0"
                                                         value={rule.value}
-                                                        onChange={(e) => updateRule(idx, { value: e.target.value })}
+                                                        onChange={(e) =>
+                                                            updateRule(idx, {
+                                                                value: e.target.value,
+                                                            })
+                                                        }
                                                     />
                                                 ) : (
                                                     <Input
                                                         type="text"
                                                         placeholder="Value"
                                                         value={rule.value}
-                                                        onChange={(e) => updateRule(idx, { value: e.target.value })}
+                                                        onChange={(e) =>
+                                                            updateRule(idx, {
+                                                                value: e.target.value,
+                                                            })
+                                                        }
                                                     />
                                                 )}
                                             </div>
@@ -612,24 +728,38 @@ export default function StratificationPanel({ event }) {
                                         {rule.type === 'form_answer' && (
                                             <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 dark:border-slate-700">
                                                 <div>
-                                                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Form</label>
+                                                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                                                        Form
+                                                    </label>
                                                     <Select
                                                         value={rule.form_id || ''}
-                                                        onChange={(e) => updateRule(idx, { form_id: e.target.value })}
+                                                        onChange={(e) =>
+                                                            updateRule(idx, {
+                                                                form_id: e.target.value,
+                                                            })
+                                                        }
                                                     >
                                                         <option value="">Any Dynamic Form</option>
-                                                        {meta.forms.map(f => (
-                                                            <option key={f.id} value={f.id}>{f.title}</option>
+                                                        {meta.forms.map((f) => (
+                                                            <option key={f.id} value={f.id}>
+                                                                {f.title}
+                                                            </option>
                                                         ))}
                                                     </Select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Question Field Key</label>
+                                                    <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                                                        Question Field Key
+                                                    </label>
                                                     <Input
                                                         type="text"
                                                         placeholder="e.g. subspecialty"
                                                         value={rule.field_key || ''}
-                                                        onChange={(e) => updateRule(idx, { field_key: e.target.value })}
+                                                        onChange={(e) =>
+                                                            updateRule(idx, {
+                                                                field_key: e.target.value,
+                                                            })
+                                                        }
                                                     />
                                                 </div>
                                             </div>
@@ -645,7 +775,7 @@ export default function StratificationPanel({ event }) {
                             Cancel
                         </Button>
                         <Button variant="primary" type="submit" disabled={saving}>
-                            {saving ? 'Saving...' : (editingGroup ? 'Update Cohort' : 'Save Cohort')}
+                            {saving ? 'Saving...' : editingGroup ? 'Update Cohort' : 'Save Cohort'}
                         </Button>
                     </div>
                 </form>
@@ -679,9 +809,13 @@ export default function StratificationPanel({ event }) {
 
                     <div className="overflow-x-auto flex-1 border border-slate-200 dark:border-slate-800 rounded-lg">
                         {loadingMembers ? (
-                            <div className="p-8 text-center text-xs text-slate-500">Loading roster...</div>
+                            <div className="p-8 text-center text-xs text-slate-500">
+                                Loading roster...
+                            </div>
                         ) : members.length === 0 ? (
-                            <div className="p-8 text-center text-xs text-slate-400 italic">No attendees matched this cohort yet</div>
+                            <div className="p-8 text-center text-xs text-slate-400 italic">
+                                No attendees matched this cohort yet
+                            </div>
                         ) : (
                             <table className="w-full text-left text-xs">
                                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold">
@@ -694,12 +828,15 @@ export default function StratificationPanel({ event }) {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {members.map(m => {
+                                    {members.map((m) => {
                                         const reg = m.registration;
                                         if (!reg) return null;
 
                                         return (
-                                            <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                            <tr
+                                                key={m.id}
+                                                className="hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                            >
                                                 <td className="p-2.5">
                                                     <div className="font-bold text-slate-900 dark:text-white">
                                                         {reg.full_name}
@@ -712,17 +849,21 @@ export default function StratificationPanel({ event }) {
                                                     {reg.ticket_type?.name ?? 'Standard'}
                                                 </td>
                                                 <td className="p-2.5">
-                                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                                        reg.status === 'checked_in'
-                                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                                                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                                                    }`}>
+                                                    <span
+                                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                                            reg.status === 'checked_in'
+                                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                        }`}
+                                                    >
                                                         {reg.status}
                                                     </span>
                                                 </td>
                                                 <td className="p-2.5">
                                                     <span className="text-[10px] font-medium text-slate-500">
-                                                        {m.is_manual ? 'Manual Pin' : 'Dynamic Match'}
+                                                        {m.is_manual
+                                                            ? 'Manual Pin'
+                                                            : 'Dynamic Match'}
                                                     </span>
                                                 </td>
                                                 <td className="p-2.5 text-right">
@@ -743,9 +884,7 @@ export default function StratificationPanel({ event }) {
                     </div>
 
                     <div className="flex justify-end pt-2">
-                        <Button onClick={() => setRosterModalOpen(false)}>
-                            Close
-                        </Button>
+                        <Button onClick={() => setRosterModalOpen(false)}>Close</Button>
                     </div>
                 </div>
             </Modal>

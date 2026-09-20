@@ -22,7 +22,9 @@ export default function ConfirmModal({
                 <Button
                     onClick={onConfirm ?? onClose}
                     disabled={processing}
-                    className={danger ? 'border-danger-fg/40 text-danger-fg hover:bg-danger-bg' : ''}
+                    className={
+                        danger ? 'border-danger-fg/40 text-danger-fg hover:bg-danger-bg' : ''
+                    }
                 >
                     {confirmLabel}
                 </Button>

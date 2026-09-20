@@ -19,7 +19,10 @@ export default function CoverBars({ count = 48, height = 220, className = '' }) 
                     <span
                         key={i}
                         className="flex-1 bg-accent"
-                        style={{ height: `${h}%`, opacity: i % 4 === 0 ? 0.62 : i % 3 === 0 ? 0.2 : 0.42 }}
+                        style={{
+                            height: `${h}%`,
+                            opacity: i % 4 === 0 ? 0.62 : i % 3 === 0 ? 0.2 : 0.42,
+                        }}
                     />
                 ))}
             </div>

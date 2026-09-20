@@ -26,7 +26,9 @@ function Section({ title, description, children }) {
     return (
         <section className="border-b border-border py-10 first:pt-0 last:border-0">
             <h2 className="text-lg font-bold text-ink">{title}</h2>
-            {description && <p className="mt-1 max-w-2xl text-sm text-ink-secondary">{description}</p>}
+            {description && (
+                <p className="mt-1 max-w-2xl text-sm text-ink-secondary">{description}</p>
+            )}
             <div className="mt-5">{children}</div>
         </section>
     );
@@ -85,14 +87,21 @@ export default function DesignSystemIndex() {
 
             <div className="px-8 py-6">
                 <div className="rounded-lg border border-border-strong bg-surface-sunken p-4 text-sm text-ink-secondary">
-                    Living reference for the primitives in <code className="num">resources/js/Components/Console</code>.{' '}
-                    <code className="num">Tabs</code> is still inlined in <code className="num">PageHeader</code> rather than
-                    standalone, and <code className="num">DateRangeControl</code>, <code className="num">FilterButton</code>,{' '}
-                    <code className="num">PaymentCardArt</code> and <code className="num">FloatingPanel</code> haven&apos;t been
-                    built — no page in the app has a real use for them yet.
+                    Living reference for the primitives in{' '}
+                    <code className="num">resources/js/Components/Console</code>.{' '}
+                    <code className="num">Tabs</code> is still inlined in{' '}
+                    <code className="num">PageHeader</code> rather than standalone, and{' '}
+                    <code className="num">DateRangeControl</code>,{' '}
+                    <code className="num">FilterButton</code>,{' '}
+                    <code className="num">PaymentCardArt</code> and{' '}
+                    <code className="num">FloatingPanel</code> haven&apos;t been built — no page in
+                    the app has a real use for them yet.
                 </div>
 
-                <Section title="Color" description="Tokens defined in tailwind.config.js theme.extend.colors.">
+                <Section
+                    title="Color"
+                    description="Tokens defined in tailwind.config.js theme.extend.colors."
+                >
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                         {COLORS.map((c) => (
                             <Swatch key={c.name} {...c} />
@@ -102,19 +111,34 @@ export default function DesignSystemIndex() {
 
                 <Section title="Typography">
                     <div className="space-y-3">
-                        <div className="text-[30px] font-bold leading-9 tracking-tight text-ink">Page title — 30px bold</div>
-                        <div className="text-lg font-bold text-ink">Section heading — 18px bold</div>
-                        <div className="text-[15px] font-medium text-ink">Body / control text — 15px medium</div>
-                        <div className="text-sm text-ink-secondary">Secondary text — 14px, ink-secondary</div>
+                        <div className="text-[30px] font-bold leading-9 tracking-tight text-ink">
+                            Page title — 30px bold
+                        </div>
+                        <div className="text-lg font-bold text-ink">
+                            Section heading — 18px bold
+                        </div>
+                        <div className="text-[15px] font-medium text-ink">
+                            Body / control text — 15px medium
+                        </div>
+                        <div className="text-sm text-ink-secondary">
+                            Secondary text — 14px, ink-secondary
+                        </div>
                         <div className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
                             Eyebrow / table header — 12px semibold uppercase
                         </div>
-                        <div className="num text-2xl font-bold text-ink">$12,480.00 — tabular nums (.num)</div>
-                        <div className="font-mono text-sm text-ink">sk_live_51H8x… — JetBrains Mono for IDs</div>
+                        <div className="num text-2xl font-bold text-ink">
+                            $12,480.00 — tabular nums (.num)
+                        </div>
+                        <div className="font-mono text-sm text-ink">
+                            sk_live_51H8x… — JetBrains Mono for IDs
+                        </div>
                     </div>
                 </Section>
 
-                <Section title="Button" description="Neutral outline only — never a solid accent fill.">
+                <Section
+                    title="Button"
+                    description="Neutral outline only — never a solid accent fill."
+                >
                     <div className="flex flex-wrap items-center gap-4">
                         <Button>Default</Button>
                         <Button icon={Plus}>With icon</Button>
@@ -127,24 +151,46 @@ export default function DesignSystemIndex() {
                         </Button>
                     </div>
                     <p className="mt-3 text-xs text-ink-tertiary">
-                        Hover, focus and active states are native — try tabbing to a button or hovering it.
+                        Hover, focus and active states are native — try tabbing to a button or
+                        hovering it.
                     </p>
                 </Section>
 
-                <Section title="Input, Select & Checkbox" description="The shared field recipe used across every form in the console.">
+                <Section
+                    title="Input, Select & Checkbox"
+                    description="The shared field recipe used across every form in the console."
+                >
                     <div className="grid max-w-md gap-5">
-                        <Input label="Role name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Event Organizer" />
-                        <Input label="With error" value="" onChange={() => {}} error="This field is required." />
+                        <Input
+                            label="Role name"
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="e.g. Event Organizer"
+                        />
+                        <Input
+                            label="With error"
+                            value=""
+                            onChange={() => {}}
+                            error="This field is required."
+                        />
                         <Select label="Status" value="active" onChange={() => {}}>
                             <option value="active">Active</option>
                             <option value="inactive">Inactive</option>
                         </Select>
-                        <Checkbox label="Use this key" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
+                        <Checkbox
+                            label="Use this key"
+                            checked={checked}
+                            onChange={(event) => setChecked(event.target.checked)}
+                        />
                     </div>
                 </Section>
 
                 <Section title="SearchInput">
-                    <SearchInput placeholder="Search name, email, or reference" value={search} onChange={(event) => setSearch(event.target.value)} />
+                    <SearchInput
+                        placeholder="Search name, email, or reference"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                    />
                 </Section>
 
                 <Section title="IconButton">
@@ -192,14 +238,36 @@ export default function DesignSystemIndex() {
 
                 <Section title="StatusBanner" description="Used at the top of drawer detail views.">
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <StatusBanner status="success" title="Payment succeeded" code="200" description="Settled to your default payout account." />
-                        <StatusBanner status="pending" title="Payment pending" code="102" description="Awaiting confirmation from the provider." />
-                        <StatusBanner status="failed" title="Payment failed" code="402" description="The card was declined by the issuer." />
-                        <StatusBanner status="neutral" title="Payment voided" description="This transaction was cancelled before capture." />
+                        <StatusBanner
+                            status="success"
+                            title="Payment succeeded"
+                            code="200"
+                            description="Settled to your default payout account."
+                        />
+                        <StatusBanner
+                            status="pending"
+                            title="Payment pending"
+                            code="102"
+                            description="Awaiting confirmation from the provider."
+                        />
+                        <StatusBanner
+                            status="failed"
+                            title="Payment failed"
+                            code="402"
+                            description="The card was declined by the issuer."
+                        />
+                        <StatusBanner
+                            status="neutral"
+                            title="Payment voided"
+                            description="This transaction was cancelled before capture."
+                        />
                     </div>
                 </Section>
 
-                <Section title="DetailCard, LabelValueRow & CopyField" description="Composed inside a Drawer's detail sections.">
+                <Section
+                    title="DetailCard, LabelValueRow & CopyField"
+                    description="Composed inside a Drawer's detail sections."
+                >
                     <div className="max-w-md">
                         <DetailCard title="Customer">
                             <LabelValueRow label="Name" value="Ada Lovelace" />
@@ -209,7 +277,10 @@ export default function DesignSystemIndex() {
                     </div>
                 </Section>
 
-                <Section title="Table" description="Populated, loading (skeleton), and empty states.">
+                <Section
+                    title="Table"
+                    description="Populated, loading (skeleton), and empty states."
+                >
                     <SegmentedControl
                         value={tableState}
                         onChange={setTableState}
@@ -232,7 +303,9 @@ export default function DesignSystemIndex() {
                                         <Tr key={row.id}>
                                             <Td>{row.name}</Td>
                                             <Td>
-                                                <StatusPill status={row.status}>{row.status}</StatusPill>
+                                                <StatusPill status={row.status}>
+                                                    {row.status}
+                                                </StatusPill>
                                             </Td>
                                             <Td align="right" numeric>
                                                 ${row.amount}
@@ -243,7 +316,10 @@ export default function DesignSystemIndex() {
                                 {tableState === 'empty' && (
                                     <tr>
                                         <td colSpan={3}>
-                                            <TableEmpty title="No records yet" description="They'll show up here once created." />
+                                            <TableEmpty
+                                                title="No records yet"
+                                                description="They'll show up here once created."
+                                            />
                                         </td>
                                     </tr>
                                 )}
@@ -252,17 +328,28 @@ export default function DesignSystemIndex() {
                     </div>
                 </Section>
 
-                <Section title="Drawer" description="Persistent 3-column layout at ≥1280px, overlay sheet below. Scoped here to a local flex row, same as a real page pairs a table with its drawer.">
+                <Section
+                    title="Drawer"
+                    description="Persistent 3-column layout at ≥1280px, overlay sheet below. Scoped here to a local flex row, same as a real page pairs a table with its drawer."
+                >
                     <div className="flex rounded-lg border border-border">
                         <div className="min-w-0 flex-1 p-6">
-                            <p className="text-sm text-ink-secondary">Content column — the drawer docks to its right at ≥1280px.</p>
-                            <Button className="mt-4" onClick={() => setDrawerOpen(true)}>Open drawer</Button>
+                            <p className="text-sm text-ink-secondary">
+                                Content column — the drawer docks to its right at ≥1280px.
+                            </p>
+                            <Button className="mt-4" onClick={() => setDrawerOpen(true)}>
+                                Open drawer
+                            </Button>
                         </div>
 
                         <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
                             <h2 className="text-lg font-bold text-ink">Drawer example</h2>
                             <div className="mt-5">
-                                <StatusBanner status="success" title="Payment succeeded" code="200" />
+                                <StatusBanner
+                                    status="success"
+                                    title="Payment succeeded"
+                                    code="200"
+                                />
                             </div>
                             <div className="mt-5">
                                 <DetailCard title="Details">
@@ -275,18 +362,31 @@ export default function DesignSystemIndex() {
                     </div>
                 </Section>
 
-                <Section title="Modal & ConfirmModal" description="Centered overlay for small self-contained forms and destructive confirmations.">
+                <Section
+                    title="Modal & ConfirmModal"
+                    description="Centered overlay for small self-contained forms and destructive confirmations."
+                >
                     <div className="flex flex-wrap gap-3">
                         <Button onClick={() => setModalOpen(true)}>Open modal</Button>
                         <Button onClick={() => setConfirmOpen(true)}>Open confirm modal</Button>
                     </div>
 
-                    <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New role" className="max-w-md">
-                        <p className="text-sm text-ink-secondary">A small self-contained form, same pattern used by the Roles and Team modals.</p>
+                    <Modal
+                        open={modalOpen}
+                        onClose={() => setModalOpen(false)}
+                        title="New role"
+                        className="max-w-md"
+                    >
+                        <p className="text-sm text-ink-secondary">
+                            A small self-contained form, same pattern used by the Roles and Team
+                            modals.
+                        </p>
                         <div className="mt-4">
                             <Input label="Role name" value="" onChange={() => {}} />
                         </div>
-                        <Button className="mt-6" onClick={() => setModalOpen(false)}>Create role</Button>
+                        <Button className="mt-6" onClick={() => setModalOpen(false)}>
+                            Create role
+                        </Button>
                     </Modal>
 
                     <ConfirmModal

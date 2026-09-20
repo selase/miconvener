@@ -18,7 +18,8 @@ function NewPollForm({ event, onCreated }) {
     const [requiresModeration, setRequiresModeration] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    const setOption = (i, value) => setOptions((prev) => prev.map((o, idx) => (idx === i ? value : o)));
+    const setOption = (i, value) =>
+        setOptions((prev) => prev.map((o, idx) => (idx === i ? value : o)));
     const addOption = () => setOptions((prev) => [...prev, '']);
     const removeOption = (i) => setOptions((prev) => prev.filter((_, idx) => idx !== i));
 
@@ -52,7 +53,12 @@ function NewPollForm({ event, onCreated }) {
         <form onSubmit={submit} className="border border-border p-4">
             <b className="text-sm font-medium text-ink">New poll or quiz question</b>
             <div className="mt-3 space-y-3">
-                <Input label="Question" value={question} onChange={(e) => setQuestion(e.target.value)} required />
+                <Input
+                    label="Question"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    required
+                />
                 <Select label="Type" value={type} onChange={(e) => setType(e.target.value)}>
                     <option value="multiple_choice">Multiple choice</option>
                     <option value="open">Open response</option>
@@ -83,32 +89,58 @@ function NewPollForm({ event, onCreated }) {
                                         className="w-full border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
                                     />
                                     {options.length > 2 && (
-                                        <button type="button" onClick={() => removeOption(i)} className="text-ink-secondary hover:text-danger-fg">
+                                        <button
+                                            type="button"
+                                            onClick={() => removeOption(i)}
+                                            className="text-ink-secondary hover:text-danger-fg"
+                                        >
                                             <X className="h-4 w-4" strokeWidth={1.75} />
                                         </button>
                                     )}
                                 </div>
                             ))}
                         </div>
-                        <Button type="button" onClick={addOption} className="mt-2">Add option</Button>
+                        <Button type="button" onClick={addOption} className="mt-2">
+                            Add option
+                        </Button>
                     </div>
                 )}
 
                 {type === 'quiz' && (
                     <div className="grid grid-cols-2 gap-3">
-                        <Input label="Timer (seconds)" type="number" min="5" max="300" value={timerSeconds} onChange={(e) => setTimerSeconds(e.target.value)} />
-                        <Input label="Points for a correct answer" type="number" min="1" max="1000" value={points} onChange={(e) => setPoints(e.target.value)} />
+                        <Input
+                            label="Timer (seconds)"
+                            type="number"
+                            min="5"
+                            max="300"
+                            value={timerSeconds}
+                            onChange={(e) => setTimerSeconds(e.target.value)}
+                        />
+                        <Input
+                            label="Points for a correct answer"
+                            type="number"
+                            min="1"
+                            max="1000"
+                            value={points}
+                            onChange={(e) => setPoints(e.target.value)}
+                        />
                     </div>
                 )}
 
                 {type === 'open' && (
                     <label className="flex items-center gap-2 text-sm text-ink">
-                        <input type="checkbox" checked={requiresModeration} onChange={(e) => setRequiresModeration(e.target.checked)} />
+                        <input
+                            type="checkbox"
+                            checked={requiresModeration}
+                            onChange={(e) => setRequiresModeration(e.target.checked)}
+                        />
                         Review responses before they're shown
                     </label>
                 )}
 
-                <Button type="submit" icon={Plus} variant="primary" disabled={saving}>Create</Button>
+                <Button type="submit" icon={Plus} variant="primary" disabled={saving}>
+                    Create
+                </Button>
             </div>
         </form>
     );
@@ -124,15 +156,24 @@ function PollCard({ event, poll, onChange }) {
     };
 
     const remove = async () => {
-        await csrfFetch(route('tenant.events.polls.destroy', { event: event.id, poll: poll.id }), { method: 'DELETE' });
+        await csrfFetch(route('tenant.events.polls.destroy', { event: event.id, poll: poll.id }), {
+            method: 'DELETE',
+        });
         onChange();
     };
 
     const moderate = async (responseId, isApproved) => {
-        await csrfFetch(route('tenant.events.polls.responses.moderate', { event: event.id, poll: poll.id, response: responseId }), {
-            method: 'PATCH',
-            body: JSON.stringify({ is_approved: isApproved }),
-        });
+        await csrfFetch(
+            route('tenant.events.polls.responses.moderate', {
+                event: event.id,
+                poll: poll.id,
+                response: responseId,
+            }),
+            {
+                method: 'PATCH',
+                body: JSON.stringify({ is_approved: isApproved }),
+            }
+        );
         onChange();
     };
 
@@ -150,15 +191,21 @@ function PollCard({ event, poll, onChange }) {
                         <StatusPill status={STATUS_TONE[poll.status]}>{poll.status}</StatusPill>
                         <span className="font-mono">{poll.responses_count} responses</span>
                         {poll.type === 'quiz' && (
-                            <span className="font-mono">{poll.timer_seconds ?? '—'}s · {poll.points} pts</span>
+                            <span className="font-mono">
+                                {poll.timer_seconds ?? '—'}s · {poll.points} pts
+                            </span>
                         )}
                     </div>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
                     {poll.status !== 'live' && (
-                        <Button onClick={() => setStatus('live')} variant="primary">Go live</Button>
+                        <Button onClick={() => setStatus('live')} variant="primary">
+                            Go live
+                        </Button>
                     )}
-                    {poll.status === 'live' && <Button onClick={() => setStatus('closed')}>Close</Button>}
+                    {poll.status === 'live' && (
+                        <Button onClick={() => setStatus('closed')}>Close</Button>
+                    )}
                     <button onClick={remove} className="text-ink-secondary hover:text-danger-fg">
                         <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                     </button>
@@ -172,12 +219,22 @@ function PollCard({ event, poll, onChange }) {
                             <div className="flex items-center justify-between text-[13px]">
                                 <span className="flex items-center gap-1.5 text-ink">
                                     {o.label}
-                                    {poll.type === 'quiz' && o.is_correct && <Check className="h-3.5 w-3.5 text-success-fg" strokeWidth={2} />}
+                                    {poll.type === 'quiz' && o.is_correct && (
+                                        <Check
+                                            className="h-3.5 w-3.5 text-success-fg"
+                                            strokeWidth={2}
+                                        />
+                                    )}
                                 </span>
-                                <span className="font-mono text-ink-secondary">{o.responses_count}</span>
+                                <span className="font-mono text-ink-secondary">
+                                    {o.responses_count}
+                                </span>
                             </div>
                             <div className="mt-1 h-1 bg-surface-sunken">
-                                <div className="h-full bg-accent" style={{ width: `${(o.responses_count / maxCount) * 100}%` }} />
+                                <div
+                                    className="h-full bg-accent"
+                                    style={{ width: `${(o.responses_count / maxCount) * 100}%` }}
+                                />
                             </div>
                         </li>
                     ))}
@@ -189,7 +246,12 @@ function PollCard({ event, poll, onChange }) {
                     <ul className="mt-3 space-y-1.5">
                         {poll.open_responses.length > 0 ? (
                             poll.open_responses.map((text, i) => (
-                                <li key={i} className="border-l-2 border-border pl-3 text-[13px] text-ink-secondary">{text}</li>
+                                <li
+                                    key={i}
+                                    className="border-l-2 border-border pl-3 text-[13px] text-ink-secondary"
+                                >
+                                    {text}
+                                </li>
                             ))
                         ) : (
                             <li className="text-[13px] text-ink-secondary">No responses yet.</li>
@@ -198,14 +260,26 @@ function PollCard({ event, poll, onChange }) {
 
                     {poll.pending_responses.length > 0 && (
                         <div className="mt-3 border-t border-border pt-3">
-                            <b className="mb-2 block text-xs uppercase tracking-wide text-warning-fg">Pending review ({poll.pending_responses.length})</b>
+                            <b className="mb-2 block text-xs uppercase tracking-wide text-warning-fg">
+                                Pending review ({poll.pending_responses.length})
+                            </b>
                             <ul className="space-y-2">
                                 {poll.pending_responses.map((r) => (
-                                    <li key={r.id} className="flex items-center justify-between gap-3 border border-border px-3 py-2">
+                                    <li
+                                        key={r.id}
+                                        className="flex items-center justify-between gap-3 border border-border px-3 py-2"
+                                    >
                                         <span className="text-[13px] text-ink">{r.text}</span>
                                         <div className="flex shrink-0 gap-1.5">
-                                            <Button onClick={() => moderate(r.id, true)} variant="primary">Approve</Button>
-                                            <Button onClick={() => moderate(r.id, false)}>Reject</Button>
+                                            <Button
+                                                onClick={() => moderate(r.id, true)}
+                                                variant="primary"
+                                            >
+                                                Approve
+                                            </Button>
+                                            <Button onClick={() => moderate(r.id, false)}>
+                                                Reject
+                                            </Button>
                                         </div>
                                     </li>
                                 ))}
@@ -239,7 +313,9 @@ function Leaderboard({ event }) {
             <ol className="mt-3 space-y-1.5">
                 {rows.map((r, i) => (
                     <li key={i} className="flex items-center justify-between text-[13px]">
-                        <span className="text-ink">{i + 1}. {r.name}</span>
+                        <span className="text-ink">
+                            {i + 1}. {r.name}
+                        </span>
                         <span className="font-mono text-ink-secondary">{r.points} pts</span>
                     </li>
                 ))}
@@ -261,11 +337,15 @@ export default function EngagementPanel({ event }) {
 
     return (
         <div className="max-w-3xl space-y-4">
-            <p className="text-sm text-ink-secondary">Live polls and quizzes. Attendees see whichever poll you most recently set live.</p>
+            <p className="text-sm text-ink-secondary">
+                Live polls and quizzes. Attendees see whichever poll you most recently set live.
+            </p>
 
             <Leaderboard event={event} />
 
-            {polls.map((p) => <PollCard key={p.id} event={event} poll={p} onChange={load} />)}
+            {polls.map((p) => (
+                <PollCard key={p.id} event={event} poll={p} onChange={load} />
+            ))}
 
             <NewPollForm event={event} onCreated={load} />
         </div>

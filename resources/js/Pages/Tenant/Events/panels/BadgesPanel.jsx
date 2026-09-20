@@ -19,16 +19,30 @@ function Badge({ event, badge }) {
             <div className={`w-2 shrink-0 ${tier.band}`} />
             <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-center justify-between">
-                    <div className="text-[10px] uppercase tracking-wide text-[#5A656A]">{event.name}</div>
-                    {tier.label && <div className={`text-[10px] font-bold tracking-wide ${tier.labelClass}`}>{tier.label}</div>}
+                    <div className="text-[10px] uppercase tracking-wide text-[#5A656A]">
+                        {event.name}
+                    </div>
+                    {tier.label && (
+                        <div className={`text-[10px] font-bold tracking-wide ${tier.labelClass}`}>
+                            {tier.label}
+                        </div>
+                    )}
                 </div>
-                <div className="mt-auto text-2xl leading-tight tracking-tight">{badge.full_name}</div>
-                <div className="mt-1.5 text-xs text-[#5A656A]">{badge.ticket_type_name ?? 'General admission'}</div>
+                <div className="mt-auto text-2xl leading-tight tracking-tight">
+                    {badge.full_name}
+                </div>
+                <div className="mt-1.5 text-xs text-[#5A656A]">
+                    {badge.ticket_type_name ?? 'General admission'}
+                </div>
                 <div className="mt-4 flex items-end justify-between gap-3">
-                    {badge.qr_image && <img src={badge.qr_image} alt="" className="h-14 w-14 shrink-0" />}
+                    {badge.qr_image && (
+                        <img src={badge.qr_image} alt="" className="h-14 w-14 shrink-0" />
+                    )}
                     <div className="flex flex-col items-end gap-0.5 text-right text-[11px] text-[#5A656A]">
                         <span className="font-mono">{badge.ticket_code}</span>
-                        {badge.seat_label && <span className="font-mono">Seat {badge.seat_label}</span>}
+                        {badge.seat_label && (
+                            <span className="font-mono">Seat {badge.seat_label}</span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -61,7 +75,9 @@ export default function BadgesPanel({ event }) {
         if (!q) {
             return badges;
         }
-        return badges.filter((b) => b.full_name.toLowerCase().includes(q) || b.ticket_code?.toLowerCase().includes(q));
+        return badges.filter(
+            (b) => b.full_name.toLowerCase().includes(q) || b.ticket_code?.toLowerCase().includes(q)
+        );
     }, [badges, query]);
 
     const print = async () => {
@@ -79,24 +95,40 @@ export default function BadgesPanel({ event }) {
         <div>
             <div className="no-print mb-5 flex items-center justify-between gap-3">
                 <div>
-                    <p className="text-sm text-ink-secondary">Design once, print for everyone, reprint at the desk.</p>
+                    <p className="text-sm text-ink-secondary">
+                        Design once, print for everyone, reprint at the desk.
+                    </p>
                     <p className="mt-1 text-xs text-ink-tertiary">
-                        Search for a name to reprint just one badge, or leave it blank and print the whole batch.
+                        Search for a name to reprint just one badge, or leave it blank and print the
+                        whole batch.
                     </p>
                 </div>
-                <Button icon={Printer} variant="primary" onClick={print} disabled={filtered.length === 0 || printing}>
-                    Print {filtered.length > 0 ? filtered.length : ''} badge{filtered.length === 1 ? '' : 's'}
+                <Button
+                    icon={Printer}
+                    variant="primary"
+                    onClick={print}
+                    disabled={filtered.length === 0 || printing}
+                >
+                    Print {filtered.length > 0 ? filtered.length : ''} badge
+                    {filtered.length === 1 ? '' : 's'}
                 </Button>
             </div>
 
             <div className="no-print mb-5">
-                <SearchInput placeholder="Search by name or entry code" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full max-w-sm" />
+                <SearchInput
+                    placeholder="Search by name or entry code"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="w-full max-w-sm"
+                />
             </div>
 
             {badges === null && <p className="text-sm text-ink-secondary">Loading badges…</p>}
 
             {badges !== null && badges.length === 0 && (
-                <p className="text-sm text-ink-secondary">No confirmed registrations yet — badges appear here once someone checks out.</p>
+                <p className="text-sm text-ink-secondary">
+                    No confirmed registrations yet — badges appear here once someone checks out.
+                </p>
             )}
 
             {badges !== null && badges.length > 0 && filtered.length === 0 && (
@@ -105,14 +137,15 @@ export default function BadgesPanel({ event }) {
 
             {filtered.length > 0 && (
                 <div className="no-print mb-6 grid grid-cols-1 gap-1.5 text-xs text-ink-tertiary sm:grid-cols-2">
-                    {filtered.map((b) => (
-                        b.print_count > 0 && (
-                            <div key={b.id} className="flex items-center gap-1.5">
-                                <Printer className="h-3 w-3" strokeWidth={1.75} />
-                                {b.full_name} — printed {b.print_count}×
-                            </div>
-                        )
-                    ))}
+                    {filtered.map(
+                        (b) =>
+                            b.print_count > 0 && (
+                                <div key={b.id} className="flex items-center gap-1.5">
+                                    <Printer className="h-3 w-3" strokeWidth={1.75} />
+                                    {b.full_name} — printed {b.print_count}×
+                                </div>
+                            )
+                    )}
                 </div>
             )}
 
@@ -131,9 +164,14 @@ export default function BadgesPanel({ event }) {
                     </b>
                     <ul className="divide-y divide-border">
                         {recentPrints.map((p, i) => (
-                            <li key={i} className="flex items-center justify-between py-1.5 text-[13px]">
+                            <li
+                                key={i}
+                                className="flex items-center justify-between py-1.5 text-[13px]"
+                            >
                                 <span className="text-ink">{p.registrant_name}</span>
-                                <span className="text-ink-secondary">{p.printed_by} · {new Date(p.printed_at).toLocaleString()}</span>
+                                <span className="text-ink-secondary">
+                                    {p.printed_by} · {new Date(p.printed_at).toLocaleString()}
+                                </span>
                             </li>
                         ))}
                     </ul>

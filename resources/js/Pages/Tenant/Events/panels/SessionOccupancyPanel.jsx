@@ -1,19 +1,19 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { 
-    Users, 
-    DoorOpen, 
-    AlertTriangle, 
-    CheckCircle2, 
-    Clock, 
-    Download, 
-    RefreshCw, 
-    QrCode, 
-    MapPin, 
-    Radio, 
+import {
+    Users,
+    DoorOpen,
+    AlertTriangle,
+    CheckCircle2,
+    Clock,
+    Download,
+    RefreshCw,
+    QrCode,
+    MapPin,
+    Radio,
     Search,
     X,
     Maximize2,
-    Activity
+    Activity,
 } from 'lucide-react';
 import Button from '@/Components/Console/Button';
 import { useToast } from '@/Components/Console/Toast';
@@ -35,21 +35,26 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
     const [rosterSearch, setRosterSearch] = useState('');
     const [rosterLoading, setRosterLoading] = useState(false);
 
-    const fetchOccupancy = useCallback(async (quiet = false) => {
-        if (!quiet) setLoading(true);
-        try {
-            const res = await csrfFetch(route('tenant.events.sessions.occupancy', { event: event.id }));
-            const data = await res.json();
-            if (data.sessions) {
-                setSessions(data.sessions);
-                setSummary(data.summary || {});
+    const fetchOccupancy = useCallback(
+        async (quiet = false) => {
+            if (!quiet) setLoading(true);
+            try {
+                const res = await csrfFetch(
+                    route('tenant.events.sessions.occupancy', { event: event.id })
+                );
+                const data = await res.json();
+                if (data.sessions) {
+                    setSessions(data.sessions);
+                    setSummary(data.summary || {});
+                }
+            } catch (err) {
+                console.error('Failed to fetch session occupancy:', err);
+            } finally {
+                if (!quiet) setLoading(false);
             }
-        } catch (err) {
-            console.error('Failed to fetch session occupancy:', err);
-        } finally {
-            if (!quiet) setLoading(false);
-        }
-    }, [event.id]);
+        },
+        [event.id]
+    );
 
     useEffect(() => {
         fetchOccupancy();
@@ -68,7 +73,11 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                         if (s.id === data.session_id) {
                             const newPct = data.occupancy_percentage;
                             const isFull = data.is_room_full;
-                            const newStatus = isFull ? 'at_capacity' : newPct >= 85 ? 'near_capacity' : 'available';
+                            const newStatus = isFull
+                                ? 'at_capacity'
+                                : newPct >= 85
+                                  ? 'near_capacity'
+                                  : 'available';
 
                             return {
                                 ...s,
@@ -138,27 +147,28 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
                 <div>
                     <div className="flex items-center gap-2">
-                        <h2 className="text-base font-semibold text-ink">Live Room Headcount & Breakout Tracking</h2>
+                        <h2 className="text-base font-semibold text-ink">
+                            Live Room Headcount & Breakout Tracking
+                        </h2>
                         <span className="flex items-center gap-1.5 rounded-full bg-success-fg/10 px-2 py-0.5 text-[11px] font-medium text-success-fg">
                             <Radio className="h-3 w-3 animate-pulse text-success-fg" />
                             Live Reverb Sync
                         </span>
                     </div>
                     <p className="mt-0.5 text-xs text-ink-secondary">
-                        Real-time room occupancy, multi-point room scanner integration, and CPD/CME accreditation logs.
+                        Real-time room occupancy, multi-point room scanner integration, and CPD/CME
+                        accreditation logs.
                     </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        icon={RefreshCw}
-                        onClick={() => fetchOccupancy()}
-                        disabled={loading}
-                    >
+                    <Button icon={RefreshCw} onClick={() => fetchOccupancy()} disabled={loading}>
                         Refresh
                     </Button>
                     <a
-                        href={route('tenant.events.reports.session-attendance', { event: event.id })}
+                        href={route('tenant.events.reports.session-attendance', {
+                            event: event.id,
+                        })}
                         download
                         className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken transition-colors"
                     >
@@ -172,13 +182,17 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-lg border border-border bg-surface p-3.5 shadow-sm">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-ink-secondary">Total In Rooms</span>
+                        <span className="text-xs font-medium text-ink-secondary">
+                            Total In Rooms
+                        </span>
                         <Users className="h-4 w-4 text-accent" />
                     </div>
                     <div className="mt-2 text-2xl font-bold font-mono text-ink">
                         {summary.total_in_sessions || 0}
                     </div>
-                    <div className="mt-1 text-[11px] text-ink-muted">Currently seated attendees</div>
+                    <div className="mt-1 text-[11px] text-ink-muted">
+                        Currently seated attendees
+                    </div>
                 </div>
 
                 <div className="rounded-lg border border-border bg-surface p-3.5 shadow-sm">
@@ -188,14 +202,19 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                     </div>
                     <div className="mt-2 text-2xl font-bold font-mono text-ink">
                         {summary.active_rooms_count || 0}
-                        <span className="text-sm font-normal text-ink-secondary"> / {summary.total_sessions || 0}</span>
+                        <span className="text-sm font-normal text-ink-secondary">
+                            {' '}
+                            / {summary.total_sessions || 0}
+                        </span>
                     </div>
                     <div className="mt-1 text-[11px] text-ink-muted">With live occupancy</div>
                 </div>
 
                 <div className="rounded-lg border border-border bg-surface p-3.5 shadow-sm">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-ink-secondary">Rooms at Capacity</span>
+                        <span className="text-xs font-medium text-ink-secondary">
+                            Rooms at Capacity
+                        </span>
                         <AlertTriangle className="h-4 w-4 text-danger-fg" />
                     </div>
                     <div className="mt-2 text-2xl font-bold font-mono text-danger-fg">
@@ -206,7 +225,9 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
 
                 <div className="rounded-lg border border-border bg-surface p-3.5 shadow-sm">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-ink-secondary">Total Sessions</span>
+                        <span className="text-xs font-medium text-ink-secondary">
+                            Total Sessions
+                        </span>
                         <Activity className="h-4 w-4 text-ink-secondary" />
                     </div>
                     <div className="mt-2 text-2xl font-bold font-mono text-ink">
@@ -283,7 +304,8 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                     <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
                                         <Clock className="h-3 w-3" />
                                         <span>
-                                            {formatTime(session.starts_at)} - {formatTime(session.ends_at)}
+                                            {formatTime(session.starts_at)} -{' '}
+                                            {formatTime(session.ends_at)}
                                         </span>
                                         {session.track && (
                                             <>
@@ -301,7 +323,9 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                                     {session.live_headcount}
                                                 </span>
                                                 <span className="text-xs text-ink-secondary">
-                                                    {hasCapacity ? `/ ${session.capacity} max` : 'attendees'}
+                                                    {hasCapacity
+                                                        ? `/ ${session.capacity} max`
+                                                        : 'attendees'}
                                                 </span>
                                             </div>
 
@@ -337,7 +361,9 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                         )}
 
                                         <div className="mt-2 flex items-center justify-between text-[11px] text-ink-muted">
-                                            <span>Pre-registered: {session.registered_count || 0}</span>
+                                            <span>
+                                                Pre-registered: {session.registered_count || 0}
+                                            </span>
                                             <span>
                                                 {hasCapacity
                                                     ? `${Math.max(0, session.capacity - session.live_headcount)} seats left`
@@ -389,7 +415,9 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                     </span>
                                 </div>
                                 <p className="text-xs text-ink-secondary">
-                                    {activeRosterSession.location} · {formatTime(activeRosterSession.starts_at)} - {formatTime(activeRosterSession.ends_at)}
+                                    {activeRosterSession.location} ·{' '}
+                                    {formatTime(activeRosterSession.starts_at)} -{' '}
+                                    {formatTime(activeRosterSession.ends_at)}
                                 </p>
                             </div>
                             <button
@@ -441,7 +469,11 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                     value={rosterSearch}
                                     onChange={(e) => {
                                         setRosterSearch(e.target.value);
-                                        loadRoster(activeRosterSession, rosterFilter, e.target.value);
+                                        loadRoster(
+                                            activeRosterSession,
+                                            rosterFilter,
+                                            e.target.value
+                                        );
                                     }}
                                     placeholder="Search attendee..."
                                     className="w-full sm:w-48 rounded border border-border bg-surface pl-8 pr-2.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
@@ -461,11 +493,15 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                 </div>
                             ) : (
                                 roster.map((attendee) => (
-                                    <div key={attendee.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                                    <div
+                                        key={attendee.id}
+                                        className="py-2.5 flex items-center justify-between gap-3 text-xs"
+                                    >
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <span className="font-semibold text-ink">
-                                                    {attendee.title ? `${attendee.title} ` : ''}{attendee.attendee_name}
+                                                    {attendee.title ? `${attendee.title} ` : ''}
+                                                    {attendee.attendee_name}
                                                 </span>
                                                 {attendee.is_in_room ? (
                                                     <span className="rounded bg-success-fg/15 px-1.5 py-0.2 text-[10px] font-semibold text-success-fg">
@@ -478,18 +514,22 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                                                 )}
                                             </div>
                                             <div className="text-[11px] text-ink-secondary">
-                                                {attendee.attendee_email} · Code: {attendee.ticket_code}
+                                                {attendee.attendee_email} · Code:{' '}
+                                                {attendee.ticket_code}
                                             </div>
                                         </div>
 
                                         <div className="text-right">
                                             <div className="font-mono text-xs font-semibold text-ink">
                                                 {attendee.duration_minutes} mins
-                                                <span className="text-[10px] text-ink-muted ml-1">({attendee.contact_hours} hrs CPD)</span>
+                                                <span className="text-[10px] text-ink-muted ml-1">
+                                                    ({attendee.contact_hours} hrs CPD)
+                                                </span>
                                             </div>
                                             <div className="text-[10px] text-ink-muted">
                                                 In: {formatTime(attendee.checked_in_at)}
-                                                {attendee.checked_out_at && ` · Out: ${formatTime(attendee.checked_out_at)}`}
+                                                {attendee.checked_out_at &&
+                                                    ` · Out: ${formatTime(attendee.checked_out_at)}`}
                                             </div>
                                         </div>
                                     </div>
@@ -502,11 +542,7 @@ export default function SessionOccupancyPanel({ event, onOpenScannerForSession }
                             <span className="text-xs text-ink-muted">
                                 Total entries: {roster.length}
                             </span>
-                            <Button
-                                onClick={() => setActiveRosterSession(null)}
-                            >
-                                Close
-                            </Button>
+                            <Button onClick={() => setActiveRosterSession(null)}>Close</Button>
                         </div>
                     </div>
                 </div>

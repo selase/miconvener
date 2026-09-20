@@ -9,7 +9,12 @@ import csrfFetch from '@/lib/csrfFetch';
 export default function SpeakersPanel({ event, speakers, onChange }) {
     const [directory, setDirectory] = useState([]);
     const [selectedSpeakerId, setSelectedSpeakerId] = useState('');
-    const [newSpeaker, setNewSpeaker] = useState({ name: '', title: '', organization: '', bio: '' });
+    const [newSpeaker, setNewSpeaker] = useState({
+        name: '',
+        title: '',
+        organization: '',
+        bio: '',
+    });
     const toast = useToast();
 
     useEffect(() => {
@@ -52,12 +57,17 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
     };
 
     const remove = async (speakerId) => {
-        await csrfFetch(route('tenant.events.speakers.destroy', { event: event.id, speaker: speakerId }), { method: 'DELETE' });
+        await csrfFetch(
+            route('tenant.events.speakers.destroy', { event: event.id, speaker: speakerId }),
+            { method: 'DELETE' }
+        );
         onChange();
     };
 
     const copyPortalLink = async (speakerId) => {
-        const response = await csrfFetch(route('tenant.events.speakers.portal-link', { event: event.id, speaker: speakerId }));
+        const response = await csrfFetch(
+            route('tenant.events.speakers.portal-link', { event: event.id, speaker: speakerId })
+        );
         const { portal_url: portalUrl } = await response.json();
         await navigator.clipboard.writeText(portalUrl);
         toast?.('Portal link copied.');
@@ -71,18 +81,32 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
             {speakers.length > 0 ? (
                 <ul className="mb-6 divide-y divide-border rounded-md border border-border">
                     {speakers.map((speaker) => (
-                        <li key={speaker.id} className="flex items-center justify-between px-4 py-3">
+                        <li
+                            key={speaker.id}
+                            className="flex items-center justify-between px-4 py-3"
+                        >
                             <div>
                                 <div className="text-sm font-medium text-ink">{speaker.name}</div>
                                 <div className="text-xs text-ink-secondary">
-                                    {[speaker.title, speaker.organization].filter(Boolean).join(', ')}
+                                    {[speaker.title, speaker.organization]
+                                        .filter(Boolean)
+                                        .join(', ')}
                                 </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-3">
-                                <button type="button" onClick={() => copyPortalLink(speaker.id)} title="Copy speaker portal link" className="text-ink-secondary hover:text-accent">
+                                <button
+                                    type="button"
+                                    onClick={() => copyPortalLink(speaker.id)}
+                                    title="Copy speaker portal link"
+                                    className="text-ink-secondary hover:text-accent"
+                                >
                                     <Link2 className="h-4 w-4" strokeWidth={1.75} />
                                 </button>
-                                <button type="button" onClick={() => remove(speaker.id)} className="text-ink-secondary hover:text-danger-fg">
+                                <button
+                                    type="button"
+                                    onClick={() => remove(speaker.id)}
+                                    className="text-ink-secondary hover:text-danger-fg"
+                                >
                                     <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                                 </button>
                             </div>
@@ -96,14 +120,22 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
             {available.length > 0 && (
                 <form onSubmit={attachExisting} className="mb-6 flex items-end gap-3">
                     <div className="flex-1">
-                        <Select label="Add existing speaker" value={selectedSpeakerId} onChange={(e) => setSelectedSpeakerId(e.target.value)}>
+                        <Select
+                            label="Add existing speaker"
+                            value={selectedSpeakerId}
+                            onChange={(e) => setSelectedSpeakerId(e.target.value)}
+                        >
                             <option value="">Select a speaker</option>
                             {available.map((s) => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
+                                <option key={s.id} value={s.id}>
+                                    {s.name}
+                                </option>
                             ))}
                         </Select>
                     </div>
-                    <Button type="submit" icon={Plus}>Add</Button>
+                    <Button type="submit" icon={Plus}>
+                        Add
+                    </Button>
                 </form>
             )}
 
@@ -111,10 +143,27 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                 <h3 className="mb-3 text-sm font-semibold text-ink">Or add a new speaker</h3>
                 <form onSubmit={createAndAttach} className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                        <Input label="Name" value={newSpeaker.name} onChange={(e) => setNewSpeaker({ ...newSpeaker, name: e.target.value })} required />
-                        <Input label="Title" value={newSpeaker.title} onChange={(e) => setNewSpeaker({ ...newSpeaker, title: e.target.value })} />
+                        <Input
+                            label="Name"
+                            value={newSpeaker.name}
+                            onChange={(e) => setNewSpeaker({ ...newSpeaker, name: e.target.value })}
+                            required
+                        />
+                        <Input
+                            label="Title"
+                            value={newSpeaker.title}
+                            onChange={(e) =>
+                                setNewSpeaker({ ...newSpeaker, title: e.target.value })
+                            }
+                        />
                     </div>
-                    <Input label="Organization" value={newSpeaker.organization} onChange={(e) => setNewSpeaker({ ...newSpeaker, organization: e.target.value })} />
+                    <Input
+                        label="Organization"
+                        value={newSpeaker.organization}
+                        onChange={(e) =>
+                            setNewSpeaker({ ...newSpeaker, organization: e.target.value })
+                        }
+                    />
                     <div>
                         <label className="mb-1.5 block text-sm font-medium text-ink">Bio</label>
                         <textarea
@@ -124,7 +173,9 @@ export default function SpeakersPanel({ event, speakers, onChange }) {
                             className="w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                         />
                     </div>
-                    <Button type="submit" icon={Plus}>Add speaker</Button>
+                    <Button type="submit" icon={Plus}>
+                        Add speaker
+                    </Button>
                 </form>
             </div>
         </div>

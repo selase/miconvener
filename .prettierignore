@@ -1,0 +1,43 @@
+# Prettier's default ignores cover node_modules only, and package.json declares
+# `format` as `prettier --write .`. Without this file that script tries to parse
+# Composer's vendor tree and the 78MB of minified Metronic theme under
+# public/assets -- it churns for minutes and would rewrite files we neither
+# wrote nor ship from source.
+#
+# What is left is the frontend source we author: resources/js, resources/css
+# and the JS build config.
+
+# Everything served is built or vendored; none of it is hand-authored.
+/public
+
+# Dependencies, caches and runtime state
+/vendor
+/node_modules
+/bootstrap/cache
+/storage
+
+# Owned by their tools, not by us
+composer.json
+composer.lock
+package-lock.json
+*.min.js
+*.min.css
+
+# Agent instructions and tooling config. Reformatting prose that an agent reads
+# as rules buys nothing and risks changing how it parses.
+/.agent
+/.agents
+/.claude
+/.gemini
+/.github
+/.opencode
+*.md
+
+# Published vendor templates stay comparable to the copies they came from
+/resources/views/vendor
+
+# Design scratch, not shipped
+/new_design
+
+# Blade is formatted by Pint and our Blade conventions, not Prettier
+*.blade.php

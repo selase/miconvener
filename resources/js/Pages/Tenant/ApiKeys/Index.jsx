@@ -39,7 +39,9 @@ export default function Index({ apiKeys }) {
             <div className="space-y-6 px-8 py-6">
                 {flash?.plainKey && (
                     <div className="rounded-lg border border-warning-fg/30 bg-warning-bg p-5">
-                        <h3 className="text-sm font-semibold text-warning-fg">Copy your new key now</h3>
+                        <h3 className="text-sm font-semibold text-warning-fg">
+                            Copy your new key now
+                        </h3>
                         <p className="mt-1 text-sm text-warning-fg">
                             This is the only time it will be shown. Store it somewhere safe.
                         </p>
@@ -47,12 +49,17 @@ export default function Index({ apiKeys }) {
                             <code className="num flex-1 truncate rounded-md border border-warning-fg/30 bg-surface px-3 py-2 text-sm text-ink">
                                 {flash.plainKey}
                             </code>
-                            <Button icon={Copy} onClick={copyKey}>Copy</Button>
+                            <Button icon={Copy} onClick={copyKey}>
+                                Copy
+                            </Button>
                         </div>
                     </div>
                 )}
 
-                <form onSubmit={submit} className="flex items-end gap-3 rounded-lg border border-border p-5">
+                <form
+                    onSubmit={submit}
+                    className="flex items-end gap-3 rounded-lg border border-border p-5"
+                >
                     <div className="flex-1">
                         <Input
                             label="New key name"
@@ -63,7 +70,9 @@ export default function Index({ apiKeys }) {
                             error={errors.name}
                         />
                     </div>
-                    <Button type="submit" disabled={processing} icon={Plus}>Generate key</Button>
+                    <Button type="submit" disabled={processing} icon={Plus}>
+                        Generate key
+                    </Button>
                 </form>
 
                 <Table>
@@ -79,12 +88,18 @@ export default function Index({ apiKeys }) {
                         {apiKeys.map((key) => (
                             <Tr key={key.id}>
                                 <Td>{key.name}</Td>
-                                <Td muted><code className="num">sk_••••{key.key_hint}</code></Td>
+                                <Td muted>
+                                    <code className="num">sk_••••{key.key_hint}</code>
+                                </Td>
                                 <Td muted>{key.created_by ?? '—'}</Td>
-                                <Td muted numeric>{key.last_used_at ?? 'Never'}</Td>
+                                <Td muted numeric>
+                                    {key.last_used_at ?? 'Never'}
+                                </Td>
                                 <Td>
                                     {key.revoked_at ? (
-                                        <StatusPill status="neutral">Revoked {key.revoked_at}</StatusPill>
+                                        <StatusPill status="neutral">
+                                            Revoked {key.revoked_at}
+                                        </StatusPill>
                                     ) : (
                                         <StatusPill status="success">Active</StatusPill>
                                     )}
@@ -118,7 +133,10 @@ export default function Index({ apiKeys }) {
                 onClose={() => setRevoking(null)}
                 onConfirm={confirmRevoke}
                 title="Revoke API key"
-                description={revoking && `Revoke "${revoking.name}"? Any integration using it will stop working immediately.`}
+                description={
+                    revoking &&
+                    `Revoke "${revoking.name}"? Any integration using it will stop working immediately.`
+                }
                 confirmLabel="Revoke"
                 danger
             />

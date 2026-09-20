@@ -6,7 +6,15 @@ const VARIANTS = {
     active: 'border-accent bg-accent-soft text-accent hover:border-accent',
 };
 
-export default function Button({ children, icon: Icon, href, disabled = false, variant = 'default', className = '', ...props }) {
+export default function Button({
+    children,
+    icon: Icon,
+    href,
+    disabled = false,
+    variant = 'default',
+    className = '',
+    ...props
+}) {
     const classes = `inline-flex h-control items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors duration-120 ease-out disabled:pointer-events-none disabled:opacity-50 ${VARIANTS[variant] ?? VARIANTS.default} ${
         disabled ? 'pointer-events-none opacity-50' : ''
     } ${className}`;

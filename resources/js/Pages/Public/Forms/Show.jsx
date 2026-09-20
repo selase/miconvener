@@ -1,21 +1,24 @@
 import { useState } from 'react';
 import { Head } from '@inertiajs/react';
-import { 
-    CheckCircle2, 
-    Calendar, 
-    FileText, 
-    AlertCircle, 
-    Star, 
-    Send, 
-    Clock, 
-    ShieldCheck, 
-    Sparkles, 
-    ArrowRight 
+import {
+    CheckCircle2,
+    Calendar,
+    FileText,
+    AlertCircle,
+    Star,
+    Send,
+    Clock,
+    ShieldCheck,
+    Sparkles,
+    ArrowRight,
 } from 'lucide-react';
 
 export default function Show({ event, form }) {
     // Read any pre-filled query params
-    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const searchParams =
+        typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search)
+            : new URLSearchParams();
     const initialTicket = searchParams.get('ticket') || searchParams.get('ticket_code') || '';
     const initialEmail = searchParams.get('email') || '';
 
@@ -31,12 +34,12 @@ export default function Show({ event, form }) {
     const schema = form.schema || [];
 
     const handleAnswerChange = (key, value) => {
-        setAnswers(prev => ({
+        setAnswers((prev) => ({
             ...prev,
-            [key]: value
+            [key]: value,
         }));
         if (errors[`answers.${key}`]) {
-            setErrors(prev => {
+            setErrors((prev) => {
                 const next = { ...prev };
                 delete next[`answers.${key}`];
                 return next;
@@ -47,7 +50,7 @@ export default function Show({ event, form }) {
     const handleMultiSelectToggle = (key, option) => {
         const current = answers[key] || [];
         const next = current.includes(option)
-            ? current.filter(item => item !== option)
+            ? current.filter((item) => item !== option)
             : [...current, option];
         handleAnswerChange(key, next);
     };
@@ -60,17 +63,26 @@ export default function Show({ event, form }) {
 
         // Basic client-side validation
         const localErrors = {};
-        schema.forEach(field => {
+        schema.forEach((field) => {
             if (field.required) {
                 const val = answers[field.key];
-                if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
-                    localErrors[`answers.${field.key}`] = [`${field.label || field.key} is required.`];
+                if (
+                    val === undefined ||
+                    val === null ||
+                    val === '' ||
+                    (Array.isArray(val) && val.length === 0)
+                ) {
+                    localErrors[`answers.${field.key}`] = [
+                        `${field.label || field.key} is required.`,
+                    ];
                 }
             }
         });
 
         if (form.requires_check_in && !ticketCode && !respondentEmail) {
-            localErrors.ticket_code = ['Please provide your ticket code or registration email to verify attendee check-in.'];
+            localErrors.ticket_code = [
+                'Please provide your ticket code or registration email to verify attendee check-in.',
+            ];
         }
 
         if (Object.keys(localErrors).length > 0) {
@@ -90,9 +102,12 @@ export default function Show({ event, form }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-CSRF-TOKEN':
+                        document
+                            .querySelector('meta[name="csrf-token"]')
+                            ?.getAttribute('content') || '',
                 },
                 body: JSON.stringify({
                     respondent_name: respondentName,
@@ -108,7 +123,9 @@ export default function Show({ event, form }) {
                 if (data.errors) {
                     setErrors(data.errors);
                 }
-                setServerMessage(data.message || 'Submission failed. Please check the fields and try again.');
+                setServerMessage(
+                    data.message || 'Submission failed. Please check the fields and try again.'
+                );
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 setSubmitted(true);
@@ -156,7 +173,7 @@ export default function Show({ event, form }) {
                 {/* Form Hero Card */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 mb-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 dark:bg-indigo-950/40 rounded-full blur-3xl pointer-events-none -mr-12 -mt-12" />
-                    
+
                     <div className="flex flex-wrap items-center gap-2 mb-3">
                         <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50 uppercase tracking-wider">
                             {form.type.replace('_', ' ')}
@@ -195,11 +212,14 @@ export default function Show({ event, form }) {
                             Response Received!
                         </h2>
                         <p className="text-sm text-slate-600 dark:text-slate-300 max-w-md mx-auto">
-                            {serverMessage || 'Thank you for taking the time to share your feedback. Your submission has been securely recorded in the conference database.'}
+                            {serverMessage ||
+                                'Thank you for taking the time to share your feedback. Your submission has been securely recorded in the conference database.'}
                         </p>
                         <div className="pt-4">
                             <a
-                                href={route('public.events.show', { event: event.slug || event.id })}
+                                href={route('public.events.show', {
+                                    event: event.slug || event.id,
+                                })}
                                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white text-sm font-semibold transition-all shadow-sm"
                             >
                                 Back to Conference Page
@@ -214,7 +234,8 @@ export default function Show({ event, form }) {
                             Form Submissions Closed
                         </h2>
                         <p className="text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                            This evaluation or survey has concluded and is no longer accepting new responses.
+                            This evaluation or survey has concluded and is no longer accepting new
+                            responses.
                         </p>
                     </div>
                 ) : (
@@ -239,7 +260,10 @@ export default function Show({ event, form }) {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                        Full Name <span className="text-slate-400 font-normal">(optional)</span>
+                                        Full Name{' '}
+                                        <span className="text-slate-400 font-normal">
+                                            (optional)
+                                        </span>
                                     </label>
                                     <input
                                         type="text"
@@ -252,7 +276,10 @@ export default function Show({ event, form }) {
 
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                        Email Address <span className="text-slate-400 font-normal">(optional)</span>
+                                        Email Address{' '}
+                                        <span className="text-slate-400 font-normal">
+                                            (optional)
+                                        </span>
                                     </label>
                                     <input
                                         type="email"
@@ -262,7 +289,9 @@ export default function Show({ event, form }) {
                                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                     />
                                     {errors.respondent_email && (
-                                        <p className="text-xs text-red-500 mt-1">{errors.respondent_email[0]}</p>
+                                        <p className="text-xs text-red-500 mt-1">
+                                            {errors.respondent_email[0]}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -280,10 +309,13 @@ export default function Show({ event, form }) {
                                         className="w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase font-mono"
                                     />
                                     {errors.ticket_code && (
-                                        <p className="text-xs text-red-500 mt-1">{errors.ticket_code[0]}</p>
+                                        <p className="text-xs text-red-500 mt-1">
+                                            {errors.ticket_code[0]}
+                                        </p>
                                     )}
                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                                        Required to confirm your attendance at this conference for accreditation.
+                                        Required to confirm your attendance at this conference for
+                                        accreditation.
                                     </p>
                                 </div>
                             )}
@@ -297,15 +329,17 @@ export default function Show({ event, form }) {
                                     <div
                                         key={field.key || idx}
                                         className={`bg-white dark:bg-slate-900 rounded-2xl border ${
-                                            fieldError 
-                                                ? 'border-red-300 dark:border-red-800/80 shadow-red-500/5' 
+                                            fieldError
+                                                ? 'border-red-300 dark:border-red-800/80 shadow-red-500/5'
                                                 : 'border-slate-200 dark:border-slate-800'
                                         } shadow-sm p-6 sm:p-7 transition-all`}
                                     >
                                         <label className="block text-sm sm:text-base font-bold text-slate-900 dark:text-white mb-1">
                                             {field.label || `Question ${idx + 1}`}
                                             {field.required && (
-                                                <span className="text-red-500 ml-1 font-semibold">*</span>
+                                                <span className="text-red-500 ml-1 font-semibold">
+                                                    *
+                                                </span>
                                             )}
                                         </label>
 
@@ -322,8 +356,15 @@ export default function Show({ event, form }) {
                                                 <input
                                                     type="text"
                                                     value={answers[field.key] || ''}
-                                                    onChange={(e) => handleAnswerChange(field.key, e.target.value)}
-                                                    placeholder={field.placeholder || 'Your answer...'}
+                                                    onChange={(e) =>
+                                                        handleAnswerChange(
+                                                            field.key,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    placeholder={
+                                                        field.placeholder || 'Your answer...'
+                                                    }
                                                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                                 />
                                             )}
@@ -333,8 +374,16 @@ export default function Show({ event, form }) {
                                                 <textarea
                                                     rows={4}
                                                     value={answers[field.key] || ''}
-                                                    onChange={(e) => handleAnswerChange(field.key, e.target.value)}
-                                                    placeholder={field.placeholder || 'Type detailed response...'}
+                                                    onChange={(e) =>
+                                                        handleAnswerChange(
+                                                            field.key,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    placeholder={
+                                                        field.placeholder ||
+                                                        'Type detailed response...'
+                                                    }
                                                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                                 />
                                             )}
@@ -344,7 +393,12 @@ export default function Show({ event, form }) {
                                                 <input
                                                     type="number"
                                                     value={answers[field.key] || ''}
-                                                    onChange={(e) => handleAnswerChange(field.key, e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAnswerChange(
+                                                            field.key,
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     placeholder="0"
                                                     className="w-full sm:w-1/3 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                                 />
@@ -354,7 +408,12 @@ export default function Show({ event, form }) {
                                             {field.type === 'select' && (
                                                 <select
                                                     value={answers[field.key] || ''}
-                                                    onChange={(e) => handleAnswerChange(field.key, e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAnswerChange(
+                                                            field.key,
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                                 >
                                                     <option value="">-- Choose an option --</option>
@@ -383,10 +442,17 @@ export default function Show({ event, form }) {
                                                                 name={field.key}
                                                                 value={opt}
                                                                 checked={answers[field.key] === opt}
-                                                                onChange={() => handleAnswerChange(field.key, opt)}
+                                                                onChange={() =>
+                                                                    handleAnswerChange(
+                                                                        field.key,
+                                                                        opt
+                                                                    )
+                                                                }
                                                                 className="text-indigo-600 focus:ring-indigo-500"
                                                             />
-                                                            <span className="text-sm font-medium">{opt}</span>
+                                                            <span className="text-sm font-medium">
+                                                                {opt}
+                                                            </span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -396,7 +462,9 @@ export default function Show({ event, form }) {
                                             {field.type === 'multiselect' && (
                                                 <div className="space-y-2">
                                                     {(field.options || []).map((opt, oIdx) => {
-                                                        const selected = (answers[field.key] || []).includes(opt);
+                                                        const selected = (
+                                                            answers[field.key] || []
+                                                        ).includes(opt);
                                                         return (
                                                             <label
                                                                 key={oIdx}
@@ -409,10 +477,17 @@ export default function Show({ event, form }) {
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={selected}
-                                                                    onChange={() => handleMultiSelectToggle(field.key, opt)}
+                                                                    onChange={() =>
+                                                                        handleMultiSelectToggle(
+                                                                            field.key,
+                                                                            opt
+                                                                        )
+                                                                    }
                                                                     className="rounded text-indigo-600 focus:ring-indigo-500"
                                                                 />
-                                                                <span className="text-sm font-medium">{opt}</span>
+                                                                <span className="text-sm font-medium">
+                                                                    {opt}
+                                                                </span>
                                                             </label>
                                                         );
                                                     })}
@@ -426,19 +501,27 @@ export default function Show({ event, form }) {
                                                         <button
                                                             key={val}
                                                             type="button"
-                                                            onClick={() => handleAnswerChange(field.key, val)}
+                                                            onClick={() =>
+                                                                handleAnswerChange(field.key, val)
+                                                            }
                                                             className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${
                                                                 (answers[field.key] || 0) >= val
                                                                     ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-sm'
                                                                     : 'border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-600'
                                                             }`}
                                                         >
-                                                            <Star className={`w-6 h-6 ${(answers[field.key] || 0) >= val ? 'fill-amber-400' : ''}`} />
-                                                            <span className="text-xs font-bold">{val}</span>
+                                                            <Star
+                                                                className={`w-6 h-6 ${(answers[field.key] || 0) >= val ? 'fill-amber-400' : ''}`}
+                                                            />
+                                                            <span className="text-xs font-bold">
+                                                                {val}
+                                                            </span>
                                                         </button>
                                                     ))}
                                                     <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
-                                                        {answers[field.key] ? `${answers[field.key]} / 5 Stars` : 'Rate from 1 to 5'}
+                                                        {answers[field.key]
+                                                            ? `${answers[field.key]} / 5 Stars`
+                                                            : 'Rate from 1 to 5'}
                                                     </span>
                                                 </div>
                                             )}
@@ -448,7 +531,12 @@ export default function Show({ event, form }) {
                                                 <input
                                                     type="date"
                                                     value={answers[field.key] || ''}
-                                                    onChange={(e) => handleAnswerChange(field.key, e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAnswerChange(
+                                                            field.key,
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     className="w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                                 />
                                             )}
@@ -459,10 +547,17 @@ export default function Show({ event, form }) {
                                                     <input
                                                         type="checkbox"
                                                         checked={Boolean(answers[field.key])}
-                                                        onChange={(e) => handleAnswerChange(field.key, e.target.checked)}
+                                                        onChange={(e) =>
+                                                            handleAnswerChange(
+                                                                field.key,
+                                                                e.target.checked
+                                                            )
+                                                        }
                                                         className="rounded text-indigo-600 focus:ring-indigo-500"
                                                     />
-                                                    <span className="text-sm font-medium">Yes, I confirm / agree</span>
+                                                    <span className="text-sm font-medium">
+                                                        Yes, I confirm / agree
+                                                    </span>
                                                 </label>
                                             )}
                                         </div>
@@ -504,7 +599,9 @@ export default function Show({ event, form }) {
 
             {/* Footer */}
             <footer className="border-t border-slate-200 dark:border-slate-800 py-6 mt-12 bg-white/50 dark:bg-slate-900/50 text-center text-xs text-slate-500 dark:text-slate-400">
-                Powered by <span className="font-bold text-slate-700 dark:text-slate-200">MiConvener</span> &bull; Academic & Professional Conference Engine
+                Powered by{' '}
+                <span className="font-bold text-slate-700 dark:text-slate-200">MiConvener</span>{' '}
+                &bull; Academic & Professional Conference Engine
             </footer>
         </div>
     );
