@@ -218,7 +218,7 @@ final class UsersController extends Controller
             'phone_no' => $validatedData['phone_no'],
             'password' => bcrypt($password),
             'status' => $validatedData['status'],
-            'photo' => $request->hasFile('photo') ? Helper::processUploadedFile($request, 'photo', Date::now()->format('YmdHis'), '/users/profile') : null,
+            'photo' => $request->hasFile('photo') ? Helper::processUploadedFile($request, 'photo', Date::now()->format('YmdHis'), '/users/profile', User::uploadDisk()) : null,
             'tenant_id' => $request->tenant_id ?? null,
         ]);
 
@@ -301,11 +301,11 @@ final class UsersController extends Controller
         if ($request->hasFile('photo')) {
             // delete old photo
             if ($user->photo) {
-                Helper::deleteFile($user->photo);
+                Helper::deleteFile($user->photo, User::uploadDisk());
             }
 
             $prefix = Date::now()->format('YmdHis');
-            $photoPath = Helper::processUploadedFile($request, 'photo', $prefix, '/users/profile');
+            $photoPath = Helper::processUploadedFile($request, 'photo', $prefix, '/users/profile', User::uploadDisk());
             $user->photo = $photoPath;
         }
 

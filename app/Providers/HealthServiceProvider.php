@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
+use Spatie\Health\Checks\Checks\BackupsCheck;
 use Spatie\Health\Checks\Checks\CacheCheck;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\DebugModeCheck;
@@ -85,6 +86,30 @@ final class HealthServiceProvider extends ServiceProvider
             \App\Checks\FailedJobsCheck::new(),
 
             \App\Checks\PaystackWebhookCheck::new(),
+
+            /**
+             * Backups are the one system whose failure is silent: nothing stops
+             * working, and you find out only when you need one. This polls the
+             * bucket every fifteen minutes so a missed nightly run shows up the
+             * same day rather than on the day it matters.
+             *
+             * Locally there is no bucket and no schedule, so it would fail for
+             * reasons that say nothing about production.
+             */
+            BackupsCheck::new()
+                ->onDisk(config('backup.backup.destination.disks')[0] ?? 'local')
+                ->locatedAt(config('backup.backup.name').'/*.zip')
+                /*
+                 * Despite the name, this is a floor: the newest backup must be
+                 * more recent than the date given. The nightly run starts at
+                 * 01:30 and takes minutes to write ~65MB, so a flat 24 hours
+                 * would flag every night while it was still uploading. 26 gives
+                 * the run room to be late and still reports a genuinely missed
+                 * night by about 03:30 the same morning.
+                 */
+                ->youngestBackShouldHaveBeenMadeBefore(now()->subHours(26))
+                ->atLeastSizeInMb(1)
+                ->unless(app()->isLocal()),
         ]);
     }
 }

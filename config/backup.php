@@ -28,21 +28,29 @@ return [
             'files' => [
 
                 /*
-                 * The list of directories and files that will be included in the backup.
+                 * Nothing. This used to archive base_path(), which made every
+                 * nightly backup a 65MB copy of a 20MB database plus the whole
+                 * source tree -- code that is already in git, the vendored
+                 * theme under public/assets, and build output that npm
+                 * regenerates. None of it is recoverable only from here.
+                 *
+                 * Nor could a file backup help: a deployed instance's
+                 * filesystem is rebuilt from the repository on every deploy,
+                 * so anything written between deploys is already gone. Uploads
+                 * go to object storage for exactly that reason -- see
+                 * Event::uploadDisk() and User::uploadDisk().
+                 *
+                 * A restore is therefore: deploy the tagged commit, then load
+                 * this dump.
                  */
-                'include' => [
-                    base_path(),
-                ],
+                'include' => [],
 
                 /*
                  * These directories and files will be excluded from the backup.
                  *
                  * Directories used by the backup process will automatically be excluded.
                  */
-                'exclude' => [
-                    base_path('vendor'),
-                    base_path('node_modules'),
-                ],
+                'exclude' => [],
 
                 /*
                  * Determines if symlinks should be followed.
@@ -170,13 +178,20 @@ return [
      */
     'notifications' => [
 
+        /*
+         * Only the failures are mailed. Two "backup succeeded" messages every
+         * morning are the reason nobody reads the one that says it didn't --
+         * positive confirmation belongs on the health dashboard, which polls
+         * for it every fifteen minutes and shows it whether or not a mail
+         * was ever sent.
+         */
         'notifications' => [
             BackupHasFailedNotification::class => ['mail'],
             UnhealthyBackupWasFoundNotification::class => ['mail'],
             CleanupHasFailedNotification::class => ['mail'],
-            BackupWasSuccessfulNotification::class => ['mail'],
-            HealthyBackupWasFoundNotification::class => ['mail'],
-            CleanupWasSuccessfulNotification::class => ['mail'],
+            BackupWasSuccessfulNotification::class => [],
+            HealthyBackupWasFoundNotification::class => [],
+            CleanupWasSuccessfulNotification::class => [],
         ],
 
         /*
@@ -186,7 +201,11 @@ return [
         'notifiable' => Notifiable::class,
 
         'mail' => [
-            'to' => 'your@example.com',
+            /*
+             * This shipped as Spatie's `your@example.com` placeholder, so every
+             * backup failure since the repository began was mailed to nobody.
+             */
+            'to' => env('BACKUP_ALERT_EMAIL', env('SUPERADMIN_EMAIL', 'hiselase@gmail.com')),
 
             'from' => [
                 'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
@@ -271,8 +290,13 @@ return [
 
             /*
              * The number of days for which daily backups must be kept.
+             *
+             * Raised from Spatie's 16. The risk these protect against is not a
+             * lost disk, it is a quiet data bug: a bad migration or a wrong
+             * update that nobody notices for weeks. At 16 days the last clean
+             * copy can be gone before anyone looks.
              */
-            'keep_daily_backups_for_days' => 16,
+            'keep_daily_backups_for_days' => 30,
 
             /*
              * The number of weeks for which one weekly backup must be kept.
@@ -281,8 +305,12 @@ return [
 
             /*
              * The number of months for which one monthly backup must be kept.
+             *
+             * Raised from Spatie's 4 to a year. This platform holds ticket
+             * money, settlements and payouts, and a question about those is
+             * asked in tax years rather than in weeks.
              */
-            'keep_monthly_backups_for_months' => 4,
+            'keep_monthly_backups_for_months' => 12,
 
             /*
              * The number of years for which one yearly backup must be kept.

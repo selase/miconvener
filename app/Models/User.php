@@ -103,6 +103,19 @@ final class User extends Authenticatable
     ];
 
     /**
+     * The disk profile photos live on, matching Event::uploadDisk().
+     *
+     * Naming it here rather than at each call site is the point: the upload
+     * helpers default to the local disk, and a deployed instance's filesystem
+     * is rebuilt on every deploy, so a photo written there is gone by the next
+     * one while users.photo still points at it.
+     */
+    public static function uploadDisk(): string
+    {
+        return config('app.env') === 'production' ? 's3' : 'public';
+    }
+
+    /**
      * Issue a fresh set, replacing any that already exist.
      *
      * @return array<int, string> the plaintext codes, shown to the user once
