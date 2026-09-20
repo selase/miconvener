@@ -50,7 +50,7 @@ test('health check endpoint is accessible and returns 200', function () {
         ),
     ]);
 
-    $response = $this->actingAs($user)->getJson('/health/json', ['X-Tenant' => $tenant->id]);
+    $response = $this->actingAs($user)->getJson(route('application.health.json', absolute: false), ['X-Tenant' => $tenant->id]);
     $response->assertStatus(200);
 });
 
@@ -68,7 +68,7 @@ test('health check endpoint is accessible and returns 500 on failure', function 
         ),
     ]);
 
-    $response = $this->actingAs($user)->getJson('/health/json', ['X-Tenant' => $tenant->id]);
+    $response = $this->actingAs($user)->getJson(route('application.health.json', absolute: false), ['X-Tenant' => $tenant->id]);
     $response->assertStatus(500);
 });
 
@@ -77,6 +77,6 @@ test('health check contains database check', function () {
     $user = User::factory()->create();
     $tenant->users()->attach($user->id);
 
-    $this->actingAs($user)->getJson('/health/json', ['X-Tenant' => $tenant->id])
+    $this->actingAs($user)->getJson(route('application.health.json', absolute: false), ['X-Tenant' => $tenant->id])
         ->assertJsonFragment(['label' => 'Database']);
 });

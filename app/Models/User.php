@@ -65,7 +65,6 @@ final class User extends Authenticatable
         'two_factor_secret',
         'two_factor_confirmed_at',
         'two_factor_recovery_codes',
-        'notification_preferences',
     ];
 
     /**
@@ -95,7 +94,6 @@ final class User extends Authenticatable
         // plaintext for the accounts that enrolled before this, and encrypting
         // the column would lock every one of them out.
         'two_factor_recovery_codes' => 'encrypted:array',
-        'notification_preferences' => 'array',
     ];
 
     /**
