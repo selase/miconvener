@@ -515,13 +515,27 @@ final class TenantController extends Controller
         }
     }
 
+    /**
+     * Turn a feature on or off for one tenant, outside whatever their plan says.
+     *
+     * The existing meta is carried over rather than replaced. It holds the
+     * feature's type and its limit, and a row that loses them reads as a
+     * boolean everywhere afterwards -- canUse() finds no 'limit' type and
+     * allows anything, featureLimitValue() returns null and caps nothing. Only
+     * the decision and its provenance change here.
+     */
     private function updateFeature(Tenant $tenant, string $featureKey, bool $enabled): void
     {
+        $existing = $tenant->features()->where('feature_key', $featureKey)->first();
+
+        $meta = $existing->meta ?? [];
+        $meta['source'] = 'admin_override';
+
         $tenant->features()->updateOrCreate(
             ['feature_key' => $featureKey],
             [
                 'enabled' => $enabled,
-                'meta' => ['source' => 'admin_override'],
+                'meta' => $meta,
             ]
         );
         \Illuminate\Support\Facades\Cache::forget("tenant_{$tenant->id}_feature_{$featureKey}");

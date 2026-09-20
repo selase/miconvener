@@ -31,6 +31,14 @@ final class Kernel extends ConsoleKernel
         // Usage Metering & Billing
         $schedule->command('tenants:audit-storage')->dailyAt('03:00');
         $schedule->command('tenants:audit-db')->dailyAt('03:30');
+        /*
+         * Plan gates read the tenant's own feature rows and treat a missing row
+         * as permitted, so that a tenant never loses a capability to a sync
+         * that has not run. The cost is that a newly added feature key is free
+         * for everyone until it has. This closes that window nightly instead of
+         * leaving it to whoever remembers.
+         */
+        $schedule->command('tenants:sync-features')->dailyAt('03:45')->withoutOverlapping();
         $schedule->command('usage:process-rollups --period=hour')->hourly();
         $schedule->command('usage:process-rollups --period=day')->daily();
         $schedule->command('usage:prune')->dailyAt('04:00');

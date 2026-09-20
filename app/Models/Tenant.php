@@ -158,6 +158,9 @@ final class Tenant extends Model
         return $this->belongsToMany(User::class);
     }
 
+    /**
+     * @return HasMany<TenantFeature, $this>
+     */
     public function features(): HasMany
     {
         return $this->hasMany(TenantFeature::class);
@@ -253,17 +256,33 @@ final class Tenant extends Model
             });
 
         // 2. Enable/Update features from the new package
+        $overridden = $this->features()
+            ->whereNotNull('meta')
+            ->get()
+            ->filter(fn ($feature): bool => ($feature->meta['source'] ?? null) === 'admin_override')
+            ->keyBy('feature_key');
+
         foreach ($package->features as $feature) {
             $enabled = $feature->type === 'limit' || $this->pivotValueIsTruthy($feature->pivot->value);
+            $override = $overridden->get($feature->slug);
 
             $this->features()->updateOrCreate(
                 ['feature_key' => $feature->slug],
                 [
-                    'enabled' => $enabled,
+                    /*
+                     * An administrator granting or withdrawing a feature by hand
+                     * outlives a plan change -- step 1 above already treats it
+                     * that way, and overwriting it here would quietly revoke a
+                     * comp the next time anything touched the subscription. The
+                     * administrator decides whether; the package still decides
+                     * how much, so the limit metadata below is refreshed either
+                     * way.
+                     */
+                    'enabled' => $override ? (bool) $override->enabled : $enabled,
                     'meta' => [
                         'value' => $feature->pivot->value,
                         'type' => $feature->type,
-                        'source' => 'package',
+                        'source' => $override ? 'admin_override' : 'package',
                         'package_id' => $this->package_id,
                     ],
                 ]
@@ -385,13 +404,6 @@ final class Tenant extends Model
     }
 
     /**
-     * Whether the plan permits a boolean feature. A feature the tenant has no
-     * row for is treated as permitted: absence means the plan's features have
-     * never been synced, not that the capability was withdrawn. Only an
-     * explicitly disabled row closes the gate. Run `tenants:sync-features`
-     * after adding a feature key so absence stops standing in for permission.
-     */
-    /**
      * Whether the tenant may show their own logo in place of the platform's.
      *
      * This is white-labelling, which is an Enterprise capability. Everyone else
@@ -403,6 +415,17 @@ final class Tenant extends Model
         return $this->planAllows('white_label');
     }
 
+    /**
+     * Whether the plan permits a boolean feature. A feature the tenant has no
+     * row for is treated as permitted: absence means the plan's features have
+     * never been synced, not that the capability was withdrawn. Only an
+     * explicitly disabled row closes the gate.
+     *
+     * Failing open this way protects a paying tenant from losing a capability
+     * because a sync had not run yet, at the cost of briefly giving one away.
+     * That trade only holds while the rows exist, so `tenants:sync-features`
+     * runs nightly and after any new feature key is added.
+     */
     public function planAllows(string $featureKey): bool
     {
         $feature = $this->features()->where('feature_key', $featureKey)->first();

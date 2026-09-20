@@ -5017,18 +5017,6 @@ parameters:
 			path: app/Models/Tenant.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$enabled.
-			identifier: property.notFound
-			count: 3
-			path: app/Models/Tenant.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$feature_key.
-			identifier: property.notFound
-			count: 1
-			path: app/Models/Tenant.php
-
-		-
 			rawMessage: 'Class App\Models\Tenant uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
 			identifier: missingType.generics
 			count: 1
@@ -5042,12 +5030,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\Tenant::emailSenderName() return type with generic class Illuminate\Database\Eloquent\Casts\Attribute does not specify its types: TGet, TSet'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Tenant.php
-
-		-
-			rawMessage: 'Method App\Models\Tenant::features() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Tenant.php
