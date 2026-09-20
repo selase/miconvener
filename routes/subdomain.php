@@ -68,7 +68,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('/settings/hub', fn (string $subdomain) => redirect()->route('tenant.settings.index', ['subdomain' => $subdomain]))
         ->name('tenant.settings.hub');
 
-    Route::get('/settings/usage', fn (string $subdomain) => view('tenant.usage'))
+    Route::get('/settings/usage', [App\Http\Controllers\Tenant\UsageController::class, 'index'])
         ->name('tenant.settings.usage');
 
     Route::get('/settings/notifications', fn (string $subdomain) => redirect()->route('tenant.account', ['subdomain' => $subdomain]))

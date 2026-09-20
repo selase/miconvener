@@ -1,4 +1,4 @@
-import { useForm, usePage } from '@inertiajs/react';
+import { Link, useForm, usePage } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
@@ -6,7 +6,7 @@ import Input from '@/Components/Console/Input';
 import Checkbox from '@/Components/Console/Checkbox';
 
 export default function Settings({ org }) {
-    const { flash, auth } = usePage().props;
+    const { flash, auth, tenant } = usePage().props;
 
     const { data, setData, transform, post, processing, errors } = useForm({
         name: org.name ?? '',
@@ -179,20 +179,28 @@ export default function Settings({ org }) {
                 <div className="mt-6 rounded-lg border border-border bg-surface p-6">
                     <h2 className="text-sm font-medium text-ink">Other settings</h2>
                     <div className="mt-4 flex flex-col gap-2">
-                        {auth?.can?.manage_payment_settings && (
-                            <a
+                        {auth?.can?.manage_payment_settings && tenant?.features?.finance && (
+                            <Link
                                 href={route('tenant.settings.payments.index')}
                                 className="text-sm text-accent hover:underline"
                             >
                                 Payments and payouts
-                            </a>
+                            </Link>
                         )}
-                        <a
+                        {auth?.can?.manage_billing && (
+                            <Link
+                                href={route('tenant.settings.billing')}
+                                className="text-sm text-accent hover:underline"
+                            >
+                                Billing details
+                            </Link>
+                        )}
+                        <Link
                             href={route('tenant.settings.usage')}
                             className="text-sm text-accent hover:underline"
                         >
                             Plan usage
-                        </a>
+                        </Link>
                     </div>
                 </div>
             </div>

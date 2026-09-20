@@ -507,7 +507,7 @@ final class Tenant extends Model
      * Determine whether a package_features pivot "value" column represents a
      * truthy boolean. The column is a plain, uncast string (e.g. "true",
      * "1", "false", "0", or empty), so this mirrors the check already used
-     * in App\Livewire\Tenant\UsageDashboard for the same ambiguity.
+     * in App\Http\Controllers\Tenant\UsageController for the same ambiguity.
      */
     private function pivotValueIsTruthy(mixed $value): bool
     {

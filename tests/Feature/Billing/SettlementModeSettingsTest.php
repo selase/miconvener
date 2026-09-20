@@ -33,7 +33,9 @@ test('the payments settings page shows the current settlement mode', function ()
     $response = $this->actingAs($user)->get("http://{$host}/settings/payments", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
-    $response->assertSee('platform_default', false);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Tenant/Settings/Payments')
+        ->where('settlementMode', $tenant->fresh()->settlement_mode));
 });
 
 test('a host can switch a tenant to own_gateway settlement mode', function () {

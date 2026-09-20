@@ -61,6 +61,9 @@ final class Invoice extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * @return HasMany<InvoiceItem, $this>
+     */
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);

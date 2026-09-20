@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 use App\Enum\TenantStatusEnum;
 use App\Models\User;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 
+/*
+ * The onboarding wizard lives on the tenant's own domain. A second copy on
+ * the root domain, a Metronic page, has been removed: it skipped the
+ * Enterprise-only logo gate and was reachable by URL alone.
+ */
 beforeEach(function () {
     $this->seed(Database\Seeders\RoleSeeder::class);
     $this->seed(Database\Seeders\PermissionsSeeder::class);
@@ -18,40 +21,41 @@ beforeEach(function () {
         'status' => TenantStatusEnum::ACTIVE,
         'onboarding_completed_at' => null,
     ]);
+
+    $this->host = $this->tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
 });
 
 test('it can visit the welcome page', function () {
-    $this->actingAs($this->user);
-
-    $response = $this->get('/onboarding/wizard');
-
-    $response->assertStatus(200);
-    $response->assertSee('Welcome to '.$this->tenant->name);
+    $this->actingAs($this->user)
+        ->get("http://{$this->host}/onboarding/wizard", ['HTTP_HOST' => $this->host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tenant/Onboarding/Wizard')
+            ->where('org.name', $this->tenant->name));
 });
 
 test('it can update branding and redirect to dashboard', function () {
-    Storage::fake('public');
-    $this->actingAs($this->user);
+    $this->actingAs($this->user)
+        ->post("http://{$this->host}/onboarding/branding", ['name' => 'New Org Name'], ['HTTP_HOST' => $this->host])
+        ->assertRedirect(route('tenant.dashboard', ['subdomain' => $this->tenant->slug]));
 
-    $response = $this->post('/onboarding/branding', [
-        'name' => 'New Org Name',
-        'logo' => UploadedFile::fake()->image('logo.png'),
-    ]);
-
-    $response->assertRedirect('/dashboard');
-    $response->assertSessionHas('onboarding_just_completed', true);
-
-    $this->tenant->refresh();
-    expect($this->tenant->name)->toBe('New Org Name');
-    expect($this->tenant->logo)->not->toBeNull();
+    expect($this->tenant->refresh()->name)->toBe('New Org Name');
 });
 
 test('it can skip to dashboard and mark as finished', function () {
+    $this->actingAs($this->user)
+        ->post("http://{$this->host}/onboarding/finish", [], ['HTTP_HOST' => $this->host])
+        ->assertRedirect(route('tenant.dashboard', ['subdomain' => $this->tenant->slug]));
+
+    expect($this->tenant->refresh()->onboarding_completed_at)->not->toBeNull();
+});
+
+test('the removed root-domain wizard no longer exists', function () {
     $this->actingAs($this->user);
 
-    $response = $this->post('/onboarding/finish');
+    $this->get('/onboarding/wizard')->assertNotFound();
+    $this->post('/onboarding/branding', ['name' => 'Hijacked'])->assertNotFound();
+    $this->post('/onboarding/finish')->assertNotFound();
 
-    $response->assertRedirect('/dashboard');
-    $this->tenant->refresh();
-    expect($this->tenant->onboarding_completed_at)->not->toBeNull();
+    expect($this->tenant->refresh()->name)->not->toBe('Hijacked');
 });
