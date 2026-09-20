@@ -38,7 +38,7 @@ test('a tenant cannot reach another tenants event through route model binding', 
     $host = 'attacker-co.'.mb_ltrim((string) config('session.domain'), '.');
 
     $response = $this->actingAs($user)
-        ->get("http://{$host}/events/{$victimEvent->id}/abstracts", ['HTTP_HOST' => $host]);
+        ->get("http://{$host}/events/{$victimEvent->id}/data/abstracts", ['HTTP_HOST' => $host]);
 
     expect($response->getStatusCode())->not->toBe(200);
     $response->assertDontSee('Victim Confidential Summit');

@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\UpdatePaymentGatewayRequest;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class PaymentSettingsController extends Controller
 {
@@ -20,7 +22,7 @@ final class PaymentSettingsController extends Controller
     /**
      * Display the merchant payment settings page.
      */
-    public function index(): View
+    public function index(): Response
     {
         $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
@@ -31,61 +33,57 @@ final class PaymentSettingsController extends Controller
             abort(403, 'Your plan does not include paid tickets.');
         }
 
-        $gateways = TenantPaymentGateway::where('tenant_id', $tenant->id)->get();
-        $stripe = $gateways->where('provider', 'stripe')->first();
-        $paystack = $gateways->where('provider', 'paystack')->first();
+        $gateways = TenantPaymentGateway::where('tenant_id', $tenant->id)->get()->keyBy('provider');
+        $canSetPlatformFee = Gate::allows('access-superadmin-dashboard');
 
-        $breadcrumbs = [
-            ['link' => route('tenant.dashboard'), 'name' => __('Dashboard')],
-            ['link' => route('tenant.settings.index'), 'name' => __('Settings')],
-            ['link' => '#', 'name' => __('Merchant Payments')],
-        ];
-
-        return view('tenant.settings.payments', [
-            'tenant' => $tenant,
-            'stripe' => $stripe,
-            'paystack' => $paystack,
-            'breadcrumbs' => $breadcrumbs,
+        return Inertia::render('Tenant/Settings/Payments', [
+            'settlementMode' => $tenant->settlement_mode,
+            'platformSettlementAvailable' => (bool) config('services.settlement.paystack.secret_key'),
+            'gateways' => collect(['stripe', 'paystack'])->mapWithKeys(fn (string $provider): array => [
+                $provider => $this->gatewaySummary($gateways->get($provider), $provider, $tenant),
+            ]),
+            'canSetPlatformFee' => $canSetPlatformFee,
+            'platformFee' => $canSetPlatformFee ? [
+                'percentage' => $tenant->platform_fee_percentage,
+                'cap' => $tenant->platform_fee_cap_amount !== null
+                    ? number_format($tenant->platform_fee_cap_amount / 100, 2, '.', '')
+                    : null,
+            ] : null,
         ]);
     }
 
     /**
-     * Update/Store merchant payment settings.
+     * Update/Store merchant payment settings. A blank secret keeps the saved
+     * one: the page never receives secrets, so it cannot send them back.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(UpdatePaymentGatewayRequest $request): RedirectResponse
     {
-        $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
         if (! $tenant->handlesTicketMoney()) {
             abort(403, 'Your plan does not include paid tickets.');
         }
 
-        $validated = $request->validate([
-            'provider' => ['required', 'string', 'in:stripe,paystack'],
-            'api_key' => ['required', 'string'],
-            'public_key' => ['nullable', 'string'],
-            'webhook_secret' => ['nullable', 'string'],
-            'is_active' => ['nullable', 'boolean'],
-        ]);
+        $validated = $request->validated();
+        $attributes = [
+            'public_key_encrypted' => $validated['public_key'] ?? null,
+            'is_active' => $request->boolean('is_active', true),
+        ];
+
+        if (filled($validated['api_key'] ?? null)) {
+            $attributes['api_key_encrypted'] = $validated['api_key'];
+        }
+
+        if (filled($validated['webhook_secret'] ?? null)) {
+            $attributes['webhook_secret_encrypted'] = $validated['webhook_secret'];
+        }
 
         TenantPaymentGateway::updateOrCreate(
-            [
-                'tenant_id' => $tenant->id,
-                'provider' => $validated['provider'],
-            ],
-            [
-                'api_key_encrypted' => $validated['api_key'],
-                'public_key_encrypted' => $validated['public_key'],
-                'webhook_secret_encrypted' => $validated['webhook_secret'],
-                'is_active' => $request->boolean('is_active', true),
-            ]
+            ['tenant_id' => $tenant->id, 'provider' => $validated['provider']],
+            $attributes
         );
 
-        return back()->with([
-            'status' => 'success',
-            'message' => __(':provider settings updated successfully.', ['provider' => ucfirst((string) $validated['provider'])]),
-        ]);
+        return back()->with('success', __(':provider settings saved.', ['provider' => ucfirst((string) $validated['provider'])]));
     }
 
     /**
@@ -106,10 +104,7 @@ final class PaymentSettingsController extends Controller
 
         $tenant->update(['settlement_mode' => $validated['settlement_mode']]);
 
-        return back()->with([
-            'status' => 'success',
-            'message' => 'Settlement mode updated.',
-        ]);
+        return back()->with('success', 'Settlement mode updated.');
     }
 
     /**
@@ -153,9 +148,23 @@ final class PaymentSettingsController extends Controller
 
         $tenant->update($attributes);
 
-        return back()->with([
-            'status' => 'success',
-            'message' => 'Platform fee updated.',
-        ]);
+        return back()->with('success', 'Platform fee updated.');
+    }
+
+    /**
+     * What the page may know about a provider: whether it is connected and its
+     * public details, never the secret key or webhook secret themselves.
+     *
+     * @return array{connected: bool, has_webhook_secret: bool, public_key: ?string, is_active: bool, webhook_url: string}
+     */
+    private function gatewaySummary(?TenantPaymentGateway $gateway, string $provider, Tenant $tenant): array
+    {
+        return [
+            'connected' => $gateway !== null,
+            'has_webhook_secret' => filled($gateway?->webhook_secret_encrypted),
+            'public_key' => $gateway?->public_key_encrypted,
+            'is_active' => (bool) $gateway?->is_active,
+            'webhook_url' => route("webhooks.merchant.{$provider}", ['tenant' => $tenant->id]),
+        ];
     }
 }

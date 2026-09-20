@@ -10,6 +10,7 @@ import csrfFetch from '@/lib/csrfFetch';
 import EventFormModal from './EventFormModal';
 import EventWorkspace from './Workspace/EventWorkspace';
 import { sectionHref } from './Workspace/sections';
+import OverviewNow, { DoorModeLink } from './Workspace/OverviewNow';
 import CheckInPanel from './CheckInPanel';
 import TicketTypesPanel from './TicketTypesPanel';
 import SpeakersPanel from './SpeakersPanel';
@@ -54,11 +55,7 @@ function formatAmount(amount, currency) {
     return `${currency} ${(amount / 100).toFixed(2)}`;
 }
 
-function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, publicUrl }) {
-    const confirmed = registrations.filter(
-        (r) => r.status === 'confirmed' || r.status === 'checked_in'
-    );
-
+function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl }) {
     const [visibility, setVisibilityState] = useState(event.visibility ?? 'public');
 
     // Persisted immediately: a host toggling this is making a confidentiality
@@ -74,9 +71,10 @@ function OverviewTab({ event, registrations, hasActiveGateway, settlementMode, p
         });
         if (!response.ok) setVisibilityState(previous);
     };
-    const confirmedCount = confirmed.length;
-    const revenue = confirmed.reduce((sum, r) => sum + r.amount, 0);
-    const platformFees = confirmed.reduce((sum, r) => sum + (r.platform_fee_amount ?? 0), 0);
+    // Counted on the server: the overview no longer loads every registration.
+    const confirmedCount = stats?.confirmed ?? 0;
+    const revenue = stats?.collected ?? 0;
+    const platformFees = stats?.platform_fees ?? 0;
 
     return (
         <div className="space-y-6">
@@ -308,11 +306,15 @@ function GuestsTab({ event, registrations }) {
 export default function Show({
     event,
     registrations,
+    stats,
     hasActiveGateway,
     settlementMode,
     publicUrl,
     sections,
     section,
+    badges,
+    phase,
+    overview,
 }) {
     const [editing, setEditing] = useState(false);
     const current = section ?? 'overview';
@@ -322,13 +324,16 @@ export default function Show({
     // One entry per section in the server's menu (App\Services\Events\EventSections).
     const panels = {
         overview: () => (
-            <OverviewTab
-                event={event}
-                registrations={registrations}
-                hasActiveGateway={hasActiveGateway}
-                settlementMode={settlementMode}
-                publicUrl={publicUrl}
-            />
+            <div className="grid gap-6">
+                <OverviewNow event={event} overview={overview} />
+                <OverviewTab
+                    event={event}
+                    stats={stats}
+                    hasActiveGateway={hasActiveGateway}
+                    settlementMode={settlementMode}
+                    publicUrl={publicUrl}
+                />
+            </div>
         ),
         guests: () => <GuestsTab event={event} registrations={registrations} />,
         tickets: () => (
@@ -360,18 +365,23 @@ export default function Show({
         'live-polls': () => <EngagementPanel event={event} />,
         forum: () => <ForumPanel event={event} />,
         'check-in': () => (
-            <CheckInPanel
-                event={event}
-                sessions={event.sessions || []}
-                scanUrl={route('tenant.events.checkin.scan', { event: event.id })}
-                searchUrl={route('tenant.events.checkin.search', { event: event.id })}
-                checkInUrlFor={(registrationId) =>
-                    route('tenant.events.checkin', {
-                        event: event.id,
-                        registration: registrationId,
-                    })
-                }
-            />
+            <div className="grid gap-4">
+                <div className="flex justify-end">
+                    <DoorModeLink event={event} />
+                </div>
+                <CheckInPanel
+                    event={event}
+                    sessions={event.sessions || []}
+                    scanUrl={route('tenant.events.checkin.scan', { event: event.id })}
+                    searchUrl={route('tenant.events.checkin.search', { event: event.id })}
+                    checkInUrlFor={(registrationId) =>
+                        route('tenant.events.checkin', {
+                            event: event.id,
+                            registration: registrationId,
+                        })
+                    }
+                />
+            </div>
         ),
         badges: () => <BadgesPanel event={event} />,
         'room-headcount': () => (
@@ -395,6 +405,8 @@ export default function Show({
             sections={sections}
             current={current}
             hrefFor={hrefFor}
+            badges={badges}
+            phase={phase}
             actions={
                 <Button icon={Pencil} onClick={() => setEditing(true)}>
                     Edit event

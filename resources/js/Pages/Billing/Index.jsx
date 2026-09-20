@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import StatusPill from '@/Components/Console/StatusPill';
@@ -26,8 +26,13 @@ function RevenueChart({ monthlyStats, currency = 'GHS' }) {
             <h2 className="text-sm font-semibold text-ink-secondary">Spending analytics</h2>
             <div className="mt-4 flex items-end gap-3" style={{ height: CHART_MAX_HEIGHT + 40 }}>
                 {monthlyStats.map((stat) => (
-                    <div key={stat.label} className="flex flex-1 flex-col items-center justify-end gap-1.5">
-                        <div className="num text-xs text-ink-secondary">{currency} {stat.formatted}</div>
+                    <div
+                        key={stat.label}
+                        className="flex flex-1 flex-col items-center justify-end gap-1.5"
+                    >
+                        <div className="num text-xs text-ink-secondary">
+                            {currency} {stat.formatted}
+                        </div>
                         <div
                             className="w-full rounded-t bg-accent-graph"
                             style={{ height: Math.max((stat.amount / max) * CHART_MAX_HEIGHT, 2) }}
@@ -69,10 +74,16 @@ function CurrentPlan({ plan }) {
     const overdue = plan?.status === 'past_due';
 
     return (
-        <div className={`rounded-lg border p-5 ${overdue ? 'border-danger-fg/40 bg-danger-bg' : 'border-border'}`}>
+        <div
+            className={`rounded-lg border p-5 ${overdue ? 'border-danger-fg/40 bg-danger-bg' : 'border-border'}`}
+        >
             <div className="text-xs font-semibold uppercase text-ink-secondary">Current plan</div>
             <div className="mt-1 text-2xl font-bold text-ink">{plan?.package_name ?? 'Free'}</div>
-            {line && <p className={`mt-1 text-sm ${overdue ? 'text-danger-fg' : 'text-ink-secondary'}`}>{line}</p>}
+            {line && (
+                <p className={`mt-1 text-sm ${overdue ? 'text-danger-fg' : 'text-ink-secondary'}`}>
+                    {line}
+                </p>
+            )}
             {plan?.can_pay_now && (
                 <Button className="mt-3" variant="primary" href={route('billing.renew')}>
                     Pay {plan.renew_amount}
@@ -82,17 +93,36 @@ function CurrentPlan({ plan }) {
     );
 }
 
-export default function Index({ transactions, invoices, subscription, accruedMetered, monthlyStats, currency = 'GHS' }) {
+export default function Index({
+    transactions,
+    invoices,
+    subscription,
+    accruedMetered,
+    monthlyStats,
+    currency = 'GHS',
+}) {
     return (
         <ConsoleLayout>
-            <PageHeader title="Billing" actions={<Button href={route('tenant.pricing')}>Change plan</Button>} />
+            <PageHeader
+                title="Billing"
+                actions={
+                    <div className="flex gap-2">
+                        <Button href={route('tenant.settings.billing')}>Billing details</Button>
+                        <Button href={route('tenant.pricing')}>Change plan</Button>
+                    </div>
+                }
+            />
 
             <div className="space-y-8 px-8 py-6">
                 <div className="grid grid-cols-2 gap-4">
                     <CurrentPlan plan={subscription} />
                     <div className="rounded-lg border border-border p-5">
-                        <div className="text-xs font-semibold uppercase text-ink-secondary">Accrued this month</div>
-                        <div className="num mt-1 text-2xl font-bold text-ink">{currency} {accruedMetered}</div>
+                        <div className="text-xs font-semibold uppercase text-ink-secondary">
+                            Accrued this month
+                        </div>
+                        <div className="num mt-1 text-2xl font-bold text-ink">
+                            {currency} {accruedMetered}
+                        </div>
                         <div className="mt-1 text-sm text-ink-secondary">Usage-based charges</div>
                     </div>
                 </div>
@@ -113,16 +143,28 @@ export default function Index({ transactions, invoices, subscription, accruedMet
                             {invoices.map((invoice) => (
                                 <Tr key={invoice.id}>
                                     <Td>{invoice.number}</Td>
-                                    <Td align="right" numeric>{invoice.currency || currency} {invoice.total}</Td>
-                                    <Td><StatusPill status={STATUS_MAP[invoice.status] ?? 'neutral'}>{invoice.status}</StatusPill></Td>
-                                    <Td muted align="right" numeric>{invoice.created_at}</Td>
+                                    <Td align="right" numeric>
+                                        {invoice.currency || currency} {invoice.total}
+                                    </Td>
                                     <Td>
-                                        <a
-                                            href={route('billing.invoices.show', { invoice: invoice.id })}
+                                        <StatusPill
+                                            status={STATUS_MAP[invoice.status] ?? 'neutral'}
+                                        >
+                                            {invoice.status}
+                                        </StatusPill>
+                                    </Td>
+                                    <Td muted align="right" numeric>
+                                        {invoice.created_at}
+                                    </Td>
+                                    <Td>
+                                        <Link
+                                            href={route('billing.invoices.show', {
+                                                invoice: invoice.id,
+                                            })}
                                             className="text-sm font-medium text-accent hover:underline"
                                         >
                                             View
-                                        </a>
+                                        </Link>
                                     </Td>
                                 </Tr>
                             ))}
@@ -150,9 +192,19 @@ export default function Index({ transactions, invoices, subscription, accruedMet
                             {transactions.data.map((transaction) => (
                                 <Tr key={transaction.id} flagged={transaction.status === 'failed'}>
                                     <Td>{transaction.description}</Td>
-                                    <Td align="right" numeric>{transaction.currency} {transaction.amount_formatted}</Td>
-                                    <Td><StatusPill status={STATUS_MAP[transaction.status] ?? 'neutral'}>{transaction.status}</StatusPill></Td>
-                                    <Td muted align="right" numeric>{transaction.created_at}</Td>
+                                    <Td align="right" numeric>
+                                        {transaction.currency} {transaction.amount_formatted}
+                                    </Td>
+                                    <Td>
+                                        <StatusPill
+                                            status={STATUS_MAP[transaction.status] ?? 'neutral'}
+                                        >
+                                            {transaction.status}
+                                        </StatusPill>
+                                    </Td>
+                                    <Td muted align="right" numeric>
+                                        {transaction.created_at}
+                                    </Td>
                                 </Tr>
                             ))}
                             {transactions.data.length === 0 && (

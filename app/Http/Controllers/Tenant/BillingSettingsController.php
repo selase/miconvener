@@ -8,24 +8,20 @@ use App\Http\Controllers\Controller;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 final class BillingSettingsController extends Controller
 {
-    public function index(TenantContext $tenantContext): View
+    public function index(TenantContext $tenantContext): Response
     {
         $this->authorize('manage billing');
         $tenant = $tenantContext->getTenant();
 
-        return view('tenant.settings.billing', [
-            'tenant' => $tenant,
+        return Inertia::render('Tenant/Settings/Billing', [
             'billingEmail' => $tenant->meta['billing_email'] ?? $tenant->email,
             'taxId' => $tenant->meta['tax_id'] ?? '',
-            'billingAddress' => $tenant->meta['billing_address'] ?? $tenant->address,
-            'breadcrumbs' => [
-                ['name' => 'Billing', 'link' => route('billing.index')],
-                ['name' => 'Settings'],
-            ],
+            'billingAddress' => $tenant->meta['billing_address'] ?? $tenant->address ?? '',
         ]);
     }
 

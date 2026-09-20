@@ -35,6 +35,20 @@ test('user with 2fa enabled is redirected to challenge page', function () {
     $response->assertRedirect(route('two-factor.challenge'));
 });
 
+test('the 2fa challenge page uses the branded sign-in layout, not the Metronic one', function () {
+    $user = User::factory()->create([
+        'two_factor_secret' => 'B7S6S7S6S7S6S7S6',
+        'two_factor_confirmed_at' => now(),
+    ])->refresh();
+
+    $this->actingAs($user)
+        ->get(route('two-factor.challenge'))
+        ->assertOk()
+        ->assertSee('Authentication or recovery code')
+        ->assertSee(route('two-factor.challenge.store'), false)
+        ->assertDontSee('style.bundle.css', false);
+});
+
 test('user can pass 2fa challenge with valid code', function () {
     $secret = 'B7S6S7S6S7S6S7S6';
     $user = User::factory()->create([

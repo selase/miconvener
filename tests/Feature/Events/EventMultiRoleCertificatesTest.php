@@ -26,7 +26,7 @@ test('host can view certificate management dashboard with auto-seeded templates'
     ]);
 
     $response = $this->actingAs($user)
-        ->getJson("http://{$host}/events/{$event->id}/certificates", ['HTTP_HOST' => $host]);
+        ->getJson("http://{$host}/events/{$event->id}/data/certificates", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $response->assertJsonStructure([

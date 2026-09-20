@@ -134,10 +134,13 @@ test('the settings page offers the fee form to whoever the endpoint would accept
 
     $this->actingAs($superadmin)->get("http://{$host}/settings/payments", ['HTTP_HOST' => $host])
         ->assertOk()
-        ->assertSee('Platform Fee (Superadmin)')
-        ->assertSee('name="platform_fee_cap"', false);
+        ->assertInertia(fn ($page) => $page
+            ->where('canSetPlatformFee', true)
+            ->where('platformFee.percentage', fn ($percentage): bool => (float) $percentage === 1.25));
 
     $this->actingAs($impostor)->get("http://{$host}/settings/payments", ['HTTP_HOST' => $host])
         ->assertOk()
-        ->assertDontSee('Platform Fee (Superadmin)');
+        ->assertInertia(fn ($page) => $page
+            ->where('canSetPlatformFee', false)
+            ->where('platformFee', null));
 });

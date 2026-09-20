@@ -33,18 +33,33 @@ function invoiceOwner(): array
 
 test('the owner can view and download an issued invoice from the root-domain route', function (): void {
     [$user, $tenant] = invoiceOwner();
-    $invoice = Invoice::factory()->create(['tenant_id' => $tenant->id, 'status' => Invoice::STATUS_ISSUED]);
+    $invoice = Invoice::factory()->create(['tenant_id' => $tenant->id, 'status' => Invoice::STATUS_ISSUED, 'currency' => 'GHS']);
 
     $this->actingAs($user);
 
     $this->get(route('billing.invoices.show', $invoice->id))
         ->assertOk()
-        ->assertViewIs('billing.invoices.show');
+        ->assertInertia(fn ($page) => $page
+            ->component('Billing/Invoice')
+            ->where('invoice.id', $invoice->id)
+            ->where('invoice.number', $invoice->number)
+            ->where('invoice.currency', 'GHS')
+            ->where('invoice.can_pay', true));
 
     $this->get(route('billing.invoices.download', $invoice->id))
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
 });
+
+test('only an issued invoice offers payment, since checkout refuses any other status', function (string $status): void {
+    [$user, $tenant] = invoiceOwner();
+    $invoice = Invoice::factory()->create(['tenant_id' => $tenant->id, 'status' => $status]);
+
+    $this->actingAs($user)
+        ->get(route('billing.invoices.show', $invoice->id))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('invoice.can_pay', false));
+})->with([Invoice::STATUS_PAID, Invoice::STATUS_OVERDUE, Invoice::STATUS_VOID]);
 
 test('a draft invoice is never shown to the tenant', function (): void {
     [$user, $tenant] = invoiceOwner();

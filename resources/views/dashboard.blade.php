@@ -66,7 +66,7 @@
                     <div class="d-flex flex-column pe-0 pe-sm-10">
                         <h5 class="mb-1 text-warning">Finish Setting Up Your Organization</h5>
                         <span>You have some pending steps in the setup wizard.
-                            <a href="{{ request()->route('subdomain') ? route('tenant.onboarding.wizard') : route('onboarding.wizard') }}"
+                            <a href="{{ route('tenant.onboarding.wizard', ['subdomain' => $currentTenant->slug]) }}"
                                 class="fw-bolder text-warning text-decoration-underline">Click here to complete it now.</a>
                         </span>
                     </div>

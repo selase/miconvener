@@ -43,7 +43,7 @@ test('host sees a printable badge with a QR image for each confirmed registratio
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/badges", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/badges", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     $badges = $response->json('badges');
@@ -69,7 +69,7 @@ test('a badge inherits the badge tier of its ticket type', function () {
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/badges", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/badges", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
     expect($response->json('badges.0.badge_tier'))->toBe('speaker');
@@ -126,7 +126,7 @@ test('printing badges logs an audit entry per registration and increments the pr
     expect(EventBadgePrint::where('registration_id', $first->id)->count())->toBe(2);
     expect(EventBadgePrint::where('registration_id', $second->id)->count())->toBe(1);
 
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/badges", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/badges", ['HTTP_HOST' => $host]);
     $badges = collect($response->json('badges'))->keyBy('id');
     expect($badges[$first->id]['print_count'])->toBe(2);
     expect($badges[$second->id]['print_count'])->toBe(1);
@@ -146,6 +146,6 @@ test('a host without read event permission cannot view badges', function () {
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/badges", ['HTTP_HOST' => $host])
+    $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/badges", ['HTTP_HOST' => $host])
         ->assertForbidden();
 });

@@ -122,7 +122,7 @@ test('finance controller returns trial balance and allows updating payout schedu
     $host = "ledgercorp.{$baseDomain}";
 
     // Index endpoint
-    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/finance", ['HTTP_HOST' => $host]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/finance", ['HTTP_HOST' => $host]);
     $response->assertOk();
     $response->assertJsonStructure([
         'stats',

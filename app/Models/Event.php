@@ -216,6 +216,9 @@ final class Event extends Model
         return $this->hasMany(EventPoll::class)->orderByDesc('created_at');
     }
 
+    /**
+     * @return HasMany<EventServiceRequest, $this>
+     */
     public function serviceRequests(): HasMany
     {
         return $this->hasMany(EventServiceRequest::class)->orderByDesc('created_at');

@@ -39,8 +39,9 @@ final class EventRegistrationNeedsApproval extends Mailable implements ShouldQue
             with: [
                 'event' => $this->registration->event,
                 'registration' => $this->registration,
+                // Straight to Guests, where the approve buttons are.
                 'reviewUrl' => $this->registration->tenant->url(
-                    '/events/'.$this->registration->event->id
+                    '/events/'.$this->registration->event->id.'/guests'
                 ),
             ],
         );

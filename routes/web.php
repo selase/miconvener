@@ -157,13 +157,6 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         Route::delete('tokens/{id}', [App\Http\Controllers\Settings\ApiTokenController::class, 'destroy'])->name('tokens.destroy');
     });
 
-    // Onboarding Wizard
-    Route::group(['prefix' => 'onboarding', 'as' => 'onboarding.'], function (): void {
-        Route::get('wizard', [App\Http\Controllers\Admin\OnboardingController::class, 'index'])->name('wizard');
-        Route::post('branding', [App\Http\Controllers\Admin\OnboardingController::class, 'updateBranding'])->name('branding.update');
-        Route::post('finish', [App\Http\Controllers\Admin\OnboardingController::class, 'finish'])->name('finish');
-    });
-
     // Enterprise Leads
     Route::resource('admin/leads', App\Http\Controllers\Admin\LeadController::class)
         ->names('admin.leads');
