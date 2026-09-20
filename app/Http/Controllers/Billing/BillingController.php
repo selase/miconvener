@@ -12,6 +12,7 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
 use App\Services\Billing\BillingNotifier;
+use App\Services\Billing\PlanChangeWarnings;
 use App\Services\Billing\RenewalScheduler;
 use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Tenancy\TenantContext;
@@ -92,6 +93,7 @@ final class BillingController extends Controller
 
         $tenant = $tenantContext->getTenant();
         $packages = Package::where('is_active', true)->with('features')->orderBy('sort_order')->get();
+        $planWarnings = app(PlanChangeWarnings::class);
 
         return Inertia::render('Billing/Pricing', [
             'packages' => $packages->map(fn (Package $package): array => [
@@ -102,6 +104,11 @@ final class BillingController extends Controller
                 'yearly_price' => (float) ($package->yearly_price ?? $package->price * 10),
                 'is_free' => $package->isFree(),
                 'features' => $package->features->pluck('name'),
+                // What this plan would cost them, so the choice is made with
+                // the facts rather than discovered afterwards.
+                'warnings' => $package->slug === $tenant->package?->slug
+                    ? []
+                    : $planWarnings->for($tenant, $package),
             ]),
             'currentPackageSlug' => $tenant->package?->slug,
             'currency' => (string) config('services.paystack.currency', 'GHS'),

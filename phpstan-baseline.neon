@@ -3349,18 +3349,6 @@ parameters:
 			path: app/Listeners/WebhookEventSubscriber.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Feature::$pivot.
-			identifier: property.notFound
-			count: 2
-			path: app/Livewire/Tenant/SubscriptionManager.php
-
-		-
-			rawMessage: 'Method App\Livewire\Tenant\SubscriptionManager::packages() return type with generic class Illuminate\Database\Eloquent\Collection does not specify its types: TKey, TModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Livewire/Tenant/SubscriptionManager.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$event.
 			identifier: property.notFound
 			count: 1
