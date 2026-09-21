@@ -48,17 +48,7 @@ parameters:
 			count: 1
 			path: app/Console/Commands/DispatchAutomatedNotificationsCommand.php
 
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::isDue().'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/DispatchAutomatedNotificationsCommand.php
 
-		-
-			rawMessage: 'Parameter #1 $rule of method App\Services\Notifications\AutomatedNotificationDispatcher::dispatchRule() expects App\Models\EventNotificationRule, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/DispatchAutomatedNotificationsCommand.php
 
 		-
 			rawMessage: Dead catch - App\Exceptions\PaymentFailedException is never thrown in the try block.

@@ -11,6 +11,7 @@ use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Models\TenantNotificationSetting;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
@@ -422,4 +423,218 @@ test('scheduled console command scans and dispatches due notification rules', fu
     Mail::assertSent(AutomatedNotificationMail::class, function (AutomatedNotificationMail $mail) {
         return $mail->hasTo('ama@stem.org');
     });
+});
+
+test('a scheduled reminder that has already been sent does not send again', function () {
+    Mail::fake();
+
+    [$tenant, $user] = eventHost('acme');
+
+    // An event that finished two months ago. Its reminder rule is still active,
+    // as an organiser has no reason to go back and switch off a rule for an
+    // event that is over.
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Past Congress',
+        'starts_at' => now()->subDays(60),
+        'ends_at' => now()->subDays(59),
+        'slug' => 'past-congress-2026',
+    ]);
+
+    EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'ama@stem.org',
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+
+    $rule = EventNotificationRule::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'name' => '2-Day Scheduled Alert',
+        'target_role' => 'attendee',
+        'target_audience' => 'confirmed',
+        'trigger_type' => 'scheduled_offset',
+        'offset_direction' => 'before',
+        'offset_amount' => 2,
+        'offset_unit' => 'days',
+        'channels' => ['email'],
+        'subject' => 'Two Days to Congress!',
+        'body_template' => 'Dear {name}, Congress begins in 2 days.',
+        'is_active' => true,
+        // It fired at the right time, two months ago.
+        'last_dispatched_at' => now()->subDays(62),
+    ]);
+
+    expect($rule->isDue())->toBeFalse();
+
+    Artisan::call('app:dispatch-automated-notifications');
+
+    Mail::assertNothingSent();
+});
+
+test('a reminder missed by a short scheduler outage still sends, an older one does not', function () {
+    [$tenant] = eventHost('acme');
+
+    $ruleForTargetAgo = function (int $hoursAgo) use ($tenant): EventNotificationRule {
+        $event = Event::factory()->published()->create([
+            'tenant_id' => $tenant->id,
+            // A "2 hours before" rule on this event targets $hoursAgo in the past.
+            'starts_at' => now()->subHours($hoursAgo)->addHours(2),
+            'slug' => 'outage-'.$hoursAgo.'-2026',
+        ]);
+
+        return EventNotificationRule::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'name' => 'Two Hour Alert',
+            'target_role' => 'attendee',
+            'target_audience' => 'confirmed',
+            'trigger_type' => 'scheduled_offset',
+            'offset_direction' => 'before',
+            'offset_amount' => 2,
+            'offset_unit' => 'hours',
+            'channels' => ['email'],
+            'subject' => 'Starting soon',
+            'body_template' => 'Dear {name}, we begin shortly.',
+            'is_active' => true,
+            'last_dispatched_at' => null,
+        ]);
+    };
+
+    // The scheduler runs every fifteen minutes, but the environment scales to
+    // zero, so a gap of a few hours is plausible and must not lose the send.
+    expect($ruleForTargetAgo(3)->isDue())->toBeTrue();
+
+    // Beyond a day the reminder is stale: telling someone an event starts in
+    // two hours, a day and a half late, is worse than staying quiet.
+    expect($ruleForTargetAgo(36)->isDue())->toBeFalse();
+});
+
+test('rescheduling a rule that already fired arms it again, renaming it does not', function () {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'starts_at' => now()->addDays(5),
+        'slug' => 'rearm-congress-2026',
+    ]);
+
+    $makeRule = fn (): EventNotificationRule => EventNotificationRule::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'name' => 'Week Ahead Alert',
+        'target_role' => 'attendee',
+        'target_audience' => 'confirmed',
+        'trigger_type' => 'scheduled_offset',
+        'offset_direction' => 'before',
+        'offset_amount' => 6,
+        'offset_unit' => 'days',
+        'channels' => ['email'],
+        'subject' => 'Coming up',
+        'body_template' => 'Dear {name}, see you soon.',
+        'is_active' => true,
+        'last_dispatched_at' => now()->subDay(),
+    ]);
+
+    // Moving the rule to a new moment is a fresh instruction, so the send it
+    // already made must not suppress the one the organiser has just asked for.
+    $rescheduled = $makeRule();
+    $this->actingAs($user)
+        ->putJson("http://{$host}/events/{$event->id}/notification-rules/{$rescheduled->id}", [
+            'offset_amount' => 2,
+        ], ['HTTP_HOST' => $host])
+        ->assertOk();
+
+    expect($rescheduled->fresh()->last_dispatched_at)->toBeNull();
+
+    // Correcting the wording is not, or an organiser fixing a typo would mail
+    // everyone a second copy.
+    $renamed = $makeRule();
+    $this->actingAs($user)
+        ->putJson("http://{$host}/events/{$event->id}/notification-rules/{$renamed->id}", [
+            'subject' => 'Coming up soon',
+        ], ['HTTP_HOST' => $host])
+        ->assertOk();
+
+    expect($renamed->fresh()->last_dispatched_at)->not->toBeNull();
+});
+
+test('scanning for due rules does not query once per published event', function () {
+    [$tenant] = eventHost('acme');
+
+    // Ten published events, each carrying an active rule that is not yet due.
+    // Nothing dispatches, so what is measured is the scan alone.
+    foreach (range(1, 10) as $index) {
+        $event = Event::factory()->published()->create([
+            'tenant_id' => $tenant->id,
+            'starts_at' => now()->addDays(30),
+            'slug' => "scan-congress-{$index}",
+        ]);
+
+        EventNotificationRule::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'name' => "Scan Rule {$index}",
+            'target_role' => 'attendee',
+            'target_audience' => 'confirmed',
+            'trigger_type' => 'scheduled_offset',
+            'offset_direction' => 'before',
+            'offset_amount' => 1,
+            'offset_unit' => 'days',
+            'channels' => ['email'],
+            'subject' => 'Coming up',
+            'body_template' => 'Dear {name}, see you soon.',
+            'is_active' => true,
+            'last_dispatched_at' => null,
+        ]);
+    }
+
+    DB::connection('landlord')->flushQueryLog();
+    DB::connection('landlord')->enableQueryLog();
+
+    Artisan::call('app:dispatch-automated-notifications');
+
+    $queryCount = count(DB::connection('landlord')->getQueryLog());
+    DB::connection('landlord')->disableQueryLog();
+
+    // The scheduler runs this every fifteen minutes across every tenant, so the
+    // cost of a scan must not grow with the number of events on the platform.
+    expect($queryCount)->toBeLessThanOrEqual(2);
+});
+
+test('the rules payload exposes the fields the console needs to show a reminder as sent', function () {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'slug' => 'payload-congress-2026',
+    ]);
+
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'name' => 'Week Ahead Alert',
+        'target_role' => 'attendee',
+        'target_audience' => 'confirmed',
+        'trigger_type' => 'scheduled_offset',
+        'offset_direction' => 'before',
+        'offset_amount' => 7,
+        'offset_unit' => 'days',
+        'channels' => ['email'],
+        'subject' => 'Coming up',
+        'body_template' => 'Dear {name}, see you soon.',
+        'is_active' => true,
+        'last_dispatched_at' => now()->subDay(),
+    ]);
+
+    // The rule card decides whether to show "Sent", and the note explaining that
+    // a scheduled reminder fires once, from exactly these two fields.
+    $this->actingAs($user)
+        ->getJson("http://{$host}/events/{$event->id}/notification-rules", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertJsonStructure(['rules' => ['*' => ['trigger_type', 'last_dispatched_at']]])
+        ->assertJsonPath('rules.0.trigger_type', 'scheduled_offset');
 });

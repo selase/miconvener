@@ -381,7 +381,7 @@ Verified by:
 - **Granular RBAC Permissions**: Added Spatie permissions (`create notification-rule`, `read notification-rule`, `update notification-rule`, `delete notification-rule`, `manage notification-settings`) to `PermissionsSeeder` and assigned to Superadmin, Org Superadmin, and Org Admin in `RolePermissions.php`.
 - **Landlord Database Migrations & Models**: Landlord tables `event_notification_rules`, `event_notification_logs`, `tenant_notification_settings`. Eloquent models `EventNotificationRule`, `EventNotificationLog`, and `TenantNotificationSetting` with UUID primary keys, JSON casts, and relations on `Event.php` (`notificationRules()`, `notificationLogs()`).
 - **Multi-Channel Notification Gateway**: `NotificationGatewayService` supporting direct Email delivery via responsive Mailable `AutomatedNotificationMail`, and multi-channel staging for SMS and WhatsApp formatted ready for plug-and-play Omnichannel API integration.
-- **Automated Rule Engine & Command**: `AutomatedNotificationDispatcher` and Artisan command `app:dispatch-automated-notifications` calculate timing offsets (e.g. 7 days before event, 2 hours after event), resolve attendee and cohort recipients, and interpolate placeholders (`{name}`, `{event_name}`, `{date}`, `{time}`, `{venue}`, `{ticket_code}`, `{ticket_url}`). The command is not registered in `app/Console/Kernel.php`, so time-based dispatch requires an external invocation.
+- **Automated Rule Engine & Command**: `AutomatedNotificationDispatcher` and Artisan command `app:dispatch-automated-notifications` calculate timing offsets (e.g. 7 days before event, 2 hours after event), resolve attendee and cohort recipients, and interpolate placeholders (`{name}`, `{event_name}`, `{date}`, `{time}`, `{venue}`, `{ticket_code}`, `{ticket_url}`). The command is registered in `app/Console/Kernel.php` on the fifteen-minute wake window (see the track below); before 2026-09-21 it was not, so time-based dispatch never ran on its own.
 - **Quota Billing & Anti-Abuse Guardrails**: `TenantNotificationSetting` defaults to a 2,500-email monthly setting and a 60-minute recipient cooldown, with overage control. Package `email_credits` limits are separately defined in `EventPackageSeeder`; 2,500 is not a universal plan allowance. Billing emails sent through `BillingNotifier` are transactional and do not use these credits.
 - **Delivery Scope**: Email is delivered by `NotificationGatewayService`. SMS and WhatsApp are staged as records for a future gateway; they are not sent or billed as delivered messages.
 - **Host Console UI**: `NotificationsPanel.jsx` added to the Event Console with monthly quota progress bar, channel statuses, 1-click preset campaign deployment (7-day reminder, day-of digital pass, post-event CME feedback, speaker slide deadline), custom rule builder, live test dispatch, and channel configuration modal.
@@ -397,3 +397,45 @@ Verified by:
 - `LedgerService` posts both ledgers once per reference. Gateway fees are booked at sale; transfer fees are passed through only when a transfer is released. OTP transfers stay parked for `finalizePayout` instead of being sent again (`LedgerIdempotencyTest.php`, `GatewayFeeLedgerTest.php`, `TransferFeePassThroughTest.php`, `PayoutOtpFlowTest.php`).
 - A downgrade or plan lapse grandfathers already-published, not-yet-ended events and locks commercial terms that would worsen. `Tenant::handlesTicketMoney()` keeps finance and refunds available for money already collected (`LapsedPlanEventsTest.php`).
 - `BillingNotifier` sends deduplicated transactional receipts, payment failures and plan-ending emails to the payer and tenant contact address (`BillingEmailsTest.php`).
+
+## [x] Track: Scheduled conference reminders actually fire
+
+Organisers could build scheduled-offset notification rules in the event console, but
+`app:dispatch-automated-notifications` was never registered with the scheduler, so a rule only
+ever ran when a superadmin triggered it by hand from the operational commands screen. Every
+reminder a tenant configured silently never sent.
+
+Registering the command alone would have been an incident. `EventNotificationRule::isDue()`
+tested `$target->isPast()`, which is true forever, and re-armed every 12 hours, so the first
+scheduled run would have mailed the attendee list of every still-published past event, and again
+twice a day after that. Proven by test before the fix.
+
+- `app/Console/Kernel.php`: `everyFifteenMinutes()->withoutOverlapping()`, sharing the existing
+  wake window with the health checks and `payouts:reconcile` rather than causing its own, and
+  fine-grained enough for rules whose offset is set in minutes.
+- `EventNotificationRule::isDue()`: a rule is due only if it has never dispatched and its target
+  passed within `CATCH_UP_HOURS = 24`. A scheduler gap of a few hours still delivers; a stale or
+  long-finished reminder never does. Existing rows with a long-past target and a null
+  `last_dispatched_at` fall outside the window, so no backfill was needed.
+- `EventNotificationRule::booted()`: changing `trigger_type`, `offset_direction`, `offset_amount`
+  or `offset_unit` clears `last_dispatched_at`, so rescheduling a fired rule arms it again while
+  editing its wording does not.
+- `last_dispatched_at` is now the sole one-shot guard. It is absent from the validation rules in
+  `EventNotificationRuleController`, which writes only validated keys, so a tenant cannot reset it.
+- `DispatchAutomatedNotificationsCommand` now selects the due-candidate rules in one query with
+  their event eager-loaded, instead of walking every published event and asking each for its rules
+  while `isDue()` lazy-loaded the event back. Scanning ten events fell from 21 queries to 2, and no
+  longer grows with the number of events on the platform -- which matters at 96 runs a day across
+  every tenant. Removed two now-obsolete `phpstan-baseline.neon` entries that the rewrite fixed.
+- Console: the rule card carries a `Sent` pill and the note "sends once. Reschedule it, or use Send
+  Now.", so fire-once is visible rather than something an organiser discovers by waiting. The
+  `Active`/`Paused` pill still reports `is_active` on its own, because a sent rule is still active
+  for rescheduling.
+
+- **Verification Evidence**:
+  - `tests/Unit/Console/ScheduledUsageResetTest.php`: scheduler registration.
+  - `tests/Feature/Events/EventAutomatedNotificationsTest.php`: a sent reminder does not send
+    again; a reminder missed by a short outage still sends while a 36-hour-old one does not;
+    rescheduling re-arms and renaming does not; the scan holds at 2 queries for ten events; the
+    rules payload exposes the two fields the console reads.
+  - Full suite passing; Pint and PHPStan clean; `npm run build` clean.

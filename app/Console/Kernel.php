@@ -55,6 +55,15 @@ final class Kernel extends ConsoleKernel
         // lost webhook cannot strand money that has already left the platform.
         $schedule->command('payouts:reconcile')->everyFifteenMinutes()->withoutOverlapping();
 
+        // Conference reminders. Shares the fifteen-minute wake window with the
+        // health checks and payout reconciliation rather than causing its own,
+        // and is fine-grained enough for rules whose offset is set in minutes.
+        // EventNotificationRule::isDue() is what keeps a missed run recoverable
+        // and a finished event's rule quiet.
+        $schedule->command('app:dispatch-automated-notifications')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
+
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
     }

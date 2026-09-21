@@ -504,6 +504,12 @@ export default function NotificationsPanel({ event }) {
                                         >
                                             {rule.is_active ? 'Active' : 'Paused'}
                                         </span>
+                                        {rule.trigger_type === 'scheduled_offset' &&
+                                            rule.last_dispatched_at && (
+                                                <span className="px-2 py-0.5 rounded text-[11px] font-semibold border bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800">
+                                                    Sent
+                                                </span>
+                                            )}
                                         <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                                             <Clock className="w-3 h-3" />
                                             {rule.offset_amount} {rule.offset_unit}{' '}
@@ -536,6 +542,13 @@ export default function NotificationsPanel({ event }) {
                                                     {new Date(
                                                         rule.last_dispatched_at
                                                     ).toLocaleString()}
+                                                    {rule.trigger_type === 'scheduled_offset' && (
+                                                        <span className="text-slate-400 dark:text-slate-500">
+                                                            {' '}
+                                                            &mdash; sends once. Reschedule it, or
+                                                            use Send Now.
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </>
                                         )}
