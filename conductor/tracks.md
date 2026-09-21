@@ -459,3 +459,29 @@ reproduced the production error verbatim before the fix.
 The lesson worth keeping: faked mail proves a message was queued, not that anyone could receive
 it. A mailable wants at least one test that actually renders it.
 
+### Follow-up: rendering every mailable found a second one
+
+Acting on that lesson, `tests/Feature/Mail/MailableRenderTest.php` now builds and renders all 24
+mailables in one pass, collecting every failure rather than stopping at the first, with a
+reflection guard asserting each mailable on disk has a render case so a new one cannot inherit
+the blind spot. Twenty-two rendered. One was the already-fixed `AutomatedNotificationMail`. One
+was new.
+
+`EventBlastMail` could not render on a worker: the tracking pixel calls
+`route("public.blasts.open", ...)`, which needs the `subdomain` parameter, and nothing on the
+queue supplied it. `ResolveTenant` sets `URL::defaults(["subdomain" => ...])` but only for an HTTP
+request. The global `Queue::before` hook in `AppServiceProvider::configureQueue()` restored the
+tenant, its permissions team, its database connection and its storage disk -- everything except
+the URL default. `TenantAwareJob` does set it, and only `DispatchNotificationRuleJob` uses that
+middleware; `SendEventBlastJob` declares none.
+
+The existing blast tests call `(new SendEventBlastJob($blast))->handle()` directly under
+`Mail::fake()`, bypassing both the queue hook and the rendering, so nothing saw it. Production has
+never sent a blast (`blasts=0, recipients=0, failed_jobs=0`), so this was latent rather than
+manifest: the first organiser to send one would have hit it.
+
+Fixed in the global hook rather than on the one job, so it covers every queued job that renders a
+tenant URL rather than only this one. `tests/Feature/Queue/TenantAwareQueueUrlTest.php` drives the
+real path -- no URL default set, dispatched through the sync queue with the array mailer, so the
+template is genuinely built.
+

@@ -172,6 +172,14 @@ final class AppServiceProvider extends ServiceProvider
                     }
 
                     app(\App\Services\Tenancy\TenantStorageManager::class)->configure($tenant);
+
+                    /*
+                     * ResolveTenant sets this for a request; without it here,
+                     * anything a worker renders that links back to a tenant
+                     * page -- mail, above all -- dies on route() with a
+                     * missing subdomain instead of going out.
+                     */
+                    \Illuminate\Support\Facades\URL::defaults(['subdomain' => $tenant->slug]);
                 }
             }
         });
