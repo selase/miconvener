@@ -204,8 +204,14 @@ return [
             /*
              * This shipped as Spatie's `your@example.com` placeholder, so every
              * backup failure since the repository began was mailed to nobody.
+             * Chained with ?: rather than env() defaults, because a key that is
+             * present but blank -- which is how .env.example ships it -- makes
+             * env() return '' instead of falling back. Spatie validates this
+             * address while booting, so a blank one throws InvalidConfig and
+             * takes down every artisan command, including the deploy's
+             * migrate --force.
              */
-            'to' => env('BACKUP_ALERT_EMAIL', env('SUPERADMIN_EMAIL', 'hiselase@gmail.com')),
+            'to' => env('BACKUP_ALERT_EMAIL') ?: env('SUPERADMIN_EMAIL') ?: 'hiselase@gmail.com',
 
             'from' => [
                 'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
