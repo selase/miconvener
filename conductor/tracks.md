@@ -439,3 +439,23 @@ twice a day after that. Proven by test before the fix.
     rescheduling re-arms and renaming does not; the scan holds at 2 queries for ten events; the
     rules payload exposes the two fields the console reads.
   - Full suite passing; Pint and PHPStan clean; `npm run build` clean.
+
+### Follow-up: the reminder mail could not render at all
+
+A controlled end-to-end proof on production (a throwaway event in `miconvener-probe`, one
+registration, one rule) showed the scheduler firing correctly at 18:00:19 and then failing to
+deliver: `EventNotificationLog` recorded `status=failed`, `No hint path defined for [mail]`.
+
+`AutomatedNotificationMail::content()` passed `view:` where all 23 other mailables pass
+`markdown:`, while its template opens with `<x-mail::message>` like the rest. `view:` never
+registers the `mail::` namespace, so the component could not resolve and the view threw. This was
+the only unsendable mail in the codebase; the one remaining mailable that does not use `markdown:`
+(`SendAccountDetails`) uses the older `build()` + `$this->markdown()` form, which is fine.
+
+Every notification test used `Mail::fake()`, which records a mailable without rendering it, so a
+view that could not render at all passed CI indefinitely. The new test renders it for real and
+reproduced the production error verbatim before the fix.
+
+The lesson worth keeping: faked mail proves a message was queued, not that anyone could receive
+it. A mailable wants at least one test that actually renders it.
+

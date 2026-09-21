@@ -36,7 +36,7 @@ final class AutomatedNotificationMail extends Mailable implements ShouldQueue
     public function content(): Content
     {
         return new Content(
-            view: 'emails.events.automated-notification',
+            markdown: 'emails.events.automated-notification',
         );
     }
 

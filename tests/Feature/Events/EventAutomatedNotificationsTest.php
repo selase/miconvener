@@ -638,3 +638,30 @@ test('the rules payload exposes the fields the console needs to show a reminder 
         ->assertJsonStructure(['rules' => ['*' => ['trigger_type', 'last_dispatched_at']]])
         ->assertJsonPath('rules.0.trigger_type', 'scheduled_offset');
 });
+
+test('the reminder email renders, so a dispatched notification can actually be delivered', function () {
+    [$tenant] = eventHost('acme');
+
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'National Science Congress',
+        'slug' => 'render-congress-2026',
+    ]);
+
+    // Every other test here fakes the mailer, so the template is never built.
+    // That is how a mailable whose view could not render at all shipped: it
+    // fires, the dispatcher logs a failure, and nobody receives anything.
+    $html = (new AutomatedNotificationMail(
+        event: $event,
+        recipientName: 'Ama Serwaa',
+        emailSubject: 'Two Days to Congress!',
+        renderedBody: 'Congress begins in 2 days.',
+        actionUrl: 'https://example.test/pass',
+        actionLabel: 'View Digital Pass',
+    ))->render();
+
+    expect($html)
+        ->toContain('Congress begins in 2 days')
+        ->toContain('View Digital Pass')
+        ->toContain('National Science Congress');
+});
