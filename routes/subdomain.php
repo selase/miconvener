@@ -339,6 +339,14 @@ Route::delete('/e/{event}/registrations/{registration}/agenda/{session}', [Atten
 Route::post('/e/{event}/registrations/{registration}/transfer', [AttendeePortalController::class, 'transfer'])->middleware('throttle:public-registration')->name('public.events.registrations.transfer');
 Route::post('/e/{event}/registrations/{registration}/transfer/confirm', [AttendeePortalController::class, 'confirmTransfer'])->middleware('throttle:public-registration')->name('public.events.registrations.transfer.confirm');
 Route::post('/e/{event}/registrations/{registration}/service-requests', [PublicServiceRequestController::class, 'store'])->name('public.events.service-requests.store');
+
+// Attendee identity across this organiser's events: proving an address.
+// The panels that show history behind it arrive in Plan B.
+Route::post('/my/verify/send', [App\Http\Controllers\Public\AttendeeAccessController::class, 'send'])->middleware('throttle:public-registration')->name('public.my.verify.send');
+Route::post('/my/verify/confirm', [App\Http\Controllers\Public\AttendeeAccessController::class, 'confirm'])->middleware('throttle:public-registration')->name('public.my.verify.confirm');
+Route::post('/my/verify/forget', [App\Http\Controllers\Public\AttendeeAccessController::class, 'forget'])->name('public.my.verify.forget');
+Route::get('/my/session', [App\Http\Controllers\Public\AttendeeAccessController::class, 'session'])->middleware('attendee_verified')->name('public.my.session');
+
 Route::get('/e/{event}/schedule.ics', [ScheduleIcsController::class, 'programme'])->name('public.events.schedule.ics');
 Route::get('/e/{event}/registrations/{registration}/agenda.ics', [ScheduleIcsController::class, 'agenda'])->name('public.events.agenda.ics');
 Route::get('/e/{event}/abstracts/submit', [App\Http\Controllers\Public\AbstractSubmissionController::class, 'create'])->name('public.events.abstracts.create');
