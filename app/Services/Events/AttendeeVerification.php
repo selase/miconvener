@@ -34,12 +34,17 @@ final class AttendeeVerification
     public const int CODES_PER_HOUR = 5;
 
     /**
-     * A bcrypt hash of a value nobody typed. Checked in place of a real code
-     * when none exists, so confirm() pays the same Hash::check cost either
-     * way and a timing difference can't reveal whether an address has a code
-     * outstanding.
+     * A bcrypt hash of a value nobody typed, checked in place of a real code
+     * when none exists. Computed once, lazily, from the app's own
+     * Hash::make() -- never hard-coded. A fixed literal bakes in whatever
+     * cost generated it; if that ever drifts from the configured
+     * hashing.bcrypt.rounds (as it did here: a hard-coded cost-12 hash next
+     * to real cost-10 codes made the dummy check take ~4x longer than a real
+     * one, splitting confirm()'s timing along exactly the line it exists to
+     * hide), the leak reopens with the timing inverted. Deriving it keeps the
+     * dummy's cost identical to real codes' by construction.
      */
-    private const string DUMMY_HASH = '$2y$12$C/ukppqcB46CUvwCU.EF0eLTzL5DaymhtFd7W5xtNqmYR6O9QEQk.';
+    private static ?string $dummyHash = null;
 
     public static function normalise(string $email): string
     {
@@ -205,12 +210,22 @@ final class AttendeeVerification
     }
 
     /**
+     * Lazily hashes a fixed throwaway string with the app's configured
+     * hasher, so the result always costs exactly what a real code's hash
+     * costs. See the property's doc comment for why this can't be a literal.
+     */
+    private static function dummyHash(): string
+    {
+        return self::$dummyHash ??= Hash::make('attendee-verification-dummy-code');
+    }
+
+    /**
      * Pays the same Hash::check cost a real comparison would, against a value
      * nobody could have typed, so confirm() takes the same time whether the
      * code was missing, expired, exhausted or consumed already.
      */
     private function checkDummyHash(string $code): void
     {
-        Hash::check($code, self::DUMMY_HASH);
+        Hash::check($code, self::dummyHash());
     }
 }

@@ -46,9 +46,14 @@ final class AttendeeAccessController extends Controller
     public function confirm(ConfirmAccessCodeRequest $request): JsonResponse
     {
         $tenant = $this->tenant();
-        $email = $this->addressFor($request, $tenant);
 
-        if ($email === null || ! $this->verification->confirm($request->session(), $tenant, $email, (string) $request->input('code'))) {
+        // A registration id that doesn't resolve still reaches confirm() --
+        // with an address no code could ever match, never a short-circuit --
+        // so it pays the same Hash::check cost as a wrong code and replies
+        // identically. Answering sooner here would itself be a timing tell.
+        $email = $this->addressFor($request, $tenant) ?? '';
+
+        if (! $this->verification->confirm($request->session(), $tenant, $email, (string) $request->input('code'))) {
             return response()->json(['message' => "That code didn't match. Check it, or ask for a new one."], 422);
         }
 

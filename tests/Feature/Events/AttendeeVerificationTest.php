@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use ReflectionClass;
 
 /**
  * An attendee proves an address with an emailed code, and the proof holds for
@@ -130,6 +131,23 @@ test('sending a code does no address-dependent work before replying', function (
 
     Queue::assertPushed(SendAttendeeAccessCode::class, 2);
     Mail::assertNothingQueued();
+});
+
+test('the dummy hash checked when no code exists costs what a real one does', function () {
+    [$tenant] = attendeeAt('dummy-cost');
+
+    // No code exists for this address, so confirm() falls back to the dummy
+    // hash. A hard-coded literal would carry whatever cost generated it,
+    // however it now drifts from the app's own hashing.bcrypt.rounds; a
+    // derived hash can't drift, because it's made by the same call real
+    // codes are.
+    app(AttendeeVerification::class)->confirm(app('session.store'), $tenant, 'nobody@stem.org', '000000');
+
+    $property = (new ReflectionClass(AttendeeVerification::class))->getProperty('dummyHash');
+    $dummyHash = (string) $property->getValue();
+
+    expect($dummyHash)->not->toBe('')
+        ->and(password_get_info($dummyHash)['options']['cost'] ?? null)->toBe((int) config('hashing.bcrypt.rounds'));
 });
 
 test('a correct code proves the address for this organiser, whatever its capitals', function () {
