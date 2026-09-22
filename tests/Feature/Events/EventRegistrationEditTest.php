@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Events;
 
+use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\EventRegistrationTransfer;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Activitylog\Models\Activity;
 
 /**
@@ -109,4 +113,76 @@ test('an organiser cannot reach another organiser\'s registration', function () 
     )->assertNotFound();
 
     expect($theirs->fresh()->email)->toBe('ama@stme.org');
+});
+
+test('registering again with the address in different capitals is the same person', function () {
+    Mail::fake();
+    [$tenant] = eventHost('dup-case');
+    $host = eventSubdomainHost('dup-case');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+    $this->post("http://{$host}/e/{$event->slug}/register", [
+        'full_name' => 'Ama Serwaa', 'email' => 'Ama@Example.com',
+    ], ['HTTP_HOST' => $host]);
+
+    // The same person, typing their address the way a phone keyboard did it.
+    // Two rows would mean two tickets, and a history that shows the event twice.
+    $this->post("http://{$host}/e/{$event->slug}/register", [
+        'full_name' => 'Ama Serwaa', 'email' => 'ama@example.com',
+    ], ['HTTP_HOST' => $host]);
+
+    expect(EventRegistration::where('event_id', $event->id)->count())->toBe(1);
+});
+
+test('correcting an unverified attendee\'s address sends the verification link to the new one', function () {
+    Mail::fake();
+    [, $user, $event, $registration, $host] = editableRegistration('edit-unverified');
+    $registration->update(['email_verified_at' => null, 'ticket_code' => null]);
+
+    $this->actingAs($user)->patchJson(
+        "http://{$host}/events/{$event->id}/registrations/{$registration->id}",
+        ['full_name' => 'Ama Serwa', 'email' => 'ama@stem.org', 'phone' => null],
+        ['HTTP_HOST' => $host]
+    )->assertOk();
+
+    // Correcting the address is pointless if the link they need still sits in
+    // the inbox that was wrong.
+    Mail::assertQueued(EventRegistrationVerifyEmail::class, fn ($mail): bool => $mail->hasTo('ama@stem.org'));
+});
+
+test('correcting a verified attendee\'s address does not ask them to verify again', function () {
+    Mail::fake();
+    [, $user, $event, $registration, $host] = editableRegistration('edit-verified');
+    $registration->update(['email_verified_at' => now()]);
+
+    $this->actingAs($user)->patchJson(
+        "http://{$host}/events/{$event->id}/registrations/{$registration->id}",
+        ['full_name' => 'Ama Serwa', 'email' => 'ama@stem.org', 'phone' => null],
+        ['HTTP_HOST' => $host]
+    )->assertOk();
+
+    Mail::assertNotQueued(EventRegistrationVerifyEmail::class);
+});
+
+test('correcting an address kills a transfer code sent to the old one', function () {
+    Mail::fake();
+    [$tenant, $user, $event, $registration, $host] = editableRegistration('edit-transfer');
+
+    $transfer = EventRegistrationTransfer::create([
+        'tenant_id' => $tenant->id,
+        'registration_id' => $registration->id,
+        'to_full_name' => 'Kwame Asare',
+        'to_email' => 'kwame@example.com',
+        'code_hash' => Hash::make('482913'),
+        'expires_at' => now()->addMinutes(EventRegistrationTransfer::TTL_MINUTES),
+    ]);
+
+    $this->actingAs($user)->patchJson(
+        "http://{$host}/events/{$event->id}/registrations/{$registration->id}",
+        ['full_name' => 'Ama Serwa', 'email' => 'ama@stem.org', 'phone' => null],
+        ['HTTP_HOST' => $host]
+    )->assertOk();
+
+    // The code went to an inbox that is no longer the holder's.
+    expect($transfer->fresh()->consumed_at)->not->toBeNull();
 });

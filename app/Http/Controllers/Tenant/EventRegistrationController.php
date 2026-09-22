@@ -10,13 +10,16 @@ use App\Http\Requests\Tenant\UpdateEventRegistrationRequest;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationRejected;
+use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventRegistration;
+use App\Models\EventRegistrationTransfer;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Services\Payment\PaystackGateway;
+use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,9 +140,40 @@ final class EventRegistrationController extends Controller
         $eventModel = $this->findEvent($tenant->id, $event);
 
         $registrationModel = $eventModel->registrations()->where('id', $registration)->firstOrFail();
+
+        $previousEmail = $registrationModel->email;
         $registrationModel->update($request->validated());
 
+        if ($registrationModel->email !== $previousEmail) {
+            $this->followTheAddress($tenant, $registrationModel);
+        }
+
         return response()->json(['message' => 'Registration updated.']);
+    }
+
+    /**
+     * Everything the old address still held has to follow the correction.
+     *
+     * A transfer code sits in an inbox that is no longer the holder's, so it is
+     * spent rather than left live. And an attendee who never confirmed their
+     * address is no better off for the fix while the link they need is in the
+     * inbox that was wrong -- so it goes out again, to the new one. A verified
+     * registration is left alone: the organizer is vouching for the change, and
+     * clearing the verification would hide a paid attendee's ticket from them.
+     */
+    private function followTheAddress(Tenant $tenant, EventRegistration $registration): void
+    {
+        EventRegistrationTransfer::query()
+            ->where('registration_id', $registration->id)
+            ->whereNull('consumed_at')
+            ->update(['consumed_at' => now()]);
+
+        if ($registration->hasVerifiedEmail()) {
+            return;
+        }
+
+        app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+        Mail::to($registration->email)->queue(new EventRegistrationVerifyEmail($registration));
     }
 
     /**

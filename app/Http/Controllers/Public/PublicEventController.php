@@ -133,7 +133,7 @@ final class PublicEventController extends Controller
 
         $existingRegistration = EventRegistration::where('tenant_id', $tenant->id)
             ->where('event_id', $eventModel->id)
-            ->where('email', $validated['email'])
+            ->forEmail($validated['email'])
             ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED])
             ->first();
 

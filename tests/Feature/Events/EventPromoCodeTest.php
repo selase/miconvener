@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventPromoCode;
 use App\Models\EventRegistration;
 use App\Models\EventTicketType;
+use App\Services\Events\PromoCodeService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 
@@ -297,4 +298,33 @@ test('invite-only ticket types require valid access code and can be unlocked', f
     $vipRegistration = EventRegistration::where('email', 'vip@example.com')->first();
     expect($vipRegistration)->not->toBeNull()
         ->and($vipRegistration->ticket_type_id)->toBe($vipTicket->id);
+});
+
+test('the per-attendee cap counts an address however it is capitalised', function () {
+    [$tenant] = eventHost('promo-case');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id, 'ticket_price' => 10000]);
+
+    $promo = EventPromoCode::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'code' => 'ONCE',
+        'discount_type' => 'percentage',
+        'discount_value' => 50,
+        'max_per_attendee' => 1,
+        'is_active' => true,
+    ]);
+
+    EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'Ama@Example.com',
+        'promo_code_id' => $promo->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+
+    // Same person, different capitals: the cap has to see them as one attendee,
+    // or it is no cap at all.
+    $result = app(PromoCodeService::class)->validateCode($event, 'ONCE', null, 'ama@example.com', 10000);
+
+    expect($result['valid'])->toBeFalse();
 });

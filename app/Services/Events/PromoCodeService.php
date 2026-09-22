@@ -108,7 +108,7 @@ final class PromoCodeService
 
         if ($email !== '' && $promoCode->max_per_attendee > 0) {
             $existingRedemptions = EventRegistration::where('promo_code_id', $promoCode->id)
-                ->where('email', $email)
+                ->forEmail($email)
                 ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED])
                 ->count();
 
