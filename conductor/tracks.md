@@ -485,3 +485,31 @@ tenant URL rather than only this one. `tests/Feature/Queue/TenantAwareQueueUrlTe
 real path -- no URL default set, dispatched through the sync queue with the array mailer, so the
 template is genuinely built.
 
+## [x] Track: Conference materials actually download
+
+`MaterialDownloadController` checked a confirmed registration, the release date and the
+per-registration limit, recorded the attempt, and then redirected to
+`Storage::disk('s3')->url(...)` -- an unsigned URL on R2's private endpoint, which answers
+`HTTP 400`. Every download in production would have failed, and each failure spent one of the
+attendee's attempts. Found on 2026-09-22 while designing the attendee portal; production had three
+materials (all Tech Summit 2026, `nkabom-events`, limit 3 each) and no attempts yet, with the first
+scheduled to release that afternoon.
+
+- Streamed through the app with `Storage::disk()->response()`, as `MediaController` already does,
+  so it works against the private bucket and there is no permanent URL to outlive the release
+  date, the registration or the limit. Disk from `Event::uploadDisk()`.
+- An attempt is recorded only once the file is found; a missing file is a 404 that costs nothing.
+- Served inline under the material's title with its extension, so a PDF opens in a phone browser.
+  `/` and `\` are stripped from the name, since `Content-Disposition` refuses them and speaker decks
+  are titled `{speaker} — Slides`.
+- `Cache-Control: private, no-store`.
+
+The existing test asserted `assertRedirect()`, which proved the code handed off rather than that
+anyone received the file -- locally the redirect landed on a working `/storage` URL, in production
+on R2's 400, and the test could not tell them apart. It now asserts the bytes arrive.
+
+- **Verification Evidence**: `tests/Feature/Events/EventMaterialTest.php` (bytes delivered within
+  the limit; inline PDF named after the material; a missing file spends no attempt; a speaker-style
+  title with an em dash and a slash still downloads -- confirmed to fail without the sanitiser).
+  `MediaRouteBypassTest` still passes. Suite 1084/1084.
+
