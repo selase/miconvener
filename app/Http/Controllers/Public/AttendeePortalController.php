@@ -13,6 +13,7 @@ use App\Models\EventRegistration;
 use App\Models\EventRegistrationTransfer;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
+use App\Support\ContactMask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -99,7 +100,7 @@ final class AttendeePortalController extends Controller
         app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
 
         return response()->json([
-            'message' => "We emailed a confirmation code to {$this->maskEmail($registrationModel->email)}. Enter it to complete the transfer.",
+            'message' => 'We emailed a confirmation code to '.ContactMask::email($registrationModel->email).'. Enter it to complete the transfer.',
             'transfer_id' => $transfer->id,
             'expires_in_minutes' => EventRegistrationTransfer::TTL_MINUTES,
         ]);
@@ -172,19 +173,6 @@ final class AttendeePortalController extends Controller
         }
 
         return response()->json(['message' => 'Ticket transferred. The new holder has been emailed.']);
-    }
-
-    /**
-     * Enough of the address to recognise your own inbox, not enough to learn
-     * someone else's.
-     */
-    private function maskEmail(string $email): string
-    {
-        [$user, $domain] = array_pad(explode('@', $email, 2), 2, '');
-
-        $visible = mb_substr($user, 0, 2);
-
-        return $visible.str_repeat('•', max(1, mb_strlen($user) - 2)).'@'.$domain;
     }
 
     private function findRegistration(string $tenantId, string $eventSlug, string $registrationId): EventRegistration

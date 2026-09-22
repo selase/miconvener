@@ -47,3 +47,15 @@ test('the portal page receives the registration, the event and what can be acted
             ->has('materials')
             ->has('canRequestHelp'));
 });
+
+test('the portal masks the address and does not send the phone number', function () {
+    [$event, $registration, $host] = portalFor('portal-masked');
+
+    // Anyone holding the link sees this page. A forwarded confirmation email
+    // should hand over a ticket, not the holder's contact details.
+    $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('registration.email', 'am•@stem.org')
+            ->missing('registration.phone'));
+});

@@ -22,6 +22,7 @@ use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\RegistrationPricingService;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
+use App\Support\ContactMask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -360,8 +361,9 @@ final class PublicEventController extends Controller
             'registration' => [
                 'id' => $registrationModel->id,
                 'full_name' => $registrationModel->full_name,
-                'email' => $registrationModel->email,
-                'phone' => $registrationModel->phone,
+                // Anyone holding the link sees this. The page never shows the
+                // phone number, so it is not sent at all.
+                'email' => ContactMask::email($registrationModel->email),
                 'status' => $registrationModel->status,
                 'ticket_code' => $registrationModel->ticket_code,
                 'ticket_type_name' => $registrationModel->ticketType?->name,
