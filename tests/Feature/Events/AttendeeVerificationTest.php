@@ -314,6 +314,22 @@ test('signing out forgets the proof', function () {
     $this->getJson("http://{$host}/my/session", ['HTTP_HOST' => $host])->assertUnauthorized();
 });
 
+test('the /my page asks for an address until one is proven', function () {
+    [$tenant, , $host] = attendeeAt('my-page');
+
+    $this->get("http://{$host}/my", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Public/Events/AttendeePortal/MyPortal')
+            ->where('organiser.name', $tenant->name)
+            ->where('verifiedEmail', null));
+
+    $this->withSession(provenFor($tenant));
+
+    $this->get("http://{$host}/my", ['HTTP_HOST' => $host])
+        ->assertInertia(fn ($page) => $page->where('verifiedEmail', 'am•@stem.org'));
+});
+
 test('proving an address rotates the session id', function () {
     [$tenant] = attendeeAt('rotate');
 

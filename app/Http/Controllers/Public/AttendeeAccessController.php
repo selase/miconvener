@@ -15,6 +15,8 @@ use App\Services\Tenancy\TenantContext;
 use App\Support\ContactMask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Lets an attendee prove they hold an address, so the portal can show what is
@@ -23,6 +25,22 @@ use Illuminate\Http\Request;
 final class AttendeeAccessController extends Controller
 {
     public function __construct(private readonly AttendeeVerification $verification) {}
+
+    /**
+     * Everything an attendee has with this organiser, once they prove an
+     * address. Reached without a registration link, by co-authors and
+     * returning delegates. Nothing links here until Plan B gives it content.
+     */
+    public function page(Request $request): Response
+    {
+        $tenant = $this->tenant();
+        $email = $this->verification->verifiedEmail($request->session(), $tenant);
+
+        return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
+            'organiser' => ['name' => $tenant->name],
+            'verifiedEmail' => $email !== null ? ContactMask::email($email) : null,
+        ]);
+    }
 
     public function send(SendAccessCodeRequest $request): JsonResponse
     {

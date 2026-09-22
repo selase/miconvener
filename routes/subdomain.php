@@ -342,6 +342,7 @@ Route::post('/e/{event}/registrations/{registration}/service-requests', [PublicS
 
 // Attendee identity across this organiser's events: proving an address.
 // The panels that show history behind it arrive in Plan B.
+Route::get('/my', [App\Http\Controllers\Public\AttendeeAccessController::class, 'page'])->name('public.my');
 Route::post('/my/verify/send', [App\Http\Controllers\Public\AttendeeAccessController::class, 'send'])->middleware('throttle:public-registration')->name('public.my.verify.send');
 Route::post('/my/verify/confirm', [App\Http\Controllers\Public\AttendeeAccessController::class, 'confirm'])->middleware('throttle:public-registration')->name('public.my.verify.confirm');
 Route::post('/my/verify/forget', [App\Http\Controllers\Public\AttendeeAccessController::class, 'forget'])->name('public.my.verify.forget');
