@@ -33,6 +33,14 @@ final class AttendeeVerification
     /** Codes one address can be sent per hour, whatever IPs ask for them. */
     public const int CODES_PER_HOUR = 5;
 
+    /**
+     * A bcrypt hash of a value nobody typed. Checked in place of a real code
+     * when none exists, so confirm() pays the same Hash::check cost either
+     * way and a timing difference can't reveal whether an address has a code
+     * outstanding.
+     */
+    private const string DUMMY_HASH = '$2y$12$C/ukppqcB46CUvwCU.EF0eLTzL5DaymhtFd7W5xtNqmYR6O9QEQk.';
+
     public static function normalise(string $email): string
     {
         return mb_strtolower(mb_trim($email));
@@ -50,11 +58,13 @@ final class AttendeeVerification
             return;
         }
 
+        // hit() increments and returns the new count atomically, so two
+        // concurrent requests for the same address can't both read the count
+        // as under the cap before either one lands.
         $key = "attendee-code:{$tenant->id}:{$email}";
-        if (RateLimiter::tooManyAttempts($key, self::CODES_PER_HOUR)) {
+        if (RateLimiter::hit($key, 3600) > self::CODES_PER_HOUR) {
             return;
         }
-        RateLimiter::hit($key, 3600);
 
         // Only the latest code works.
         AttendeeAccessCode::query()
@@ -79,6 +89,16 @@ final class AttendeeVerification
     /**
      * On a match: consumes the code, rotates the session id against fixation,
      * and remembers the address for this tenant only.
+     *
+     * The attempt is reserved with an atomic increment before the code is
+     * checked, and the code is consumed with an atomic update after -- each
+     * guarded by a where clause on the same conditions isUsable() would
+     * check. Reading attempts in PHP and writing it back later, as
+     * isUsable()-then-increment did, lets concurrent guesses all read the
+     * count before any of them lands, so N guesses in flight can all get past
+     * the cap; the same race let two concurrent correct guesses both consume
+     * the code. Only a row count of exactly one from the conditional write
+     * proves this request was the one that changed the row.
      */
     public function confirm(Session $session, Tenant $tenant, string $email, string $code): bool
     {
@@ -91,17 +111,37 @@ final class AttendeeVerification
             ->latest()
             ->first();
 
-        if ($accessCode === null || ! $accessCode->isUsable()) {
+        if ($accessCode === null) {
+            $this->checkDummyHash($code);
+
+            return false;
+        }
+
+        $reserved = AttendeeAccessCode::query()
+            ->whereKey($accessCode->id)
+            ->whereNull('consumed_at')
+            ->where('expires_at', '>', now())
+            ->where('attempts', '<', AttendeeAccessCode::MAX_ATTEMPTS)
+            ->increment('attempts');
+
+        if ($reserved !== 1) {
+            $this->checkDummyHash($code);
+
             return false;
         }
 
         if (! $accessCode->matches($code)) {
-            $accessCode->increment('attempts');
-
             return false;
         }
 
-        $accessCode->update(['consumed_at' => now()]);
+        $consumed = AttendeeAccessCode::query()
+            ->whereKey($accessCode->id)
+            ->whereNull('consumed_at')
+            ->update(['consumed_at' => now()]);
+
+        if ($consumed !== 1) {
+            return false;
+        }
 
         $session->regenerate();
         $session->put(self::sessionKey($tenant), [
@@ -162,5 +202,15 @@ final class AttendeeVerification
     private static function sessionKey(Tenant $tenant): string
     {
         return "attendee_verified.{$tenant->id}";
+    }
+
+    /**
+     * Pays the same Hash::check cost a real comparison would, against a value
+     * nobody could have typed, so confirm() takes the same time whether the
+     * code was missing, expired, exhausted or consumed already.
+     */
+    private function checkDummyHash(string $code): void
+    {
+        Hash::check($code, self::DUMMY_HASH);
     }
 }

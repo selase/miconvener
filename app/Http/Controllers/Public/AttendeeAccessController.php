@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendee\ConfirmAccessCodeRequest;
 use App\Http\Requests\Attendee\SendAccessCodeRequest;
+use App\Jobs\Events\SendAttendeeAccessCode;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Events\AttendeeVerification;
@@ -25,12 +26,15 @@ final class AttendeeAccessController extends Controller
 
     public function send(SendAccessCodeRequest $request): JsonResponse
     {
-        $tenant = $this->tenant();
-        $email = $this->addressFor($request, $tenant);
-
-        if ($email !== null) {
-            $this->verification->sendCode($tenant, $email);
-        }
+        // No address-dependent work happens here: looking up a registration,
+        // hashing a code and queuing mail all cost time that would otherwise
+        // tell a caller whether the address (or registration id) means
+        // anything here. That work moves to a queued job.
+        SendAttendeeAccessCode::dispatch(
+            $this->tenant(),
+            $request->filled('email') ? (string) $request->input('email') : null,
+            $request->filled('registration') ? (string) $request->input('registration') : null,
+        );
 
         // The same answer whatever happened. Anyone can type an address here,
         // and a different reply for "found" would reveal who attends.

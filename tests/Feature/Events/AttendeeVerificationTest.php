@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Events;
 
+use App\Jobs\Events\SendAttendeeAccessCode;
 use App\Mail\Events\AttendeeAccessCodeMail;
 use App\Models\AttendeeAccessCode;
 use App\Models\Event;
@@ -16,6 +17,7 @@ use App\Services\Events\AttendeeVerification;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 
 /**
  * An attendee proves an address with an emailed code, and the proof holds for
@@ -114,6 +116,20 @@ test('asking for a code answers the same whether or not the address is known', f
     expect($unknown->status())->toBe($known->status())
         ->and($unknown->json())->toEqual($known->json());
     Mail::assertQueued(AttendeeAccessCodeMail::class, 1);
+});
+
+test('sending a code does no address-dependent work before replying', function () {
+    [, , $host] = attendeeAt('code-queued');
+    Queue::fake();
+
+    // The lookup, the hash and the mail push all happen in the job, not the
+    // controller -- otherwise their cost would tell a caller, by timing
+    // alone, whether the address meant anything here.
+    $this->postJson("http://{$host}/my/verify/send", ['email' => 'ama@stem.org'], ['HTTP_HOST' => $host])->assertOk();
+    $this->postJson("http://{$host}/my/verify/send", ['email' => 'nobody@stem.org'], ['HTTP_HOST' => $host])->assertOk();
+
+    Queue::assertPushed(SendAttendeeAccessCode::class, 2);
+    Mail::assertNothingQueued();
 });
 
 test('a correct code proves the address for this organiser, whatever its capitals', function () {
