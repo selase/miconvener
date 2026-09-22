@@ -194,6 +194,18 @@ final class EventRegistration extends Model
     }
 
     /**
+     * Addresses are stored as typed; identity is not case-sensitive. Compared
+     * as lower(email) so the (tenant_id, lower(email)) index serves it.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeForEmail(Builder $query, string $email): Builder
+    {
+        return $query->whereRaw('lower('.$query->qualifyColumn('email').') = ?', [mb_strtolower(mb_trim($email))]);
+    }
+
+    /**
      * A paid ticket is verified by the payment itself -- the holder received a
      * checkout link and a receipt at that address. A free one has nothing
      * standing behind it but the click on a verification email.

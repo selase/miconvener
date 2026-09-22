@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -113,4 +114,31 @@ test('recovery is rate limited', function () {
 
     // Without a limit this is a tool for walking an address list.
     expect($statuses)->toContain(429);
+});
+
+test('recovery does not care how the address is capitalised', function () {
+    Mail::fake();
+    [$tenant, $event, $host] = recoverableEvent('rec-case');
+
+    // Addresses are stored exactly as typed. Someone who registered as
+    // Ama@Example.com and asks as ama@example.com is the same person.
+    EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'email' => 'Ama@Example.com', 'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+
+    $this->postJson("http://{$host}/e/{$event->slug}/find-ticket", [
+        'email' => 'ama@example.com',
+    ], ['HTTP_HOST' => $host])->assertOk();
+
+    Mail::assertQueued(EventTicketLink::class, fn ($mail): bool => $mail->hasTo('Ama@Example.com'));
+});
+
+test('addresses are looked up through an index on their lowercase form', function () {
+    $index = DB::connection('landlord')->selectOne(
+        "select indexdef from pg_indexes where indexname = 'event_registrations_tenant_id_lower_email_index'"
+    );
+
+    expect($index)->not->toBeNull()
+        ->and($index->indexdef)->toContain('lower((email)');
 });

@@ -40,7 +40,7 @@ final class TicketRecoveryController extends Controller
         $registration = EventRegistration::query()
             ->where('tenant_id', $tenant->id)
             ->where('event_id', $eventModel->id)
-            ->where('email', $validated['email'])
+            ->forEmail($validated['email'])
             ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED])
             ->latest()
             ->first();
