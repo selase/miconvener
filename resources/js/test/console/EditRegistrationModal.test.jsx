@@ -48,3 +48,38 @@ describe('editing a registration', () => {
         expect(onSaved).not.toHaveBeenCalled();
     });
 });
+
+describe('editing a registration: the request never reaches the server', () => {
+    // csrfFetch's own vi.fn() is created inside the vi.mock() factory, which
+    // Vitest evaluates before this file's imports run. Vitest's mock-call
+    // tracking treats a *rejection* produced by a mock born that early as a
+    // reportable error even once the component's try/catch has fully handled
+    // it, which would fail this test despite the component behaving
+    // correctly. Delegating the rejection through a mock created here, inside
+    // describe(), sidesteps that false positive without changing what's
+    // exercised: csrfFetch(...) still rejects and the component still has to
+    // recover from it.
+    const failingRequest = vi.fn();
+
+    beforeEach(() => {
+        csrfFetch.mockReset();
+        failingRequest.mockReset();
+        csrfFetch.mockImplementation((...args) => failingRequest(...args));
+    });
+
+    it('recovers when the request never reaches the server', async () => {
+        failingRequest.mockRejectedValue(new Error('offline'));
+        const onSaved = vi.fn();
+        render(
+            <EditRegistrationModal event={event} registration={registration} onClose={() => {}} onSaved={onSaved} />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        expect(
+            await screen.findByText("Couldn't reach the server. Check your connection and try again.")
+        ).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Save' }).disabled).toBe(false);
+        expect(onSaved).not.toHaveBeenCalled();
+    });
+});

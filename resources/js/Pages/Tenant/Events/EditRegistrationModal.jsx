@@ -17,32 +17,43 @@ export default function EditRegistrationModal({ event, registration, onClose, on
     });
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
+    const [formError, setFormError] = useState(null);
 
     const set = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
     const submit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        const response = await csrfFetch(
-            route('tenant.events.registrations.update', {
-                event: event.id,
-                registration: registration.id,
-            }),
-            { method: 'PATCH', body: JSON.stringify({ ...form, phone: form.phone || null }) }
-        );
-        setSaving(false);
+        setFormError(null);
 
-        if (response.ok) {
-            onSaved();
-            return;
+        try {
+            const response = await csrfFetch(
+                route('tenant.events.registrations.update', {
+                    event: event.id,
+                    registration: registration.id,
+                }),
+                { method: 'PATCH', body: JSON.stringify({ ...form, phone: form.phone || null }) }
+            );
+
+            if (response.ok) {
+                onSaved();
+                return;
+            }
+
+            const json = await response.json().catch(() => ({}));
+            setErrors(
+                Object.fromEntries(
+                    Object.entries(json.errors ?? {}).map(([field, messages]) => [field, messages[0]])
+                )
+            );
+        } catch {
+            // The request never reached the server -- offline, DNS failure, an
+            // aborted connection. There is nothing field-specific to blame, so
+            // this is a form-level error rather than one attached to an input.
+            setFormError("Couldn't reach the server. Check your connection and try again.");
+        } finally {
+            setSaving(false);
         }
-
-        const json = await response.json().catch(() => ({}));
-        setErrors(
-            Object.fromEntries(
-                Object.entries(json.errors ?? {}).map(([field, messages]) => [field, messages[0]])
-            )
-        );
     };
 
     return (
@@ -65,6 +76,7 @@ export default function EditRegistrationModal({ event, registration, onClose, on
                     required
                 />
                 <Input label="Phone" value={form.phone} onChange={set('phone')} error={errors.phone} />
+                {formError && <p className="text-sm text-danger-fg">{formError}</p>}
                 <div className="flex justify-end gap-2">
                     <Button type="button" onClick={onClose}>
                         Cancel
