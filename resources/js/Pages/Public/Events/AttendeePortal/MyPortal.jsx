@@ -10,10 +10,20 @@ import VerifyPrompt from './VerifyPrompt';
  */
 export default function MyPortal({ organiser, verifiedEmail: provenAtLoad }) {
     const [verifiedEmail, setVerifiedEmail] = useState(provenAtLoad);
+    const [signOutError, setSignOutError] = useState(false);
 
     const signOut = async () => {
-        await csrfFetch(route('public.my.verify.forget'), { method: 'POST' });
-        setVerifiedEmail(null);
+        try {
+            const response = await csrfFetch(route('public.my.verify.forget'), { method: 'POST' });
+            if (!response.ok) {
+                setSignOutError(true);
+                return;
+            }
+            setSignOutError(false);
+            setVerifiedEmail(null);
+        } catch {
+            setSignOutError(true);
+        }
     };
 
     return (
@@ -28,6 +38,11 @@ export default function MyPortal({ organiser, verifiedEmail: provenAtLoad }) {
                         <button type="button" onClick={signOut} className="text-accent underline">
                             Sign out
                         </button>
+                        {signOutError && (
+                            <span className="ml-2 text-[13px] text-ink-secondary">
+                                Couldn't sign you out. Try again.
+                            </span>
+                        )}
                     </p>
                 ) : (
                     <div className="mt-8">
