@@ -71,10 +71,11 @@ test('a correct code completes the transfer and warns the previous holder', func
         'email' => 'kwame@example.com',
     ], ['HTTP_HOST' => $host])->assertOk();
 
-    // Read the code the way the holder would -- out of the email.
+    // Read the code the way the holder would -- out of the rendered email.
     $code = null;
     Mail::assertQueued(EventTicketTransferCode::class, function ($mail) use (&$code): bool {
-        $code = $mail->transfer->plainCode;
+        expect($mail->render())->toContain($mail->code);
+        $code = $mail->code;
 
         return true;
     });
@@ -143,7 +144,8 @@ test('an expired code is refused', function () {
 
     $code = null;
     Mail::assertQueued(EventTicketTransferCode::class, function ($mail) use (&$code): bool {
-        $code = $mail->transfer->plainCode;
+        expect($mail->render())->toContain($mail->code);
+        $code = $mail->code;
 
         return true;
     });
@@ -167,7 +169,8 @@ test('a checked-in ticket cannot be transferred even with a valid code', functio
 
     $code = null;
     Mail::assertQueued(EventTicketTransferCode::class, function ($mail) use (&$code): bool {
-        $code = $mail->transfer->plainCode;
+        expect($mail->render())->toContain($mail->code);
+        $code = $mail->code;
 
         return true;
     });
@@ -194,7 +197,7 @@ test('a fresh request supersedes an abandoned one', function () {
     }
 
     Mail::assertQueued(EventTicketTransferCode::class, function ($mail) use (&$codes): bool {
-        $codes[] = $mail->transfer->plainCode;
+        $codes[] = $mail->code;
 
         return true;
     });
@@ -205,4 +208,25 @@ test('a fresh request supersedes an abandoned one', function () {
 
     $registration->refresh();
     expect($registration->email)->toBe('ama@example.com');
+});
+
+test('the transfer code survives the queue', function () {
+    [$tenant, , $registration] = transferrableTicket('xfer-queue');
+
+    $transfer = EventRegistrationTransfer::create([
+        'tenant_id' => $tenant->id,
+        'registration_id' => $registration->id,
+        'to_full_name' => 'Kwame Asare',
+        'to_email' => 'kwame@example.com',
+        'code_hash' => Hash::make('482913'),
+        'expires_at' => now()->addMinutes(EventRegistrationTransfer::TTL_MINUTES),
+    ]);
+
+    // A queued mail is serialised and rebuilt on a worker, and SerializesModels
+    // brings models back from the database -- so anything held only in memory
+    // is gone by the time the email is written. Mail::fake() never serialises,
+    // which is how an empty code box passed every other test in this file.
+    $rebuilt = unserialize(serialize(new EventTicketTransferCode($transfer, '482913')));
+
+    expect($rebuilt->render())->toContain('482913');
 });

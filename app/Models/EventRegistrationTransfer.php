@@ -24,13 +24,6 @@ final class EventRegistrationTransfer extends Model
     /** Guessing a six-digit code is only hard if guessing is limited. */
     public const int MAX_ATTEMPTS = 5;
 
-    /**
-     * The code in the clear, held only for the life of the request that creates
-     * it so the mailable can render it. It is never persisted -- only its hash
-     * is -- so a leaked row cannot complete a transfer.
-     */
-    public ?string $plainCode = null;
-
     protected $connection = 'landlord';
 
     protected $fillable = [

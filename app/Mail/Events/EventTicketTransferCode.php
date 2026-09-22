@@ -13,13 +13,21 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
+/**
+ * The code arrives as a constructor argument, never read off the transfer.
+ * This mail is queued, and a queued mailable's models are rebuilt from the
+ * database on the worker: a value held only in memory does not make the trip.
+ */
 final class EventTicketTransferCode extends Mailable
 {
     use BrandedForTenant;
     use Queueable;
     use SerializesModels;
 
-    public function __construct(public EventRegistrationTransfer $transfer) {}
+    public function __construct(
+        public EventRegistrationTransfer $transfer,
+        public string $code,
+    ) {}
 
     public function envelope(): Envelope
     {
@@ -34,7 +42,7 @@ final class EventTicketTransferCode extends Mailable
                 'transfer' => $this->transfer,
                 'registration' => $this->transfer->registration,
                 'event' => $this->transfer->registration->event,
-                'code' => $this->transfer->plainCode,
+                'code' => $this->code,
             ],
         );
     }

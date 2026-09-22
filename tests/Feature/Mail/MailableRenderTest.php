@@ -134,7 +134,7 @@ test('every mailable renders', function (): void {
         'EventRegistrationVerifyEmail' => fn () => new EventRegistrationVerifyEmail($registration),
         'EventRegistrationWaitlisted' => fn () => new EventRegistrationWaitlisted($registration),
         'EventTicketLink' => fn () => new EventTicketLink($registration),
-        'EventTicketTransferCode' => fn () => new EventTicketTransferCode($transfer),
+        'EventTicketTransferCode' => fn () => new EventTicketTransferCode($transfer, '123456'),
         'EventTicketTransferred' => fn () => new EventTicketTransferred($registration, 'Ama Serwaa', 'Kofi Mensah', 'kofi@stem.org'),
         'NewEnterpriseLead' => fn () => new NewEnterpriseLead($lead),
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),

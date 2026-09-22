@@ -94,9 +94,8 @@ final class AttendeePortalController extends Controller
         ]);
 
         $transfer->setRelation('registration', $registrationModel);
-        $transfer->plainCode = $code;
 
-        Mail::to($registrationModel->email)->queue(new EventTicketTransferCode($transfer));
+        Mail::to($registrationModel->email)->queue(new EventTicketTransferCode($transfer, $code));
         app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
 
         return response()->json([

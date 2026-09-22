@@ -65,7 +65,7 @@ test('an attendee can transfer their ticket to someone else, and a fresh confirm
 
     $code = null;
     Mail::assertQueued(EventTicketTransferCode::class, function ($mail) use (&$code): bool {
-        $code = $mail->transfer->plainCode;
+        $code = $mail->code;
 
         return true;
     });
