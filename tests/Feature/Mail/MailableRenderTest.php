@@ -10,6 +10,7 @@ use App\Mail\Billing\RenewalReminderMail;
 use App\Mail\Billing\SubscriptionEndedMail;
 use App\Mail\Billing\SubscriptionEndingMail;
 use App\Mail\Events\AbstractDecisionNotificationMail;
+use App\Mail\Events\AttendeeAccessCodeMail;
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Mail\Events\EventBlastMail;
 use App\Mail\Events\EventRegistrationConfirmed;
@@ -124,6 +125,7 @@ test('every mailable renders', function (): void {
         'SubscriptionEndedMail' => fn () => new SubscriptionEndedMail($tenant, 'Starter', 'https://acme.test/billing'),
         'SubscriptionEndingMail' => fn () => new SubscriptionEndingMail($tenant, 'Starter', '12 October 2026', 'https://acme.test/billing'),
         'AbstractDecisionNotificationMail' => fn () => new AbstractDecisionNotificationMail($event, $abstract, 'Congratulations.'),
+        'AttendeeAccessCodeMail' => fn () => new AttendeeAccessCodeMail($tenant, '123456'),
         'AutomatedNotificationMail' => fn () => new AutomatedNotificationMail($event, 'Ama Serwaa', 'Two days to go', 'Congress begins in 2 days.', 'https://acme.test/pass', 'View Digital Pass'),
         'EventBlastMail' => fn () => new EventBlastMail($blast, 'Ama Serwaa', $registration->id),
         'EventRegistrationConfirmed' => fn () => new EventRegistrationConfirmed($registration),
