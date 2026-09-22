@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import Portal from '@/Pages/Public/Events/Confirmation';
+import Portal from '@/Pages/Public/Events/AttendeePortal/Portal';
 import { portalProps, keynote } from '../fixtures/portal';
 
 vi.mock('@/Layouts/PublicLayout', () => ({ default: ({ children }) => children }));

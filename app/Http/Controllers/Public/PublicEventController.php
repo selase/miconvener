@@ -355,7 +355,7 @@ final class PublicEventController extends Controller
                 ->values();
         }
 
-        return Inertia::render('Public/Events/Confirmation', [
+        return Inertia::render('Public/Events/AttendeePortal/Portal', [
             'event' => $this->toPublicPayload($eventModel, revealDetails: $registrationModel->isConfirmed()),
             'registration' => [
                 'id' => $registrationModel->id,

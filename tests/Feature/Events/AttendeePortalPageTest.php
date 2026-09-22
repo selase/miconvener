@@ -39,7 +39,7 @@ test('the portal page receives the registration, the event and what can be acted
     $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('Public/Events/Confirmation')
+            ->component('Public/Events/AttendeePortal/Portal')
             ->where('registration.id', $registration->id)
             ->where('registration.status', EventRegistration::STATUS_CONFIRMED)
             ->has('registration.ticket_code')
