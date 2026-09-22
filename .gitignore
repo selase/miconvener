@@ -30,8 +30,10 @@ GEMINI.md
 .github/copilot-instructions.md
 /.codex
 
-# Local git worktrees
+# Local git worktrees, including Claude Code's. A worktree holds its own .git
+# file, so an unignored one is committed as a broken embedded-repository link.
 /.worktrees
+/.claude/worktrees/
 
 # Subagent-driven-development scratch (ledgers, briefs, review packages)
 .superpowers
