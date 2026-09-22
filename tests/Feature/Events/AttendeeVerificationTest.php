@@ -150,6 +150,53 @@ test('the dummy hash checked when no code exists costs what a real one does', fu
         ->and(password_get_info($dummyHash)['options']['cost'] ?? null)->toBe((int) config('hashing.bcrypt.rounds'));
 });
 
+test('the dummy hash survives a reset static, as PHP-FPM resets it every request', function () {
+    [$tenant] = attendeeAt('dummy-survives-fpm');
+
+    // The static is a PHP process-level memo, so an earlier test in this
+    // same run may have already set it; the cache store, by contrast, is
+    // fresh for this test (a new Application per test). Clear the static
+    // first, so the warm-up below is forced to actually populate this
+    // test's own cache rather than short-circuiting on an already-set value
+    // left over from another test.
+    $property = (new ReflectionClass(AttendeeVerification::class))->getProperty('dummyHash');
+    $property->setValue(null, null);
+
+    // Warm the cache the way a first request would: confirm() with no
+    // usable code runs the dummy path once, which populates the cache
+    // behind dummyHash() (and the static in front of it).
+    app(AttendeeVerification::class)->confirm(app('session.store'), $tenant, 'nobody@stem.org', '000000');
+
+    // Simulate a fresh PHP-FPM request: the static resets to its default,
+    // the cache does not.
+    $property->setValue(null, null);
+
+    Hash::spy();
+
+    app(AttendeeVerification::class)->confirm(app('session.store'), $tenant, 'nobody@stem.org', '000000');
+
+    Hash::shouldNotHaveReceived('make');
+});
+
+test('a code sent on one organiser does not confirm on another', function () {
+    [$acme, , $acmeHost] = attendeeAt('acme-cross', 'ama@stem.org');
+    [, , $otherHost] = attendeeAt('other-cross', 'ama@stem.org');
+
+    $this->postJson("http://{$acmeHost}/my/verify/send", ['email' => 'ama@stem.org'], ['HTTP_HOST' => $acmeHost])->assertOk();
+    $code = sentCode();
+
+    // Same code, same address, the other organiser's tenant: the code was
+    // never issued there, so it must not confirm.
+    $this->postJson("http://{$otherHost}/my/verify/confirm", ['email' => 'ama@stem.org', 'code' => $code], ['HTTP_HOST' => $otherHost])
+        ->assertUnprocessable();
+    $this->getJson("http://{$otherHost}/my/session", ['HTTP_HOST' => $otherHost])->assertUnauthorized();
+
+    // Positive control: the same code still works where it was actually sent.
+    $this->postJson("http://{$acmeHost}/my/verify/confirm", ['email' => 'ama@stem.org', 'code' => $code], ['HTTP_HOST' => $acmeHost])
+        ->assertOk();
+    $this->getJson("http://{$acmeHost}/my/session", ['HTTP_HOST' => $acmeHost])->assertOk();
+});
+
 test('a correct code proves the address for this organiser, whatever its capitals', function () {
     [$tenant, , $host] = attendeeAt('code-ok');
 

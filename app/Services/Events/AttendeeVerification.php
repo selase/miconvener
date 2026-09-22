@@ -12,6 +12,7 @@ use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Tenancy\FeatureMeteringService;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -34,15 +35,17 @@ final class AttendeeVerification
     public const int CODES_PER_HOUR = 5;
 
     /**
-     * A bcrypt hash of a value nobody typed, checked in place of a real code
-     * when none exists. Computed once, lazily, from the app's own
-     * Hash::make() -- never hard-coded. A fixed literal bakes in whatever
-     * cost generated it; if that ever drifts from the configured
-     * hashing.bcrypt.rounds (as it did here: a hard-coded cost-12 hash next
-     * to real cost-10 codes made the dummy check take ~4x longer than a real
-     * one, splitting confirm()'s timing along exactly the line it exists to
-     * hide), the leak reopens with the timing inverted. Deriving it keeps the
-     * dummy's cost identical to real codes' by construction.
+     * A per-request front for dummyHash()'s cache entry -- not "computed once
+     * per process". Production runs PHP-FPM, with no Octane, so every static
+     * property resets to its default at the start of each request; a bare
+     * `??=` here would look like a memo but actually run Hash::make() on
+     * every single request that falls through to the dummy path, alongside
+     * the Hash::check() that path always pays. A confirm with no usable code
+     * would then cost two bcrypt hashes while a confirm against a live code
+     * costs one -- the very timing tell this class exists to close. Caching
+     * the hash itself (see dummyHash()) survives across requests; this
+     * static only saves a cache round-trip for the rest of the one request
+     * that's already running.
      */
     private static ?string $dummyHash = null;
 
@@ -210,13 +213,28 @@ final class AttendeeVerification
     }
 
     /**
-     * Lazily hashes a fixed throwaway string with the app's configured
-     * hasher, so the result always costs exactly what a real code's hash
-     * costs. See the property's doc comment for why this can't be a literal.
+     * Hashes a fixed throwaway string with the app's configured hasher, so
+     * the result always costs exactly what a real code's hash costs -- never
+     * a hard-coded literal, which would bake in whatever cost generated it
+     * and drift from a later hashing.bcrypt.rounds change (as it did here
+     * once: a hard-coded cost-12 hash next to real cost-10 codes made the
+     * dummy check take ~4x longer than a real one, splitting confirm()'s
+     * timing along exactly the line it exists to hide).
+     *
+     * Cached forever, keyed by the hashing driver and cost, because PHP-FPM
+     * resets the static memo above on every request: without a cache behind
+     * it, every confirm() that falls through to the dummy path would run its
+     * own Hash::make() in addition to the Hash::check() it already pays for,
+     * costing roughly double a real confirm and reopening the timing tell.
+     * The cost is folded into the key so that changing it regenerates the
+     * dummy instead of serving a stale one at the old cost.
      */
     private static function dummyHash(): string
     {
-        return self::$dummyHash ??= Hash::make('attendee-verification-dummy-code');
+        return self::$dummyHash ??= Cache::rememberForever(
+            'attendee-dummy-hash:'.config('hashing.driver').':'.config('hashing.bcrypt.rounds'),
+            fn (): string => Hash::make('attendee-verification-dummy-code'),
+        );
     }
 
     /**
