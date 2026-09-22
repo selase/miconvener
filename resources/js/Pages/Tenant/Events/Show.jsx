@@ -7,6 +7,7 @@ import SegmentedControl from '@/Components/Console/SegmentedControl';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { Download, Check, X, Pencil } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
+import EditRegistrationModal from './EditRegistrationModal';
 import EventFormModal from './EventFormModal';
 import EventWorkspace from './Workspace/EventWorkspace';
 import { sectionHref } from './Workspace/sections';
@@ -174,6 +175,7 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
 
 function GuestsTab({ event, registrations }) {
     const reload = () => router.reload({ only: ['registrations'] });
+    const [editing, setEditing] = useState(null);
 
     const act = async (registration, action, body) => {
         await csrfFetch(
@@ -242,34 +244,43 @@ function GuestsTab({ event, registrations }) {
                                         : '—'}
                                 </Td>
                                 <Td align="right">
-                                    {registration.status === 'pending_approval' && (
-                                        <div className="flex justify-end gap-1.5">
-                                            <button
-                                                onClick={() => act(registration, 'approve')}
-                                                title="Approve"
-                                                className="text-ink-secondary hover:text-success-fg"
-                                            >
-                                                <Check className="h-4 w-4" strokeWidth={1.75} />
-                                            </button>
-                                            <button
-                                                onClick={() => reject(registration)}
-                                                title="Reject"
-                                                className="text-ink-secondary hover:text-danger-fg"
-                                            >
-                                                <X className="h-4 w-4" strokeWidth={1.75} />
-                                            </button>
-                                        </div>
-                                    )}
-                                    {(registration.status === 'confirmed' ||
-                                        registration.status === 'checked_in' ||
-                                        registration.status === 'waitlisted') && (
+                                    <div className="flex items-center justify-end gap-3">
                                         <button
-                                            onClick={() => act(registration, 'cancel')}
-                                            className="text-xs text-ink-secondary hover:text-danger-fg"
+                                            onClick={() => setEditing(registration)}
+                                            title="Edit"
+                                            className="text-ink-secondary hover:text-ink"
                                         >
-                                            Cancel
+                                            <Pencil className="h-4 w-4" strokeWidth={1.75} />
                                         </button>
-                                    )}
+                                        {registration.status === 'pending_approval' && (
+                                            <div className="flex justify-end gap-1.5">
+                                                <button
+                                                    onClick={() => act(registration, 'approve')}
+                                                    title="Approve"
+                                                    className="text-ink-secondary hover:text-success-fg"
+                                                >
+                                                    <Check className="h-4 w-4" strokeWidth={1.75} />
+                                                </button>
+                                                <button
+                                                    onClick={() => reject(registration)}
+                                                    title="Reject"
+                                                    className="text-ink-secondary hover:text-danger-fg"
+                                                >
+                                                    <X className="h-4 w-4" strokeWidth={1.75} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {(registration.status === 'confirmed' ||
+                                            registration.status === 'checked_in' ||
+                                            registration.status === 'waitlisted') && (
+                                            <button
+                                                onClick={() => act(registration, 'cancel')}
+                                                className="text-xs text-ink-secondary hover:text-danger-fg"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                    </div>
                                 </Td>
                             </Tr>
                         ))}
@@ -298,6 +309,17 @@ function GuestsTab({ event, registrations }) {
                         </tr>
                     </tbody>
                 </Table>
+            )}
+            {editing && (
+                <EditRegistrationModal
+                    event={event}
+                    registration={editing}
+                    onClose={() => setEditing(null)}
+                    onSaved={() => {
+                        setEditing(null);
+                        reload();
+                    }}
+                />
             )}
         </div>
     );

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\UpdateEventRegistrationRequest;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationRejected;
@@ -121,6 +122,24 @@ final class EventRegistrationController extends Controller
 
             return response()->json(['message' => 'Registration cancelled.']);
         });
+    }
+
+    /**
+     * Corrects who a registration belongs to: a mistyped address, a misspelt
+     * name. An attendee's history is keyed to their email, so this is also the
+     * way back for someone registered under the wrong one. The model's
+     * activity log records what changed.
+     */
+    public function update(UpdateEventRegistrationRequest $request, string $subdomain, string $event, string $registration): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $registrationModel = $eventModel->registrations()->where('id', $registration)->firstOrFail();
+        $registrationModel->update($request->validated());
+
+        return response()->json(['message' => 'Registration updated.']);
     }
 
     /**
