@@ -63,6 +63,9 @@ jobs:
     - name: Run JS Linting
       run: npm run lint
 
+    - name: Run JS Tests
+      run: npm test
+
     - name: Execute tests
       env:
         DB_HOST: 127.0.0.1
