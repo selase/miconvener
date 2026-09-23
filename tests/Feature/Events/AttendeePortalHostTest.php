@@ -4,8 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Events;
 
+use App\Enum\TenantStatusEnum;
+use App\Enum\UsageMetric;
 use App\Models\Tenant;
+use App\Models\UsageEvent;
+use App\Models\UsageLimit;
+use App\Models\UsageRollup;
+use App\Models\User;
 use App\Services\Events\AttendeeVerification;
+use App\Services\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 
@@ -41,12 +48,72 @@ test('the portal opens when the organiser is named in the host', function () {
         ->assertInertia(fn ($page) => $page->where('organiser.name', $tenant->name));
 });
 
+test('dns-equivalent host spelling reaches the tenant portal', function (string $spelling): void {
+    $tenant = Tenant::factory()->create(['slug' => 'dns-host', 'isolation_mode' => 'shared']);
+    $host = match ($spelling) {
+        'uppercase' => 'DNS-HOST.'.mb_strtoupper(baseDomain()),
+        'terminal-dot' => 'dns-host.'.baseDomain().'.',
+    };
+
+    $this->get("http://{$host}/my", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('organiser.name', $tenant->name));
+})->with([
+    'uppercase' => 'uppercase',
+    'one terminal dot' => 'terminal-dot',
+]);
+
 test('a header cannot name the organiser on a host that does not', function () {
     $tenant = Tenant::factory()->create(['slug' => 'header-victim', 'isolation_mode' => 'shared']);
     $host = 'www.'.baseDomain();
 
     // www is reserved, so nothing in the host names an organiser. Without the
     // guard the X-Tenant header decides, and the page answers for that tenant.
+    $this->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
+        ->assertNotFound();
+});
+
+test('a rejected host answers before tenant status validation', function (): void {
+    $tenant = Tenant::factory()->create([
+        'slug' => 'banned-victim',
+        'status' => TenantStatusEnum::BANNED,
+        'isolation_mode' => 'shared',
+    ]);
+    $host = 'www.'.baseDomain();
+
+    $this->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
+        ->assertNotFound();
+});
+
+test('a rejected host answers before tenant membership validation', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 'member-victim', 'isolation_mode' => 'shared']);
+    $user = User::factory()->create();
+    $host = 'www.'.baseDomain();
+
+    $this->actingAs($user)
+        ->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
+        ->assertNotFound();
+});
+
+test('a rejected host answers before tenant usage enforcement', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 'limit-victim', 'isolation_mode' => 'shared']);
+    UsageRollup::create([
+        'tenant_id' => $tenant->id,
+        'metric' => UsageMetric::REQUEST_COUNT,
+        'period' => 'day',
+        'period_start' => now()->startOfDay(),
+        'value' => 800,
+        'dimensions_hash' => 'portal-host-test',
+    ]);
+    UsageLimit::create([
+        'tenant_id' => $tenant->id,
+        'metric' => UsageMetric::REQUEST_COUNT,
+        'limit_value' => 500,
+        'period' => 'month',
+        'block_on_limit' => true,
+    ]);
+    $host = 'www.'.baseDomain();
+
     $this->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
         ->assertNotFound();
 });
@@ -95,8 +162,14 @@ test('an unresolved host cannot reuse a tenant from an earlier request', functio
     $this->get("http://{$tenantHost}/my", ['HTTP_HOST' => $tenantHost])
         ->assertOk();
 
+    $usageEventsAfterValidRequest = UsageEvent::query()->count();
+
     $this->get("http://{$reservedHost}/my", ['HTTP_HOST' => $reservedHost])
         ->assertNotFound();
+
+    expect(app(TenantContext::class)->getTenant())->toBeNull()
+        ->and(app(TenantContext::class)->activeTenantId())->toBeNull()
+        ->and(UsageEvent::query()->count())->toBe($usageEventsAfterValidRequest);
 });
 
 test('an external custom domain does not claim attendee portal support', function (): void {

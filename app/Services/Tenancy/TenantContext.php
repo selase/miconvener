@@ -23,6 +23,12 @@ final class TenantContext
         return $this->tenant;
     }
 
+    public function clear(): void
+    {
+        $this->tenant = null;
+        $this->activeTenantId = null;
+    }
+
     public function setActiveTenantId(?string $tenantId): void
     {
         $this->activeTenantId = $tenantId;

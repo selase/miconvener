@@ -34,7 +34,9 @@ test('middleware denies access if feature disabled', function () {
     $user = User::factory()->create();
     $this->tenant->users()->attach($user->id);
 
-    $this->actingAs($user)->get('/test-feature')->assertStatus(403);
+    $this->actingAs($user)
+        ->get('/test-feature', ['X-Tenant' => $this->tenant->id])
+        ->assertStatus(403);
 });
 
 test('middleware allows access if feature enabled', function () {
@@ -43,7 +45,9 @@ test('middleware allows access if feature enabled', function () {
     $user = User::factory()->create();
     $this->tenant->users()->attach($user->id);
 
-    $this->actingAs($user)->get('/test-feature')->assertStatus(200);
+    $this->actingAs($user)
+        ->get('/test-feature', ['X-Tenant' => $this->tenant->id])
+        ->assertStatus(200);
 });
 
 test('blade directive renders content if feature enabled', function () {

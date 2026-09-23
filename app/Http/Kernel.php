@@ -41,6 +41,8 @@ final class Kernel extends HttpKernel
     protected $middleware = [
         // \App\Http\Middleware\TrustHosts::class,
         TrustProxies::class,
+        Middleware\ResetTenantContext::class,
+        Middleware\GuardAttendeePortalHost::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,
         ValidatePostSize::class,

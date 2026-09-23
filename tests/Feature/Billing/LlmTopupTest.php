@@ -6,7 +6,6 @@ use App\Contracts\PaymentGateway;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Llm\LlmUsageService;
-use App\Services\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Config;
 
 uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
@@ -28,10 +27,7 @@ beforeEach(function () {
     $this->tenant->users()->attach($this->user);
     makeTenantOwner($this->user, $this->tenant);
 
-    // TenantContext is a singleton in the container; set it directly rather than
-    // mocking. Requests through subdomain routes still re-resolve and overwrite it
-    // via the real ResolveTenant middleware, exercising the actual resolution path.
-    app(TenantContext::class)->setTenant($this->tenant);
+    $this->withSession(['active_tenant_id' => $this->tenant->id]);
 
     $this->actingAs($this->user);
 

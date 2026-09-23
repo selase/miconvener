@@ -26,6 +26,16 @@ test('it can set and get active tenant id', function () {
     expect($this->context->activeTenantId())->toBe($tenantId);
 });
 
+test('it clears both tenant representations between requests', function () {
+    $tenant = new Tenant(['id' => '019bb884-3060-70f0-906a-ed7cc8e994ef', 'name' => 'Test Tenant']);
+    $this->context->setTenant($tenant);
+
+    $this->context->clear();
+
+    expect($this->context->getTenant())->toBeNull()
+        ->and($this->context->activeTenantId())->toBeNull();
+});
+
 test('it returns null when no tenant is set', function () {
     expect($this->context->getTenant())->toBeNull();
     expect($this->context->activeTenantId())->toBeNull();

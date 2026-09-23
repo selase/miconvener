@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enum\TenantStatusEnum;
 use App\Models\Tenant;
 use App\Models\TenantFeature;
-use App\Services\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Route;
 
 beforeEach(function () {
@@ -30,14 +29,7 @@ test('middleware allows access when feature is enabled', function () {
         'enabled' => true,
     ]);
 
-    // Simulating being on the tenant subdomain
-    $url = 'http://enabled.'.config('app.domain').'/test-feature-protected';
-
-    // We need to make sure the ResolveTenant middleware picks it up
-    // In tests, we can manually set the context
-    app(TenantContext::class)->setTenant($tenant);
-
-    $response = $this->get('/test-feature-protected');
+    $response = $this->get('/test-feature-protected', ['X-Tenant' => $tenant->id]);
 
     $response->assertStatus(200);
     $response->assertSee('allowed');
@@ -59,9 +51,7 @@ test('middleware blocks access when feature is disabled', function () {
         'enabled' => false,
     ]);
 
-    app(TenantContext::class)->setTenant($tenant);
-
-    $response = $this->get('/test-feature-protected');
+    $response = $this->get('/test-feature-protected', ['X-Tenant' => $tenant->id]);
 
     $response->assertStatus(403);
 });
@@ -77,9 +67,7 @@ test('middleware blocks access when feature record is missing', function () {
 
     // No feature record created
 
-    app(TenantContext::class)->setTenant($tenant);
-
-    $response = $this->get('/test-feature-protected');
+    $response = $this->get('/test-feature-protected', ['X-Tenant' => $tenant->id]);
 
     $response->assertStatus(403);
 });

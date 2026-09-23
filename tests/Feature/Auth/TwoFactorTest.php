@@ -93,11 +93,8 @@ test('tenant requiring 2fa redirects unconfigured user to account security', fun
     $user = User::factory()->create()->refresh();
     $user->tenants()->attach($tenant);
 
-    // TenantContext is a singleton in the container; set it directly rather than
-    // mocking, since it is a plain data holder and mocking a final class is not possible.
-    app(App\Services\Tenancy\TenantContext::class)->setTenant($tenant);
-
-    $response = $this->actingAs($user)
+    $response = $this->withSession(['active_tenant_id' => $tenant->id])
+        ->actingAs($user)
         ->get('/dashboard');
 
     $response->assertRedirect(route('tenant.account', ['subdomain' => $tenant->slug]));
