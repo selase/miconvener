@@ -342,11 +342,15 @@ Route::post('/e/{event}/registrations/{registration}/service-requests', [PublicS
 
 // Attendee identity across this organiser's events: proving an address.
 // The panels that show history behind it arrive in Plan B.
-Route::get('/my', [App\Http\Controllers\Public\AttendeeAccessController::class, 'page'])->name('public.my');
-Route::post('/my/verify/send', [App\Http\Controllers\Public\AttendeeAccessController::class, 'send'])->middleware('throttle:public-registration')->name('public.my.verify.send');
-Route::post('/my/verify/confirm', [App\Http\Controllers\Public\AttendeeAccessController::class, 'confirm'])->middleware('throttle:public-registration')->name('public.my.verify.confirm');
-Route::post('/my/verify/forget', [App\Http\Controllers\Public\AttendeeAccessController::class, 'forget'])->name('public.my.verify.forget');
-Route::get('/my/session', [App\Http\Controllers\Public\AttendeeAccessController::class, 'session'])->middleware('attendee_verified')->name('public.my.session');
+// Guarded so only the address bar may name the organisation: these pages
+// answer with one organiser's attendee data.
+Route::prefix('my')->middleware('tenant_from_host')->group(function (): void {
+    Route::get('/', [App\Http\Controllers\Public\AttendeeAccessController::class, 'page'])->name('public.my');
+    Route::post('/verify/send', [App\Http\Controllers\Public\AttendeeAccessController::class, 'send'])->middleware('throttle:public-registration')->name('public.my.verify.send');
+    Route::post('/verify/confirm', [App\Http\Controllers\Public\AttendeeAccessController::class, 'confirm'])->middleware('throttle:public-registration')->name('public.my.verify.confirm');
+    Route::post('/verify/forget', [App\Http\Controllers\Public\AttendeeAccessController::class, 'forget'])->name('public.my.verify.forget');
+    Route::get('/session', [App\Http\Controllers\Public\AttendeeAccessController::class, 'session'])->middleware('attendee_verified')->name('public.my.session');
+});
 
 Route::get('/e/{event}/schedule.ics', [ScheduleIcsController::class, 'programme'])->name('public.events.schedule.ics');
 Route::get('/e/{event}/registrations/{registration}/agenda.ics', [ScheduleIcsController::class, 'agenda'])->name('public.events.agenda.ics');
