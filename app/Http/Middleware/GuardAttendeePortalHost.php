@@ -30,14 +30,42 @@ final readonly class GuardAttendeePortalHost
 
         $host = $this->hostMatcher->normalizeHost($request->getHost());
 
-        if ($this->hostMatcher->tenantSlug($host) === null) {
-            abort(404);
+        if ($this->hostMatcher->isPlatformHost($host)) {
+            $request->headers->set('host', $host);
+            $request->server->set('HTTP_HOST', $host);
+            $request->server->set('SERVER_NAME', $host);
+            $request->attributes->set('is_platform_attendee_portal', true);
+
+            return $next($request);
         }
 
-        $request->headers->set('host', $host);
-        $request->server->set('HTTP_HOST', $host);
-        $request->server->set('SERVER_NAME', $host);
+        $baseDomain = $this->hostMatcher->baseDomain();
 
-        return $next($request);
+        if ($baseDomain !== '' && $request->isMethod('GET') && $request->is('my')) {
+            $scheme = $request->getScheme();
+
+            if ($this->hostMatcher->isWwwHost($host)) {
+                $query = $request->getQueryString();
+                $target = "{$scheme}://{$baseDomain}/my".($query ? "?{$query}" : '');
+
+                return redirect()->to($target);
+            }
+
+            $slug = $this->hostMatcher->tenantSlug($host);
+            if ($slug !== null) {
+                $query = $request->getQueryString();
+                $params = [];
+                if ($query) {
+                    parse_str($query, $params);
+                }
+                $params['organiser'] = $slug;
+                $targetQuery = http_build_query($params);
+                $target = "{$scheme}://{$baseDomain}/my".($targetQuery !== '' ? "?{$targetQuery}" : '');
+
+                return redirect()->to($target);
+            }
+        }
+
+        abort(404);
     }
 }

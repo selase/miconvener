@@ -31,6 +31,9 @@ export default function MyPortal({ organiser, verifiedEmail: provenAtLoad }) {
             <div className="mx-auto max-w-2xl px-6 py-16 sm:px-10">
                 <h1 className="text-2xl font-normal tracking-tight text-ink">
                     Your events with {organiser.name}
+                    {organiser?.name
+                        ? `Your events with ${organiser.name}`
+                        : 'Your MiConvener events'}
                 </h1>
                 {verifiedEmail ? (
                     <p className="mt-3 text-[13.5px] text-ink-secondary">

@@ -50,4 +50,25 @@ test('an empty platform domain fails closed', function (): void {
     config(['session.domain' => null]);
 
     expect($this->matcher->matches($this->tenant, 'acme.miconvener.test'))->toBeFalse();
+    expect($this->matcher->matches($this->tenant, 'acme.miconvener.test'))->toBeFalse()
+        ->and($this->matcher->isPlatformHost('miconvener.test'))->toBeFalse()
+        ->and($this->matcher->isWwwHost('www.miconvener.test'))->toBeFalse();
+});
+
+test('the exact base domain is recognized as the platform host', function (): void {
+    expect($this->matcher->isPlatformHost('miconvener.test'))->toBeTrue()
+        ->and($this->matcher->isPlatformHost('MICONVENER.TEST.'))->toBeTrue()
+        ->and($this->matcher->isPlatformHost('www.miconvener.test'))->toBeFalse()
+        ->and($this->matcher->isPlatformHost('acme.miconvener.test'))->toBeFalse()
+        ->and($this->matcher->isPlatformHost('miconvener.test..'))->toBeFalse()
+        ->and($this->matcher->isPlatformHost('miconvener.test.example.com'))->toBeFalse();
+});
+
+test('the www host is recognized for redirection', function (): void {
+    expect($this->matcher->isWwwHost('www.miconvener.test'))->toBeTrue()
+        ->and($this->matcher->isWwwHost('WWW.MICONVENER.TEST.'))->toBeTrue()
+        ->and($this->matcher->isWwwHost('miconvener.test'))->toBeFalse()
+        ->and($this->matcher->isWwwHost('acme.miconvener.test'))->toBeFalse()
+        ->and($this->matcher->isWwwHost('www.miconvener.test..'))->toBeFalse()
+        ->and($this->matcher->isWwwHost('www.other.test'))->toBeFalse();
 });

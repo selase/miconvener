@@ -39,16 +39,15 @@ function baseDomain(): string
     return mb_ltrim((string) config('session.domain'), '.');
 }
 
-test('the portal opens when the organiser is named in the host', function () {
+test('the portal redirects when the organiser is named in the host', function () {
     $tenant = Tenant::factory()->create(['slug' => 'host-ok', 'isolation_mode' => 'shared']);
     $host = 'host-ok.'.baseDomain();
 
     $this->get("http://{$host}/my", ['HTTP_HOST' => $host])
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->where('organiser.name', $tenant->name));
+        ->assertRedirect('http://'.baseDomain().'/my?organiser=host-ok');
 });
 
-test('dns-equivalent host spelling reaches the tenant portal', function (string $spelling): void {
+test('dns-equivalent host spelling reaches the tenant portal redirect', function (string $spelling): void {
     $tenant = Tenant::factory()->create(['slug' => 'dns-host', 'isolation_mode' => 'shared']);
     $host = match ($spelling) {
         'uppercase' => 'DNS-HOST.'.mb_strtoupper(baseDomain()),
@@ -56,19 +55,17 @@ test('dns-equivalent host spelling reaches the tenant portal', function (string 
     };
 
     $this->get("http://{$host}/my", ['HTTP_HOST' => $host])
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->where('organiser.name', $tenant->name));
+        ->assertRedirect('http://'.baseDomain().'/my?organiser=dns-host');
 })->with([
     'uppercase' => 'uppercase',
     'one terminal dot' => 'terminal-dot',
 ]);
 
-test('a header cannot name the organiser on a host that does not', function () {
+test('a header cannot name the organiser on a rejected host', function () {
     $tenant = Tenant::factory()->create(['slug' => 'header-victim', 'isolation_mode' => 'shared']);
-    $host = 'www.'.baseDomain();
+    $host = 'rejected.external.test';
 
-    // www is reserved, so nothing in the host names an organiser. Without the
-    // guard the X-Tenant header decides, and the page answers for that tenant.
+    // An external/rejected host answers 404 before X-Tenant header or session can decide.
     $this->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
         ->assertNotFound();
 });
@@ -79,7 +76,7 @@ test('a rejected host answers before tenant status validation', function (): voi
         'status' => TenantStatusEnum::BANNED,
         'isolation_mode' => 'shared',
     ]);
-    $host = 'www.'.baseDomain();
+    $host = 'rejected.external.test';
 
     $this->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
         ->assertNotFound();
@@ -88,7 +85,7 @@ test('a rejected host answers before tenant status validation', function (): voi
 test('a rejected host answers before tenant membership validation', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'member-victim', 'isolation_mode' => 'shared']);
     $user = User::factory()->create();
-    $host = 'www.'.baseDomain();
+    $host = 'rejected.external.test';
 
     $this->actingAs($user)
         ->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
@@ -112,15 +109,15 @@ test('a rejected host answers before tenant usage enforcement', function (): voi
         'period' => 'month',
         'block_on_limit' => true,
     ]);
-    $host = 'www.'.baseDomain();
+    $host = 'rejected.external.test';
 
     $this->get("http://{$host}/my", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
         ->assertNotFound();
 });
 
-test('a session cannot name the organiser on a host that does not', function () {
+test('a session cannot name the organiser on a rejected host', function () {
     $tenant = Tenant::factory()->create(['slug' => 'session-victim', 'isolation_mode' => 'shared']);
-    $host = 'www.'.baseDomain();
+    $host = 'rejected.external.test';
 
     $this->withSession(['active_tenant_id' => $tenant->id])
         ->get("http://{$host}/my", ['HTTP_HOST' => $host])
@@ -157,14 +154,14 @@ test('no code is sent for an organiser only a header names', function () {
 test('an unresolved host cannot reuse a tenant from an earlier request', function (): void {
     Tenant::factory()->create(['slug' => 'first-host', 'isolation_mode' => 'shared']);
     $tenantHost = 'first-host.'.baseDomain();
-    $reservedHost = 'www.'.baseDomain();
+    $rejectedHost = 'rejected.external.test';
 
     $this->get("http://{$tenantHost}/my", ['HTTP_HOST' => $tenantHost])
-        ->assertOk();
+        ->assertRedirect('http://'.baseDomain().'/my?organiser=first-host');
 
     $usageEventsAfterValidRequest = UsageEvent::query()->count();
 
-    $this->get("http://{$reservedHost}/my", ['HTTP_HOST' => $reservedHost])
+    $this->get("http://{$rejectedHost}/my", ['HTTP_HOST' => $rejectedHost])
         ->assertNotFound();
 
     expect(app(TenantContext::class)->getTenant())->toBeNull()

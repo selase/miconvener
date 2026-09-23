@@ -28,6 +28,12 @@ final readonly class ResolveTenant
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->attributes->get('is_platform_attendee_portal')) {
+            $this->dbManager->configureShared();
+
+            return $next($request);
+        }
+
         $tenant = $this->resolver->resolve($request);
 
         if (! $tenant instanceof \App\Models\Tenant) {

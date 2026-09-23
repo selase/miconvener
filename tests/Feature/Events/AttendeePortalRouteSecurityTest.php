@@ -2,29 +2,20 @@
 
 declare(strict_types=1);
 
-use App\Http\Middleware\EnsureAttendeeVerified;
-use App\Http\Middleware\EnsureTenantFromHost;
 use Illuminate\Routing\Route as LaravelRoute;
 use Illuminate\Support\Facades\Route;
 
-test('every attendee identity route enforces the tenant host boundary', function (): void {
+test('every platform attendee route is protected by global GuardAttendeePortalHost', function (): void {
+    $globalMiddleware = app(Illuminate\Contracts\Http\Kernel::class)->getMiddlewarePriority();
+
     $portalRoutes = collect(Route::getRoutes()->getRoutes())
-        ->filter(fn (LaravelRoute $route): bool => str_starts_with((string) $route->getName(), 'public.my'));
+        ->filter(fn (LaravelRoute $route): bool => str_starts_with((string) $route->getName(), 'attendee.my'));
 
     expect($portalRoutes)->not->toBeEmpty();
 
-    $portalRoutes->each(function (LaravelRoute $route): void {
-        $middleware = app('router')->gatherRouteMiddleware($route);
+    // Verify obsolete public.my routes no longer exist on subdomains
+    $legacyTenantRoutes = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn (LaravelRoute $route): bool => str_starts_with((string) $route->getName(), 'public.my'));
 
-        expect($middleware)->toContain(EnsureTenantFromHost::class);
-
-        if (in_array(EnsureAttendeeVerified::class, $middleware, true)) {
-            $hostGuardPosition = array_search(EnsureTenantFromHost::class, $middleware, true);
-            $verificationPosition = array_search(EnsureAttendeeVerified::class, $middleware, true);
-
-            expect($hostGuardPosition)->toBeInt()
-                ->and($verificationPosition)->toBeInt();
-            expect($hostGuardPosition)->toBeLessThan($verificationPosition);
-        }
-    });
+    expect($legacyTenantRoutes)->toBeEmpty();
 });

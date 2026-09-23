@@ -43,7 +43,11 @@ final class RouteServiceProvider extends ServiceProvider
 
             Route::middleware('web')
                 ->group(base_path('routes/public.php'));
+
+            Route::middleware('web')
+                ->group(base_path('routes/attendee.php'));
         });
+
     }
 
     /**

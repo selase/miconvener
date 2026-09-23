@@ -14,6 +14,28 @@ final class TenantHostMatcher
         return $this->tenantSlug($host) === mb_strtolower($tenant->slug);
     }
 
+    public function isPlatformHost(string $host): bool
+    {
+        $baseDomain = $this->baseDomain();
+
+        if ($baseDomain === '') {
+            return false;
+        }
+
+        return $this->normalizeHost($host) === $baseDomain;
+    }
+
+    public function isWwwHost(string $host): bool
+    {
+        $baseDomain = $this->baseDomain();
+
+        if ($baseDomain === '') {
+            return false;
+        }
+
+        return $this->normalizeHost($host) === "www.{$baseDomain}";
+    }
+
     public function tenantSlug(string $host): ?string
     {
         $baseDomain = $this->baseDomain();
@@ -45,7 +67,7 @@ final class TenantHostMatcher
         return str_ends_with($host, '.') ? mb_substr($host, 0, -1) : $host;
     }
 
-    private function baseDomain(): string
+    public function baseDomain(): string
     {
         return mb_strtolower(mb_trim((string) config('session.domain'), " \n\r\t\v\0."));
     }

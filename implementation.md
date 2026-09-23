@@ -1,0 +1,91 @@
+# Implementation Plan: Platform Attendee Portal (Stages 1–3)
+
+## Goal
+Implement the foundational layers of the **Platform Attendee Portal** as specified in `docs/superpowers/specs/2026-09-23-platform-attendee-portal-design.md`:
+1. Establish the canonical platform host boundary at `https://miconvener.com/my` with automatic subdomain 302 redirects (`{tenant}.miconvener.com/my` -> `miconvener.com/my?organiser={tenant}`) and pre-routing tenant context bypass.
+2. Build the landlord-scoped platform verification engine (`platform_attendee_access_codes`), independent rate limiters (email cooldown, hourly, daily, IP burst/daily, Cloudflare Turnstile step-up), and 12-hour session-based identity.
+3. Deploy the central `/my` verification shell with status-specific UX, 60s resend timer, address correction, and neutral 202 queuing.
+
+---
+
+## Tasks
+
+### Stage 1: Platform Host Boundary, Pre-routing Isolation, & Subdomain Redirects
+- [ ] **1.1 Unit tests for Host Matcher**: Add tests in `tests/Unit/Tenancy/TenantHostMatcherTest.php` for `isPlatformHost(string $host)`, `isWwwHost(string $host)`, and `tenantSlug(string $host)`.
+- [ ] **1.2 Update TenantHostMatcher**: Implement `isPlatformHost` and `isWwwHost` with host normalization and terminal dot handling.
+- [ ] **1.3 Update GuardAttendeePortalHost Middleware**:
+  - Intercept `/my` and `/my/*`.
+  - For `isPlatformHost`: tag `$request->attributes->set('is_platform_attendee_portal', true)`.
+  - For `isWwwHost`: return 302 redirect to `https://{baseDomain}/my`.
+  - For valid tenant slug: return 302 redirect to `https://{baseDomain}/my?organiser={slug}`.
+  - For any invalid, nested, or unrecognized host: abort 404.
+- [ ] **1.4 Update ResolveTenant Middleware**:
+  - If `$request->attributes->get('is_platform_attendee_portal')` is true, call `$this->dbManager->configureShared()` and proceed without tenant resolution (ignoring session `active_tenant_id` and `X-Tenant` header).
+- [ ] **1.5 Route Wiring**:
+  - Define root-matching `/my` group in `routes/web.php` (or `routes/attendee.php` registered in `RouteServiceProvider`).
+  - Remove obsolete `/my` prefix group from `routes/subdomain.php`.
+- [ ] **1.6 Feature Tests**:
+  - Create `tests/Feature/Events/PlatformAttendeePortalHostTest.php` verifying base domain access, `www` redirect, tenant subdomain redirect with `?organiser=`, 404 on invalid hosts, and total isolation from session `active_tenant_id` / `X-Tenant`.
+
+### Stage 2: Platform Access Codes & Multi-Tier Verification Infrastructure
+- [ ] **2.1 Landlord Migration & Model**:
+  - Create migration for `platform_attendee_access_codes` table (`id` uuid pk, `email_normalized`, `code_hash`, `attempts`, `expires_at`, `consumed_at`, timestamps, composite index `(email_normalized, consumed_at, created_at)`).
+  - Create model `App\Models\PlatformAttendeeAccessCode` with `MassPrunable`.
+- [ ] **2.2 Rate Limiting & Turnstile Service**:
+  - Implement `App\Services\Events\AttendeePortalRateLimiter` managing:
+    - Email cooldown: 1 per 60s
+    - Email hourly: 5 per hr
+    - Email daily: 10 per 24h
+    - IP burst: 20 per 10min (6th attempt requires Turnstile)
+    - IP daily: 100 per 24h
+    - Confirm attempts: 10 per email / 10min, 60 per IP / 10min
+  - Add Turnstile verification via Laravel HTTP client.
+- [ ] **2.3 Verification Service & Mailable**:
+  - Create `App\Mail\Events\PlatformAttendeeAccessCodeMail` (transactional, platform-branded "Your MiConvener sign-in code", zero tenant credits metered).
+  - Create `App\Jobs\Events\SendPlatformAttendeeAccessCode`.
+  - Create `App\Services\Events\PlatformAttendeeVerification`:
+    - Normalization: `mb_strtolower(mb_trim($email))`.
+    - Cached BCrypt dummy hash matching hashing rounds to guarantee constant-time checks.
+    - Atomic attempt increment and atomic consumption.
+    - Confirmation stores `attendee_verified_platform` session marker (12-hour duration) and rotates session ID.
+- [ ] **2.4 Middleware & Pruning Schedule**:
+  - Create `App\Http\Middleware\EnsurePlatformAttendeeVerified` reading `attendee_verified_platform`.
+  - Register daily prune for `PlatformAttendeeAccessCode` at 04:00 in `app/Console/Kernel.php`.
+- [ ] **2.5 Feature & Unit Tests**:
+  - Test pruning in `tests/Feature/Events/PlatformAttendeeAccessCodePruningTest.php`.
+  - Test verification lifecycle, timing invariance, rate limiting, and Turnstile challenge in `tests/Feature/Events/PlatformAttendeeVerificationTest.php`.
+
+### Stage 3: Central `/my` Verification Shell
+- [ ] **3.1 Controller & Form Requests**:
+  - Create `App\Http\Requests\Attendee\PlatformSendAccessCodeRequest` and `PlatformConfirmAccessCodeRequest`.
+  - Create `App\Http\Controllers\Public\PlatformAttendeeAccessController`:
+    - `page(Request $request)`: renders `Public/Events/AttendeePortal/MyPortal` with masked verified email, optional preselected organiser hint, or verification prompt.
+    - `send(PlatformSendAccessCodeRequest $request)`: neutral 202 response, Turnstile handling (428 when challenge required).
+    - `confirm(PlatformConfirmAccessCodeRequest $request)`: atomic verification, session rotation, returns masked email.
+    - `forget(Request $request)`: signs out and clears platform proof.
+    - `session(Request $request)`: returns current verified session email.
+- [ ] **3.2 Frontend UI Enhancements**:
+  - Update `VerifyPrompt.jsx` to support:
+    - 60s cooldown timer.
+    - Turnstile widget appearance when challenged.
+    - Status-specific copy (422 validation, 428 challenge, 429 rate limit, 500 error, network error).
+    - "Use a different email address" button to reset form.
+    - Explanation after 2 failed attempts that 5 wrong guesses invalidate the code.
+  - Update `MyPortal.jsx` for platform layout and verified empty state ("No MiConvener events found for this address yet").
+- [ ] **3.3 Frontend Component Tests**:
+  - Update Vitest tests in `resources/js/test/portal/VerifyPrompt.test.jsx`.
+
+---
+
+## Verification Plan
+1. **Automated Unit & Feature Tests**:
+   - `TenantHostMatcherTest.php`
+   - `PlatformAttendeePortalHostTest.php`
+   - `PlatformAttendeeAccessCodePruningTest.php`
+   - `PlatformAttendeeVerificationTest.php`
+   - `VerifyPrompt.test.jsx`
+2. **Quality Gates**:
+   - `vendor/bin/pint --dirty`
+   - `vendor/bin/phpstan analyse --memory-limit=2G`
+   - `npm run build`
+
