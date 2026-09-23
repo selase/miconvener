@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import csrfFetch from '@/lib/csrfFetch';
 
@@ -7,7 +6,6 @@ const RESEND_AFTER_SECONDS = 60;
 const INPUT_CLASS =
     'w-full border border-border bg-surface px-3 py-2 text-[13px] text-ink focus:border-accent focus:outline-none';
 const PRIMARY_CLASS =
-    'inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90 disabled:opacity-60';
     'inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed';
 
 const OFFLINE_MESSAGE = "Couldn't reach the server. Check your connection and try again.";
@@ -95,10 +93,8 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             : { email, turnstile_token: turnstileToken };
 
         try {
-            const response = await csrfFetch(route('public.my.verify.send'), {
             const response = await csrfFetch(sendRoute, {
                 method: 'POST',
-                body: JSON.stringify(who),
                 body: JSON.stringify(payload),
             });
             const json = await response.json().catch(() => ({}));
@@ -116,12 +112,10 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             }
 
             if (!response.ok) {
-                setMessage('Too many attempts just now. Try again in a minute.');
                 const errorMsg = json.errors?.email?.[0] ?? json.message ?? "Couldn't send the code. Please try again.";
                 setMessage(errorMsg);
                 return;
             }
-            setMessage(json.message);
 
             setMessage(json.message ?? `A sign-in code was sent to ${email || 'your email'}.`);
             setStage('code');
@@ -145,10 +139,8 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             : { email, code };
 
         try {
-            const response = await csrfFetch(route('public.my.verify.confirm'), {
             const response = await csrfFetch(confirmRoute, {
                 method: 'POST',
-                body: JSON.stringify({ ...who, code }),
                 body: JSON.stringify(payload),
             });
             const json = await response.json().catch(() => ({}));
@@ -157,8 +149,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                 onVerified(json.email);
                 return;
             }
-            setMisses(misses + 1);
-            setMessage(json.message ?? "That code didn't match.");
 
             if (response.status === 429) {
                 setMessage('Too many verification attempts. Please try again later.');
@@ -185,19 +175,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
 
     if (stage === 'address') {
         return (
-            <form onSubmit={send} className="space-y-3">
-                <label htmlFor="verify-email" className="block text-[13px] text-ink-secondary">
-                    The address you registered with
-                </label>
-                <input
-                    id="verify-email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={INPUT_CLASS}
-                />
-                <button type="submit" disabled={busy} className={PRIMARY_CLASS}>
             <form onSubmit={send} className="space-y-4">
                 <div>
                     <label htmlFor="verify-email" className="block text-[13px] font-medium text-ink-secondary">
@@ -227,7 +204,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                 >
                     {busy ? 'Sending…' : 'Email me a code'}
                 </button>
-                {message && <p className="text-[13px] text-ink-secondary">{message}</p>}
 
                 <div aria-live="polite">
                     {message && <p className="text-[13px] text-ink-secondary">{message}</p>}
@@ -238,7 +214,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
 
     if (stage === 'ready') {
         return (
-            <div className="space-y-3">
             <div className="space-y-4">
                 <p className="text-[13.5px] text-ink-secondary">
                     To see everything you have with this organiser, confirm it's you. We'll email a
@@ -247,7 +222,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                 <button type="button" onClick={send} disabled={busy} className={PRIMARY_CLASS}>
                     {busy ? 'Sending…' : 'Email me a code'}
                 </button>
-                {message && <p className="text-[13px] text-ink-secondary">{message}</p>}
                 <div aria-live="polite">
                     {message && <p className="text-[13px] text-ink-secondary">{message}</p>}
                 </div>
@@ -256,21 +230,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
     }
 
     return (
-        <form onSubmit={confirm} className="space-y-3">
-            {message && <p className="text-[13px] text-ink-secondary">{message}</p>}
-            <label htmlFor="verify-code" className="block text-[13px] text-ink-secondary">
-                Code
-            </label>
-            <input
-                id="verify-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                required
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className={INPUT_CLASS}
-            />
-            <div className="flex items-center gap-4">
         <form onSubmit={confirm} className="space-y-4">
             <div aria-live="polite">
                 {message && <p className="text-[13px] text-ink-secondary">{message}</p>}
@@ -300,7 +259,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                     type="button"
                     onClick={send}
                     disabled={wait > 0 || busy}
-                    className="text-[12.5px] text-accent underline disabled:text-ink-secondary disabled:no-underline"
                     className="text-[12.5px] text-accent underline hover:opacity-80 disabled:text-ink-secondary disabled:no-underline cursor-pointer disabled:cursor-not-allowed"
                 >
                     {wait > 0 ? `Send another code in ${wait}s` : 'Send another code'}
@@ -319,9 +277,6 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                     After five wrong tries a code stops working. Ask for a new one if you need to.
                 </p>
             )}
-            <p className="text-[12.5px] text-ink-secondary">
-                Wrong address? The organiser can correct it for you.
-            </p>
         </form>
     );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Download } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 
 export default function MyTicketPanel({ event, registration }) {
@@ -14,14 +15,16 @@ export default function MyTicketPanel({ event, registration }) {
 
     const canTransfer = registration.status !== 'checked_in';
 
-    const post = async (routeName, body) => {
-        const response = await csrfFetch(
-            route(routeName, { event: event.slug, registration: registration.id }),
-            {
-                method: 'POST',
-                body: JSON.stringify(body),
-            }
-        );
+    const post = async (actionPath, legacyRouteName, body) => {
+        const isPlatform = typeof window !== 'undefined' && window.location.pathname.startsWith('/my/events');
+        const url = isPlatform
+            ? `/my/events/${registration.id}/${actionPath}`
+            : route(legacyRouteName, { event: event.slug, registration: registration.id });
+
+        const response = await csrfFetch(url, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        });
         return [response, await response.json()];
     };
 
@@ -30,7 +33,7 @@ export default function MyTicketPanel({ event, registration }) {
         setSaving(true);
         setError(null);
         setMessage(null);
-        const [response, json] = await post('public.events.registrations.transfer', form);
+        const [response, json] = await post('transfer', 'public.events.registrations.transfer', form);
         setSaving(false);
         if (!response.ok) {
             setError(json.message ?? 'Could not start this transfer.');
@@ -44,7 +47,7 @@ export default function MyTicketPanel({ event, registration }) {
         e.preventDefault();
         setSaving(true);
         setError(null);
-        const [response, json] = await post('public.events.registrations.transfer.confirm', {
+        const [response, json] = await post('transfer/confirm', 'public.events.registrations.transfer.confirm', {
             code,
         });
         setSaving(false);
@@ -96,6 +99,13 @@ export default function MyTicketPanel({ event, registration }) {
                 </dl>
 
                 <div className="mt-4 flex gap-2">
+                    <a
+                        href={`/my/events/${registration.id}/ticket`}
+                        className="inline-flex h-control items-center gap-1.5 border border-border px-4 text-sm text-ink hover:border-accent"
+                    >
+                        <Download className="h-4 w-4" />
+                        Download PDF
+                    </a>
                     {canTransfer && (
                         <button
                             onClick={() => setTransferring(!transferring)}

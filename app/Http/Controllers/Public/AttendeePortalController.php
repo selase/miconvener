@@ -149,10 +149,13 @@ final class AttendeePortalController extends Controller
         $previousName = $registrationModel->full_name;
         $previousEmail = $registrationModel->email;
 
+        $registrationModel->rotateTicketCredentials();
         $registrationModel->update([
             'full_name' => $transfer->to_full_name,
             'email' => $transfer->to_email,
             'phone' => $transfer->to_phone,
+            'ticket_code' => $registrationModel->ticket_code,
+            'qr_token' => $registrationModel->qr_token,
         ]);
 
         $transfer->update(['consumed_at' => now()]);

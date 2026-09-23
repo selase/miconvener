@@ -15,11 +15,15 @@ export default function MyDayPanel({ event, registration, agendaIds, setAgendaId
         const isFull = session.capacity !== null && session.signup_count >= session.capacity;
         if (!inAgenda && isFull) return;
 
-        const url = route(inAgenda ? 'public.events.agenda.remove' : 'public.events.agenda.add', {
-            event: event.slug,
-            registration: registration.id,
-            session: session.id,
-        });
+        const isPlatform =
+            typeof window !== 'undefined' && window.location.pathname.startsWith('/my/events');
+        const url = isPlatform
+            ? `/my/events/${registration.id}/agenda/${session.id}`
+            : route(inAgenda ? 'public.events.agenda.remove' : 'public.events.agenda.add', {
+                  event: event.slug,
+                  registration: registration.id,
+                  session: session.id,
+              });
         await csrfFetch(url, { method: inAgenda ? 'DELETE' : 'POST' });
         setAgendaIds((prev) =>
             inAgenda ? prev.filter((id) => id !== session.id) : [...prev, session.id]

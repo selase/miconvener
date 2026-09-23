@@ -30,6 +30,16 @@ final class PlatformAttendeeVerification
         return mb_strtolower(mb_trim($email));
     }
 
+    public static function getVerifiedEmail(?Session $session = null): ?string
+    {
+        $session ??= request()->hasSession() ? request()->session() : null;
+        if ($session === null) {
+            return null;
+        }
+
+        return app(self::class)->verifiedEmail($session);
+    }
+
     /**
      * Validate send abuse limits and queue code generation and mailing.
      *
@@ -131,6 +141,20 @@ final class PlatformAttendeeVerification
         ]);
 
         return true;
+    }
+
+    /**
+     * Store verified platform session proof directly (e.g. from signed free ticket verification link).
+     */
+    public function storeVerifiedSession(Session $session, string $email): void
+    {
+        $normalized = self::normalise($email);
+        $session->regenerate();
+        $session->put(self::SESSION_KEY, [
+            'email' => $normalized,
+            'verified_at' => now()->getTimestamp(),
+            'expires_at' => now()->addHours(self::VERIFIED_HOURS)->getTimestamp(),
+        ]);
     }
 
     /**

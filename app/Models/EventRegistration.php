@@ -104,9 +104,11 @@ final class EventRegistration extends Model
      * Signed token carried in the QR code. Verified via hash_equals against
      * a fresh HMAC of the registration id, so a forged/guessed token fails.
      */
-    public static function signToken(string $registrationId): string
+    public static function signToken(string $registrationId, ?string $salt = null): string
     {
-        return hash_hmac('sha256', $registrationId, config('app.key'));
+        $payload = $salt !== null ? "{$registrationId}:{$salt}" : $registrationId;
+
+        return hash_hmac('sha256', $payload, (string) config('app.key'));
     }
 
     /**
@@ -219,5 +221,16 @@ final class EventRegistration extends Model
     {
         $this->ticket_code = self::generateTicketCode();
         $this->qr_token = self::signToken($this->id);
+    }
+
+    /**
+     * Transactionally rotate ticket code and QR token upon transfer so
+     * previously downloaded tickets, screenshots, and offline snapshots
+     * become immediately invalid at online check-in.
+     */
+    public function rotateTicketCredentials(): void
+    {
+        $this->ticket_code = self::generateTicketCode();
+        $this->qr_token = self::signToken($this->id, Str::random(16));
     }
 }

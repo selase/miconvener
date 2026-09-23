@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
+use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
 use App\Services\Payment\PaystackGateway;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -16,6 +17,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class EventCheckoutController extends Controller
 {
+    public function __construct(
+        private readonly PlatformAttendeeWorkspaceAuthorizer $workspaceAuthorizer,
+    ) {}
+
     public function checkout(string $subdomain, string $event, string $registration): Response|RedirectResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -27,12 +32,12 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
+
         if ($registrationModel->isConfirmed()) {
-            return redirect()->route('public.events.confirmation', [
-                'subdomain' => $tenant->slug,
-                'event' => $event,
-                'registration' => $registrationModel->id,
-            ]);
+            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
+
+            return redirect($workspaceUrl);
         }
 
         $paystack = $tenant->isPlatformDefaultSettlement()
@@ -53,15 +58,13 @@ final class EventCheckoutController extends Controller
 
         $customerId = $paystack->createCustomer($registrationModel->email, $registrationModel->full_name);
 
+        $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
+
         $checkoutUrl = $paystack->createOneTimeCheckoutSession(
             $customerId,
             $registrationModel->effectiveChargedAmount(),
             $registrationModel->currency,
-            route('public.events.confirmation', [
-                'subdomain' => $tenant->slug,
-                'event' => $event,
-                'registration' => $registrationModel->id,
-            ]),
+            $workspaceUrl,
             [
                 'event_registration_id' => $registrationModel->id,
                 'tenant_id' => $tenant->id,

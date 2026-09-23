@@ -98,19 +98,35 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
   - `tests/Feature/Events/PlatformAttendeeHistoryTest.php`: multi-tenant aggregation, lifecycle categorization, transfer actions, auth gate rejection.
 
 ### Stage 5: Central Event Workspace & Checkout Grant
-- [ ] **5.1 Checkout Grant & Return Handling**:
-  - Paystack return handler generating a short-lived, signed or session-scoped `checkout_grant` (30-minute TTL) allowing immediate single-registration workspace view while webhook completes fulfillment.
-  - Endpoint `GET /my/events/{registration}/status` for bounded status polling (up to 30s) so UI transitions smoothly once payment confirms.
-- [ ] **5.2 Central Event Workspace Endpoint**:
-  - `GET /my/events/{registration}` in `PlatformAttendeeAccessController` (or dedicated `PlatformAttendeeWorkspaceController`):
+- [x] **5.1 Checkout Grant & Return Handling**:
+  - `PlatformAttendeeWorkspaceAuthorizer`: 30-minute session-scoped `checkout_grant` allowing immediate single-registration workspace view while webhook completes fulfillment without creating platform-wide email proof.
+  - Endpoint `GET /my/events/{registration}/status` for bounded status polling (2s initial, 5s interval, 24 attempts max / 2 minutes) with status and confirmation details.
+- [x] **5.2 Central Event Workspace Endpoint**:
+  - `GET /my/events/{registration}` in `PlatformAttendeeWorkspaceController`:
     - Authorize via verified platform attendee email matching registration email OR valid checkout grant.
-    - Pass complete event context (sessions, speakers, ticket details, seat assignment, released materials, forum, polls).
-    - Render `Public/Events/AttendeePortal/Workspace` (or integrated view).
-- [ ] **5.3 Ticket Download & Actions**:
+    - Pass complete event context (sessions, speakers, ticket details, seat assignment, released materials, service requests).
+    - Render `Public/Events/AttendeePortal/Portal` with `is_checkout_grant` flag and "Confirming payment" loader if pending.
+- [x] **5.3 Ticket Download & Actions**:
   - `GET /my/events/{registration}/ticket`: PDF ticket download using `TicketPdfService`.
-  - Registration transfer invitation action.
-- [ ] **5.4 Feature Tests**:
-  - Tests covering checkout grant authorization, polling, workspace data delivery, and access restrictions.
+  - Atomic ticket credential rotation (`rotateTicketCredentials`) on transfer to prevent dual-possession.
+  - Materials streaming download via `PlatformAttendeeWorkspaceController::downloadMaterial`.
+  - Service request creation gated to running events or checked-in attendees.
+- [x] **5.4 Feature Tests**:
+  - Tests covering checkout grant authorization, expired grant redirect, bounded status polling, PDF download, credential rotation, and access restrictions in `tests/Feature/Events/PlatformAttendeeWorkspaceTest.php` (10 passing tests, 53 assertions).
+
+### Stage 6: Dashboard UI (Action-First Lifecycle Hierarchy)
+- [ ] **6.1 Action-First Dashboard Components**:
+  - Implement action-oriented cards on `/my`:
+    - `NeedsAttentionSection`: pending payments with "Complete payment" action, incoming transfer invitations with "Review & accept".
+    - `LiveNowSection`: running events with badge, quick actions (Open ticket, Check-in QR, My Day agenda, Request help), seat & room badge.
+    - `UpcomingOrganiserSection`: grouped by organiser, displaying dates, event name, ticket summary, and workspace link.
+    - `PastOrganiserSection`: collapsible history with certificate download links, attendance records, and past event summaries.
+- [ ] **6.2 Filter by Organiser Support**:
+  - Honour `?organiser={slug}` URL query parameter in the UI and data layer, focusing the view on the specified organiser while retaining "See all events" switch.
+- [ ] **6.3 Integration with `/my/events` Data**:
+  - Wire `MyPortal.jsx` to load and display data from `PlatformAttendeeHistory::getHistory` / `/my/events`.
+- [ ] **6.4 Verification**:
+  - Feature tests for dashboard presentation, Vitest tests for dashboard UI states, and production build check (`npm run build`).
 
 ---
 

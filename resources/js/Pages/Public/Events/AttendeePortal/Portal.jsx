@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { router } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
-import { CheckCircle2, Clock, ListOrdered, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, ListOrdered, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import MyTicketPanel from './panels/MyTicketPanel';
 import MyDayPanel from './panels/MyDayPanel';
 import GetHelpPanel from './panels/GetHelpPanel';
@@ -14,7 +15,7 @@ const STATUS_NOTICE = {
         // the gateway; someone just approved has not paid at all, and telling
         // them their payment is being confirmed leaves them waiting forever.
         title: (registration) =>
-            registration.awaiting_checkout ? 'One step left' : 'Payment pending',
+            registration.awaiting_checkout ? 'One step left' : 'Confirming payment',
         description: (event, registration) =>
             registration.awaiting_checkout
                 ? `Your place at ${event.name} is approved. Pay to secure it — your spot is held once the payment goes through.`
@@ -52,22 +53,72 @@ const STATUS_NOTICE = {
 
 /**
  * The attendee's page for one registration, reached by the link in their
- * confirmation email. Each tab is its own file under panels/.
+ * confirmation email or Paystack return. Each tab is its own file under panels/.
  */
-export default function Portal({ event, registration, materials = [], canRequestHelp = false }) {
-    const notice = STATUS_NOTICE[registration.status];
+export default function Portal({ event, registration, materials = [], canRequestHelp = false, poll_payment = false }) {
+    const [currentRegistration, setCurrentRegistration] = useState(registration);
+    const [isPolling, setIsPolling] = useState(
+        poll_payment || (registration.status === 'pending_payment' && !registration.awaiting_checkout)
+    );
+    const [pollingDelayed, setPollingDelayed] = useState(false);
+    const pollAttempts = useRef(0);
+    const MAX_POLL_ATTEMPTS = 24; // 2s initial + ~23 * 5s = ~2 minutes
+
+    useEffect(() => {
+        if (!isPolling) return;
+
+        let timer;
+        const checkStatus = async () => {
+            pollAttempts.current += 1;
+            try {
+                const res = await fetch(`/my/events/${currentRegistration.id}/status`, {
+                    headers: { Accept: 'application/json' },
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.is_confirmed) {
+                        setIsPolling(false);
+                        router.reload();
+                        return;
+                    }
+                }
+            } catch {
+                // Network failure during polling is tolerated; next poll will retry
+            }
+
+            if (pollAttempts.current >= MAX_POLL_ATTEMPTS) {
+                setIsPolling(false);
+                setPollingDelayed(true);
+            } else {
+                timer = setTimeout(checkStatus, 5000);
+            }
+        };
+
+        // First status check at 2 seconds
+        timer = setTimeout(checkStatus, 2000);
+
+        return () => clearTimeout(timer);
+    }, [isPolling, currentRegistration.id]);
+
+    const notice = STATUS_NOTICE[currentRegistration.status];
     const [tab, setTab] = useState('ticket');
-    const [agendaIds, setAgendaIds] = useState(registration.agenda_session_ids ?? []);
+    const [agendaIds, setAgendaIds] = useState(currentRegistration.agenda_session_ids ?? []);
 
     // Nothing on these tabs is usable until the ticket exists, and it does not
     // exist until the address behind a free registration has been confirmed.
-    const verified = registration.email_verified !== false;
+    const verified = currentRegistration.email_verified !== false;
     const tabs = verified ? [['ticket', 'My ticket']] : [];
     if (verified && event.sessions.length > 0) tabs.push(['agenda', 'My day']);
     // Only offer what can actually be acted on: help while the event is
     // running, downloads once something has been released.
     if (verified && canRequestHelp) tabs.push(['help', 'Get help']);
     if (verified && materials.length > 0) tabs.push(['downloads', 'Downloads']);
+
+    const restartPolling = () => {
+        pollAttempts.current = 0;
+        setPollingDelayed(false);
+        setIsPolling(true);
+    };
 
     return (
         <PublicLayout>
@@ -78,17 +129,43 @@ export default function Portal({ event, registration, materials = [], canRequest
                             className={`mx-auto h-10 w-10 ${notice.color}`}
                             strokeWidth={1.5}
                         />
+                        {isPolling ? (
+                            <Loader2
+                                className="mx-auto h-10 w-10 animate-spin text-accent"
+                                strokeWidth={1.5}
+                            />
+                        ) : (
+                            <notice.icon
+                                className={`mx-auto h-10 w-10 ${notice.color}`}
+                                strokeWidth={1.5}
+                            />
+                        )}
                         <h1 className="mt-5 text-2xl font-normal tracking-tight text-ink">
-                            {typeof notice.title === 'function'
-                                ? notice.title(registration)
-                                : notice.title}
+                            {isPolling
+                                ? 'Confirming payment...'
+                                : typeof notice.title === 'function'
+                                  ? notice.title(currentRegistration)
+                                  : notice.title}
                         </h1>
                         <p className="mt-3 text-[13.5px] text-ink-secondary">
-                            {notice.description(event, registration)}
+                            {isPolling
+                                ? `We're confirming your payment with Paystack for ${event.name}. Your ticket will appear here automatically.`
+                                : pollingDelayed
+                                  ? `Payment confirmation is taking a little longer than usual. You can check again below, or we'll email your ticket to you as soon as it clears.`
+                                  : notice.description(event, currentRegistration)}
                         </p>
-                        {registration.awaiting_checkout && registration.checkout_url && (
+                        {pollingDelayed && (
+                            <button
+                                onClick={restartPolling}
+                                className="mt-6 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-5 py-2.5 text-[13.5px] font-medium text-ink hover:border-accent"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Check again
+                            </button>
+                        )}
+                        {currentRegistration.awaiting_checkout && currentRegistration.checkout_url && (
                             <a
-                                href={registration.checkout_url}
+                                href={currentRegistration.checkout_url}
                                 className="mt-6 inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90"
                             >
                                 Complete payment

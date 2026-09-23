@@ -23,16 +23,18 @@ export default function GetHelpPanel({ event, registration }) {
     const submit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        const response = await csrfFetch(
-            route('public.events.service-requests.store', {
+        const isPlatform = typeof window !== 'undefined' && window.location.pathname.startsWith('/my/events');
+        const url = isPlatform
+            ? `/my/events/${registration.id}/service-requests`
+            : route('public.events.service-requests.store', {
                 event: event.slug,
                 registration: registration.id,
-            }),
-            {
-                method: 'POST',
-                body: JSON.stringify({ type, location: location || null, note: note || null }),
-            }
-        );
+            });
+
+        const response = await csrfFetch(url, {
+            method: 'POST',
+            body: JSON.stringify({ type, location: location || null, note: note || null }),
+        });
         const json = await response.json();
         setSaving(false);
         setSent(json);

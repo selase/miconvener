@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Public\PlatformAttendeeAccessController;
+use App\Http\Controllers\Public\PlatformAttendeeWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('my')->group(function (): void {
@@ -18,5 +19,18 @@ Route::prefix('my')->group(function (): void {
         Route::get('/certificates', [PlatformAttendeeAccessController::class, 'certificates'])->name('attendee.my.certificates');
         Route::get('/abstracts', [PlatformAttendeeAccessController::class, 'abstracts'])->name('attendee.my.abstracts');
         Route::get('/attendance', [PlatformAttendeeAccessController::class, 'attendance'])->name('attendee.my.attendance');
+    });
+
+    // Event workspace endpoints (authorized via platform email proof or checkout grant)
+    Route::prefix('events/{registration}')->group(function (): void {
+        Route::get('/', [PlatformAttendeeWorkspaceController::class, 'show'])->name('attendee.my.events.workspace');
+        Route::get('/status', [PlatformAttendeeWorkspaceController::class, 'status'])->name('attendee.my.events.status');
+        Route::get('/ticket', [PlatformAttendeeWorkspaceController::class, 'ticket'])->name('attendee.my.events.ticket');
+        Route::post('/transfer', [PlatformAttendeeWorkspaceController::class, 'transfer'])->middleware('throttle:public-registration')->name('attendee.my.events.transfer');
+        Route::post('/transfer/confirm', [PlatformAttendeeWorkspaceController::class, 'confirmTransfer'])->middleware('throttle:public-registration')->name('attendee.my.events.transfer.confirm');
+        Route::post('/agenda/{session}', [PlatformAttendeeWorkspaceController::class, 'addToAgenda'])->name('attendee.my.events.agenda.add');
+        Route::delete('/agenda/{session}', [PlatformAttendeeWorkspaceController::class, 'removeFromAgenda'])->name('attendee.my.events.agenda.remove');
+        Route::post('/service-requests', [PlatformAttendeeWorkspaceController::class, 'storeServiceRequest'])->name('attendee.my.events.service-requests.store');
+        Route::get('/materials/{material}/download', [PlatformAttendeeWorkspaceController::class, 'downloadMaterial'])->name('attendee.my.events.materials.download');
     });
 });
