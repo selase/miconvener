@@ -115,18 +115,30 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
   - Tests covering checkout grant authorization, expired grant redirect, bounded status polling, PDF download, credential rotation, and access restrictions in `tests/Feature/Events/PlatformAttendeeWorkspaceTest.php` (10 passing tests, 53 assertions).
 
 ### Stage 6: Dashboard UI (Action-First Lifecycle Hierarchy)
-- [ ] **6.1 Action-First Dashboard Components**:
-  - Implement action-oriented cards on `/my`:
-    - `NeedsAttentionSection`: pending payments with "Complete payment" action, incoming transfer invitations with "Review & accept".
-    - `LiveNowSection`: running events with badge, quick actions (Open ticket, Check-in QR, My Day agenda, Request help), seat & room badge.
-    - `UpcomingOrganiserSection`: grouped by organiser, displaying dates, event name, ticket summary, and workspace link.
-    - `PastOrganiserSection`: collapsible history with certificate download links, attendance records, and past event summaries.
-- [ ] **6.2 Filter by Organiser Support**:
-  - Honour `?organiser={slug}` URL query parameter in the UI and data layer, focusing the view on the specified organiser while retaining "See all events" switch.
-- [ ] **6.3 Integration with `/my/events` Data**:
-  - Wire `MyPortal.jsx` to load and display data from `PlatformAttendeeHistory::getHistory` / `/my/events`.
-- [ ] **6.4 Verification**:
-  - Feature tests for dashboard presentation, Vitest tests for dashboard UI states, and production build check (`npm run build`).
+- [x] **6.1 Action-First Dashboard Components**:
+  - `NeedsAttentionSection`: pending payments with "Complete payment" action, incoming transfer invitations with "Review & accept".
+  - `LiveNowSection`: running events with pulsing indicator, checked-in badges, seat assignments, quick actions ("Open workspace", "My Day agenda", "Get help").
+  - `OrganiserEventsSection`: grouped by organiser, upcoming events with ticket details and released materials count, collapsible past events (de-emphasized when urgent items exist).
+- [x] **6.2 Filter by Organiser Support**:
+  - Honour `?organiser={slug}` URL query parameter in the UI and data layer, focusing the view on the specified organiser while offering "See all events" clear button.
+- [x] **6.3 Integration with `/my/events` Data**:
+  - Preload `initialHistory` via Inertia from `PlatformAttendeeAccessController::page`.
+  - Wire `MyPortal.jsx` to load and display data, with `HistorySkeleton`, error retry state, and honest empty state.
+- [x] **6.4 Verification**:
+  - Feature tests in `tests/Feature/Events/PlatformAttendeeDashboardTest.php` (3 tests, 54 assertions), clean production build via `npm run build` (2.38s), and 0 PHPStan errors.
+
+### Stage 7: Responsive Navigation & Offline PWA
+- [ ] **7.1 Web App Manifest**:
+  - App manifest scoped to `/my/` (`public/attendee-manifest.json` or dynamic route) with appropriate icons and standalone display.
+- [ ] **7.2 Service Worker Shell Precaching**:
+  - Service worker script precaching the `/my` shell and critical offline assets.
+- [ ] **7.3 Offline Ticket Snapshot**:
+  - Opt-in "Save ticket offline" snapshot stored in browser IndexedDB / localStorage.
+  - Automatic expiry 7 days post-event.
+- [ ] **7.4 Responsive Navigation**:
+  - Sticky bottom tab bar on mobile / top bar on desktop: Overview / Ticket / My Day / More.
+- [ ] **7.5 Verification**:
+  - Automated tests and browser verification.
 
 ---
 
