@@ -81,6 +81,37 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
   - Production asset compilation via `npm run build`.
   - Update Vitest tests in `resources/js/test/portal/VerifyPrompt.test.jsx`.
 
+### Stage 4: Cross-Tenant History Service
+- [x] **4.1 History Service Implementation**:
+  - `App\Services\Events\PlatformAttendeeHistory`:
+    - `getHistory(string $email, ?string $organiserSlug = null)`: groups into `needs_attention` (unpaid registrations, pending transfers), `live_now` (ongoing/checked in), and `organisers` with `upcoming` (starts_at ASC) and `past` (starts_at DESC).
+    - `getCertificates(string $email, ?string $organiserSlug = null)`: certificates earned across all organisers.
+    - `getAbstracts(string $email, ?string $organiserSlug = null)`: abstracts submitted or co-authored across all organisers.
+    - `getAttendance(string $email, ?string $organiserSlug = null)`: session attendance and dwell time records.
+    - Landlord bypass (`withoutGlobalScopes()`) and banned tenant exclusions (`TenantStatusEnum::BANNED`).
+- [x] **4.2 Endpoints in PlatformAttendeeAccessController**:
+  - `GET /my/events`
+  - `GET /my/certificates`
+  - `GET /my/abstracts`
+  - `GET /my/attendance`
+- [x] **4.3 Feature Tests**:
+  - `tests/Feature/Events/PlatformAttendeeHistoryTest.php`: multi-tenant aggregation, lifecycle categorization, transfer actions, auth gate rejection.
+
+### Stage 5: Central Event Workspace & Checkout Grant
+- [ ] **5.1 Checkout Grant & Return Handling**:
+  - Paystack return handler generating a short-lived, signed or session-scoped `checkout_grant` (30-minute TTL) allowing immediate single-registration workspace view while webhook completes fulfillment.
+  - Endpoint `GET /my/events/{registration}/status` for bounded status polling (up to 30s) so UI transitions smoothly once payment confirms.
+- [ ] **5.2 Central Event Workspace Endpoint**:
+  - `GET /my/events/{registration}` in `PlatformAttendeeAccessController` (or dedicated `PlatformAttendeeWorkspaceController`):
+    - Authorize via verified platform attendee email matching registration email OR valid checkout grant.
+    - Pass complete event context (sessions, speakers, ticket details, seat assignment, released materials, forum, polls).
+    - Render `Public/Events/AttendeePortal/Workspace` (or integrated view).
+- [ ] **5.3 Ticket Download & Actions**:
+  - `GET /my/events/{registration}/ticket`: PDF ticket download using `TicketPdfService`.
+  - Registration transfer invitation action.
+- [ ] **5.4 Feature Tests**:
+  - Tests covering checkout grant authorization, polling, workspace data delivery, and access restrictions.
+
 ---
 
 ## Verification Plan

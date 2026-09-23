@@ -9,6 +9,7 @@ use App\Http\Requests\Attendee\PlatformConfirmAccessCodeRequest;
 use App\Http\Requests\Attendee\PlatformSendAccessCodeRequest;
 use App\Models\Tenant;
 use App\Services\Events\AttendeePortalRateLimiter;
+use App\Services\Events\PlatformAttendeeHistory;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Support\ContactMask;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ final class PlatformAttendeeAccessController extends Controller
     public function __construct(
         private readonly PlatformAttendeeVerification $verification,
         private readonly AttendeePortalRateLimiter $rateLimiter,
+        private readonly PlatformAttendeeHistory $history,
     ) {}
 
     public function page(Request $request): Response
@@ -28,8 +30,9 @@ final class PlatformAttendeeAccessController extends Controller
         $verifiedEmail = $this->verification->verifiedEmail($request->session());
 
         $organiser = null;
-        if ($request->filled('organiser')) {
-            $tenant = Tenant::query()->where('slug', (string) $request->input('organiser'))->first();
+        $organiserSlug = $request->filled('organiser') ? (string) $request->input('organiser') : null;
+        if ($organiserSlug !== null) {
+            $tenant = Tenant::query()->where('slug', $organiserSlug)->first();
             if ($tenant !== null) {
                 $organiser = [
                     'name' => $tenant->name,
@@ -38,9 +41,15 @@ final class PlatformAttendeeAccessController extends Controller
             }
         }
 
+        $history = null;
+        if ($verifiedEmail !== null) {
+            $history = $this->history->getHistory($verifiedEmail, $organiserSlug);
+        }
+
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
             'organiser' => $organiser,
             'verifiedEmail' => $verifiedEmail !== null ? ContactMask::email($verifiedEmail) : null,
+            'initialHistory' => $history,
         ]);
     }
 
@@ -120,5 +129,37 @@ final class PlatformAttendeeAccessController extends Controller
         return response()->json([
             'email' => ContactMask::email($email),
         ]);
+    }
+
+    public function events(Request $request): JsonResponse
+    {
+        $email = (string) $request->attributes->get('attendee_email');
+        $organiserSlug = $request->filled('organiser') ? (string) $request->input('organiser') : null;
+
+        return response()->json($this->history->getHistory($email, $organiserSlug));
+    }
+
+    public function certificates(Request $request): JsonResponse
+    {
+        $email = (string) $request->attributes->get('attendee_email');
+        $organiserSlug = $request->filled('organiser') ? (string) $request->input('organiser') : null;
+
+        return response()->json($this->history->getCertificates($email, $organiserSlug));
+    }
+
+    public function abstracts(Request $request): JsonResponse
+    {
+        $email = (string) $request->attributes->get('attendee_email');
+        $organiserSlug = $request->filled('organiser') ? (string) $request->input('organiser') : null;
+
+        return response()->json($this->history->getAbstracts($email, $organiserSlug));
+    }
+
+    public function attendance(Request $request): JsonResponse
+    {
+        $email = (string) $request->attributes->get('attendee_email');
+        $organiserSlug = $request->filled('organiser') ? (string) $request->input('organiser') : null;
+
+        return response()->json($this->history->getAttendance($email, $organiserSlug));
     }
 }

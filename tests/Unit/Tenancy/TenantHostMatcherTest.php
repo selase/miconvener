@@ -49,7 +49,6 @@ test('hosts without a canonical tenant label have no tenant slug', function (str
 test('an empty platform domain fails closed', function (): void {
     config(['session.domain' => null]);
 
-    expect($this->matcher->matches($this->tenant, 'acme.miconvener.test'))->toBeFalse();
     expect($this->matcher->matches($this->tenant, 'acme.miconvener.test'))->toBeFalse()
         ->and($this->matcher->isPlatformHost('miconvener.test'))->toBeFalse()
         ->and($this->matcher->isWwwHost('www.miconvener.test'))->toBeFalse();
