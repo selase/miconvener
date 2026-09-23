@@ -31,7 +31,21 @@ Route::prefix('my')->group(function (): void {
         Route::post('/transfer/confirm', [PlatformAttendeeWorkspaceController::class, 'confirmTransfer'])->middleware('throttle:public-registration')->name('attendee.my.events.transfer.confirm');
         Route::post('/agenda/{session}', [PlatformAttendeeWorkspaceController::class, 'addToAgenda'])->name('attendee.my.events.agenda.add');
         Route::delete('/agenda/{session}', [PlatformAttendeeWorkspaceController::class, 'removeFromAgenda'])->name('attendee.my.events.agenda.remove');
-        Route::post('/service-requests', [PlatformAttendeeWorkspaceController::class, 'storeServiceRequest'])->name('attendee.my.events.service-requests.store');
+        Route::get('/service-requests', [PlatformAttendeeWorkspaceController::class, 'serviceRequests'])->name('attendee.my.events.service-requests.index');
+        Route::post('/service-requests', [PlatformAttendeeWorkspaceController::class, 'storeServiceRequest'])->middleware('throttle:public-registration')->name('attendee.my.events.service-requests.store');
         Route::get('/materials/{material}/download', [PlatformAttendeeWorkspaceController::class, 'downloadMaterial'])->name('attendee.my.events.materials.download');
+
+        // Contextual Actions: Polls, Forum, Dynamic Forms
+        Route::get('/poll', [PlatformAttendeeWorkspaceController::class, 'poll'])->name('attendee.my.events.poll.show');
+        Route::post('/poll/{poll}/respond', [PlatformAttendeeWorkspaceController::class, 'respondPoll'])->middleware('throttle:public-registration')->name('attendee.my.events.poll.respond');
+
+        Route::get('/forum', [PlatformAttendeeWorkspaceController::class, 'forum'])->name('attendee.my.events.forum.index');
+        Route::post('/forum', [PlatformAttendeeWorkspaceController::class, 'storeForumThread'])->middleware('throttle:public-registration')->name('attendee.my.events.forum.store');
+        Route::post('/forum/{thread}/vote', [PlatformAttendeeWorkspaceController::class, 'voteForumThread'])->name('attendee.my.events.forum.vote');
+        Route::post('/forum/{thread}/unvote', [PlatformAttendeeWorkspaceController::class, 'unvoteForumThread'])->name('attendee.my.events.forum.unvote');
+
+        Route::get('/forms', [PlatformAttendeeWorkspaceController::class, 'forms'])->name('attendee.my.events.forms.index');
+        Route::get('/forms/{form}', [PlatformAttendeeWorkspaceController::class, 'showForm'])->name('attendee.my.events.forms.show');
+        Route::post('/forms/{form}', [PlatformAttendeeWorkspaceController::class, 'submitForm'])->middleware('throttle:public-registration')->name('attendee.my.events.forms.submit');
     });
 });

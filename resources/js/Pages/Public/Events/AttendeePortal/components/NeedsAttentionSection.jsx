@@ -59,11 +59,7 @@ export default function NeedsAttentionSection({ items }) {
                                     )}
                                 </div>
 
-                                {dateStr && (
-                                    <p className="text-xs text-ink-secondary">
-                                        {dateStr}
-                                    </p>
-                                )}
+                                {dateStr && <p className="text-xs text-ink-secondary">{dateStr}</p>}
 
                                 <p className="text-[13px] font-medium text-amber-900 dark:text-amber-200 pt-0.5">
                                     {item.reason}

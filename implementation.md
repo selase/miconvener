@@ -139,17 +139,37 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
 - [x] **7.5 Verification**:
   - Verified with `tests/Feature/Events/PlatformAttendeePwaTest.php` (2 passing tests, 11 assertions), 55 passing platform tests (329 assertions), 0 PHPStan errors, and clean Vite production build.
 
+### Stage 8: Contextual Actions (Polls, Q&A, Dynamic Forms, and Durable Service Requests)
+- [x] **8.1 Durable Service Requests**:
+  - `GET /my/events/{registration}/service-requests` endpoint in `PlatformAttendeeWorkspaceController` returning all service requests with status progression.
+  - Enhance `POST /my/events/{registration}/service-requests`: prevent duplicate active requests of the same type (`['open', 'acknowledged', 'in_progress']`), medical priority escalation, and return full progression.
+  - Update `GetHelpPanel.jsx`: load existing requests on mount, display live progression stepper (Open -> Acknowledged -> In Progress -> Resolved), urgent medical styling, duplicate prevention.
+- [x] **8.2 Contextual Live Polls & Quizzes**:
+  - `GET /my/events/{registration}/poll` and `POST /my/events/{registration}/poll/{poll}/respond` in `PlatformAttendeeWorkspaceController`.
+  - Derive stable opaque respondent token (`hash_hmac`) from registration ID and app key, preventing duplicate responses while keeping attendee identity private from organiser poll records.
+  - Create `PollPanel.jsx`: active question, options, quiz timer/countdown, real-time feedback, and score presentation.
+- [x] **8.3 Event Q&A / Forum**:
+  - `GET /my/events/{registration}/forum`, `POST /my/events/{registration}/forum`, `POST /my/events/{registration}/forum/{thread}/vote`, and `POST /my/events/{registration}/forum/{thread}/unvote`.
+  - Allow confirmed registered attendees of private events to access the forum.
+  - Create `ForumPanel.jsx`: questions list with upvote counts, "Ask a question" modal with anonymous toggle, and host reply highlighting.
+- [x] **8.4 Dynamic Forms & Surveys**:
+  - `GET /my/events/{registration}/forms`, `GET /my/events/{registration}/forms/{form}`, and `POST /my/events/{registration}/forms/{form}`.
+  - Automatic identity binding (`registration_id`, `email`, `name`) without requiring re-entry; enforce `requires_check_in` eligibility; sync dynamic participant stratification groups.
+  - Create `FormsPanel.jsx`: schema-driven form renderer and submission management.
+- [x] **8.5 Portal Navigation Integration**:
+  - Update `Portal.jsx` to dynamically render contextual tabs (`ticket`, `agenda`, `poll`, `forum`, `forms`, `help`, `downloads`), badge live polls, and support desktop & mobile navigation.
+- [x] **8.6 Verification**:
+  - Create `tests/Feature/Events/PlatformAttendeeContextualActionsTest.php` (10 passing tests, 54 assertions).
+  - Run Pint, PHPStan, and Vite build (clean build, 0 errors).
+
 ---
 
 ## Verification Plan
-1. **Automated Unit & Feature Tests**:
-   - `TenantHostMatcherTest.php`
-   - `PlatformAttendeePortalHostTest.php`
-   - `PlatformAttendeeAccessCodePruningTest.php`
-   - `PlatformAttendeeVerificationTest.php`
-   - `VerifyPrompt.test.jsx`
+1. **Automated Feature Tests**:
+   - `tests/Feature/Events/PlatformAttendeeContextualActionsTest.php`
 2. **Quality Gates**:
    - `vendor/bin/pint --dirty`
    - `vendor/bin/phpstan analyse --memory-limit=2G`
    - `npm run build`
+
 

@@ -203,6 +203,9 @@ final class Event extends Model
         return $this->hasMany(EventSeatAssignment::class);
     }
 
+    /**
+     * @return HasMany<EventForumThread, $this>
+     */
     public function forumThreads(): HasMany
     {
         return $this->hasMany(EventForumThread::class)->orderByDesc('is_pinned')->orderByDesc('created_at');
@@ -218,6 +221,9 @@ final class Event extends Model
         return $this->hasMany(EventBadgePrint::class);
     }
 
+    /**
+     * @return HasMany<EventPoll, $this>
+     */
     public function polls(): HasMany
     {
         return $this->hasMany(EventPoll::class)->orderByDesc('created_at');
@@ -291,11 +297,17 @@ final class Event extends Model
         return $this->hasMany(EventCertificate::class)->latest('issued_at');
     }
 
+    /**
+     * @return HasMany<EventDynamicForm, $this>
+     */
     public function dynamicForms(): HasMany
     {
         return $this->hasMany(EventDynamicForm::class)->latest('created_at');
     }
 
+    /**
+     * @return HasMany<EventParticipantGroup, $this>
+     */
     public function participantGroups(): HasMany
     {
         return $this->hasMany(EventParticipantGroup::class)->orderBy('name');

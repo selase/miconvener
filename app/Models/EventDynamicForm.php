@@ -12,6 +12,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+/**
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $event_id
+ * @property string $title
+ * @property string $slug
+ * @property string|null $description
+ * @property string $type
+ * @property bool $is_active
+ * @property bool $is_public
+ * @property bool $requires_check_in
+ * @property array<int, array<string, mixed>>|null $schema
+ * @property \Illuminate\Support\Carbon|null $starts_at
+ * @property \Illuminate\Support\Carbon|null $ends_at
+ * @property int|null $submission_limit
+ * @property-read Event $event
+ */
 final class EventDynamicForm extends Model
 {
     use BelongsToTenant;
@@ -92,6 +109,9 @@ final class EventDynamicForm extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return HasMany<EventDynamicFormSubmission, $this>
+     */
     public function submissions(): HasMany
     {
         return $this->hasMany(EventDynamicFormSubmission::class, 'form_id')->latest('submitted_at');

@@ -49,11 +49,17 @@ final class EventForumThread extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return HasMany<EventForumReply, $this>
+     */
     public function replies(): HasMany
     {
         return $this->hasMany(EventForumReply::class, 'thread_id')->orderBy('created_at');
     }
 
+    /**
+     * @return HasMany<EventForumVote, $this>
+     */
     public function votes(): HasMany
     {
         return $this->hasMany(EventForumVote::class, 'thread_id');

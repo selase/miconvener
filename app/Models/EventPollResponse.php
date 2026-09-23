@@ -10,6 +10,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string|null $option_id
+ * @property string|null $response_text
+ * @property bool|null $is_correct
+ * @property int $points_awarded
+ */
 final class EventPollResponse extends Model
 {
     use BelongsToTenant;

@@ -10,6 +10,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property array<string, mixed>|null $answers
+ * @property \Carbon\CarbonImmutable|null $submitted_at
+ */
 final class EventDynamicFormSubmission extends Model
 {
     use BelongsToTenant;

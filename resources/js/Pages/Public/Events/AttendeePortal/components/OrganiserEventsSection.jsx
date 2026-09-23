@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { ArrowRight, Building, Calendar, ChevronDown, ChevronUp, Download, MapPin, Ticket, X } from 'lucide-react';
+import {
+    ArrowRight,
+    Building,
+    Calendar,
+    ChevronDown,
+    ChevronUp,
+    Download,
+    MapPin,
+    Ticket,
+    X,
+} from 'lucide-react';
 
 function formatEventDates(startsAt, endsAt) {
     if (!startsAt) return null;
@@ -88,7 +98,8 @@ export default function OrganiserEventsSection({
                     <div className="flex items-center gap-2 text-xs text-ink">
                         <Building className="h-3.5 w-3.5 text-ink-secondary" />
                         <span>
-                            Filtered to events by <strong className="font-semibold">{selectedOrganiser.name}</strong>
+                            Filtered to events by{' '}
+                            <strong className="font-semibold">{selectedOrganiser.name}</strong>
                         </span>
                     </div>
                     {onClearFilter && (
@@ -129,7 +140,8 @@ export default function OrganiserEventsSection({
                                 {org.name}
                             </h2>
                             <span className="text-xs text-ink-secondary">
-                                {upcoming.length} upcoming{past.length > 0 ? ` · ${past.length} past` : ''}
+                                {upcoming.length} upcoming
+                                {past.length > 0 ? ` · ${past.length} past` : ''}
                             </span>
                         </div>
 
@@ -175,7 +187,9 @@ export default function OrganiserEventsSection({
                                                     <div className="flex flex-wrap items-center gap-2 pt-0.5">
                                                         <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-subtle px-2 py-0.5 text-xs text-ink">
                                                             <Ticket className="h-3 w-3 text-ink-secondary" />
-                                                            <span>{item.ticket?.type ?? 'Admission'}</span>
+                                                            <span>
+                                                                {item.ticket?.type ?? 'Admission'}
+                                                            </span>
                                                             <span className="font-mono text-ink-secondary text-[11px]">
                                                                 #{item.ticket?.code}
                                                             </span>
@@ -190,7 +204,8 @@ export default function OrganiserEventsSection({
                                                         {materialsCount > 0 && (
                                                             <span className="inline-flex items-center gap-1 text-xs text-ink-secondary">
                                                                 <Download className="h-3 w-3" />
-                                                                {materialsCount} material{materialsCount > 1 ? 's' : ''}
+                                                                {materialsCount} material
+                                                                {materialsCount > 1 ? 's' : ''}
                                                             </span>
                                                         )}
                                                     </div>

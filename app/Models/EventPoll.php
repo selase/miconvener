@@ -56,11 +56,17 @@ final class EventPoll extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return HasMany<EventPollOption, $this>
+     */
     public function options(): HasMany
     {
         return $this->hasMany(EventPollOption::class, 'poll_id')->orderBy('sort_order');
     }
 
+    /**
+     * @return HasMany<EventPollResponse, $this>
+     */
     public function responses(): HasMany
     {
         return $this->hasMany(EventPollResponse::class, 'poll_id');

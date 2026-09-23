@@ -1,4 +1,12 @@
-import { ArrowRight, Building, Calendar, CheckCircle2, HelpCircle, MapPin, Ticket } from 'lucide-react';
+import {
+    ArrowRight,
+    Building,
+    Calendar,
+    CheckCircle2,
+    HelpCircle,
+    MapPin,
+    Ticket,
+} from 'lucide-react';
 
 function formatEventDates(startsAt, endsAt) {
     if (!startsAt) return null;
@@ -91,7 +99,9 @@ export default function LiveNowSection({ items }) {
                                     <div className="flex flex-wrap items-center gap-2 pt-1">
                                         <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-subtle px-2.5 py-1 text-xs text-ink">
                                             <Ticket className="h-3.5 w-3.5 text-ink-secondary" />
-                                            <span className="font-medium">{item.ticket?.type ?? 'Admission'}</span>
+                                            <span className="font-medium">
+                                                {item.ticket?.type ?? 'Admission'}
+                                            </span>
                                             <span className="font-mono text-ink-secondary text-[11px]">
                                                 #{item.ticket?.code}
                                             </span>
@@ -99,7 +109,10 @@ export default function LiveNowSection({ items }) {
 
                                         {item.ticket?.seat && (
                                             <span className="rounded-lg border border-border bg-surface-subtle px-2.5 py-1 text-xs text-ink">
-                                                Seat: <span className="font-medium">{item.ticket.seat}</span>
+                                                Seat:{' '}
+                                                <span className="font-medium">
+                                                    {item.ticket.seat}
+                                                </span>
                                             </span>
                                         )}
                                     </div>

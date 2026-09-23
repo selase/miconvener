@@ -3,13 +3,16 @@ import { Head, Link, router } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import {
     ArrowLeft,
+    BarChart2,
     Calendar,
     CheckCircle2,
     Clock,
     Download,
+    FileText,
     HelpCircle,
     ListOrdered,
     Loader2,
+    MessageSquare,
     MoreHorizontal,
     RefreshCw,
     Ticket,
@@ -20,6 +23,9 @@ import MyTicketPanel from './panels/MyTicketPanel';
 import MyDayPanel from './panels/MyDayPanel';
 import GetHelpPanel from './panels/GetHelpPanel';
 import DownloadsPanel from './panels/DownloadsPanel';
+import PollPanel from './panels/PollPanel';
+import ForumPanel from './panels/ForumPanel';
+import FormsPanel from './panels/FormsPanel';
 import { getOfflineTicket, purgeExpiredOfflineTickets } from '@/lib/offlineTicketStore';
 import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
 
@@ -72,6 +78,10 @@ export default function Portal({
     materials = [],
     canRequestHelp = false,
     poll_payment = false,
+    has_live_poll = false,
+    has_forum = false,
+    has_forms = false,
+    active_service_requests_count = 0,
 }) {
     const [currentRegistration, setCurrentRegistration] = useState(registration);
     const [isPolling, setIsPolling] = useState(
@@ -140,18 +150,33 @@ export default function Portal({
     const [tab, setTab] = useState('ticket');
     const [agendaIds, setAgendaIds] = useState(currentRegistration.agenda_session_ids ?? []);
 
-    // Nothing on these tabs is usable until the ticket exists, and it does not
-    // exist until the address behind a free registration has been confirmed.
     const verified = currentRegistration.email_verified !== false;
+
+    // Contextual Tabs
+    const contextualTabs = [];
+    if (verified && has_live_poll) contextualTabs.push(['poll', 'Live poll', BarChart2]);
+    if (verified && has_forum) contextualTabs.push(['forum', 'Q&A', MessageSquare]);
+    if (verified && has_forms) contextualTabs.push(['forms', 'Feedback', FileText]);
+    if (verified && canRequestHelp) contextualTabs.push(['help', 'Get help', HelpCircle]);
+    if (verified && materials.length > 0) contextualTabs.push(['downloads', `Downloads (${materials.length})`, Download]);
+
+    const isContextualTab = ['poll', 'forum', 'forms', 'help', 'downloads'].includes(tab);
+
     const desktopTabs = verified ? [['ticket', 'My ticket', Ticket]] : [];
     if (verified && event.sessions?.length > 0) desktopTabs.push(['agenda', 'My day', Calendar]);
-    if (verified && canRequestHelp) desktopTabs.push(['help', 'Get help', HelpCircle]);
-    if (verified && materials.length > 0) desktopTabs.push(['downloads', 'Downloads', Download]);
+    desktopTabs.push(...contextualTabs);
 
     const restartPolling = () => {
         pollAttempts.current = 0;
         setPollingDelayed(false);
         setIsPolling(true);
+    };
+
+    const handleSelectMoreTab = () => {
+        if (isContextualTab) return;
+        if (contextualTabs.length > 0) {
+            setTab(contextualTabs[0][0]);
+        }
     };
 
     return (
@@ -271,47 +296,49 @@ export default function Portal({
                                     key={key}
                                     type="button"
                                     onClick={() => setTab(key)}
-                                    className={`-mb-px flex items-center gap-1.5 border-b px-3.5 py-2.5 text-[13px] font-medium min-h-[44px] cursor-pointer ${
+                                    className={`-mb-px flex items-center gap-1.5 border-b px-3.5 py-2.5 text-[13px] font-medium min-h-[44px] cursor-pointer transition-colors ${
                                         tab === key
-                                            ? 'border-accent text-accent'
+                                            ? 'border-accent text-accent font-semibold'
                                             : 'border-transparent text-ink-secondary hover:text-ink'
                                     }`}
                                 >
                                     {Icon && <Icon className="h-3.5 w-3.5" />}
                                     <span>{label}</span>
+                                    {key === 'poll' && (
+                                        <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                                    )}
+                                    {key === 'help' && active_service_requests_count > 0 && (
+                                        <span className="rounded-full bg-red-500 px-1.5 py-0.2 text-[10px] text-white">
+                                            {active_service_requests_count}
+                                        </span>
+                                    )}
                                 </button>
                             ))}
                         </nav>
 
-                        {/* Mobile "More" sub-nav header when help or downloads is active */}
-                        {(tab === 'help' || tab === 'downloads') && (
-                            <div className="mt-6 mb-6 flex justify-center gap-2 border-b border-border pb-3 md:hidden">
-                                {canRequestHelp && (
+                        {/* Mobile "More" contextual sub-nav header (< 768px) */}
+                        {isContextualTab && contextualTabs.length > 0 && (
+                            <div className="mt-6 mb-6 flex flex-wrap justify-center gap-2 border-b border-border pb-3 md:hidden">
+                                {contextualTabs.map(([key, label, Icon]) => (
                                     <button
+                                        key={key}
                                         type="button"
-                                        onClick={() => setTab('help')}
-                                        className={`rounded-lg px-3.5 py-2 text-xs font-medium min-h-[44px] ${
-                                            tab === 'help'
-                                                ? 'bg-accent text-white'
-                                                : 'bg-surface-subtle text-ink-secondary'
+                                        onClick={() => setTab(key)}
+                                        className={`rounded-lg px-3 py-1.5 text-xs font-medium min-h-[44px] flex items-center gap-1.5 cursor-pointer ${
+                                            tab === key
+                                                ? 'bg-accent text-white font-semibold'
+                                                : 'bg-surface-subtle text-ink-secondary hover:text-ink'
                                         }`}
                                     >
-                                        Get help
+                                        {Icon && <Icon className="h-3.5 w-3.5" />}
+                                        <span>{label}</span>
+                                        {key === 'help' && active_service_requests_count > 0 && (
+                                            <span className="rounded-full bg-red-500 px-1.5 py-0.2 text-[10px] text-white">
+                                                {active_service_requests_count}
+                                            </span>
+                                        )}
                                     </button>
-                                )}
-                                {materials.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setTab('downloads')}
-                                        className={`rounded-lg px-3.5 py-2 text-xs font-medium min-h-[44px] ${
-                                            tab === 'downloads'
-                                                ? 'bg-accent text-white'
-                                                : 'bg-surface-subtle text-ink-secondary'
-                                        }`}
-                                    >
-                                        Downloads ({materials.length})
-                                    </button>
-                                )}
+                                ))}
                             </div>
                         )}
 
@@ -331,8 +358,21 @@ export default function Portal({
                                 setAgendaIds={setAgendaIds}
                             />
                         )}
+                        {tab === 'poll' && (
+                            <PollPanel registration={registration} isOnline={isOnline} />
+                        )}
+                        {tab === 'forum' && (
+                            <ForumPanel registration={registration} isOnline={isOnline} />
+                        )}
+                        {tab === 'forms' && (
+                            <FormsPanel registration={registration} isOnline={isOnline} />
+                        )}
                         {tab === 'help' && (
-                            <GetHelpPanel event={event} registration={registration} />
+                            <GetHelpPanel
+                                event={event}
+                                registration={registration}
+                                isOnline={isOnline}
+                            />
                         )}
                         {tab === 'downloads' && <DownloadsPanel materials={materials} />}
 
@@ -376,22 +416,19 @@ export default function Portal({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            setTab(
-                                                tab === 'help' || tab === 'downloads'
-                                                    ? tab
-                                                    : canRequestHelp
-                                                      ? 'help'
-                                                      : 'downloads'
-                                            )
-                                        }
-                                        className={`flex flex-col items-center justify-center gap-1 text-[11px] min-h-[44px] cursor-pointer ${
-                                            tab === 'help' || tab === 'downloads'
+                                        onClick={handleSelectMoreTab}
+                                        className={`relative flex flex-col items-center justify-center gap-1 text-[11px] min-h-[44px] cursor-pointer ${
+                                            isContextualTab
                                                 ? 'text-accent font-semibold'
                                                 : 'text-ink-secondary hover:text-ink'
                                         }`}
                                     >
-                                        <MoreHorizontal className="h-4 w-4" />
+                                        <div className="relative">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                            {(has_live_poll || active_service_requests_count > 0) && (
+                                                <span className="absolute -top-1 -right-1.5 h-2 w-2 rounded-full bg-accent animate-pulse" />
+                                            )}
+                                        </div>
                                         <span>More</span>
                                     </button>
                                 </div>
