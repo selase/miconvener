@@ -42,6 +42,7 @@ final class Kernel extends ConsoleKernel
         $schedule->command('usage:process-rollups --period=hour')->hourly();
         $schedule->command('usage:process-rollups --period=day')->daily();
         $schedule->command('usage:prune')->dailyAt('04:00');
+        $schedule->command('model:prune', ['--model' => [\App\Models\PlatformAttendeeAccessCode::class]])->dailyAt('04:00');
         $schedule->command('usage:check-alerts')->dailyAt('09:00'); // Check limits daily
         $schedule->command('tenants:reset-usage --feature=event_registrations')->monthlyOn(1, '00:05');
         $schedule->command('tenants:reset-usage --feature=email_credits')->monthlyOn(1, '00:10');

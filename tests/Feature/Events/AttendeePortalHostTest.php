@@ -16,18 +16,7 @@ use App\Services\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 
-/**
- * Which organiser a request belongs to decides whose attendee history it can
- * see, so on the portal that answer may come only from the address bar.
- *
- * Tenant resolution has five sources. Two are the host -- a verified custom
- * domain, and the subdomain. The others are the session, an X-Tenant header
- * the caller sends, and a route parameter. The subdomain routes match any
- * label, including reserved ones like www, so www.<domain>/my reaches these
- * routes with no tenant in the host and falls through to whatever the caller
- * supplied.
- */
-beforeEach(function () {
+beforeEach(function (): void {
     refreshTenantDatabases();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
@@ -39,7 +28,7 @@ function baseDomain(): string
     return mb_ltrim((string) config('session.domain'), '.');
 }
 
-test('the portal redirects when the organiser is named in the host', function () {
+test('the portal redirects when the organiser is named in the host', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'host-ok', 'isolation_mode' => 'shared']);
     $host = 'host-ok.'.baseDomain();
 
@@ -61,7 +50,7 @@ test('dns-equivalent host spelling reaches the tenant portal redirect', function
     'one terminal dot' => 'terminal-dot',
 ]);
 
-test('a header cannot name the organiser on a rejected host', function () {
+test('a header cannot name the organiser on a rejected host', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'header-victim', 'isolation_mode' => 'shared']);
     $host = 'rejected.external.test';
 
@@ -115,7 +104,7 @@ test('a rejected host answers before tenant usage enforcement', function (): voi
         ->assertNotFound();
 });
 
-test('a session cannot name the organiser on a rejected host', function () {
+test('a session cannot name the organiser on a rejected host', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'session-victim', 'isolation_mode' => 'shared']);
     $host = 'rejected.external.test';
 
@@ -124,7 +113,7 @@ test('a session cannot name the organiser on a rejected host', function () {
         ->assertNotFound();
 });
 
-test('a proof already held is not honoured through a header', function () {
+test('a proof already held is not honoured through a header', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'proof-victim', 'isolation_mode' => 'shared']);
     $host = 'www.'.baseDomain();
 
@@ -139,7 +128,7 @@ test('a proof already held is not honoured through a header', function () {
         ->assertNotFound();
 });
 
-test('no code is sent for an organiser only a header names', function () {
+test('no code is sent for an organiser only a header names', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'code-victim', 'isolation_mode' => 'shared']);
     $host = 'www.'.baseDomain();
 

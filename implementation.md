@@ -28,10 +28,10 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
   - Create `tests/Feature/Events/PlatformAttendeePortalHostTest.php` verifying base domain access, `www` redirect, tenant subdomain redirect with `?organiser=`, 404 on invalid hosts, and total isolation from session `active_tenant_id` / `X-Tenant`.
 
 ### Stage 2: Platform Access Codes & Multi-Tier Verification Infrastructure
-- [ ] **2.1 Landlord Migration & Model**:
+- [x] **2.1 Landlord Migration & Model**:
   - Create migration for `platform_attendee_access_codes` table (`id` uuid pk, `email_normalized`, `code_hash`, `attempts`, `expires_at`, `consumed_at`, timestamps, composite index `(email_normalized, consumed_at, created_at)`).
   - Create model `App\Models\PlatformAttendeeAccessCode` with `MassPrunable`.
-- [ ] **2.2 Rate Limiting & Turnstile Service**:
+- [x] **2.2 Rate Limiting & Turnstile Service**:
   - Implement `App\Services\Events\AttendeePortalRateLimiter` managing:
     - Email cooldown: 1 per 60s
     - Email hourly: 5 per hr
@@ -40,7 +40,7 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
     - IP daily: 100 per 24h
     - Confirm attempts: 10 per email / 10min, 60 per IP / 10min
   - Add Turnstile verification via Laravel HTTP client.
-- [ ] **2.3 Verification Service & Mailable**:
+- [x] **2.3 Verification Service & Mailable**:
   - Create `App\Mail\Events\PlatformAttendeeAccessCodeMail` (transactional, platform-branded "Your MiConvener sign-in code", zero tenant credits metered).
   - Create `App\Jobs\Events\SendPlatformAttendeeAccessCode`.
   - Create `App\Services\Events\PlatformAttendeeVerification`:
@@ -48,10 +48,10 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
     - Cached BCrypt dummy hash matching hashing rounds to guarantee constant-time checks.
     - Atomic attempt increment and atomic consumption.
     - Confirmation stores `attendee_verified_platform` session marker (12-hour duration) and rotates session ID.
-- [ ] **2.4 Middleware & Pruning Schedule**:
+- [x] **2.4 Middleware & Pruning Schedule**:
   - Create `App\Http\Middleware\EnsurePlatformAttendeeVerified` reading `attendee_verified_platform`.
   - Register daily prune for `PlatformAttendeeAccessCode` at 04:00 in `app/Console/Kernel.php`.
-- [ ] **2.5 Feature & Unit Tests**:
+- [x] **2.5 Feature & Unit Tests**:
   - Test pruning in `tests/Feature/Events/PlatformAttendeeAccessCodePruningTest.php`.
   - Test verification lifecycle, timing invariance, rate limiting, and Turnstile challenge in `tests/Feature/Events/PlatformAttendeeVerificationTest.php`.
 

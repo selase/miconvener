@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    /*
+    |--------------------------------------------------------------------------
+    | Cloudflare Turnstile Settings
+    |--------------------------------------------------------------------------
+    |
+    | Used to verify human presence when anonymous send volume exceeds
+    | the burst challenge threshold from a single IP.
+    |
+    */
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY', ''),
+        'secret_key' => env('TURNSTILE_SECRET_KEY', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Abuse Control Limits
+    |--------------------------------------------------------------------------
+    |
+    | Limits protecting mailbox delivery and preventing enumeration/spraying.
+    |
+    */
+    'rate_limits' => [
+        'email_cooldown_seconds' => (int) env('ATTENDEE_PORTAL_EMAIL_COOLDOWN_SECONDS', 60),
+        'email_hourly' => (int) env('ATTENDEE_PORTAL_EMAIL_HOURLY', 5),
+        'email_daily' => (int) env('ATTENDEE_PORTAL_EMAIL_DAILY', 10),
+        'ip_burst' => (int) env('ATTENDEE_PORTAL_IP_BURST', 20),
+        'ip_burst_window_seconds' => (int) env('ATTENDEE_PORTAL_IP_BURST_WINDOW_SECONDS', 600),
+        'ip_challenge_threshold' => (int) env('ATTENDEE_PORTAL_IP_CHALLENGE_THRESHOLD', 5),
+        'ip_daily' => (int) env('ATTENDEE_PORTAL_IP_DAILY', 100),
+        'confirm_email_limit' => (int) env('ATTENDEE_PORTAL_CONFIRM_EMAIL_LIMIT', 10),
+        'confirm_email_window_seconds' => (int) env('ATTENDEE_PORTAL_CONFIRM_EMAIL_WINDOW_SECONDS', 600),
+        'confirm_ip_limit' => (int) env('ATTENDEE_PORTAL_CONFIRM_IP_LIMIT', 60),
+        'confirm_ip_window_seconds' => (int) env('ATTENDEE_PORTAL_CONFIRM_IP_WINDOW_SECONDS', 600),
+    ],
+];
