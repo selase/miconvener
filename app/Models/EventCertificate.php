@@ -11,6 +11,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
+/**
+ * @property \Carbon\CarbonImmutable|null $issued_at
+ * @property Event|null $event
+ * @property EventRegistration|null $registration
+ * @property Tenant|null $tenant
+ */
 final class EventCertificate extends Model
 {
     use BelongsToTenant;
@@ -40,21 +46,33 @@ final class EventCertificate extends Model
         return url('/verify/cert/'.$this->uuid);
     }
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<EventRegistration, $this>
+     */
     public function registration(): BelongsTo
     {
         return $this->belongsTo(EventRegistration::class, 'registration_id');
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    /**
+     * @return BelongsTo<EventCertificateTemplate, $this>
+     */
     public function template(): BelongsTo
     {
         return $this->belongsTo(EventCertificateTemplate::class, 'template_id');

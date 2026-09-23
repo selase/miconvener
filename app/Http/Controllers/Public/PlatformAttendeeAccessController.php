@@ -162,4 +162,33 @@ final class PlatformAttendeeAccessController extends Controller
 
         return response()->json($this->history->getAttendance($email, $organiserSlug));
     }
+
+    public function manifest(): JsonResponse
+    {
+        return response()->json([
+            'name' => 'MiConvener Attendee Portal',
+            'short_name' => 'My Events',
+            'description' => 'Your tickets, materials, and agendas across all MiConvener events',
+            'start_url' => '/my',
+            'scope' => '/my/',
+            'display' => 'standalone',
+            'background_color' => '#ffffff',
+            'theme_color' => '#4f46e5',
+            'icons' => [
+                [
+                    'src' => '/assets/img/brand/mark-180.png',
+                    'sizes' => '180x180',
+                    'type' => 'image/png',
+                ],
+                [
+                    'src' => '/assets/img/brand/mark-512.png',
+                    'sizes' => '512x512',
+                    'type' => 'image/png',
+                ],
+            ],
+        ], 200, [
+            'Content-Type' => 'application/manifest+json',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
 }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Download } from 'lucide-react';
+import { AlertCircle, Check, Download, Smartphone, Trash2, WifiOff } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
+import { getOfflineTicket, removeOfflineTicket, saveOfflineTicket } from '@/lib/offlineTicketStore';
 
-export default function MyTicketPanel({ event, registration }) {
+export default function MyTicketPanel({ event, registration, isOnline = true }) {
     const [transferring, setTransferring] = useState(false);
     // 'details' collects who it goes to; 'code' confirms it from the current
     // holder's inbox. The ticket does not move until the second step.
@@ -12,8 +13,25 @@ export default function MyTicketPanel({ event, registration }) {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
     const [error, setError] = useState(null);
+    const [savedOffline, setSavedOffline] = useState(Boolean(getOfflineTicket(registration.id)));
+    const [showOfflineModal, setShowOfflineModal] = useState(false);
 
-    const canTransfer = registration.status !== 'checked_in';
+    const canTransfer = registration.status !== 'checked_in' && isOnline;
+
+    const handleSaveOffline = () => {
+        const snapshot = saveOfflineTicket(registration, event);
+        if (snapshot) {
+            setSavedOffline(true);
+            setShowOfflineModal(false);
+            setMessage('Ticket saved to this device for offline access.');
+        }
+    };
+
+    const handleRemoveOffline = () => {
+        removeOfflineTicket(registration.id);
+        setSavedOffline(false);
+        setMessage('Offline ticket copy removed from this device.');
+    };
 
     const post = async (actionPath, legacyRouteName, body) => {
         const isPlatform = typeof window !== 'undefined' && window.location.pathname.startsWith('/my/events');
@@ -98,7 +116,7 @@ export default function MyTicketPanel({ event, registration }) {
                     ))}
                 </dl>
 
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                     <a
                         href={`/my/events/${registration.id}/ticket`}
                         className="inline-flex h-control items-center gap-1.5 border border-border px-4 text-sm text-ink hover:border-accent"
@@ -106,15 +124,88 @@ export default function MyTicketPanel({ event, registration }) {
                         <Download className="h-4 w-4" />
                         Download PDF
                     </a>
-                    {canTransfer && (
+
+                    {savedOffline ? (
+                        <div className="inline-flex h-control items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            <span className="inline-flex items-center gap-1">
+                                <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                Saved offline
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleRemoveOffline}
+                                className="text-emerald-700 underline hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 cursor-pointer"
+                                title="Remove offline snapshot from this browser"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setShowOfflineModal(true)}
+                            className="inline-flex h-control items-center gap-1.5 border border-border px-4 text-sm text-ink hover:border-accent cursor-pointer"
+                        >
+                            <Smartphone className="h-4 w-4" />
+                            Save ticket offline
+                        </button>
+                    )}
+
+                    {canTransfer ? (
                         <button
                             onClick={() => setTransferring(!transferring)}
-                            className="inline-flex h-control items-center border border-border px-4 text-sm text-ink hover:border-accent"
+                            className="inline-flex h-control items-center border border-border px-4 text-sm text-ink hover:border-accent cursor-pointer"
                         >
                             Transfer
                         </button>
-                    )}
+                    ) : !isOnline && registration.status !== 'checked_in' ? (
+                        <span
+                            className="inline-flex h-control items-center gap-1 border border-border/60 bg-surface-subtle px-3 text-xs text-ink-secondary cursor-not-allowed"
+                            title="Internet connection required to transfer this ticket"
+                        >
+                            <WifiOff className="h-3.5 w-3.5" />
+                            Transfer (offline)
+                        </span>
+                    ) : null}
                 </div>
+
+                {showOfflineModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl space-y-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                                <div>
+                                    <h3 className="text-sm font-semibold text-ink">
+                                        Save ticket to this device?
+                                    </h3>
+                                    <p className="mt-1.5 text-xs text-ink-secondary leading-relaxed">
+                                        This stores your ticket and QR code directly in this browser so you can view it even without an internet connection at the venue.
+                                    </p>
+                                    <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+                                        Do not save on shared or public computers. Anyone who opens this browser can see your ticket.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowOfflineModal(false)}
+                                    className="rounded-lg border border-border px-3.5 py-2 text-xs font-medium text-ink hover:bg-surface-subtle cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveOffline}
+                                    className="rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white hover:opacity-90 cursor-pointer"
+                                >
+                                    Save offline copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {message && <p className="mt-3 text-[13px] text-ink-secondary">{message}</p>}
                 {error && <p className="mt-3 text-[13px] text-danger-fg">{error}</p>}

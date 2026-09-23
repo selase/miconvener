@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import csrfFetch from '@/lib/csrfFetch';
 import VerifyPrompt from './VerifyPrompt';
@@ -8,6 +8,8 @@ import LiveNowSection from './components/LiveNowSection';
 import OrganiserEventsSection from './components/OrganiserEventsSection';
 import HistorySkeleton from './components/HistorySkeleton';
 import { AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
+import { clearAllOfflineTickets, purgeExpiredOfflineTickets } from '@/lib/offlineTicketStore';
+import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
 
 /**
  * Platform attendee portal shell: proves identity across all organisers
@@ -24,6 +26,11 @@ export default function MyPortal({
     const [error, setError] = useState(null);
     const [selectedOrganiser, setSelectedOrganiser] = useState(organiser);
     const [signOutError, setSignOutError] = useState(false);
+
+    useEffect(() => {
+        registerAttendeeServiceWorker();
+        purgeExpiredOfflineTickets();
+    }, []);
 
     const signOutRoute = window.route ? route('attendee.my.verify.forget') : '/my/verify/forget';
     const eventsRoute = window.route ? route('attendee.my.events') : '/my/events';
@@ -97,6 +104,7 @@ export default function MyPortal({
                 setSignOutError(true);
                 return;
             }
+            clearAllOfflineTickets();
             setSignOutError(false);
             setVerifiedEmail(null);
             setHistory(null);
@@ -116,6 +124,13 @@ export default function MyPortal({
 
     return (
         <PublicLayout>
+            <Head>
+                <link rel="manifest" href="/my/manifest.json" />
+                <meta name="theme-color" content="#4f46e5" />
+                <meta name="apple-mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+            </Head>
+
             <div className="mx-auto max-w-2xl px-6 py-16 sm:px-10">
                 <div className="space-y-1 mb-8">
                     <h1 className="text-2xl font-normal tracking-tight text-ink">

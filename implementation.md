@@ -128,17 +128,16 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
   - Feature tests in `tests/Feature/Events/PlatformAttendeeDashboardTest.php` (3 tests, 54 assertions), clean production build via `npm run build` (2.38s), and 0 PHPStan errors.
 
 ### Stage 7: Responsive Navigation & Offline PWA
-- [ ] **7.1 Web App Manifest**:
-  - App manifest scoped to `/my/` (`public/attendee-manifest.json` or dynamic route) with appropriate icons and standalone display.
-- [ ] **7.2 Service Worker Shell Precaching**:
-  - Service worker script precaching the `/my` shell and critical offline assets.
-- [ ] **7.3 Offline Ticket Snapshot**:
-  - Opt-in "Save ticket offline" snapshot stored in browser IndexedDB / localStorage.
-  - Automatic expiry 7 days post-event.
-- [ ] **7.4 Responsive Navigation**:
-  - Sticky bottom tab bar on mobile / top bar on desktop: Overview / Ticket / My Day / More.
-- [ ] **7.5 Verification**:
-  - Automated tests and browser verification.
+- [x] **7.1 Web App Manifest**:
+  - App manifest scoped to `/my/` via `GET /my/manifest.json` and `PlatformAttendeeAccessController::manifest()` with standalone display and `/my/` start URL.
+- [x] **7.2 Service Worker Shell Precaching**:
+  - Service worker `public/attendee-sw.js` and `resources/js/lib/registerServiceWorker.js` precaching shell and branding assets, fetch handler strictly scoped to `/my*`, never caching authenticated API responses in HTTP cache.
+- [x] **7.3 Offline Ticket Snapshot**:
+  - Opt-in "Save ticket offline" snapshot stored in browser `localStorage` (`resources/js/lib/offlineTicketStore.js`), 7-day post-event expiry (or 30-day confirmation expiry), explicit omission of sensitive attendee fields (email, phone, certificates, notes), and automatic cleanup on sign-out via `clearAllOfflineTickets()`.
+- [x] **7.4 Responsive Navigation**:
+  - Safe-area-aware sticky bottom navigation on mobile (<768px) with 44px touch targets (`Overview`, `Ticket`, `My day`, `More`), desktop header navigation (>=768px), offline banner, and "Saved offline" pill with modal confirmation.
+- [x] **7.5 Verification**:
+  - Verified with `tests/Feature/Events/PlatformAttendeePwaTest.php` (2 passing tests, 11 assertions), 55 passing platform tests (329 assertions), 0 PHPStan errors, and clean Vite production build.
 
 ---
 

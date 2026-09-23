@@ -182,6 +182,9 @@ final class Event extends Model
         return $this->visibility === self::VISIBILITY_PRIVATE;
     }
 
+    /**
+     * @return HasMany<EventMaterial, $this>
+     */
     public function materials(): HasMany
     {
         return $this->hasMany(EventMaterial::class)->orderBy('created_at');

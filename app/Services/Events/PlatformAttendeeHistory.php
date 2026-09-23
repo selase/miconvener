@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Events;
 
 use App\Enum\TenantStatusEnum;
-use App\Models\EventAbstract;
+use App\Models\Event;
 use App\Models\EventAbstractAuthor;
 use App\Models\EventCertificate;
-use App\Models\EventMaterial;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationTransfer;
 use App\Models\EventSessionAttendance;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
 
 final class PlatformAttendeeHistory
@@ -82,8 +82,8 @@ final class PlatformAttendeeHistory
                     'event' => [
                         'name' => $reg->event->name,
                         'slug' => $reg->event->slug,
-                        'starts_at' => $reg->event->starts_at?->toIso8601String(),
-                        'ends_at' => $reg->event->ends_at?->toIso8601String(),
+                        'starts_at' => $reg->event->starts_at->toIso8601String(),
+                        'ends_at' => $reg->event->ends_at->toIso8601String(),
                     ],
                 ];
             }
@@ -114,13 +114,13 @@ final class PlatformAttendeeHistory
                     'event' => [
                         'name' => $event->name,
                         'slug' => $event->slug,
-                        'starts_at' => $event->starts_at?->toIso8601String(),
-                        'ends_at' => $event->ends_at?->toIso8601String(),
+                        'starts_at' => $event->starts_at->toIso8601String(),
+                        'ends_at' => $event->ends_at->toIso8601String(),
                     ],
                 ];
             }
 
-            $isLive = ($event->starts_at && $event->starts_at->isPast() && ($event->ends_at === null || $event->ends_at->isFuture()))
+            $isLive = ($event->starts_at->isPast() && $event->ends_at->isFuture())
                 || $reg->checked_in_at !== null
                 || $reg->status === EventRegistration::STATUS_CHECKED_IN;
 
@@ -132,8 +132,8 @@ final class PlatformAttendeeHistory
                     'event' => [
                         'name' => $event->name,
                         'slug' => $event->slug,
-                        'starts_at' => $event->starts_at?->toIso8601String(),
-                        'ends_at' => $event->ends_at?->toIso8601String(),
+                        'starts_at' => $event->starts_at->toIso8601String(),
+                        'ends_at' => $event->ends_at->toIso8601String(),
                         'location' => $event->address,
                         'format' => $event->location_type,
                     ],
@@ -146,7 +146,7 @@ final class PlatformAttendeeHistory
                         'code' => $reg->ticket_code ?? $reg->id,
                         'type' => $reg->ticketType?->name,
                         'status' => $reg->status,
-                        'seat' => $reg->seatAssignment?->seat_number,
+                        'seat' => $reg->seatAssignment?->seat_label,
                     ],
                     'available_actions' => $this->availableActionsFor($reg),
                 ];
@@ -168,8 +168,8 @@ final class PlatformAttendeeHistory
                 'event' => [
                     'name' => $event->name,
                     'slug' => $event->slug,
-                    'starts_at' => $event->starts_at?->toIso8601String(),
-                    'ends_at' => $event->ends_at?->toIso8601String(),
+                    'starts_at' => $event->starts_at->toIso8601String(),
+                    'ends_at' => $event->ends_at->toIso8601String(),
                     'location' => $event->address,
                     'format' => $event->location_type,
                 ],
@@ -178,13 +178,13 @@ final class PlatformAttendeeHistory
                     'code' => $reg->ticket_code ?? $reg->id,
                     'type' => $reg->ticketType?->name,
                     'status' => $reg->status,
-                    'seat' => $reg->seatAssignment?->seat_number,
+                    'seat' => $reg->seatAssignment?->seat_label,
                 ],
                 'available_actions' => $this->availableActionsFor($reg),
                 'released_materials' => $this->releasedMaterialsFor($reg),
             ];
 
-            $hasEnded = $event->ends_at !== null && $event->ends_at->isPast();
+            $hasEnded = $event->ends_at->isPast();
 
             if ($hasEnded) {
                 $organisersMap[$tenant->id]['past'][] = $entry;
@@ -194,23 +194,24 @@ final class PlatformAttendeeHistory
         }
 
         // Sort upcoming ascending (starts_at ASC, id ASC) and past descending (starts_at DESC, id DESC)
-        $organisers = array_values(array_map(function (array $org): array {
-            usort($org['upcoming'], function (array $a, array $b): int {
-                $timeA = $a['event']['starts_at'] ?? '';
-                $timeB = $b['event']['starts_at'] ?? '';
-
-                return $timeA <=> $timeB ?: strcmp($a['registration_id'], $b['registration_id']);
+        $organisers = [];
+        foreach ($organisersMap as $org) {
+            $upcoming = $org['upcoming'];
+            usort($upcoming, function (array $a, array $b): int {
+                return $a['event']['starts_at'] <=> $b['event']['starts_at']
+                    ?: strcmp($a['registration_id'], $b['registration_id']);
             });
+            $org['upcoming'] = $upcoming;
 
-            usort($org['past'], function (array $a, array $b): int {
-                $timeA = $a['event']['starts_at'] ?? '';
-                $timeB = $b['event']['starts_at'] ?? '';
-
-                return $timeB <=> $timeA ?: strcmp($b['registration_id'], $a['registration_id']);
+            $past = $org['past'];
+            usort($past, function (array $a, array $b): int {
+                return $b['event']['starts_at'] <=> $a['event']['starts_at']
+                    ?: strcmp($b['registration_id'], $a['registration_id']);
             });
+            $org['past'] = $past;
 
-            return $org;
-        }, $organisersMap));
+            $organisers[] = $org;
+        }
 
         return [
             'needs_attention' => $needsAttention,
@@ -228,10 +229,11 @@ final class PlatformAttendeeHistory
     {
         $email = PlatformAttendeeVerification::normalise($emailNormalized);
 
-        return EventCertificate::withoutGlobalScopes()
+        /** @var \Illuminate\Database\Eloquent\Collection<int, EventCertificate> $certificates */
+        $certificates = EventCertificate::withoutGlobalScopes()
             ->where(function (Builder $query) use ($email): void {
                 $query->whereRaw('lower(recipient_email) = ?', [$email])
-                    ->orWhereHas('registration', fn (Builder $r) => $r->withoutGlobalScopes()->forEmail($email));
+                    ->orWhereHas('registration', fn (Builder $r) => $r->withoutGlobalScopes()->whereRaw('lower(email) = ?', [$email]));
             })
             ->whereHas('tenant', fn (Builder $q) => $q->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
             ->when($organiserSlug !== null, fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $organiserSlug)))
@@ -240,22 +242,28 @@ final class PlatformAttendeeHistory
                 'tenant' => fn ($q) => $q->withoutGlobalScopes(),
             ])
             ->latest('issued_at')
-            ->get()
-            ->unique('uuid')
-            ->map(fn (EventCertificate $cert): array => [
+            ->get();
+
+        $results = [];
+        foreach ($certificates->unique('uuid') as $cert) {
+            $event = $cert->event;
+            $tenant = $cert->tenant;
+
+            $results[] = [
                 'id' => $cert->id,
                 'uuid' => $cert->uuid,
-                'event_name' => $cert->event?->name,
-                'organiser_name' => $cert->tenant?->name,
+                'event_name' => $event?->name,
+                'organiser_name' => $tenant?->name,
                 'recipient_name' => $cert->recipient_name,
                 'role' => $cert->role,
                 'cpd_hours' => $cert->cpd_hours,
                 'issued_at' => $cert->issued_at?->toIso8601String(),
                 'verification_url' => $cert->verificationUrl(),
                 'download_url' => url("/verify/cert/{$cert->uuid}/download"),
-            ])
-            ->values()
-            ->all();
+            ];
+        }
+
+        return $results;
     }
 
     /**
@@ -267,6 +275,7 @@ final class PlatformAttendeeHistory
     {
         $email = PlatformAttendeeVerification::normalise($emailNormalized);
 
+        /** @var \Illuminate\Database\Eloquent\Collection<int, EventAbstractAuthor> $authors */
         $authors = EventAbstractAuthor::withoutGlobalScopes()
             ->whereRaw('lower(email) = ?', [$email])
             ->whereHas('abstract', fn (Builder $q) => $q->withoutGlobalScopes()->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED)))
@@ -279,21 +288,24 @@ final class PlatformAttendeeHistory
             ])
             ->get();
 
-        return $authors->map(fn (EventAbstractAuthor $author) => $author->abstract)
-            ->filter()
-            ->unique('id')
-            ->map(fn (EventAbstract $abstract): array => [
-                'id' => $abstract->id,
-                'code' => $abstract->code,
-                'title' => $abstract->title,
-                'event_name' => $abstract->event?->name,
-                'organiser_name' => $abstract->tenant?->name,
-                'status' => $abstract->status,
-                'presentation_preference' => $abstract->presentation_preference,
-                'created_at' => $abstract->created_at?->toIso8601String(),
-            ])
-            ->values()
-            ->all();
+        $abstracts = [];
+        foreach ($authors as $author) {
+            $abstract = $author->abstract;
+            if ($abstract !== null && ! isset($abstracts[$abstract->id])) {
+                $abstracts[$abstract->id] = [
+                    'id' => $abstract->id,
+                    'code' => $abstract->code,
+                    'title' => $abstract->title,
+                    'event_name' => $abstract->event?->name,
+                    'organiser_name' => $abstract->tenant?->name,
+                    'status' => $abstract->status,
+                    'presentation_preference' => $abstract->presentation_preference,
+                    'created_at' => $abstract->created_at?->toIso8601String(),
+                ];
+            }
+        }
+
+        return array_values($abstracts);
     }
 
     /**
@@ -305,8 +317,9 @@ final class PlatformAttendeeHistory
     {
         $email = PlatformAttendeeVerification::normalise($emailNormalized);
 
-        return EventSessionAttendance::withoutGlobalScopes()
-            ->whereHas('registration', fn (Builder $r) => $r->withoutGlobalScopes()->forEmail($email))
+        /** @var \Illuminate\Database\Eloquent\Collection<int, EventSessionAttendance> $attendances */
+        $attendances = EventSessionAttendance::withoutGlobalScopes()
+            ->whereHas('registration', fn (Builder $r) => $r->withoutGlobalScopes()->whereRaw('lower(email) = ?', [$email]))
             ->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
             ->when($organiserSlug !== null, fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $organiserSlug)))
             ->with([
@@ -315,17 +328,21 @@ final class PlatformAttendeeHistory
                 'tenant' => fn ($t) => $t->withoutGlobalScopes(),
             ])
             ->latest('checked_in_at')
-            ->get()
-            ->map(fn (EventSessionAttendance $att): array => [
+            ->get();
+
+        $result = [];
+        foreach ($attendances as $att) {
+            $result[] = [
                 'id' => $att->id,
                 'session_title' => $att->session?->title,
                 'event_name' => $att->event?->name,
                 'organiser_name' => $att->tenant?->name,
-                'checked_in_at' => $att->checked_in_at?->toIso8601String(),
+                'checked_in_at' => $att->checked_in_at->toIso8601String(),
                 'checked_out_at' => $att->checked_out_at?->toIso8601String(),
-            ])
-            ->values()
-            ->all();
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -357,15 +374,18 @@ final class PlatformAttendeeHistory
             return [];
         }
 
-        return $registration->event->materials
-            ->filter(fn (EventMaterial $m) => $m->isReleased())
-            ->map(fn (EventMaterial $m) => [
-                'id' => $m->id,
-                'title' => $m->title,
-                'file_size' => $m->file_size,
-                'mime_type' => $m->mime_type,
-            ])
-            ->values()
-            ->all();
+        $materials = [];
+        foreach ($registration->event->materials as $m) {
+            if ($m->isReleased()) {
+                $materials[] = [
+                    'id' => $m->id,
+                    'title' => $m->title,
+                    'file_size' => $m->file_size,
+                    'mime_type' => $m->mime_type,
+                ];
+            }
+        }
+
+        return $materials;
     }
 }

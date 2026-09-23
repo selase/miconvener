@@ -15,6 +15,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use RuntimeException;
 
+/**
+ * @property Event|null $event
+ * @property Tenant|null $tenant
+ */
 final class EventAbstract extends Model
 {
     use BelongsToTenant;
@@ -102,6 +106,9 @@ final class EventAbstract extends Model
         throw new RuntimeException('Could not generate a unique abstract code after 10 attempts.');
     }
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);

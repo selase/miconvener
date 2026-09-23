@@ -11,6 +11,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property EventSession|null $session
+ * @property Event|null $event
+ * @property Tenant|null $tenant
+ * @property EventRegistration|null $registration
+ */
 final class EventSessionAttendance extends Model
 {
     use BelongsToTenant;
@@ -36,11 +42,17 @@ final class EventSessionAttendance extends Model
         'checked_out_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<EventSession, $this>
+     */
     public function session(): BelongsTo
     {
         return $this->belongsTo(EventSession::class, 'session_id');

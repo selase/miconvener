@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property EventAbstract|null $abstract
+ */
 final class EventAbstractAuthor extends Model
 {
     use HasFactory;
@@ -28,6 +31,9 @@ final class EventAbstractAuthor extends Model
         'sort_order',
     ];
 
+    /**
+     * @return BelongsTo<EventAbstract, $this>
+     */
     public function abstract(): BelongsTo
     {
         return $this->belongsTo(EventAbstract::class, 'abstract_id');

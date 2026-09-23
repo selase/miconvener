@@ -78,8 +78,8 @@ final class PlatformAttendeeWorkspaceController extends Controller
         $materials = [];
         if ($registrationModel->isConfirmed()) {
             $materials = $event->materials
-                ->filter(fn ($m): bool => $m instanceof EventMaterial && $m->isReleased())
-                ->map(fn ($m): array => [
+                ->filter(fn (EventMaterial $m): bool => $m->isReleased())
+                ->map(fn (EventMaterial $m): array => [
                     'id' => $m->id,
                     'title' => $m->title,
                     'remaining_attempts' => $m->remainingAttemptsFor($registrationModel->id),
