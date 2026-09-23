@@ -14,3 +14,4 @@ Enter it on the page you came from. It works once and expires in {{ $minutes }} 
 Thanks,<br>
 {{ config('app.name') }}
 </x-mail::message>
+

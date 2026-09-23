@@ -28,9 +28,11 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
   - Create `tests/Feature/Events/PlatformAttendeePortalHostTest.php` verifying base domain access, `www` redirect, tenant subdomain redirect with `?organiser=`, 404 on invalid hosts, and total isolation from session `active_tenant_id` / `X-Tenant`.
 
 ### Stage 2: Platform Access Codes & Multi-Tier Verification Infrastructure
+- [ ] **2.1 Landlord Migration & Model**:
 - [x] **2.1 Landlord Migration & Model**:
   - Create migration for `platform_attendee_access_codes` table (`id` uuid pk, `email_normalized`, `code_hash`, `attempts`, `expires_at`, `consumed_at`, timestamps, composite index `(email_normalized, consumed_at, created_at)`).
   - Create model `App\Models\PlatformAttendeeAccessCode` with `MassPrunable`.
+- [ ] **2.2 Rate Limiting & Turnstile Service**:
 - [x] **2.2 Rate Limiting & Turnstile Service**:
   - Implement `App\Services\Events\AttendeePortalRateLimiter` managing:
     - Email cooldown: 1 per 60s
@@ -40,6 +42,7 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
     - IP daily: 100 per 24h
     - Confirm attempts: 10 per email / 10min, 60 per IP / 10min
   - Add Turnstile verification via Laravel HTTP client.
+- [ ] **2.3 Verification Service & Mailable**:
 - [x] **2.3 Verification Service & Mailable**:
   - Create `App\Mail\Events\PlatformAttendeeAccessCodeMail` (transactional, platform-branded "Your MiConvener sign-in code", zero tenant credits metered).
   - Create `App\Jobs\Events\SendPlatformAttendeeAccessCode`.
@@ -48,6 +51,7 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
     - Cached BCrypt dummy hash matching hashing rounds to guarantee constant-time checks.
     - Atomic attempt increment and atomic consumption.
     - Confirmation stores `attendee_verified_platform` session marker (12-hour duration) and rotates session ID.
+- [ ] **2.4 Middleware & Pruning Schedule**:
 - [x] **2.4 Middleware & Pruning Schedule**:
   - Create `App\Http\Middleware\EnsurePlatformAttendeeVerified` reading `attendee_verified_platform`.
   - Register daily prune for `PlatformAttendeeAccessCode` at 04:00 in `app/Console/Kernel.php`.
@@ -56,7 +60,7 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
   - Test verification lifecycle, timing invariance, rate limiting, and Turnstile challenge in `tests/Feature/Events/PlatformAttendeeVerificationTest.php`.
 
 ### Stage 3: Central `/my` Verification Shell
-- [ ] **3.1 Controller & Form Requests**:
+- [x] **3.1 Controller & Form Requests**:
   - Create `App\Http\Requests\Attendee\PlatformSendAccessCodeRequest` and `PlatformConfirmAccessCodeRequest`.
   - Create `App\Http\Controllers\Public\PlatformAttendeeAccessController`:
     - `page(Request $request)`: renders `Public/Events/AttendeePortal/MyPortal` with masked verified email, optional preselected organiser hint, or verification prompt.
@@ -64,7 +68,7 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
     - `confirm(PlatformConfirmAccessCodeRequest $request)`: atomic verification, session rotation, returns masked email.
     - `forget(Request $request)`: signs out and clears platform proof.
     - `session(Request $request)`: returns current verified session email.
-- [ ] **3.2 Frontend UI Enhancements**:
+- [x] **3.2 Frontend UI Enhancements**:
   - Update `VerifyPrompt.jsx` to support:
     - 60s cooldown timer.
     - Turnstile widget appearance when challenged.
@@ -72,7 +76,9 @@ Implement the foundational layers of the **Platform Attendee Portal** as specifi
     - "Use a different email address" button to reset form.
     - Explanation after 2 failed attempts that 5 wrong guesses invalidate the code.
   - Update `MyPortal.jsx` for platform layout and verified empty state ("No MiConvener events found for this address yet").
-- [ ] **3.3 Frontend Component Tests**:
+- [x] **3.3 Component Verification & Feature Tests**:
+  - Feature tests in `tests/Feature/Events/PlatformAttendeeAccessControllerTest.php`.
+  - Production asset compilation via `npm run build`.
   - Update Vitest tests in `resources/js/test/portal/VerifyPrompt.test.jsx`.
 
 ---
