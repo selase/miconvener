@@ -74,12 +74,20 @@ test('a checked-in attendee can ask before the published start time', function (
     expect(EventServiceRequest::where('event_id', $event->id)->count())->toBe(1);
 });
 
-test('the confirmation page only offers the tabs that can be acted on', function () {
-    [$event, $registration, $host] = helpScenario('help-tabs', [
+test('the workspace only offers the tabs that can be acted on', function () {
+    [$event, $registration] = helpScenario('help-tabs', [
         'starts_at' => now()->addDays(10), 'ends_at' => now()->addDays(10)->addHours(4),
-    ]);
+    ], ['email' => 'helpme@example.com']);
 
-    $props = $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+    $platformHost = app(\App\Services\Tenancy\TenantHostMatcher::class)->baseDomain();
+
+    $props = $this->withSession([
+        \App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => [
+            'email' => 'helpme@example.com',
+            'verified_at' => now()->getTimestamp(),
+            'expires_at' => now()->addHours(12)->getTimestamp(),
+        ],
+    ])->get("http://{$platformHost}/my/events/{$registration->id}", ['HTTP_HOST' => $platformHost])
         ->assertOk()
         ->viewData('page')['props'];
 

@@ -5,8 +5,10 @@ import { portalProps, keynote } from '../fixtures/portal';
 
 vi.mock('@/Layouts/PublicLayout', () => ({ default: ({ children }) => children }));
 
+// Two navs render now -- the desktop tab strip and the fixed mobile bar --
+// so the tab strip is named rather than guessed at.
 const tabLabels = () =>
-    within(screen.getByRole('navigation'))
+    within(screen.getByRole('navigation', { name: 'Event workspace navigation' }))
         .queryAllByRole('button')
         .map((button) => button.textContent);
 
@@ -18,7 +20,7 @@ describe('attendee portal', () => {
 
     it('offers every tab once each has something in it, in order', () => {
         render(<Portal {...portalProps({ canRequestHelp: true, materials: [keynote] })} />);
-        expect(tabLabels()).toEqual(['My ticket', 'My day', 'Get help', 'Downloads']);
+        expect(tabLabels()).toEqual(['My ticket', 'My day', 'Get help', 'Downloads (1)']);
     });
 
     it('shows no tabs until the address is confirmed', () => {
@@ -35,7 +37,7 @@ describe('attendee portal', () => {
 
     it('lists released materials on the Downloads tab', () => {
         render(<Portal {...portalProps({ materials: [keynote] })} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Downloads' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Downloads (1)' }));
         expect(screen.getByText('Keynote')).toBeTruthy();
     });
 });

@@ -24,6 +24,17 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 });
 
+function approvalProof(string $email): array
+{
+    return [
+        \App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => [
+            'email' => mb_strtolower($email),
+            'verified_at' => now()->getTimestamp(),
+            'expires_at' => now()->addHours(12)->getTimestamp(),
+        ],
+    ];
+}
+
 function approvalHost(): array
 {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
@@ -288,10 +299,10 @@ test('someone approved but not yet paying is offered a way to pay', function () 
         'payment_reference' => null,
     ]);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
+    $host = mb_ltrim((string) config('session.domain'), '.');
 
-    $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+    $this->withSession(approvalProof($registration->email))
+        ->get("http://{$host}/my/events/{$registration->id}", ['HTTP_HOST' => $host])
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('registration.awaiting_checkout', true)
@@ -313,10 +324,10 @@ test('someone who has already started paying is not told to pay again', function
         'payment_reference' => 'ps_already_started',
     ]);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
+    $host = mb_ltrim((string) config('session.domain'), '.');
 
-    $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+    $this->withSession(approvalProof($registration->email))
+        ->get("http://{$host}/my/events/{$registration->id}", ['HTTP_HOST' => $host])
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('registration.awaiting_checkout', false));
 });

@@ -65,11 +65,11 @@ test('public free registration is confirmed but withholds the ticket until the e
     expect($registration->ticket_code)->toBeNull();
     expect($registration->email_verified_at)->toBeNull();
 
-    $response->assertRedirect(route('public.events.confirmation', [
-        'subdomain' => $tenant->slug,
-        'event' => $event->slug,
-        'registration' => $registration->id,
-    ]));
+    // Registration hands off to the canonical workspace on the platform host,
+    // not to the organiser's old confirmation page.
+    $response->assertRedirect(
+        app(\App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($registration)
+    );
 
     Mail::assertQueued(EventRegistrationVerifyEmail::class);
     Mail::assertNotQueued(EventRegistrationConfirmed::class);
@@ -281,13 +281,18 @@ test('the guest list shows each registrant\'s assigned seat and room', function 
         ->where('registrations.0.room_name', 'Main Hall'));
 });
 
-test('the confirmation page shows the registrant their assigned seat', function () {
+test('the workspace shows the registrant their assigned seat', function () {
     [$tenant] = eventHost('acme');
     $host = eventSubdomainHost('acme');
 
     $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
     $room = EventVenueRoom::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Main Hall', 'rows' => 2, 'seats_per_row' => 2]);
-    $registration = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'seated@example.com',
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
     EventSeatAssignment::factory()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
@@ -296,7 +301,19 @@ test('the confirmation page shows the registrant their assigned seat', function 
         'seat_label' => 'C-02',
     ]);
 
-    $response = $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host]);
+    // The old confirmation URL is now a handoff, so the seat is read where the
+    // ticket now lives: the canonical workspace, once the address is proven.
+    $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+        ->assertRedirect();
+
+    $platformHost = app(\App\Services\Tenancy\TenantHostMatcher::class)->baseDomain();
+    $response = $this->withSession([
+        \App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => [
+            'email' => 'seated@example.com',
+            'verified_at' => now()->getTimestamp(),
+            'expires_at' => now()->addHours(12)->getTimestamp(),
+        ],
+    ])->get("http://{$platformHost}/my/events/{$registration->id}", ['HTTP_HOST' => $platformHost]);
 
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page

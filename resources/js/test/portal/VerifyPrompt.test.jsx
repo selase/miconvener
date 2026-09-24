@@ -18,11 +18,11 @@ describe('verify prompt', () => {
         const onVerified = vi.fn();
         render(<VerifyPrompt onVerified={onVerified} />);
 
-        fireEvent.change(screen.getByLabelText('The address you registered with'), {
+        fireEvent.change(screen.getByLabelText('Your email address'), {
             target: { value: 'ama@stem.org' },
         });
         fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
-        fireEvent.change(await screen.findByLabelText('Code'), { target: { value: '482913' } });
+        fireEvent.change(await screen.findByLabelText('Verification code'), { target: { value: '482913' } });
         fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
         await waitFor(() => expect(onVerified).toHaveBeenCalledWith('am•@stem.org'));
@@ -36,7 +36,7 @@ describe('verify prompt', () => {
         csrfFetch.mockReturnValueOnce(answer(true, { message: 'On its way.' }));
         render(<VerifyPrompt registrationId="reg-1" sentTo="am•@stem.org" onVerified={() => {}} />);
 
-        expect(screen.queryByLabelText('The address you registered with')).toBeNull();
+        expect(screen.queryByLabelText('Your email address')).toBeNull();
         expect(screen.getByText(/am•@stem\.org/)).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
 

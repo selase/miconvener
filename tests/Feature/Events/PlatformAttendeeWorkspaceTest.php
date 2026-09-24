@@ -313,7 +313,7 @@ test('ticket transfer rotates credentials atomically and immediately revokes pre
         ->assertOk();
 });
 
-test('event checkout sets 30-minute checkout grant and sets callback url to platform workspace', function (): void {
+test('checkout points Paystack at the workspace, and grants access only to a browser with a claim', function (): void {
     $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
     $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
     $registration = EventRegistration::factory()->create([
@@ -340,11 +340,22 @@ test('event checkout sets 30-minute checkout grant and sets callback url to plat
         },
     ]);
 
-    $response = $this->get("http://{$subdomainHost}/e/{$event->slug}/checkout/{$registration->id}", [
+    // A stranger who merely knows the UUID may still pay -- a colleague settling
+    // an invoice is a real case -- but takes away no access.
+    $this->get("http://{$subdomainHost}/e/{$event->slug}/checkout/{$registration->id}", [
         'HTTP_HOST' => $subdomainHost,
     ]);
 
-    // Check that session holds checkout grant for this registration
+    expect(session(PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY, []))
+        ->not->toHaveKey($registration->id);
+
+    // The person whose address it is does get the grant, so returning from
+    // Paystack lands them on their own ticket.
+    $this->withSession(verifiedSessionFor($registration->email))
+        ->get("http://{$subdomainHost}/e/{$event->slug}/checkout/{$registration->id}", [
+            'HTTP_HOST' => $subdomainHost,
+        ]);
+
     $grants = session(PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY, []);
     expect($grants)->toHaveKey($registration->id)
         ->and($grants[$registration->id])->toBeGreaterThan(now()->getTimestamp());

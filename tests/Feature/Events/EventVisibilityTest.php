@@ -11,6 +11,8 @@ use App\Models\EventSpeaker;
 use App\Models\Speaker;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Events\PlatformAttendeeVerification;
+use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Support\Facades\Artisan;
 
 /**
@@ -23,6 +25,27 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 });
+
+function platformHostName(): string
+{
+    return app(TenantHostMatcher::class)->baseDomain();
+}
+
+function platformUrlFor(EventRegistration $registration): string
+{
+    return 'http://'.platformHostName()."/my/events/{$registration->id}";
+}
+
+function visibilityProof(string $email): array
+{
+    return [
+        PlatformAttendeeVerification::SESSION_KEY => [
+            'email' => $email,
+            'verified_at' => now()->getTimestamp(),
+            'expires_at' => now()->addHours(PlatformAttendeeVerification::VERIFIED_HOURS)->getTimestamp(),
+        ],
+    ];
+}
 
 function eventWithLineup(string $slug, string $visibility): array
 {
@@ -85,10 +108,12 @@ test('a confirmed registration unlocks a private event', function () {
     $registration = EventRegistration::factory()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
+        'email' => 'member@example.com',
         'status' => EventRegistration::STATUS_CONFIRMED,
     ]);
 
-    $props = $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+    $props = $this->withSession(visibilityProof('member@example.com'))
+        ->get(platformUrlFor($registration), ['HTTP_HOST' => platformHostName()])
         ->assertOk()
         ->viewData('page')['props'];
 
@@ -102,10 +127,12 @@ test('an unconfirmed registration does not unlock a private event', function () 
     $registration = EventRegistration::factory()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
+        'email' => 'midcheckout@example.com',
         'status' => EventRegistration::STATUS_PENDING_PAYMENT,
     ]);
 
-    $props = $this->get("http://{$host}/e/{$event->slug}/registrations/{$registration->id}", ['HTTP_HOST' => $host])
+    $props = $this->withSession(visibilityProof('midcheckout@example.com'))
+        ->get(platformUrlFor($registration), ['HTTP_HOST' => platformHostName()])
         ->assertOk()
         ->viewData('page')['props'];
 
