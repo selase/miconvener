@@ -1102,7 +1102,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,
-            'organiser_slug' => $event->tenant?->slug ?? $registration?->tenant?->slug,
+            'organiser_slug' => $event->tenant->slug,
             'description' => $event->description,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),

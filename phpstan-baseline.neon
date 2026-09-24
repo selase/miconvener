@@ -966,11 +966,6 @@ parameters:
 			count: 2
 			path: app/Http/Controllers/Public/PublicEventController.php
 
-		-
-			rawMessage: Using nullsafe method call on non-nullable type Carbon\CarbonImmutable. Use -> instead.
-			identifier: nullsafe.neverNull
-			count: 2
-			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
 			rawMessage: 'Anonymous function should return array{id: string, title: string, body: string, author_name: string, is_answered: bool, attachment_url: string|null, attachment_name: string|null, votes_count: int<0, max>, ...} but returns array{id: string, title: string, body: string, author_name: string, is_answered: bool, attachment_url: string|null, attachment_name: string|null, votes_count: int<0, max>, ...}.'

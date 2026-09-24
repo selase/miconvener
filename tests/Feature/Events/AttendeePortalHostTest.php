@@ -11,7 +11,6 @@ use App\Models\UsageEvent;
 use App\Models\UsageLimit;
 use App\Models\UsageRollup;
 use App\Models\User;
-use App\Services\Events\AttendeeVerification;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
