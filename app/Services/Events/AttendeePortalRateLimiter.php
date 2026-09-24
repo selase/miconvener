@@ -60,7 +60,6 @@ final class AttendeePortalRateLimiter
             }
         }
 
-        $cooldown = (int) config('attendee_portal.rate_limits.email_cooldown_seconds', 60);
         if (RateLimiter::tooManyAttempts("portal:rl:email:cooldown:{$emailHash}", 1)) {
             return ['status' => self::RESULT_RATE_LIMITED];
         }
@@ -157,26 +156,5 @@ final class AttendeePortalRateLimiter
 
             return false;
         }
-    }
-
-    public function clearSendLimits(string $emailNormalized, string $ip): void
-    {
-        $emailHash = hash('sha256', $emailNormalized);
-        $ipHash = hash('sha256', $ip);
-
-        RateLimiter::clear("portal:rl:email:cooldown:{$emailHash}");
-        RateLimiter::clear("portal:rl:email:hourly:{$emailHash}");
-        RateLimiter::clear("portal:rl:email:daily:{$emailHash}");
-        RateLimiter::clear("portal:rl:ip:burst:{$ipHash}");
-        RateLimiter::clear("portal:rl:ip:daily:{$ipHash}");
-    }
-
-    public function clearConfirmLimits(string $emailNormalized, string $ip): void
-    {
-        $emailHash = hash('sha256', $emailNormalized);
-        $ipHash = hash('sha256', $ip);
-
-        RateLimiter::clear("portal:rl:confirm:email:{$emailHash}");
-        RateLimiter::clear("portal:rl:confirm:ip:{$ipHash}");
     }
 }
