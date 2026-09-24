@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import csrfFetch from '@/lib/csrfFetch';
 import VerifyPrompt from './VerifyPrompt';
 import NeedsAttentionSection from './components/NeedsAttentionSection';
 import LiveNowSection from './components/LiveNowSection';
 import OrganiserEventsSection from './components/OrganiserEventsSection';
+import CertificatesSection from './components/CertificatesSection';
+import AbstractsSection from './components/AbstractsSection';
+import AttendanceSection from './components/AttendanceSection';
 import HistorySkeleton from './components/HistorySkeleton';
 import { AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
 import { clearAllOfflineTickets, purgeExpiredOfflineTickets } from '@/lib/offlineTicketStore';
@@ -13,19 +16,31 @@ import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
 
 /**
  * Platform attendee portal shell: proves identity across all organisers
- * and provides the action-first entrance to the attendee's event lifecycle.
+ * and provides the action-first entrance to the attendee's event lifecycle,
+ * certificates, abstracts, and verified attendance records.
  */
 export default function MyPortal({
     organiser = null,
     verifiedEmail: provenAtLoad = null,
     initialHistory = null,
+    initialCertificates = null,
+    initialAbstracts = null,
+    initialAttendance = null,
 }) {
     const [verifiedEmail, setVerifiedEmail] = useState(provenAtLoad);
     const [history, setHistory] = useState(initialHistory);
+    const [certificates, setCertificates] = useState(initialCertificates || []);
+    const [abstracts, setAbstracts] = useState(initialAbstracts || []);
+    const [attendance, setAttendance] = useState(initialAttendance || []);
     const [loading, setLoading] = useState(Boolean(provenAtLoad && !initialHistory));
     const [error, setError] = useState(null);
     const [selectedOrganiser, setSelectedOrganiser] = useState(organiser);
     const [signOutError, setSignOutError] = useState(false);
+
+    const initialTab = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('tab') || 'events'
+        : 'events';
+    const [activeTab, setActiveTab] = useState(initialTab);
 
     useEffect(() => {
         registerAttendeeServiceWorker();
@@ -34,58 +49,89 @@ export default function MyPortal({
 
     const signOutRoute = window.route ? route('attendee.my.verify.forget') : '/my/verify/forget';
     const eventsRoute = window.route ? route('attendee.my.events') : '/my/events';
+    const certificatesRoute = window.route ? route('attendee.my.certificates') : '/my/certificates';
+    const abstractsRoute = window.route ? route('attendee.my.abstracts') : '/my/abstracts';
+    const attendanceRoute = window.route ? route('attendee.my.attendance') : '/my/attendance';
 
-    const fetchHistory = useCallback(
+    const fetchData = useCallback(
         async (orgSlug = null) => {
             setLoading(true);
             setError(null);
 
-            const url = new URL(eventsRoute, window.location.origin);
-            if (orgSlug) {
-                url.searchParams.set('organiser', orgSlug);
-            }
+            const buildUrl = (baseRoute) => {
+                const url = new URL(baseRoute, window.location.origin);
+                if (orgSlug) {
+                    url.searchParams.set('organiser', orgSlug);
+                }
+                return url.toString();
+            };
 
             try {
-                const response = await fetch(url.toString(), {
-                    headers: {
-                        Accept: 'application/json',
-                    },
-                });
+                const [eventsRes, certsRes, abstractsRes, attendanceRes] = await Promise.all([
+                    fetch(buildUrl(eventsRoute), { headers: { Accept: 'application/json' } }),
+                    fetch(buildUrl(certificatesRoute), { headers: { Accept: 'application/json' } }),
+                    fetch(buildUrl(abstractsRoute), { headers: { Accept: 'application/json' } }),
+                    fetch(buildUrl(attendanceRoute), { headers: { Accept: 'application/json' } }),
+                ]);
 
-                if (response.status === 401) {
+                if (
+                    eventsRes.status === 401 ||
+                    certsRes.status === 401 ||
+                    abstractsRes.status === 401 ||
+                    attendanceRes.status === 401
+                ) {
                     // Session expired or proof invalid
                     setVerifiedEmail(null);
                     setHistory(null);
+                    setCertificates([]);
+                    setAbstracts([]);
+                    setAttendance([]);
+                    setActiveTab('events');
                     setLoading(false);
                     return;
                 }
 
-                if (!response.ok) {
+                if (!eventsRes.ok) {
                     setError("Couldn't load your events. Please check your connection and try again.");
                     setLoading(false);
                     return;
                 }
 
-                const data = await response.json();
-                setHistory(data);
+                const eventsData = await eventsRes.json();
+                setHistory(eventsData);
+
+                if (certsRes.ok) {
+                    const certsData = await certsRes.json();
+                    setCertificates(certsData);
+                }
+
+                if (abstractsRes.ok) {
+                    const abstractsData = await abstractsRes.json();
+                    setAbstracts(abstractsData);
+                }
+
+                if (attendanceRes.ok) {
+                    const attendanceData = await attendanceRes.json();
+                    setAttendance(attendanceData);
+                }
             } catch {
                 setError("Couldn't connect to the server. Please check your connection.");
             } finally {
                 setLoading(false);
             }
         },
-        [eventsRoute]
+        [eventsRoute, certificatesRoute, abstractsRoute, attendanceRoute]
     );
 
     useEffect(() => {
         if (verifiedEmail && !history && !loading) {
-            fetchHistory(selectedOrganiser?.slug);
+            fetchData(selectedOrganiser?.slug);
         }
-    }, [verifiedEmail, history, loading, selectedOrganiser, fetchHistory]);
+    }, [verifiedEmail, history, loading, selectedOrganiser, fetchData]);
 
     const handleVerified = (maskedEmail) => {
         setVerifiedEmail(maskedEmail);
-        fetchHistory(selectedOrganiser?.slug);
+        fetchData(selectedOrganiser?.slug);
     };
 
     const handleClearFilter = () => {
@@ -94,7 +140,7 @@ export default function MyPortal({
         const url = new URL(window.location.href);
         url.searchParams.delete('organiser');
         window.history.replaceState({}, '', url.pathname);
-        fetchHistory(null);
+        fetchData(null);
     };
 
     const signOut = async () => {
@@ -108,19 +154,62 @@ export default function MyPortal({
             setSignOutError(false);
             setVerifiedEmail(null);
             setHistory(null);
+            setCertificates([]);
+            setAbstracts([]);
+            setAttendance([]);
+            setActiveTab('events');
         } catch {
             setSignOutError(true);
         }
     };
 
+    const certifiedHoursCount = (certificates || []).filter(
+        (c) => c.cpd_hours && Number(c.cpd_hours) > 0
+    ).length;
+
+    // Available tabs based on non-empty record rules (Spec §7.4)
+    const availableTabs = [
+        { key: 'events', label: 'Events', count: null },
+        ...(certificates.length > 0
+            ? [{ key: 'certificates', label: 'Certificates', count: certificates.length }]
+            : []),
+        ...(abstracts.length > 0
+            ? [{ key: 'abstracts', label: 'Abstracts', count: abstracts.length }]
+            : []),
+        ...(attendance.length > 0 || certifiedHoursCount > 0
+            ? [{ key: 'attendance', label: 'Attendance', count: attendance.length }]
+            : []),
+    ];
+
+    // Gracefully fallback if the selected tab is not available
+    useEffect(() => {
+        if (!availableTabs.some((t) => t.key === activeTab)) {
+            setActiveTab('events');
+        }
+    }, [availableTabs, activeTab]);
+
+    const handleTabChange = (key) => {
+        setActiveTab(key);
+        const url = new URL(window.location.href);
+        if (key === 'events') {
+            url.searchParams.delete('tab');
+        } else {
+            url.searchParams.set('tab', key);
+        }
+        window.history.replaceState({}, '', url.toString());
+    };
+
     const hasNeedsAttention = (history?.needs_attention?.length ?? 0) > 0;
     const hasLiveNow = (history?.live_now?.length ?? 0) > 0;
+    const hasOrganisers = (history?.organisers?.length ?? 0) > 0;
     const hasUrgent = hasNeedsAttention || hasLiveNow;
+    const hasAnyRecords = certificates.length > 0 || abstracts.length > 0 || attendance.length > 0;
     const isEmpty =
         history &&
         !hasNeedsAttention &&
         !hasLiveNow &&
-        (history.organisers?.length ?? 0) === 0;
+        !hasOrganisers &&
+        !hasAnyRecords;
 
     return (
         <PublicLayout>
@@ -139,7 +228,7 @@ export default function MyPortal({
                             : 'Your MiConvener events'}
                     </h1>
                     <p className="text-[13.5px] text-ink-secondary">
-                        Central workspace for your tickets, materials, and agendas across all organisers.
+                        Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.
                     </p>
                 </div>
 
@@ -183,7 +272,7 @@ export default function MyPortal({
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => fetchHistory(selectedOrganiser?.slug)}
+                                    onClick={() => fetchData(selectedOrganiser?.slug)}
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 shadow-xs hover:bg-red-50 dark:border-red-800 dark:bg-red-950 dark:text-red-200 cursor-pointer"
                                 >
                                     <RefreshCw className="h-3 w-3" />
@@ -196,10 +285,10 @@ export default function MyPortal({
                         {isEmpty && !loading && !error && (
                             <div className="rounded-xl border border-border bg-surface-subtle p-8 text-center space-y-3">
                                 <p className="text-sm font-medium text-ink">
-                                    No MiConvener events were found for this address yet.
+                                    No MiConvener events or records were found for this address yet.
                                 </p>
                                 <p className="text-xs text-ink-secondary max-w-md mx-auto">
-                                    Registrations made with this email address will appear here automatically. If you registered with a different address, you can sign in with that one instead.
+                                    Registrations and credentials made with this email address will appear here automatically. If you registered with a different address, you can sign in with that one instead.
                                 </p>
                                 <div className="pt-2">
                                     <button
@@ -213,17 +302,83 @@ export default function MyPortal({
                             </div>
                         )}
 
-                        {/* Lifecycle Dashboard Hierarchy */}
-                        {history && !loading && !isEmpty && (
+                        {/* Conditional Record Tabs Navigation */}
+                        {availableTabs.length > 1 && !loading && !isEmpty && (
+                            <nav
+                                aria-label="Portal sections"
+                                role="tablist"
+                                className="flex items-center gap-1 border-b border-border overflow-x-auto -mb-2"
+                            >
+                                {availableTabs.map((tabItem) => (
+                                    <button
+                                        key={tabItem.key}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={activeTab === tabItem.key}
+                                        onClick={() => handleTabChange(tabItem.key)}
+                                        className={`-mb-px flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 text-xs font-medium cursor-pointer transition-colors whitespace-nowrap min-h-[44px] ${
+                                            activeTab === tabItem.key
+                                                ? 'border-accent text-accent font-semibold'
+                                                : 'border-transparent text-ink-secondary hover:text-ink hover:border-border'
+                                        }`}
+                                    >
+                                        <span>{tabItem.label}</span>
+                                        {tabItem.count !== null && (
+                                            <span
+                                                className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                                                    activeTab === tabItem.key
+                                                        ? 'bg-accent/15 text-accent font-semibold'
+                                                        : 'bg-surface-subtle text-ink-secondary border border-border'
+                                                }`}
+                                            >
+                                                {tabItem.count}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </nav>
+                        )}
+
+                        {/* Panels */}
+                        {!loading && !isEmpty && (
                             <div className="space-y-8">
-                                <NeedsAttentionSection items={history.needs_attention} />
-                                <LiveNowSection items={history.live_now} />
-                                <OrganiserEventsSection
-                                    organisers={history.organisers}
-                                    hasUrgentItems={hasUrgent}
-                                    selectedOrganiser={selectedOrganiser}
-                                    onClearFilter={handleClearFilter}
-                                />
+                                {activeTab === 'events' && history && (
+                                    <div className="space-y-8">
+                                        <NeedsAttentionSection items={history.needs_attention} />
+                                        <LiveNowSection items={history.live_now} />
+                                        <OrganiserEventsSection
+                                            organisers={history.organisers}
+                                            hasUrgentItems={hasUrgent}
+                                            selectedOrganiser={selectedOrganiser}
+                                            onClearFilter={handleClearFilter}
+                                        />
+                                        {!hasOrganisers && !hasNeedsAttention && !hasLiveNow && (
+                                            <div className="rounded-xl border border-border bg-surface-subtle p-8 text-center space-y-2">
+                                                <p className="text-sm font-medium text-ink">
+                                                    No registered events found
+                                                </p>
+                                                <p className="text-xs text-ink-secondary max-w-sm mx-auto">
+                                                    You do not have any registered events for this email address. Switch to the tabs above to access your certificates and records.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeTab === 'certificates' && (
+                                    <CertificatesSection certificates={certificates} />
+                                )}
+
+                                {activeTab === 'abstracts' && (
+                                    <AbstractsSection abstracts={abstracts} />
+                                )}
+
+                                {activeTab === 'attendance' && (
+                                    <AttendanceSection
+                                        attendance={attendance}
+                                        certificates={certificates}
+                                    />
+                                )}
                             </div>
                         )}
                     </div>

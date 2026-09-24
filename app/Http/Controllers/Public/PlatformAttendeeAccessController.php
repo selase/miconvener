@@ -42,14 +42,23 @@ final class PlatformAttendeeAccessController extends Controller
         }
 
         $history = null;
+        $certificates = null;
+        $abstracts = null;
+        $attendance = null;
         if ($verifiedEmail !== null) {
             $history = $this->history->getHistory($verifiedEmail, $organiserSlug);
+            $certificates = $this->history->getCertificates($verifiedEmail, $organiserSlug);
+            $abstracts = $this->history->getAbstracts($verifiedEmail, $organiserSlug);
+            $attendance = $this->history->getAttendance($verifiedEmail, $organiserSlug);
         }
 
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
             'organiser' => $organiser,
             'verifiedEmail' => $verifiedEmail !== null ? ContactMask::email($verifiedEmail) : null,
             'initialHistory' => $history,
+            'initialCertificates' => $certificates,
+            'initialAbstracts' => $abstracts,
+            'initialAttendance' => $attendance,
         ]);
     }
 

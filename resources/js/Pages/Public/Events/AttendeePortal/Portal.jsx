@@ -82,6 +82,8 @@ export default function Portal({
     has_forum = false,
     has_forms = false,
     active_service_requests_count = 0,
+    certificate = null,
+    attendance = [],
 }) {
     const [currentRegistration, setCurrentRegistration] = useState(registration);
     const [isPolling, setIsPolling] = useState(
@@ -348,6 +350,7 @@ export default function Portal({
                                 event={event}
                                 registration={registration}
                                 isOnline={isOnline}
+                                certificate={certificate}
                             />
                         )}
                         {tab === 'agenda' && (

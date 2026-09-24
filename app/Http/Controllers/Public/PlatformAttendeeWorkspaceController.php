@@ -11,6 +11,7 @@ use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventTicketTransferCode;
 use App\Mail\Events\EventTicketTransferred;
 use App\Models\Event;
+use App\Models\EventCertificate;
 use App\Models\EventDynamicForm;
 use App\Models\EventForumBan;
 use App\Models\EventForumReply;
@@ -22,12 +23,14 @@ use App\Models\EventPollOption;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationTransfer;
 use App\Models\EventServiceRequest;
+use App\Models\EventSessionAttendance;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\TicketPdfService;
 use App\Services\Stratification\ParticipantStratificationService;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Support\ContactMask;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -105,6 +108,39 @@ final class PlatformAttendeeWorkspaceController extends Controller
         $pollPayment = $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
             && filled($registrationModel->payment_reference);
 
+        $certificate = EventCertificate::withoutGlobalScopes()
+            ->where('event_id', $event->id)
+            ->where(function (Builder $q) use ($registrationModel): void {
+                $q->where('registration_id', $registrationModel->id)
+                    ->orWhereRaw('lower(recipient_email) = ?', [mb_strtolower($registrationModel->email)]);
+            })
+            ->first();
+
+        $certificatePayload = $certificate !== null ? [
+            'id' => $certificate->id,
+            'uuid' => $certificate->uuid,
+            'recipient_name' => $certificate->recipient_name,
+            'role' => $certificate->role,
+            'cpd_hours' => $certificate->cpd_hours,
+            'issued_at' => $certificate->issued_at?->toIso8601String(),
+            'verification_url' => $certificate->verificationUrl(),
+            'download_url' => url("/verify/cert/{$certificate->uuid}/download"),
+        ] : null;
+
+        $attendanceRecords = EventSessionAttendance::withoutGlobalScopes()
+            ->where('registration_id', $registrationModel->id)
+            ->with(['session' => fn ($s) => $s->withoutGlobalScopes()])
+            ->latest('checked_in_at')
+            ->get()
+            ->map(fn (EventSessionAttendance $att): array => [
+                'id' => $att->id,
+                'session_title' => $att->session?->title,
+                'checked_in_at' => $att->checked_in_at->toIso8601String(),
+                'checked_out_at' => $att->checked_out_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
         return Inertia::render('Public/Events/AttendeePortal/Portal', [
             'event' => $this->buildEventPayload($event, revealDetails: $registrationModel->isConfirmed()),
             'registration' => [
@@ -135,6 +171,8 @@ final class PlatformAttendeeWorkspaceController extends Controller
                     : null,
             ],
             'materials' => $materials,
+            'certificate' => $certificatePayload,
+            'attendance' => $attendanceRecords,
             'canRequestHelp' => $canRequestHelp,
             'poll_payment' => $pollPayment,
             'is_checkout_grant' => $this->authorizer->hasCheckoutGrant($request->session(), $registrationModel->id),

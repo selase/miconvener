@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { AlertCircle, Check, Download, Smartphone, Trash2, WifiOff } from 'lucide-react';
+import { AlertCircle, Award, Check, Download, ExternalLink, Smartphone, Sparkles, Trash2, WifiOff } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 import { getOfflineTicket, removeOfflineTicket, saveOfflineTicket } from '@/lib/offlineTicketStore';
 
-export default function MyTicketPanel({ event, registration, isOnline = true }) {
+export default function MyTicketPanel({ event, registration, isOnline = true, certificate = null }) {
     const [transferring, setTransferring] = useState(false);
     // 'details' collects who it goes to; 'code' confirms it from the current
     // holder's inbox. The ticket does not move until the second step.
@@ -203,6 +203,58 @@ export default function MyTicketPanel({ event, registration, isOnline = true }) 
                                     Save offline copy
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {certificate && (
+                    <div className="mt-5 rounded-xl border border-border bg-surface-subtle p-4 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+                            <div className="flex items-center gap-2">
+                                <Award className="h-4 w-4 text-accent" />
+                                <h3 className="text-xs font-semibold text-ink uppercase tracking-wide">
+                                    Official Certificate
+                                </h3>
+                                {certificate.role && (
+                                    <span className="rounded-md bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                                        {certificate.role}
+                                    </span>
+                                )}
+                            </div>
+                            {certificate.cpd_hours && Number(certificate.cpd_hours) > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                    <Sparkles className="h-3 w-3" />
+                                    <span>{certificate.cpd_hours} CPD hours</span>
+                                </span>
+                            )}
+                        </div>
+
+                        <p className="text-xs text-ink-secondary">
+                            Your certificate of participation has been issued and verified for this registration.
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                            {certificate.download_url && (
+                                <a
+                                    href={certificate.download_url}
+                                    download
+                                    className="inline-flex h-control items-center gap-1.5 border border-border bg-surface px-3 text-xs font-medium text-ink hover:border-accent"
+                                >
+                                    <Download className="h-3.5 w-3.5" />
+                                    Download PDF
+                                </a>
+                            )}
+                            {certificate.verification_url && (
+                                <a
+                                    href={certificate.verification_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex h-control items-center gap-1.5 border border-accent/30 bg-accent/5 px-3 text-xs font-medium text-accent hover:bg-accent/10"
+                                >
+                                    <span>Verify</span>
+                                    <ExternalLink className="h-3 w-3 opacity-70" />
+                                </a>
+                            )}
                         </div>
                     </div>
                 )}
