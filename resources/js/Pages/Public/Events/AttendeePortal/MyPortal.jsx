@@ -307,7 +307,7 @@ export default function MyPortal({
                             <nav
                                 aria-label="Portal sections"
                                 role="tablist"
-                                className="flex items-center gap-1 border-b border-border overflow-x-auto -mb-2"
+                                className="flex items-center gap-1 border-b border-border overflow-x-auto mb-6 sm:mb-8"
                             >
                                 {availableTabs.map((tabItem) => (
                                     <button
