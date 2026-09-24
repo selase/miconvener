@@ -553,6 +553,19 @@ Replacing the single-tenant `/my` portal with a single platform-wide passwordles
   - **Conditional Record Tabs**: Verified `Certificates` (Ghana Health Informatics Symposium 2026 with 6.5 CPD hours, verification & download URLs), `Abstracts` (ABS-0842 accepted oral presentation), and `Attendance` (verified session check-ins).
   - **Event Workspace**: Verified `My Ticket` (QR code rendering, credential rotation, offline ticket store, PDF download), `My Day` (session agenda with speaker slide downloads under `MaterialReleasePolicy` and calendar `.ics` download), `Live Poll` (runtime voting options), `Q&A` (forum threads with host replies), `Feedback` (dynamic survey form), `Get Help` (active refreshment request with status stepper at Acknowledged), and `Downloads`.
   - Fixed and committed Ziggy route subdomain parameter requirement on `public.events.agenda.ics` (`d4f310a`). Full test suite passing (110 feature tests, 625 assertions). Full screenshot artifacts captured and archived.
+- [x] **Post-Implementation Audit & Hardening (Claude Code Handover & Production Deploy)**:
+  - Comprehensive adversarial audit ledger in `docs/superpowers/audits/2026-09-24-platform-attendee-portal-audit.md` (commits `4099b3f..50a3fe7` on `main`).
+  - **F6 Legacy Confirmation Link Handoff**: `PublicEventController::confirmation` converted from an unauthenticated direct ticket renderer into a handoff redirecting to canonical workspace (`/my/events/{registration}`), preventing old confirmation emails from leaking rotated ticket QR codes after transfers. Free-ticket verify link scoped strictly to the registration via `rememberRegistered()` without minting 12-hour global proof.
+  - **F7 Workspace Grant Gating**: `EventCheckoutController::checkout` gated with `canClaimWorkspace()`, decoupling unconditional invoice payments from workspace access (requires session registration claim, active proof, or cryptographic signed payment invite URL).
+  - **F8 Transfer Recipient Action Removal**: Removed "Review & accept transfer" card from recipient's Needs Attention list to prevent 403s and adhere to status vs task invariant.
+  - **F9 Transferred Ticket Temporal Boundaries**: Bounded certificates and session attendance by `transfer.consumed_at` via `transfers()` relation on `EventRegistration`, preventing cross-holder record leaks.
+  - **F10 & F4 Turnstile & Operational Logging**: Added hashed digests (`hash_hmac`) with correlation IDs to access code send logs; validated Cloudflare Turnstile token action (`attendee-signin`) and hostname; closed deploy preconditions.
+  - **F11 Boundary Test Suite & Return-To Sanitation**: Rebuilt `AttendeePortalRouteSecurityTest` to actively execute hostile host HTTP requests across all 25 routes; added sanitized `return_to` redirect handling in `MyPortal.jsx`.
+  - **F13 Anonymous Shell Caching**: Service worker updated to fetch `/my` with `credentials: 'omit'` under cache `miconvener-attendee-v2` to prevent cached PII disclosure on shared devices.
+  - **F15 & F16 Characterisation Tests & Inertia CORS**: Migrated 8 characterisation tests; replaced cross-origin Inertia redirect in `register()` with `Inertia::location()` to prevent silent CORS failures; mocked `@inertiajs/react` in Vitest.
+  - **Probe Workspace Seeder**: Added `ProbeWorkspaceSeeder` (`feat(probe)`) furnishing complete live workspace state across all features (sessions, release policies, polls, forms, Q&A, service requests, certificates, abstracts, attendance).
+  - All 5 pipeline gates green: `pint --test` passed, `phpstan` 0 errors, `npm run lint` clean, `npm test` 10/10 Vitest passed, `php artisan test` 1228 passed (5281 assertions). Deployed and verified live.
+
 
 
 
