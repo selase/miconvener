@@ -474,3 +474,33 @@ every registrant would have seen a network error instead of their ticket. `regis
 returns `Inertia::location()` straight to the workspace — the same fix, and the same reasoning,
 that `EventCheckoutController` already carried a comment about. Worth remembering: **on an
 Inertia POST, a cross-origin redirect is not a redirect.**
+
+---
+
+## Shipped
+
+Pushed to `main` as `15226a2..673878c` on 2026-09-24 — 17 commits of the original work plus
+seven of remediation. **CI passed for the first time on this body of work** (run 35981595015,
+all five gates). Laravel Cloud deployment `depl-a2d25308` succeeded.
+
+`ATTENDEE_PORTAL_IP_CHALLENGE_THRESHOLD=20` was set on the production environment before the
+push, so the Turnstile challenge cannot fire ahead of the hard IP cap while the keys are absent
+(F4). The remaining caps still apply: 20 sends per IP per 10 minutes, 100 per IP per day, 5 per
+email per hour, 10 per email per day. **When `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are
+set, delete this variable** so the challenge returns to the sixth request, as the spec intends.
+
+Verified against production after deploy:
+
+| Check | Result |
+|---|---|
+| `miconvener.com/my` | 200, renders `AttendeePortal/MyPortal` |
+| `www.miconvener.com/my` | 301 → `miconvener.com/my` |
+| `{tenant}.miconvener.com/my` | 302 → `miconvener.com/my?organiser={tenant}` |
+| Cloud vanity domain `/my` | 404 |
+| Nested host `a.b.miconvener.com` | refused |
+| `/my/events/{uuid}` unauthenticated | 302 → `/my?return_to=/my/events/{uuid}` |
+| Legacy confirmation, unknown id | 404 |
+| Anonymous `/my` payload | `verifiedEmail`, `initialHistory` both null — the shell the service worker caches carries no history (F13) |
+| `POST /my/verify/send`, known address | 202, code queued |
+| `POST /my/verify/send`, unknown address | 202, byte-identical response — no enumeration |
+| `POST /my/verify/confirm`, wrong code | generic 422 |
