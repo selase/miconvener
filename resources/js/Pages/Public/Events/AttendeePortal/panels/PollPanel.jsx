@@ -21,19 +21,25 @@ export default function PollPanel({ registration, isOnline = true }) {
             });
             if (res.ok) {
                 const data = await res.json();
-                setPoll(data.poll);
-                if (data.poll?.user_response) {
-                    if (data.poll.user_response.score !== null) {
+                const pollData = data.poll;
+                const userResp = pollData?.user_response || data.my_response;
+                if (pollData && userResp && !pollData.user_response) {
+                    pollData.user_response = userResp;
+                }
+                setPoll(pollData);
+                if (userResp) {
+                    const score = userResp.score ?? userResp.points_awarded;
+                    if (score !== null && score !== undefined) {
                         setQuizResult({
-                            score: data.poll.user_response.score,
-                            is_correct: data.poll.user_response.is_correct,
+                            score,
+                            is_correct: userResp.is_correct,
                         });
                     }
                 }
             } else {
                 setError('Unable to load live poll. Please try again.');
             }
-        } catch {
+        } catch (err) {
             setError('Unable to connect. Please check your network.');
         } finally {
             setLoading(false);
@@ -71,6 +77,7 @@ export default function PollPanel({ registration, isOnline = true }) {
         } else if (selectedOptionId) {
             payload.option_id = selectedOptionId;
         } else if (textResponse.trim()) {
+            payload.response_text = textResponse.trim();
             payload.text_response = textResponse.trim();
         }
 
@@ -88,16 +95,17 @@ export default function PollPanel({ registration, isOnline = true }) {
                 return;
             }
 
-            if (data.score !== undefined) {
+            const score = data.score ?? data.points_awarded;
+            if (score !== undefined && score !== null) {
                 setQuizResult({
-                    score: data.score,
+                    score,
                     is_correct: data.is_correct,
                 });
             }
 
             // Reload poll to show updated percentages and user_response
             await fetchPoll();
-        } catch {
+        } catch (err) {
             setError('A network error occurred while submitting.');
         } finally {
             setSubmitting(false);
@@ -141,7 +149,8 @@ export default function PollPanel({ registration, isOnline = true }) {
         );
     }
 
-    const hasResponded = Boolean(poll.user_response);
+    const userResponse = poll.user_response;
+    const hasResponded = Boolean(userResponse);
     const isQuiz = poll.type === 'quiz';
 
     return (
@@ -221,6 +230,9 @@ export default function PollPanel({ registration, isOnline = true }) {
                             const isUserSelected =
                                 poll.user_response.option_ids?.includes(opt.id) ||
                                 poll.user_response.option_ids === opt.id;
+                                userResponse?.option_ids?.includes(opt.id) ||
+                                userResponse?.option_ids === opt.id ||
+                                userResponse?.option_id === opt.id;
                             return (
                                 <div
                                     key={opt.id}
@@ -250,6 +262,7 @@ export default function PollPanel({ registration, isOnline = true }) {
                             Your answer:{' '}
                             <span className="font-semibold">
                                 {poll.user_response.text_response}
+                                {userResponse?.text_response || userResponse?.response_text}
                             </span>
                         </div>
                     )}

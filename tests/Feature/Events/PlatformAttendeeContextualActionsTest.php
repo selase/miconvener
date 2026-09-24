@@ -109,6 +109,19 @@ test('verified attendee can retrieve live poll and respond with opaque token iso
 
     $duplicateResponse->assertStatus(422);
     $duplicateResponse->assertJsonPath('message', 'You already responded to this poll.');
+
+    // 5. Subsequent GET /poll returns total_votes, calculated percentages, and respondent's choice
+    $afterResponse = $this->withSession($session)
+        ->getJson("http://{$host}/my/events/{$registration->id}/poll", ['HTTP_HOST' => $host]);
+
+    $afterResponse->assertOk();
+    $afterResponse->assertJsonPath('has_responded', true);
+    $afterResponse->assertJsonPath('poll.total_votes', 1);
+    $afterResponse->assertJsonPath('poll.user_response.option_id', $opt1->id);
+    expect($afterResponse->json('poll.options.0.votes_count'))->toBe(1);
+    expect($afterResponse->json('poll.options.0.percentage'))->toBe(100);
+    expect($afterResponse->json('poll.options.1.votes_count'))->toBe(0);
+    expect($afterResponse->json('poll.options.1.percentage'))->toBe(0);
 });
 
 test('attendee taking a quiz receives immediate scoring and feedback', function (): void {
@@ -405,6 +418,16 @@ test('attendee dynamic form submission binds verified identity and enforces chec
     expect($submission->respondent_name)->toBe('Kofi Badu');
     expect($submission->respondent_email)->toBe('kofi@example.com');
     expect($submission->answers['session_quality'])->toBe('Excellent');
+
+    // 5. Subsequent submission attempt by same registration is rejected as duplicate
+    $dupRes = $this->withSession($session)
+        ->postJson(
+            "http://{$host}/my/events/{$registration->id}/forms/{$form->id}",
+            ['answers' => ['session_quality' => 'Excellent']],
+            ['HTTP_HOST' => $host]
+        );
+    $dupRes->assertStatus(422);
+    $dupRes->assertJsonPath('message', 'You have already submitted this form.');
 });
 
 test('attendee service request tracks status progression, medical urgency, and prevents duplicate active requests', function (): void {
@@ -524,4 +547,38 @@ test('unauthorized or cross-registration contextual requests are rejected', func
     $this->withSession($bobSession)
         ->getJson("http://{$host}/my/events/{$registrationA->id}/service-requests", ['HTTP_HOST' => $host])
         ->assertStatus(401);
+});
+
+test('forum thread validates attachment mime types and rejects forbidden extensions', function (): void {
+    $host = platformHost();
+    $tenant = Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'author@example.com',
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+
+    $session = sessionFor('author@example.com');
+
+    // Create an invalid executable file
+    $file = \Illuminate\Http\UploadedFile::fake()->create('malicious.exe', 500, 'application/x-msdownload');
+
+    $response = $this->withSession($session)
+        ->post(
+            "http://{$host}/my/events/{$registration->id}/forum",
+            [
+                'title' => 'Important update',
+                'body' => 'Please download this file.',
+                'attachment' => $file,
+            ],
+            [
+                'HTTP_HOST' => $host,
+                'HTTP_ACCEPT' => 'application/json',
+            ]
+        );
+
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors(['attachment']);
 });

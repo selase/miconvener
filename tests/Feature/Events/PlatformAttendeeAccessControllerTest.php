@@ -22,9 +22,11 @@ beforeEach(function (): void {
     Queue::fake();
 });
 
-function platformHost(): string
-{
-    return mb_ltrim((string) config('session.domain'), '.');
+if (! function_exists('Tests\Feature\Events\platformHost')) {
+    function platformHost(): string
+    {
+        return mb_ltrim((string) config('session.domain'), '.');
+    }
 }
 
 test('page renders MyPortal on platform host with optional presentation organiser context', function (): void {

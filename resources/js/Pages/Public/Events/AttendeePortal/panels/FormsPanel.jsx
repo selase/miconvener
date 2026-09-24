@@ -8,6 +8,7 @@ import {
     ArrowLeft,
     Send,
     Check,
+    Star,
 } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 
@@ -36,7 +37,7 @@ export default function FormsPanel({ registration, isOnline = true }) {
             } else {
                 setGeneralError('Failed to load forms and surveys.');
             }
-        } catch {
+        } catch (err) {
             setGeneralError('Network error while loading forms.');
         } finally {
             setLoading(false);
@@ -63,15 +64,16 @@ export default function FormsPanel({ registration, isOnline = true }) {
             if (res.ok) {
                 const data = await res.json();
                 setActiveFormDetails(data);
-                if (data.submission?.answers) {
-                    setAnswers(data.submission.answers);
+                const sub = data.submission || data.my_submission;
+                if (sub?.answers) {
+                    setAnswers(sub.answers);
                 } else {
                     setAnswers({});
                 }
             } else {
                 setGeneralError('Could not load form schema.');
             }
-        } catch {
+        } catch (err) {
             setGeneralError('Network error loading form details.');
         } finally {
             setActiveFormLoading(false);
@@ -83,6 +85,26 @@ export default function FormsPanel({ registration, isOnline = true }) {
             ...prev,
             [fieldKey]: value,
         }));
+        if (formErrors[`answers.${fieldKey}`]) {
+            setFormErrors((prev) => {
+                const next = { ...prev };
+                delete next[`answers.${fieldKey}`];
+                return next;
+            });
+        }
+    };
+
+    const handleMultiSelectToggle = (fieldKey, optionVal) => {
+        setAnswers((prev) => {
+            const current = Array.isArray(prev[fieldKey]) ? prev[fieldKey] : [];
+            const next = current.includes(optionVal)
+                ? current.filter((v) => v !== optionVal)
+                : [...current, optionVal];
+            return {
+                ...prev,
+                [fieldKey]: next,
+            };
+        });
         if (formErrors[`answers.${fieldKey}`]) {
             setFormErrors((prev) => {
                 const next = { ...prev };
@@ -123,7 +145,7 @@ export default function FormsPanel({ registration, isOnline = true }) {
             // Refresh list and reload details
             await fetchForms();
             await openForm(selectedFormId);
-        } catch {
+        } catch (err) {
             setGeneralError('Network error submitting form.');
         } finally {
             setSubmitting(false);
@@ -150,9 +172,12 @@ export default function FormsPanel({ registration, isOnline = true }) {
 
     // Detail / Submission view
     if (selectedFormId && activeFormDetails) {
-        const { form, schema = [], submission } = activeFormDetails;
-        const isSubmitted = Boolean(submission);
-        const canSubmit = form.is_eligible && !isSubmitted;
+        const form = activeFormDetails.form || {};
+        const schema = activeFormDetails.schema || form.schema || [];
+        const submission = activeFormDetails.submission || activeFormDetails.my_submission;
+        const isSubmitted = Boolean(submission || activeFormDetails.has_submitted);
+        const isEligible = form.is_eligible !== undefined ? form.is_eligible : (!form.requires_check_in || true);
+        const canSubmit = isEligible && !isSubmitted;
 
         return (
             <div className="rounded-xl border border-border bg-surface p-6 text-left shadow-sm space-y-6">
@@ -188,7 +213,7 @@ export default function FormsPanel({ registration, isOnline = true }) {
                             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                             <span>
                                 Submitted on{' '}
-                                {new Date(submission.submitted_at).toLocaleDateString(undefined, {
+                                {new Date(submission?.submitted_at || Date.now()).toLocaleDateString(undefined, {
                                     month: 'short',
                                     day: 'numeric',
                                     year: 'numeric',
@@ -201,7 +226,7 @@ export default function FormsPanel({ registration, isOnline = true }) {
                     </div>
                 )}
 
-                {!form.is_eligible && (
+                {!isEligible && (
                     <div className="rounded-lg bg-amber-50 p-4 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200 flex items-center gap-2">
                         <Lock className="h-4 w-4 shrink-0 text-amber-600" />
                         <span>
@@ -333,6 +358,112 @@ export default function FormsPanel({ registration, isOnline = true }) {
                                                 );
                                             })}
                                         </div>
+                                    )}
+
+                                    {/* Multiselect Group */}
+                                    {field.type === 'multiselect' && (
+                                        <div className="space-y-2 pt-1">
+                                            {(field.options || []).map((opt) => {
+                                                const optVal =
+                                                    typeof opt === 'object' ? opt.value : opt;
+                                                const optLabel =
+                                                    typeof opt === 'object' ? opt.label : opt;
+                                                const isChecked =
+                                                    Array.isArray(currentValue) &&
+                                                    currentValue.includes(optVal);
+                                                return (
+                                                    <label
+                                                        key={optVal}
+                                                        className={`flex items-center gap-2.5 rounded-lg border p-3 text-xs min-h-[44px] cursor-pointer transition-colors ${
+                                                            isChecked
+                                                                ? 'border-accent bg-accent-soft/20 text-ink font-medium'
+                                                                : 'border-border text-ink-secondary hover:bg-surface-subtle'
+                                                        }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            disabled={!canSubmit}
+                                                            checked={isChecked}
+                                                            onChange={() =>
+                                                                handleMultiSelectToggle(
+                                                                    field.key,
+                                                                    optVal
+                                                                )
+                                                            }
+                                                            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                                                        />
+                                                        <span>{optLabel}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Rating Scale (1-5) */}
+                                    {field.type === 'rating' && (
+                                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                                            {[1, 2, 3, 4, 5].map((val) => {
+                                                const isFilled = Number(currentValue) >= val;
+                                                return (
+                                                    <button
+                                                        key={val}
+                                                        type="button"
+                                                        disabled={!canSubmit}
+                                                        onClick={() =>
+                                                            handleAnswerChange(field.key, val)
+                                                        }
+                                                        className={`flex flex-col items-center justify-center rounded-lg border p-2.5 min-h-[44px] min-w-[44px] transition-all cursor-pointer ${
+                                                            isFilled
+                                                                ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-sm'
+                                                                : 'border-border text-ink-muted hover:border-ink-secondary'
+                                                        }`}
+                                                    >
+                                                        <Star
+                                                            className={`h-5 w-5 ${isFilled ? 'fill-amber-400 text-amber-400' : ''}`}
+                                                        />
+                                                        <span className="mt-1 text-[10px] font-bold">
+                                                            {val}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                            <span className="ml-2 text-xs text-ink-secondary">
+                                                {currentValue
+                                                    ? `${currentValue} / 5 Stars`
+                                                    : 'Rate from 1 to 5'}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Date */}
+                                    {field.type === 'date' && (
+                                        <input
+                                            type="date"
+                                            disabled={!canSubmit}
+                                            value={currentValue}
+                                            onChange={(e) =>
+                                                handleAnswerChange(field.key, e.target.value)
+                                            }
+                                            className="w-full sm:w-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:border-accent focus:outline-none disabled:bg-surface-subtle"
+                                        />
+                                    )}
+
+                                    {/* Boolean */}
+                                    {field.type === 'boolean' && (
+                                        <label className="flex items-center gap-2.5 rounded-lg border border-border p-3 text-xs min-h-[44px] cursor-pointer hover:bg-surface-subtle">
+                                            <input
+                                                type="checkbox"
+                                                disabled={!canSubmit}
+                                                checked={Boolean(currentValue)}
+                                                onChange={(e) =>
+                                                    handleAnswerChange(field.key, e.target.checked)
+                                                }
+                                                className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                                            />
+                                            <span className="text-ink font-medium">
+                                                Yes / Agree
+                                            </span>
+                                        </label>
                                     )}
 
                                     {errorMsg && (

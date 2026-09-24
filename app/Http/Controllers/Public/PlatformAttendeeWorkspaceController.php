@@ -507,12 +507,25 @@ final class PlatformAttendeeWorkspaceController extends Controller
         }
 
         $poll = $event->polls()->live()->with('options')->first();
+        $poll = $event->polls()->live()->with(['options' => fn ($q) => $q->withCount('responses')])->withCount('responses')->first();
         if (! $poll) {
             return response()->json(['poll' => null]);
         }
 
         $token = $this->pollRespondentToken($registrationModel, $poll);
         $existing = $poll->responses()->where('respondent_token', $token)->first();
+
+        $totalVotes = (int) $poll->responses_count;
+
+        $userResponse = $existing ? [
+            'option_id' => $existing->option_id,
+            'option_ids' => $existing->option_id ? [$existing->option_id] : [],
+            'response_text' => $existing->response_text,
+            'text_response' => $existing->response_text,
+            'is_correct' => $existing->is_correct,
+            'points_awarded' => $existing->points_awarded,
+            'score' => $existing->points_awarded,
+        ] : null;
 
         return response()->json([
             'poll' => [
@@ -523,18 +536,17 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'points' => $poll->points,
                 'went_live_at' => $poll->went_live_at?->toIso8601String(),
                 'is_time_up' => $poll->type === EventPoll::TYPE_QUIZ && $poll->timeUp(),
+                'total_votes' => $totalVotes,
                 'options' => $poll->options->map(fn (EventPollOption $o): array => [
                     'id' => $o->id,
                     'label' => $o->label,
+                    'votes_count' => (int) ($o->responses_count ?? 0),
+                    'percentage' => $totalVotes > 0 ? (int) round((((int) ($o->responses_count ?? 0)) / $totalVotes) * 100) : 0,
                 ])->values()->all(),
+                'user_response' => $userResponse,
             ],
             'has_responded' => $existing !== null,
-            'my_response' => $existing ? [
-                'option_id' => $existing->option_id,
-                'response_text' => $existing->response_text,
-                'is_correct' => $existing->is_correct,
-                'points_awarded' => $existing->points_awarded,
-            ] : null,
+            'my_response' => $userResponse,
         ]);
     }
 
@@ -563,6 +575,10 @@ final class PlatformAttendeeWorkspaceController extends Controller
         $token = $this->pollRespondentToken($registrationModel, $pollModel);
         if ($pollModel->responses()->where('respondent_token', $token)->exists()) {
             return response()->json(['message' => 'You already responded to this poll.'], 422);
+        }
+
+        if ($request->has('text_response') && ! $request->has('response_text')) {
+            $request->merge(['response_text' => $request->input('text_response')]);
         }
 
         $validated = $request->validate([
@@ -599,6 +615,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'message' => 'Thanks for responding!',
             'is_correct' => $pollModel->type === EventPoll::TYPE_QUIZ ? $response->is_correct : null,
             'points_awarded' => $response->points_awarded,
+            'score' => $response->points_awarded,
         ]);
     }
 
@@ -673,7 +690,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string', 'max:5000'],
             'is_anonymous' => ['sometimes', 'boolean'],
-            'attachment' => ['nullable', 'file', 'max:10240'],
+            'attachment' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,ppt,pptx,txt,zip'],
         ]);
 
         $attachment = [];
@@ -855,8 +872,14 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'type' => $formModel->type,
                 'schema' => $formModel->schema ?? [],
                 'requires_check_in' => $formModel->requires_check_in,
+                'is_eligible' => true,
             ],
+            'schema' => $formModel->schema ?? [],
             'has_submitted' => $submission !== null,
+            'submission' => $submission ? [
+                'answers' => $submission->answers,
+                'submitted_at' => $submission->submitted_at?->toIso8601String(),
+            ] : null,
             'my_submission' => $submission ? [
                 'answers' => $submission->answers,
                 'submitted_at' => $submission->submitted_at?->toIso8601String(),
@@ -893,6 +916,10 @@ final class PlatformAttendeeWorkspaceController extends Controller
             return response()->json([
                 'message' => 'This evaluation is restricted to checked-in attendees of this conference.',
             ], 403);
+        }
+
+        if ($formModel->submissions()->where('registration_id', $registrationModel->id)->exists()) {
+            return response()->json(['message' => 'You have already submitted this form.'], 422);
         }
 
         $validated = $request->validate([
