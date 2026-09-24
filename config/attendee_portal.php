@@ -19,6 +19,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Probe Workspace
+    |--------------------------------------------------------------------------
+    |
+    | Which organisation and which attendee ProbeWorkspaceSeeder furnishes, so
+    | the whole workspace can be looked at with every part switched on.
+    |
+    */
+    'probe' => [
+        'tenant_slug' => env('PROBE_TENANT_SLUG', 'miconvener-probe'),
+        'attendee_email' => env('PROBE_ATTENDEE_EMAIL', 'hiselase@gmail.com'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Abuse Control Limits
     |--------------------------------------------------------------------------
     |
