@@ -1,4 +1,4 @@
-import { Check, Download, Plus } from 'lucide-react';
+import { Check, Download, FileText, Plus } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 
 function formatSessionTime(startsAt, endsAt) {
@@ -53,6 +53,41 @@ export default function MyDayPanel({ event, registration, agendaIds, setAgendaId
                                         ? `${session.location ? ' · ' : ''}${Math.max(session.capacity - session.signup_count, 0)} seats left`
                                         : ''}
                                 </div>
+                                {session.materials && session.materials.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        {session.materials.map((m) => (
+                                            <a
+                                                key={m.id}
+                                                href={
+                                                    m.remaining_attempts > 0
+                                                        ? m.download_url
+                                                        : undefined
+                                                }
+                                                className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                                    m.remaining_attempts > 0
+                                                        ? 'border-border bg-surface text-ink hover:border-accent hover:text-accent'
+                                                        : 'cursor-not-allowed border-border/50 bg-surface-sunken text-ink-muted opacity-60'
+                                                }`}
+                                                title={
+                                                    m.remaining_attempts > 0
+                                                        ? `Download ${m.title} (${m.remaining_attempts} attempts left)`
+                                                        : `${m.title} (No attempts left)`
+                                                }
+                                            >
+                                                <FileText className="h-3 w-3 shrink-0 text-ink-secondary" />
+                                                <span className="max-w-[150px] truncate">
+                                                    {m.title}
+                                                </span>
+                                                {m.provenance === 'speaker' && (
+                                                    <span className="rounded bg-accent/10 px-1 py-0.5 text-[9px] font-semibold text-accent">
+                                                        Slides
+                                                    </span>
+                                                )}
+                                                <Download className="h-2.5 w-2.5 shrink-0 opacity-70" />
+                                            </a>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <button
                                 onClick={() => toggle(session)}

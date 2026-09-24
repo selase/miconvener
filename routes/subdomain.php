@@ -179,6 +179,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::patch('events/{event}/blasts/{blast}/cancel', [EventBlastController::class, 'cancel'])->name('tenant.events.blasts.cancel');
 
     Route::post('events/{event}/materials', [EventMaterialController::class, 'store'])->name('tenant.events.materials.store');
+    Route::patch('events/{event}/materials/speaker-policy', [EventMaterialController::class, 'updateSpeakerPolicy'])->name('tenant.events.materials.speaker-policy');
     Route::delete('events/{event}/materials/{material}', [EventMaterialController::class, 'destroy'])->name('tenant.events.materials.destroy');
 
     Route::post('events/{event}/venue/rooms', [EventVenueController::class, 'storeRoom'])->name('tenant.events.venue.rooms.store');

@@ -17,6 +17,10 @@ final class EventMaterial extends Model
     use HasFactory;
     use HasUuids;
 
+    public const string PROVENANCE_ORGANIZER = 'organizer';
+
+    public const string PROVENANCE_SPEAKER = 'speaker';
+
     protected $connection = 'landlord';
 
     protected $fillable = [
@@ -29,12 +33,14 @@ final class EventMaterial extends Model
         'mime_type',
         'download_limit',
         'release_at',
+        'provenance',
     ];
 
     protected $casts = [
         'file_size' => 'integer',
         'download_limit' => 'integer',
         'release_at' => 'datetime',
+        'provenance' => 'string',
     ];
 
     public function event(): BelongsTo
@@ -47,14 +53,32 @@ final class EventMaterial extends Model
         return $this->belongsTo(EventSession::class, 'session_id');
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<EventSpeaker, $this>
+     */
+    public function eventSpeaker(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EventSpeaker::class, 'slides_material_id');
+    }
+
     public function downloads(): HasMany
     {
         return $this->hasMany(EventMaterialDownload::class, 'material_id');
     }
 
-    public function isReleased(): bool
+    public function isReleased(?\Carbon\CarbonInterface $now = null): bool
     {
-        return $this->release_at === null || $this->release_at->isPast();
+        return app(\App\Services\Events\MaterialReleasePolicy::class)->isReleased($this, $now);
+    }
+
+    public function isSpeakerDeck(): bool
+    {
+        return $this->provenance === self::PROVENANCE_SPEAKER;
+    }
+
+    public function isOrganizerMaterial(): bool
+    {
+        return $this->provenance === self::PROVENANCE_ORGANIZER;
     }
 
     public function downloadsUsedBy(string $registrationId): int

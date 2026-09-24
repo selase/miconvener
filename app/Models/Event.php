@@ -50,6 +50,18 @@ final class Event extends Model
 
     public const array VISIBILITIES = [self::VISIBILITY_PUBLIC, self::VISIBILITY_PRIVATE];
 
+    public const string SPEAKER_POLICY_BEFORE = 'before';
+
+    public const string SPEAKER_POLICY_DURING = 'during';
+
+    public const string SPEAKER_POLICY_AFTER = 'after';
+
+    public const array SPEAKER_POLICIES = [
+        self::SPEAKER_POLICY_BEFORE,
+        self::SPEAKER_POLICY_DURING,
+        self::SPEAKER_POLICY_AFTER,
+    ];
+
     protected $connection = 'landlord';
 
     /**
@@ -58,6 +70,7 @@ final class Event extends Model
      */
     protected $attributes = [
         'visibility' => self::VISIBILITY_PUBLIC,
+        'speaker_slide_policy' => self::SPEAKER_POLICY_AFTER,
     ];
 
     protected $fillable = [
@@ -81,6 +94,7 @@ final class Event extends Model
         'currency',
         'hero_image_path',
         'visibility',
+        'speaker_slide_policy',
         'plan_your_visit_content',
         'platform_fee_percentage',
         'platform_fee_cap_amount',
@@ -99,6 +113,7 @@ final class Event extends Model
         'platform_fee_percentage' => 'float',
         'platform_fee_cap_amount' => 'integer',
         'registration_settings' => 'array',
+        'speaker_slide_policy' => 'string',
     ];
 
     /**

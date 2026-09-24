@@ -28,6 +28,7 @@ final class EventMaterialController extends Controller
             'release_at' => $material->release_at?->toIso8601String(),
             'is_released' => $material->isReleased(),
             'downloads_count' => $material->downloads()->count(),
+            'provenance' => $material->provenance,
         ];
     }
 
@@ -61,9 +62,30 @@ final class EventMaterialController extends Controller
             'mime_type' => $file->getMimeType(),
             'download_limit' => $validated['download_limit'],
             'release_at' => $validated['release_at'] ?? null,
+            'provenance' => EventMaterial::PROVENANCE_ORGANIZER,
         ]);
 
         return response()->json($this->toPayload($material));
+    }
+
+    public function updateSpeakerPolicy(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+
+        $validated = $request->validate([
+            'speaker_slide_policy' => ['required', 'string', \Illuminate\Validation\Rule::in(Event::SPEAKER_POLICIES)],
+        ]);
+
+        $eventModel->update([
+            'speaker_slide_policy' => $validated['speaker_slide_policy'],
+        ]);
+
+        return response()->json([
+            'speaker_slide_policy' => $eventModel->speaker_slide_policy,
+            'message' => 'Speaker slide release policy updated.',
+        ]);
     }
 
     public function destroy(string $subdomain, string $event, string $material): JsonResponse

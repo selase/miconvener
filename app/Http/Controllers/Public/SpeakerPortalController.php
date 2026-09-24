@@ -84,6 +84,7 @@ final class SpeakerPortalController extends Controller
                 'file_path' => $path,
                 'file_size' => $file->getSize(),
                 'mime_type' => $file->getMimeType(),
+                'provenance' => EventMaterial::PROVENANCE_SPEAKER,
             ]);
         } else {
             $material = EventMaterial::create([
@@ -94,6 +95,7 @@ final class SpeakerPortalController extends Controller
                 'file_size' => $file->getSize(),
                 'mime_type' => $file->getMimeType(),
                 'download_limit' => 999,
+                'provenance' => EventMaterial::PROVENANCE_SPEAKER,
             ]);
             $pivot->update(['slides_material_id' => $material->id]);
         }

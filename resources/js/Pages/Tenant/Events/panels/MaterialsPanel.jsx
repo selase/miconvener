@@ -17,12 +17,43 @@ function formatSize(bytes) {
 export default function MaterialsPanel({ event, materials }) {
     const [form, setForm] = useState({ title: '', download_limit: 3, release_at: '', file: null });
     const [saving, setSaving] = useState(false);
+    const [speakerPolicy, setSpeakerPolicy] = useState(event.speaker_slide_policy || 'after');
+    const [savingPolicy, setSavingPolicy] = useState(false);
     const toast = useToast();
 
     const totalDownloads = materials.reduce((sum, m) => sum + m.downloads_count, 0);
     const waitingToRelease = materials.filter((m) => !m.is_released).length;
 
     const reload = () => router.reload({ only: ['event'] });
+
+    const handlePolicyChange = async (newPolicy) => {
+        const previous = speakerPolicy;
+        setSpeakerPolicy(newPolicy);
+        setSavingPolicy(true);
+
+        try {
+            const response = await csrfFetch(
+                route('tenant.events.materials.speaker-policy', { event: event.id }),
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({ speaker_slide_policy: newPolicy }),
+                }
+            );
+
+            if (!response.ok) {
+                const json = await response.json();
+                throw new Error(json.message ?? 'Could not update speaker slide policy.');
+            }
+
+            toast?.('Speaker slide release policy updated.');
+            reload();
+        } catch (err) {
+            setSpeakerPolicy(previous);
+            toast?.(err.message ?? 'Failed to update policy. Reverted to previous value.');
+        } finally {
+            setSavingPolicy(false);
+        }
+    };
 
     const upload = async (e) => {
         e.preventDefault();
@@ -61,7 +92,32 @@ export default function MaterialsPanel({ event, materials }) {
     };
 
     return (
-        <div className="max-w-4xl">
+        <div className="max-w-4xl space-y-6">
+            <div className="border border-border p-4 bg-surface">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <b className="text-sm font-medium text-ink">Speaker Slide Release Policy</b>
+                        <p className="text-xs text-ink-secondary mt-0.5">
+                            Controls when attendee downloads unlock for slide decks uploaded by speakers.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={speakerPolicy}
+                            onChange={(e) => handlePolicyChange(e.target.value)}
+                            disabled={savingPolicy}
+                            className="rounded border border-border bg-surface px-3 py-1.5 text-xs text-ink focus:border-accent focus:outline-none disabled:opacity-50"
+                        >
+                            <option value="before">Before sessions begin (immediate upon upload)</option>
+                            <option value="during">When presentation starts (first linked session start)</option>
+                            <option value="after">After session ends (last linked session end)</option>
+                        </select>
+                        {savingPolicy && (
+                            <span className="text-xs text-ink-muted animate-pulse">Saving…</span>
+                        )}
+                    </div>
+                </div>
+            </div>
             <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="border border-border p-4">
                     <div className="text-xs text-ink-secondary">Files</div>
@@ -96,7 +152,14 @@ export default function MaterialsPanel({ event, materials }) {
                                             strokeWidth={1.5}
                                         />
                                         <div>
-                                            <div className="text-ink">{m.title}</div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-ink">{m.title}</span>
+                                                {m.provenance === 'speaker' && (
+                                                    <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                                                        Speaker slides
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="text-xs text-ink-secondary">
                                                 {formatSize(m.file_size)}
                                             </div>

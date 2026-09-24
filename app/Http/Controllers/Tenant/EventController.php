@@ -506,6 +506,7 @@ final class EventController extends Controller
             'description' => $event->description,
             'status' => $event->status,
             'visibility' => $event->visibility,
+            'speaker_slide_policy' => $event->speaker_slide_policy ?? Event::SPEAKER_POLICY_AFTER,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),
             'timezone' => $event->timezone,
@@ -565,6 +566,7 @@ final class EventController extends Controller
                 'release_at' => $m->release_at?->toIso8601String(),
                 'is_released' => $m->isReleased(),
                 'downloads_count' => $m->downloads()->count(),
+                'provenance' => $m->provenance,
             ])->values() : [],
             'venue_rooms' => $event->relationLoaded('venueRooms') ? $event->venueRooms->map(fn ($room): array => [
                 'id' => $room->id,

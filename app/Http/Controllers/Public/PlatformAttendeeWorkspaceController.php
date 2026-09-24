@@ -92,6 +92,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 ->map(fn (EventMaterial $m): array => [
                     'id' => $m->id,
                     'title' => $m->title,
+                    'provenance' => $m->provenance,
                     'remaining_attempts' => $m->remainingAttemptsFor($registrationModel->id),
                     'download_url' => route('attendee.my.events.materials.download', [
                         'registration' => $registrationModel->id,
@@ -142,7 +143,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             ->all();
 
         return Inertia::render('Public/Events/AttendeePortal/Portal', [
-            'event' => $this->buildEventPayload($event, revealDetails: $registrationModel->isConfirmed()),
+            'event' => $this->buildEventPayload($event, revealDetails: $registrationModel->isConfirmed(), registration: $registrationModel),
             'registration' => [
                 'id' => $registrationModel->id,
                 'full_name' => $registrationModel->full_name,
@@ -1092,7 +1093,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function buildEventPayload(Event $event, bool $revealDetails): array
+    private function buildEventPayload(Event $event, bool $revealDetails, ?EventRegistration $registration = null): array
     {
         $withhold = $event->isPrivate() && ! $revealDetails;
 
@@ -1110,19 +1111,30 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'ticket_price' => $event->ticket_price,
             'currency' => $event->currency,
             'hero_image_url' => Helper::storageUrl($event->hero_image_path),
-            'sessions' => ! $withhold && $event->relationLoaded('sessions') ? $event->sessions->map(fn ($s): array => [
-                'id' => $s->id,
-                'title' => $s->title,
-                'description' => $s->description,
-                'starts_at' => $s->starts_at->toIso8601String(),
-                'ends_at' => $s->ends_at->toIso8601String(),
-                'location' => $s->location,
-                'track' => $s->track,
-                'type' => $s->type,
-                'capacity' => $s->capacity,
-                'signup_count' => $s->registrations_count ?? 0,
-                'speaker_names' => $s->relationLoaded('speakers') ? $s->speakers->pluck('name')->values() : [],
-            ])->values()->all() : [],
+            'sessions' => ! $withhold && $event->relationLoaded('sessions') ? $event->sessions->map(function ($s) use ($registration): array {
+                $sessionMaterials = [];
+                if ($registration !== null && $registration->isConfirmed()) {
+                    $sessionMaterials = app(\App\Services\Events\MaterialReleasePolicy::class)
+                        ->releasedMaterialsForSession($s, $registration)
+                        ->values()
+                        ->all();
+                }
+
+                return [
+                    'id' => $s->id,
+                    'title' => $s->title,
+                    'description' => $s->description,
+                    'starts_at' => $s->starts_at->toIso8601String(),
+                    'ends_at' => $s->ends_at->toIso8601String(),
+                    'location' => $s->location,
+                    'track' => $s->track,
+                    'type' => $s->type,
+                    'capacity' => $s->capacity,
+                    'signup_count' => $s->registrations_count ?? 0,
+                    'speaker_names' => $s->relationLoaded('speakers') ? $s->speakers->pluck('name')->values() : [],
+                    'materials' => $sessionMaterials,
+                ];
+            })->values()->all() : [],
         ];
     }
 

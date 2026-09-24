@@ -19,7 +19,14 @@ export default function DownloadsPanel({ materials }) {
                             strokeWidth={1.5}
                         />
                         <div className="min-w-0">
-                            <div className="truncate text-[13.5px] text-ink">{m.title}</div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="truncate text-[13.5px] text-ink">{m.title}</span>
+                                {m.provenance === 'speaker' && (
+                                    <span className="shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                                        Speaker slides
+                                    </span>
+                                )}
+                            </div>
                             <div className="text-xs text-ink-secondary">
                                 {m.remaining_attempts} of your attempts left
                             </div>
