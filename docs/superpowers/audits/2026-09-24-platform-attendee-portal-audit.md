@@ -504,3 +504,39 @@ Verified against production after deploy:
 | `POST /my/verify/send`, known address | 202, code queued |
 | `POST /my/verify/send`, unknown address | 202, byte-identical response — no enumeration |
 | `POST /my/verify/confirm`, wrong code | generic 422 |
+
+---
+
+## F4 closed: Turnstile is live
+
+Completed 2026-09-24, after the portal shipped.
+
+The widget existed in Cloudflare and the React side was already complete — explicit render, script
+injection, `reset()` between attempts, token posted as `turnstile_token`. Two things were missing.
+
+**Keys.** `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are now set on the production
+environment, and `ATTENDEE_PORTAL_IP_CHALLENGE_THRESHOLD` — the temporary override that held the
+challenge off while the keys were absent — has been deleted. The challenge is back to the sixth
+request per IP per ten minutes, as the spec intends.
+
+**Validation.** Verification accepted any token Cloudflare called genuine. A token is scoped to
+the sitekey that minted it, which left two gaps: one solved against a different form in the same
+Cloudflare account could be spent here, and one solved on a page that merely embeds our sitekey
+could be replayed at us. Cloudflare returns `action` and `hostname` beside `success`, so both are
+checked now (`86e4f59`). The widget signs `attendee-signin`, and the server names that action in
+its own challenge response rather than both ends hardcoding the string, so they cannot drift.
+The hostname must be the platform host, which the host guard already guarantees.
+
+The existing tests faked a bare `{"success": true}`, which no longer resembles a real reply; they
+now fake what Cloudflare actually returns, and a genuine token with the wrong action, or solved
+on another host, is refused — with the matching pair as a positive control.
+
+Verified end to end in a browser on production: the challenge rendered, solved, passed
+server-side validation, the code arrived, and the dashboard returned registrations from two
+different organisers for one proven address.
+
+**Note for whoever reads this next:** exercising the challenge on production requires either
+sending real mail or temporarily lowering the threshold. Lower it (`=0` fires on the first
+request and sends no mail at all), test, then delete the variable. Do not spray requests at
+`@example.invalid` addresses to build the burst — those hard-bounce against the sending domain,
+which is the very thing Turnstile is there to protect.
