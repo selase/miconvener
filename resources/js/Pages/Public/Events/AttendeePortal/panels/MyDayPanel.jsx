@@ -105,16 +105,19 @@ export default function MyDayPanel({ event, registration, agendaIds, setAgendaId
                     );
                 })}
             </ul>
-            <a
-                href={route('public.events.agenda.ics', {
-                    event: event.slug,
-                    registration: registration.id,
-                })}
-                className="inline-flex h-control items-center gap-1.5 border border-border px-3 text-xs text-ink-secondary hover:border-accent hover:text-accent"
-            >
-                <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-                Add my day to calendar
-            </a>
+            {event.organiser_slug && (
+                <a
+                    href={route('public.events.agenda.ics', {
+                        subdomain: event.organiser_slug,
+                        event: event.slug,
+                        registration: registration.id,
+                    })}
+                    className="inline-flex h-control items-center gap-1.5 border border-border px-3 text-xs text-ink-secondary hover:border-accent hover:text-accent"
+                >
+                    <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Add my day to calendar
+                </a>
+            )}
         </div>
     );
 }

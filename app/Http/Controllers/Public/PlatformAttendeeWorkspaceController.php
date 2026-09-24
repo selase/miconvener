@@ -58,6 +58,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             ->where('id', $registration)
             ->with([
                 'event' => fn ($q) => $q->withoutGlobalScopes()->with([
+                    'tenant' => fn ($t) => $t->withoutGlobalScopes(),
                     'sessions' => fn ($s) => $s->withoutGlobalScopes()->withCount('registrations')->with('speakers'),
                     'materials' => fn ($m) => $m->withoutGlobalScopes(),
                 ]),
@@ -1101,6 +1102,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,
+            'organiser_slug' => $event->tenant?->slug ?? $registration?->tenant?->slug,
             'description' => $event->description,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),
