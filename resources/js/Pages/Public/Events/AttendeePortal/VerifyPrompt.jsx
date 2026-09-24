@@ -29,6 +29,7 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
     // Turnstile challenge state
     const [challengeRequired, setChallengeRequired] = useState(false);
     const [siteKey, setSiteKey] = useState(null);
+    const [challengeAction, setChallengeAction] = useState(null);
     const [turnstileToken, setTurnstileToken] = useState(null);
     const turnstileWidgetId = useRef(null);
 
@@ -56,6 +57,9 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                 } else {
                     turnstileWidgetId.current = window.turnstile.render('#turnstile-container', {
                         sitekey: siteKey,
+                        // Named by the server so the two cannot drift: the same
+                        // string is what it checks the token back against.
+                        action: challengeAction ?? undefined,
                         callback: (token) => {
                             setTurnstileToken(token);
                             setMessage(null);
@@ -78,7 +82,7 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             script.onload = renderWidget;
             document.head.appendChild(script);
         }
-    }, [challengeRequired, siteKey]);
+    }, [challengeRequired, siteKey, challengeAction]);
 
     const sendRoute = window.route ? route('attendee.my.verify.send') : '/my/verify/send';
     const confirmRoute = window.route ? route('attendee.my.verify.confirm') : '/my/verify/confirm';
@@ -102,6 +106,7 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             if (response.status === 428) {
                 setChallengeRequired(true);
                 setSiteKey(json.site_key);
+                setChallengeAction(json.action ?? null);
                 setMessage('Please complete the verification challenge below.');
                 return;
             }

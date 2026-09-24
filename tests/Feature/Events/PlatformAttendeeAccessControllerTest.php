@@ -103,7 +103,11 @@ test('send returns 428 when Turnstile challenge is required and 422 when invalid
     // Fake Cloudflare Turnstile sequence: first fails, second succeeds
     Http::fakeSequence('https://challenges.cloudflare.com/*')
         ->push(['success' => false])
-        ->push(['success' => true]);
+        ->push([
+            'success' => true,
+            'action' => \App\Services\Events\AttendeePortalRateLimiter::TURNSTILE_ACTION,
+            'hostname' => app(\App\Services\Tenancy\TenantHostMatcher::class)->baseDomain(),
+        ]);
 
     $this->postJson("http://{$host}/my/verify/send", [
         'email' => 'user6@example.com',

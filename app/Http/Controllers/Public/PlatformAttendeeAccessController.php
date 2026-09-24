@@ -75,6 +75,7 @@ final class PlatformAttendeeAccessController extends Controller
                 'message' => 'Please complete the verification challenge.',
                 'challenge_required' => true,
                 'site_key' => $result['site_key'] ?? null,
+                'action' => $result['action'] ?? null,
             ], 428);
         }
 
@@ -83,6 +84,7 @@ final class PlatformAttendeeAccessController extends Controller
                 'message' => 'Verification challenge failed. Please try again.',
                 'challenge_required' => true,
                 'site_key' => $result['site_key'] ?? null,
+                'action' => $result['action'] ?? null,
             ], 422);
         }
 

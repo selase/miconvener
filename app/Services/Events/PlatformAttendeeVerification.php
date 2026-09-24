@@ -45,7 +45,7 @@ final class PlatformAttendeeVerification
     /**
      * Validate send abuse limits and queue code generation and mailing.
      *
-     * @return array{status: string, site_key?: string|null}
+     * @return array{status: string, site_key?: string|null, action?: string}
      */
     public function requestSend(string $email, string $ip, ?string $turnstileToken = null): array
     {

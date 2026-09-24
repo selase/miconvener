@@ -19,6 +19,11 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 
+function turnstileHost(): string
+{
+    return app(\App\Services\Tenancy\TenantHostMatcher::class)->baseDomain();
+}
+
 beforeEach(function (): void {
     refreshTenantDatabases();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
@@ -86,7 +91,7 @@ test('requestSend triggers Turnstile step-up challenge on 6th attempt from one I
     // Sequential fake for failing then passing verification
     Http::fakeSequence('https://challenges.cloudflare.com/*')
         ->push(['success' => false])
-        ->push(['success' => true]);
+        ->push(['success' => true, 'action' => AttendeePortalRateLimiter::TURNSTILE_ACTION, 'hostname' => turnstileHost()]);
 
     // 6th attempt with failing Turnstile token triggers challenge_failed
     $failedChallenge = $service->requestSend('user6@example.com', '172.16.0.50', 'invalid-token');
@@ -102,7 +107,11 @@ test('requestSend blocks after IP burst limit of 20 attempts in 10 minutes even 
     Config::set('attendee_portal.turnstile.secret_key', 'test-secret-key-xyz');
 
     Http::fake([
-        'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response(['success' => true]),
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+            'success' => true,
+            'action' => AttendeePortalRateLimiter::TURNSTILE_ACTION,
+            'hostname' => turnstileHost(),
+        ]),
     ]);
 
     $service = app(PlatformAttendeeVerification::class);
@@ -294,4 +303,37 @@ test('EnsurePlatformAttendeeVerified middleware protects routes', function (): v
     ])->getJson('/test/protected-attendee')
         ->assertOk()
         ->assertJson(['email' => 'ama@example.com']);
+});
+
+test('a genuine token is still refused when it was not solved for this form or this site', function (): void {
+    Config::set('attendee_portal.turnstile.site_key', 'test-site-key-123');
+    Config::set('attendee_portal.turnstile.secret_key', 'test-secret-key-xyz');
+
+    $limiter = app(AttendeePortalRateLimiter::class);
+
+    // Cloudflare says all three tokens are real. Only the last was minted for
+    // this form, on this site.
+    Http::fakeSequence('https://challenges.cloudflare.com/*')
+        ->push(['success' => true, 'action' => 'newsletter-signup', 'hostname' => turnstileHost()])
+        ->push(['success' => true, 'action' => AttendeePortalRateLimiter::TURNSTILE_ACTION, 'hostname' => 'phishing.example.com'])
+        ->push(['success' => true, 'action' => AttendeePortalRateLimiter::TURNSTILE_ACTION, 'hostname' => turnstileHost()]);
+
+    expect($limiter->verifyTurnstileToken('real-token', '10.1.1.1'))->toBeFalse()
+        ->and($limiter->verifyTurnstileToken('real-token', '10.1.1.1'))->toBeFalse()
+        ->and($limiter->verifyTurnstileToken('real-token', '10.1.1.1'))->toBeTrue();
+});
+
+test('the challenge response tells the widget which action to sign', function (): void {
+    Config::set('attendee_portal.turnstile.site_key', 'test-site-key-123');
+
+    $service = app(PlatformAttendeeVerification::class);
+
+    for ($i = 1; $i <= 5; $i++) {
+        $service->requestSend("action-probe{$i}@example.com", '172.16.9.9');
+    }
+
+    $challenged = $service->requestSend('action-probe6@example.com', '172.16.9.9');
+
+    expect($challenged['status'])->toBe(AttendeePortalRateLimiter::RESULT_CHALLENGE_REQUIRED)
+        ->and($challenged['action'])->toBe(AttendeePortalRateLimiter::TURNSTILE_ACTION);
 });

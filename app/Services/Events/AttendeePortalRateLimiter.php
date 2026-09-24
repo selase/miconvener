@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Events;
 
+use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -11,6 +12,15 @@ use Throwable;
 
 final class AttendeePortalRateLimiter
 {
+    /**
+     * Named on the widget and checked on the way back.
+     *
+     * A token is only good for the sitekey it was minted under, so this stops
+     * one solved somewhere else in the same account -- a different form, a
+     * different flow -- being spent here.
+     */
+    public const string TURNSTILE_ACTION = 'attendee-signin';
+
     public const string RESULT_ALLOWED = 'allowed';
 
     public const string RESULT_RATE_LIMITED = 'rate_limited';
@@ -19,10 +29,12 @@ final class AttendeePortalRateLimiter
 
     public const string RESULT_CHALLENGE_FAILED = 'challenge_failed';
 
+    public function __construct(private readonly TenantHostMatcher $hostMatcher) {}
+
     /**
      * Check if a send request passes abuse limits and human challenge requirements.
      *
-     * @return array{status: string, site_key?: string|null}
+     * @return array{status: string, site_key?: string|null, action?: string}
      */
     public function checkSend(string $emailNormalized, string $ip, ?string $turnstileToken = null): array
     {
@@ -49,6 +61,7 @@ final class AttendeePortalRateLimiter
                 return [
                     'status' => self::RESULT_CHALLENGE_REQUIRED,
                     'site_key' => $siteKey,
+                    'action' => self::TURNSTILE_ACTION,
                 ];
             }
 
@@ -56,6 +69,7 @@ final class AttendeePortalRateLimiter
                 return [
                     'status' => self::RESULT_CHALLENGE_FAILED,
                     'site_key' => $siteKey,
+                    'action' => self::TURNSTILE_ACTION,
                 ];
             }
         }
@@ -150,7 +164,34 @@ final class AttendeePortalRateLimiter
                 'remoteip' => $ip,
             ]);
 
-            return (bool) ($response->json('success') ?? false);
+            if (($response->json('success') ?? false) !== true) {
+                return false;
+            }
+
+            // Cloudflare echoes back where the challenge was solved and what it
+            // was solved for. Both are checked, because "success" on its own
+            // only says the token is genuine -- not that it was minted for this
+            // form, on this site.
+            if ($response->json('action') !== self::TURNSTILE_ACTION) {
+                Log::warning('Turnstile token presented with an unexpected action.', [
+                    'action' => $response->json('action'),
+                ]);
+
+                return false;
+            }
+
+            $expectedHost = $this->hostMatcher->baseDomain();
+            $solvedOn = $this->hostMatcher->normalizeHost((string) $response->json('hostname'));
+
+            if ($expectedHost !== '' && $solvedOn !== $expectedHost) {
+                Log::warning('Turnstile token solved on an unexpected hostname.', [
+                    'hostname' => $solvedOn,
+                ]);
+
+                return false;
+            }
+
+            return true;
         } catch (Throwable $e) {
             Log::error('Turnstile verification failed: '.$e->getMessage());
 
