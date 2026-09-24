@@ -513,7 +513,7 @@ on R2's 400, and the test could not tell them apart. It now asserts the bytes ar
   title with an em dash and a slash still downloads -- confirmed to fail without the sanitiser).
   `MediaRouteBypassTest` still passes. Suite 1084/1084.
 
-## [ ] Track: Platform Attendee Portal (Central Identity & Lifecycle Command Center)
+## [x] Track: Platform Attendee Portal (Central Identity & Lifecycle Command Center)
 
 Replacing the single-tenant `/my` portal with a single platform-wide passwordless attendee portal at `https://miconvener.com/my` across all organisers on the platform.
 
@@ -545,6 +545,6 @@ Replacing the single-tenant `/my` portal with a single platform-wide passwordles
   - [x] **10.4 Organiser Console UX**: Implemented `PATCH /events/{event}/materials/speaker-policy` endpoint in `EventMaterialController` with `update event` permission gating and tenant scoping; enhanced `MaterialsPanel.jsx` with plain-language policy dropdown, optimistic UI with error rollback, saving indicator, toast notifications, and "Speaker slides" badge for materials.
   - [x] **10.5 Attendee Workspace & "My Day" Placement**: Attached released session materials in `PlatformAttendeeWorkspaceController::buildEventPayload()` and `DownloadsPanel`; updated `MyDayPanel.jsx` to render released materials directly inside session cards with download attempt counts and "Slides" badge; updated `DownloadsPanel.jsx` with "Speaker slides" badge; enforced download attempt limit decrements only when files actually exist on disk (404 does not decrement attempt count).
   - [x] **10.6 Automated Verification**: 8 dedicated tests (57 assertions) in `tests/Feature/Events/MaterialReleasePolicyTest.php`, all 90 tests (560 assertions) in the platform attendee test suite passing, full PHPStan static analysis passing (0 errors), ESLint passing, clean Pint formatting, and successful Vite production build.
-- **Stage 11: Cleanup & Security Audit**: Deprecate legacy tenant verification tables, static analysis, Pint, full Pest suite.
+- [x] **Stage 11: Cleanup & Security Audit**: Dropped obsolete `attendee_access_codes` table via landlord migration `2026_09_24_110000_drop_attendee_access_codes_table.php`; purged legacy single-tenant verification artifacts (`AttendeeAccessCode`, `AttendeeAccessCodeFactory`, `AttendeeVerification`, `AttendeeAccessController`, `EnsureAttendeeVerified`, `AttendeeAccessCodeMail`, `SendAttendeeAccessCode`, and `attendee_verified` middleware registration); updated `MailableRenderTest` to render `PlatformAttendeeAccessCodeMail`; verified full security boundaries (timing-safe verification, Turnstile step-up, cross-tenant isolation, checkout-grant segregation); verified 0 PHPStan errors, clean ESLint, clean Pint formatting, successful Vite build, and 110 passing feature tests (625 assertions).
 
 

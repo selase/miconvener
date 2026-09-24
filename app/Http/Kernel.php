@@ -101,7 +101,6 @@ final class Kernel extends HttpKernel
         'verified' => EnsureEmailIsVerified::class,
         'feature' => Middleware\EnsureFeatureEnabled::class,
         'feature_limit' => Middleware\EnsureFeatureLimit::class,
-        'attendee_verified' => Middleware\EnsureAttendeeVerified::class,
         'platform_attendee_verified' => Middleware\EnsurePlatformAttendeeVerified::class,
         'tenant_from_host' => Middleware\EnsureTenantFromHost::class,
         'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,

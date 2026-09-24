@@ -122,7 +122,7 @@ test('a proof already held is not honoured through a header', function (): void 
     // the guard answers before the verification does.
     $this->withSession(["attendee_verified.{$tenant->id}" => [
         'email' => 'ama@stem.org',
-        'expires_at' => now()->addMinutes(AttendeeVerification::VERIFIED_MINUTES)->getTimestamp(),
+        'expires_at' => now()->addMinutes(720)->getTimestamp(),
     ]])
         ->getJson("http://{$host}/my/session", ['HTTP_HOST' => $host, 'HTTP_X_TENANT' => $tenant->slug])
         ->assertNotFound();
