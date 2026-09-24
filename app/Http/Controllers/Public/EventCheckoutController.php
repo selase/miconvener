@@ -34,9 +34,16 @@ final class EventCheckoutController extends Controller
 
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
-        if ($registrationModel->isConfirmed()) {
+        // Paying for a ticket stays open to whoever holds the link -- a
+        // colleague settling an invoice is a real case. Seeing the private
+        // workspace afterwards is not: the grant is minted only for a browser
+        // that already has a claim on this registration, so knowing the UUID
+        // alone never becomes a credential.
+        if ($this->canClaimWorkspace($registrationModel)) {
             $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
+        }
 
+        if ($registrationModel->isConfirmed()) {
             return redirect($workspaceUrl);
         }
 
@@ -58,8 +65,6 @@ final class EventCheckoutController extends Controller
 
         $customerId = $paystack->createCustomer($registrationModel->email, $registrationModel->full_name);
 
-        $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
-
         $checkoutUrl = $paystack->createOneTimeCheckoutSession(
             $customerId,
             $registrationModel->effectiveChargedAmount(),
@@ -79,6 +84,28 @@ final class EventCheckoutController extends Controller
         // location response tells the client to perform a full page visit instead,
         // and degrades to an ordinary 302 for non-Inertia requests.
         return Inertia::location($checkoutUrl);
+    }
+
+    /**
+     * Whether this browser may be handed workspace access for a registration
+     * it is about to pay for.
+     *
+     * Three claims count, and all three are held by the browser rather than
+     * typed into the URL: proof of the registration's own address (or a grant
+     * it already holds), a signature this application issued when it mailed a
+     * payment invite, and having created the registration in this session.
+     */
+    private function canClaimWorkspace(EventRegistration $registration): bool
+    {
+        if ($this->workspaceAuthorizer->canAccess(request()->session(), $registration)) {
+            return true;
+        }
+
+        if (request()->hasValidSignature()) {
+            return true;
+        }
+
+        return $this->workspaceAuthorizer->registeredInThisSession(request()->session(), $registration->id);
     }
 
     private function tenantGateway(Tenant $tenant): ?PaystackGateway

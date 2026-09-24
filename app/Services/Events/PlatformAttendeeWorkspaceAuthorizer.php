@@ -12,6 +12,8 @@ final class PlatformAttendeeWorkspaceAuthorizer
 {
     public const string CHECKOUT_GRANTS_SESSION_KEY = 'attendee_checkout_grants';
 
+    public const string REGISTERED_SESSION_KEY = 'attendee_registered_in_session';
+
     public const int DEFAULT_GRANT_TTL_MINUTES = 30;
 
     public function __construct(
@@ -48,6 +50,26 @@ final class PlatformAttendeeWorkspaceAuthorizer
         }
 
         return true;
+    }
+
+    /**
+     * Remember that this browser created a registration, so the person who
+     * just filled in the form keeps reaching their own ticket without proving
+     * an address they have not been asked for yet.
+     */
+    public function rememberRegistered(Session $session, string $registrationId): void
+    {
+        $owned = $session->get(self::REGISTERED_SESSION_KEY, []);
+        $owned[$registrationId] = now()->getTimestamp();
+        $session->put(self::REGISTERED_SESSION_KEY, $owned);
+    }
+
+    /**
+     * Whether this browser created the registration during this session.
+     */
+    public function registeredInThisSession(Session $session, string $registrationId): bool
+    {
+        return array_key_exists($registrationId, $session->get(self::REGISTERED_SESSION_KEY, []));
     }
 
     /**

@@ -10,7 +10,9 @@ use App\Models\PlatformAttendeeAccessCode;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 final class PlatformAttendeeVerification
 {
@@ -51,12 +53,16 @@ final class PlatformAttendeeVerification
 
         $check = $this->rateLimiter->checkSend($normalized, $ip, $turnstileToken);
         if ($check['status'] !== AttendeePortalRateLimiter::RESULT_ALLOWED) {
+            $this->logSend($normalized, $ip, $check['status']);
+
             return $check;
         }
 
         SendPlatformAttendeeAccessCode::dispatch($normalized);
 
         $this->rateLimiter->recordSend($normalized, $ip);
+
+        $this->logSend($normalized, $ip, AttendeePortalRateLimiter::RESULT_ALLOWED);
 
         return ['status' => AttendeePortalRateLimiter::RESULT_ALLOWED];
     }
@@ -144,20 +150,6 @@ final class PlatformAttendeeVerification
     }
 
     /**
-     * Store verified platform session proof directly (e.g. from signed free ticket verification link).
-     */
-    public function storeVerifiedSession(Session $session, string $email): void
-    {
-        $normalized = self::normalise($email);
-        $session->regenerate();
-        $session->put(self::SESSION_KEY, [
-            'email' => $normalized,
-            'verified_at' => now()->getTimestamp(),
-            'expires_at' => now()->addHours(self::VERIFIED_HOURS)->getTimestamp(),
-        ]);
-    }
-
-    /**
      * The address proven platform-wide, or null if expired or missing.
      */
     public function verifiedEmail(Session $session): ?string
@@ -188,6 +180,27 @@ final class PlatformAttendeeVerification
             'platform-attendee-dummy-hash:'.config('hashing.driver').':'.config('hashing.bcrypt.rounds'),
             fn (): string => Hash::make('platform-attendee-verification-dummy-code'),
         );
+    }
+
+    /**
+     * Record one send attempt for operators.
+     *
+     * The endpoint mails any syntactically valid address on purpose, so that
+     * abuse of it is invisible unless it is counted. The address and the IP are
+     * recorded as keyed digests: enough to group repeat offenders and to answer
+     * a deliverability complaint, without writing an attendee's address into
+     * the application log.
+     */
+    private function logSend(string $emailNormalized, string $ip, string $result): void
+    {
+        $key = (string) config('app.key');
+
+        Log::info('platform attendee access code send', [
+            'correlation_id' => (string) Str::uuid(),
+            'email_hmac' => hash_hmac('sha256', $emailNormalized, $key),
+            'ip_hmac' => hash_hmac('sha256', $ip, $key),
+            'result' => $result,
+        ]);
     }
 
     private function checkDummyHash(string $code): void

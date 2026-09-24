@@ -14,15 +14,14 @@ use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Mail\Events\EventRegistrationWaitlisted;
 use App\Models\Event;
 use App\Models\EventFormField;
-use App\Models\EventMaterial;
 use App\Models\EventRegistration;
 use App\Models\EventTicketType;
 use App\Models\Tenant;
-use App\Services\Events\QrCodeGenerator;
+use App\Services\Events\PlatformAttendeeVerification;
+use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
 use App\Services\Events\RegistrationPricingService;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
-use App\Support\ContactMask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,6 +30,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 final class PublicEventController extends Controller
 {
@@ -52,7 +52,7 @@ final class PublicEventController extends Controller
         ]);
     }
 
-    public function register(Request $request, string $subdomain, string $event): RedirectResponse
+    public function register(Request $request, string $subdomain, string $event): SymfonyResponse
     {
         $tenant = $this->getTenant();
 
@@ -235,6 +235,12 @@ final class PublicEventController extends Controller
                 : null,
         ]);
 
+        // The browser that just filled in this form is allowed to follow its
+        // own registration through to payment and its ticket without being
+        // asked to prove an address it has not yet been mailed at.
+        app(PlatformAttendeeWorkspaceAuthorizer::class)
+            ->rememberRegistered(request()->session(), $registration->id);
+
         if ($promoCodeModel) {
             app(\App\Services\Events\PromoCodeService::class)->recordRedemption($promoCodeModel);
         }
@@ -272,11 +278,15 @@ final class PublicEventController extends Controller
             ]);
         }
 
-        return redirect()->route('public.events.confirmation', [
-            'subdomain' => $tenant->slug,
-            'event' => $eventModel->slug,
-            'registration' => $registration->id,
-        ]);
+        // Straight to the canonical workspace on the platform host. Going via
+        // public.events.confirmation would work in a browser but not here: this
+        // response answers an Inertia form submission, which follows redirects
+        // with XHR, and that route now redirects to another origin -- which CORS
+        // blocks. Inertia's location response asks the client for a full page
+        // visit instead, and degrades to an ordinary 302 for everything else.
+        return Inertia::location(
+            app(PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($registration)
+        );
     }
 
     /**
@@ -295,16 +305,28 @@ final class PublicEventController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
-        $portal = [
-            'subdomain' => $tenant->slug,
-            'event' => $eventModel->slug,
-            'registration' => $registrationModel->id,
-        ];
+        $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
+
+        // Following this link opens the ticket it belongs to, and nothing else.
+        // It is tempting to treat it as proof of the address -- it was signed
+        // and mailed there -- but it stays valid for seven days and a link can
+        // be forwarded, archived or read over a shoulder, where a typed code
+        // cannot. Platform proof would turn any of those into a tour of every
+        // event this person has ever attended, across every organiser. A grant
+        // scoped to this one registration spares them a second challenge to see
+        // their own ticket without spending their whole history on it.
+        $authorizer->grantCheckoutAccess(
+            request()->session(),
+            $registrationModel->id,
+            PlatformAttendeeVerification::VERIFIED_HOURS * 60,
+        );
+
+        $workspace = $authorizer->workspaceUrl($registrationModel);
 
         // Clicking twice -- a mail client prefetching, a forwarded link -- must
         // not issue a second ticket or send a second email.
         if ($registrationModel->hasVerifiedEmail()) {
-            return redirect()->route('public.events.confirmation', $portal);
+            return redirect()->away($workspace);
         }
 
         $registrationModel->email_verified_at = now();
@@ -320,87 +342,30 @@ final class PublicEventController extends Controller
             Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
         }
 
-        return redirect()->route('public.events.confirmation', $portal)
+        return redirect()->away($workspace)
             ->with('success', 'Email confirmed. Your ticket is on its way.');
     }
 
-    public function confirmation(string $subdomain, string $event, string $registration): Response
+    /**
+     * Every confirmation and ticket email ever sent links here, so the URL and
+     * route name never change. What it does changed: knowing a registration
+     * UUID is no longer a credential, so this hands the visitor to the one
+     * canonical workspace, which asks them to prove their address if the
+     * browser cannot already.
+     */
+    public function confirmation(string $subdomain, string $event, string $registration): RedirectResponse
     {
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)
-            ->with(['sessions' => fn ($query) => $query->withCount('registrations'), 'sessions.speakers'])
-            ->firstOrFail();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->firstOrFail();
         $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
             ->where('event_id', $eventModel->id)
             ->where('id', $registration)
-            ->with(['ticketType:id,name', 'sessions:id', 'seatAssignment.room:id,name'])
             ->firstOrFail();
 
-        $materials = [];
-        if ($registrationModel->isConfirmed()) {
-            $materials = $eventModel->materials()
-                ->get()
-                ->filter(fn (EventMaterial $m): bool => $m->isReleased())
-                ->map(fn (EventMaterial $m): array => [
-                    'id' => $m->id,
-                    'title' => $m->title,
-                    'remaining_attempts' => $m->remainingAttemptsFor($registrationModel->id),
-                    'download_url' => route('public.events.materials.download', [
-                        'subdomain' => $tenant->slug,
-                        'event' => $eventModel->slug,
-                        'registration' => $registrationModel->id,
-                        'material' => $m->id,
-                    ]),
-                ])
-                ->values();
-        }
-
-        return Inertia::render('Public/Events/AttendeePortal/Portal', [
-            'event' => $this->toPublicPayload($eventModel, revealDetails: $registrationModel->isConfirmed()),
-            'registration' => [
-                'id' => $registrationModel->id,
-                'full_name' => $registrationModel->full_name,
-                // Anyone holding the link sees this. The page never shows the
-                // phone number, so it is not sent at all.
-                'email' => ContactMask::email($registrationModel->email),
-                'status' => $registrationModel->status,
-                'ticket_code' => $registrationModel->ticket_code,
-                'ticket_type_name' => $registrationModel->ticketType?->name,
-                'qr_image' => $registrationModel->qr_token
-                    ? QrCodeGenerator::svgDataUri($registrationModel->qr_token)
-                    : null,
-                'agenda_session_ids' => $registrationModel->sessions->pluck('id')->values(),
-                'waitlist_position' => $registrationModel->waitlist_position,
-                'approval_note' => $registrationModel->approval_note,
-                'seat_label' => $registrationModel->seatAssignment?->seat_label,
-                'room_name' => $registrationModel->seatAssignment?->room?->name,
-                'checked_in' => $registrationModel->checked_in_at !== null,
-                'email_verified' => $registrationModel->hasVerifiedEmail(),
-                // Awaiting payment covers two very different people: someone
-                // who has paid and is waiting on the gateway, and someone just
-                // approved who has not started. Only the second needs a button,
-                // and telling them we are confirming a payment they never made
-                // leaves them waiting for nothing.
-                'awaiting_checkout' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
-                    && blank($registrationModel->payment_reference),
-                'checkout_url' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
-                    ? route('public.events.checkout', [
-                        'subdomain' => $tenant->slug,
-                        'event' => $eventModel->slug,
-                        'registration' => $registrationModel->id,
-                    ])
-                    : null,
-            ],
-            'materials' => $materials,
-            // Asking for water three weeks early reaches nobody: a service
-            // request is only answerable while there are staff in the room. The
-            // window opens when the event does, or as soon as the attendee is
-            // scanned in -- whichever happens first, since people arrive before
-            // the published start.
-            'canRequestHelp' => $registrationModel->checked_in_at !== null
-                || ($eventModel->starts_at?->isPast() && $eventModel->ends_at?->isFuture()),
-        ]);
+        return redirect()->away(
+            app(PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($registrationModel)
+        );
     }
 
     /**

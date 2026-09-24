@@ -12,6 +12,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\URL;
 
 final class EventRegistrationPaymentInvite extends Mailable
 {
@@ -37,7 +38,11 @@ final class EventRegistrationPaymentInvite extends Mailable
                 'event' => $this->registration->event,
                 'registration' => $this->registration,
                 'reason' => $this->reason,
-                'checkoutUrl' => route('public.events.checkout', [
+                // Signed, because following this link from the inbox it was
+                // sent to is what entitles the payer to their own workspace
+                // afterwards. An unsigned copy still pays; it just does not
+                // hand out access.
+                'checkoutUrl' => URL::signedRoute('public.events.checkout', [
                     'subdomain' => $this->registration->tenant->slug,
                     'event' => $this->registration->event->slug,
                     'registration' => $this->registration->id,
