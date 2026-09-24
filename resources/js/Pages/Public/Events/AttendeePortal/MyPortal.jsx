@@ -130,6 +130,16 @@ export default function MyPortal({
     }, [verifiedEmail, history, loading, selectedOrganiser, fetchData]);
 
     const handleVerified = (maskedEmail) => {
+        // Someone sent here from a workspace they could not open yet is put
+        // back where they were going. The target is only ever followed when it
+        // is a path on this portal, so a crafted ?return_to cannot bounce a
+        // just-verified visitor off to somewhere else.
+        const requested = new URLSearchParams(window.location.search).get('return_to');
+        if (requested && /^\/my(\/|$)/.test(requested) && !requested.startsWith('//')) {
+            window.location.assign(requested);
+            return;
+        }
+
         setVerifiedEmail(maskedEmail);
         fetchData(selectedOrganiser?.slug);
     };
