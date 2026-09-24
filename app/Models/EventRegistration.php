@@ -180,6 +180,19 @@ final class EventRegistration extends Model
         return $this->hasMany(EventBadgePrint::class, 'registration_id')->orderByDesc('created_at');
     }
 
+    /**
+     * Every handover this ticket has been through, consumed or still open.
+     *
+     * A consumed one marks the moment the ticket changed hands, which is what
+     * separates the records of one holder from the next.
+     *
+     * @return HasMany<EventRegistrationTransfer, $this>
+     */
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(EventRegistrationTransfer::class, 'registration_id');
+    }
+
     public function isConfirmed(): bool
     {
         return in_array($this->status, [self::STATUS_CONFIRMED, self::STATUS_CHECKED_IN], true);

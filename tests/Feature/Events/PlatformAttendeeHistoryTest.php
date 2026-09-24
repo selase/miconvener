@@ -117,7 +117,7 @@ test('getHistory returns cross-tenant registrations grouped by urgency and organ
         ->and($tcgEntry['upcoming'])->toHaveCount(0);
 });
 
-test('getHistory classifies needs_attention for pending payment and pending transfers', function (): void {
+test('getHistory asks for payment but never for a transfer the recipient cannot complete', function (): void {
     $service = app(PlatformAttendeeHistory::class);
     $email = 'urgent@example.com';
 
@@ -156,11 +156,20 @@ test('getHistory classifies needs_attention for pending payment and pending tran
 
     $history = $service->getHistory($email);
 
-    expect($history['needs_attention'])->toHaveCount(2);
+    // The payment is the recipient's to make, so it is offered. The transfer is
+    // not: its code was sent to the current holder, and the workspace behind
+    // any such card would refuse this address until the ticket is theirs.
+    expect($history['needs_attention'])->toHaveCount(1);
 
     $reasons = collect($history['needs_attention'])->pluck('reason')->all();
     expect($reasons)->toContain('Payment required to secure your ticket')
-        ->and($reasons)->toContain('Ticket transfer awaiting your confirmation');
+        ->and($reasons)->not->toContain('Ticket transfer awaiting your confirmation');
+
+    // Every action offered must open for the person it is offered to.
+    foreach ($history['needs_attention'] as $item) {
+        $registration = EventRegistration::withoutGlobalScopes()->find($item['registration_id']);
+        expect(mb_strtolower($registration->email))->toBe($email);
+    }
 });
 
 test('getHistory classifies live_now for running events or checked-in attendees', function (): void {

@@ -9,7 +9,6 @@ use App\Models\Event;
 use App\Models\EventAbstractAuthor;
 use App\Models\EventCertificate;
 use App\Models\EventRegistration;
-use App\Models\EventRegistrationTransfer;
 use App\Models\EventSessionAttendance;
 use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,46 +47,12 @@ final class PlatformAttendeeHistory
         $liveNow = [];
         $organisersMap = [];
 
-        // Check for pending transfers where attendee is the recipient
-        $pendingTransfers = EventRegistrationTransfer::withoutGlobalScopes()
-            ->whereRaw('lower(to_email) = ?', [$email])
-            ->whereNull('consumed_at')
-            ->where('expires_at', '>', now())
-            ->where('attempts', '<', EventRegistrationTransfer::MAX_ATTEMPTS)
-            ->whereHas('tenant', fn (Builder $q) => $q->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
-            ->when($organiserSlug !== null, fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $organiserSlug)))
-            ->with([
-                'registration' => fn ($q) => $q->withoutGlobalScopes()->with([
-                    'event' => fn ($e) => $e->withoutGlobalScopes(),
-                    'tenant' => fn ($t) => $t->withoutGlobalScopes(),
-                ]),
-            ])
-            ->get();
-
-        foreach ($pendingTransfers as $transfer) {
-            $reg = $transfer->registration;
-            if ($reg !== null && $reg->event !== null && $reg->tenant !== null) {
-                $needsAttention[] = [
-                    'registration_id' => $reg->id,
-                    'reason' => 'Ticket transfer awaiting your confirmation',
-                    'action' => [
-                        'label' => 'Review & accept transfer',
-                        'url' => url("/my/events/{$reg->id}"),
-                    ],
-                    'organiser' => [
-                        'id' => $reg->tenant->id,
-                        'name' => $reg->tenant->name,
-                        'slug' => $reg->tenant->slug,
-                    ],
-                    'event' => [
-                        'name' => $reg->event->name,
-                        'slug' => $reg->event->slug,
-                        'starts_at' => $reg->event->starts_at->toIso8601String(),
-                        'ends_at' => $reg->event->ends_at->toIso8601String(),
-                    ],
-                ];
-            }
-        }
+        // A transfer addressed to this person is deliberately absent from
+        // "needs your attention". The confirmation code goes to the current
+        // holder, who completes the handover; the recipient has nothing to do
+        // until the ticket is theirs, at which point it appears in the ordinary
+        // organiser grouping below. Listing it as an action offered a card that
+        // refused the only person it invited.
 
         foreach ($registrations as $reg) {
             $event = $reg->event;
@@ -231,9 +196,21 @@ final class PlatformAttendeeHistory
 
         /** @var \Illuminate\Database\Eloquent\Collection<int, EventCertificate> $certificates */
         $certificates = EventCertificate::withoutGlobalScopes()
+            // A certificate names its own recipient, so that address always
+            // reaches it. The ticket reaches it too -- an organiser who
+            // corrects a misspelt address should not cut the holder off from a
+            // certificate already issued -- but only while the ticket has not
+            // changed hands since. Otherwise a transfer would hand the previous
+            // holder's certificate, bearing their name, to the new one.
             ->where(function (Builder $query) use ($email): void {
                 $query->whereRaw('lower(recipient_email) = ?', [$email])
-                    ->orWhereHas('registration', fn (Builder $r) => $r->withoutGlobalScopes()->whereRaw('lower(email) = ?', [$email]));
+                    ->orWhere(function (Builder $viaTicket) use ($email): void {
+                        $viaTicket
+                            ->whereHas('registration', fn (Builder $r) => $r->withoutGlobalScopes()->whereRaw('lower(email) = ?', [$email]))
+                            ->whereDoesntHave('registration.transfers', fn (Builder $t) => $t->withoutGlobalScopes()
+                                ->whereNotNull('consumed_at')
+                                ->whereColumn('event_registration_transfers.consumed_at', '>', 'event_certificates.issued_at'));
+                    });
             })
             ->whereHas('tenant', fn (Builder $q) => $q->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
             ->when($organiserSlug !== null, fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $organiserSlug)))
@@ -320,6 +297,13 @@ final class PlatformAttendeeHistory
         /** @var \Illuminate\Database\Eloquent\Collection<int, EventSessionAttendance> $attendances */
         $attendances = EventSessionAttendance::withoutGlobalScopes()
             ->whereHas('registration', fn (Builder $r) => $r->withoutGlobalScopes()->whereRaw('lower(email) = ?', [$email]))
+            // Being scanned into a room is something a particular person did.
+            // When a ticket changes hands mid-event, the check-ins that predate
+            // the handover stay with whoever was in the room, not with whoever
+            // holds the ticket afterwards.
+            ->whereDoesntHave('registration.transfers', fn (Builder $t) => $t->withoutGlobalScopes()
+                ->whereNotNull('consumed_at')
+                ->whereColumn('event_registration_transfers.consumed_at', '>', 'event_session_attendances.checked_in_at'))
             ->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
             ->when($organiserSlug !== null, fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $organiserSlug)))
             ->with([
