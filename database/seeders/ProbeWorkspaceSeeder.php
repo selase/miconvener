@@ -188,13 +188,17 @@ final class ProbeWorkspaceSeeder extends Seeder
                 Storage::disk($disk)->put($path, $spec['body']);
             }
 
+            // Keyed on the path, not the title. Re-titling a fixture used to
+            // orphan the old row rather than update it, leaving a stale copy
+            // beside the new one -- which is exactly how a withheld file came
+            // to be visible during a browser run.
             /** @var EventMaterial $material */
             $material = EventMaterial::query()->updateOrCreate(
-                ['event_id' => $event->id, 'title' => $spec['title']],
+                ['event_id' => $event->id, 'file_path' => $path],
                 [
                     'tenant_id' => $event->tenant_id,
                     'session_id' => $spec['session']?->id,
-                    'file_path' => $path,
+                    'title' => $spec['title'],
                     'file_size' => mb_strlen($spec['body']),
                     'mime_type' => 'text/plain',
                     'download_limit' => 5,
@@ -205,6 +209,13 @@ final class ProbeWorkspaceSeeder extends Seeder
 
             $decks[$key] = $material;
         }
+
+        // Anything this seeder is no longer responsible for goes, so a renamed
+        // or dropped fixture cannot linger and be mistaken for real behaviour.
+        EventMaterial::query()
+            ->where('event_id', $event->id)
+            ->whereNotIn('id', collect($decks)->pluck('id')->all())
+            ->delete();
 
         $this->speaker($event, $sessions['running'], $decks['deck']);
     }

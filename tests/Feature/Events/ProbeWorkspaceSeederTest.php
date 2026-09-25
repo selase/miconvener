@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Models\Event;
+use App\Models\EventMaterial;
 use App\Models\Tenant;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Tenancy\TenantHostMatcher;
@@ -156,4 +157,28 @@ test('the withheld file stays withheld for the whole event, not just its first h
     $this->travelTo($event->ends_at->copy()->addHours(2));
 
     expect(implode(' ', $titles()))->toContain('Workshop handout');
+});
+
+test('re-titling a fixture replaces it instead of leaving a stale copy beside it', function (): void {
+    [, $event] = seedProbeWorkspace();
+
+    $materials = fn () => EventMaterial::withoutGlobalScopes()
+        ->where('event_id', $event->id)
+        ->get();
+
+    expect($materials())->toHaveCount(3);
+
+    // Stand in for a renamed fixture: the row the seeder would previously have
+    // orphaned, sharing a path with the one it is about to write.
+    $handout = $materials()->firstWhere('title', 'Workshop handout (released after the event)');
+    $handout->update(['title' => 'Workshop handout (some older wording)']);
+
+    Artisan::call('db:seed', ['--class' => ProbeWorkspaceSeeder::class]);
+
+    $after = $materials();
+
+    expect($after)->toHaveCount(3)
+        ->and($after->pluck('file_path')->unique())->toHaveCount(3)
+        ->and($after->pluck('title'))->toContain('Workshop handout (released after the event)')
+        ->and($after->pluck('title'))->not->toContain('Workshop handout (some older wording)');
 });
