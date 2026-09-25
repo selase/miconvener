@@ -1,3 +1,5 @@
+import '@/lib/echo';
+
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { ToastProvider } from '@/Components/Console/Toast';
