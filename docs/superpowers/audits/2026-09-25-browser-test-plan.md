@@ -274,3 +274,28 @@ whenever the plan is run. `ProbeWorkspaceSeederTest` asserts this at three point
 the start, half an hour before the event ends, and two hours after, where it does finally appear.
 
 **B3 should be re-run after the seeder is refreshed. Everything else in the first run stands.**
+
+---
+
+## Outcome
+
+Run 2026-09-25 against production, by an agent driving Chrome.
+
+**13 PASS · 2 N/A · 0 FAIL.**
+
+| | |
+|---|---|
+| A1–A4 | PASS. No ticket or QR reachable while signed out, by either the workspace URL or a legacy confirmation link. An unknown address received copy identical to a known one. |
+| B1, B4 | PASS. Masked address; events grouped across two organisers; download decremented its attempt counter. |
+| B2, D4 | N/A. Turnstile not reached within its threshold — correctly not forced. No check-in stream running. |
+| B3 | PASS on re-run, after the fixture was fixed (see correction above). `Downloads (2)`, handout withheld. |
+| C1–C3 | PASS. Seat badge on the request; poll results moved with no reload; seat C-14 pulsed amber and returned to assigned when resolved. |
+| D1–D3 | PASS. Echo connected on the private channel; **~0.8s** from submission to console banner; urgent request produced a red persistent banner, a red seat, and an email naming the attendee and seat, while an ordinary request produced none. |
+
+**The measurement in D2 is the result worth keeping.** Had the socket been dead, the eight-second
+poll would have delivered the same banner and looked identical to anyone watching. Only the number
+separates real-time from a silent fallback, which is why that check asks for one.
+
+The single FAIL in the first run was this document's fixture, not the application. Both halves of
+that — a fixture that contradicted its own check for most of the day, and a seeder that duplicated
+a row instead of renaming it — are fixed and covered by tests.
