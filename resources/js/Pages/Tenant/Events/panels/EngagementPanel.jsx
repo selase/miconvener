@@ -363,6 +363,8 @@ export default function EngagementPanel({ event }) {
                 </p>
             )}
 
+            <PresentLink event={event} />
+
             <Leaderboard event={event} />
 
             {polls.map((p) => (
@@ -370,6 +372,87 @@ export default function EngagementPanel({ event }) {
             ))}
 
             <NewPollForm event={event} onCreated={load} />
+        </div>
+    );
+}
+
+/**
+ * The results screen for the room, and the link for whoever is driving the
+ * projector -- which at a conference is rarely the organiser's own laptop, so
+ * it opens on a token rather than a login.
+ */
+function PresentLink({ event }) {
+    const [url, setUrl] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const fetchLink = (rotate = false) => {
+        setBusy(true);
+        const route_ = rotate
+            ? route('tenant.events.polls.present-link.rotate', { event: event.id })
+            : route('tenant.events.polls.present-link', { event: event.id });
+
+        csrfFetch(route_, { method: rotate ? 'POST' : 'GET' })
+            .then((r) => r.json())
+            .then((data) => {
+                setUrl(data.present_url);
+                setCopied(false);
+            })
+            .finally(() => setBusy(false));
+    };
+
+    useEffect(() => {
+        fetchLink();
+        // Only when the event changes; rotating is explicit.
+    }, [event.id]);
+
+    const copy = () => {
+        if (!url) {
+            return;
+        }
+        navigator.clipboard?.writeText(url).then(() => setCopied(true));
+    };
+
+    return (
+        <div className="border border-border p-4">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <p className="text-[13.5px] font-medium text-ink">Show results on screen</p>
+                    <p className="mt-0.5 text-xs text-ink-secondary">
+                        Full-screen results with a QR code the room can scan to vote.
+                    </p>
+                </div>
+                <Button
+                    onClick={() => url && window.open(url, '_blank', 'noopener')}
+                    disabled={!url || busy}
+                >
+                    Present
+                </Button>
+            </div>
+
+            {url && (
+                <div className="mt-3 flex items-center gap-2">
+                    <code className="flex-1 truncate border border-border bg-surface px-2 py-1.5 text-[11.5px] text-ink-secondary">
+                        {url}
+                    </code>
+                    <button
+                        type="button"
+                        onClick={copy}
+                        className="shrink-0 text-xs text-accent hover:underline"
+                    >
+                        {copied ? 'Copied' : 'Copy'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => fetchLink(true)}
+                        disabled={busy}
+                        className="shrink-0 text-xs text-ink-secondary hover:text-danger-fg"
+                        title="Issues a new link and stops the old one working"
+                    >
+                        Revoke
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

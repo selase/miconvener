@@ -214,6 +214,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('events/{event}/polls', [EventPollController::class, 'index'])->name('tenant.events.polls.index');
     Route::post('events/{event}/polls', [EventPollController::class, 'store'])->name('tenant.events.polls.store');
     Route::patch('events/{event}/polls/{poll}', [EventPollController::class, 'updateStatus'])->name('tenant.events.polls.status');
+    Route::get('events/{event}/polls/present-link', [EventPollController::class, 'presentLink'])->name('tenant.events.polls.present-link');
+    Route::post('events/{event}/polls/present-link/rotate', [EventPollController::class, 'rotatePresentLink'])->name('tenant.events.polls.present-link.rotate');
     Route::delete('events/{event}/polls/{poll}', [EventPollController::class, 'destroy'])->name('tenant.events.polls.destroy');
     Route::patch('events/{event}/polls/{poll}/responses/{response}', [EventPollController::class, 'moderateResponse'])->name('tenant.events.polls.responses.moderate');
     Route::get('events/{event}/quiz/leaderboard', [EventPollController::class, 'leaderboard'])->name('tenant.events.quiz.leaderboard');
@@ -359,6 +361,11 @@ Route::post('/e/{event}/forum', [PublicForumController::class, 'store'])->name('
 Route::post('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'vote'])->name('public.events.forum.vote');
 Route::delete('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'unvote'])->name('public.events.forum.unvote');
 Route::post('/e/{event}/forum/{thread}/report', [PublicForumController::class, 'report'])->name('public.events.forum.report');
+
+// The results screen behind the speaker. Reached by a token, because the
+// machine driving a projector is rarely the organiser's own.
+Route::get('/e/{event}/present/{token}', [App\Http\Controllers\Public\PollPresentationController::class, 'show'])->name('public.events.present');
+Route::get('/e/{event}/present/{token}/results', [App\Http\Controllers\Public\PollPresentationController::class, 'results'])->name('public.events.present.results');
 
 Route::get('/e/{event}/poll', [PublicPollController::class, 'show'])->name('public.events.poll.show');
 Route::post('/e/{event}/poll/{poll}/respond', [PublicPollController::class, 'respond'])->name('public.events.poll.respond');

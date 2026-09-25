@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Public;
 
+use App\Events\PollResultsUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventPoll;
@@ -91,6 +92,8 @@ final class PublicPollController extends Controller
             'points_awarded' => $selectedOption?->is_correct ? $pollModel->points : 0,
             'is_approved' => $pollModel->type === EventPoll::TYPE_OPEN && $pollModel->requires_moderation ? null : true,
         ]);
+
+        PollResultsUpdated::dispatch($pollModel->fresh(['options', 'responses']));
 
         return response()->json([
             'message' => 'Thanks for responding!',

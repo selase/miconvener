@@ -12,6 +12,7 @@ use App\Models\EventPollResponse;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 final class EventPollController extends Controller
@@ -124,6 +125,37 @@ final class EventPollController extends Controller
     }
 
     /**
+     * The link an AV desk opens, minted on first ask.
+     */
+    public function presentLink(string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        if (blank($eventModel->present_token)) {
+            $eventModel->update(['present_token' => Str::random(40)]);
+        }
+
+        return response()->json(['present_url' => $this->presentUrl($tenant->slug, $eventModel)]);
+    }
+
+    /**
+     * Issues a new token, which is how an organiser revokes the old link --
+     * the laptop it was opened on stops showing results at the next refresh.
+     */
+    public function rotatePresentLink(string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $eventModel->update(['present_token' => Str::random(40)]);
+
+        return response()->json(['present_url' => $this->presentUrl($tenant->slug, $eventModel)]);
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function leaderboardPayload(Event $eventModel): array
@@ -145,6 +177,15 @@ final class EventPollController extends Controller
     private function findEvent(string $tenantId, string $eventId): Event
     {
         return Event::where('tenant_id', $tenantId)->where('id', $eventId)->firstOrFail();
+    }
+
+    private function presentUrl(string $subdomain, Event $event): string
+    {
+        return route('public.events.present', [
+            'subdomain' => $subdomain,
+            'event' => $event->slug,
+            'token' => $event->present_token,
+        ]);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Public;
 
 use App\Enum\TenantStatusEnum;
+use App\Events\PollResultsUpdated;
 use App\Events\ServiceRequestRaised;
 use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
@@ -654,6 +655,8 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'points_awarded' => $selectedOption?->is_correct ? $pollModel->points : 0,
             'is_approved' => $pollModel->type === EventPoll::TYPE_OPEN && $pollModel->requires_moderation ? null : true,
         ]);
+
+        PollResultsUpdated::dispatch($pollModel->fresh(['options', 'responses']));
 
         return response()->json([
             'message' => 'Thanks for responding!',

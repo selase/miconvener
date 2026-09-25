@@ -78,6 +78,7 @@ final class Event extends Model
         'created_by',
         'name',
         'slug',
+        'present_token',
         'description',
         'cover_image_path',
         'status',
