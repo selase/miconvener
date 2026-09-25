@@ -30,8 +30,12 @@ final class PollResults
     {
         $poll->loadMissing(['options', 'responses']);
 
+        // Strictly true. A response awaiting a moderator carries null, and
+        // "not rejected" would put it on the wall -- which is the one thing
+        // moderating it was meant to prevent. Everything unmoderated is
+        // written as approved at the point it is recorded.
         $approved = $poll->responses->filter(
-            fn (EventPollResponse $r): bool => $r->is_approved !== false
+            fn (EventPollResponse $r): bool => $r->is_approved === true
         );
 
         $total = $approved->count();

@@ -75,6 +75,11 @@ final class PollPresentationController extends Controller
         $poll = $event->polls()
             ->whereIn('status', [EventPoll::STATUS_LIVE, EventPoll::STATUS_CLOSED])
             ->with(['options', 'responses'])
+            // A poll that is open beats one that has closed, however recently.
+            // Ordering on went_live_at alone would let the last poll an
+            // organiser closed sit on the wall while the room is answering the
+            // next one.
+            ->orderByRaw('case when status = ? then 0 else 1 end', [EventPoll::STATUS_LIVE])
             ->orderByDesc('went_live_at')
             ->first();
 

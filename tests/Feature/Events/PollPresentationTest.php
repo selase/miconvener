@@ -179,3 +179,67 @@ test('the console mints a link and revoking it breaks the old one', function ():
     $this->get("http://{$host}/e/{$event->slug}/present/{$oldToken}", ['HTTP_HOST' => $host])
         ->assertNotFound();
 });
+
+test('an open poll beats a closed one, however recently it closed', function (): void {
+    [$tenant, $event] = presentScenario('present-order');
+    $host = eventSubdomainHost('present-order');
+
+    // Closed later than the live one went live -- the organiser moved on, and
+    // the wall should have moved with them.
+    EventPoll::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'question' => 'The one we just finished',
+        'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+        'status' => EventPoll::STATUS_CLOSED,
+        'went_live_at' => now(),
+    ]);
+
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->viewData('page')['props'];
+
+    expect($props['poll']['question'])->toBe('How are you joining us today?');
+});
+
+test('an answer awaiting a moderator does not reach the wall', function (): void {
+    [$tenant, $event, $poll] = presentScenario('present-moderated', EventPoll::TYPE_OPEN);
+    $host = eventSubdomainHost('present-moderated');
+
+    $poll->update(['requires_moderation' => true]);
+
+    EventPollResponse::create([
+        'tenant_id' => $tenant->id,
+        'poll_id' => $poll->id,
+        'response_text' => 'approved and safe to show',
+        'respondent_token' => 'voter-approved',
+        'is_approved' => true,
+    ]);
+    EventPollResponse::create([
+        'tenant_id' => $tenant->id,
+        'poll_id' => $poll->id,
+        'response_text' => 'still waiting on a moderator',
+        'respondent_token' => 'voter-pending',
+        'is_approved' => null,
+    ]);
+
+    $response = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host]);
+    $props = $response->viewData('page')['props'];
+
+    expect(collect($props['poll']['open_responses'])->pluck('text'))
+        ->toContain('approved and safe to show')
+        ->not->toContain('still waiting on a moderator');
+
+    $response->assertDontSee('still waiting on a moderator');
+});
+
+test('a poll nobody answered shows zeroes rather than dividing by them', function (): void {
+    [, $event] = presentScenario('present-empty');
+    $host = eventSubdomainHost('present-empty');
+
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->viewData('page')['props'];
+
+    expect($props['poll']['total_responses'])->toBe(0)
+        ->and($props['poll']['options'][0]['percentage'])->toBe(0)
+        ->and($props['poll']['options'][0]['count'])->toBe(0);
+});

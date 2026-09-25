@@ -13,6 +13,7 @@ use App\Models\EventForumThread;
 use App\Models\EventMaterial;
 use App\Models\EventPoll;
 use App\Models\EventPollOption;
+use App\Models\EventPollResponse;
 use App\Models\EventRegistration;
 use App\Models\EventSeatAssignment;
 use App\Models\EventSession;
@@ -61,7 +62,7 @@ final class ProbeWorkspaceSeeder extends Seeder
         $event = $this->event($tenant);
         $sessions = $this->sessions($event);
         $this->materials($event, $sessions);
-        $this->poll($event);
+        $this->polls($event);
         $this->feedbackForm($event);
         $registration = $this->registration($event, $attendeeEmail);
         $this->seat($event, $registration);
@@ -250,27 +251,214 @@ final class ProbeWorkspaceSeeder extends Seeder
         unset($eventSpeaker);
     }
 
-    private function poll(Event $event): void
+    /**
+     * A spread of polls, so the results screen can be judged against shapes it
+     * will actually meet: a runaway favourite, a dead heat, a five-point scale,
+     * an eleven-point one, a question nobody answered, a quiz before and after
+     * its answer is revealed, and free text both moderated and not.
+     *
+     * Only one is live. The rest are closed, so an organiser can put each on
+     * the wall in turn from Live polls without two competing for the screen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function pollPlan(): array
     {
-        /** @var EventPoll $poll */
-        $poll = EventPoll::query()->updateOrCreate(
-            ['event_id' => $event->id, 'question' => 'How are you joining us today?'],
+        return [
             [
-                'tenant_id' => $event->tenant_id,
+                'question' => 'This session met my expectations',
                 'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
                 'status' => EventPoll::STATUS_LIVE,
-                'went_live_at' => now()->subMinutes(5),
+                'options' => ['Strongly disagree' => 1, 'Disagree' => 2, 'Neutral' => 6, 'Agree' => 18, 'Strongly agree' => 27],
+            ],
+            [
+                'question' => 'Did the venue Wi-Fi work for you?',
+                'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+                'status' => EventPoll::STATUS_CLOSED,
+                // One option runs away with it -- the case where every other bar
+                // has to stay readable next to a full-width one.
+                'options' => ['Yes, fine' => 47, 'Slow but usable' => 9, 'No' => 3],
+            ],
+            [
+                'question' => 'Coffee or tea?',
+                'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+                'status' => EventPoll::STATUS_CLOSED,
+                'options' => ['Coffee' => 21, 'Tea' => 21],
+            ],
+            [
+                'question' => 'How likely are you to recommend MiConvener to a colleague?',
+                'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+                'status' => EventPoll::STATUS_CLOSED,
+                // Eleven bars: the most a screen should ever have to carry.
+                'options' => ['0' => 0, '1' => 0, '2' => 1, '3' => 1, '4' => 2, '5' => 3, '6' => 4, '7' => 6, '8' => 11, '9' => 14, '10' => 19],
+            ],
+            [
+                'question' => 'Which track will you follow tomorrow?',
+                'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+                'status' => EventPoll::STATUS_CLOSED,
+                'options' => ['Clinical practice' => 14, 'Health informatics' => 22, 'Policy' => 8, 'Research methods' => 11, 'Undecided' => 6],
+            ],
+            [
+                'question' => 'Are you joining the gala dinner?',
+                'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+                'status' => EventPoll::STATUS_CLOSED,
+                'options' => ['Yes' => 38, 'No' => 12],
+            ],
+            [
+                'question' => 'Has anyone voted on this one yet?',
+                'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+                'status' => EventPoll::STATUS_CLOSED,
+                // Nobody has. Every bar at zero, and no division by it.
+                'options' => ['Option A' => 0, 'Option B' => 0, 'Option C' => 0],
+            ],
+            [
+                'question' => 'Which of these is a notifiable disease in Ghana?',
+                'type' => EventPoll::TYPE_QUIZ,
+                'status' => EventPoll::STATUS_CLOSED,
+                'points' => 10,
+                'correct' => 'Cholera',
+                'options' => ['Cholera' => 31, 'Hypertension' => 7, 'Type 2 diabetes' => 4, 'Asthma' => 2],
+            ],
+            [
+                'question' => 'In what year was the first MiConvener congress held?',
+                'type' => EventPoll::TYPE_QUIZ,
+                'status' => EventPoll::STATUS_CLOSED,
+                'points' => 10,
+                'correct' => '2024',
+                'options' => ['2022' => 5, '2023' => 12, '2024' => 18, '2025' => 9],
+            ],
+            [
+                'question' => 'What should we cover at next year\'s congress?',
+                'type' => EventPoll::TYPE_OPEN,
+                'status' => EventPoll::STATUS_CLOSED,
                 'requires_moderation' => false,
-            ]
-        );
+                'answers' => [
+                    ['Offline-first tooling for district hospitals', 'Ama Serwaa'],
+                    ['More on data protection and consent', null],
+                    ['Practical sessions, fewer keynotes', 'Kofi Mensah'],
+                    ['Costing and reimbursement models', null],
+                    ['Interoperability between the big EMRs', 'Abena Owusu'],
+                    ['Training pathways for informatics staff', null],
+                    ['Procurement, honestly', 'Yaw Darko'],
+                    ['Maternal health dashboards', null],
+                    ['How to keep a system running after the grant ends', 'Efua Quaye'],
+                ],
+            ],
+            [
+                'question' => 'Any questions for the closing panel?',
+                'type' => EventPoll::TYPE_OPEN,
+                'status' => EventPoll::STATUS_CLOSED,
+                // Moderated: what a moderator has not yet approved must not
+                // reach a wall, which is the whole point of moderating it.
+                'requires_moderation' => true,
+                'answers' => [
+                    ['How do we fund maintenance, not just pilots?', 'Kwame Asante', true],
+                    ['Will the slides be shared?', null, true],
+                    ['Can we see the raw evaluation data?', 'Adwoa Boateng', true],
+                    ['this one is still waiting on a moderator', null, null],
+                    ['and so is this one', 'Anonymous', null],
+                ],
+            ],
+        ];
+    }
 
-        $options = ['In the room', 'Watching online', 'Catching up later', 'Presenting today'];
+    private function polls(Event $event): void
+    {
+        $kept = [];
+        $order = 0;
 
-        foreach ($options as $index => $label) {
-            EventPollOption::query()->updateOrCreate(
-                ['poll_id' => $poll->id, 'label' => $label],
-                ['tenant_id' => $event->tenant_id, 'sort_order' => $index]
+        foreach ($this->pollPlan() as $spec) {
+            $wentLiveAt = now()->subMinutes(120 - ($order * 10));
+
+            /** @var EventPoll $poll */
+            $poll = EventPoll::query()->updateOrCreate(
+                ['event_id' => $event->id, 'question' => $spec['question']],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'type' => $spec['type'],
+                    'status' => $spec['status'],
+                    'went_live_at' => $wentLiveAt,
+                    'points' => $spec['points'] ?? 0,
+                    'requires_moderation' => $spec['requires_moderation'] ?? false,
+                ]
             );
+
+            $poll->responses()->delete();
+
+            if ($spec['type'] === EventPoll::TYPE_OPEN) {
+                $this->openAnswers($event, $poll, $spec['answers']);
+            } else {
+                $this->optionVotes($event, $poll, $spec);
+            }
+
+            $kept[] = $poll->id;
+            $order++;
+        }
+
+        // Anything this seeder no longer owns goes, so a question dropped from
+        // the plan cannot linger on the wall.
+        EventPoll::query()
+            ->where('event_id', $event->id)
+            ->whereNotIn('id', $kept)
+            ->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $spec
+     */
+    private function optionVotes(Event $event, EventPoll $poll, array $spec): void
+    {
+        $order = 0;
+
+        foreach ($spec['options'] as $label => $votes) {
+            /** @var EventPollOption $option */
+            $option = EventPollOption::query()->updateOrCreate(
+                ['poll_id' => $poll->id, 'label' => (string) $label],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'sort_order' => $order,
+                    'is_correct' => ($spec['correct'] ?? null) === $label,
+                ]
+            );
+
+            for ($i = 0; $i < $votes; $i++) {
+                EventPollResponse::query()->create([
+                    'tenant_id' => $event->tenant_id,
+                    'poll_id' => $poll->id,
+                    'option_id' => $option->id,
+                    'respondent_token' => hash('sha256', "probe:{$poll->id}:{$label}:{$i}"),
+                    'is_correct' => $option->is_correct ? true : null,
+                    'points_awarded' => $option->is_correct ? ($spec['points'] ?? 0) : 0,
+                    'is_approved' => true,
+                ]);
+            }
+
+            $order++;
+        }
+
+        EventPollOption::query()
+            ->where('poll_id', $poll->id)
+            ->whereNotIn('label', array_map('strval', array_keys($spec['options'])))
+            ->delete();
+    }
+
+    /**
+     * @param  array<int, array<int, mixed>>  $answers
+     */
+    private function openAnswers(Event $event, EventPoll $poll, array $answers): void
+    {
+        foreach ($answers as $index => $answer) {
+            [$text, $name] = [$answer[0], $answer[1] ?? null];
+            $approved = array_key_exists(2, $answer) ? $answer[2] : true;
+
+            EventPollResponse::query()->create([
+                'tenant_id' => $event->tenant_id,
+                'poll_id' => $poll->id,
+                'response_text' => $text,
+                'respondent_name' => $name,
+                'respondent_token' => hash('sha256', "probe:{$poll->id}:open:{$index}"),
+                'is_approved' => $approved,
+            ]);
         }
     }
 
