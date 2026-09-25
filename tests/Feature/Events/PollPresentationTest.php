@@ -186,7 +186,7 @@ test('an open poll beats a closed one, however recently it closed', function ():
 
     // Closed later than the live one went live -- the organiser moved on, and
     // the wall should have moved with them.
-    EventPoll::create([
+    $closed = EventPoll::create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
         'question' => 'The one we just finished',
@@ -194,6 +194,13 @@ test('an open poll beats a closed one, however recently it closed', function ():
         'status' => EventPoll::STATUS_CLOSED,
         'went_live_at' => now(),
     ]);
+
+    // Created after the live one, and said so explicitly. The polls relation
+    // sorts on created_at, so without that being set aside this closed poll
+    // wins -- which is how this test once passed while production showed the
+    // wrong question: both rows landed in the same second and the tie fell the
+    // right way by luck.
+    $closed->forceFill(['created_at' => now()->addMinute()])->saveQuietly();
 
     $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
         ->viewData('page')['props'];

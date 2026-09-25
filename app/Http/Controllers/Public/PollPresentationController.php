@@ -73,6 +73,10 @@ final class PollPresentationController extends Controller
     private function livePayload(Event $event): ?array
     {
         $poll = $event->polls()
+            // The relation sorts by created_at, which would otherwise decide
+            // this outright and leave the ordering below as a tiebreaker that
+            // only ever fires when two polls are created in the same second.
+            ->reorder()
             ->whereIn('status', [EventPoll::STATUS_LIVE, EventPoll::STATUS_CLOSED])
             ->with(['options', 'responses'])
             // A poll that is open beats one that has closed, however recently.
