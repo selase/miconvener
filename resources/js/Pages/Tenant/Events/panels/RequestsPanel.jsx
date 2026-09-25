@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 import Button from '@/Components/Console/Button';
 import StatusPill from '@/Components/Console/StatusPill';
 import csrfFetch from '@/lib/csrfFetch';
@@ -69,6 +69,15 @@ function RequestCard({ event, request, onChange }) {
                 <div className="mt-0.5 text-xs text-ink-secondary">
                     {[request.location, request.registrant_name].filter(Boolean).join(' · ')}
                 </div>
+                {request.seat_label && (
+                    <div className="mt-1 inline-flex items-center gap-1.5 border border-border px-2 py-0.5 text-xs font-medium text-ink">
+                        <MapPin className="h-3 w-3 text-ink-secondary" strokeWidth={1.75} />
+                        Seat {request.seat_label}
+                        {request.room_name && (
+                            <span className="font-normal text-ink-secondary">· {request.room_name}</span>
+                        )}
+                    </div>
+                )}
                 {request.note && <p className="mt-1.5 text-[13px] text-ink">{request.note}</p>}
                 {request.assignee_name && (
                     <div className="mt-1.5 text-xs text-ink-tertiary">

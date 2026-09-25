@@ -90,6 +90,9 @@ final class EventServiceRequest extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<EventRegistration, $this>
+     */
     public function registration(): BelongsTo
     {
         return $this->belongsTo(EventRegistration::class);

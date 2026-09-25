@@ -21,7 +21,14 @@ final class EventServiceRequestController extends Controller
         $eventModel = $this->findEvent($tenant->id, $event);
 
         $requests = $eventModel->serviceRequests()
-            ->with(['registration:id,full_name', 'assignedTo:id,first_name,last_name'])
+            ->with([
+                // The seat is what sends a steward to the right person: a name
+                // alone means walking the room asking who asked.
+                'registration:id,full_name',
+                'registration.seatAssignment:id,registration_id,room_id,seat_label',
+                'registration.seatAssignment.room:id,name',
+                'assignedTo:id,first_name,last_name',
+            ])
             ->get();
 
         return response()->json($requests->map(fn (EventServiceRequest $r): array => $this->payload($r)));
@@ -84,6 +91,8 @@ final class EventServiceRequestController extends Controller
             'is_medical' => $r->isMedical(),
             'age_minutes' => $r->ageInMinutes(),
             'registrant_name' => $r->registration?->full_name,
+            'seat_label' => $r->registration?->seatAssignment?->seat_label,
+            'room_name' => $r->registration?->seatAssignment?->room?->name,
             'assignee_name' => $r->assignedTo ? mb_trim($r->assignedTo->first_name.' '.$r->assignedTo->last_name) : null,
             'created_at' => $r->created_at->toIso8601String(),
         ];

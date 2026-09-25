@@ -1226,12 +1226,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/DashboardController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$full_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/DashboardController.php
-
-		-
 			rawMessage: Expression on left side of ?? is not nullable.
 			identifier: nullCoalesce.expr
 			count: 1
@@ -2103,12 +2097,6 @@ parameters:
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$first_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$full_name.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
@@ -3939,12 +3927,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventServiceRequest::event() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventServiceRequest.php
-
-		-
-			rawMessage: 'Method App\Models\EventServiceRequest::registration() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventServiceRequest.php

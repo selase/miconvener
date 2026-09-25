@@ -335,11 +335,33 @@ export default function EngagementPanel({ event }) {
 
     useEffect(load, [event.id]);
 
+    // While a poll is open, the results are the instrument -- an organiser
+    // reading them off a projector should not have to reload to see the room
+    // answer. Nothing polls once every poll is closed.
+    const hasLivePoll = polls.some((p) => p.status === 'live');
+
+    useEffect(() => {
+        if (!hasLivePoll) {
+            return undefined;
+        }
+
+        const interval = setInterval(load, 8000);
+
+        return () => clearInterval(interval);
+    }, [hasLivePoll, event.id]);
+
     return (
         <div className="max-w-3xl space-y-4">
             <p className="text-sm text-ink-secondary">
                 Live polls and quizzes. Attendees see whichever poll you most recently set live.
             </p>
+
+            {hasLivePoll && (
+                <p className="flex items-center gap-1.5 text-xs text-ink-secondary">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                    Results update as votes arrive.
+                </p>
+            )}
 
             <Leaderboard event={event} />
 
