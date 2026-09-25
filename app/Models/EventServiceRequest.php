@@ -85,6 +85,9 @@ final class EventServiceRequest extends Model
         'resolved_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<Event, $this>
+     */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
@@ -98,6 +101,9 @@ final class EventServiceRequest extends Model
         return $this->belongsTo(EventRegistration::class);
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
@@ -116,5 +122,36 @@ final class EventServiceRequest extends Model
     public function ageInMinutes(): int
     {
         return (int) $this->created_at->diffInMinutes(now());
+    }
+
+    /**
+     * What the floor team sees for this request.
+     *
+     * Lives on the model because two things render it -- the console's own
+     * fetch and the broadcast that arrives while the console is open -- and a
+     * request that looked different depending on how it reached the panel
+     * would be worse than one that arrived late.
+     *
+     * @return array<string, mixed>
+     */
+    public function consolePayload(): array
+    {
+        return [
+            'id' => $this->id,
+            'type' => $this->type,
+            'priority' => $this->priority,
+            'status' => $this->status,
+            'location' => $this->location,
+            'note' => $this->note,
+            'is_medical' => $this->isMedical(),
+            'age_minutes' => $this->ageInMinutes(),
+            'registrant_name' => $this->registration?->full_name,
+            'seat_label' => $this->registration?->seatAssignment?->seat_label,
+            'room_name' => $this->registration?->seatAssignment?->room?->name,
+            'assignee_name' => $this->assignedTo
+                ? mb_trim($this->assignedTo->first_name.' '.$this->assignedTo->last_name)
+                : null,
+            'created_at' => $this->created_at->toIso8601String(),
+        ];
     }
 }

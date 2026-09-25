@@ -2096,24 +2096,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventReportController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$first_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$last_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
-			rawMessage: 'Method App\Http\Controllers\Tenant\EventServiceRequestController::getTenant() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Tenant/EventServiceRequestController.php
-
-		-
 			rawMessage: Left side of && is always true.
 			identifier: booleanAnd.leftAlwaysTrue
 			count: 1
@@ -3915,18 +3897,6 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\EventServiceRequest uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventServiceRequest.php
-
-		-
-			rawMessage: 'Method App\Models\EventServiceRequest::assignedTo() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventServiceRequest.php
-
-		-
-			rawMessage: 'Method App\Models\EventServiceRequest::event() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventServiceRequest.php

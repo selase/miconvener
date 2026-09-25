@@ -131,6 +131,7 @@ function RequestCard({ event, request, onChange }) {
 
 export default function RequestsPanel({ event }) {
     const [requests, setRequests] = useState([]);
+    const [arrived, setArrived] = useState(null);
 
     const load = () => {
         csrfFetch(route('tenant.events.service-requests.index', { event: event.id }))
@@ -140,10 +141,38 @@ export default function RequestsPanel({ event }) {
 
     useEffect(() => {
         load();
+        // Polling stays as the floor beneath the broadcast: a console that
+        // loses its socket keeps working, eight seconds behind.
         const interval = setInterval(load, 8000);
         return () => clearInterval(interval);
         // Dependencies deliberately limited to the ids above (re-run only when they change).
     }, [event.id]);
+
+    // A request is somebody waiting, so it should land on the screen when it is
+    // made rather than whenever the next poll happens to come round.
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.Echo) {
+            return undefined;
+        }
+
+        const channel = window.Echo.private(`event.${event.id}.service-requests`);
+
+        channel.listen('.ServiceRequestRaised', (incoming) => {
+            setRequests((current) =>
+                current.some((r) => r.id === incoming.id) ? current : [incoming, ...current]
+            );
+            setArrived(incoming);
+        });
+
+        return () => {
+            channel.stopListening('.ServiceRequestRaised');
+            window.Echo.leave(`event.${event.id}.service-requests`);
+        };
+    }, [event.id]);
+
+    // The banner stays until it is dismissed or another arrives: an urgent
+    // request that faded out while nobody was looking would be worse than none.
+    const dismissArrival = () => setArrived(null);
 
     const active = sortActive(requests.filter((r) => ACTIVE_STATUSES.includes(r.status)));
     const closed = requests
@@ -156,6 +185,39 @@ export default function RequestsPanel({ event }) {
                 Requests raised by attendees from their ticket page, newest waits and medical
                 requests first.
             </p>
+
+            {arrived && (
+                <div
+                    role="alert"
+                    className={`flex items-start justify-between gap-3 border p-3 text-sm ${
+                        arrived.is_medical
+                            ? 'border-danger-fg bg-danger-bg text-danger-fg'
+                            : 'border-accent bg-accent/5 text-ink'
+                    }`}
+                >
+                    <div className="flex items-start gap-2">
+                        {arrived.is_medical && (
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} />
+                        )}
+                        <div>
+                            <span className="font-medium">
+                                {arrived.is_medical ? 'First aid requested' : 'New request'}
+                            </span>{' '}
+                            {TYPE_LABEL[arrived.type] ?? arrived.type}
+                            {arrived.registrant_name && ` from ${arrived.registrant_name}`}
+                            {arrived.seat_label && `, seat ${arrived.seat_label}`}
+                            {arrived.room_name && ` in ${arrived.room_name}`}.
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={dismissArrival}
+                        className="shrink-0 text-xs underline opacity-80 hover:opacity-100"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            )}
 
             {active.length > 0 ? (
                 <ul className="space-y-2">

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventServiceRequest;
+use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,19 @@ use Illuminate\Validation\Rule;
 
 final class EventServiceRequestController extends Controller
 {
+    /**
+     * The seat is what sends a steward to the right person: a name alone means
+     * walking the room asking who asked.
+     *
+     * @var list<string>
+     */
+    private const array CONSOLE_RELATIONS = [
+        'registration:id,full_name',
+        'registration.seatAssignment:id,registration_id,room_id,seat_label',
+        'registration.seatAssignment.room:id,name',
+        'assignedTo:id,first_name,last_name',
+    ];
+
     public function index(string $subdomain, string $event): JsonResponse
     {
         $this->authorize('read event');
@@ -21,17 +35,10 @@ final class EventServiceRequestController extends Controller
         $eventModel = $this->findEvent($tenant->id, $event);
 
         $requests = $eventModel->serviceRequests()
-            ->with([
-                // The seat is what sends a steward to the right person: a name
-                // alone means walking the room asking who asked.
-                'registration:id,full_name',
-                'registration.seatAssignment:id,registration_id,room_id,seat_label',
-                'registration.seatAssignment.room:id,name',
-                'assignedTo:id,first_name,last_name',
-            ])
+            ->with(self::CONSOLE_RELATIONS)
             ->get();
 
-        return response()->json($requests->map(fn (EventServiceRequest $r): array => $this->payload($r)));
+        return response()->json($requests->map(fn (EventServiceRequest $r): array => $r->consolePayload()));
     }
 
     public function claim(Request $request, string $subdomain, string $event, string $serviceRequest): JsonResponse
@@ -49,7 +56,7 @@ final class EventServiceRequestController extends Controller
             'acknowledged_at' => $requestModel->acknowledged_at ?? now(),
         ]);
 
-        return response()->json($this->payload($requestModel->fresh(['registration:id,full_name', 'assignedTo:id,first_name,last_name'])));
+        return response()->json($requestModel->fresh(self::CONSOLE_RELATIONS)->consolePayload());
     }
 
     public function updateStatus(Request $request, string $subdomain, string $event, string $serviceRequest): JsonResponse
@@ -68,7 +75,7 @@ final class EventServiceRequestController extends Controller
             'resolved_at' => $validated['status'] === EventServiceRequest::STATUS_RESOLVED ? now() : $requestModel->resolved_at,
         ]);
 
-        return response()->json($this->payload($requestModel->fresh(['registration:id,full_name', 'assignedTo:id,first_name,last_name'])));
+        return response()->json($requestModel->fresh(self::CONSOLE_RELATIONS)->consolePayload());
     }
 
     private function findEvent(string $tenantId, string $eventId): Event
@@ -76,29 +83,7 @@ final class EventServiceRequestController extends Controller
         return Event::where('tenant_id', $tenantId)->where('id', $eventId)->firstOrFail();
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function payload(EventServiceRequest $r): array
-    {
-        return [
-            'id' => $r->id,
-            'type' => $r->type,
-            'priority' => $r->priority,
-            'status' => $r->status,
-            'location' => $r->location,
-            'note' => $r->note,
-            'is_medical' => $r->isMedical(),
-            'age_minutes' => $r->ageInMinutes(),
-            'registrant_name' => $r->registration?->full_name,
-            'seat_label' => $r->registration?->seatAssignment?->seat_label,
-            'room_name' => $r->registration?->seatAssignment?->room?->name,
-            'assignee_name' => $r->assignedTo ? mb_trim($r->assignedTo->first_name.' '.$r->assignedTo->last_name) : null,
-            'created_at' => $r->created_at->toIso8601String(),
-        ];
-    }
-
-    private function getTenant()
+    private function getTenant(): Tenant
     {
         $tenant = app(TenantContext::class)->getTenant();
         if (! $tenant) {

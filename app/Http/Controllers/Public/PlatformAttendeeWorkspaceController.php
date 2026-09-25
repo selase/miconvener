@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Public;
 
 use App\Enum\TenantStatusEnum;
+use App\Events\ServiceRequestRaised;
 use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventTicketTransferCode;
 use App\Mail\Events\EventTicketTransferred;
+use App\Mail\Events\UrgentServiceRequestRaised;
 use App\Models\Event;
 use App\Models\EventCertificate;
 use App\Models\EventDynamicForm;
@@ -511,6 +513,8 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 ? EventServiceRequest::PRIORITY_URGENT
                 : EventServiceRequest::PRIORITY_NORMAL,
         ]);
+
+        $this->announceServiceRequest($serviceRequest, $registrationModel);
 
         return response()->json([
             'message' => 'Someone is on the way.',
@@ -1068,6 +1072,34 @@ final class PlatformAttendeeWorkspaceController extends Controller
     private function forumVoterToken(EventRegistration $registration, Event $event): string
     {
         return hash_hmac('sha256', "forum:{$registration->id}:event:{$event->id}", (string) config('app.key'));
+    }
+
+    /**
+     * Tells the floor team, twice over where it matters.
+     *
+     * Every request is broadcast, so a console that is open shows it without
+     * waiting for its next poll. An urgent one is also emailed, because the
+     * case worth designing for is the one where nobody is looking at a screen.
+     */
+    private function announceServiceRequest(EventServiceRequest $serviceRequest, EventRegistration $registration): void
+    {
+        $serviceRequest->setRelation('registration', $registration);
+
+        ServiceRequestRaised::dispatch($serviceRequest);
+
+        if ($serviceRequest->priority !== EventServiceRequest::PRIORITY_URGENT) {
+            return;
+        }
+
+        $tenant = $registration->tenant;
+        $to = $tenant?->email;
+
+        if ($tenant === null || blank($to)) {
+            return;
+        }
+
+        Mail::to($to)->queue(new UrgentServiceRequestRaised($serviceRequest));
+        $this->meteringService->recordUsage($tenant, 'email_credits');
     }
 
     private function serviceRequestTypeLabel(string $type): string

@@ -23,6 +23,7 @@ use App\Mail\Events\EventTicketLink;
 use App\Mail\Events\EventTicketTransferCode;
 use App\Mail\Events\EventTicketTransferred;
 use App\Mail\Events\PlatformAttendeeAccessCodeMail;
+use App\Mail\Events\UrgentServiceRequestRaised;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
@@ -105,6 +106,16 @@ test('every mailable renders', function (): void {
         'expires_at' => now()->addHour(),
     ]);
 
+    $urgentRequest = App\Models\EventServiceRequest::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'registration_id' => $registration->id,
+        'type' => App\Models\EventServiceRequest::TYPE_MEDICAL,
+        'status' => App\Models\EventServiceRequest::STATUS_OPEN,
+        'priority' => App\Models\EventServiceRequest::PRIORITY_URGENT,
+        'note' => 'Feeling faint, near the back of the hall.',
+    ]);
+
     // Shape taken from BillingDailySummary's documented return type, so this
     // fails if the producer and the template drift apart.
     $summary = [
@@ -138,6 +149,7 @@ test('every mailable renders', function (): void {
         'EventTicketLink' => fn () => new EventTicketLink($registration),
         'EventTicketTransferCode' => fn () => new EventTicketTransferCode($transfer, '123456'),
         'EventTicketTransferred' => fn () => new EventTicketTransferred($registration, 'Ama Serwaa', 'Kofi Mensah', 'kofi@stem.org'),
+        'UrgentServiceRequestRaised' => fn () => new UrgentServiceRequestRaised($urgentRequest),
         'NewEnterpriseLead' => fn () => new NewEnterpriseLead($lead),
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),

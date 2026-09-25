@@ -7,6 +7,8 @@ import Input from '@/Components/Console/Input';
 import SearchInput from '@/Components/Console/SearchInput';
 import csrfFetch from '@/lib/csrfFetch';
 
+const ACTIVE_REQUEST_STATUSES = ['open', 'acknowledged', 'in_progress'];
+
 function buildGrid(room) {
     const rowLetters = Array.from({ length: room.rows }, (_, i) => String.fromCharCode(65 + i));
     return rowLetters.map((letter) => ({
@@ -149,6 +151,54 @@ export default function VenuePanel({ event, venueRooms }) {
         return map;
     }, [room]);
 
+    // Which seats are waiting on someone. A seat that lights up points a
+    // steward at the right chair, so this follows the same channel the requests
+    // panel listens on, with the same poll beneath it.
+    const [waitingSeats, setWaitingSeats] = useState({});
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadWaiting = () => {
+            csrfFetch(route('tenant.events.service-requests.index', { event: event.id }))
+                .then((r) => r.json())
+                .then((rows) => {
+                    if (cancelled) {
+                        return;
+                    }
+                    const map = {};
+                    rows.filter((r) => ACTIVE_REQUEST_STATUSES.includes(r.status)).forEach((r) => {
+                        if (r.seat_label) {
+                            map[r.seat_label] = r;
+                        }
+                    });
+                    setWaitingSeats(map);
+                });
+        };
+
+        loadWaiting();
+        const interval = setInterval(loadWaiting, 8000);
+
+        let channel = null;
+        if (typeof window !== 'undefined' && window.Echo) {
+            channel = window.Echo.private(`event.${event.id}.service-requests`);
+            channel.listen('.ServiceRequestRaised', (incoming) => {
+                if (incoming.seat_label) {
+                    setWaitingSeats((current) => ({ ...current, [incoming.seat_label]: incoming }));
+                }
+            });
+        }
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+            if (channel) {
+                channel.stopListening('.ServiceRequestRaised');
+                window.Echo.leave(`event.${event.id}.service-requests`);
+            }
+        };
+    }, [event.id]);
+
     const reload = () => {
         setPicked(null);
         router.reload({ only: ['event'] });
@@ -234,10 +284,16 @@ export default function VenuePanel({ event, venueRooms }) {
                                     </span>
                                     {row.seats.map((label) => {
                                         const taken = assignmentByLabel[label];
+                                        const waiting = waitingSeats[label];
+                                        const seatTitle = waiting
+                                            ? `${taken?.registration_name ?? label} — ${waiting.is_medical ? 'first aid requested' : 'waiting on a request'}`
+                                            : taken
+                                              ? taken.registration_name
+                                              : label;
                                         return (
                                             <button
                                                 key={label}
-                                                title={taken ? taken.registration_name : label}
+                                                title={seatTitle}
                                                 onClick={() =>
                                                     setPicked(
                                                         taken
@@ -245,7 +301,13 @@ export default function VenuePanel({ event, venueRooms }) {
                                                             : { label }
                                                     )
                                                 }
-                                                className={`h-3.5 w-3.5 border ${taken ? 'border-accent bg-accent' : 'border-border hover:border-accent'} ${picked?.label === label ? 'ring-1 ring-accent' : ''}`}
+                                                className={`h-3.5 w-3.5 border ${
+                                                    waiting
+                                                        ? `animate-pulse ${waiting.is_medical ? 'border-danger-fg bg-danger-fg' : 'border-warning-fg bg-warning-fg'}`
+                                                        : taken
+                                                          ? 'border-accent bg-accent'
+                                                          : 'border-border hover:border-accent'
+                                                } ${picked?.label === label ? 'ring-1 ring-accent' : ''}`}
                                             />
                                         );
                                     })}
@@ -258,6 +320,14 @@ export default function VenuePanel({ event, venueRooms }) {
                             </span>
                             <span className="flex items-center gap-1.5">
                                 <span className="h-3 w-3 border border-accent bg-accent" /> Assigned
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <span className="h-3 w-3 border border-warning-fg bg-warning-fg" />{' '}
+                                Waiting
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <span className="h-3 w-3 border border-danger-fg bg-danger-fg" />{' '}
+                                First aid
                             </span>
                         </div>
                     </div>
