@@ -126,7 +126,7 @@ Then, per tab:
 |---|---|
 | **My ticket** | QR image, entry code, status `checked_in`, **Seat C-14**, **Main Auditorium**, buttons for PDF / Save offline / Transfer |
 | **My day** | **4 sessions** — one finished, one running now, a workshop and a closing still ahead, each with a room and track |
-| **Downloads** | exactly **2** files: *Programme and floor plan* and the speaker deck. **The workshop handout must NOT be listed** — it is dated for later. Seeing three files is a FAIL of the release policy |
+| **Downloads** | exactly **2** files: *Programme and floor plan* and the speaker deck. **The workshop handout must NOT be listed** — it is dated past the end of the event, so it stays withheld for the whole window no matter when you test. Seeing three files is a FAIL of the release policy |
 | **Live poll** | *"How are you joining us today?"* with 4 options |
 | **Feedback** | a form with a rating, a select, a yes/no and a long-text field |
 | **Q&A** | 4 threads, one pinned/answered |
@@ -252,3 +252,25 @@ Flag these three above everything else, in this order:
 
 A2, A3 and A4 are correctness. D2 is a degradation with a working fallback — worth reporting
 plainly, not worth alarm.
+
+---
+
+## Correction, 2026-09-25
+
+The first run of this plan reported **B3 FAIL — Downloads (3)**, with the workshop handout
+visible. That was **this fixture's fault, not the release policy's.**
+
+The handout was originally dated two hours after seeding. The seeder had last run at 07:00, so
+the file released legitimately at 08:59, and the run observed it at 11:57 — nearly three hours
+after it was due. The policy withheld it for exactly as long as it was asked to. Checked directly
+on production: `release_at=2026-09-25T08:59:20+00:00`, `now=2026-09-25T11:57:53+00:00`.
+
+The fixture was wrong, and so was this document: a file that quietly becomes available part way
+through its own window, under a check that says it must never appear, produces a false alarm for
+most of the day and teaches whoever is testing that a working feature is broken.
+
+The handout is now dated past the end of the event, so it is withheld for the entire window
+whenever the plan is run. `ProbeWorkspaceSeederTest` asserts this at three points in time — at
+the start, half an hour before the event ends, and two hours after, where it does finally appear.
+
+**B3 should be re-run after the seeder is refreshed. Everything else in the first run stands.**

@@ -130,3 +130,30 @@ test('running the seeder twice changes nothing and moves the event to the new no
         ->and($event->starts_at->greaterThan($firstStart))->toBeTrue()
         ->and($event->ends_at->isFuture())->toBeTrue();
 });
+
+test('the withheld file stays withheld for the whole event, not just its first hours', function (): void {
+    [, $event, $registration] = seedProbeWorkspace();
+    $host = app(TenantHostMatcher::class)->baseDomain();
+
+    $titles = fn (): array => collect(
+        $this->withSession(probeProof('probe@example.com'))
+            ->get("http://{$host}/my/events/{$registration->id}", ['HTTP_HOST' => $host])
+            ->viewData('page')['props']['materials']
+    )->pluck('title')->all();
+
+    expect($titles())->toHaveCount(2)
+        ->and(implode(' ', $titles()))->not->toContain('Workshop handout');
+
+    // Walk to the last hour of the event. A fixture whose withheld file quietly
+    // appears part way through its own window teaches whoever is testing that
+    // the release policy is broken at exactly the moment it is working.
+    $this->travelTo($event->ends_at->copy()->subMinutes(30));
+
+    expect($titles())->toHaveCount(2)
+        ->and(implode(' ', $titles()))->not->toContain('Workshop handout');
+
+    // And it does still release eventually -- it is dated, not hidden.
+    $this->travelTo($event->ends_at->copy()->addHours(2));
+
+    expect(implode(' ', $titles()))->toContain('Workshop handout');
+});

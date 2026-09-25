@@ -159,10 +159,15 @@ final class ProbeWorkspaceSeeder extends Seeder
                 'provenance' => EventMaterial::PROVENANCE_ORGANIZER,
             ],
             'handout' => [
-                'title' => 'Workshop handout (released at the workshop)',
-                'body' => "Workshop handout\n\nWithheld until the workshop begins, to show a dated release.",
+                'title' => 'Workshop handout (released after the event)',
+                'body' => "Workshop handout\n\nWithheld for the whole event, to show a dated release.",
                 'session' => $sessions['workshop'],
-                'release_at' => now()->addHours(2),
+                // Dated past the end of the event on purpose. Releasing part-way
+                // through would be truer to a real handout, but this file's job
+                // here is to be the withheld one: a fixture that quietly becomes
+                // available half way through its own window teaches the reader
+                // that the release policy is broken when it is working.
+                'release_at' => now()->addHours(7),
                 'provenance' => EventMaterial::PROVENANCE_ORGANIZER,
             ],
             'deck' => [
