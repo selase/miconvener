@@ -3,6 +3,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { useToast } from '@/Components/Console/Toast';
 import {
     LayoutDashboard,
+    LogOut,
     Calendar,
     Users,
     ShieldCheck,
@@ -160,6 +161,26 @@ export default function ConsoleLayout({ children, compact = false }) {
                         );
                     })}
                 </nav>
+
+                {/* A console is signed into on venue laptops and shared desks,
+                    so there has to be a way out of it that is not clearing
+                    cookies. Inertia's method="post" carries the CSRF token. */}
+                <div className="mt-auto border-t border-border py-2">
+                    <Link
+                        href={route('logout')}
+                        method="post"
+                        as="button"
+                        type="button"
+                        onClick={() => setNavOpen(false)}
+                        title={compact ? 'Sign out' : undefined}
+                        className={`flex w-full items-center gap-2.5 px-4.5 py-1.75 text-[13px] text-ink-secondary transition-colors duration-120 ease-out hover:bg-surface-hover hover:text-ink ${
+                            compact ? 'md:justify-center md:px-0 md:py-2.5' : ''
+                        }`}
+                    >
+                        <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                        <span className={compact ? 'md:sr-only' : undefined}>Sign out</span>
+                    </Link>
+                </div>
             </aside>
 
             <div className="min-w-0 flex-1 overflow-y-auto bg-surface">
