@@ -22,7 +22,7 @@ screen reached by a revocable token; results broadcast over Reverb, measured at 
 |---|---|
 | A deck — an ordered sequence | An organiser sets each poll live by hand, one at a time |
 | Presenter controls | No next/previous, no close-and-reveal, no sense of position |
-| An audience voting page | **The QR on the presentation screen opens raw JSON** (§8) |
+| A working QR on the wall | **The one shipped 2026-09-25 opens raw JSON** (§8) |
 | Any check-in for online attendees | **Nobody at a virtual event can be marked present** (§6) |
 | An email on speakers | A speaker cannot be recognised by who they are (§5) |
 | Question types beyond three | No scale, rating, ranking, word cloud, number or multi-select |
@@ -54,8 +54,8 @@ screen reached by a revocable token; results broadcast over Reverb, measured at 
 
 ## 3. Scope
 
-**Part 1 — the room:** decks, presenter controls, the voting page, check-in for online attendees,
-and the capacity work in §7.
+**Part 1 — the room:** decks, presenter controls, the portal's poll tab following the presenter,
+check-in for online attendees, and the capacity work in §7.
 
 **Part 2 — the questions:** the seven new types with their inputs and charts.
 
@@ -84,7 +84,7 @@ poll_decks
   event_id uuid
   session_id uuid nullable  the talk this belongs to
   title varchar
-  join_code varchar(8)      unique among live decks
+  join_code varchar(8)      selects a deck at a multi-track event; never a credential
   status                    draft | live | ended
   current_poll_id nullable  where the presenter is standing
   present_token varchar     revocable, as events.present_token already is
@@ -105,18 +105,25 @@ left on a previous question must not be able to answer it.
 
 A presentation in progress is not interrupted by session expiry (§5).
 
-### 4.3 Joining
+### 4.3 There is no join code, and no voting page
 
-The join code identifies *which* deck, not *who* may vote. A voter reaches `/join/{code}`, and
-from there:
+Mentimeter needs a code because it has no accounts: a code is how a stranger finds your poll.
+Decision 2 removes that problem. A registered attendee is already signed in to `/my`, their
+workspace already knows which event they are at, and it already has a **Live poll** tab that
+takes a vote today.
 
-- **Already verified in `/my`** — straight to the question.
-- **Not verified** — the portal's existing email-code flow, then back to the question.
-- **Verified but not registered for this event, or not present** — told plainly which of the two
-  is missing, and what to do about it. Never a blank refusal.
+So the portal *is* the voting surface. What the deck adds to it is following the presenter:
+showing the current question, replacing it when the presenter advances, and refusing a stale one
+at the endpoint rather than merely hiding it.
 
-One registration, one vote per question, enforced on the registration rather than on a device, so
-clearing storage or switching phones earns nothing.
+The QR and short link on the wall become a **convenience deep-link** into that tab — faster than
+"open miconvener.com/my and find your event" when a speaker has thirty seconds of the room's
+attention. They grant nothing. Someone who follows one without being signed in gets the portal's
+ordinary sign-in, and someone not registered for that event is told so.
+
+`poll_decks.join_code` therefore exists only to disambiguate **which deck** — useful at an event
+running parallel tracks, where a delegate's workspace may offer more than one live question. It is
+a selector, never a credential.
 
 ### 4.4 The cost of decision 2, stated plainly
 
@@ -144,10 +151,19 @@ in Part 1, and is recorded here as the known escape hatch rather than a plan.
 Speakers verify exactly as attendees do: an emailed six-digit code, the same
 `PlatformAttendeeVerification`, the same session marker. No second identity system.
 
-This requires one change: **`speakers` has no email column** — it holds name, title, organisation,
-bio and photo. That is why the token link exists; there was no address to send anything to, and
-nothing currently emails a speaker their link at all. Adding `email` lets a speaker be recognised
-in `/my`, and separately lets the product email them a deadline.
+This requires one change, and the owner has made it a requirement rather than an option:
+**every speaker must have an email address.**
+
+`speakers` has no email column today — it holds name, title, organisation, bio and photo. That is
+why the token link exists; there was no address to send anything to, and nothing currently emails
+a speaker their link at all. Adding it lets a speaker be recognised in `/my`, and separately lets
+the product email them a deadline.
+
+Because rows already exist without one, the column arrives nullable and the **form requires it**,
+so no new speaker can be created without an address while existing ones stay editable. The
+organiser console shows which speakers are missing one, since a speaker without an address cannot
+reach their portal and that should be visible rather than discovered at an event. Making the column
+itself non-nullable waits until the backfill is done.
 
 A speaker is matched to their registration by that address, normalised the same way as everywhere
 else in the portal.
@@ -249,20 +265,19 @@ nothing from this spec.
 
 ---
 
-## 8. The voting page, and a live bug it fixes
+## 8. The QR on the wall, and a live bug
 
 The QR on the presentation screen points at `/e/{event}/poll`, **which returns JSON** — the data
 endpoint the public event page's widget fetches, not a page. Anyone scanning it in a room today
 sees a blob. Shipped 2026-09-25; the tests asserted the join URL *contained* `/poll` and never that
 it was somewhere a person could vote.
 
-Part 1 replaces it with a phone-first page at `/join/{code}`: one question at a time, large
-targets, no chrome, following the presenter. Until then the QR should point at the public event
-page, where the existing widget can at least take a vote.
+It becomes a deep-link into the attendee's own Live poll tab (§4.3). No new page is needed — the
+portal already votes — so this is a link correction, not a feature.
 
 **Lesson recorded:** asserting the shape of a URL is not asserting that the URL works.
 
-Voting is limited **per registration**, not per address — per address is precisely what would
+Voting is limited **per registration**, not per address; per address is precisely what would
 punish a WiFi crowd. The public vote endpoint currently has no limit at all, which decision 2
 resolves as a side effect: an identified voter can be counted.
 
@@ -325,7 +340,7 @@ room of three it is a disclosure.
 2. `email` on speakers, and speaker recognition in `/my` (§5.1)
 3. Deck model, `deck_id`/`position`, join codes
 4. Presenter controls, with voting refused on non-current questions
-5. Voting page at `/join/{code}` — fixes §8
+5. The portal's Live poll tab follows the presenter, and refuses stale questions
 6. Coalesced broadcasts, SQL counting, the index (§7.2, §7.3)
 7. Presenter hold on session expiry (§5.4)
 
