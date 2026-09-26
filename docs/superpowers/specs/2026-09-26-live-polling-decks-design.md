@@ -1,12 +1,12 @@
 # Live Polling Decks — Design Spec
 
-**Date:** 2026-09-26 · **Status:** awaiting owner review · **Path:** architectural
+**Date:** 2026-09-26 · **Status:** awaiting owner review (revision 2) · **Path:** architectural
 
 **Goal:** a Mentimeter-grade live polling experience inside MiConvener, so an organiser running a
 congress never needs a second subscription to ask a room a question.
 
-Facts about the current system were read from the code on 2026-09-26. Where this spec and the
-code disagree later, the code wins — re-verify before relying on a claim.
+Facts about the current system were read from the code on 2026-09-26. Where this spec and the code
+disagree later, the code wins — re-verify before relying on a claim.
 
 ---
 
@@ -14,63 +14,61 @@ code disagree later, the code wins — re-verify before relying on a claim.
 
 **Exists and works:** three poll types (multiple choice, open text, quiz); one poll live at a time
 per event; an organiser panel with bars, a moderation queue and a quiz leaderboard; a presentation
-screen reached by a revocable token; results broadcast over Reverb, measured at ~0.8s end to end;
-anonymous voting from the public event page.
+screen reached by a revocable token; results broadcast over Reverb, measured at ~0.8s end to end.
 
 **Missing, and why each matters:**
 
 | Missing | Consequence today |
 |---|---|
-| A deck — an ordered sequence | An organiser sets each poll live by hand, one at a time, from a console tab |
-| Presenter controls | No next/previous, no way to close voting and reveal, no sense of position |
-| An audience join page | **The QR on the presentation screen opens raw JSON** (§7) |
+| A deck — an ordered sequence | An organiser sets each poll live by hand, one at a time |
+| Presenter controls | No next/previous, no close-and-reveal, no sense of position |
+| An audience voting page | **The QR on the presentation screen opens raw JSON** (§8) |
+| Any check-in for online attendees | **Nobody at a virtual event can be marked present** (§6) |
+| An email on speakers | A speaker cannot be recognised by who they are (§5) |
 | Question types beyond three | No scale, rating, ranking, word cloud, number or multi-select |
 | Charts per type | Bars are the only visualisation |
-| Speaker authorship | A speaker's portal uploads slides and nothing else |
 
 ---
 
-## 2. Decisions taken in brainstorming
-
-These were settled with the owner and are not reopened here.
+## 2. Decisions taken with the owner
 
 1. **Built on polls, not surveys.** A Mentimeter deck is a sequence of *short* questions, each
-   answered by the whole room at once at the presenter's pace. A survey is one form, many
-   questions, self-paced, submitted once and read afterwards. The shape wanted is the shape polls
-   already have; what is missing is the sequence and the types. Surveys keep their own job and
-   get their own results dashboard separately.
-2. **Anonymous by default, recognised when signed in.** A hall always contains people who are not
-   in the registration system — walk-ins, a speaker's guest, someone who never verified their
-   address. A poll a third of the room cannot answer is not worth asking. An attendee already
-   signed in is recognised, which is what lets a quiz leaderboard or CME participation credit the
-   right person.
-3. **Organisers and speakers may both author and present.** A deck belongs to a session; whoever
-   has rights over that session may build it and run it. "Organiser prepares, speaker presents"
-   then needs no feature of its own.
-4. **Speakers identify by emailed code**, the same passwordless mechanism attendees use — not the
-   forwardable token link that currently guards slide upload.
-5. **Results do not stream to voters' phones.** The wall is the shared surface; a phone in a hall
-   is for answering. This is also what keeps socket count flat as audiences grow (§6).
+   answered by a whole room at the presenter's pace. A survey is one form, many questions,
+   self-paced, submitted once, read afterwards. The shape wanted is the shape polls already have;
+   what is missing is the sequence and the types. Surveys keep their own job.
+2. **Only registered, present people vote** — attendees, support staff and speakers alike. This
+   replaces an earlier decision to allow anonymous voting. It buys one vote per person, results
+   that can be trusted, and answers that can count toward attendance or CME. It costs reach, and
+   §6 is about paying that cost honestly rather than pretending it is free.
+3. **Speakers are attendees.** A speaker checks in, wears a badge, eats lunch, attends other
+   talks, wants the materials, gets a certificate and fills the post-event survey. That is the
+   attendee portal, already built. Speakers therefore live in `/my` with a speaker section, not in
+   a separate workspace, and are registered like everyone else — usually by the organiser on their
+   behalf, and usually without paying.
+4. **Results do not stream to voters' phones.** The wall is the shared surface; a phone in a hall
+   is for answering. This keeps socket count flat as audiences grow (§7.1).
+5. **Organisers and speakers may both author and present.** A deck belongs to a session; whoever
+   has rights over that session may build and run it.
 
 ---
 
 ## 3. Scope
 
-**In scope — Part 1:** the deck, presenter controls, the audience join code and voting page, and
-the capacity work in §6.
+**Part 1 — the room:** decks, presenter controls, the voting page, check-in for online attendees,
+and the capacity work in §7.
 
-**In scope — Part 2:** the seven new question types with their inputs and charts.
+**Part 2 — the questions:** the seven new types with their inputs and charts.
 
-**Out of scope, deliberately:**
+**Out of scope:**
 
-- **The Speakers Workspace.** Speaker deck authoring assumes a surface that does not exist. The
-  `Speaker` model holds name, title, organisation, bio and photo; the portal does three things.
-  Bio and headshot upload, conflict-of-interest disclosure, deadlines and session Q&A are a
-  separate project with its own spec. This spec designs *so that* decks can live there, and Part 1
-  ships organiser-only authoring.
-- **Q&A with upvotes.** Mentimeter has it; so does the existing Forum, including moderation and
-  banning. A Forum slide in a deck is the later answer, not a second implementation.
-- **A date question type.** Surveys have one. No live-room question is answered by it.
+- **A separate Speakers Workspace.** Decision 3 removes the need for one: rebuilding check-in,
+  badges, materials, certificates and surveys beside where they already work would be duplication.
+  What remains genuinely speaker-specific — confirming attendance, uploading slides, conflict-of-
+  interest disclosure, keeping a bio current — becomes a section of `/my`, and is specified
+  separately from this document.
+- **Q&A with upvotes.** The Forum already does this, with moderation and banning. A Forum slide in
+  a deck is the later answer, not a second implementation.
+- **A date question type.** Surveys have one; no live-room question is answered by it.
 - **Survey results dashboard.** Needed, unrelated, separately specified.
 
 ---
@@ -86,137 +84,194 @@ poll_decks
   event_id uuid
   session_id uuid nullable  the talk this belongs to
   title varchar
-  join_code varchar(8)      unique per event while a deck is active
+  join_code varchar(8)      unique among live decks
   status                    draft | live | ended
   current_poll_id nullable  where the presenter is standing
   present_token varchar     revocable, as events.present_token already is
   created_at / updated_at
 ```
 
-`event_polls` gains `deck_id` (nullable) and `position` (integer). A poll with no deck keeps
-working exactly as it does now — the existing single-poll flow is not disturbed.
+`event_polls` gains `deck_id` (nullable) and `position`. A poll with no deck behaves exactly as it
+does now; the existing single-poll flow is not disturbed.
 
 ### 4.2 Presenter controls
 
-The presenter holds the pace. Controls: **next**, **previous**, **close voting**, **reveal**
-(quiz only), **reopen**, and **end deck**.
+The presenter holds the pace: **next**, **previous**, **close voting**, **reveal** (quiz),
+**reopen**, **end deck**.
 
-Advancing sets `current_poll_id`, closes the outgoing poll and opens the incoming one in one
-transaction, then broadcasts. Voting on a poll that is not `current` is refused by the endpoint,
-not merely hidden — a phone left on a previous question must not be able to answer it.
+Advancing closes the outgoing poll and opens the incoming one in one transaction, then broadcasts.
+Voting on a poll that is not `current` is **refused by the endpoint**, not merely hidden — a phone
+left on a previous question must not be able to answer it.
 
-**A presentation in progress cannot be interrupted by session expiry** (§5). Ending the deck, or
-the session's end time passing, releases that hold.
+A presentation in progress is not interrupted by session expiry (§5).
 
-### 4.3 Audience join
+### 4.3 Joining
 
-A deck displays a **join code** — six to eight characters, unambiguous alphabet (no `O`/`0`,
-`I`/`1`), unique among live decks. The wall shows the code, a short URL and a QR.
+The join code identifies *which* deck, not *who* may vote. A voter reaches `/join/{code}`, and
+from there:
 
-Joining needs no account. A voter gets a signed, http-only **participant cookie** holding an
-opaque token, which is what `respondent_token` becomes for anonymous voters. One device, one vote
-per question. A signed-in attendee's registration is recognised instead, so their answers can
-count toward a leaderboard or attendance — while the organiser still receives no identifying
-token, exactly as today's poll respondent tokens work.
+- **Already verified in `/my`** — straight to the question.
+- **Not verified** — the portal's existing email-code flow, then back to the question.
+- **Verified but not registered for this event, or not present** — told plainly which of the two
+  is missing, and what to do about it. Never a blank refusal.
 
-Clearing storage earns another vote. That is Mentimeter's accepted trade and is stated here so
-nobody later mistakes it for a defect.
+One registration, one vote per question, enforced on the registration rather than on a device, so
+clearing storage or switching phones earns nothing.
 
----
+### 4.4 The cost of decision 2, stated plainly
 
-## 5. Speaker identity
+Requiring registration means **every voter must have signed in**, which puts the emailed sign-in
+code on the critical path for a whole room. Two consequences worth deciding with open eyes:
 
-Speakers verify by emailed six-digit code, reusing `PlatformAttendeeVerification` wholesale:
-atomic attempt reservation, single use, 15-minute expiry, cached dummy hash, session regeneration.
-A speaker marker is stored separately from the attendee marker; holding one does not confer the
-other.
+- Most attendees will already be verified — they signed in to see their ticket — and proof lasts
+  12 hours, so a delegate who opened their ticket that morning votes without friction.
+- Those who have not will each need an email round-trip at the moment a speaker asks a question.
+  A congress starting its first poll may send several hundred codes within minutes. The per-address
+  caps are untouched by volume (one code each), and the venue-address problem is fixed (§7.4) —
+  but **outbound mail throughput becomes the constraint**, and should be checked against the mail
+  provider's limits before an event of that size.
 
-**The 12-hour window gets one exception.** Proof is fixed, not sliding, so a speaker who verifies
-at 08:00 to rehearse would be asked for a code mid-deck at 20:00, in front of a room. While a deck
-is `live` and the verified speaker is its presenter, authorisation holds until the deck ends or
-the session's end time passes. Nothing else extends.
-
-The existing `portal_token` link keeps working for slide upload. It does **not** grant deck
-authoring: a forwardable link that has been sitting in an inbox since the call for papers should
-not put words on the main screen.
+If that friction proves worse than the integrity it buys, the fallback is decision 2 reversed for
+nominated questions — an organiser marking a particular poll as open to anyone. That is not built
+in Part 1, and is recorded here as the known escape hatch rather than a plan.
 
 ---
 
-## 6. Holding a thousand people
+## 5. Speakers
 
-A congress may exceed a thousand attendees. Four things break at that size; each was measured or
-read on 2026-09-26, not assumed.
+### 5.1 Identity
 
-### 6.1 Sockets — the reason voters' phones do not stream
+Speakers verify exactly as attendees do: an emailed six-digit code, the same
+`PlatformAttendeeVerification`, the same session marker. No second identity system.
 
-The provisioned Reverb cluster holds **100 concurrent connections**. If every phone subscribed,
-one 1,000-person event would need the 2,000 tier.
+This requires one change: **`speakers` has no email column** — it holds name, title, organisation,
+bio and photo. That is why the token link exists; there was no address to send anything to, and
+nothing currently emails a speaker their link at all. Adding `email` lets a speaker be recognised
+in `/my`, and separately lets the product email them a deadline.
 
-Because results do not stream to phones (decision 5), **only presenter screens hold sockets** —
-one or two per event. The 100 tier then covers dozens of simultaneous events, and connection
-count stays flat as audiences grow. This is the property being bought, more than the money.
+A speaker is matched to their registration by that address, normalised the same way as everywhere
+else in the portal.
 
-Voters get their acknowledgement in the response to their own vote. No socket.
+### 5.2 Registration
 
-### 6.2 Broadcasts must be aggregated, not per vote
+Speakers are registered like anyone else, ordinarily by the organiser on their behalf, and
+ordinarily without paying. Nothing new is needed for this: a registration with a zero amount
+already exists as a shape. A speaker who genuinely is not attending — a recorded contribution, a
+withdrawn name — simply has no registration and therefore no portal, which is correct.
 
-`PollResultsUpdated` currently fires **on every vote**, synchronously, inside the request. A
-thousand people answering within ten seconds of a question opening is a thousand synchronous HTTP
-calls to Reverb, with voters waiting on them.
+### 5.3 The token link survives, narrowed
 
-Broadcasts become **interval-coalesced**: at most one per poll per second, carrying the current
-aggregate. A vote records, schedules a broadcast if none is pending, and returns. A wall updating
-once a second reads as live to a room; a wall updating a thousand times in ten seconds reads the
-same and costs a thousand times more.
+The existing `portal_token` keeps working for **slide upload only**. It is long-lived and
+forwardable; something that has sat in an inbox since the call for papers should not be able to
+put words on the main screen. Deck authoring and presenting require a verified address.
 
-### 6.3 Counting moves to SQL
+### 5.4 The 12-hour window gets one exception
 
-`PollResults::forDisplay` loads every response into memory and filters the collection. At a
-thousand rows, recomputed per broadcast, that is the same work repeatedly.
-
-Counts become a `GROUP BY option_id` aggregate. `event_poll_responses` gains an index on
-`(poll_id, option_id)`; it currently indexes `tenant_id` and uniquely `(poll_id, respondent_token)`.
-Open text keeps its existing capped fetch of the most recent approved answers.
-
-### 6.4 Compute
-
-Production runs one `flex-512mb` instance with **autoscaling off**. A thousand phones posting
-within seconds is the spikiest traffic this product will ever serve, on the configuration least
-able to absorb it. **Enabling autoscaling before a large event is a deployment precondition, not
-code** — recorded here so it is decided rather than discovered.
-
-### 6.5 Rate limits — done, 2026-09-26
-
-Shipped ahead of this spec as `d6cb49b`, because it was a live defect rather than a new feature:
-
-- **No proxies were trusted.** The client address read from a request was the load balancer's,
-  identical for every visitor, so every per-IP limit was one global limit shared by the whole
-  internet. Fixed to trust all proxies as Laravel Cloud documents, with a test that fails without it.
-- **A solved challenge now earns passage** past the burst ceiling. A hall is one address shared by
-  everyone in it, so volume cannot distinguish a congress from a script — only the challenge can.
-  The daily figure became a backstop sized for a venue. Mailbox caps are untouched.
+Proof is fixed, not sliding. A speaker who verifies at 08:00 to rehearse would be asked for a code
+mid-deck at 20:00, in front of a room. While a deck is `live` and the verified speaker is its
+presenter, authorisation holds until the deck ends or the session's end time passes. Nothing else
+extends.
 
 ---
 
-## 7. The audience voting page, and a live bug it fixes
+## 6. Presence, and the hole in it
 
-The QR on the presentation screen points at `/e/{event}/poll`, **which returns JSON**. It is the
-data endpoint the public event page's widget fetches, not a page. Anyone in a room who scans it
-today sees a blob of JSON. Shipped by me on 2026-09-25; the tests asserted the join URL *contained*
-`/poll` and never that it was somewhere a person could vote.
+Decision 2 requires people to be *present*, and presence today means `checked_in_at`, which is
+written only by staff at a door: search, scan, or mark present from the console. **Nothing on the
+attendee side ever writes it.** Events are either `in_person` or `virtual`.
 
-Part 1 replaces it with a phone-first voting page at `/join/{code}`: one question at a time, large
-targets, no chrome, following the presenter. Until Part 1 lands the QR should point at the public
-event page, where the existing widget can at least take a vote.
+So as things stand, a virtual event can check nobody in, and a remote attendee at an in-person
+event never can be. Requiring check-in to vote would silently exclude them.
 
-**Lesson recorded:** a test that asserts the shape of a URL has not asserted that the URL works.
+**Self check-in closes it.** An attendee marks themselves present from their event workspace,
+available while the event is running, and recorded exactly as a door scan is — same column, same
+attendance record, with the source noted so an organiser can tell a scan from a self-report.
+
+- **Virtual events:** self check-in is the mechanism. Opening the workspace during the event offers
+  it; it is not silently automatic, because "I am here" should be something a person says.
+- **In-person events:** the door remains the norm. Self check-in is available as an organiser
+  setting for events that do not staff a desk, and is off by default.
+
+This is worth building beyond polling: a virtual event currently produces no attendance record at
+all, which matters for CME and for certificates that claim hours.
 
 ---
 
-## 8. Question types
+## 7. Holding a thousand people
 
-Ten types. Three exist; seven are new. Each needs a phone input and a wall chart, and the two are
-designed together — a type is not done because it can be answered.
+Each figure below was read or measured on 2026-09-26.
+
+### 7.1 Sockets
+
+The Reverb cluster holds **100 concurrent connections**. Because results do not stream to phones
+(decision 4), only presenter screens hold sockets — one or two per event — so the tier covers
+dozens of simultaneous events and connection count stays flat as audiences grow. That property
+matters more than the money.
+
+Voters get their acknowledgement in the response to their own vote.
+
+### 7.2 Broadcasts are coalesced, not per vote
+
+`PollResultsUpdated` currently fires on **every vote**, synchronously, inside the request. A
+thousand people answering within ten seconds is a thousand synchronous calls to Reverb with voters
+waiting on them.
+
+Broadcasts become interval-coalesced: at most one per poll per second, carrying the current
+aggregate. A wall updating once a second reads as live to a room; a thousand times in ten seconds
+reads identically and costs a thousand times more.
+
+### 7.3 Counting moves to SQL
+
+`PollResults::forDisplay` loads every response into memory and filters the collection. Counts
+become a `GROUP BY option_id` aggregate, with an index on `(poll_id, option_id)` —
+`event_poll_responses` currently indexes `tenant_id` and uniquely `(poll_id, respondent_token)`.
+
+### 7.4 Rate limits — done, 2026-09-26 (`d6cb49b`)
+
+Shipped ahead of this spec because it was a live defect:
+
+- **No proxies were trusted**, so the address read from every request was the load balancer's —
+  the same value for every visitor on earth, making each per-IP limit one global limit shared by
+  the whole internet. Fixed to trust all proxies as Laravel Cloud documents, with a test that
+  fails without it.
+- **Passing the challenge now earns passage** past the burst ceiling. A hall is one address shared
+  by everyone in it, so volume cannot tell a congress from a script; only the challenge can. The
+  daily figure became a backstop sized for a venue. Mailbox caps are untouched.
+
+Decision 2 makes this load-bearing rather than incidental: a room that must sign in to vote is a
+room that must all request codes from the same venue address at once.
+
+### 7.5 Compute
+
+Production runs one `flex-512mb` instance with autoscaling off. **The owner will enable
+autoscaling once development finishes**; recorded so the dependency is not forgotten, and needing
+nothing from this spec.
+
+---
+
+## 8. The voting page, and a live bug it fixes
+
+The QR on the presentation screen points at `/e/{event}/poll`, **which returns JSON** — the data
+endpoint the public event page's widget fetches, not a page. Anyone scanning it in a room today
+sees a blob. Shipped 2026-09-25; the tests asserted the join URL *contained* `/poll` and never that
+it was somewhere a person could vote.
+
+Part 1 replaces it with a phone-first page at `/join/{code}`: one question at a time, large
+targets, no chrome, following the presenter. Until then the QR should point at the public event
+page, where the existing widget can at least take a vote.
+
+**Lesson recorded:** asserting the shape of a URL is not asserting that the URL works.
+
+Voting is limited **per registration**, not per address — per address is precisely what would
+punish a WiFi crowd. The public vote endpoint currently has no limit at all, which decision 2
+resolves as a side effect: an identified voter can be counted.
+
+---
+
+## 9. Question types
+
+Ten types. Three exist; seven are new. Each needs a phone input and a wall chart, designed
+together — a type is not finished because it can be answered.
 
 | Type | Phone | Wall | Status |
 |---|---|---|---|
@@ -231,58 +286,70 @@ designed together — a type is not done because it can be answered.
 | Word cloud | one to three words | cloud, repeats grow | new |
 | Ranking | drag into order | ranked bars by average position | new |
 
-**Multiple select** reports percentages of respondents, not of votes, because five options each
-chosen by everyone is 100% five times and a bar chart that sums to 500% is a lie.
+**Multiple select** reports percentages of respondents, not of votes: five options each chosen by
+everyone is 100% five times, and a chart summing to 500% is a lie.
 
-**Word cloud** normalises case and trims punctuation before counting, and caps entries per
-respondent. Moderation applies as it does to open text: an unapproved word never reaches the wall.
+**Word cloud** normalises case and trims punctuation before counting, caps entries per respondent,
+and moderates as open text does — an unapproved word never reaches the wall.
 
-**Ranking** scores by average position, and the wall states the respondent count, because an
-average position over four voters is not a result.
+**Ranking** scores by average position and states the respondent count, because an average
+position over four voters is not a result.
 
 ---
 
-## 9. Privacy
+## 10. Privacy
+
+Decision 2 makes every vote attributable in the database. That raises the stakes on what leaves it.
 
 The presentation screen is opened by a token, on a machine with no login, in front of a room. What
-it serves is **counts, never people** — no respondent token, no name, no answer attributable to
-anyone. Open text carries a display name only where the question asked for one, and only once
-approved. This holds for the broadcast too, which rides a public channel precisely because there
-is nobody on a projector to authorise.
+it serves is **counts, never people** — no respondent token, no registration, no name, no answer
+attributable to anyone. Open text carries a display name only where the question asked for one,
+and only once approved. The broadcast carries the same aggregate, and rides a public channel
+precisely because there is nobody on a projector to authorise.
 
-The same rule governs every new chart. A histogram of salaries in a room of forty is an aggregate;
-a histogram of salaries in a room of three is a disclosure. **Charts for number, scale and rating
-suppress detail below a floor of five respondents**, showing a count and "not enough responses yet"
-instead.
+The organiser's own view is also aggregate. Individual answers are not exposed per person, because
+a poll answered in a room is not a survey response and attendees will not know the difference
+unless told. **If an organiser should ever be able to see who answered what, that is a product
+decision to take deliberately, not a consequence of having made voting identified.**
 
----
-
-## 10. Delivery
-
-**Part 1 — decks and the room**
-1. Deck model, `deck_id`/`position` on polls, join codes
-2. Presenter controls, with voting refused on non-current questions
-3. Audience join page and participant cookie — fixes §7
-4. Aggregated broadcasts, SQL counting, the index (§6.2, §6.3)
-5. Presenter hold on session expiry (§5)
-
-**Part 2 — the seven types**
-6. Yes/No, rating, scale — the three closest to what exists
-7. Multiple select, number — new aggregation shapes
-8. Word cloud — normalisation and moderation
-9. Ranking — new input and new scoring
-10. Speaker authoring, once a Speakers Workspace exists to hold it
-
-Each numbered item ships on its own and is reviewable alone. Part 2 does not begin until Part 1 is
-deployed and used in a room, because the thing most likely to be wrong is the pacing, and no
-number of question types fixes that.
+**Charts for number, scale and rating suppress detail below five respondents**, showing a count
+and "not enough responses yet". A histogram of salaries in a room of forty is an aggregate; in a
+room of three it is a disclosure.
 
 ---
 
-## 11. Testing
+## 11. Delivery
 
-Beyond the usual: **an assertion that a page renders is not an assertion that it works** — §7 is
-the standing example. Every new type gets a test that the wall payload carries no identifying
-field, and the three suppressed charts get a test at the floor boundary. The presenter's hold on
-expiry gets a test that travels past 12 hours mid-deck. Broadcast coalescing gets a test that a
-hundred votes produce fewer than a hundred broadcasts — the point of it is the number.
+**Part 1 — the room**
+1. Self check-in, with the virtual case first (§6) — unblocks everything else
+2. `email` on speakers, and speaker recognition in `/my` (§5.1)
+3. Deck model, `deck_id`/`position`, join codes
+4. Presenter controls, with voting refused on non-current questions
+5. Voting page at `/join/{code}` — fixes §8
+6. Coalesced broadcasts, SQL counting, the index (§7.2, §7.3)
+7. Presenter hold on session expiry (§5.4)
+
+**Part 2 — the questions**
+8. Yes/No, rating, scale — closest to what exists
+9. Multiple select, number — new aggregation shapes
+10. Word cloud — normalisation and moderation
+11. Ranking — new input and scoring
+
+Each item ships on its own and is reviewable alone. Part 2 does not begin until Part 1 has been
+used in a real room: the thing most likely to be wrong is the pacing, and no number of question
+types fixes that.
+
+---
+
+## 12. Testing
+
+Beyond the usual: **asserting that a page renders is not asserting that it works** — §8 is the
+standing example, and the QR was green in tests while broken on the wall.
+
+- Every new type: a test that the wall payload carries no identifying field.
+- The three suppressed charts: a test at the five-respondent boundary.
+- The presenter's hold: a test that travels past 12 hours mid-deck.
+- Coalescing: a test that a hundred votes produce fewer than a hundred broadcasts — the number is
+  the point.
+- Self check-in: a test that a virtual event can mark someone present, since today it cannot.
+- Voting: a test that a second vote from the same registration on another device is refused.
