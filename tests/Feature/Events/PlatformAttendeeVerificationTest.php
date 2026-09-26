@@ -102,7 +102,7 @@ test('requestSend triggers Turnstile step-up challenge on 6th attempt from one I
     expect($passedChallenge['status'])->toBe(AttendeePortalRateLimiter::RESULT_ALLOWED);
 });
 
-test('requestSend blocks after IP burst limit of 20 attempts in 10 minutes even with Turnstile', function (): void {
+test('a solved challenge carries a shared address past the burst ceiling', function (): void {
     Config::set('attendee_portal.turnstile.site_key', 'test-site-key-123');
     Config::set('attendee_portal.turnstile.secret_key', 'test-secret-key-xyz');
 
@@ -117,14 +117,45 @@ test('requestSend blocks after IP burst limit of 20 attempts in 10 minutes even 
     $service = app(PlatformAttendeeVerification::class);
     $ip = '172.16.0.99';
 
-    // Simulate 20 attempts from the IP
+    // Well past the burst ceiling already.
     $ipHash = hash('sha256', $ip);
     for ($i = 1; $i <= 20; $i++) {
         \Illuminate\Support\Facades\RateLimiter::hit("portal:rl:ip:burst:{$ipHash}", 600);
     }
 
-    $blocked = $service->requestSend('user21@example.com', $ip, 'valid-token');
-    expect($blocked['status'])->toBe(AttendeePortalRateLimiter::RESULT_RATE_LIMITED);
+    // This assertion was the other way round, and was wrong. A congress hall
+    // is one address shared by everyone in it, so a ceiling on requests from
+    // an address refuses the twenty-first delegate in the room -- including
+    // one who has just proved they are a person. The challenge is what tells
+    // a hall from a script, and passing it has to be worth something.
+    $allowed = $service->requestSend('user21@example.com', $ip, 'valid-token');
+    expect($allowed['status'])->toBe(AttendeePortalRateLimiter::RESULT_ALLOWED);
+});
+
+test('the daily ceiling per address is still a ceiling', function (): void {
+    Config::set('attendee_portal.turnstile.site_key', 'test-site-key-123');
+    Config::set('attendee_portal.turnstile.secret_key', 'test-secret-key-xyz');
+    Config::set('attendee_portal.rate_limits.ip_daily', 30);
+
+    Http::fake([
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+            'success' => true,
+            'action' => AttendeePortalRateLimiter::TURNSTILE_ACTION,
+            'hostname' => turnstileHost(),
+        ]),
+    ]);
+
+    $service = app(PlatformAttendeeVerification::class);
+    $ip = '172.16.0.98';
+    $ipHash = hash('sha256', $ip);
+
+    for ($i = 1; $i <= 30; $i++) {
+        \Illuminate\Support\Facades\RateLimiter::hit("portal:rl:ip:daily:{$ipHash}", 86400);
+    }
+
+    // Solved challenge or not, the day's backstop holds.
+    expect($service->requestSend('too-many@example.com', $ip, 'valid-token')['status'])
+        ->toBe(AttendeePortalRateLimiter::RESULT_RATE_LIMITED);
 });
 
 test('dispatchCode consumes previous unconsumed codes and sends platform-branded email', function (): void {
@@ -325,6 +356,9 @@ test('a genuine token is still refused when it was not solved for this form or t
 
 test('the challenge response tells the widget which action to sign', function (): void {
     Config::set('attendee_portal.turnstile.site_key', 'test-site-key-123');
+    // Both halves, because a challenge there is no secret to verify against is
+    // theatre -- the limiter declines to issue one and falls back to counting.
+    Config::set('attendee_portal.turnstile.secret_key', 'test-secret-key-xyz');
 
     $service = app(PlatformAttendeeVerification::class);
 

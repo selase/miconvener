@@ -46,32 +46,38 @@ final class AttendeePortalRateLimiter
             return ['status' => self::RESULT_RATE_LIMITED];
         }
 
-        $ipBurstLimit = (int) config('attendee_portal.rate_limits.ip_burst', 20);
-        if (RateLimiter::tooManyAttempts("portal:rl:ip:burst:{$ipHash}", $ipBurstLimit)) {
-            return ['status' => self::RESULT_RATE_LIMITED];
-        }
-
         $ipBurstAttempts = RateLimiter::attempts("portal:rl:ip:burst:{$ipHash}");
         $challengeThreshold = (int) config('attendee_portal.rate_limits.ip_challenge_threshold', 5);
+        $siteKey = (string) config('attendee_portal.turnstile.site_key');
+        $canChallenge = $siteKey !== '' && (string) config('attendee_portal.turnstile.secret_key') !== '';
 
-        if ($ipBurstAttempts >= $challengeThreshold) {
-            $siteKey = config('attendee_portal.turnstile.site_key');
+        // A conference hall is one address shared by everyone in it, so volume
+        // from a single IP cannot tell a thousand delegates from one script.
+        // Only the challenge can, and passing it has to earn passage -- a hard
+        // burst ceiling applied on top would refuse the twenty-first person in
+        // the room no matter how plainly human they had just proved themselves.
+        if ($canChallenge) {
+            if ($ipBurstAttempts >= $challengeThreshold) {
+                if ($turnstileToken === null || mb_trim($turnstileToken) === '') {
+                    return [
+                        'status' => self::RESULT_CHALLENGE_REQUIRED,
+                        'site_key' => $siteKey,
+                        'action' => self::TURNSTILE_ACTION,
+                    ];
+                }
 
-            if ($turnstileToken === null || mb_trim($turnstileToken) === '') {
-                return [
-                    'status' => self::RESULT_CHALLENGE_REQUIRED,
-                    'site_key' => $siteKey,
-                    'action' => self::TURNSTILE_ACTION,
-                ];
+                if (! $this->verifyTurnstileToken($turnstileToken, $ip)) {
+                    return [
+                        'status' => self::RESULT_CHALLENGE_FAILED,
+                        'site_key' => $siteKey,
+                        'action' => self::TURNSTILE_ACTION,
+                    ];
+                }
             }
-
-            if (! $this->verifyTurnstileToken($turnstileToken, $ip)) {
-                return [
-                    'status' => self::RESULT_CHALLENGE_FAILED,
-                    'site_key' => $siteKey,
-                    'action' => self::TURNSTILE_ACTION,
-                ];
-            }
+        } elseif (RateLimiter::tooManyAttempts("portal:rl:ip:burst:{$ipHash}", (int) config('attendee_portal.rate_limits.ip_burst', 20))) {
+            // With no challenge configured there is nothing to pass, so the
+            // burst ceiling is all that stands between a mailbox and a script.
+            return ['status' => self::RESULT_RATE_LIMITED];
         }
 
         if (RateLimiter::tooManyAttempts("portal:rl:email:cooldown:{$emailHash}", 1)) {
