@@ -9,6 +9,7 @@ use App\Models\EventNotificationLog;
 use App\Models\EventNotificationRule;
 use App\Models\EventParticipantGroup;
 use App\Models\EventRegistration;
+use App\Models\EventSpeaker;
 use App\Models\Speaker;
 use App\Models\User;
 
@@ -82,8 +83,15 @@ final class AutomatedNotificationDispatcher
         $audience = $rule->target_audience;
 
         // 1. SPEAKER ROLE
+        //
+        // Queried through Speaker::whereIn() rather than $event->speakers()
+        // (an untyped BelongsToMany) so the collection below is concretely
+        // typed as Speaker, matching how the organiser branch below queries
+        // User directly.
         if ($role === EventNotificationRule::ROLE_SPEAKER || $audience === 'speakers') {
-            return $event->speakers()->get()->map(fn (Speaker $s): array => [
+            $speakerIds = EventSpeaker::where('event_id', $event->id)->pluck('speaker_id');
+
+            return Speaker::whereIn('id', $speakerIds)->get()->map(fn (Speaker $s): array => [
                 'name' => $s->name,
                 'email' => $s->email,
                 'phone' => null,

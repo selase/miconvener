@@ -24,6 +24,7 @@ final class EventSpeakerController extends Controller
         $validated = $request->validate([
             'speaker_id' => ['required', Rule::exists('speakers', 'id')->where('tenant_id', $tenant->id)],
             'role' => ['nullable', 'string', 'max:50'],
+            'email' => ['required', 'email', 'max:255'],
         ]);
 
         $eventModel->speakers()->syncWithoutDetaching([

@@ -27,6 +27,7 @@ use App\Models\EventRegistration;
 use App\Models\EventRegistrationTransfer;
 use App\Models\EventServiceRequest;
 use App\Models\EventSessionAttendance;
+use App\Models\Speaker;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\SelfCheckIn;
@@ -178,6 +179,10 @@ final class PlatformAttendeeWorkspaceController extends Controller
                     : null,
             ],
             'materials' => $materials,
+            // A speaker is an attendee who also speaks: same ticket, same portal, one
+            // extra section. Matched on the address they verified with, so nothing new
+            // has to be proven.
+            'speaker' => $this->speakerFor($event, $registrationModel),
             'certificate' => $certificatePayload,
             'attendance' => $attendanceRecords,
             'canRequestHelp' => $canRequestHelp,
@@ -1092,6 +1097,28 @@ final class PlatformAttendeeWorkspaceController extends Controller
     private function pollRespondentToken(EventRegistration $registration, EventPoll $poll): string
     {
         return hash_hmac('sha256', "poll:{$registration->id}:{$poll->id}", (string) config('app.key'));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function speakerFor(Event $event, EventRegistration $registration): ?array
+    {
+        $speaker = Speaker::withoutGlobalScopes()
+            ->forEmail($registration->email)
+            ->where('tenant_id', $registration->tenant_id)
+            ->whereHas('eventSpeakers', fn (Builder $q) => $q->withoutGlobalScopes()->where('event_id', $event->id))
+            ->first();
+
+        if (! $speaker instanceof Speaker) {
+            return null;
+        }
+
+        return [
+            'name' => $speaker->name,
+            'title' => $speaker->title,
+            'organization' => $speaker->organization,
+        ];
     }
 
     private function forumVoterToken(EventRegistration $registration, Event $event): string

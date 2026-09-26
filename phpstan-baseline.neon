@@ -966,7 +966,6 @@ parameters:
 			count: 2
 			path: app/Http/Controllers/Public/PublicEventController.php
 
-
 		-
 			rawMessage: 'Anonymous function should return array{id: string, title: string, body: string, author_name: string, is_answered: bool, attachment_url: string|null, attachment_name: string|null, votes_count: int<0, max>, ...} but returns array{id: string, title: string, body: string, author_name: string, is_answered: bool, attachment_url: string|null, attachment_name: string|null, votes_count: int<0, max>, ...}.'
 			identifier: return.type
@@ -5216,12 +5215,6 @@ parameters:
 			path: app/Services/Llm/LlmUsageService.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Speaker::$email.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
 			identifier: property.notFound
 			count: 1
@@ -5231,18 +5224,6 @@ parameters:
 			rawMessage: Expression on left side of ?? is not nullable.
 			identifier: nullCoalesce.expr
 			count: 2
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() expects callable(Illuminate\Database\Eloquent\Model, int): array{name: string, email: mixed, phone: null, ticket_code: null, action_url: string, action_label: ''Speaker Programme''}, Closure(App\Models\Speaker): array{name: string, email: mixed, phone: null, ticket_code: null, action_url: string, action_label: ''Speaker Programme''} given.'
-			identifier: argument.type
-			count: 1
 			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
 
 		-
@@ -5272,18 +5253,6 @@ parameters:
 		-
 			rawMessage: 'Parameter $recipient of method App\Services\Notifications\NotificationGatewayService::dispatch() expects array{name?: string|null, email?: string|null, phone?: string|null}, array{name: string, email: string|null, phone: string|null, ticket_code: string|null, action_url: string|null, action_label: string|null} given.'
 			identifier: argument.type
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
-			identifier: method.unresolvableReturnType
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Return type of call to method Illuminate\Support\Collection<int,array<string, mixed>>::all() contains unresolvable type.'
-			identifier: method.unresolvableReturnType
 			count: 1
 			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
 
