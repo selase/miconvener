@@ -253,6 +253,26 @@ if (! function_exists('presenterScenario')) {
 }
 
 /**
+ * A presenter's deck plus a signed-in owner and the tenant host to call from,
+ * for driving the deck endpoints over HTTP.
+ *
+ * @return array{0: Tenant, 1: Event, 2: PollDeck, 3: EventPoll, 4: EventPoll, 5: User, 6: string}
+ */
+if (! function_exists('deckConsole')) {
+    function deckConsole(string $slug): array
+    {
+        [$tenant, $event, $deck, $first, $second] = presenterScenario($slug);
+        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        setPermissionsTeamId($tenant->id);
+        makeTenantOwner($user, $tenant);
+        $tenant->users()->attach($user->id);
+        $host = "{$slug}.".mb_ltrim((string) config('session.domain'), '.');
+
+        return [$tenant, $event, $deck, $first, $second, $user, $host];
+    }
+}
+
+/**
  * Make the user the tenant's owner (Org Superadmin), seeding the built-in
  * roles and permissions if this test has not.
  */

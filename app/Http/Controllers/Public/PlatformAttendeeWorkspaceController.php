@@ -647,7 +647,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             abort(404);
         }
 
-        $pollModel = $event->polls()->where('id', $poll)->with('options')->firstOrFail();
+        $pollModel = $event->polls()->where('id', $poll)->with(['options', 'deck'])->firstOrFail();
 
         // Never opened: there is nothing here to answer, and "closed" would be a lie
         // about a question the room has not been shown.

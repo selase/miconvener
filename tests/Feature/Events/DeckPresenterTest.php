@@ -6,7 +6,6 @@ use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventRegistration;
 use App\Models\PollDeck;
-use App\Models\User;
 use App\Services\Events\DeckPresenter;
 use App\Services\Tenancy\TenantHostMatcher;
 
@@ -134,22 +133,6 @@ test('going back lands on the question just behind, not the first one', function
     expect($deck->fresh()->current_poll_id)->toBe($second->id);
 });
 
-/**
- * The service is well covered above; these exercise the HTTP surface, which
- * nothing else touches -- routes, authorization, tenancy and payload shape.
- */
-function deckConsole(string $slug): array
-{
-    [$tenant, $event, $deck, $first, $second] = presenterScenario($slug);
-    $user = User::factory()->create(['tenant_id' => $tenant->id]);
-    setPermissionsTeamId($tenant->id);
-    makeTenantOwner($user, $tenant);
-    $tenant->users()->attach($user->id);
-    $host = "{$slug}.".mb_ltrim((string) config('session.domain'), '.');
-
-    return [$tenant, $event, $deck, $first, $second, $user, $host];
-}
-
 test('the console drives the deck and reports where the presenter is standing', function (): void {
     [$tenant, $event, $deck, $first, $second, $user, $host] = deckConsole('console-drive');
 
@@ -202,11 +185,11 @@ test('a deck belonging to another tenant is not found, whoever asks', function (
     [$tenantA, $eventA, $deckA, $firstA, $secondA, $userA, $hostA] = deckConsole('console-mine');
     [$tenantB, $eventB, $deckB] = deckConsole('console-theirs');
 
-    // Someone else's deck id on my own event's URL. TenantScope is a no-op
-    // without a tenant in context, so findDeck's explicit scoping is the only
-    // thing standing between these two rooms.
+    // Their event AND their deck, asked for from my host with my login, so
+    // the only thing refusing it is the tenant filter. Pairing their deck with
+    // MY event id would pass on the mismatch alone and prove nothing.
     $this->actingAs($userA)
-        ->postJson("http://{$hostA}/events/{$eventA->id}/decks/{$deckB->id}/start", [], ['HTTP_HOST' => $hostA])
+        ->postJson("http://{$hostA}/events/{$eventB->id}/decks/{$deckB->id}/start", [], ['HTTP_HOST' => $hostA])
         ->assertNotFound();
 
     expect($deckB->fresh()->status)->toBe(PollDeck::STATUS_DRAFT);
@@ -243,4 +226,38 @@ test('an advance after the deck has ended is refused, not obeyed', function (): 
 
     // Nothing stranded live on a deck the room has been told is over.
     expect($second->fresh()->status)->not->toBe(EventPoll::STATUS_LIVE);
+});
+
+test('a standalone question that has closed says so rather than vanishing', function (): void {
+    // No deck at all -- the case that has to keep behaving as it always did,
+    // except that a closed question now explains itself instead of 404ing.
+    [$tenant, $event, $deck, $first] = presenterScenario('standalone-closed');
+    $loose = EventPoll::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'question' => 'On its own',
+        'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+        'status' => EventPoll::STATUS_CLOSED,
+    ]);
+    $option = EventPollOption::create([
+        'tenant_id' => $tenant->id, 'poll_id' => $loose->id, 'label' => 'Yes', 'sort_order' => 0,
+    ]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'standalone@example.com',
+        'status' => EventRegistration::STATUS_CHECKED_IN,
+        'checked_in_at' => now(),
+    ]);
+
+    expect($loose->isCurrent())->toBeTrue();
+
+    $host = app(TenantHostMatcher::class)->baseDomain();
+
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$loose->id}/respond", [
+            'option_id' => $option->id,
+        ], ['HTTP_HOST' => $host])
+        ->assertStatus(422)
+        ->assertJsonPath('message', 'That question has closed.');
 });
