@@ -129,10 +129,14 @@ test('a multiple choice response cannot be submitted with an option from a diffe
     $registration = checkedInVoter($tenant, $event, 'voter@example.com');
     $host = app(TenantHostMatcher::class)->baseDomain();
 
+    // respondPoll has three 422 branches now; name the one that must fire, or
+    // this stays green when a different refusal starts answering first.
     $this->withSession(proofFor($registration->email))
         ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
             'option_id' => $foreignOption->id,
-        ], ['HTTP_HOST' => $host])->assertStatus(422);
+        ], ['HTTP_HOST' => $host])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('option_id');
 });
 
 test('host can create a quiz question with a correct answer marked', function () {
@@ -206,7 +210,9 @@ test('a quiz response is rejected once the timer has run out', function () {
     $this->withSession(proofFor($registration->email))
         ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
             'option_id' => $option->id,
-        ], ['HTTP_HOST' => $host])->assertStatus(422);
+        ], ['HTTP_HOST' => $host])
+        ->assertStatus(422)
+        ->assertJsonPath('message', "Time's up for this question.");
 });
 
 test('the quiz leaderboard sums points across quiz questions per respondent', function () {

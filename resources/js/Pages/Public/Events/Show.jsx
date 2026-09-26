@@ -7,7 +7,6 @@ import Input from '@/Components/Console/Input';
 import Button from '@/Components/Console/Button';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import respondentToken from '@/lib/respondentToken';
-import { getRespondentName, setRespondentName } from '@/lib/respondentName';
 
 function formatDateRange(startsAt, endsAt, timezone) {
     const sameDay =
@@ -342,28 +341,13 @@ function QuizLeaderboard({ event }) {
 
 function LivePollSection({ event }) {
     const [poll, setPoll] = useState(undefined);
-    const [selected, setSelected] = useState('');
-    const [text, setText] = useState('');
-    const [name, setName] = useState(getRespondentName());
-    const [done, setDone] = useState(false);
-    const [feedback, setFeedback] = useState(null);
     const [secondsLeft, setSecondsLeft] = useState(null);
 
     useEffect(() => {
         const load = () =>
             csrfFetch(route('public.events.poll.show', { event: event.slug }))
                 .then((r) => r.json())
-                .then((data) => {
-                    setPoll((prev) => {
-                        if (prev?.id !== data.poll?.id) {
-                            setSelected('');
-                            setText('');
-                            setDone(false);
-                            setFeedback(null);
-                        }
-                        return data.poll;
-                    });
-                });
+                .then((data) => setPoll(data.poll));
         load();
         const interval = setInterval(load, 4000);
         return () => clearInterval(interval);
@@ -389,102 +373,34 @@ function LivePollSection({ event }) {
 
     const timeUp = secondsLeft !== null && secondsLeft <= 0;
 
-    const submit = async (e) => {
-        e.preventDefault();
-        if (poll.type === 'quiz') setRespondentName(name);
-        const response = await csrfFetch(
-            route('public.events.poll.respond', { event: event.slug, poll: poll.id }),
-            {
-                method: 'POST',
-                body: JSON.stringify({
-                    option_id: poll.type !== 'open' ? selected : undefined,
-                    response_text: poll.type === 'open' ? text : undefined,
-                    respondent_name: poll.type === 'quiz' ? name || undefined : undefined,
-                    respondent_token: respondentToken(),
-                }),
-            }
-        );
-        const json = await response.json();
-        if (response.ok) {
-            setDone(true);
-            if (poll.type === 'quiz') setFeedback(json);
-        }
-    };
-
-    if (done) {
-        return (
-            <div>
-                {poll.type === 'quiz' && feedback ? (
-                    <p
-                        className={`text-sm ${feedback.is_correct ? 'text-accent' : 'text-ink-secondary'}`}
-                    >
-                        {feedback.is_correct
-                            ? `Correct! +${feedback.points_awarded} points.`
-                            : 'Not quite — better luck on the next question.'}
-                    </p>
-                ) : (
-                    <p className="text-sm text-accent">Thanks for responding!</p>
-                )}
-                {poll.type === 'quiz' && <QuizLeaderboard event={event} />}
-            </div>
-        );
-    }
-
     return (
         <div>
-            <form onSubmit={submit} className="max-w-md space-y-3">
+            <div className="max-w-md space-y-3">
                 <div className="flex items-baseline justify-between gap-3">
                     <b className="block text-[15px] text-ink">{poll.question}</b>
                     {secondsLeft !== null && (
                         <span
                             className={`shrink-0 font-mono text-sm ${secondsLeft <= 5 ? 'text-danger-fg' : 'text-ink-secondary'}`}
                         >
-                            {secondsLeft}s
+                            {timeUp ? "Time's up" : `${secondsLeft}s`}
                         </span>
                     )}
                 </div>
 
-                {poll.type === 'quiz' && (
-                    <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Your name, for the leaderboard (optional)"
-                        className="w-full border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
-                    />
-                )}
-
-                {poll.type === 'multiple_choice' || poll.type === 'quiz' ? (
-                    <div className="space-y-2">
-                        {poll.options.map((o) => (
-                            <label
-                                key={o.id}
-                                className={`flex cursor-pointer items-center gap-2.5 border px-3.5 py-2.5 text-[13.5px] ${selected === o.id ? 'border-accent bg-accent-soft' : 'border-border'}`}
-                            >
-                                <input
-                                    type="radio"
-                                    name="poll_option"
-                                    value={o.id}
-                                    checked={selected === o.id}
-                                    onChange={(e) => setSelected(e.target.value)}
-                                    required
-                                />
-                                {o.label}
-                            </label>
-                        ))}
-                    </div>
-                ) : (
-                    <textarea
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        rows={3}
-                        required
-                        className="w-full border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
-                    />
-                )}
-                <Button type="submit" variant="primary" disabled={timeUp}>
-                    {timeUp ? "Time's up" : 'Submit response'}
-                </Button>
-            </form>
+                <div className="border border-border bg-surface-muted px-3.5 py-3">
+                    <p className="text-[13.5px] text-ink">
+                        Answering is for people who are here. Open your ticket in
+                        your MiConvener portal and check in — your answer counts
+                        towards attendance.
+                    </p>
+                    <a
+                        href="/my"
+                        className="mt-2 inline-block text-[13.5px] font-medium text-accent underline"
+                    >
+                        Open my ticket
+                    </a>
+                </div>
+            </div>
             {poll.type === 'quiz' && <QuizLeaderboard event={event} />}
         </div>
     );

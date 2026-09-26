@@ -109,7 +109,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 ->all();
         }
 
-        $canRequestHelp = $registrationModel->checked_in_at !== null
+        $canRequestHelp = $registrationModel->isPresent()
             || ($event->starts_at->isPast() && $event->ends_at->isFuture());
 
         $pollPayment = $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
@@ -165,7 +165,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'approval_note' => $registrationModel->approval_note,
                 'seat_label' => $registrationModel->seatAssignment?->seat_label,
                 'room_name' => $registrationModel->seatAssignment?->room?->name,
-                'checked_in' => $registrationModel->checked_in_at !== null,
+                'checked_in' => $registrationModel->isPresent(),
                 'self_check_in_available' => app(SelfCheckIn::class)->isAvailableFor($registrationModel),
                 'email_verified' => $registrationModel->hasVerifiedEmail(),
                 'awaiting_checkout' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
@@ -633,7 +633,10 @@ final class PlatformAttendeeWorkspaceController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 401);
         }
 
-        if (! $registrationModel->isPresent()) {
+        // Both halves matter. Cancelling a registration does not clear the
+        // check-in that came before it, so presence alone would let a ticket
+        // that was refunded or withdrawn keep voting for the rest of the day.
+        if (! $registrationModel->isConfirmed() || ! $registrationModel->isPresent()) {
             return response()->json([
                 'message' => 'You need to be checked in to answer. Check in from your ticket, or ask at the desk.',
             ], 403);

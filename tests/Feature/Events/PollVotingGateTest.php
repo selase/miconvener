@@ -90,3 +90,23 @@ test('a second device cannot vote again for the same registration', function ():
 
     expect($poll->responses()->count())->toBe(1);
 });
+
+test('a registration cancelled after it checked in cannot still vote', function (): void {
+    [$tenant, $event, $poll, $option, $registration] = votingScenario('vote-cancelled');
+
+    // Cancelling does not rewind the check-in that came before it, so presence
+    // alone would leave a refunded ticket voting for the rest of the day.
+    $registration->update([
+        'checked_in_at' => now(),
+        'status' => EventRegistration::STATUS_CANCELLED,
+    ]);
+    $host = app(TenantHostMatcher::class)->baseDomain();
+
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
+            'option_id' => $option->id,
+        ], ['HTTP_HOST' => $host])
+        ->assertStatus(403);
+
+    expect($poll->responses()->count())->toBe(0);
+});

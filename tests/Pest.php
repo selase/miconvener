@@ -170,15 +170,17 @@ if (! function_exists('eventHost')) {
  *
  * @return array<string, mixed>
  */
-function proofFor(string $email): array
-{
-    return [
-        App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => [
-            'email' => $email,
-            'verified_at' => now()->getTimestamp(),
-            'expires_at' => now()->addHours(12)->getTimestamp(),
-        ],
-    ];
+if (! function_exists('proofFor')) {
+    function proofFor(string $email): array
+    {
+        return [
+            App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => [
+                'email' => $email,
+                'verified_at' => now()->getTimestamp(),
+                'expires_at' => now()->addHours(12)->getTimestamp(),
+            ],
+        ];
+    }
 }
 
 /**
