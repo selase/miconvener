@@ -1,6 +1,6 @@
 # Live Polling Decks — Design Spec
 
-**Date:** 2026-09-26 · **Status:** awaiting owner review (revision 2) · **Path:** architectural
+**Date:** 2026-09-26 · **Status:** awaiting owner approval (revision 3) · **Path:** architectural
 
 **Goal:** a Mentimeter-grade live polling experience inside MiConvener, so an organiser running a
 congress never needs a second subscription to ask a room a question.
@@ -40,6 +40,11 @@ screen reached by a revocable token; results broadcast over Reverb, measured at 
    replaces an earlier decision to allow anonymous voting. It buys one vote per person, results
    that can be trusted, and answers that can count toward attendance or CME. It costs reach, and
    §6 is about paying that cost honestly rather than pretending it is free.
+
+   *Support staff vote by being registered*, comped, like any other attendee. Console users are
+   not registrations and have no ticket, so a steward who should be able to answer a question is
+   given one — which is also true of their badge, their lunch and their certificate. No code is
+   needed for this: a zero-amount registration is a shape that already exists.
 3. **Speakers are attendees.** A speaker checks in, wears a badge, eats lunch, attends other
    talks, wants the materials, gets a certificate and fills the post-event survey. That is the
    attendee portal, already built. Speakers therefore live in `/my` with a speaker section, not in
