@@ -69,6 +69,7 @@ final class EventRegistration extends Model
         'payment_reference',
         'checked_in_at',
         'checked_in_by',
+        'checked_in_source',
     ];
 
     protected $casts = [
@@ -196,6 +197,16 @@ final class EventRegistration extends Model
     public function isConfirmed(): bool
     {
         return in_array($this->status, [self::STATUS_CONFIRMED, self::STATUS_CHECKED_IN], true);
+    }
+
+    /**
+     * Present means someone recorded this person as being here -- scanned at a
+     * door, or self-reported at a virtual event. Confirmed is not present: a
+     * ticket bought in March says nothing about the room in September.
+     */
+    public function isPresent(): bool
+    {
+        return $this->checked_in_at !== null;
     }
 
     public function scopeConfirmed(Builder $query): Builder

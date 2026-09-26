@@ -27,6 +27,7 @@ Route::prefix('my')->group(function (): void {
         Route::get('/', [PlatformAttendeeWorkspaceController::class, 'show'])->name('attendee.my.events.workspace');
         Route::get('/status', [PlatformAttendeeWorkspaceController::class, 'status'])->name('attendee.my.events.status');
         Route::get('/ticket', [PlatformAttendeeWorkspaceController::class, 'ticket'])->name('attendee.my.events.ticket');
+        Route::post('/check-in', [PlatformAttendeeWorkspaceController::class, 'checkIn'])->name('attendee.my.events.check-in');
         Route::post('/transfer', [PlatformAttendeeWorkspaceController::class, 'transfer'])->middleware('throttle:public-registration')->name('attendee.my.events.transfer');
         Route::post('/transfer/confirm', [PlatformAttendeeWorkspaceController::class, 'confirmTransfer'])->middleware('throttle:public-registration')->name('attendee.my.events.transfer.confirm');
         Route::post('/agenda/{session}', [PlatformAttendeeWorkspaceController::class, 'addToAgenda'])->name('attendee.my.events.agenda.add');

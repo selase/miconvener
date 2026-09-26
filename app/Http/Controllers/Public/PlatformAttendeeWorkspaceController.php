@@ -29,6 +29,7 @@ use App\Models\EventServiceRequest;
 use App\Models\EventSessionAttendance;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
 use App\Services\Events\QrCodeGenerator;
+use App\Services\Events\SelfCheckIn;
 use App\Services\Events\TicketPdfService;
 use App\Services\Stratification\ParticipantStratificationService;
 use App\Services\Tenancy\FeatureMeteringService;
@@ -164,6 +165,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'seat_label' => $registrationModel->seatAssignment?->seat_label,
                 'room_name' => $registrationModel->seatAssignment?->room?->name,
                 'checked_in' => $registrationModel->checked_in_at !== null,
+                'self_check_in_available' => app(SelfCheckIn::class)->isAvailableFor($registrationModel),
                 'email_verified' => $registrationModel->hasVerifiedEmail(),
                 'awaiting_checkout' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
                     && blank($registrationModel->payment_reference),
@@ -216,6 +218,26 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'checked_in' => $registrationModel->checked_in_at !== null,
             'payment_confirmed' => $registrationModel->isConfirmed(),
         ]);
+    }
+
+    public function checkIn(Request $request, string $registration): JsonResponse
+    {
+        $registrationModel = EventRegistration::withoutGlobalScopes()
+            ->where('id', $registration)
+            ->with(['event' => fn ($q) => $q->withoutGlobalScopes()])
+            ->first();
+
+        if ($registrationModel === null || ! $this->authorizer->canAccess($request->session(), $registrationModel)) {
+            return response()->json(['message' => 'Unauthorized.'], 401);
+        }
+
+        if (! app(SelfCheckIn::class)->perform($registrationModel)) {
+            return response()->json([
+                'message' => 'Check-in is open while the event is running.',
+            ], 422);
+        }
+
+        return response()->json(['checked_in' => true]);
     }
 
     public function ticket(Request $request, string $registration): Response
