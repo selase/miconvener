@@ -24,6 +24,7 @@ use App\Http\Controllers\Tenant\EventFormFieldController;
 use App\Http\Controllers\Tenant\EventForumController;
 use App\Http\Controllers\Tenant\EventMaterialController;
 use App\Http\Controllers\Tenant\EventPollController;
+use App\Http\Controllers\Tenant\EventPollDeckController;
 use App\Http\Controllers\Tenant\EventRegistrationController;
 use App\Http\Controllers\Tenant\EventReportController;
 use App\Http\Controllers\Tenant\EventServiceRequestController;
@@ -219,6 +220,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::delete('events/{event}/polls/{poll}', [EventPollController::class, 'destroy'])->name('tenant.events.polls.destroy');
     Route::patch('events/{event}/polls/{poll}/responses/{response}', [EventPollController::class, 'moderateResponse'])->name('tenant.events.polls.responses.moderate');
     Route::get('events/{event}/quiz/leaderboard', [EventPollController::class, 'leaderboard'])->name('tenant.events.quiz.leaderboard');
+
+    Route::post('events/{event}/decks/{deck}/start', [EventPollDeckController::class, 'start'])->name('tenant.events.decks.start');
+    Route::post('events/{event}/decks/{deck}/advance', [EventPollDeckController::class, 'advance'])->name('tenant.events.decks.advance');
+    Route::post('events/{event}/decks/{deck}/previous', [EventPollDeckController::class, 'previous'])->name('tenant.events.decks.previous');
+    Route::post('events/{event}/decks/{deck}/close', [EventPollDeckController::class, 'close'])->name('tenant.events.decks.close');
+    Route::post('events/{event}/decks/{deck}/end', [EventPollDeckController::class, 'end'])->name('tenant.events.decks.end');
 
     Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
     Route::post('events/{event}/badges/print-log', [EventBadgeController::class, 'logPrint'])->name('tenant.events.badges.print-log');

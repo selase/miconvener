@@ -647,7 +647,19 @@ final class PlatformAttendeeWorkspaceController extends Controller
             abort(404);
         }
 
-        $pollModel = $event->polls()->live()->where('id', $poll)->with('options')->firstOrFail();
+        $pollModel = $event->polls()->where('id', $poll)->with('options')->firstOrFail();
+
+        // Never opened: there is nothing here to answer, and "closed" would be a lie
+        // about a question the room has not been shown.
+        if ($pollModel->status === EventPoll::STATUS_DRAFT) {
+            abort(404);
+        }
+
+        if (! $pollModel->isCurrent() || $pollModel->status !== EventPoll::STATUS_LIVE) {
+            return response()->json([
+                'message' => 'That question has closed.',
+            ], 422);
+        }
 
         if ($pollModel->type === EventPoll::TYPE_QUIZ && $pollModel->timeUp()) {
             return response()->json(['message' => "Time's up for this question."], 422);

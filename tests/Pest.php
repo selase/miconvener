@@ -222,6 +222,37 @@ if (! function_exists('deckPoll')) {
 }
 
 /**
+ * A tenant, an in-progress event, a draft deck and two ordered polls inside
+ * it -- everything a presenter test needs to start moving the pointer. Lives
+ * here rather than in one test file so Tasks 7 and 9's briefs, which run
+ * their own file alone, still have it.
+ *
+ * @return array{0: Tenant, 1: Event, 2: PollDeck, 3: EventPoll, 4: EventPoll}
+ */
+if (! function_exists('presenterScenario')) {
+    function presenterScenario(string $slug): array
+    {
+        $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+        $event = Event::factory()->published()->create([
+            'tenant_id' => $tenant->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(3),
+        ]);
+        $deck = PollDeck::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'title' => 'Plenary',
+            'join_code' => PollDeck::generateJoinCode(),
+            'status' => PollDeck::STATUS_DRAFT,
+        ]);
+        $first = deckPoll($tenant, $event, $deck, 'First', 0);
+        $second = deckPoll($tenant, $event, $deck, 'Second', 1);
+
+        return [$tenant, $event, $deck, $first, $second];
+    }
+}
+
+/**
  * Make the user the tenant's owner (Org Superadmin), seeding the built-in
  * roles and permissions if this test has not.
  */
