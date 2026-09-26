@@ -35,6 +35,8 @@ final class EventPoll extends Model
     protected $fillable = [
         'tenant_id',
         'event_id',
+        'deck_id',
+        'position',
         'question',
         'type',
         'status',
@@ -45,6 +47,7 @@ final class EventPoll extends Model
     ];
 
     protected $casts = [
+        'position' => 'integer',
         'timer_seconds' => 'integer',
         'points' => 'integer',
         'went_live_at' => 'datetime',
@@ -54,6 +57,14 @@ final class EventPoll extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
+    }
+
+    /**
+     * @return BelongsTo<PollDeck, $this>
+     */
+    public function deck(): BelongsTo
+    {
+        return $this->belongsTo(PollDeck::class, 'deck_id');
     }
 
     /**
@@ -84,5 +95,18 @@ final class EventPoll extends Model
         }
 
         return now()->greaterThan($this->went_live_at->addSeconds($this->timer_seconds));
+    }
+
+    /**
+     * A poll outside a deck is always its own current question; inside one, only
+     * the deck's pointer decides.
+     */
+    public function isCurrent(): bool
+    {
+        if ($this->deck_id === null) {
+            return true;
+        }
+
+        return $this->deck?->current_poll_id === $this->id;
     }
 }
