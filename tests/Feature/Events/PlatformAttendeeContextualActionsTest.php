@@ -53,7 +53,8 @@ test('verified attendee can retrieve live poll and respond with opaque token iso
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
         'email' => 'attendee@example.com',
-        'status' => EventRegistration::STATUS_CONFIRMED,
+        'status' => EventRegistration::STATUS_CHECKED_IN,
+        'checked_in_at' => now(),
     ]);
 
     $poll = EventPoll::factory()->live()->create([
@@ -87,7 +88,11 @@ test('verified attendee can retrieve live poll and respond with opaque token iso
     $respondResponse->assertOk();
 
     // 3. Invariant audit: response is keyed by opaque HMAC token and NEVER contains registration ID or email
-    $expectedToken = hash_hmac('sha256', "poll:{$registration->id}:{$poll->id}", (string) config('app.key'));
+    // Derived from the registration alone, not the poll: one person keeps one
+    // identity across every question, which is what lets the quiz leaderboard
+    // sum their points. Uniqueness per poll comes from the (poll_id,
+    // respondent_token) index, not from the token's shape.
+    $expectedToken = hash_hmac('sha256', "poll:{$registration->id}", (string) config('app.key'));
     $savedResponse = EventPollResponse::where('poll_id', $poll->id)->first();
 
     expect($savedResponse)->not->toBeNull();
@@ -132,7 +137,8 @@ test('attendee taking a quiz receives immediate scoring and feedback', function 
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
         'email' => 'quizzer@example.com',
-        'status' => EventRegistration::STATUS_CONFIRMED,
+        'status' => EventRegistration::STATUS_CHECKED_IN,
+        'checked_in_at' => now(),
     ]);
 
     $quiz = EventPoll::factory()->live()->quiz()->create([
@@ -169,7 +175,8 @@ test('attendee cannot respond to an inactive poll', function (): void {
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
         'email' => 'attendee@example.com',
-        'status' => EventRegistration::STATUS_CONFIRMED,
+        'status' => EventRegistration::STATUS_CHECKED_IN,
+        'checked_in_at' => now(),
     ]);
 
     $draftPoll = EventPoll::factory()->create([

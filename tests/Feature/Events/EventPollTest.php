@@ -7,8 +7,10 @@ namespace Tests\Feature\Events;
 use App\Models\Event;
 use App\Models\EventPoll;
 use App\Models\EventPollResponse;
+use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Support\Facades\Artisan;
 
 beforeEach(function () {
@@ -26,6 +28,20 @@ function pollHost(): array
     $tenant->users()->attach($user->id);
 
     return [$tenant, $user];
+}
+
+// A poll is now answered from the attendee portal by a registered, checked-in
+// person -- not by an anonymous caller supplying its own respondent_token.
+// This stands in for "someone at the event, signed in on their phone."
+function checkedInVoter(Tenant $tenant, Event $event, string $email): EventRegistration
+{
+    return EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => $email,
+        'status' => EventRegistration::STATUS_CHECKED_IN,
+        'checked_in_at' => now(),
+    ]);
 }
 
 test('host can create a multiple choice poll with options', function () {
@@ -64,19 +80,40 @@ test('the public poll endpoint only returns a live poll', function () {
         ->assertJsonPath('poll.question', 'Live one');
 });
 
+test('the public respond route is closed and points to the portal', function () {
+    [$tenant] = pollHost();
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $poll = EventPoll::factory()->live()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
+
+    // An old QR or a bookmarked page should say something useful rather than
+    // 404ing in someone's hand, and never accept an anonymous vote again.
+    $response = $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
+        'respondent_token' => 'token-abc',
+    ], ['HTTP_HOST' => $host]);
+
+    $response->assertStatus(410);
+    expect($response->json('message'))->toContain('portal');
+    expect($response->json('portal_url'))->not->toBeNull();
+});
+
 test('a respondent can only answer a poll once', function () {
     [$tenant] = pollHost();
     $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
     $poll = EventPoll::factory()->live()->open()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
-    $url = "http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond";
+    $registration = checkedInVoter($tenant, $event, 'voter@example.com');
+    $host = app(TenantHostMatcher::class)->baseDomain();
+    $url = "http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond";
 
-    $this->postJson($url, ['response_text' => 'First answer', 'respondent_token' => 'token-abc'], ['HTTP_HOST' => $host])
+    $this->withSession(proofFor($registration->email))
+        ->postJson($url, ['response_text' => 'First answer'], ['HTTP_HOST' => $host])
         ->assertOk();
 
-    $this->postJson($url, ['response_text' => 'Second try', 'respondent_token' => 'token-abc'], ['HTTP_HOST' => $host])
+    $this->withSession(proofFor($registration->email))
+        ->postJson($url, ['response_text' => 'Second try'], ['HTTP_HOST' => $host])
         ->assertStatus(422);
 
     expect(EventPollResponse::where('poll_id', $poll->id)->count())->toBe(1);
@@ -89,13 +126,13 @@ test('a multiple choice response cannot be submitted with an option from a diffe
     $otherPoll = EventPoll::factory()->live()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
     $foreignOption = $otherPoll->options()->create(['tenant_id' => $tenant->id, 'label' => 'Foreign option']);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
+    $registration = checkedInVoter($tenant, $event, 'voter@example.com');
+    $host = app(TenantHostMatcher::class)->baseDomain();
 
-    $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
-        'option_id' => $foreignOption->id,
-        'respondent_token' => 'token-xyz',
-    ], ['HTTP_HOST' => $host])->assertStatus(422);
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
+            'option_id' => $foreignOption->id,
+        ], ['HTTP_HOST' => $host])->assertStatus(422);
 });
 
 test('host can create a quiz question with a correct answer marked', function () {
@@ -128,22 +165,23 @@ test('answering a quiz correctly awards points and answering wrong awards none',
     $correct = $poll->options()->create(['tenant_id' => $tenant->id, 'label' => 'Right', 'is_correct' => true]);
     $wrong = $poll->options()->create(['tenant_id' => $tenant->id, 'label' => 'Wrong', 'is_correct' => false]);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
+    $host = app(TenantHostMatcher::class)->baseDomain();
 
-    $correctResponse = $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
-        'option_id' => $correct->id,
-        'respondent_token' => 'token-right',
-        'respondent_name' => 'Ama',
-    ], ['HTTP_HOST' => $host]);
+    $rightVoter = checkedInVoter($tenant, $event, 'right@example.com');
+    $correctResponse = $this->withSession(proofFor($rightVoter->email))
+        ->postJson("http://{$host}/my/events/{$rightVoter->id}/poll/{$poll->id}/respond", [
+            'option_id' => $correct->id,
+            'respondent_name' => 'Ama',
+        ], ['HTTP_HOST' => $host]);
     $correctResponse->assertOk();
     expect($correctResponse->json('is_correct'))->toBeTrue();
     expect($correctResponse->json('points_awarded'))->toBe(15);
 
-    $wrongResponse = $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
-        'option_id' => $wrong->id,
-        'respondent_token' => 'token-wrong',
-    ], ['HTTP_HOST' => $host]);
+    $wrongVoter = checkedInVoter($tenant, $event, 'wrong@example.com');
+    $wrongResponse = $this->withSession(proofFor($wrongVoter->email))
+        ->postJson("http://{$host}/my/events/{$wrongVoter->id}/poll/{$poll->id}/respond", [
+            'option_id' => $wrong->id,
+        ], ['HTTP_HOST' => $host]);
     $wrongResponse->assertOk();
     expect($wrongResponse->json('is_correct'))->toBeFalse();
     expect($wrongResponse->json('points_awarded'))->toBe(0);
@@ -162,13 +200,13 @@ test('a quiz response is rejected once the timer has run out', function () {
     ]);
     $option = $poll->options()->create(['tenant_id' => $tenant->id, 'label' => 'Option', 'is_correct' => true]);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
+    $registration = checkedInVoter($tenant, $event, 'voter@example.com');
+    $host = app(TenantHostMatcher::class)->baseDomain();
 
-    $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
-        'option_id' => $option->id,
-        'respondent_token' => 'token-late',
-    ], ['HTTP_HOST' => $host])->assertStatus(422);
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
+            'option_id' => $option->id,
+        ], ['HTTP_HOST' => $host])->assertStatus(422);
 });
 
 test('the quiz leaderboard sums points across quiz questions per respondent', function () {
@@ -181,20 +219,23 @@ test('the quiz leaderboard sums points across quiz questions per respondent', fu
     $pollTwo = EventPoll::factory()->live()->quiz()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'points' => 5]);
     $optionTwoCorrect = $pollTwo->options()->create(['tenant_id' => $tenant->id, 'label' => 'Right again', 'is_correct' => true]);
 
+    $registration = checkedInVoter($tenant, $event, 'kwame@example.com');
+    $attendeeHost = app(TenantHostMatcher::class)->baseDomain();
+
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$attendeeHost}/my/events/{$registration->id}/poll/{$pollOne->id}/respond", [
+            'option_id' => $optionOneCorrect->id,
+            'respondent_name' => 'Kwame',
+        ], ['HTTP_HOST' => $attendeeHost])->assertOk();
+
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$attendeeHost}/my/events/{$registration->id}/poll/{$pollTwo->id}/respond", [
+            'option_id' => $optionTwoCorrect->id,
+            'respondent_name' => 'Kwame',
+        ], ['HTTP_HOST' => $attendeeHost])->assertOk();
+
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
-
-    $this->postJson("http://{$host}/e/{$event->slug}/poll/{$pollOne->id}/respond", [
-        'option_id' => $optionOneCorrect->id,
-        'respondent_token' => 'token-leader',
-        'respondent_name' => 'Kwame',
-    ], ['HTTP_HOST' => $host])->assertOk();
-
-    $this->postJson("http://{$host}/e/{$event->slug}/poll/{$pollTwo->id}/respond", [
-        'option_id' => $optionTwoCorrect->id,
-        'respondent_token' => 'token-leader',
-        'respondent_name' => 'Kwame',
-    ], ['HTTP_HOST' => $host])->assertOk();
 
     $publicLeaderboard = $this->getJson("http://{$host}/e/{$event->slug}/quiz/leaderboard", ['HTTP_HOST' => $host]);
     $publicLeaderboard->assertOk();
@@ -211,16 +252,19 @@ test('an open poll marked to require moderation holds responses back until a hos
     $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
     $poll = EventPoll::factory()->live()->open()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'requires_moderation' => true]);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
+    $registration = checkedInVoter($tenant, $event, 'voter@example.com');
+    $attendeeHost = app(TenantHostMatcher::class)->baseDomain();
 
-    $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
-        'response_text' => 'Pending answer',
-        'respondent_token' => 'token-mod',
-    ], ['HTTP_HOST' => $host])->assertOk();
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$attendeeHost}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
+            'response_text' => 'Pending answer',
+        ], ['HTTP_HOST' => $attendeeHost])->assertOk();
 
     $response = EventPollResponse::where('poll_id', $poll->id)->firstOrFail();
     expect($response->is_approved)->toBeNull();
+
+    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
+    $host = "acme.{$baseDomain}";
 
     $listing = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/polls", ['HTTP_HOST' => $host]);
     $pollPayload = collect($listing->json())->firstWhere('id', $poll->id);
@@ -242,13 +286,13 @@ test('an open poll without moderation auto-approves responses as before', functi
     $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
     $poll = EventPoll::factory()->live()->open()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
 
-    $baseDomain = mb_ltrim((string) config('session.domain'), '.');
-    $host = "acme.{$baseDomain}";
+    $registration = checkedInVoter($tenant, $event, 'voter@example.com');
+    $host = app(TenantHostMatcher::class)->baseDomain();
 
-    $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
-        'response_text' => 'Instant answer',
-        'respondent_token' => 'token-noauth',
-    ], ['HTTP_HOST' => $host])->assertOk();
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
+            'response_text' => 'Instant answer',
+        ], ['HTTP_HOST' => $host])->assertOk();
 
     expect(EventPollResponse::where('poll_id', $poll->id)->first()->is_approved)->toBeTrue();
 });

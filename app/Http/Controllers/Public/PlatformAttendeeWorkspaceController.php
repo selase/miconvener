@@ -584,7 +584,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             return response()->json(['poll' => null]);
         }
 
-        $token = $this->pollRespondentToken($registrationModel, $poll);
+        $token = $this->pollRespondentToken($registrationModel);
         $existing = $poll->responses()->where('respondent_token', $token)->first();
 
         $totalVotes = (int) $poll->responses_count;
@@ -633,6 +633,12 @@ final class PlatformAttendeeWorkspaceController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 401);
         }
 
+        if (! $registrationModel->isPresent()) {
+            return response()->json([
+                'message' => 'You need to be checked in to answer. Check in from your ticket, or ask at the desk.',
+            ], 403);
+        }
+
         $event = $registrationModel->event;
         if ($event === null) {
             abort(404);
@@ -644,7 +650,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             return response()->json(['message' => "Time's up for this question."], 422);
         }
 
-        $token = $this->pollRespondentToken($registrationModel, $pollModel);
+        $token = $this->pollRespondentToken($registrationModel);
         if ($pollModel->responses()->where('respondent_token', $token)->exists()) {
             return response()->json(['message' => 'You already responded to this poll.'], 422);
         }
@@ -1094,9 +1100,16 @@ final class PlatformAttendeeWorkspaceController extends Controller
         );
     }
 
-    private function pollRespondentToken(EventRegistration $registration, EventPoll $poll): string
+    /**
+     * One person, one identity across every poll in the event. Uniqueness per
+     * poll is already enforced by the (poll_id, respondent_token) index, so
+     * naming the poll inside the token buys nothing -- and costs the quiz
+     * leaderboard, which sums a person's points across questions by grouping
+     * on this value.
+     */
+    private function pollRespondentToken(EventRegistration $registration): string
     {
-        return hash_hmac('sha256', "poll:{$registration->id}:{$poll->id}", (string) config('app.key'));
+        return hash_hmac('sha256', "poll:{$registration->id}", (string) config('app.key'));
     }
 
     /**

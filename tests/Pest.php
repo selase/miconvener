@@ -164,6 +164,24 @@ if (! function_exists('eventHost')) {
 }
 
 /**
+ * A session carrying proof that this address was verified, as the portal's
+ * sign-in leaves behind. Lives here rather than in one test file so a run
+ * filtered to a single file still has it.
+ *
+ * @return array<string, mixed>
+ */
+function proofFor(string $email): array
+{
+    return [
+        App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => [
+            'email' => $email,
+            'verified_at' => now()->getTimestamp(),
+            'expires_at' => now()->addHours(12)->getTimestamp(),
+        ],
+    ];
+}
+
+/**
  * Make the user the tenant's owner (Org Superadmin), seeding the built-in
  * roles and permissions if this test has not.
  */

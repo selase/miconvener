@@ -7,7 +7,6 @@ namespace Tests\Feature\Events;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
-use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Events\SelfCheckIn;
 use App\Services\Tenancy\TenantHostMatcher;
 
@@ -28,17 +27,6 @@ function virtualEventScenario(string $slug): array
     ]);
 
     return [$tenant, $event, $registration];
-}
-
-function proofFor(string $email): array
-{
-    return [
-        PlatformAttendeeVerification::SESSION_KEY => [
-            'email' => $email,
-            'verified_at' => now()->getTimestamp(),
-            'expires_at' => now()->addHours(12)->getTimestamp(),
-        ],
-    ];
 }
 
 test('an attendee at a virtual event can mark themselves present', function (): void {

@@ -9,7 +9,9 @@ use App\Models\Event;
 use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
+use App\Models\EventRegistration;
 use App\Models\Tenant;
+use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Str;
@@ -133,12 +135,23 @@ test('voting moves the screen without anyone reloading it', function (): void {
     EventFacade::fake([PollResultsUpdated::class]);
 
     [$tenant, $event, $poll, $option] = presentScenario('present-live');
-    $host = eventSubdomainHost('present-live');
 
-    $this->postJson("http://{$host}/e/{$event->slug}/poll/{$poll->id}/respond", [
-        'option_id' => $option->id,
-        'respondent_token' => 'voter-1',
-    ], ['HTTP_HOST' => $host])->assertOk();
+    // The wall is driven by the portal now: a poll is answered by a
+    // registered, checked-in attendee, not an anonymous caller-supplied token.
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'voter@example.com',
+        'status' => EventRegistration::STATUS_CHECKED_IN,
+        'checked_in_at' => now(),
+    ]);
+    $host = app(TenantHostMatcher::class)->baseDomain();
+
+    $this->withSession(proofFor($registration->email))
+        ->postJson("http://{$host}/my/events/{$registration->id}/poll/{$poll->id}/respond", [
+            'option_id' => $option->id,
+        ], ['HTTP_HOST' => $host])
+        ->assertOk();
 
     EventFacade::assertDispatched(PollResultsUpdated::class, function (PollResultsUpdated $broadcast) use ($event): bool {
         $payload = $broadcast->broadcastWith();
@@ -148,8 +161,6 @@ test('voting moves the screen without anyone reloading it', function (): void {
             // Public channel, so the payload must carry nothing personal.
             && ! str_contains(json_encode($payload), 'respondent_token');
     });
-
-    unset($tenant);
 });
 
 test('the console mints a link and revoking it breaks the old one', function (): void {
