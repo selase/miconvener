@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('title');
             $table->string('join_code', 8)->nullable()->unique();
             $table->string('status', 16)->default('draft');
-            $table->uuid('current_poll_id')->nullable();
+            $table->foreignUuid('current_poll_id')->nullable()->constrained('event_polls')->nullOnDelete();
             $table->string('present_token', 64)->nullable()->unique();
             $table->timestamps();
 

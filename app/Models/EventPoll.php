@@ -100,6 +100,11 @@ final class EventPoll extends Model
     /**
      * A poll outside a deck is always its own current question; inside one, only
      * the deck's pointer decides.
+     *
+     * Safe to call in a `foreach ($deck->polls as $poll)` loop despite
+     * `Model::shouldBeStrict()`: AutomaticallyEagerLoadRelationships is on
+     * (config/essentials.php), so the first access loads `deck` for the whole
+     * collection in one query rather than lazy loading per row.
      */
     public function isCurrent(): bool
     {

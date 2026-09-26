@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Event;
+use App\Models\EventPoll;
+use App\Models\PollDeck;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -180,6 +183,41 @@ if (! function_exists('proofFor')) {
                 'expires_at' => now()->addHours(12)->getTimestamp(),
             ],
         ];
+    }
+}
+
+/**
+ * A tenant and a published event to hang a poll deck off of. Lives here
+ * rather than in one test file so a run filtered to a single file (as
+ * later tasks' briefs do) still has it -- see Ruling 6 in progress.md.
+ *
+ * @return array{0: Tenant, 1: Event}
+ */
+if (! function_exists('deckScenario')) {
+    function deckScenario(string $slug): array
+    {
+        $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+        $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+
+        return [$tenant, $event];
+    }
+}
+
+/**
+ * A draft poll positioned inside a deck, as a deck's own polls are created.
+ */
+if (! function_exists('deckPoll')) {
+    function deckPoll(Tenant $tenant, Event $event, PollDeck $deck, string $question, int $position): EventPoll
+    {
+        return EventPoll::create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'deck_id' => $deck->id,
+            'position' => $position,
+            'question' => $question,
+            'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+            'status' => EventPoll::STATUS_DRAFT,
+        ]);
     }
 }
 
