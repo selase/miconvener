@@ -18,16 +18,37 @@ beforeEach(function (): void {
 });
 
 test('a speaker cannot be created without an address', function (): void {
-    [$tenant, $user] = eventHost('speaker-email');
+    [, $user] = eventHost('speaker-email');
     $host = eventSubdomainHost('speaker-email');
-    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
 
     $this->actingAs($user)
-        ->postJson("http://{$host}/events/{$event->id}/speakers", [
+        ->postJson("http://{$host}/speakers", [
             'name' => 'Dr Ama Serwaa',
         ], ['HTTP_HOST' => $host])
         ->assertStatus(422)
         ->assertJsonValidationErrors('email');
+});
+
+test('attaching an existing speaker to an event still needs only speaker_id and role', function (): void {
+    [$tenant, $user] = eventHost('speaker-attach');
+    $host = eventSubdomainHost('speaker-attach');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $speaker = Speaker::create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Dr Ama Serwaa',
+        'email' => 'ama@example.com',
+    ]);
+
+    // This is the attach-an-existing-speaker flow the console actually uses --
+    // it never sends an email, because it isn't creating anything. A `required`
+    // email rule here would validate a field this method never reads, and
+    // break every attach.
+    $this->actingAs($user)
+        ->postJson("http://{$host}/events/{$event->id}/speakers", [
+            'speaker_id' => $speaker->id,
+            'role' => 'keynote',
+        ], ['HTTP_HOST' => $host])
+        ->assertOk();
 });
 
 test('a speaker is found by address, however it was typed', function (): void {
