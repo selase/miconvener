@@ -9,15 +9,25 @@ use App\Models\EventPoll;
 use App\Models\PollDeck;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * The only writer of a deck's current_poll_id. Moving the pointer and changing
+ * the two polls' statuses happen together or not at all: a room that saw the
+ * question change must never be voting on one that is still open behind it.
+ */
 final class DeckPresenter
 {
     /**
-     * The only writer of current_poll_id. Moving the pointer and changing the
-     * two polls' statuses happen together or not at all: a room that saw the
-     * question change must never be voting on one that is still open behind it.
+     * Only a draft deck starts. Pressing Start on one already running -- a
+     * reloaded presenter tab, a double tap -- would otherwise reopen question
+     * one while the current question stayed live, putting two live questions
+     * in a deck and sending the wall back to the beginning.
      */
     public function start(PollDeck $deck): void
     {
+        if ($deck->status !== PollDeck::STATUS_DRAFT) {
+            return;
+        }
+
         $first = $deck->polls()->first();
 
         if ($first === null) {
@@ -43,6 +53,10 @@ final class DeckPresenter
         return $this->moveTo($deck, $this->neighbour($deck, forward: false));
     }
 
+    /**
+     * Closes the question but leaves the pointer on it: the room keeps seeing
+     * what it just answered, with voting shut, until the presenter moves on.
+     */
     public function closeCurrent(PollDeck $deck): void
     {
         $current = $deck->currentPoll;
@@ -85,7 +99,10 @@ final class DeckPresenter
 
     private function moveTo(PollDeck $deck, ?EventPoll $next): ?EventPoll
     {
-        if ($next === null) {
+        // An ended deck has no pace to hold. Without this, a stray advance
+        // after end() would strand a live question on a deck the room has
+        // been told is over, and the wall would keep showing it.
+        if ($next === null || $deck->status !== PollDeck::STATUS_LIVE) {
             return null;
         }
 
