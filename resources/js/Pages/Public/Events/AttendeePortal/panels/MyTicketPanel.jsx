@@ -17,6 +17,34 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
     const [showOfflineModal, setShowOfflineModal] = useState(false);
 
     const canTransfer = registration.status !== 'checked_in' && isOnline;
+    const [checkingIn, setCheckingIn] = useState(false);
+    const [checkedIn, setCheckedIn] = useState(Boolean(registration.checked_in));
+
+    // Being here is what earns the right to answer a poll, so at a virtual
+    // event this button is the only way in. Without it the room can watch a
+    // question go up and have no way to reply to it.
+    const handleSelfCheckIn = async () => {
+        setCheckingIn(true);
+        setError(null);
+        setMessage(null);
+        try {
+            const response = await csrfFetch(`/my/events/${registration.id}/check-in`, {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+                setCheckedIn(true);
+                setMessage(data.message || "You're checked in. Enjoy the event.");
+            } else {
+                setError(data.message || 'Could not check you in. Please try again.');
+            }
+        } catch {
+            setError('Unable to connect. Please check your network.');
+        } finally {
+            setCheckingIn(false);
+        }
+    };
 
     const handleSaveOffline = () => {
         const snapshot = saveOfflineTicket(registration, event);
@@ -149,6 +177,24 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
                             <Smartphone className="h-4 w-4" />
                             Save ticket offline
                         </button>
+                    )}
+
+                    {registration.self_check_in_available && !checkedIn && isOnline && (
+                        <button
+                            onClick={handleSelfCheckIn}
+                            disabled={checkingIn}
+                            className="inline-flex h-control items-center gap-1.5 border border-accent bg-accent px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60 cursor-pointer"
+                        >
+                            <Check className="h-4 w-4" />
+                            {checkingIn ? 'Checking you in…' : "I'm here"}
+                        </button>
+                    )}
+
+                    {checkedIn && (
+                        <span className="inline-flex h-control items-center gap-1.5 border border-accent/40 bg-accent-soft px-4 text-sm text-accent">
+                            <Check className="h-4 w-4" />
+                            Checked in
+                        </span>
                     )}
 
                     {canTransfer ? (

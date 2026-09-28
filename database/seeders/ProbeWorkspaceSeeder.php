@@ -20,6 +20,7 @@ use App\Models\EventSession;
 use App\Models\EventSessionAttendance;
 use App\Models\EventSpeaker;
 use App\Models\EventVenueRoom;
+use App\Models\PollDeck;
 use App\Models\Speaker;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
@@ -401,6 +402,45 @@ final class ProbeWorkspaceSeeder extends Seeder
             ->where('event_id', $event->id)
             ->whereNotIn('id', $kept)
             ->delete();
+
+        $this->deck($event);
+    }
+
+    /**
+     * One deck, left in draft, holding the first four questions in order.
+     *
+     * Draft rather than live on purpose: starting it is the thing being
+     * demonstrated, and a deck already running would take the wall away from
+     * the loose polls this fixture also exists to show.
+     */
+    private function deck(Event $event): void
+    {
+        /** @var PollDeck $deck */
+        $deck = PollDeck::query()->updateOrCreate(
+            ['event_id' => $event->id, 'title' => 'Opening plenary'],
+            [
+                'tenant_id' => $event->tenant_id,
+                'join_code' => PollDeck::generateJoinCode(),
+                'status' => PollDeck::STATUS_DRAFT,
+            ]
+        );
+
+        $deck->setCurrentPoll(null);
+        EventPoll::query()->where('deck_id', $deck->id)->update(['deck_id' => null, 'position' => 0]);
+
+        $questions = [
+            'This session met my expectations',
+            'Did the venue Wi-Fi work for you?',
+            'Which track will you follow tomorrow?',
+            'Which of these is a notifiable disease in Ghana?',
+        ];
+
+        foreach ($questions as $position => $question) {
+            EventPoll::query()
+                ->where('event_id', $event->id)
+                ->where('question', $question)
+                ->update(['deck_id' => $deck->id, 'position' => $position]);
+        }
     }
 
     /**

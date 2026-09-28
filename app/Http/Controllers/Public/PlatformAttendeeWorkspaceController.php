@@ -243,7 +243,12 @@ final class PlatformAttendeeWorkspaceController extends Controller
             ], 422);
         }
 
-        return response()->json(['checked_in' => true]);
+        // Says so from here, beside the refusal copy, rather than leaving the
+        // success wording to whichever client happens to call this.
+        return response()->json([
+            'checked_in' => true,
+            'message' => "You're checked in. Enjoy the event.",
+        ]);
     }
 
     public function ticket(Request $request, string $registration): Response

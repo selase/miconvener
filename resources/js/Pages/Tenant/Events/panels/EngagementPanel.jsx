@@ -324,6 +324,254 @@ function Leaderboard({ event }) {
     );
 }
 
+
+/**
+ * Decks, and the controls for driving one in front of a room.
+ *
+ * A deck is an ordered run of questions the presenter moves through. Every
+ * surface -- the wall, each phone -- follows the deck's pointer rather than
+ * guessing from which poll went live last.
+ */
+function DeckSection({ event, polls, onChange }) {
+    const [decks, setDecks] = useState([]);
+    const [title, setTitle] = useState('');
+    const [creating, setCreating] = useState(false);
+
+    const load = () => {
+        csrfFetch(route('tenant.events.decks.index', { event: event.id }))
+            .then((r) => r.json())
+            .then(setDecks)
+            .catch(() => {});
+    };
+
+    useEffect(load, [event.id]);
+
+    const live = decks.some((d) => d.status === 'live');
+
+    // While a deck is running the position is the instrument; nothing polls
+    // once every deck is idle.
+    useEffect(() => {
+        if (!live) return undefined;
+        const interval = setInterval(load, 5000);
+        return () => clearInterval(interval);
+    }, [live, event.id]);
+
+    const create = async (e) => {
+        e.preventDefault();
+        if (!title.trim()) return;
+        setCreating(true);
+        await csrfFetch(route('tenant.events.decks.store', { event: event.id }), {
+            method: 'POST',
+            body: JSON.stringify({ title }),
+        });
+        setTitle('');
+        setCreating(false);
+        load();
+    };
+
+    return (
+        <section className="space-y-3 border-t border-border pt-4">
+            <div>
+                <h3 className="text-sm font-medium text-ink">Decks</h3>
+                <p className="mt-1 text-xs text-ink-secondary">
+                    An ordered run of questions. Start one and the wall and every
+                    phone follow you through it.
+                </p>
+            </div>
+
+            {decks.map((deck) => (
+                <DeckCard
+                    key={deck.id}
+                    event={event}
+                    deck={deck}
+                    polls={polls}
+                    onChange={() => {
+                        load();
+                        onChange();
+                    }}
+                />
+            ))}
+
+            <form onSubmit={create} className="flex gap-2">
+                <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Deck name, e.g. Opening plenary"
+                    className="h-control flex-1 border border-border px-3 text-sm text-ink focus:border-accent focus:outline-none"
+                />
+                <button
+                    type="submit"
+                    disabled={creating || !title.trim()}
+                    className="h-control border border-border px-4 text-sm text-ink hover:border-accent disabled:opacity-50 cursor-pointer"
+                >
+                    Add deck
+                </button>
+            </form>
+        </section>
+    );
+}
+
+function DeckCard({ event, deck, polls, onChange }) {
+    const [busy, setBusy] = useState(false);
+
+    const drive = async (action) => {
+        setBusy(true);
+        await csrfFetch(
+            route(`tenant.events.decks.${action}`, { event: event.id, deck: deck.id })
+        , { method: 'POST' });
+        setBusy(false);
+        onChange();
+    };
+
+    const setPolls = async (ids) => {
+        setBusy(true);
+        await csrfFetch(route('tenant.events.decks.polls', { event: event.id, deck: deck.id }), {
+            method: 'PUT',
+            body: JSON.stringify({ poll_ids: ids }),
+        });
+        setBusy(false);
+        onChange();
+    };
+
+    const inDeck = deck.polls.map((p) => p.id);
+    const available = polls.filter((p) => !inDeck.includes(p.id));
+
+    const move = (index, delta) => {
+        const next = [...inDeck];
+        const target = index + delta;
+        if (target < 0 || target >= next.length) return;
+        [next[index], next[target]] = [next[target], next[index]];
+        setPolls(next);
+    };
+
+    const position = deck.polls.findIndex((p) => p.id === deck.current_poll_id);
+
+    return (
+        <div className="border border-border p-4 space-y-3">
+            <div className="flex items-baseline justify-between gap-3">
+                <div>
+                    <b className="text-sm text-ink">{deck.title}</b>
+                    <span className="ml-2 text-xs text-ink-secondary">
+                        {deck.status === 'live'
+                            ? `Question ${position + 1} of ${deck.polls.length}`
+                            : `${deck.polls.length} question${deck.polls.length === 1 ? '' : 's'} · ${deck.status}`}
+                    </span>
+                </div>
+                {deck.status === 'live' && (
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                )}
+            </div>
+
+            <ol className="space-y-1.5">
+                {deck.polls.map((poll, index) => (
+                    <li
+                        key={poll.id}
+                        className={`flex items-center gap-2 border px-3 py-2 text-[13px] ${
+                            poll.id === deck.current_poll_id
+                                ? 'border-accent bg-accent-soft text-ink'
+                                : 'border-border text-ink-secondary'
+                        }`}
+                    >
+                        <span className="w-5 shrink-0 text-xs text-ink-muted">{index + 1}</span>
+                        <span className="flex-1">{poll.question}</span>
+                        <button
+                            type="button"
+                            onClick={() => move(index, -1)}
+                            disabled={busy || index === 0}
+                            className="px-1 text-xs text-ink-secondary disabled:opacity-30 cursor-pointer"
+                            aria-label="Move up"
+                        >
+                            ↑
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => move(index, 1)}
+                            disabled={busy || index === deck.polls.length - 1}
+                            className="px-1 text-xs text-ink-secondary disabled:opacity-30 cursor-pointer"
+                            aria-label="Move down"
+                        >
+                            ↓
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setPolls(inDeck.filter((id) => id !== poll.id))}
+                            disabled={busy}
+                            className="px-1 text-xs text-danger-fg disabled:opacity-30 cursor-pointer"
+                            aria-label="Remove from deck"
+                        >
+                            ×
+                        </button>
+                    </li>
+                ))}
+            </ol>
+
+            {available.length > 0 && (
+                <select
+                    value=""
+                    onChange={(e) => e.target.value && setPolls([...inDeck, e.target.value])}
+                    disabled={busy}
+                    className="h-control w-full border border-border px-3 text-sm text-ink focus:border-accent focus:outline-none"
+                >
+                    <option value="">Add a question to this deck…</option>
+                    {available.map((p) => (
+                        <option key={p.id} value={p.id}>
+                            {p.question}
+                        </option>
+                    ))}
+                </select>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+                {deck.status !== 'live' ? (
+                    <button
+                        type="button"
+                        onClick={() => drive('start')}
+                        disabled={busy || deck.polls.length === 0 || deck.status === 'ended'}
+                        className="h-control border border-accent bg-accent px-4 text-sm text-white hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                    >
+                        Start deck
+                    </button>
+                ) : (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => drive('previous')}
+                            disabled={busy}
+                            className="h-control border border-border px-4 text-sm text-ink hover:border-accent disabled:opacity-50 cursor-pointer"
+                        >
+                            Back
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => drive('advance')}
+                            disabled={busy}
+                            className="h-control border border-accent bg-accent px-4 text-sm text-white hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                        >
+                            Next question
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => drive('close')}
+                            disabled={busy}
+                            className="h-control border border-border px-4 text-sm text-ink hover:border-accent disabled:opacity-50 cursor-pointer"
+                        >
+                            Close voting
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => drive('end')}
+                            disabled={busy}
+                            className="h-control border border-border px-4 text-sm text-ink hover:border-accent disabled:opacity-50 cursor-pointer"
+                        >
+                            End deck
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function EngagementPanel({ event }) {
     const [polls, setPolls] = useState([]);
 
@@ -353,7 +601,8 @@ export default function EngagementPanel({ event }) {
     return (
         <div className="max-w-3xl space-y-4">
             <p className="text-sm text-ink-secondary">
-                Live polls and quizzes. Attendees see whichever poll you most recently set live.
+                Live polls and quizzes. Put questions into a deck to run them in
+                order; a loose poll is shown on its own when no deck is running.
             </p>
 
             {hasLivePoll && (
@@ -364,6 +613,8 @@ export default function EngagementPanel({ event }) {
             )}
 
             <PresentLink event={event} />
+
+            <DeckSection event={event} polls={polls} onChange={load} />
 
             <Leaderboard event={event} />
 

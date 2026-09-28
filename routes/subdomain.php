@@ -221,6 +221,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::patch('events/{event}/polls/{poll}/responses/{response}', [EventPollController::class, 'moderateResponse'])->name('tenant.events.polls.responses.moderate');
     Route::get('events/{event}/quiz/leaderboard', [EventPollController::class, 'leaderboard'])->name('tenant.events.quiz.leaderboard');
 
+    Route::get('events/{event}/decks', [EventPollDeckController::class, 'index'])->name('tenant.events.decks.index');
+    Route::post('events/{event}/decks', [EventPollDeckController::class, 'store'])->name('tenant.events.decks.store');
+    Route::put('events/{event}/decks/{deck}/polls', [EventPollDeckController::class, 'setPolls'])->name('tenant.events.decks.polls');
+    Route::delete('events/{event}/decks/{deck}', [EventPollDeckController::class, 'destroy'])->name('tenant.events.decks.destroy');
     Route::post('events/{event}/decks/{deck}/start', [EventPollDeckController::class, 'start'])->name('tenant.events.decks.start');
     Route::post('events/{event}/decks/{deck}/advance', [EventPollDeckController::class, 'advance'])->name('tenant.events.decks.advance');
     Route::post('events/{event}/decks/{deck}/previous', [EventPollDeckController::class, 'previous'])->name('tenant.events.decks.previous');
