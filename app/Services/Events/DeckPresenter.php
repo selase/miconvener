@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Events;
 
-use App\Events\PollResultsUpdated;
 use App\Models\EventPoll;
 use App\Models\PollDeck;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +15,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class DeckPresenter
 {
+    public function __construct(private readonly PollBroadcastCoalescer $broadcaster) {}
+
     /**
      * Only a draft deck starts. Pressing Start on one already running -- a
      * reloaded presenter tab, a double tap -- would otherwise reopen question
@@ -40,7 +41,7 @@ final class DeckPresenter
             $first->update(['status' => EventPoll::STATUS_LIVE, 'went_live_at' => now()]);
         });
 
-        PollResultsUpdated::dispatch($first->fresh('options'));
+        $this->broadcaster->broadcastNow($first->fresh('options'));
     }
 
     public function advance(PollDeck $deck): ?EventPoll
@@ -67,7 +68,7 @@ final class DeckPresenter
 
         $current->update(['status' => EventPoll::STATUS_CLOSED]);
 
-        PollResultsUpdated::dispatch($current->fresh('options'));
+        $this->broadcaster->broadcastNow($current->fresh('options'));
     }
 
     public function end(PollDeck $deck): void
@@ -84,7 +85,7 @@ final class DeckPresenter
         // question nobody will answer again, and dropping it would leave the
         // wall a poll-interval behind on the last thing the room saw.
         if ($outgoing !== null) {
-            PollResultsUpdated::dispatch($outgoing->fresh('options'));
+            $this->broadcaster->broadcastNow($outgoing->fresh('options'));
         }
     }
 
@@ -123,7 +124,7 @@ final class DeckPresenter
             $deck->setCurrentPoll($next);
         });
 
-        PollResultsUpdated::dispatch($next->fresh('options'));
+        $this->broadcaster->broadcastNow($next->fresh('options'));
 
         return $next;
     }

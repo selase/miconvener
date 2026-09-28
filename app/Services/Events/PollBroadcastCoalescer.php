@@ -7,6 +7,8 @@ namespace App\Services\Events;
 use App\Events\PollResultsUpdated;
 use App\Models\EventPoll;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Rate-limits the broadcast a vote triggers.
@@ -36,8 +38,30 @@ final class PollBroadcastCoalescer
             return false;
         }
 
-        PollResultsUpdated::dispatch($poll);
+        $this->broadcastNow($poll);
 
         return true;
+    }
+
+    /**
+     * Send the results out regardless of the window, and never let a failure
+     * to send break what has already happened.
+     *
+     * PollResultsUpdated is ShouldBroadcastNow, so it reaches Reverb inside the
+     * request. Unguarded, a Reverb outage means every vote is recorded and then
+     * answered with a 500, and a presenter pressing Next sees an error for a
+     * question that did advance -- so they press again and skip one. The vote
+     * and the pointer are the truth; the broadcast is how the room finds out.
+     */
+    public function broadcastNow(EventPoll $poll): void
+    {
+        try {
+            PollResultsUpdated::dispatch($poll);
+        } catch (Throwable $e) {
+            Log::warning('poll results broadcast failed', [
+                'poll_id' => $poll->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 }

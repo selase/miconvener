@@ -78,11 +78,20 @@ final class ProbeWorkspaceSeeder extends Seeder
 
     private function event(Tenant $tenant): Event
     {
+        $existingToken = Event::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('slug', self::EVENT_SLUG)
+            ->value('present_token');
+
         /** @var Event $event */
         $event = Event::query()->updateOrCreate(
             ['tenant_id' => $tenant->id, 'slug' => self::EVENT_SLUG],
             [
                 'name' => 'Probe Full Experience',
+                // The wall is the point of a deck, and it opens on this token
+                // rather than a login. Kept if one already exists, so re-seeding
+                // does not revoke a link someone has open on a projector.
+                'present_token' => $existingToken ?? Str::random(40),
                 'description' => 'Every part of the attendee workspace, switched on at once: a ticket with a seat, a running programme, released and withheld material, a live poll, an open feedback form, Q&A, and help while the room is open.',
                 'status' => 'published',
                 'visibility' => Event::VISIBILITY_PUBLIC,

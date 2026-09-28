@@ -8,7 +8,9 @@ use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
 use App\Models\EventRegistration;
+use App\Models\PollDeck;
 use App\Models\Tenant;
+use App\Services\Events\DeckPresenter;
 use App\Services\Events\PollBroadcastCoalescer;
 use App\Services\Events\PollResults;
 use App\Services\Tenancy\TenantHostMatcher;
@@ -271,4 +273,40 @@ test('a phone and the wall agree on the count while answers await a moderator', 
     // the same question showed two different totals depending where you looked.
     expect($phone->json('poll.total_votes'))->toBe(2)
         ->and($wall['total_responses'])->toBe(2);
+});
+
+test('a broadcast that cannot be delivered does not undo the vote or the move', function (): void {
+    [$tenant, $event, $poll, $option] = scaleScenario('broadcast-down');
+
+    // Reverb unreachable. PollResultsUpdated is ShouldBroadcastNow, so this
+    // happens inside the request: unguarded, a vote is recorded and then
+    // answered with a 500, and a presenter pressing Next sees an error for a
+    // question that did advance -- so they press again and skip one.
+    EventFacade::listen(PollResultsUpdated::class, function (): void {
+        throw new RuntimeException('Pusher error: cURL error 7: Failed to connect');
+    });
+
+    $coalescer = app(PollBroadcastCoalescer::class);
+
+    expect(fn () => $coalescer->schedule($poll))->not->toThrow(RuntimeException::class)
+        ->and(fn () => $coalescer->broadcastNow($poll))->not->toThrow(RuntimeException::class);
+});
+
+test('a presenter can still drive a deck while broadcasting is down', function (): void {
+    [$tenant, $event, $deck, $first, $second] = presenterScenario('presenter-broadcast-down');
+
+    EventFacade::listen(PollResultsUpdated::class, function (): void {
+        throw new RuntimeException('Pusher error: cURL error 7: Failed to connect');
+    });
+
+    $presenter = app(DeckPresenter::class);
+
+    $presenter->start($deck);
+    expect($deck->fresh()->current_poll_id)->toBe($first->id);
+
+    $presenter->advance($deck->fresh());
+    expect($deck->fresh()->current_poll_id)->toBe($second->id);
+
+    $presenter->end($deck->fresh());
+    expect($deck->fresh()->status)->toBe(PollDeck::STATUS_ENDED);
 });
