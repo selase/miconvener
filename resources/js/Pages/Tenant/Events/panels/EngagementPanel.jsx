@@ -332,7 +332,7 @@ function Leaderboard({ event }) {
  * surface -- the wall, each phone -- follows the deck's pointer rather than
  * guessing from which poll went live last.
  */
-function DeckSection({ event, polls, onChange }) {
+export function DeckSection({ event, polls, onChange }) {
     const [decks, setDecks] = useState([]);
     const [title, setTitle] = useState('');
     const [creating, setCreating] = useState(false);
