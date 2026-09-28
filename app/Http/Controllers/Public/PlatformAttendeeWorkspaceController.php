@@ -578,8 +578,15 @@ final class PlatformAttendeeWorkspaceController extends Controller
             abort(404);
         }
 
-        $poll = $event->polls()->live()->with('options')->first();
-        $poll = $event->polls()->live()->with(['options' => fn ($q) => $q->withCount('responses')])->withCount('responses')->first();
+        // Approved only, on both counts. The wall counts approved answers, and
+        // a phone showing a different total for the same question reads as a
+        // bug to the person holding it.
+        $approved = fn ($query) => $query->where('is_approved', true);
+
+        $poll = $event->polls()->live()
+            ->with(['options' => fn ($q) => $q->withCount(['responses' => $approved])])
+            ->withCount(['responses' => $approved])
+            ->first();
         if (! $poll) {
             return response()->json(['poll' => null]);
         }

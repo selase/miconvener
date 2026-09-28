@@ -78,7 +78,7 @@ final class PollPresentationController extends Controller
             // only ever fires when two polls are created in the same second.
             ->reorder()
             ->whereIn('status', [EventPoll::STATUS_LIVE, EventPoll::STATUS_CLOSED])
-            ->with(['options', 'responses'])
+            ->with('options')
             // A poll that is open beats one that has closed, however recently.
             // Ordering on went_live_at alone would let the last poll an
             // organiser closed sit on the wall while the room is answering the

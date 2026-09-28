@@ -85,8 +85,16 @@ final class PollResults
                     ->where('poll_id', $poll->id)
                     ->where('is_approved', true)
                     ->whereNotNull('response_text')
-                    ->where('response_text', '!=', '')
+                    // Trimmed, because a bubble holding three spaces is not an
+                    // answer and would take one of the thirty slots from one.
+                    ->whereRaw("btrim(response_text) <> ''")
+                    // created_at is second-precision, so a busy question ties
+                    // dozens of rows. Without the id as a tiebreaker the LIMIT
+                    // decides WHICH thirty, and the wall reshuffles between
+                    // renders. Ids are time-ordered UUIDv7, so this also keeps
+                    // the newest first.
                     ->orderByDesc('created_at')
+                    ->orderByDesc('id')
                     ->limit(30)
                     ->get()
                     ->map(fn (EventPollResponse $r): array => [

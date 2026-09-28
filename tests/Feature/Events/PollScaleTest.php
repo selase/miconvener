@@ -7,9 +7,11 @@ use App\Models\Event;
 use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
+use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Events\PollBroadcastCoalescer;
 use App\Services\Events\PollResults;
+use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Str;
@@ -34,6 +36,7 @@ function scaleScenario(string $slug, string $type = EventPoll::TYPE_MULTIPLE_CHO
 }
 
 test('a hundred votes do not cause a hundred broadcasts', function (): void {
+    $this->freezeTime();
     EventFacade::fake([PollResultsUpdated::class]);
 
     [$tenant, $event, $poll, $option] = scaleScenario('scale-coalesce');
@@ -49,6 +52,7 @@ test('a hundred votes do not cause a hundred broadcasts', function (): void {
 });
 
 test('the first vote in a window broadcasts and the rest report that one is already out', function (): void {
+    $this->freezeTime();
     EventFacade::fake([PollResultsUpdated::class]);
 
     [$tenant, $event, $poll] = scaleScenario('scale-window');
@@ -59,6 +63,7 @@ test('the first vote in a window broadcasts and the rest report that one is alre
 });
 
 test('two polls answered at once do not silence each other', function (): void {
+    $this->freezeTime();
     EventFacade::fake([PollResultsUpdated::class]);
 
     [$tenantA, $eventA, $pollA] = scaleScenario('scale-two-a');
@@ -69,6 +74,12 @@ test('two polls answered at once do not silence each other', function (): void {
     // see their own wall move.
     expect($coalescer->schedule($pollA))->toBeTrue()
         ->and($coalescer->schedule($pollB))->toBeTrue();
+
+    // Both of the above pass against an unconditional dispatch. These are what
+    // say the window is real AND that it is keyed per poll: A is now suppressed
+    // while B, opened in the same second, still went out.
+    expect($coalescer->schedule($pollA))->toBeFalse()
+        ->and($coalescer->schedule($pollB))->toBeFalse();
 
     EventFacade::assertDispatchedTimes(PollResultsUpdated::class, 2);
 });
@@ -151,18 +162,103 @@ test('an open poll counts its replies and shows only the last thirty', function 
         // than whatever order the rows happen to come back in.
         $reply->forceFill(['created_at' => now()->addSeconds($i)])->save();
     }
-    // An empty string is not an answer, and must not inflate the count on a
-    // wall or take a slot from one someone actually wrote.
+    // Neither an empty string nor three spaces is an answer. Both must stay off
+    // the wall and out of the thirty slots someone else's answer wants.
     EventPollResponse::create([
         'tenant_id' => $tenant->id, 'poll_id' => $poll->id, 'response_text' => '',
         'respondent_token' => 'open-blank', 'is_approved' => true,
+    ]);
+    EventPollResponse::create([
+        'tenant_id' => $tenant->id, 'poll_id' => $poll->id, 'response_text' => '   ',
+        'respondent_token' => 'open-spaces', 'is_approved' => true,
     ]);
 
     $results = app(PollResults::class)->forDisplay($poll->fresh());
 
     // Every reply counts toward the total even though an open answer carries no
     // option_id and so falls into the null group.
-    expect($results['total_responses'])->toBe(41)
+    expect($results['total_responses'])->toBe(42)
         ->and($results['open_responses'])->toHaveCount(30)
-        ->and($results['open_responses'][0]['text'])->toBe('Answer 40');
+        ->and($results['open_responses'][0]['text'])->toBe('Answer 40')
+        ->and(collect($results['open_responses'])->pluck('text'))
+        ->each(fn ($text) => $text->not->toBe('')->not->toBe('   '));
+});
+
+test('the wall does not read every answer to draw the bars', function (): void {
+    [$tenant, $event, $poll, $option] = scaleScenario('scale-wall');
+    $event->update(['present_token' => Str::random(40)]);
+
+    $rows = [];
+    foreach (range(1, 200) as $i) {
+        $rows[] = [
+            'id' => Str::uuid()->toString(),
+            'tenant_id' => $tenant->id,
+            'poll_id' => $poll->id,
+            'option_id' => $option->id,
+            'respondent_token' => "wall-{$i}",
+            'is_approved' => true,
+            'points_awarded' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+    EventPollResponse::on('landlord')->insert($rows);
+
+    $statements = [];
+    DB::listen(function ($query) use (&$statements): void {
+        $statements[] = $query->sql;
+    });
+
+    $host = 'scale-wall.'.mb_ltrim((string) config('session.domain'), '.');
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($props['poll']['total_responses'])->toBe(200);
+
+    // The wall's own page load, and the poll it falls back to without a socket,
+    // used to eager load every response alongside the poll. Counting moved to
+    // SQL but this read did not, so the cost stayed on the busiest path.
+    $bulkReads = collect($statements)
+        ->filter(fn (string $sql): bool => str_contains($sql, 'event_poll_responses')
+            && ! str_contains($sql, 'count(*)'))
+        ->all();
+
+    expect($bulkReads)->toBe([]);
+});
+
+test('a phone and the wall agree on the count while answers await a moderator', function (): void {
+    [$tenant, $event, $poll, $option] = scaleScenario('scale-agree', EventPoll::TYPE_OPEN);
+    $poll->update(['requires_moderation' => true]);
+
+    foreach (['yes-one', 'yes-two'] as $token) {
+        EventPollResponse::create([
+            'tenant_id' => $tenant->id, 'poll_id' => $poll->id,
+            'response_text' => 'Approved', 'respondent_token' => $token, 'is_approved' => true,
+        ]);
+    }
+    EventPollResponse::create([
+        'tenant_id' => $tenant->id, 'poll_id' => $poll->id,
+        'response_text' => 'Waiting', 'respondent_token' => 'pending-one', 'is_approved' => null,
+    ]);
+
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'agree@example.com',
+        'status' => EventRegistration::STATUS_CHECKED_IN,
+        'checked_in_at' => now(),
+    ]);
+
+    $host = app(TenantHostMatcher::class)->baseDomain();
+    $phone = $this->withSession(proofFor($registration->email))
+        ->getJson("http://{$host}/my/events/{$registration->id}/poll", ['HTTP_HOST' => $host])
+        ->assertOk();
+
+    $wall = app(PollResults::class)->forDisplay($poll->fresh());
+
+    // The phone counted every row and the wall counted only approved ones, so
+    // the same question showed two different totals depending where you looked.
+    expect($phone->json('poll.total_votes'))->toBe(2)
+        ->and($wall['total_responses'])->toBe(2);
 });

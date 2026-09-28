@@ -40,7 +40,7 @@ final class DeckPresenter
             $first->update(['status' => EventPoll::STATUS_LIVE, 'went_live_at' => now()]);
         });
 
-        PollResultsUpdated::dispatch($first->fresh(['options', 'responses']));
+        PollResultsUpdated::dispatch($first->fresh('options'));
     }
 
     public function advance(PollDeck $deck): ?EventPoll
@@ -67,16 +67,25 @@ final class DeckPresenter
 
         $current->update(['status' => EventPoll::STATUS_CLOSED]);
 
-        PollResultsUpdated::dispatch($current->fresh(['options', 'responses']));
+        PollResultsUpdated::dispatch($current->fresh('options'));
     }
 
     public function end(PollDeck $deck): void
     {
-        DB::transaction(function () use ($deck): void {
-            $deck->currentPoll?->update(['status' => EventPoll::STATUS_CLOSED]);
+        $outgoing = $deck->currentPoll;
+
+        DB::transaction(function () use ($deck, $outgoing): void {
+            $outgoing?->update(['status' => EventPoll::STATUS_CLOSED]);
             $deck->update(['status' => PollDeck::STATUS_ENDED]);
             $deck->setCurrentPoll(null);
         });
+
+        // Directly, not through the coalescer: this is the settled count for a
+        // question nobody will answer again, and dropping it would leave the
+        // wall a poll-interval behind on the last thing the room saw.
+        if ($outgoing !== null) {
+            PollResultsUpdated::dispatch($outgoing->fresh('options'));
+        }
     }
 
     private function neighbour(PollDeck $deck, bool $forward): ?EventPoll
@@ -114,7 +123,7 @@ final class DeckPresenter
             $deck->setCurrentPoll($next);
         });
 
-        PollResultsUpdated::dispatch($next->fresh(['options', 'responses']));
+        PollResultsUpdated::dispatch($next->fresh('options'));
 
         return $next;
     }
