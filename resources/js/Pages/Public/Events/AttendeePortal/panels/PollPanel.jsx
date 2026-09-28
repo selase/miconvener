@@ -52,6 +52,39 @@ export default function PollPanel({ registration, isOnline = true }) {
         }
     }, [registration.id, isOnline]);
 
+    // The presenter holds the pace, so the phone follows rather than decides.
+    // Five seconds, because this is the fallback for a room with no socket and
+    // a question is open for a minute or two at most.
+    useEffect(() => {
+        if (!isOnline) return undefined;
+
+        const interval = setInterval(() => {
+            fetch(`/my/events/${registration.id}/poll`, {
+                headers: { Accept: 'application/json' },
+            })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((data) => {
+                    if (!data) return;
+                    const next = data.poll;
+                    // Only when the presenter has actually moved on. Replacing
+                    // the poll object every five seconds would wipe a half-typed
+                    // answer out from under whoever was writing it.
+                    setPoll((current) => {
+                        if (current?.id === next?.id) return current;
+                        setSelectedOptionId(null);
+                        setSelectedOptionIds([]);
+                        setTextResponse('');
+                        setQuizResult(null);
+                        setError(null);
+                        return next;
+                    });
+                })
+                .catch(() => {});
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [registration.id, isOnline]);
+
     const handleOptionToggle = (optionId) => {
         if (poll.allows_multiple) {
             if (selectedOptionIds.includes(optionId)) {
@@ -134,9 +167,11 @@ export default function PollPanel({ registration, isOnline = true }) {
         return (
             <div className="rounded-xl border border-border bg-surface p-8 text-center">
                 <BarChart2 className="mx-auto h-8 w-8 text-ink-muted" />
-                <h3 className="mt-3 text-base font-medium text-ink">No live poll right now</h3>
+                <h3 className="mt-3 text-base font-medium text-ink">
+                    Waiting for the next question
+                </h3>
                 <p className="mt-1.5 text-xs text-ink-secondary">
-                    When the organizers activate a poll or quiz, it will be available here.
+                    This updates on its own when the presenter moves on.
                 </p>
                 <button
                     type="button"

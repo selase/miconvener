@@ -7,6 +7,7 @@ namespace App\Services\Events;
 use App\Jobs\Events\SendPlatformAttendeeAccessCode;
 use App\Mail\Events\PlatformAttendeeAccessCodeMail;
 use App\Models\PlatformAttendeeAccessCode;
+use App\Models\PollDeck;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -151,8 +152,14 @@ final class PlatformAttendeeVerification
 
     /**
      * The address proven platform-wide, or null if expired or missing.
+     *
+     * Proof is fixed at twelve hours and deliberately does not slide. The one
+     * exception is a deck being presented: a speaker who verified at eight in
+     * the morning to rehearse must not be asked for a code at eight in the
+     * evening, mid-question, in front of a room. The hold lasts exactly as long
+     * as the deck is live and extends nothing else.
      */
-    public function verifiedEmail(Session $session): ?string
+    public function verifiedEmail(Session $session, ?PollDeck $presentingDeck = null): ?string
     {
         $marker = $session->get(self::SESSION_KEY);
 
@@ -160,7 +167,9 @@ final class PlatformAttendeeVerification
             return null;
         }
 
-        if ($marker['expires_at'] <= now()->getTimestamp()) {
+        $held = $presentingDeck !== null && $presentingDeck->status === PollDeck::STATUS_LIVE;
+
+        if (! $held && $marker['expires_at'] <= now()->getTimestamp()) {
             $session->forget(self::SESSION_KEY);
 
             return null;

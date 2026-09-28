@@ -9,7 +9,14 @@ import { Head } from '@inertiajs/react';
  * follows whichever poll is live and shows a way in while it waits, because a
  * results screen with nothing on it is a wasted wall.
  */
-export default function PollPresentation({ event, organiser, poll: initialPoll, join, resultsUrl }) {
+export default function PollPresentation({
+    event,
+    organiser,
+    poll: initialPoll,
+    join,
+    resultsUrl,
+    eligibleVoters = 0,
+}) {
     const [poll, setPoll] = useState(initialPoll);
     const [connected, setConnected] = useState(false);
 
@@ -89,7 +96,20 @@ export default function PollPresentation({ event, organiser, poll: initialPoll, 
                             </p>
                         )}
 
-                        {poll.type === 'open' ? (
+                        {poll.total_responses === 0 && eligibleVoters === 0 ? (
+                            /* A chart of zeroes and a room that cannot answer
+                               yet look identical from the back of a hall, and
+                               only one of them is something an organiser can
+                               do anything about. */
+                            <div className="mt-[6vh]">
+                                <p className="text-[2.2vw] text-white/70">
+                                    Nobody has checked in yet
+                                </p>
+                                <p className="mt-[1vh] text-[1.4vw] text-white/40">
+                                    Delegates answer from their ticket once they are checked in.
+                                </p>
+                            </div>
+                        ) : poll.type === 'open' ? (
                             <OpenWall responses={poll.open_responses} />
                         ) : (
                             <ol className="mt-[4vh] space-y-[2.5vh]">

@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventPoll;
+use App\Models\PollDeck;
 use App\Services\Events\PollResults;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Tenancy\TenantContext;
+use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -34,8 +36,15 @@ final class PollPresentationController extends Controller
             'event' => $eventModel->slug,
         ]);
 
-        // The room needs to reach the voting page without being read a URL.
-        $joinPage = url("/e/{$eventModel->slug}/poll");
+        // The room needs to reach somewhere it can actually answer without
+        // being read a URL. This used to point at /e/{event}/poll, the data
+        // endpoint the public page fetches, so anyone who scanned it got a
+        // blob of JSON. Answering happens in the portal now.
+        //
+        // Built against the platform host, not this request's: the wall is
+        // served from the tenant's subdomain and the portal is not, so url()
+        // would send a scanned phone to a subdomain that redirects it away.
+        $joinPage = request()->getScheme().'://'.app(TenantHostMatcher::class)->baseDomain().'/my';
 
         return Inertia::render('Public/Events/PollPresentation', [
             'event' => [
@@ -44,6 +53,12 @@ final class PollPresentationController extends Controller
             ],
             'organiser' => ['name' => $this->tenant()->name],
             'poll' => $this->livePayload($eventModel),
+            // Zero bars and a room that cannot answer yet look identical from
+            // the back of a hall, and only one of them is something an
+            // organiser can act on.
+            'eligibleVoters' => $eventModel->registrations()
+                ->whereNotNull('checked_in_at')
+                ->count(),
             'join' => [
                 'url' => $joinPage,
                 'qr' => QrCodeGenerator::svgDataUri($joinPage),
@@ -72,6 +87,20 @@ final class PollPresentationController extends Controller
      */
     private function livePayload(Event $event): ?array
     {
+        // A deck decides what the room is looking at. Only the polls are eager
+        // loaded, never the responses -- PollResults counts in SQL, and the
+        // wall is the busiest reader there is.
+        $deck = PollDeck::query()
+            ->where('event_id', $event->id)
+            ->where('status', PollDeck::STATUS_LIVE)
+            ->with('currentPoll.options')
+            ->first();
+
+        if ($deck?->currentPoll !== null) {
+            return $this->results->forDisplay($deck->currentPoll);
+        }
+
+        // No deck running: fall back to whatever went live on its own.
         $poll = $event->polls()
             // The relation sorts by created_at, which would otherwise decide
             // this outright and leave the ordering below as a tiebreaker that

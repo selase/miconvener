@@ -11,6 +11,7 @@ use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
+use App\Services\Events\DeckPresenter;
 use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Event as EventFacade;
@@ -84,7 +85,9 @@ test('the screen opens on its token and serves counts, never people', function (
         ->and($props['poll']['total_responses'])->toBe(1)
         ->and($props['poll']['options'][0]['count'])->toBe(1)
         ->and($props['poll']['options'][0]['percentage'])->toBe(100)
-        ->and($props['join']['url'])->toContain('/poll');
+        // Somewhere a person can vote, not the JSON endpoint the public page
+        // fetches. Asserting '/poll' here is what let the broken QR ship green.
+        ->and($props['join']['url'])->toContain('/my');
 
     // Nothing that ties an answer to a person may reach a page anyone can open.
     $response->assertDontSee('a-token-that-must-never-be-shown');
@@ -260,4 +263,105 @@ test('a poll nobody answered shows zeroes rather than dividing by them', functio
     expect($props['poll']['total_responses'])->toBe(0)
         ->and($props['poll']['options'][0]['percentage'])->toBe(0)
         ->and($props['poll']['options'][0]['count'])->toBe(0);
+});
+
+test('the wall shows the deck question, not whatever went live last', function (): void {
+    [$tenant, $event, $deck, $first, $second] = presenterScenario('wall-follows');
+    $event->update(['present_token' => Str::random(40)]);
+    $host = eventSubdomainHost('wall-follows');
+
+    $presenter = app(DeckPresenter::class);
+    $presenter->start($deck);
+    $presenter->advance($deck->fresh());
+
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->viewData('page')['props'];
+
+    expect($props['poll']['question'])->toBe('Second');
+});
+
+test('a loose poll that went live later does not steal the wall from the deck', function (): void {
+    [$tenant, $event, $deck, $first, $second] = presenterScenario('wall-steal');
+    $event->update(['present_token' => Str::random(40)]);
+    $host = eventSubdomainHost('wall-steal');
+
+    app(DeckPresenter::class)->start($deck);
+
+    // Opened after the deck's question and with a later went_live_at, so the
+    // old ordering would have put it on the wall in front of the room.
+    EventPoll::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'question' => 'Loose and later',
+        'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+        'status' => EventPoll::STATUS_LIVE,
+        'went_live_at' => now()->addMinutes(5),
+    ]);
+
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->viewData('page')['props'];
+
+    expect($props['poll']['question'])->toBe('First');
+});
+
+test('a room where nobody has checked in says so rather than showing silence as a result', function (): void {
+    [$tenant, $event, $deck, $first] = presenterScenario('wall-empty');
+    $event->update(['present_token' => Str::random(40)]);
+    $host = eventSubdomainHost('wall-empty');
+
+    app(DeckPresenter::class)->start($deck);
+
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->viewData('page')['props'];
+
+    // Zero bars and "nobody can answer yet" look identical on a wall, and the
+    // second is the one an organiser can act on.
+    expect($props['poll']['total_responses'])->toBe(0)
+        ->and($props['eligibleVoters'])->toBe(0);
+});
+
+test('the wall counts only the people who are actually here', function (): void {
+    [$tenant, $event, $deck, $first] = presenterScenario('wall-eligible');
+    $event->update(['present_token' => Str::random(40)]);
+    $host = eventSubdomainHost('wall-eligible');
+
+    EventRegistration::factory()->count(2)->create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CHECKED_IN, 'checked_in_at' => now(),
+    ]);
+    // Confirmed but not through the door: cannot answer, so must not be counted
+    // as someone the room is waiting on.
+    EventRegistration::factory()->count(3)->create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED, 'checked_in_at' => null,
+    ]);
+
+    app(DeckPresenter::class)->start($deck);
+
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->viewData('page')['props'];
+
+    expect($props['eligibleVoters'])->toBe(2);
+});
+
+test('the code on the wall leads somewhere a person can vote', function (): void {
+    [$tenant, $event, $deck] = presenterScenario('wall-qr');
+    $event->update(['present_token' => Str::random(40)]);
+    $host = eventSubdomainHost('wall-qr');
+
+    $props = $this->get("http://{$host}/e/{$event->slug}/present/{$event->present_token}", ['HTTP_HOST' => $host])
+        ->viewData('page')['props'];
+
+    // It pointed at /e/{event}/poll, which returns JSON. Someone in a room
+    // scanned it and got a blob.
+    $join = $props['join']['url'];
+
+    expect($join)->toContain('/my')
+        ->and($join)->not->toContain('/poll');
+
+    $platformHost = app(TenantHostMatcher::class)->baseDomain();
+
+    expect($join)->toStartWith("http://{$platformHost}/");
+
+    $this->get($join, ['HTTP_HOST' => $platformHost])->assertOk();
 });
