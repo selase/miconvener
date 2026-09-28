@@ -172,16 +172,26 @@ test('an open poll counts its replies and shows only the last thirty', function 
         'tenant_id' => $tenant->id, 'poll_id' => $poll->id, 'response_text' => '   ',
         'respondent_token' => 'open-spaces', 'is_approved' => true,
     ]);
+    // Nor a tab, nor a newline. btrim() strips only spaces by default, so these
+    // two walked through the first version of this guard.
+    EventPollResponse::create([
+        'tenant_id' => $tenant->id, 'poll_id' => $poll->id, 'response_text' => "\t",
+        'respondent_token' => 'open-tab', 'is_approved' => true,
+    ]);
+    EventPollResponse::create([
+        'tenant_id' => $tenant->id, 'poll_id' => $poll->id, 'response_text' => "\n",
+        'respondent_token' => 'open-newline', 'is_approved' => true,
+    ]);
 
     $results = app(PollResults::class)->forDisplay($poll->fresh());
 
     // Every reply counts toward the total even though an open answer carries no
     // option_id and so falls into the null group.
-    expect($results['total_responses'])->toBe(42)
+    expect($results['total_responses'])->toBe(44)
         ->and($results['open_responses'])->toHaveCount(30)
         ->and($results['open_responses'][0]['text'])->toBe('Answer 40')
         ->and(collect($results['open_responses'])->pluck('text'))
-        ->each(fn ($text) => $text->not->toBe('')->not->toBe('   '));
+        ->each(fn ($text) => $text->toMatch('/[^\s]/'));
 });
 
 test('the wall does not read every answer to draw the bars', function (): void {

@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Events\PollResultsUpdated;
 use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventRegistration;
 use App\Models\PollDeck;
 use App\Services\Events\DeckPresenter;
 use App\Services\Tenancy\TenantHostMatcher;
+use Illuminate\Support\Facades\Event as EventFacade;
 
 test('advancing closes the question behind it and opens the next', function (): void {
     [$tenant, $event, $deck, $first, $second] = presenterScenario('presenter-advance');
@@ -89,6 +91,24 @@ test('a question still marked live but no longer the deck\'s is refused too', fu
         ->assertJsonPath('message', 'That question has closed.');
 
     expect($first->responses()->count())->toBe(0);
+});
+
+test('ending a deck sends the settled count out, not just the status change', function (): void {
+    EventFacade::fake([PollResultsUpdated::class]);
+
+    [$tenant, $event, $deck, $first] = presenterScenario('presenter-end-broadcast');
+    $presenter = app(DeckPresenter::class);
+    $presenter->start($deck);
+    $presenter->end($deck->fresh());
+
+    // Without this the last thing the room saw sat a poll-interval behind: the
+    // question closed, and nothing told the wall what it finished on.
+    EventFacade::assertDispatched(PollResultsUpdated::class, function (PollResultsUpdated $broadcast) use ($first): bool {
+        $payload = $broadcast->broadcastWith();
+
+        return $payload['id'] === $first->id
+            && $payload['status'] === EventPoll::STATUS_CLOSED;
+    });
 });
 
 test('ending a deck closes whatever was open', function (): void {

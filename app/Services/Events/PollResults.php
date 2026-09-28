@@ -85,9 +85,11 @@ final class PollResults
                     ->where('poll_id', $poll->id)
                     ->where('is_approved', true)
                     ->whereNotNull('response_text')
-                    // Trimmed, because a bubble holding three spaces is not an
-                    // answer and would take one of the thirty slots from one.
-                    ->whereRaw("btrim(response_text) <> ''")
+                    // Must hold at least one character that is not whitespace.
+                    // btrim() strips only spaces by default, so a tab- or
+                    // newline-only answer survived it -- the same blank bubble,
+                    // taking one of the thirty slots, via a narrower door.
+                    ->whereRaw("response_text ~ '[^[:space:]]'")
                     // created_at is second-precision, so a busy question ties
                     // dozens of rows. Without the id as a tiebreaker the LIMIT
                     // decides WHICH thirty, and the wall reshuffles between
