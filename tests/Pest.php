@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Event;
 use App\Models\EventPoll;
+use App\Models\EventRegistration;
 use App\Models\PollDeck;
 use App\Models\Tenant;
 use App\Models\User;
@@ -249,6 +250,34 @@ if (! function_exists('presenterScenario')) {
         $second = deckPoll($tenant, $event, $deck, 'Second', 1);
 
         return [$tenant, $event, $deck, $first, $second];
+    }
+}
+
+/**
+ * A published virtual event with one confirmed registration, for the paths
+ * where someone marks themselves present rather than being scanned in.
+ *
+ * @return array{0: Tenant, 1: Event, 2: EventRegistration}
+ */
+if (! function_exists('virtualEventScenario')) {
+    function virtualEventScenario(string $slug): array
+    {
+
+        $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
+        $event = Event::factory()->published()->create([
+            'tenant_id' => $tenant->id,
+            'location_type' => Event::LOCATION_VIRTUAL,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(4),
+        ]);
+        $registration = EventRegistration::factory()->create([
+            'tenant_id' => $tenant->id,
+            'event_id' => $event->id,
+            'email' => 'present@example.com',
+            'status' => EventRegistration::STATUS_CONFIRMED,
+        ]);
+
+        return [$tenant, $event, $registration];
     }
 }
 

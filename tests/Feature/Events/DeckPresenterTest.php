@@ -7,6 +7,7 @@ use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventRegistration;
 use App\Models\PollDeck;
+use App\Models\User;
 use App\Services\Events\DeckPresenter;
 use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Support\Facades\Event as EventFacade;
@@ -280,4 +281,54 @@ test('a standalone question that has closed says so rather than vanishing', func
         ], ['HTTP_HOST' => $host])
         ->assertStatus(422)
         ->assertJsonPath('message', 'That question has closed.');
+});
+
+test('the phone shows the same question as the wall, not the newest live poll', function (): void {
+    [$tenant, $event, $deck, $first, $second] = presenterScenario('phone-follows');
+
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'email' => 'phone@example.com',
+        'status' => EventRegistration::STATUS_CHECKED_IN, 'checked_in_at' => now(),
+    ]);
+
+    app(DeckPresenter::class)->start($deck);
+
+    // Opened alongside the deck and created later, so the portal's old
+    // "most recent live poll" pick would have put this on every phone while
+    // the wall showed the deck's question -- and the vote gate would then have
+    // refused the answers it invited.
+    $loose = EventPoll::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id,
+        'question' => 'Loose and newer', 'type' => EventPoll::TYPE_MULTIPLE_CHOICE,
+        'status' => EventPoll::STATUS_LIVE, 'went_live_at' => now()->addMinute(),
+    ]);
+    // Explicitly later. created_at is second-precision, so rows made in one
+    // test tie, and the old ordering would have looked correct by luck.
+    $loose->forceFill(['created_at' => now()->addMinute()])->save();
+
+    $host = app(TenantHostMatcher::class)->baseDomain();
+
+    $this->withSession(proofFor($registration->email))
+        ->getJson("http://{$host}/my/events/{$registration->id}/poll", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertJsonPath('poll.id', $first->id)
+        ->assertJsonPath('poll.question', 'First');
+});
+
+test('a signed-in user without permission cannot drive the deck', function (): void {
+    [$tenant, $event, $deck, $first, $second, $owner, $host] = deckConsole('console-perms');
+
+    // In the tenant, signed in, but holding no role that grants "update event".
+    // The one other auth test asserts a 401 the middleware returns before
+    // authorize() is ever reached, so without this the call could be deleted.
+    $bystander = User::factory()->create(['tenant_id' => $tenant->id]);
+    $tenant->users()->attach($bystander->id);
+    setPermissionsTeamId($tenant->id);
+
+    $this->actingAs($bystander)
+        ->postJson("http://{$host}/events/{$event->id}/decks/{$deck->id}/start", [], ['HTTP_HOST' => $host])
+        ->assertForbidden();
+
+    expect($deck->fresh()->status)->toBe(PollDeck::STATUS_DRAFT);
 });

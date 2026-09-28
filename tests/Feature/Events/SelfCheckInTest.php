@@ -6,28 +6,8 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventRegistration;
-use App\Models\Tenant;
 use App\Services\Events\SelfCheckIn;
 use App\Services\Tenancy\TenantHostMatcher;
-
-function virtualEventScenario(string $slug): array
-{
-    $tenant = Tenant::factory()->create(['slug' => $slug, 'isolation_mode' => 'shared']);
-    $event = Event::factory()->published()->create([
-        'tenant_id' => $tenant->id,
-        'location_type' => Event::LOCATION_VIRTUAL,
-        'starts_at' => now()->subHour(),
-        'ends_at' => now()->addHours(4),
-    ]);
-    $registration = EventRegistration::factory()->create([
-        'tenant_id' => $tenant->id,
-        'event_id' => $event->id,
-        'email' => 'present@example.com',
-        'status' => EventRegistration::STATUS_CONFIRMED,
-    ]);
-
-    return [$tenant, $event, $registration];
-}
 
 test('an attendee at a virtual event can mark themselves present', function (): void {
     [$tenant, $event, $registration] = virtualEventScenario('self-checkin');

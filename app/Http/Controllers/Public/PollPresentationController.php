@@ -57,6 +57,7 @@ final class PollPresentationController extends Controller
             // the back of a hall, and only one of them is something an
             // organiser can act on.
             'eligibleVoters' => $eventModel->registrations()
+                ->confirmed()
                 ->whereNotNull('checked_in_at')
                 ->count(),
             'join' => [

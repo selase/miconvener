@@ -10,6 +10,7 @@ use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
 use App\Services\Tenancy\TenantContext;
+use App\Services\Tenancy\TenantHostMatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,7 +50,10 @@ final class PublicPollController extends Controller
         // says something useful rather than 404ing in someone's hand.
         return response()->json([
             'message' => 'Open your ticket in the MiConvener portal to answer.',
-            'portal_url' => url('/my'),
+            // Against the platform host, not this request's. This route is
+            // served from the tenant's subdomain and the portal is not, so
+            // url() would hand back a link that redirects the caller away.
+            'portal_url' => request()->getScheme().'://'.app(TenantHostMatcher::class)->baseDomain().'/my',
         ], 410);
     }
 

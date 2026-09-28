@@ -26,6 +26,7 @@ use App\Models\EventRegistration;
 use App\Models\EventRegistrationTransfer;
 use App\Models\EventServiceRequest;
 use App\Models\EventSessionAttendance;
+use App\Models\PollDeck;
 use App\Models\Speaker;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
 use App\Services\Events\PollBroadcastCoalescer;
@@ -583,10 +584,22 @@ final class PlatformAttendeeWorkspaceController extends Controller
         // bug to the person holding it.
         $approved = fn ($query) => $query->where('is_approved', true);
 
-        $poll = $event->polls()->live()
-            ->with(['options' => fn ($q) => $q->withCount(['responses' => $approved])])
-            ->withCount(['responses' => $approved])
+        // The same pointer the wall reads. Without this the phone picks the most
+        // recently created live poll while the wall shows the deck's current
+        // one, so a room can be answering a different question from the one
+        // behind the speaker -- and the vote gate then refuses the answer.
+        $deck = PollDeck::query()
+            ->where('event_id', $event->id)
+            ->where('status', PollDeck::STATUS_LIVE)
             ->first();
+
+        $pollQuery = $event->polls()
+            ->with(['options' => fn ($q) => $q->withCount(['responses' => $approved])])
+            ->withCount(['responses' => $approved]);
+
+        $poll = $deck?->current_poll_id !== null
+            ? $pollQuery->where('id', $deck->current_poll_id)->first()
+            : $pollQuery->live()->first();
         if (! $poll) {
             return response()->json(['poll' => null]);
         }
