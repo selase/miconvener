@@ -28,22 +28,32 @@ final class PollResults
      */
     public function forDisplay(EventPoll $poll): array
     {
-        $poll->loadMissing(['options', 'responses']);
+        $poll->loadMissing('options');
 
-        // Strictly true. A response awaiting a moderator carries null, and
-        // "not rejected" would put it on the wall -- which is the one thing
-        // moderating it was meant to prevent. Everything unmoderated is
-        // written as approved at the point it is recorded.
-        $approved = $poll->responses->filter(
-            fn (EventPollResponse $r): bool => $r->is_approved === true
-        );
+        // Grouped in SQL, not counted in PHP. A thousand people answering in a
+        // hall used to mean a thousand hydrated models per render, and this
+        // renders on every broadcast.
+        //
+        // is_approved is compared strictly to true. A response awaiting a
+        // moderator carries null, and "not rejected" would put it on the wall,
+        // which is the one thing moderating it was meant to prevent. Everything
+        // unmoderated is written as approved at the point it is recorded.
+        $grouped = EventPollResponse::query()
+            ->where('poll_id', $poll->id)
+            ->where('is_approved', true)
+            ->selectRaw('option_id, count(*) as total')
+            ->groupBy('option_id')
+            ->get();
 
-        $total = $approved->count();
+        // Summed across every group, including the null one an open answer
+        // falls into, so an open poll still reports how many people replied.
+        $total = (int) $grouped->sum('total');
+        $counts = $grouped->pluck('total', 'option_id');
 
         $options = $poll->options
             ->sortBy('sort_order')
-            ->map(function (EventPollOption $option) use ($poll, $approved, $total): array {
-                $count = $approved->where('option_id', $option->id)->count();
+            ->map(function (EventPollOption $option) use ($poll, $counts, $total): array {
+                $count = (int) ($counts[$option->id] ?? 0);
 
                 return [
                     'id' => $option->id,
@@ -68,11 +78,17 @@ final class PollResults
             'status' => $poll->status,
             'total_responses' => $total,
             'options' => $options,
+            // Capped in the query rather than after loading everything: the
+            // wall shows the last thirty, however many were written.
             'open_responses' => $poll->type === EventPoll::TYPE_OPEN
-                ? $approved
-                    ->filter(fn (EventPollResponse $r): bool => filled($r->response_text))
-                    ->sortByDesc('created_at')
-                    ->take(30)
+                ? EventPollResponse::query()
+                    ->where('poll_id', $poll->id)
+                    ->where('is_approved', true)
+                    ->whereNotNull('response_text')
+                    ->where('response_text', '!=', '')
+                    ->orderByDesc('created_at')
+                    ->limit(30)
+                    ->get()
                     ->map(fn (EventPollResponse $r): array => [
                         'id' => $r->id,
                         'text' => $r->response_text,

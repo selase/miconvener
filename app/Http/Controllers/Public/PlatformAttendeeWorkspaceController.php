@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Public;
 
 use App\Enum\TenantStatusEnum;
-use App\Events\PollResultsUpdated;
 use App\Events\ServiceRequestRaised;
 use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
@@ -29,6 +28,7 @@ use App\Models\EventServiceRequest;
 use App\Models\EventSessionAttendance;
 use App\Models\Speaker;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
+use App\Services\Events\PollBroadcastCoalescer;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\SelfCheckIn;
 use App\Services\Events\TicketPdfService;
@@ -704,7 +704,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'is_approved' => $pollModel->type === EventPoll::TYPE_OPEN && $pollModel->requires_moderation ? null : true,
         ]);
 
-        PollResultsUpdated::dispatch($pollModel->fresh(['options', 'responses']));
+        app(PollBroadcastCoalescer::class)->schedule($pollModel->fresh('options'));
 
         return response()->json([
             'message' => 'Thanks for responding!',
