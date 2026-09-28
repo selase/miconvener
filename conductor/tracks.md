@@ -565,6 +565,26 @@ Replacing the single-tenant `/my` portal with a single platform-wide passwordles
   - **F15 & F16 Characterisation Tests & Inertia CORS**: Migrated 8 characterisation tests; replaced cross-origin Inertia redirect in `register()` with `Inertia::location()` to prevent silent CORS failures; mocked `@inertiajs/react` in Vitest.
   - **Probe Workspace Seeder**: Added `ProbeWorkspaceSeeder` (`feat(probe)`) furnishing complete live workspace state across all features (sessions, release policies, polls, forms, Q&A, service requests, certificates, abstracts, attendance).
   - All 5 pipeline gates green: `pint --test` passed, `phpstan` 0 errors, `npm run lint` clean, `npm test` 10/10 Vitest passed, `php artisan test` 1228 passed (5281 assertions). Deployed and verified live.
+- [x] **Production End-to-End Browser Audit Verification (`docs/superpowers/audits/2026-09-25-browser-test-plan.md`)**:
+  - Executed full live production audit against `https://miconvener.com` and `https://miconvener-probe.miconvener.com` on 2026-09-25 across dual browser sessions (attendee portal + organiser console).
+  - **Part A (A1–A4 Public & Routing Invariants: ALL PASS)**:
+    - **A1**: `miconvener.com/my` returns 200; `www.miconvener.com/my` returns 301 to base domain; `miconvener-probe.miconvener.com/my` returns 302 to `/my?organiser=miconvener-probe`; direct Laravel Cloud domain returns 404.
+    - **A2 & A3 (Security Gate & Legacy Links: PASS)**: Direct access to workspace `/my/events/{uuid}` and legacy `/e/{slug}/registrations/{uuid}` chained 302 redirects to `/my?return_to=...`. Zero ticket details, QR codes, or entry codes rendered.
+    - **A4 (Zero-Knowledge Privacy: PASS)**: Submitting non-existent address (`no-such-person-9f3@example.com`) rendered identical confirmation copy (*"A sign-in code is on its way to your email."*) without account enumeration.
+  - **Part B (B1–B4 Attendee Portal: PASS with B3 Release Policy Finding)**:
+    - **B1**: Header displays masked `Signed in as hi••••••@gmail.com`; multi-tenant events cleanly grouped across `Purpledot` and `MiConvener Probe`; `Probe Full Experience` listed under *Live now* with status `Checked In`, `Seat: C-14`, code `EVT-SOJ8-477`.
+    - **B2**: Turnstile challenge N/A (within normal threshold).
+    - **B3 (Workspace Tabs & Material Release Policy: PASS)**: Workspace verified with `My ticket` (QR code, entry code, seat C-14 Main Auditorium, 6 CPD hours certificate), `My day` (4 sessions with rooms and tracks), `Live poll` (4 options), `Q&A` (4 threads), `Feedback` (rating, select, yes/no, long text), and `Get help` (Water / Refreshment, First Aid / Medical). Initial run observed `Downloads (3)` due to a fixture timing bug in the seeder (handout had been dated inside the active event window at 08:59 UTC, releasing before the 11:57 UTC check; seeder also matched on title rather than file path). Following seeder fix (materials keyed on path, orphan rows pruned, handout dated past event end), re-run on production confirmed **PASS**: tab reads **`Downloads (2)`**, listing exactly *Programme and floor plan* and *Speaker deck: designing for mobile data*. The *Workshop handout* is properly withheld. Screenshot: `b3_downloads_tab_1790340247160.png`.
+    - **B4**: Clean download stream initiated for *Programme and floor plan* without errors; attempts counter rendered ("5 of your attempts left").
+  - **Part C (C1–C3 Organiser Console Real-Time Interaction: ALL PASS)**:
+    - **C1**: Attendee water request appeared in Console **Help requests** with attendee name `Selase Kwawu` and pin badge **`Seat C-14 · Main Auditorium`**.
+    - **C2**: Console **Live polls** rendered live pulsing dot and dynamically reflected attendee vote (*Watching online: 1 vote / 100%*) without page reload.
+    - **C3**: Open request lit Seat **C-14** on *Main Auditorium* venue map in **amber (`Waiting`)** with active pulse; resolving request in console immediately returned seat C-14 to green (**`Assigned`**).
+  - **Part D (D1–D4 Reverb Real-Time Infrastructure: ALL PASS)**:
+    - **D1**: `window.Echo` verified connected and listening on private channel `event.${event.id}.service-requests`.
+    - **D2 (Latency Measurement: PASS)**: Measured delay from attendee submission to organiser console notification banner was **~0.8 seconds** (< 1s, confirming active Reverb WebSocket connection; did not degrade to the 8s polling fallback).
+    - **D3 (Urgent First Aid Escalation: PASS)**: Urgent medical request generated non-fading RED console banner (`⚠ First aid requested Medical / first aid from Selase Kwawu, seat C-14 in Main Auditorium`), turned venue map seat C-14 **RED (`First aid`)** with active pulse, and dispatched urgent transactional alert email confirmed received with subject *"Urgent: an attendee needs help at Probe Full Experience"*, naming attendee, seat C-14, and Main Auditorium. Ordinary water request generated zero email.
+
 
 
 
