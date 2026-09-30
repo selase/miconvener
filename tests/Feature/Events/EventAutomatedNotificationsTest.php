@@ -6,10 +6,12 @@ namespace Tests\Feature\Events;
 
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Models\Event;
+use App\Models\EventMaterial;
 use App\Models\EventNotificationLog;
 use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Models\TenantNotificationSetting;
+use App\Services\Notifications\AutomatedNotificationDispatcher;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -18,6 +20,106 @@ beforeEach(function () {
     refreshTenantDatabases();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+});
+
+test('registration and check-in occurrence rules target only the supplied matching registration', function (): void {
+    Mail::fake();
+    [$tenant] = eventHost('occurrence-rules');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $first = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'first@example.com',
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+    EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'email' => 'second@example.com',
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+
+    $ruleAttributes = [
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'target_role' => EventNotificationRule::ROLE_ATTENDEE,
+        'channels' => ['email'],
+        'subject' => 'Hello {name}',
+        'body_template' => 'Your code is {ticket_code}.',
+        'is_active' => true,
+    ];
+    EventNotificationRule::create($ruleAttributes + [
+        'name' => 'Registration',
+        'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION,
+    ]);
+
+    $dispatcher = app(AutomatedNotificationDispatcher::class);
+    expect($dispatcher->dispatchRegistrationRules($first))->toBe(1);
+
+    $first->update(['status' => EventRegistration::STATUS_CHECKED_IN]);
+    EventNotificationRule::create($ruleAttributes + [
+        'name' => 'Check-in',
+        'target_audience' => 'checked_in',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_CHECKIN,
+    ]);
+
+    expect($dispatcher->dispatchCheckInRules($first->fresh(), 'gate-a'))->toBe(1)
+        ->and(EventNotificationLog::query()->where('recipient_email', 'first@example.com')->count())->toBe(2)
+        ->and(EventNotificationLog::query()->where('recipient_email', 'second@example.com')->count())->toBe(0);
+});
+
+test('occurrence rules ignore a registration outside their audience', function (): void {
+    [$tenant] = eventHost('occurrence-audience');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'name' => 'Checked in only',
+        'target_role' => EventNotificationRule::ROLE_ATTENDEE,
+        'target_audience' => 'checked_in',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION,
+        'channels' => ['email'],
+        'subject' => 'Welcome',
+        'body_template' => 'Welcome.',
+        'is_active' => true,
+    ]);
+
+    expect(app(AutomatedNotificationDispatcher::class)->dispatchRegistrationRules($registration))->toBe(0)
+        ->and(EventNotificationLog::query()->count())->toBe(0);
+});
+
+test('material occurrence rules claim each matching recipient only once', function (): void {
+    [$tenant] = eventHost('material-rules');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    EventRegistration::factory()->count(2)->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'status' => EventRegistration::STATUS_CONFIRMED,
+    ]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'name' => 'Materials ready',
+        'target_role' => EventNotificationRule::ROLE_ATTENDEE,
+        'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_MATERIALS,
+        'channels' => ['email'],
+        'subject' => 'Materials ready',
+        'body_template' => 'Download the materials.',
+        'is_active' => true,
+    ]);
+    $material = EventMaterial::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+    $dispatcher = app(AutomatedNotificationDispatcher::class);
+
+    expect($dispatcher->dispatchMaterialRules($material))->toBe(2)
+        ->and($dispatcher->dispatchMaterialRules($material))->toBe(0)
+        ->and(EventNotificationLog::query()->count())->toBe(2);
 });
 
 test('host can view notification dashboard, audiences, and tenant quota', function () {
@@ -318,7 +420,7 @@ test('quota guardrail suppresses delivery when free monthly email limit is excee
     Mail::assertSent(AutomatedNotificationMail::class);
 });
 
-test('anti-abuse cooldown prevents duplicate notification spamming to the same recipient', function () {
+test('separate manual sends are not suppressed as unrelated duplicate notifications', function () {
     Mail::fake();
 
     [$tenant, $user] = eventHost('acme');
@@ -362,15 +464,16 @@ test('anti-abuse cooldown prevents duplicate notification spamming to the same r
     expect(EventNotificationLog::where('event_id', $event->id)
         ->where('status', EventNotificationLog::STATUS_SENT)->count())->toBe(1);
 
-    // Immediate second dispatch is rate limited and suppressed
+    // A second explicit organizer action is a separate occurrence. The old
+    // recipient cooldown incorrectly suppressed it merely because the address
+    // had received some other event email recently.
     $secondResponse = $this->actingAs($user)
         ->postJson("http://{$host}/events/{$event->id}/notification-rules/{$rule->id}/dispatch", [], ['HTTP_HOST' => $host]);
 
     $secondResponse->assertOk();
 
-    // A rate-limited recipient is suppressed before any row is written, so the
-    // proof is that the second dispatch added nothing.
-    expect(EventNotificationLog::where('event_id', $event->id)->count())->toBe(1);
+    expect(EventNotificationLog::where('event_id', $event->id)->count())->toBe(2);
+    Mail::assertSent(AutomatedNotificationMail::class, 2);
 });
 
 test('scheduled console command scans and dispatches due notification rules', function () {

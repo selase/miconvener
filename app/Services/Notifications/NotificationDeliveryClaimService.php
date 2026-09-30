@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 final class NotificationDeliveryClaimService
 {
     /**
-     * @param  array{name?: ?string, email?: ?string, phone?: ?string}  $recipient
+     * @param  array<string, mixed>  $recipient
      * @param  array{subject: string, body: string, action_url?: ?string, action_label?: ?string}  $payload
      */
     public function claim(
@@ -73,7 +73,7 @@ final class NotificationDeliveryClaimService
     }
 
     /**
-     * @param  array{name?: ?string, email?: ?string, phone?: ?string}  $recipient
+     * @param  array<string, mixed>  $recipient
      * @return array{name: string, email: ?string, phone: ?string}
      */
     private function normalizeRecipient(array $recipient): array

@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 /**
  * Runs one notification rule's whole recipient list in a worker.
@@ -43,9 +44,12 @@ final class DispatchNotificationRuleJob implements ShouldQueue
      */
     public ?string $tenantId;
 
+    public string $occurrenceKey;
+
     public function __construct(public EventNotificationRule $rule)
     {
         $this->tenantId = app(TenantContext::class)->activeTenantId() ?? $rule->tenant_id;
+        $this->occurrenceKey = 'manual:'.Str::uuid7();
     }
 
     /**
@@ -58,6 +62,7 @@ final class DispatchNotificationRuleJob implements ShouldQueue
 
     public function handle(AutomatedNotificationDispatcher $dispatcher): void
     {
-        $dispatcher->dispatchRule($this->rule);
+        $dispatcher->dispatchBulkRule($this->rule, $this->occurrenceKey);
+        $this->rule->update(['last_dispatched_at' => now()]);
     }
 }

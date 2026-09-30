@@ -41,7 +41,7 @@ final class DispatchAutomatedNotificationsCommand extends Command
             }
 
             $this->line("Dispatching due rule [{$rule->name}] for event [{$rule->event->name}]...");
-            $stats = $dispatcher->dispatchRule($rule);
+            $stats = $dispatcher->dispatchScheduledRule($rule);
 
             $this->info(" -> Dispatched to {$stats['total_recipients']} recipients ({$stats['sent_count']} emails sent, {$stats['staged_count']} SMS/WhatsApp staged, {$stats['suppressed_count']} quota suppressed).");
             $totalDispatched++;
