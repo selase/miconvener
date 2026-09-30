@@ -6,6 +6,8 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
+use App\Models\EventNotificationLog;
+use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Models\LedgerTransaction;
 use App\Models\Tenant;
@@ -88,6 +90,12 @@ test('a platform_default charge.success confirms the registration via tenant_id 
     config(['services.settlement.paystack.secret_key' => $platformSecret]);
 
     $event = Event::factory()->published()->paid(10_000)->create(['tenant_id' => $tenant->id, 'platform_fee_percentage' => 5.0]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Platform paid',
+        'target_role' => 'attendee', 'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION, 'channels' => ['email'],
+        'subject' => 'Paid', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
     $registration = EventRegistration::factory()->pendingPayment()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
@@ -115,6 +123,7 @@ test('a platform_default charge.success confirms the registration via tenant_id 
     $registration->refresh();
     expect($registration->status)->toBe(EventRegistration::STATUS_CONFIRMED);
     expect($registration->ticket_code)->not->toBeNull();
+    expect(EventNotificationLog::query()->where('source_id', $registration->id)->count())->toBe(1);
 
     $entry = EventLedgerEntry::where('tenant_id', $tenant->id)->where('type', EventLedgerEntry::TYPE_CHARGE)->firstOrFail();
     expect($entry->gross_amount)->toBe(10_000);

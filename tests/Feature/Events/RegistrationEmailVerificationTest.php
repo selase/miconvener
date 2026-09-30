@@ -7,6 +7,8 @@ namespace Tests\Feature\Events;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Models\Event;
+use App\Models\EventNotificationLog;
+use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Artisan;
@@ -53,6 +55,12 @@ test('a free registration gets a verification email, not a ticket', function () 
 test('confirming the email issues the ticket and sends it', function () {
     Mail::fake();
     [$tenant, $event, $host] = freeEventFor('verify-click');
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Welcome',
+        'target_role' => 'attendee', 'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION, 'channels' => ['email'],
+        'subject' => 'Welcome', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
 
     $this->post("http://{$host}/e/{$event->slug}/register", [
         'full_name' => 'Ama Mensah', 'email' => 'ama@example.com',
@@ -69,6 +77,7 @@ test('confirming the email issues the ticket and sends it', function () {
     $registration->refresh();
     expect($registration->email_verified_at)->not->toBeNull();
     expect($registration->ticket_code)->not->toBeNull();
+    expect(EventNotificationLog::query()->where('source_id', $registration->id)->count())->toBe(1);
 
     Mail::assertQueued(EventRegistrationConfirmed::class, fn ($m): bool => $m->hasTo('ama@example.com'));
 });
@@ -94,6 +103,12 @@ test('an unsigned or tampered verification link is refused', function () {
 test('clicking the link twice does not issue a second ticket or a second email', function () {
     Mail::fake();
     [$tenant, $event, $host] = freeEventFor('verify-twice');
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Welcome',
+        'target_role' => 'attendee', 'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION, 'channels' => ['email'],
+        'subject' => 'Welcome', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
 
     $this->post("http://{$host}/e/{$event->slug}/register", [
         'full_name' => 'Ama Mensah', 'email' => 'ama@example.com',
@@ -111,6 +126,7 @@ test('clicking the link twice does not issue a second ticket or a second email',
     $this->get($url, ['HTTP_HOST' => $host])->assertRedirect();
 
     expect($registration->fresh()->ticket_code)->toBe($firstCode);
+    expect(EventNotificationLog::query()->where('source_id', $registration->id)->count())->toBe(1);
     Mail::assertQueuedCount(2); // the verify mail, then one ticket mail
 });
 
