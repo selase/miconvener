@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Head } from '@inertiajs/react';
+import PollChart from '@/Components/Polls/PollChart';
 
 /**
  * The screen behind the speaker.
@@ -8,6 +9,10 @@ import { Head } from '@inertiajs/react';
  * the console equivalent: no chrome, no controls, one question at a time. It
  * follows whichever poll is live and shows a way in while it waits, because a
  * results screen with nothing on it is a wasted wall.
+ *
+ * Exactly one screen tall, never taller. Nobody at the back of a hall can
+ * scroll a projector, so the question, the chart and the way in all have to fit
+ * at once -- the chart takes whatever height is left and packs itself into it.
  */
 export default function PollPresentation({
     event,
@@ -56,18 +61,23 @@ export default function PollPresentation({
     const isClosed = poll?.status === 'closed';
 
     return (
-        <div className="min-h-screen bg-neutral-950 px-[4vw] py-[4vh] text-white">
+        <div className="flex h-screen flex-col overflow-hidden bg-neutral-950 px-[4vw] py-[4vh] text-white">
             <Head title={`${event.name} — live results`} />
 
-            <header className="flex items-baseline justify-between">
+            <header className="flex shrink-0 items-baseline justify-between">
                 <div>
-                    <p className="text-[1.6vw] uppercase tracking-[0.2em] text-white/40">
+                    <p
+                        className="uppercase tracking-[0.2em] text-white/40"
+                        style={{ fontSize: 'min(1.6vw, 3vh)' }}
+                    >
                         {organiser.name}
                     </p>
-                    <p className="text-[1.8vw] text-white/70">{event.name}</p>
+                    <p className="text-white/70" style={{ fontSize: 'min(1.8vw, 3.4vh)' }}>
+                        {event.name}
+                    </p>
                 </div>
                 {poll && (
-                    <p className="text-[1.6vw] text-white/50">
+                    <p className="text-white/50" style={{ fontSize: 'min(1.6vw, 3vh)' }}>
                         {poll.total_responses}{' '}
                         {poll.total_responses === 1 ? 'response' : 'responses'}
                         {connected && <span className="ml-3 text-emerald-400">●</span>}
@@ -76,9 +86,11 @@ export default function PollPresentation({
             </header>
 
             {!poll && (
-                <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
-                    <p className="text-[3vw] font-light">Waiting for the next question</p>
-                    <p className="mt-[2vh] text-[1.6vw] text-white/50">
+                <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
+                    <p className="font-light" style={{ fontSize: 'min(3vw, 6vh)' }}>
+                        Waiting for the next question
+                    </p>
+                    <p className="mt-[2vh] text-white/50" style={{ fontSize: 'min(1.6vw, 3vh)' }}>
                         Join now so you are ready
                     </p>
                     <JoinBlock join={join} large />
@@ -86,38 +98,42 @@ export default function PollPresentation({
             )}
 
             {poll && (
-                <main className="mt-[5vh] grid grid-cols-[1fr_auto] gap-[4vw]">
-                    <div>
-                        <h1 className="text-[3.4vw] font-light leading-tight">{poll.question}</h1>
+                <main className="mt-[4vh] grid min-h-0 flex-1 grid-cols-[1fr_auto] gap-[4vw]">
+                    <div className="flex min-h-0 flex-col">
+                        <h1
+                            className="line-clamp-3 shrink-0 font-light leading-tight"
+                            style={{ fontSize: questionSize(poll.question) }}
+                        >
+                            {poll.question}
+                        </h1>
 
                         {isClosed && (
-                            <p className="mt-[1vh] text-[1.4vw] uppercase tracking-[0.2em] text-amber-300">
+                            <p
+                                className="mt-[1vh] shrink-0 uppercase tracking-[0.2em] text-amber-300"
+                                style={{ fontSize: 'min(1.4vw, 2.6vh)' }}
+                            >
                                 Voting closed
                             </p>
                         )}
 
-                        {poll.total_responses === 0 && eligibleVoters === 0 ? (
-                            /* A chart of zeroes and a room that cannot answer
-                               yet look identical from the back of a hall, and
-                               only one of them is something an organiser can
-                               do anything about. */
-                            <div className="mt-[6vh]">
-                                <p className="text-[2.2vw] text-white/70">
-                                    Nobody has checked in yet
-                                </p>
-                                <p className="mt-[1vh] text-[1.4vw] text-white/40">
-                                    Delegates answer from their ticket once they are checked in.
-                                </p>
-                            </div>
-                        ) : poll.type === 'open' ? (
-                            <OpenWall responses={poll.open_responses} />
-                        ) : (
-                            <ol className="mt-[4vh] space-y-[2.5vh]">
-                                {poll.options.map((option) => (
-                                    <Bar key={option.id} option={option} closed={isClosed} />
-                                ))}
-                            </ol>
-                        )}
+                        <div className="mt-[3vh] min-h-0 flex-1">
+                            {poll.total_responses === 0 && eligibleVoters === 0 ? (
+                                /* A chart of zeroes and a room that cannot answer
+                                   yet look identical from the back of a hall, and
+                                   only one of them is something an organiser can
+                                   do anything about. */
+                                <div>
+                                    <p className="text-white/70" style={{ fontSize: 'min(2.2vw, 4.2vh)' }}>
+                                        Nobody has checked in yet
+                                    </p>
+                                    <p className="mt-[1vh] text-white/40" style={{ fontSize: 'min(1.4vw, 2.6vh)' }}>
+                                        Delegates answer from their ticket once they are checked in.
+                                    </p>
+                                </div>
+                            ) : (
+                                <PollChart poll={poll} />
+                            )}
+                        </div>
                     </div>
 
                     <JoinBlock join={join} />
@@ -127,60 +143,22 @@ export default function PollPresentation({
     );
 }
 
-function Bar({ option, closed }) {
-    // Green only once voting is closed: colouring the right answer while people
-    // are still choosing would give it away from the back of the room.
-    const correct = closed && option.is_correct;
+/**
+ * A long question gets a smaller face so it stays on three lines and leaves the
+ * chart room, rather than pushing the bars off the bottom of the wall.
+ */
+function questionSize(question) {
+    const length = question?.length ?? 0;
 
-    return (
-        <li>
-            <div className="flex items-baseline justify-between text-[2vw]">
-                <span className={correct ? 'text-emerald-300' : 'text-white'}>
-                    {option.label}
-                    {correct && <span className="ml-3 text-[1.4vw]">correct</span>}
-                </span>
-                <span className="tabular-nums text-white/60">
-                    {option.percentage}% <span className="text-[1.3vw]">({option.count})</span>
-                </span>
-            </div>
-            <div className="mt-[1vh] h-[2.4vh] w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                    className={`h-full rounded-full transition-[width] duration-700 ease-out ${
-                        correct ? 'bg-emerald-400' : 'bg-white'
-                    }`}
-                    style={{ width: `${Math.max(option.percentage, option.count > 0 ? 2 : 0)}%` }}
-                />
-            </div>
-        </li>
-    );
-}
-
-function OpenWall({ responses }) {
-    if (!responses || responses.length === 0) {
-        return (
-            <p className="mt-[6vh] text-[1.8vw] text-white/40">
-                Answers will appear here as they arrive.
-            </p>
-        );
+    if (length > 140) {
+        return 'min(2.2vw, 4.2vh)';
     }
 
-    return (
-        <ul className="mt-[4vh] grid grid-cols-2 gap-[1.5vw]">
-            {responses.map((response) => (
-                <li
-                    key={response.id}
-                    className="rounded-2xl bg-white/5 p-[1.5vw] text-[1.5vw] leading-snug"
-                >
-                    {response.text}
-                    {response.name && (
-                        <span className="mt-[1vh] block text-[1.1vw] text-white/40">
-                            {response.name}
-                        </span>
-                    )}
-                </li>
-            ))}
-        </ul>
-    );
+    if (length > 80) {
+        return 'min(2.8vw, 5.2vh)';
+    }
+
+    return 'min(3.4vw, 6.4vh)';
 }
 
 function JoinBlock({ join, large = false }) {
@@ -188,11 +166,15 @@ function JoinBlock({ join, large = false }) {
         <div className={`text-center ${large ? 'mt-[4vh]' : ''}`}>
             <div
                 className="mx-auto rounded-2xl bg-white p-[1vw]"
-                style={{ width: large ? '18vw' : '13vw' }}
+                style={{ width: large ? 'min(18vw, 34vh)' : 'min(13vw, 26vh)' }}
                 dangerouslySetInnerHTML={{ __html: decodeQr(join.qr) }}
             />
-            <p className="mt-[1.5vh] text-[1.2vw] text-white/50">Scan to join</p>
-            <p className="mt-[0.5vh] text-[1.1vw] text-white/35">{join.url.replace(/^https?:\/\//, '')}</p>
+            <p className="mt-[1.5vh] text-white/50" style={{ fontSize: 'min(1.2vw, 2.4vh)' }}>
+                Scan to join
+            </p>
+            <p className="mt-[0.5vh] text-white/35" style={{ fontSize: 'min(1.1vw, 2.2vh)' }}>
+                {join.url.replace(/^https?:\/\//, '')}
+            </p>
         </div>
     );
 }

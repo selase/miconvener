@@ -416,14 +416,23 @@ final class ProbeWorkspaceSeeder extends Seeder
     }
 
     /**
-     * One deck, left in draft, holding the first four questions in order.
+     * One deck, left in draft, holding five questions that between them cover
+     * every way a chart has to fit: five bars, three, the eleven-point scale
+     * that drops to one line per option, five again, and a quiz whose answer is
+     * revealed on close.
      *
      * Draft rather than live on purpose: starting it is the thing being
      * demonstrated, and a deck already running would take the wall away from
-     * the loose polls this fixture also exists to show.
+     * the loose polls this fixture also exists to show. It keeps any presenter
+     * link it already has, so re-seeding does not revoke one in use.
      */
     private function deck(Event $event): void
     {
+        $existingToken = PollDeck::query()
+            ->where('event_id', $event->id)
+            ->where('title', 'Opening plenary')
+            ->value('present_token');
+
         /** @var PollDeck $deck */
         $deck = PollDeck::query()->updateOrCreate(
             ['event_id' => $event->id, 'title' => 'Opening plenary'],
@@ -431,6 +440,7 @@ final class ProbeWorkspaceSeeder extends Seeder
                 'tenant_id' => $event->tenant_id,
                 'join_code' => PollDeck::generateJoinCode(),
                 'status' => PollDeck::STATUS_DRAFT,
+                'present_token' => $existingToken ?? Str::random(48),
             ]
         );
 
@@ -440,6 +450,7 @@ final class ProbeWorkspaceSeeder extends Seeder
         $questions = [
             'This session met my expectations',
             'Did the venue Wi-Fi work for you?',
+            'How likely are you to recommend MiConvener to a colleague?',
             'Which track will you follow tomorrow?',
             'Which of these is a notifiable disease in Ghana?',
         ];

@@ -14,6 +14,7 @@ use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 final class EventPollDeckController extends Controller
 {
@@ -130,6 +131,35 @@ final class EventPollDeckController extends Controller
         return response()->json(['deleted' => true]);
     }
 
+    /**
+     * The link a presenter drives this deck from. Minted on first request rather
+     * than whenever the console loads: it grants control, not just a view, so it
+     * should exist only once someone has asked to hand it over. Asking needs the
+     * same permission as pressing Next yourself.
+     */
+    public function presenterLink(string $subdomain, string $event, string $deck): JsonResponse
+    {
+        $deckModel = $this->findDeck($event, $deck);
+
+        if (blank($deckModel->present_token)) {
+            $deckModel->update(['present_token' => Str::random(48)]);
+        }
+
+        return response()->json(['presenter_url' => $this->presenterUrl($deckModel)]);
+    }
+
+    /**
+     * Issues a new token, which is how the old link is revoked: a laptop still
+     * holding it gets a 404 on its next press.
+     */
+    public function rotatePresenterLink(string $subdomain, string $event, string $deck): JsonResponse
+    {
+        $deckModel = $this->findDeck($event, $deck);
+        $deckModel->update(['present_token' => Str::random(48)]);
+
+        return response()->json(['presenter_url' => $this->presenterUrl($deckModel)]);
+    }
+
     public function start(string $subdomain, string $event, string $deck): JsonResponse
     {
         $this->presenter->start($this->findDeck($event, $deck));
@@ -163,6 +193,16 @@ final class EventPollDeckController extends Controller
         $this->presenter->end($this->findDeck($event, $deck));
 
         return $this->payload($event, $deck);
+    }
+
+    private function presenterUrl(PollDeck $deck): string
+    {
+        return route('public.events.decks.presenter', [
+            'subdomain' => $this->tenant()->slug,
+            'event' => $deck->event->slug,
+            'deck' => $deck->id,
+            'token' => $deck->present_token,
+        ]);
     }
 
     private function tenant(): Tenant

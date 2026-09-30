@@ -223,13 +223,15 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     Route::get('events/{event}/decks', [EventPollDeckController::class, 'index'])->name('tenant.events.decks.index');
     Route::post('events/{event}/decks', [EventPollDeckController::class, 'store'])->name('tenant.events.decks.store');
-    Route::put('events/{event}/decks/{deck}/polls', [EventPollDeckController::class, 'setPolls'])->name('tenant.events.decks.polls');
-    Route::delete('events/{event}/decks/{deck}', [EventPollDeckController::class, 'destroy'])->name('tenant.events.decks.destroy');
-    Route::post('events/{event}/decks/{deck}/start', [EventPollDeckController::class, 'start'])->name('tenant.events.decks.start');
-    Route::post('events/{event}/decks/{deck}/advance', [EventPollDeckController::class, 'advance'])->name('tenant.events.decks.advance');
-    Route::post('events/{event}/decks/{deck}/previous', [EventPollDeckController::class, 'previous'])->name('tenant.events.decks.previous');
-    Route::post('events/{event}/decks/{deck}/close', [EventPollDeckController::class, 'close'])->name('tenant.events.decks.close');
-    Route::post('events/{event}/decks/{deck}/end', [EventPollDeckController::class, 'end'])->name('tenant.events.decks.end');
+    Route::put('events/{event}/decks/{deck}/polls', [EventPollDeckController::class, 'setPolls'])->whereUuid('deck')->name('tenant.events.decks.polls');
+    Route::delete('events/{event}/decks/{deck}', [EventPollDeckController::class, 'destroy'])->whereUuid('deck')->name('tenant.events.decks.destroy');
+    Route::get('events/{event}/decks/{deck}/presenter-link', [EventPollDeckController::class, 'presenterLink'])->whereUuid('deck')->name('tenant.events.decks.presenter-link');
+    Route::post('events/{event}/decks/{deck}/presenter-link/rotate', [EventPollDeckController::class, 'rotatePresenterLink'])->whereUuid('deck')->name('tenant.events.decks.presenter-link.rotate');
+    Route::post('events/{event}/decks/{deck}/start', [EventPollDeckController::class, 'start'])->whereUuid('deck')->name('tenant.events.decks.start');
+    Route::post('events/{event}/decks/{deck}/advance', [EventPollDeckController::class, 'advance'])->whereUuid('deck')->name('tenant.events.decks.advance');
+    Route::post('events/{event}/decks/{deck}/previous', [EventPollDeckController::class, 'previous'])->whereUuid('deck')->name('tenant.events.decks.previous');
+    Route::post('events/{event}/decks/{deck}/close', [EventPollDeckController::class, 'close'])->whereUuid('deck')->name('tenant.events.decks.close');
+    Route::post('events/{event}/decks/{deck}/end', [EventPollDeckController::class, 'end'])->whereUuid('deck')->name('tenant.events.decks.end');
 
     Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
     Route::post('events/{event}/badges/print-log', [EventBadgeController::class, 'logPrint'])->name('tenant.events.badges.print-log');
@@ -377,6 +379,20 @@ Route::post('/e/{event}/forum/{thread}/report', [PublicForumController::class, '
 // machine driving a projector is rarely the organiser's own.
 Route::get('/e/{event}/present/{token}', [App\Http\Controllers\Public\PollPresentationController::class, 'show'])->name('public.events.present');
 Route::get('/e/{event}/present/{token}/results', [App\Http\Controllers\Public\PollPresentationController::class, 'results'])->name('public.events.present.results');
+
+// The presenter's own screen for one deck. The token is the deck's, so it
+// drives that deck and nothing else; rotating it from the console revokes it.
+Route::get('/e/{event}/decks/{deck}/present/{token}', [App\Http\Controllers\Public\DeckPresenterController::class, 'show'])
+    ->whereUuid('deck')
+    ->name('public.events.decks.presenter');
+Route::get('/e/{event}/decks/{deck}/present/{token}/state', [App\Http\Controllers\Public\DeckPresenterController::class, 'state'])
+    ->whereUuid('deck')
+    ->name('public.events.decks.presenter.state');
+Route::post('/e/{event}/decks/{deck}/present/{token}/{action}', [App\Http\Controllers\Public\DeckPresenterController::class, 'act'])
+    ->whereUuid('deck')
+    ->whereIn('action', ['start', 'advance', 'previous', 'close', 'end'])
+    ->middleware('throttle:120,1')
+    ->name('public.events.decks.presenter.act');
 
 Route::get('/e/{event}/poll', [PublicPollController::class, 'show'])->name('public.events.poll.show');
 Route::post('/e/{event}/poll/{poll}/respond', [PublicPollController::class, 'respond'])->name('public.events.poll.respond');

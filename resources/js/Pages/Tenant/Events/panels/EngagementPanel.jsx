@@ -521,6 +521,8 @@ function DeckCard({ event, deck, polls, onChange }) {
                 </select>
             )}
 
+            <PresenterLink event={event} deck={deck} />
+
             <div className="flex flex-wrap gap-2">
                 {deck.status !== 'live' ? (
                     <button
@@ -568,6 +570,96 @@ function DeckCard({ event, deck, polls, onChange }) {
                     </>
                 )}
             </div>
+        </div>
+    );
+}
+
+
+/**
+ * The link a speaker drives this deck from.
+ *
+ * Fetched only when asked for, unlike the wall's link: this one grants control,
+ * so it should come into existence when someone means to hand it over, not
+ * whenever the console happens to load.
+ */
+export function PresenterLink({ event, deck }) {
+    const [url, setUrl] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const fetchLink = async (rotate = false) => {
+        setBusy(true);
+        const target = rotate
+            ? route('tenant.events.decks.presenter-link.rotate', { event: event.id, deck: deck.id })
+            : route('tenant.events.decks.presenter-link', { event: event.id, deck: deck.id });
+
+        try {
+            const response = await csrfFetch(target, { method: rotate ? 'POST' : 'GET' });
+            const data = await response.json();
+            setUrl(data.presenter_url);
+            setCopied(false);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const copy = () => {
+        if (url) {
+            navigator.clipboard?.writeText(url).then(() => setCopied(true));
+        }
+    };
+
+    if (!url) {
+        return (
+            <button
+                type="button"
+                onClick={() => fetchLink()}
+                disabled={busy}
+                className="text-xs text-accent hover:underline disabled:opacity-50 cursor-pointer"
+            >
+                Get a presenter link for a speaker
+            </button>
+        );
+    }
+
+    return (
+        <div className="space-y-2 border border-border bg-surface-subtle p-3">
+            <p className="text-xs text-ink-secondary">
+                Whoever has this link can move through this deck. Send it to the speaker; issue a new
+                one to take it back.
+            </p>
+            <div className="flex items-center gap-2">
+                <input
+                    readOnly
+                    value={url}
+                    onFocus={(e) => e.target.select()}
+                    className="h-control min-w-0 flex-1 border border-border bg-surface px-2 text-xs text-ink"
+                    aria-label="Presenter link"
+                />
+                <button
+                    type="button"
+                    onClick={copy}
+                    className="h-control border border-border px-3 text-xs text-ink hover:border-accent cursor-pointer"
+                >
+                    {copied ? 'Copied' : 'Copy'}
+                </button>
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-control items-center border border-border px-3 text-xs text-ink hover:border-accent"
+                >
+                    Open
+                </a>
+            </div>
+            <button
+                type="button"
+                onClick={() => fetchLink(true)}
+                disabled={busy}
+                className="text-xs text-ink-secondary hover:text-danger-fg disabled:opacity-50 cursor-pointer"
+            >
+                Issue a new link (the old one stops working)
+            </button>
         </div>
     );
 }
