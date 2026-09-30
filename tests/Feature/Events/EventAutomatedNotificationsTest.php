@@ -130,6 +130,21 @@ test('host can view notification dashboard, audiences, and tenant quota', functi
         'tenant_id' => $tenant->id,
         'slug' => 'cardio-notify-2026',
     ]);
+    EventNotificationLog::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'notification_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION,
+        'dedupe_key' => 'dashboard-history',
+        'source_type' => EventRegistration::class,
+        'source_id' => $event->id,
+        'recipient_email' => 'history@example.com',
+        'channel' => EventNotificationLog::CHANNEL_EMAIL,
+        'status' => EventNotificationLog::STATUS_SENT,
+        'attempts' => 1,
+        'subject' => 'Welcome',
+        'message' => 'Welcome.',
+        'sent_at' => now(),
+    ]);
 
     $response = $this->actingAs($user)
         ->getJson("http://{$host}/events/{$event->id}/notification-rules", ['HTTP_HOST' => $host]);
@@ -148,6 +163,10 @@ test('host can view notification dashboard, audiences, and tenant quota', functi
         'presets',
         'recent_logs',
     ]);
+    $response->assertJsonPath('recent_logs.0.notification_type', EventNotificationRule::TRIGGER_ON_REGISTRATION)
+        ->assertJsonPath('recent_logs.0.source_type', EventRegistration::class)
+        ->assertJsonPath('recent_logs.0.attempts', 1)
+        ->assertJsonPath('recent_logs.0.status', EventNotificationLog::STATUS_SENT);
 });
 
 test('host can create, update, toggle, and delete notification rules', function () {

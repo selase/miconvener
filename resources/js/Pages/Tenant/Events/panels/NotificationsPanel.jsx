@@ -380,17 +380,16 @@ export default function NotificationsPanel({ event }) {
                     </p>
                 </div>
 
-                {/* Anti-Abuse Guardrails */}
+                {/* Reliable delivery */}
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
-                        Anti-Abuse Guardrails
+                        Reliable Delivery
                     </div>
                     <div className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
-                        <ShieldCheck className="w-5 h-5 text-indigo-600" /> Active Protection
+                        <ShieldCheck className="w-5 h-5 text-indigo-600" /> Exact Occurrence Keys
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                        {settings?.anti_abuse_cooldown_minutes || 60}m frequency cooldown per
-                        attendee
+                        Retries cannot resend the same rule occurrence and channel.
                     </div>
                 </div>
 
@@ -418,6 +417,41 @@ export default function NotificationsPanel({ event }) {
                     </div>
                 </div>
             </div>
+
+            {recentLogs.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                            Recent delivery history
+                        </h3>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {recentLogs.map((log) => (
+                            <div
+                                key={log.id}
+                                className="p-3 flex items-center justify-between gap-4 text-xs"
+                            >
+                                <div className="min-w-0">
+                                    <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                                        {log.recipient_email ||
+                                            log.recipient_phone ||
+                                            'Missing contact'}
+                                    </div>
+                                    <div className="text-slate-500 dark:text-slate-400">
+                                        {(log.notification_type || 'legacy').replaceAll('_', ' ')} ·{' '}
+                                        {log.channel} · {log.attempts || 0} attempt(s)
+                                    </div>
+                                </div>
+                                <span className="shrink-0 rounded border border-slate-200 dark:border-slate-700 px-2 py-1 font-semibold text-slate-600 dark:text-slate-300">
+                                    {log.status === 'staged_omnichannel'
+                                        ? 'Staged — not sent or billed'
+                                        : log.status.replaceAll('_', ' ')}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Quick Presets Carousel / Cards */}
             <div>
@@ -700,49 +734,76 @@ export default function NotificationsPanel({ event }) {
                             {/* Schedule Timing Offset */}
                             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
                                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                                    Trigger Timing
+                                    Trigger
                                 </label>
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={ruleForm.offset_amount}
-                                        onChange={(e) =>
-                                            setRuleForm({
-                                                ...ruleForm,
-                                                offset_amount: parseInt(e.target.value) || 0,
-                                            })
-                                        }
-                                        className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
-                                    />
-                                    <select
-                                        value={ruleForm.offset_unit}
-                                        onChange={(e) =>
-                                            setRuleForm({
-                                                ...ruleForm,
-                                                offset_unit: e.target.value,
-                                            })
-                                        }
-                                        className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
-                                    >
-                                        <option value="days">Days</option>
-                                        <option value="hours">Hours</option>
-                                        <option value="minutes">Minutes</option>
-                                    </select>
-                                    <select
-                                        value={ruleForm.offset_direction}
-                                        onChange={(e) =>
-                                            setRuleForm({
-                                                ...ruleForm,
-                                                offset_direction: e.target.value,
-                                            })
-                                        }
-                                        className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
-                                    >
-                                        <option value="before">Before Event</option>
-                                        <option value="after">After Event</option>
-                                    </select>
-                                </div>
+                                <select
+                                    value={ruleForm.trigger_type}
+                                    onChange={(e) =>
+                                        setRuleForm({ ...ruleForm, trigger_type: e.target.value })
+                                    }
+                                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
+                                >
+                                    <option value="scheduled_offset">At a scheduled offset</option>
+                                    <option value="on_registration">
+                                        When a matching attendee completes registration
+                                    </option>
+                                    <option value="on_checkin">
+                                        When a matching attendee checks in
+                                    </option>
+                                    <option value="on_materials_uploaded">
+                                        When materials are published (all matching recipients)
+                                    </option>
+                                </select>
+                                {ruleForm.trigger_type !== 'scheduled_offset' && (
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                        This trigger evaluates only the attendee involved in the
+                                        occurrence, except materials, which notifies the full
+                                        matching audience.
+                                    </p>
+                                )}
+                                {ruleForm.trigger_type === 'scheduled_offset' && (
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={ruleForm.offset_amount}
+                                            onChange={(e) =>
+                                                setRuleForm({
+                                                    ...ruleForm,
+                                                    offset_amount: parseInt(e.target.value) || 0,
+                                                })
+                                            }
+                                            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
+                                        />
+                                        <select
+                                            value={ruleForm.offset_unit}
+                                            onChange={(e) =>
+                                                setRuleForm({
+                                                    ...ruleForm,
+                                                    offset_unit: e.target.value,
+                                                })
+                                            }
+                                            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
+                                        >
+                                            <option value="days">Days</option>
+                                            <option value="hours">Hours</option>
+                                            <option value="minutes">Minutes</option>
+                                        </select>
+                                        <select
+                                            value={ruleForm.offset_direction}
+                                            onChange={(e) =>
+                                                setRuleForm({
+                                                    ...ruleForm,
+                                                    offset_direction: e.target.value,
+                                                })
+                                            }
+                                            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
+                                        >
+                                            <option value="before">Before Event</option>
+                                            <option value="after">After Event</option>
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             <div>
