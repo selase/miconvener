@@ -11,10 +11,118 @@ use App\Models\EventNotificationRule;
 use App\Models\TenantNotificationSetting;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use RuntimeException;
 use Throwable;
 
 final class NotificationGatewayService
 {
+    /**
+     * Execute one atomically claimed delivery.
+     *
+     * @return array{status: string, message: string, cost: int}
+     */
+    public function deliver(EventNotificationLog $delivery): array
+    {
+        if (in_array($delivery->status, [
+            EventNotificationLog::STATUS_SENT,
+            EventNotificationLog::STATUS_STAGED,
+            EventNotificationLog::STATUS_SUPPRESSED_QUOTA,
+            EventNotificationLog::STATUS_SKIPPED,
+            EventNotificationLog::STATUS_UNSUBSCRIBED,
+        ], true)) {
+            return [
+                'status' => $delivery->status,
+                'message' => 'Delivery is already terminal.',
+                'cost' => (int) $delivery->cost_billed,
+            ];
+        }
+
+        $delivery->forceFill([
+            'attempts' => $delivery->attempts + 1,
+            'last_attempted_at' => now(),
+        ])->save();
+
+        if ($delivery->channel === EventNotificationLog::CHANNEL_EMAIL && empty($delivery->recipient_email)) {
+            return $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'No email address available for recipient.');
+        }
+
+        if (in_array($delivery->channel, [EventNotificationLog::CHANNEL_SMS, EventNotificationLog::CHANNEL_WHATSAPP], true) && empty($delivery->recipient_phone)) {
+            return $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'No phone number available for recipient.');
+        }
+
+        if (! in_array($delivery->channel, [
+            EventNotificationLog::CHANNEL_EMAIL,
+            EventNotificationLog::CHANNEL_SMS,
+            EventNotificationLog::CHANNEL_WHATSAPP,
+        ], true)) {
+            return $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'Unsupported notification channel.');
+        }
+
+        $settings = TenantNotificationSetting::forTenant($delivery->tenant_id);
+
+        if (! $settings->canSend($delivery->channel)) {
+            return $this->finish(
+                $delivery,
+                EventNotificationLog::STATUS_SUPPRESSED_QUOTA,
+                "Sending blocked: {$delivery->channel} quota reached or channel disabled in settings.",
+                metadata: ['reason' => 'Quota exceeded or channel disabled in tenant settings.'],
+            );
+        }
+
+        if (in_array($delivery->channel, [EventNotificationLog::CHANNEL_SMS, EventNotificationLog::CHANNEL_WHATSAPP], true)) {
+            $cost = $settings->recordSend($delivery->channel);
+
+            return $this->finish(
+                $delivery,
+                EventNotificationLog::STATUS_STAGED,
+                "Staged for Omnichannel {$delivery->channel} gateway dispatch. Not billed until delivered.",
+                metadata: [
+                    'provider' => 'omnichannel',
+                    'channel' => $delivery->channel,
+                    'to' => $delivery->recipient_phone,
+                    'staged_at' => now()->toIso8601String(),
+                    'would_bill' => $cost,
+                ],
+            );
+        }
+
+        $cost = $settings->recordSend(EventNotificationLog::CHANNEL_EMAIL);
+
+        try {
+            $metadata = $delivery->metadata ?? [];
+            $event = $delivery->event;
+
+            if (! $event instanceof Event) {
+                throw new RuntimeException('The event for this notification no longer exists.');
+            }
+
+            Mail::to($delivery->recipient_email)->sendNow(new AutomatedNotificationMail(
+                event: $event,
+                recipientName: $delivery->recipient_name ?: 'Conference Participant',
+                emailSubject: (string) $delivery->subject,
+                renderedBody: (string) $delivery->message,
+                actionUrl: $metadata['action_url'] ?? null,
+                actionLabel: $metadata['action_label'] ?? 'View Event',
+            ));
+
+            return $this->finish($delivery, EventNotificationLog::STATUS_SENT, 'Email dispatched successfully.', $cost, sent: true);
+        } catch (Throwable $e) {
+            Log::error("Automated notification email failed: {$e->getMessage()}", [
+                'delivery_id' => $delivery->id,
+                'event_id' => $delivery->event_id,
+                'email' => $delivery->recipient_email,
+            ]);
+            $settings->refundSend(EventNotificationLog::CHANNEL_EMAIL);
+
+            return $this->finish(
+                $delivery,
+                EventNotificationLog::STATUS_FAILED,
+                $e->getMessage(),
+                metadata: ['error' => $e->getMessage()],
+            );
+        }
+    }
+
     /**
      * Dispatch notification to a recipient across requested channels with quota and anti-abuse checks.
      *
@@ -53,17 +161,6 @@ final class NotificationGatewayService
                 $results[$channel] = [
                     'status' => 'skipped',
                     'message' => 'No phone number available for SMS/WhatsApp recipient.',
-                    'cost' => 0,
-                ];
-
-                continue;
-            }
-
-            // Anti-abuse cooldown check (skip if notification recently sent to this recipient for this event)
-            if ($this->isRateLimited($event->id, $email, $phone, $channel, $settings->anti_abuse_cooldown_minutes)) {
-                $results[$channel] = [
-                    'status' => 'rate_limited',
-                    'message' => "Suppressed by anti-abuse cooldown ({$settings->anti_abuse_cooldown_minutes}m).",
                     'cost' => 0,
                 ];
 
@@ -215,29 +312,25 @@ final class NotificationGatewayService
         return $results;
     }
 
-    private function isRateLimited(string $eventId, ?string $email, ?string $phone, string $channel, int $cooldownMinutes): bool
-    {
-        if ($cooldownMinutes <= 0 || (! $email && ! $phone)) {
-            return false;
-        }
+    /**
+     * @param  array<string, mixed>  $metadata
+     * @return array{status: string, message: string, cost: int}
+     */
+    private function finish(
+        EventNotificationLog $delivery,
+        string $status,
+        string $message,
+        int $cost = 0,
+        array $metadata = [],
+        bool $sent = false,
+    ): array {
+        $delivery->forceFill([
+            'status' => $status,
+            'cost_billed' => $cost,
+            'metadata' => array_merge($delivery->metadata ?? [], $metadata),
+            'sent_at' => $sent ? now() : null,
+        ])->save();
 
-        $since = now()->subMinutes($cooldownMinutes);
-
-        return EventNotificationLog::where('event_id', $eventId)
-            ->where('channel', $channel)
-            ->whereIn('status', [EventNotificationLog::STATUS_SENT, EventNotificationLog::STATUS_STAGED])
-            ->where(function ($query) use ($email, $phone): void {
-                if ($email) {
-                    $query->where('recipient_email', $email);
-                }
-                if ($phone) {
-                    $query->orWhere('recipient_phone', $phone);
-                }
-            })
-            // created_at, not sent_at: a staged row has no sent_at, and the
-            // cooldown means "when did we last try", not "when did we last
-            // deliver".
-            ->where('created_at', '>=', $since)
-            ->exists();
+        return ['status' => $status, 'message' => $message, 'cost' => $cost];
     }
 }

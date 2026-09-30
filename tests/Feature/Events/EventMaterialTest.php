@@ -6,6 +6,8 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventMaterial;
+use App\Models\EventNotificationLog;
+use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Models\User;
@@ -28,6 +30,13 @@ test('host can upload a material', function () {
     $tenant->users()->attach($user->id);
 
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Materials',
+        'target_role' => 'attendee', 'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_MATERIALS, 'channels' => ['email'],
+        'subject' => 'Materials', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
 
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
@@ -40,6 +49,8 @@ test('host can upload a material', function () {
 
     $response->assertOk();
     expect(EventMaterial::where('event_id', $event->id)->where('title', 'Opening slides')->exists())->toBeTrue();
+    $material = EventMaterial::where('event_id', $event->id)->where('title', 'Opening slides')->firstOrFail();
+    expect(EventNotificationLog::query()->where('source_id', $material->id)->count())->toBe(1);
 });
 
 test('a confirmed registrant can download a released material up to their attempt limit', function () {

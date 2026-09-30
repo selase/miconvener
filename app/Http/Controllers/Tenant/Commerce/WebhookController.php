@@ -183,6 +183,7 @@ final class WebhookController extends Controller
             'currency' => $currency,
         ]);
         $registration->save();
+        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
 
         // The platform-settled path posts to both ledgers; this one recorded
         // only the old single-row entry, so an own_gateway tenant had no

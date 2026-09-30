@@ -64,6 +64,7 @@ final class EventMaterialController extends Controller
             'release_at' => $validated['release_at'] ?? null,
             'provenance' => EventMaterial::PROVENANCE_ORGANIZER,
         ]);
+        app(\App\Services\Notifications\EventRuleTriggerService::class)->materialPublished($material);
 
         return response()->json($this->toPayload($material));
     }

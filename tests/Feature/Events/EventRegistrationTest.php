@@ -7,6 +7,8 @@ namespace Tests\Feature\Events;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Models\Event;
+use App\Models\EventNotificationLog;
+use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Models\EventSeatAssignment;
 use App\Models\EventVenueRoom;
@@ -156,6 +158,12 @@ test('paystack webhook confirms the matching registration exactly once', functio
     ]);
 
     $event = Event::factory()->published()->paid(5000)->create(['tenant_id' => $tenant->id]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Paid',
+        'target_role' => 'attendee', 'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION, 'channels' => ['email'],
+        'subject' => 'Paid', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
     $registration = EventRegistration::factory()->pendingPayment()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
@@ -193,6 +201,7 @@ test('paystack webhook confirms the matching registration exactly once', functio
     expect($registration->status)->toBe(EventRegistration::STATUS_CONFIRMED);
     expect($registration->ticket_code)->not->toBeNull();
     expect($registration->payment_reference)->toBe('ref_abc123');
+    expect(EventNotificationLog::query()->where('source_id', $registration->id)->count())->toBe(1);
 
     // Queued rather than sent, so a webhook delivered twice still results in a
     // single confirmation email being handed to the queue.
@@ -217,6 +226,12 @@ test('check-in marks a confirmed registration checked in and rejects a forged to
     $host = eventSubdomainHost('acme');
 
     $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Checked in',
+        'target_role' => 'attendee', 'target_audience' => 'checked_in',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_CHECKIN, 'channels' => ['email'],
+        'subject' => 'Checked in', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
     $registration = EventRegistration::factory()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
@@ -229,10 +244,17 @@ test('check-in marks a confirmed registration checked in and rejects a forged to
     $registration->refresh();
     expect($registration->status)->toBe(EventRegistration::STATUS_CHECKED_IN);
     expect($registration->checked_in_at)->not->toBeNull();
+    expect(EventNotificationLog::query()->where('source_id', $registration->id)->count())->toBe(1);
 
     $this->actingAs($user)
         ->postJson("http://{$host}/events/{$event->id}/checkin/scan", ['token' => 'forged-token'], ['HTTP_HOST' => $host])
         ->assertNotFound();
+
+    $scanned = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+    $this->actingAs($user)
+        ->postJson("http://{$host}/events/{$event->id}/checkin/scan", ['token' => $scanned->qr_token], ['HTTP_HOST' => $host])
+        ->assertOk();
+    expect(EventNotificationLog::query()->where('source_id', $scanned->id)->count())->toBe(1);
 });
 
 test('checking in a guest with an assigned seat returns the seat and room in the response', function () {

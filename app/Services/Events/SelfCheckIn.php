@@ -51,6 +51,10 @@ final class SelfCheckIn
             'checked_in_by' => null,
             'checked_in_source' => self::SOURCE,
         ]);
+        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCheckedIn(
+            $registration,
+            (string) $registration->checked_in_at?->getTimestamp(),
+        );
 
         return true;
     }

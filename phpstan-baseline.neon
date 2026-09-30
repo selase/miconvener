@@ -5215,45 +5215,15 @@ parameters:
 			path: app/Services/Llm/LlmUsageService.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$slug.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
 			rawMessage: Expression on left side of ?? is not nullable.
 			identifier: nullCoalesce.expr
 			count: 2
 			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
 
 		-
-			rawMessage: 'Parameter #2 $event of method App\Services\Notifications\AutomatedNotificationDispatcher::resolveRecipients() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
 			rawMessage: 'Parameter #2 $recipient of method App\Services\Notifications\AutomatedNotificationDispatcher::interpolateTemplate() expects array{name: string, email: string|null, phone: string|null, ticket_code: string|null, action_url: string|null}, array{name: string, email: string|null, phone: string|null, ticket_code: string|null, action_url: string|null, action_label: string|null} given.'
 			identifier: argument.type
 			count: 2
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Parameter #3 $event of method App\Services\Notifications\AutomatedNotificationDispatcher::interpolateTemplate() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 2
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Parameter $event of method App\Services\Notifications\NotificationGatewayService::dispatch() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
-
-		-
-			rawMessage: 'Parameter $recipient of method App\Services\Notifications\NotificationGatewayService::dispatch() expects array{name?: string|null, email?: string|null, phone?: string|null}, array{name: string, email: string|null, phone: string|null, ticket_code: string|null, action_url: string|null, action_label: string|null} given.'
-			identifier: argument.type
-			count: 1
 			path: app/Services/Notifications/AutomatedNotificationDispatcher.php
 
 		-

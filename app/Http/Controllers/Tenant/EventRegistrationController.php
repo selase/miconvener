@@ -322,6 +322,7 @@ final class EventRegistrationController extends Controller
             $registration->email_verified_at ??= now();
             $registration->issueTicket();
             $registration->save();
+            app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
             Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
 
             return;

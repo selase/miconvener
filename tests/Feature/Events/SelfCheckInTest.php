@@ -5,12 +5,20 @@ declare(strict_types=1);
 namespace Tests\Feature\Events;
 
 use App\Models\Event;
+use App\Models\EventNotificationLog;
+use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Services\Events\SelfCheckIn;
 use App\Services\Tenancy\TenantHostMatcher;
 
 test('an attendee at a virtual event can mark themselves present', function (): void {
     [$tenant, $event, $registration] = virtualEventScenario('self-checkin');
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Self checked in',
+        'target_role' => 'attendee', 'target_audience' => 'checked_in',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_CHECKIN, 'channels' => ['email'],
+        'subject' => 'Checked in', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
     $host = app(TenantHostMatcher::class)->baseDomain();
 
     expect($registration->checked_in_at)->toBeNull();
@@ -26,6 +34,7 @@ test('an attendee at a virtual event can mark themselves present', function (): 
         ->and($registration->checked_in_source)->toBe('self')
         ->and($registration->checked_in_by)->toBeNull()
         ->and($registration->status)->toBe(EventRegistration::STATUS_CHECKED_IN);
+    expect(EventNotificationLog::query()->where('source_id', $registration->id)->count())->toBe(1);
 });
 
 test('self check-in is closed before the event and after it ends', function (): void {

@@ -24,6 +24,8 @@ final class EventNotificationLog extends Model
 
     public const string STATUS_SENT = 'sent';
 
+    public const string STATUS_PENDING = 'pending';
+
     public const string STATUS_STAGED = 'staged_omnichannel';
 
     public const string STATUS_FAILED = 'failed';
@@ -32,12 +34,18 @@ final class EventNotificationLog extends Model
 
     public const string STATUS_UNSUBSCRIBED = 'unsubscribed';
 
+    public const string STATUS_SKIPPED = 'skipped';
+
     protected $connection = 'landlord';
 
     protected $fillable = [
         'tenant_id',
         'event_id',
         'rule_id',
+        'notification_type',
+        'dedupe_key',
+        'source_type',
+        'source_id',
         'recipient_name',
         'recipient_email',
         'recipient_phone',
@@ -46,14 +54,18 @@ final class EventNotificationLog extends Model
         'subject',
         'message',
         'cost_billed',
+        'attempts',
         'metadata',
         'sent_at',
+        'last_attempted_at',
     ];
 
     protected $casts = [
         'metadata' => 'array',
         'cost_billed' => 'integer',
+        'attempts' => 'integer',
         'sent_at' => 'datetime',
+        'last_attempted_at' => 'datetime',
     ];
 
     public function event(): BelongsTo

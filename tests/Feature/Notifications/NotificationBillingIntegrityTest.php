@@ -85,7 +85,7 @@ test('a staged message does not claim it was sent', function () {
     expect($log->sent_at)->toBeNull();
 });
 
-test('the anti-abuse cooldown still suppresses a staged repeat', function () {
+test('separate staged messages to one recipient are not treated as duplicates', function () {
     [$tenant, $event, $settings] = gatewayScenario('bill-cooldown');
     $settings->update(['anti_abuse_cooldown_minutes' => 60]);
 
@@ -95,10 +95,8 @@ test('the anti-abuse cooldown still suppresses a staged repeat', function () {
     app(NotificationGatewayService::class)->dispatch($event, null, $recipient, ['sms'], $payload);
     $second = app(NotificationGatewayService::class)->dispatch($event, null, $recipient, ['sms'], $payload);
 
-    // Nulling sent_at must not disable the cooldown: it now measures when we
-    // last tried, which is what it always meant.
-    expect($second['sms']['status'])->toBe('rate_limited');
-    expect(EventNotificationLog::where('event_id', $event->id)->count())->toBe(1);
+    expect($second['sms']['status'])->toBe(EventNotificationLog::STATUS_STAGED);
+    expect(EventNotificationLog::where('event_id', $event->id)->count())->toBe(2);
 });
 
 test('a failed email does not consume the monthly quota', function () {

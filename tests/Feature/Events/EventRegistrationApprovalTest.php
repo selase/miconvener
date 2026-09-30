@@ -11,6 +11,8 @@ use App\Mail\Events\EventRegistrationPendingApproval;
 use App\Mail\Events\EventRegistrationRejected;
 use App\Mail\Events\EventRegistrationWaitlisted;
 use App\Models\Event;
+use App\Models\EventNotificationLog;
+use App\Models\EventNotificationRule;
 use App\Models\EventRegistration;
 use App\Models\EventTicketType;
 use App\Models\Tenant;
@@ -70,6 +72,12 @@ test('approving a free pending registration confirms it and issues a ticket', fu
     Mail::fake();
     [$tenant, $user] = approvalHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id, 'requires_approval' => true]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Approved',
+        'target_role' => 'attendee', 'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION, 'channels' => ['email'],
+        'subject' => 'Approved', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
     $registration = EventRegistration::factory()->create([
         'tenant_id' => $tenant->id,
         'event_id' => $event->id,
@@ -88,6 +96,7 @@ test('approving a free pending registration confirms it and issues a ticket', fu
     $registration->refresh();
     expect($registration->status)->toBe(EventRegistration::STATUS_CONFIRMED);
     expect($registration->ticket_code)->not->toBeNull();
+    expect(EventNotificationLog::query()->where('source_id', $registration->id)->count())->toBe(1);
 
     Mail::assertQueued(EventRegistrationConfirmed::class);
 });
@@ -190,6 +199,12 @@ test('cancelling a confirmed registration promotes the next waitlisted person an
     Mail::fake();
     [$tenant, $user] = approvalHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    EventNotificationRule::create([
+        'tenant_id' => $tenant->id, 'event_id' => $event->id, 'name' => 'Promoted',
+        'target_role' => 'attendee', 'target_audience' => 'confirmed',
+        'trigger_type' => EventNotificationRule::TRIGGER_ON_REGISTRATION, 'channels' => ['email'],
+        'subject' => 'Promoted', 'body_template' => 'Hello {name}.', 'is_active' => true,
+    ]);
     $confirmed = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_CONFIRMED, 'amount' => 0]);
     $waitlistedFirst = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_WAITLISTED, 'waitlist_position' => 1, 'amount' => 0, 'ticket_code' => null, 'qr_token' => null]);
     $waitlistedSecond = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => EventRegistration::STATUS_WAITLISTED, 'waitlist_position' => 2, 'amount' => 0, 'ticket_code' => null, 'qr_token' => null]);
@@ -205,6 +220,7 @@ test('cancelling a confirmed registration promotes the next waitlisted person an
     expect($waitlistedFirst->fresh()->waitlist_position)->toBeNull();
     expect($waitlistedFirst->fresh()->ticket_code)->not->toBeNull();
     expect($waitlistedSecond->fresh()->waitlist_position)->toBe(1);
+    expect(EventNotificationLog::query()->where('source_id', $waitlistedFirst->id)->count())->toBe(1);
 
     Mail::assertQueued(EventRegistrationConfirmed::class, fn ($mail): bool => $mail->registration->id === $waitlistedFirst->id);
 });
