@@ -54,7 +54,6 @@ export default function NotificationsPanel({ event }) {
         sms_enabled: false,
         whatsapp_enabled: false,
         overage_billing_enabled: false,
-        anti_abuse_cooldown_minutes: 60,
     });
 
     const [testForm, setTestForm] = useState({
@@ -94,7 +93,6 @@ export default function NotificationsPanel({ event }) {
                     sms_enabled: data.settings.sms_enabled,
                     whatsapp_enabled: data.settings.whatsapp_enabled,
                     overage_billing_enabled: data.settings.overage_billing_enabled,
-                    anti_abuse_cooldown_minutes: data.settings.anti_abuse_cooldown_minutes,
                 });
             }
         } catch (err) {
@@ -1032,30 +1030,6 @@ export default function NotificationsPanel({ event }) {
                                         className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                     />
                                 </label>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                        Anti-Abuse Cooldown (Minutes)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="5"
-                                        max="1440"
-                                        value={settingsForm.anti_abuse_cooldown_minutes}
-                                        onChange={(e) =>
-                                            setSettingsForm({
-                                                ...settingsForm,
-                                                anti_abuse_cooldown_minutes:
-                                                    parseInt(e.target.value) || 60,
-                                            })
-                                        }
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none"
-                                    />
-                                    <p className="text-[11px] text-slate-400 mt-1">
-                                        Prevents repeated duplicate notifications to the same
-                                        attendee.
-                                    </p>
-                                </div>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">

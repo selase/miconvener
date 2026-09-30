@@ -167,17 +167,6 @@ final class NotificationGatewayService
                 continue;
             }
 
-            // Anti-abuse cooldown check (skip if notification recently sent to this recipient for this event)
-            if ($this->isRateLimited($event->id, $email, $phone, $channel, $settings->anti_abuse_cooldown_minutes)) {
-                $results[$channel] = [
-                    'status' => 'rate_limited',
-                    'message' => "Suppressed by anti-abuse cooldown ({$settings->anti_abuse_cooldown_minutes}m).",
-                    'cost' => 0,
-                ];
-
-                continue;
-            }
-
             // Quota and billing permission check
             if (! $settings->canSend($channel)) {
                 EventNotificationLog::create([
@@ -321,32 +310,6 @@ final class NotificationGatewayService
         }
 
         return $results;
-    }
-
-    private function isRateLimited(string $eventId, ?string $email, ?string $phone, string $channel, int $cooldownMinutes): bool
-    {
-        if ($cooldownMinutes <= 0 || (! $email && ! $phone)) {
-            return false;
-        }
-
-        $since = now()->subMinutes($cooldownMinutes);
-
-        return EventNotificationLog::where('event_id', $eventId)
-            ->where('channel', $channel)
-            ->whereIn('status', [EventNotificationLog::STATUS_SENT, EventNotificationLog::STATUS_STAGED])
-            ->where(function ($query) use ($email, $phone): void {
-                if ($email) {
-                    $query->where('recipient_email', $email);
-                }
-                if ($phone) {
-                    $query->orWhere('recipient_phone', $phone);
-                }
-            })
-            // created_at, not sent_at: a staged row has no sent_at, and the
-            // cooldown means "when did we last try", not "when did we last
-            // deliver".
-            ->where('created_at', '>=', $since)
-            ->exists();
     }
 
     /**
