@@ -95,6 +95,10 @@ final class EventCheckInController extends Controller
             'checked_in_at' => now(),
             'checked_in_by' => $request->user()->id,
         ]);
+        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCheckedIn(
+            $registration,
+            (string) $registration->checked_in_at?->getTimestamp(),
+        );
 
         return response()->json([
             'message' => "{$registration->full_name} checked in.",

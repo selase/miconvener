@@ -192,6 +192,7 @@ final class SettlementWebhookController extends Controller
             'currency' => $currency,
         ]);
         $registration->save();
+        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
 
         app(\App\Services\Finance\LedgerService::class)->recordTicketSale(
             $eventModel,

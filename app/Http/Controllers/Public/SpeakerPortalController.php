@@ -98,6 +98,7 @@ final class SpeakerPortalController extends Controller
                 'provenance' => EventMaterial::PROVENANCE_SPEAKER,
             ]);
             $pivot->update(['slides_material_id' => $material->id]);
+            app(\App\Services\Notifications\EventRuleTriggerService::class)->materialPublished($material);
         }
 
         return response()->json(['message' => 'Slides uploaded.']);

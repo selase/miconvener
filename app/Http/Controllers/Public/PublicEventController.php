@@ -338,6 +338,7 @@ final class PublicEventController extends Controller
         $registrationModel->save();
 
         if ($registrationModel->isConfirmed()) {
+            app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
         }
