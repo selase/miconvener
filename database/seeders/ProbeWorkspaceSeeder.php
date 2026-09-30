@@ -9,16 +9,19 @@ use App\Models\EventAbstract;
 use App\Models\EventAbstractAuthor;
 use App\Models\EventCertificate;
 use App\Models\EventDynamicForm;
+use App\Models\EventForumReply;
 use App\Models\EventForumThread;
 use App\Models\EventMaterial;
 use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
+use App\Models\EventPromoCode;
 use App\Models\EventRegistration;
 use App\Models\EventSeatAssignment;
 use App\Models\EventSession;
 use App\Models\EventSessionAttendance;
 use App\Models\EventSpeaker;
+use App\Models\EventTicketType;
 use App\Models\EventVenueRoom;
 use App\Models\PollDeck;
 use App\Models\Speaker;
@@ -44,7 +47,13 @@ use RuntimeException;
  */
 final class ProbeWorkspaceSeeder extends Seeder
 {
-    public const string EVENT_SLUG = 'probe-full-experience';
+    public const string EVENT_SLUG = 'ghana-digital-health-summit';
+
+    /** What the demo event was called before it was given a realistic identity. */
+    public const string LEGACY_EVENT_SLUG = 'probe-full-experience';
+
+    /** Every paid ticket, in pesewas: cheap enough to buy for real in a demo. */
+    public const int DEMO_PRICE = 200;
 
     public function run(): void
     {
@@ -61,11 +70,15 @@ final class ProbeWorkspaceSeeder extends Seeder
         setPermissionsTeamId($tenant->id);
 
         $event = $this->event($tenant);
+        $tickets = $this->ticketTypes($event);
+        $this->promoCodes($event, $tickets);
         $sessions = $this->sessions($event);
         $this->materials($event, $sessions);
         $this->polls($event);
         $this->feedbackForm($event);
         $registration = $this->registration($event, $attendeeEmail);
+        $registration->update(['ticket_type_id' => $tickets['guest']->id]);
+        $this->crowd($event, $tickets, $attendeeEmail);
         $this->seat($event, $registration);
         $this->forum($event, $sessions, $attendeeEmail);
         $this->attendance($event, $sessions, $registration);
@@ -78,6 +91,15 @@ final class ProbeWorkspaceSeeder extends Seeder
 
     private function event(Tenant $tenant): Event
     {
+        // Renamed in place rather than recreated, so the registrations, deck and
+        // presenter links built under the old slug carry over to the new one.
+        $legacy = Event::query()->where('tenant_id', $tenant->id)->where('slug', self::LEGACY_EVENT_SLUG)->first();
+        $current = Event::query()->where('tenant_id', $tenant->id)->where('slug', self::EVENT_SLUG)->exists();
+
+        if ($legacy !== null && ! $current) {
+            $legacy->update(['slug' => self::EVENT_SLUG]);
+        }
+
         $existingToken = Event::query()
             ->where('tenant_id', $tenant->id)
             ->where('slug', self::EVENT_SLUG)
@@ -87,12 +109,12 @@ final class ProbeWorkspaceSeeder extends Seeder
         $event = Event::query()->updateOrCreate(
             ['tenant_id' => $tenant->id, 'slug' => self::EVENT_SLUG],
             [
-                'name' => 'Probe Full Experience',
+                'name' => 'Ghana Digital Health Summit 2026',
                 // The wall is the point of a deck, and it opens on this token
                 // rather than a login. Kept if one already exists, so re-seeding
                 // does not revoke a link someone has open on a projector.
                 'present_token' => $existingToken ?? Str::random(40),
-                'description' => 'Every part of the attendee workspace, switched on at once: a ticket with a seat, a running programme, released and withheld material, a live poll, an open feedback form, Q&A, and help while the room is open.',
+                'description' => $this->description(),
                 'status' => 'published',
                 'visibility' => Event::VISIBILITY_PUBLIC,
                 // Running now, so "Get help" and "Live now" are both open.
@@ -100,14 +122,160 @@ final class ProbeWorkspaceSeeder extends Seeder
                 'ends_at' => now()->addHours(6),
                 'timezone' => 'Africa/Accra',
                 'location_type' => 'in_person',
-                'address' => 'Accra International Conference Centre, Accra, Ghana',
+                'address' => 'Accra International Conference Centre, Castle Road, Ridge, Accra',
                 'currency' => 'GHS',
                 'ticket_price' => 0,
+                'capacity' => 400,
                 'speaker_slide_policy' => Event::SPEAKER_POLICY_DURING,
+                'hero_image_path' => $this->storeImage('summit-hero.jpg', 'events/hero/ghana-digital-health-summit.jpg'),
+                'cover_image_path' => $this->storeImage('summit-cover.jpg', 'events/cover/ghana-digital-health-summit.jpg'),
             ]
         );
 
         return $event;
+    }
+
+    private function description(): string
+    {
+        return <<<'TEXT'
+            Ghana Digital Health Summit brings together clinicians, hospital administrators, policymakers, insurers and technologists for one day on a single question: what does it take to make digital health work in Ghana, not just in a pilot?
+
+            Across four sessions we move from the national picture to the ward floor. The Ghana Health Service and NHIA open the day on interoperability and claims; district teams share what electronic records changed in practice; and founders building for low connectivity show what works when the network does not.
+
+            Who should attend: medical and nursing leads, health information officers, hospital and pharmacy managers, NGO programme staff, and anyone building or buying health technology in West Africa.
+
+            What is included: all sessions, lunch and refreshments, conference materials, a CPD certificate of attendance, and the evening networking reception.
+            TEXT;
+    }
+
+    /**
+     * Copies a committed demo image onto the upload disk at a fixed path, so
+     * re-seeding overwrites it rather than piling up copies.
+     */
+    private function storeImage(string $asset, string $path): string
+    {
+        Storage::disk(Event::uploadDisk())->put($path, (string) file_get_contents(database_path("seeders/assets/demo/{$asset}")));
+
+        return $path;
+    }
+
+    /**
+     * Paid tiers at a price someone can actually pay in a demo, so checkout,
+     * receipts, finance and payouts are shown with real money rather than
+     * invented rows. The complimentary tier holds the seeded crowd; it is
+     * invite-only, so the public page offers only what can be bought.
+     *
+     * @return array<string, EventTicketType>
+     */
+    private function ticketTypes(Event $event): array
+    {
+        $plan = [
+            'delegate' => ['Delegate — Full Access', 'All sessions, lunch and refreshments, conference pack, CPD certificate and the evening reception.', self::DEMO_PRICE, 250, null],
+            'student' => ['Student & Early Career', 'Full programme for students and professionals in their first three years. Bring your student or staff ID.', self::DEMO_PRICE, 80, null],
+            'virtual' => ['Virtual Pass', 'Follow the sessions online, take part in live polls and Q&A, and download the materials.', self::DEMO_PRICE, 500, null],
+            'guest' => ['Speaker & Invited Guest', 'Complimentary, by invitation.', 0, 120, 'GDHS-GUEST'],
+        ];
+
+        $tickets = [];
+        $order = 0;
+
+        foreach ($plan as $key => [$name, $description, $price, $capacity, $accessCode]) {
+            /** @var EventTicketType $ticket */
+            $ticket = EventTicketType::query()->updateOrCreate(
+                ['event_id' => $event->id, 'name' => $name],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'description' => $description,
+                    'price' => $price,
+                    'capacity' => $capacity,
+                    'is_active' => true,
+                    'access_code' => $accessCode,
+                    'sort_order' => $order++,
+                ]
+            );
+            $tickets[$key] = $ticket;
+        }
+
+        return $tickets;
+    }
+
+    /**
+     * @param  array<string, EventTicketType>  $tickets
+     */
+    private function promoCodes(Event $event, array $tickets): void
+    {
+        $codes = [
+            ['GDHS-EARLY', 'Early-bird: 25% off any paid ticket.', EventPromoCode::TYPE_PERCENTAGE, 25, 100, null],
+            ['NURSES50', 'Half price for nursing and midwifery staff.', EventPromoCode::TYPE_PERCENTAGE, 50, 60, [$tickets['delegate']->id]],
+            ['PARTNER-COMP', 'Complimentary delegate place for sponsor and partner staff.', EventPromoCode::TYPE_COMPLIMENTARY, 0, 20, [$tickets['delegate']->id]],
+        ];
+
+        foreach ($codes as [$code, $description, $type, $value, $max, $ticketIds]) {
+            EventPromoCode::query()->updateOrCreate(
+                ['event_id' => $event->id, 'code' => $code],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'description' => $description,
+                    'discount_type' => $type,
+                    'discount_value' => $value,
+                    'currency' => 'GHS',
+                    'max_redemptions' => $max,
+                    'max_per_attendee' => 1,
+                    'starts_at' => now()->subDays(30),
+                    'expires_at' => now()->addDays(7),
+                    'applicable_ticket_type_ids' => $ticketIds,
+                    'is_active' => true,
+                ]
+            );
+        }
+    }
+
+    /**
+     * A room's worth of delegates, so the guest list, check-in, badges and
+     * headcount look like an event rather than a test.
+     *
+     * Every one is complimentary: finance and payouts are computed from these
+     * rows, and inventing paid ones on a tenant that holds real charges would
+     * report money that was never taken. Their addresses are sub-addresses of
+     * the demo mailbox, so an announcement sent in a demo lands in an inbox the
+     * presenter owns instead of bouncing and damaging deliverability for every
+     * organiser on the platform.
+     *
+     * @param  array<string, EventTicketType>  $tickets
+     */
+    private function crowd(Event $event, array $tickets, string $attendeeEmail): void
+    {
+        [$local, $domain] = explode('@', $attendeeEmail) + [1 => 'example.com'];
+
+        $first = ['Kwame', 'Ama', 'Kofi', 'Akosua', 'Yaw', 'Abena', 'Kwabena', 'Efua', 'Kojo', 'Adwoa', 'Kwesi', 'Esi', 'Nana', 'Afia', 'Selorm', 'Dzifa', 'Edem', 'Mawuli', 'Fatima', 'Ibrahim', 'Aisha', 'Mohammed', 'Naa', 'Nii', 'Dede', 'Ekow', 'Araba', 'Fiifi', 'Mansa', 'Kekeli'];
+        $last = ['Mensah', 'Owusu', 'Boateng', 'Asante', 'Osei', 'Agyeman', 'Appiah', 'Darko', 'Amoah', 'Addo', 'Quaye', 'Tetteh', 'Lamptey', 'Ofori', 'Adjei', 'Nkrumah', 'Sarpong', 'Frimpong', 'Acheampong', 'Kuffour', 'Amankwah', 'Bekoe', 'Dogbe', 'Agbeko', 'Seidu', 'Abdulai', 'Yakubu', 'Iddrisu', 'Hammond', 'Aryeetey'];
+
+        for ($i = 1; $i <= 84; $i++) {
+            $name = $first[($i * 7) % count($first)].' '.$last[($i * 11) % count($last)];
+            $present = $i % 5 !== 0;
+
+            /** @var EventRegistration $registration */
+            $registration = EventRegistration::query()->updateOrCreate(
+                ['event_id' => $event->id, 'email' => sprintf('%s+ghs-%02d@%s', $local, $i, $domain)],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'ticket_type_id' => $tickets['guest']->id,
+                    'full_name' => $name,
+                    'phone' => sprintf('+23324%07d', 1000000 + $i * 3713),
+                    'status' => $present ? EventRegistration::STATUS_CHECKED_IN : EventRegistration::STATUS_CONFIRMED,
+                    'amount' => 0,
+                    'currency' => 'GHS',
+                    'email_verified_at' => now()->subDays(10),
+                    'checked_in_at' => $present ? now()->subMinutes(150 - $i) : null,
+                    'checked_in_source' => $present ? 'scan' : null,
+                ]
+            );
+
+            if (blank($registration->ticket_code)) {
+                $registration->issueTicket();
+                $registration->save();
+            }
+        }
     }
 
     /**
@@ -596,51 +764,63 @@ final class ProbeWorkspaceSeeder extends Seeder
      */
     private function forum(Event $event, array $sessions, string $attendeeEmail): void
     {
+        $organiser = 'Summit Secretariat';
+
         $threads = [
-            [
-                'title' => 'Will the slides be shared after the talks?',
-                'body' => 'Asking on behalf of colleagues who could not travel.',
-                'author' => 'Kofi Mensah',
-                'email' => 'kofi@example.com',
-                'answered' => true,
-                'pinned' => true,
-                'session' => $sessions['opening'],
-            ],
-            [
-                'title' => 'Is there a quiet room for prayers?',
-                'body' => 'And is it on the same floor as the main auditorium?',
-                'author' => 'Abena Owusu',
-                'email' => 'abena@example.com',
-                'answered' => false,
-                'pinned' => false,
-                'session' => null,
-            ],
-            [
-                'title' => 'Great session on mobile data',
-                'body' => 'The point about bundling assets for 3G was the most useful thing I have heard all week.',
-                'author' => 'Selase Kwawu',
-                'email' => $attendeeEmail,
-                'answered' => false,
-                'pinned' => false,
-                'session' => $sessions['running'],
-            ],
+            ['Will the slides be shared after the talks?', 'Asking on behalf of colleagues at Tamale Teaching Hospital who could not travel down.', 'Kofi Mensah', true, true, 'opening', [
+                [$organiser, 'Yes. Every speaker has agreed to share their deck, and they appear under Downloads in your ticket as each session ends.'],
+                ['Esi Tetteh', 'Thank you. The NHIA claims deck especially, please.'],
+            ]],
+            ['Is there a quiet room for prayers?', 'And is it on the same floor as the main auditorium?', 'Abena Owusu', true, false, null, [
+                [$organiser, 'Room 1.04 on the ground floor is set aside all day, two minutes from the auditorium doors. Ask any usher in a green lanyard.'],
+            ]],
+            ['Great session on mobile data', 'The point about bundling assets for 3G was the most useful thing I have heard all week.', 'Selase Kwawu', false, false, 'running', [
+                ['Kwabena Asante', 'Agreed. We rolled back an offline-first rewrite last year for exactly the reasons she described.'],
+                ['Dzifa Agbeko', 'Does anyone have the link to the connectivity survey she mentioned?'],
+            ]],
+            ['How does the new NHIA e-claims timeline affect private facilities?', 'We are a 40-bed private hospital in Kumasi. Is the October deadline for everyone or only public facilities?', 'Dr Yaw Boateng', true, false, 'opening', [
+                [$organiser, 'Passed to the NHIA panel. Their answer: all accredited facilities, but private facilities under 50 beds have a three-month grace period.'],
+                ['Afia Sarpong', 'That grace period is news to us. Very helpful, thank you.'],
+            ]],
+            ['Any recommendations for an EMR that works offline?', 'Our district clinics lose connectivity for hours. What are people actually using?', 'Mawuli Dogbe', false, false, null, [
+                ['Nana Adjei', 'We use an open-source EMR on local servers with nightly sync. It is not glamorous, but it has not lost a record in two years.'],
+                ['Ibrahim Seidu', 'Same here. The hard part was training, not the software.'],
+                ['Kojo Amoah', 'Would love a session on this next year.'],
+            ]],
+            ['Parking at the conference centre', 'Is there parking on site, or should we come by ride-share?', 'Araba Quaye', true, false, null, [
+                [$organiser, 'The east car park is reserved for delegates; show your ticket QR at the gate. It fills by 8:30, so ride-share is safer after that.'],
+            ]],
+            ['Will the CPD certificate count toward MDC renewal?', 'I need the points for my licence renewal this year.', 'Dr Efua Hammond', true, false, null, [
+                [$organiser, 'Yes. The summit is accredited for 6 CPD points. Your certificate appears in your ticket once attendance is recorded.'],
+            ]],
+            ['Networking reception tonight: dress code?', 'Coming straight from the sessions. Is business attire fine?', 'Kekeli Addo', false, false, null, []],
         ];
 
-        foreach ($threads as $thread) {
-            EventForumThread::query()->updateOrCreate(
-                ['event_id' => $event->id, 'title' => $thread['title']],
+        foreach ($threads as [$title, $body, $author, $answered, $pinned, $session, $replies]) {
+            /** @var EventForumThread $thread */
+            $thread = EventForumThread::query()->updateOrCreate(
+                ['event_id' => $event->id, 'title' => $title],
                 [
                     'tenant_id' => $event->tenant_id,
-                    'session_id' => $thread['session']?->id,
-                    'body' => $thread['body'],
-                    'author_name' => $thread['author'],
-                    'author_email' => $thread['email'],
+                    'session_id' => $session !== null ? $sessions[$session]->id : null,
+                    'body' => $body,
+                    'author_name' => $author,
+                    // The attendee's own thread stays theirs; the rest are not
+                    // mailboxes anyone reads, and nothing is ever sent to them.
+                    'author_email' => $author === 'Selase Kwawu' ? $attendeeEmail : null,
                     'is_anonymous' => false,
-                    'is_pinned' => $thread['pinned'],
-                    'is_answered' => $thread['answered'],
+                    'is_pinned' => $pinned,
+                    'is_answered' => $answered,
                     'is_hidden' => false,
                 ]
             );
+
+            foreach ($replies as [$replyAuthor, $replyBody]) {
+                EventForumReply::query()->updateOrCreate(
+                    ['thread_id' => $thread->id, 'body' => $replyBody],
+                    ['tenant_id' => $event->tenant_id, 'author_name' => $replyAuthor]
+                );
+            }
         }
     }
 
