@@ -162,16 +162,14 @@ export default function InquiriesIndex({ shop, inquiries, stats, filters }) {
                 {inquiries.data.length > 0 ? (
                     <Table>
                         <Thead>
-                            <Tr>
-                                <Th>Reference / Date</Th>
-                                <Th>Planner / Organization</Th>
-                                <Th>Space Requested</Th>
-                                <Th>Event Schedule</Th>
-                                <Th>Layout & Guests</Th>
-                                <Th>Estimated Amount</Th>
-                                <Th>Status</Th>
-                                <Th align="right">Action</Th>
-                            </Tr>
+                            <Th>Reference / Date</Th>
+                            <Th>Planner / Organization</Th>
+                            <Th>Space Requested</Th>
+                            <Th>Event Schedule</Th>
+                            <Th>Layout & Guests</Th>
+                            <Th>Estimated Amount</Th>
+                            <Th>Status</Th>
+                            <Th align="right">Action</Th>
                         </Thead>
                         <tbody>
                             {inquiries.data.map((lead) => (
@@ -233,14 +231,13 @@ export default function InquiriesIndex({ shop, inquiries, stats, filters }) {
                                         </div>
                                         {lead.deposit_required_pesewas > 0 && (
                                             <div className="text-[10px] text-ink-tertiary">
-                                                Deposit: {formatCurrency(lead.deposit_required_pesewas)}
+                                                Deposit:{' '}
+                                                {formatCurrency(lead.deposit_required_pesewas)}
                                             </div>
                                         )}
                                     </Td>
                                     <Td>
-                                        <StatusPill
-                                            status={STATUS_MAP[lead.status] || 'neutral'}
-                                        >
+                                        <StatusPill status={STATUS_MAP[lead.status] || 'neutral'}>
                                             {lead.status.replace('_', ' ')}
                                         </StatusPill>
                                     </Td>
