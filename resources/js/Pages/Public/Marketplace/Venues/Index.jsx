@@ -16,17 +16,30 @@ import {
     ChevronDown,
 } from 'lucide-react';
 
-export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
-    const [q, setQ] = useState(filters.q || '');
-    const [city, setCity] = useState(filters.city || '');
-    const [minCapacity, setMinCapacity] = useState(filters.min_capacity || '');
-    const [capacityStyle, setCapacityStyle] = useState(filters.capacity_style || 'banquet');
-    const [minPrice, setMinPrice] = useState(filters.min_price || '');
-    const [maxPrice, setMaxPrice] = useState(filters.max_price || '');
-    const [priceVisibility, setPriceVisibility] = useState(filters.price_visibility || '');
-    const [selectedAmenities, setSelectedAmenities] = useState(filters.amenities || []);
-    const [sort, setSort] = useState(filters.sort || 'recommended');
+export default function VenuesIndex({
+    venues = { data: [], total: 0 },
+    amenities = [],
+    filters = {},
+}) {
+    const [q, setQ] = useState(filters?.q || '');
+    const [city, setCity] = useState(filters?.city || '');
+    const [minCapacity, setMinCapacity] = useState(filters?.min_capacity || '');
+    const [capacityStyle, setCapacityStyle] = useState(filters?.capacity_style || 'banquet');
+    const [minPrice, setMinPrice] = useState(filters?.min_price || '');
+    const [maxPrice, setMaxPrice] = useState(filters?.max_price || '');
+    const [priceVisibility, setPriceVisibility] = useState(filters?.price_visibility || '');
+    const [selectedAmenities, setSelectedAmenities] = useState(() => {
+        if (Array.isArray(filters?.amenities)) return filters.amenities;
+        if (typeof filters?.amenities === 'string' && filters.amenities) return [filters.amenities];
+        return [];
+    });
+    const [sort, setSort] = useState(filters?.sort || 'recommended');
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+    const getMediaUrl = (media) => {
+        if (!media) return null;
+        return media.url || media.file_path || null;
+    };
 
     const applyFilters = (overrides = {}) => {
         const query = {
@@ -77,17 +90,24 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
         });
-        const modelLabel = {
-            per_day: '/ day',
-            per_half_day: '/ half day',
-            per_hour: '/ hr',
-            flat_rate: 'flat rate',
-        }[pricingModel] ?? '';
+        const modelLabel =
+            {
+                per_day: '/ day',
+                per_half_day: '/ half day',
+                per_hour: '/ hr',
+                flat_rate: 'flat rate',
+            }[pricingModel] ?? '';
         return `GHS ${ghs} ${modelLabel}`;
     };
 
     const hasActiveFilters = Boolean(
-        q || city || minCapacity || minPrice || maxPrice || priceVisibility || selectedAmenities.length > 0
+        q ||
+        city ||
+        minCapacity ||
+        minPrice ||
+        maxPrice ||
+        priceVisibility ||
+        selectedAmenities.length > 0
     );
 
     return (
@@ -100,7 +120,8 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                     <div>
                         <h1 className="text-xl font-semibold text-ink">Venues & Event Spaces</h1>
                         <p className="text-xs text-ink-secondary">
-                            {venues.total} {venues.total === 1 ? 'space' : 'spaces'} available across Ghana
+                            {venues.total} {venues.total === 1 ? 'space' : 'spaces'} available
+                            across Ghana
                         </p>
                     </div>
 
@@ -111,7 +132,10 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface md:hidden"
                         >
                             <SlidersHorizontal className="h-4 w-4" />
-                            <span>Filters {selectedAmenities.length > 0 && `(${selectedAmenities.length})`}</span>
+                            <span>
+                                Filters{' '}
+                                {selectedAmenities.length > 0 && `(${selectedAmenities.length})`}
+                            </span>
                         </button>
 
                         <div className="relative">
@@ -123,7 +147,9 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                                 }}
                                 className="rounded-lg border border-border bg-canvas py-1.5 pl-3 pr-8 text-xs text-ink focus:border-accent focus:ring-1 focus:ring-accent"
                             >
-                                <option value="recommended">Sort: Recommended (Verified First)</option>
+                                <option value="recommended">
+                                    Sort: Recommended (Verified First)
+                                </option>
                                 <option value="price_asc">Price: Low to High</option>
                                 <option value="price_desc">Price: High to Low</option>
                                 <option value="capacity_desc">Highest Capacity</option>
@@ -140,7 +166,9 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                     <div className={`space-y-6 md:block ${filterDrawerOpen ? 'block' : 'hidden'}`}>
                         <div className="rounded-xl border border-border bg-surface p-5 space-y-5">
                             <div className="flex items-center justify-between border-b border-border pb-3">
-                                <span className="text-xs font-semibold text-ink uppercase tracking-wider">Refine Search</span>
+                                <span className="text-xs font-semibold text-ink uppercase tracking-wider">
+                                    Refine Search
+                                </span>
                                 {hasActiveFilters && (
                                     <button
                                         type="button"
@@ -155,7 +183,9 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
 
                             {/* Keyword */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-medium text-ink-secondary">Search</label>
+                                <label className="text-[11px] font-medium text-ink-secondary">
+                                    Search
+                                </label>
                                 <div className="relative">
                                     <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-ink-tertiary" />
                                     <input
@@ -171,7 +201,9 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
 
                             {/* City */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-medium text-ink-secondary">City / Region</label>
+                                <label className="text-[11px] font-medium text-ink-secondary">
+                                    City / Region
+                                </label>
                                 <select
                                     value={city}
                                     onChange={(e) => {
@@ -193,7 +225,9 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
 
                             {/* Capacity Style & Minimum */}
                             <div className="space-y-2 border-t border-border pt-4">
-                                <label className="text-[11px] font-medium text-ink-secondary">Capacity Layout</label>
+                                <label className="text-[11px] font-medium text-ink-secondary">
+                                    Capacity Layout
+                                </label>
                                 <div className="grid grid-cols-2 gap-1 text-[11px]">
                                     {[
                                         { id: 'banquet', label: 'Banquet' },
@@ -206,7 +240,8 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                                             type="button"
                                             onClick={() => {
                                                 setCapacityStyle(style.id);
-                                                if (minCapacity) applyFilters({ capacity_style: style.id });
+                                                if (minCapacity)
+                                                    applyFilters({ capacity_style: style.id });
                                             }}
                                             className={`rounded border px-2 py-1 text-center transition-colors ${
                                                 capacityStyle === style.id
@@ -234,7 +269,9 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
 
                             {/* Price Visibility */}
                             <div className="space-y-1.5 border-t border-border pt-4">
-                                <label className="text-[11px] font-medium text-ink-secondary">Pricing Transparency</label>
+                                <label className="text-[11px] font-medium text-ink-secondary">
+                                    Pricing Transparency
+                                </label>
                                 <div className="space-y-1 text-xs">
                                     <label className="flex items-center gap-2 cursor-pointer text-ink-secondary hover:text-ink">
                                         <input
@@ -292,8 +329,12 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                                             >
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedAmenities.includes(amenity.slug)}
-                                                    onChange={() => handleAmenityToggle(amenity.slug)}
+                                                    checked={selectedAmenities.includes(
+                                                        amenity.slug
+                                                    )}
+                                                    onChange={() =>
+                                                        handleAmenityToggle(amenity.slug)
+                                                    }
                                                     className="rounded border-border text-accent focus:ring-accent"
                                                 />
                                                 <span className="text-[11px]">{amenity.name}</span>
@@ -318,9 +359,12 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                         {venues.data.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
                                 <Building2 className="mx-auto h-10 w-10 text-ink-tertiary" />
-                                <h3 className="mt-3 text-sm font-semibold text-ink">No matching spaces found</h3>
+                                <h3 className="mt-3 text-sm font-semibold text-ink">
+                                    No matching spaces found
+                                </h3>
                                 <p className="mt-1 text-xs text-ink-secondary max-w-sm mx-auto">
-                                    Try adjusting your search criteria, clearing some amenity filters, or broadening the capacity range.
+                                    Try adjusting your search criteria, clearing some amenity
+                                    filters, or broadening the capacity range.
                                 </p>
                                 <button
                                     type="button"
@@ -339,22 +383,28 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                                         .filter((a) => a.is_included)
                                         .slice(0, 2);
 
+                                    const mediaUrl = getMediaUrl(
+                                        venue.primary_media || venue.primaryMedia
+                                    );
+
                                     return (
                                         <div
                                             key={venue.id}
                                             className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-all hover:border-accent/40 hover:shadow-md"
                                         >
                                             <div className="relative aspect-video w-full bg-canvas flex items-center justify-center overflow-hidden border-b border-border">
-                                                {venue.primary_media?.url ? (
+                                                {mediaUrl ? (
                                                     <img
-                                                        src={venue.primary_media.url}
+                                                        src={mediaUrl}
                                                         alt={venue.title}
                                                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                     />
                                                 ) : (
                                                     <div className="flex flex-col items-center gap-1 text-ink-tertiary">
                                                         <Building2 className="h-8 w-8 stroke-1" />
-                                                        <span className="text-[10px]">Photo Preview</span>
+                                                        <span className="text-[10px]">
+                                                            Photo Preview
+                                                        </span>
                                                     </div>
                                                 )}
 
@@ -379,7 +429,9 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                                                     {venue.shop?.name}
                                                 </Link>
                                                 <h3 className="mt-1 text-sm font-semibold text-ink group-hover:text-accent transition-colors line-clamp-1">
-                                                    <Link href={`/marketplace/venues/${venue.slug}`}>
+                                                    <Link
+                                                        href={`/marketplace/venues/${venue.slug}`}
+                                                    >
                                                         {venue.title}
                                                     </Link>
                                                 </h3>
@@ -387,12 +439,14 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                                                 <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10.5px] text-ink-secondary">
                                                     {venue.capacity_breakdown?.banquet && (
                                                         <span className="rounded bg-canvas px-2 py-0.5 border border-border">
-                                                            {venue.capacity_breakdown.banquet} Banquet
+                                                            {venue.capacity_breakdown.banquet}{' '}
+                                                            Banquet
                                                         </span>
                                                     )}
                                                     {venue.capacity_breakdown?.theater && (
                                                         <span className="rounded bg-canvas px-2 py-0.5 border border-border">
-                                                            {venue.capacity_breakdown.theater} Theater
+                                                            {venue.capacity_breakdown.theater}{' '}
+                                                            Theater
                                                         </span>
                                                     )}
                                                     {venue.floor_area_sqm && (
@@ -453,8 +507,8 @@ export default function VenuesIndex({ venues, amenities = [], filters = {} }) {
                                             link.active
                                                 ? 'bg-accent text-white'
                                                 : link.url
-                                                ? 'border border-border bg-surface text-ink hover:bg-surface-hover'
-                                                : 'text-ink-tertiary pointer-events-none'
+                                                  ? 'border border-border bg-surface text-ink hover:bg-surface-hover'
+                                                  : 'text-ink-tertiary pointer-events-none'
                                         }`}
                                     />
                                 ))}

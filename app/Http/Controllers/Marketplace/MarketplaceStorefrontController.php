@@ -23,7 +23,7 @@ final class MarketplaceStorefrontController extends Controller
             ->firstOrFail();
 
         $spaces = $shop->listings()
-            ->with(['primaryMedia', 'amenities.amenity'])
+            ->with(['shop', 'primaryMedia', 'amenities.amenity'])
             ->where('status', StoreListing::STATUS_PUBLISHED)
             ->orderBy('sort_order')
             ->orderByDesc('created_at')

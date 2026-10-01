@@ -15,6 +15,12 @@ import {
 } from 'lucide-react';
 
 export default function StorefrontShow({ shop, spaces = [] }) {
+    const getMediaUrl = (media) => {
+        if (!media) return null;
+        if (typeof media === 'string') return media;
+        return media.url || media.file_path || null;
+    };
+
     const formatPrice = (pesewas, pricingModel, priceVisibility) => {
         if (priceVisibility === 'on_request') {
             return 'Custom Quote on Request';
@@ -23,12 +29,13 @@ export default function StorefrontShow({ shop, spaces = [] }) {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
         });
-        const modelLabel = {
-            per_day: '/ day',
-            per_half_day: '/ half day',
-            per_hour: '/ hour',
-            flat_rate: 'flat rate',
-        }[pricingModel] ?? '';
+        const modelLabel =
+            {
+                per_day: '/ day',
+                per_half_day: '/ half day',
+                per_hour: '/ hour',
+                flat_rate: 'flat rate',
+            }[pricingModel] ?? '';
         return `GHS ${ghs} ${modelLabel}`;
     };
 
@@ -46,7 +53,9 @@ export default function StorefrontShow({ shop, spaces = [] }) {
 
                         <div className="space-y-2 flex-1">
                             <div className="flex flex-wrap items-center gap-2.5">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-ink">{shop.name}</h1>
+                                <h1 className="text-2xl sm:text-3xl font-bold text-ink">
+                                    {shop.name}
+                                </h1>
                                 {shop.verification_status === 'verified' && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
                                         <ShieldCheck className="h-3.5 w-3.5" />
@@ -58,7 +67,9 @@ export default function StorefrontShow({ shop, spaces = [] }) {
                             <div className="flex flex-wrap items-center gap-4 text-xs text-ink-secondary">
                                 <div className="flex items-center gap-1">
                                     <MapPin className="h-3.5 w-3.5 text-accent" />
-                                    <span>{shop.address}, {shop.city}, {shop.region}</span>
+                                    <span>
+                                        {shop.address}, {shop.city}, {shop.region}
+                                    </span>
                                 </div>
                                 {shop.phone && (
                                     <div className="flex items-center gap-1">
@@ -82,7 +93,9 @@ export default function StorefrontShow({ shop, spaces = [] }) {
                 {/* About Section */}
                 {shop.description && (
                     <div className="rounded-xl border border-border bg-surface p-6 space-y-3">
-                        <h2 className="text-sm font-semibold text-ink uppercase tracking-wider">About {shop.name}</h2>
+                        <h2 className="text-sm font-semibold text-ink uppercase tracking-wider">
+                            About {shop.name}
+                        </h2>
                         <p className="text-xs text-ink-secondary leading-relaxed whitespace-pre-line">
                             {shop.description}
                         </p>
@@ -94,7 +107,8 @@ export default function StorefrontShow({ shop, spaces = [] }) {
                     <div>
                         <h2 className="text-xl font-semibold text-ink">Spaces & Event Halls</h2>
                         <p className="text-xs text-ink-secondary">
-                            Explore all conference halls, ballrooms, and outdoor spaces hosted by {shop.name}.
+                            Explore all conference halls, ballrooms, and outdoor spaces hosted by{' '}
+                            {shop.name}.
                         </p>
                     </div>
 
@@ -110,15 +124,19 @@ export default function StorefrontShow({ shop, spaces = [] }) {
                                     .filter((a) => a.is_included)
                                     .slice(0, 3);
 
+                                const spaceMediaUrl = getMediaUrl(
+                                    space.primary_media || space.primaryMedia
+                                );
+
                                 return (
                                     <div
                                         key={space.id}
                                         className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-all hover:border-accent hover:shadow-md"
                                     >
                                         <div className="aspect-video w-full bg-canvas flex items-center justify-center overflow-hidden border-b border-border">
-                                            {space.primary_media?.url ? (
+                                            {spaceMediaUrl ? (
                                                 <img
-                                                    src={space.primary_media.url}
+                                                    src={spaceMediaUrl}
                                                     alt=""
                                                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                 />
@@ -193,9 +211,12 @@ export default function StorefrontShow({ shop, spaces = [] }) {
 
                 {/* Cross-Sell & Hospitality Services Bridge */}
                 <div className="rounded-xl border border-border bg-canvas p-6 space-y-4">
-                    <h3 className="text-sm font-semibold text-ink">Other Services Offered by {shop.name}</h3>
+                    <h3 className="text-sm font-semibold text-ink">
+                        Other Services Offered by {shop.name}
+                    </h3>
                     <p className="text-xs text-ink-secondary">
-                        When booking a space at {shop.name}, additional in-house event services can be packaged into your custom quotation.
+                        When booking a space at {shop.name}, additional in-house event services can
+                        be packaged into your custom quotation.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="rounded-lg border border-border bg-surface p-4 flex items-center gap-3">
@@ -203,8 +224,12 @@ export default function StorefrontShow({ shop, spaces = [] }) {
                                 <Utensils className="h-4 w-4" />
                             </div>
                             <div>
-                                <div className="text-xs font-semibold text-ink">In-House Catering & Banqueting</div>
-                                <div className="text-[11px] text-ink-secondary">Buffets, multi-course dining, and cocktail finger foods</div>
+                                <div className="text-xs font-semibold text-ink">
+                                    In-House Catering & Banqueting
+                                </div>
+                                <div className="text-[11px] text-ink-secondary">
+                                    Buffets, multi-course dining, and cocktail finger foods
+                                </div>
                             </div>
                         </div>
 
@@ -213,8 +238,12 @@ export default function StorefrontShow({ shop, spaces = [] }) {
                                 <Tv className="h-4 w-4" />
                             </div>
                             <div>
-                                <div className="text-xs font-semibold text-ink">In-House AV & Lighting Rig</div>
-                                <div className="text-[11px] text-ink-secondary">Audio systems, projectors, and stage lighting packages</div>
+                                <div className="text-xs font-semibold text-ink">
+                                    In-House AV & Lighting Rig
+                                </div>
+                                <div className="text-[11px] text-ink-secondary">
+                                    Audio systems, projectors, and stage lighting packages
+                                </div>
                             </div>
                         </div>
                     </div>

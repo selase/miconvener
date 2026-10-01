@@ -52,7 +52,7 @@ final class MarketplaceListingController extends Controller
     {
         /** @var StoreListing $listing */
         $listing = StoreListing::query()
-            ->with(['shop', 'media', 'amenities.amenity'])
+            ->with(['shop', 'primaryMedia', 'media', 'amenities.amenity'])
             ->where('listing_kind', StoreListing::KIND_VENUE)
             ->where('slug', $slug)
             ->where('status', StoreListing::STATUS_PUBLISHED)
@@ -63,7 +63,7 @@ final class MarketplaceListingController extends Controller
 
         // Other spaces from this venue host
         $otherSpaces = StoreListing::query()
-            ->with(['primaryMedia'])
+            ->with(['shop', 'primaryMedia'])
             ->where('shop_id', $listing->shop_id)
             ->where('id', '!=', $listing->id)
             ->where('status', StoreListing::STATUS_PUBLISHED)

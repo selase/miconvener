@@ -31,6 +31,12 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
         });
     };
 
+    const getMediaUrl = (media) => {
+        if (!media) return null;
+        if (typeof media === 'string') return media;
+        return media.url || media.file_path || null;
+    };
+
     const formatPrice = (pesewas, pricingModel, priceVisibility) => {
         if (priceVisibility === 'on_request') {
             return 'Price on request';
@@ -39,12 +45,13 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
         });
-        const modelLabel = {
-            per_day: '/ day',
-            per_half_day: '/ half day',
-            per_hour: '/ hr',
-            flat_rate: 'flat rate',
-        }[pricingModel] ?? '';
+        const modelLabel =
+            {
+                per_day: '/ day',
+                per_half_day: '/ half day',
+                per_hour: '/ hr',
+                flat_rate: 'flat rate',
+            }[pricingModel] ?? '';
         return `GHS ${ghs} ${modelLabel}`;
     };
 
@@ -64,7 +71,9 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                         Discover & book verified event spaces across Ghana.
                     </h1>
                     <p className="mt-4 text-base sm:text-lg text-ink-secondary max-w-2xl mx-auto">
-                        From luxury beachfront ballrooms to auditorium plenary halls. Compare transparent capacity breakdowns, generator backups, and included amenities with approval-first bookings.
+                        From luxury beachfront ballrooms to auditorium plenary halls. Compare
+                        transparent capacity breakdowns, generator backups, and included amenities
+                        with approval-first bookings.
                     </p>
 
                     {/* Quick Search Card */}
@@ -129,16 +138,28 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                     {/* Quick Pill Suggestions */}
                     <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-ink-secondary">
                         <span className="text-ink-tertiary">Popular:</span>
-                        <Link href="/marketplace/venues?city=Accra" className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink">
+                        <Link
+                            href="/marketplace/venues?city=Accra"
+                            className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink"
+                        >
                             Accra Venues
                         </Link>
-                        <Link href="/marketplace/venues?city=Kumasi" className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink">
+                        <Link
+                            href="/marketplace/venues?city=Kumasi"
+                            className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink"
+                        >
                             Kumasi Venues
                         </Link>
-                        <Link href="/marketplace/venues?capacity_style=banquet&min_capacity=300" className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink">
+                        <Link
+                            href="/marketplace/venues?capacity_style=banquet&min_capacity=300"
+                            className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink"
+                        >
                             Large Banquets (300+)
                         </Link>
-                        <Link href="/marketplace/venues?amenities[]=standby_generator" className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink">
+                        <Link
+                            href="/marketplace/venues?amenities[]=standby_generator"
+                            className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-ink"
+                        >
                             ⚡ Standby Generator Guaranteed
                         </Link>
                     </div>
@@ -150,8 +171,12 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h2 className="text-xl font-semibold text-ink">Marketplace Directory</h2>
-                            <p className="text-xs text-ink-secondary">Everything required to convene exceptional events.</p>
+                            <h2 className="text-xl font-semibold text-ink">
+                                Marketplace Directory
+                            </h2>
+                            <p className="text-xs text-ink-secondary">
+                                Everything required to convene exceptional events.
+                            </p>
                         </div>
                     </div>
 
@@ -173,7 +198,8 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                                 Venues & Spaces
                             </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                Ballrooms, plenary auditoriums, open-air lawns, and boardrooms across Ghana.
+                                Ballrooms, plenary auditoriums, open-air lawns, and boardrooms
+                                across Ghana.
                             </p>
                             <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-accent">
                                 <span>Browse Venues</span>
@@ -191,9 +217,12 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                                     Coming Soon
                                 </span>
                             </div>
-                            <h3 className="mt-4 text-sm font-semibold text-ink">Catering & Banqueting</h3>
+                            <h3 className="mt-4 text-sm font-semibold text-ink">
+                                Catering & Banqueting
+                            </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                Full-course plated dinners, buffets, cocktail canapés, and coffee break catering.
+                                Full-course plated dinners, buffets, cocktail canapés, and coffee
+                                break catering.
                             </p>
                         </div>
 
@@ -207,9 +236,12 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                                     Coming Soon
                                 </span>
                             </div>
-                            <h3 className="mt-4 text-sm font-semibold text-ink">Audiovisual & Tech</h3>
+                            <h3 className="mt-4 text-sm font-semibold text-ink">
+                                Audiovisual & Tech
+                            </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                LED video walls, multi-mic sound systems, livestreaming rigs, and stage lighting.
+                                LED video walls, multi-mic sound systems, livestreaming rigs, and
+                                stage lighting.
                             </p>
                         </div>
 
@@ -225,7 +257,8 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                             </div>
                             <h3 className="mt-4 text-sm font-semibold text-ink">Decor & Rentals</h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                High-peak canopies, Chiavari chairs, ambient drapery, and exhibition booths.
+                                High-peak canopies, Chiavari chairs, ambient drapery, and exhibition
+                                booths.
                             </p>
                         </div>
                     </div>
@@ -238,7 +271,9 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h2 className="text-xl font-semibold text-ink">Featured Spaces</h2>
-                            <p className="text-xs text-ink-secondary">Hand-picked spaces ready for your next conference or banquet.</p>
+                            <p className="text-xs text-ink-secondary">
+                                Hand-picked spaces ready for your next conference or banquet.
+                            </p>
                         </div>
                         <Link
                             href="/marketplace/venues"
@@ -252,7 +287,9 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                     {featuredVenues.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-border p-12 text-center">
                             <Building2 className="mx-auto h-8 w-8 text-ink-tertiary" />
-                            <p className="mt-2 text-xs text-ink-secondary">No featured spaces listed yet.</p>
+                            <p className="mt-2 text-xs text-ink-secondary">
+                                No featured spaces listed yet.
+                            </p>
                             <Link
                                 href="/marketplace/venues"
                                 className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white"
@@ -269,22 +306,28 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                                     venue.capacity_breakdown?.cocktail ?? 0
                                 );
 
+                                const mediaUrl = getMediaUrl(
+                                    venue.primary_media || venue.primaryMedia
+                                );
+
                                 return (
                                     <div
                                         key={venue.id}
                                         className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-all hover:border-accent/40 hover:shadow-md"
                                     >
                                         <div className="relative aspect-video w-full bg-canvas flex items-center justify-center overflow-hidden border-b border-border">
-                                            {venue.primary_media?.url ? (
+                                            {mediaUrl ? (
                                                 <img
-                                                    src={venue.primary_media.url}
+                                                    src={mediaUrl}
                                                     alt={venue.title}
                                                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                 />
                                             ) : (
                                                 <div className="flex flex-col items-center gap-1 text-ink-tertiary">
                                                     <Building2 className="h-8 w-8 stroke-1" />
-                                                    <span className="text-[10px]">Photo Preview</span>
+                                                    <span className="text-[10px]">
+                                                        Photo Preview
+                                                    </span>
                                                 </div>
                                             )}
 
@@ -329,7 +372,11 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
 
                                             <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
                                                 <div className="text-xs font-semibold text-ink">
-                                                    {formatPrice(venue.rental_price_pesewas, venue.pricing_model, venue.price_visibility)}
+                                                    {formatPrice(
+                                                        venue.rental_price_pesewas,
+                                                        venue.pricing_model,
+                                                        venue.price_visibility
+                                                    )}
                                                 </div>
 
                                                 <Link
@@ -353,9 +400,12 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
             <section className="border-t border-border bg-surface py-16">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="text-center max-w-2xl mx-auto mb-12">
-                        <h2 className="text-2xl font-semibold text-ink">Why book through MiConvener Marketplace?</h2>
+                        <h2 className="text-2xl font-semibold text-ink">
+                            Why book through MiConvener Marketplace?
+                        </h2>
                         <p className="mt-2 text-xs text-ink-secondary">
-                            Designed specifically for professional event organizers who cannot afford surprises on event day.
+                            Designed specifically for professional event organizers who cannot
+                            afford surprises on event day.
                         </p>
                     </div>
 
@@ -364,9 +414,13 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                             <div className="grid h-10 w-10 place-items-center rounded-lg bg-accent/10 text-accent">
                                 <CheckCircle2 className="h-5 w-5" />
                             </div>
-                            <h3 className="text-sm font-semibold text-ink">Included vs. Excluded Transparency</h3>
+                            <h3 className="text-sm font-semibold text-ink">
+                                Included vs. Excluded Transparency
+                            </h3>
                             <p className="text-xs text-ink-secondary leading-relaxed">
-                                Every venue publishes an exact checklist. Know upfront if standby generators, central AC, chairs, or AV gear are included in the base rate or require add-on fees.
+                                Every venue publishes an exact checklist. Know upfront if standby
+                                generators, central AC, chairs, or AV gear are included in the base
+                                rate or require add-on fees.
                             </p>
                         </div>
 
@@ -374,9 +428,13 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                             <div className="grid h-10 w-10 place-items-center rounded-lg bg-accent/10 text-accent">
                                 <ShieldCheck className="h-5 w-5" />
                             </div>
-                            <h3 className="text-sm font-semibold text-ink">Approval-First Bookings</h3>
+                            <h3 className="text-sm font-semibold text-ink">
+                                Approval-First Bookings
+                            </h3>
                             <p className="text-xs text-ink-secondary leading-relaxed">
-                                Avoid double-bookings. Dates and bespoke configurations are confirmed directly with the venue management before any financial commitments or payments unlock.
+                                Avoid double-bookings. Dates and bespoke configurations are
+                                confirmed directly with the venue management before any financial
+                                commitments or payments unlock.
                             </p>
                         </div>
 
@@ -384,9 +442,13 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                             <div className="grid h-10 w-10 place-items-center rounded-lg bg-accent/10 text-accent">
                                 <Building2 className="h-5 w-5" />
                             </div>
-                            <h3 className="text-sm font-semibold text-ink">Integrated 8-Pillars Coordination</h3>
+                            <h3 className="text-sm font-semibold text-ink">
+                                Integrated 8-Pillars Coordination
+                            </h3>
                             <p className="text-xs text-ink-secondary leading-relaxed">
-                                Confirmed bookings seamlessly bridge into your event operations dashboard (Pillar 6: Venue & Logistics) with direct real-time communication threads.
+                                Confirmed bookings seamlessly bridge into your event operations
+                                dashboard (Pillar 6: Venue & Logistics) with direct real-time
+                                communication threads.
                             </p>
                         </div>
                     </div>

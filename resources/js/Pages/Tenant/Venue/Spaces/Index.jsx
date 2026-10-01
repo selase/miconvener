@@ -4,7 +4,16 @@ import Button from '@/Components/Console/Button';
 import PageHeader from '@/Components/Console/PageHeader';
 import StatusPill from '@/Components/Console/StatusPill';
 import { Table, Thead, Tr, Th, Td } from '@/Components/Console/Table';
-import { Plus, Building2, MapPin, Users, CheckCircle2, AlertCircle, Edit, Trash2 } from 'lucide-react';
+import {
+    Plus,
+    Building2,
+    MapPin,
+    Users,
+    CheckCircle2,
+    AlertCircle,
+    Edit,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
 
@@ -33,13 +42,20 @@ export default function SpacesIndex({ shop, spaces }) {
         <div className="space-y-6">
             <PageHeader
                 title="Venue Spaces & Halls"
-                description={`Manage bookable halls, capacities, and amenity checklists for ${shop.name}.`}
-                action={
+                actions={
                     <div className="flex items-center gap-3">
-                        <Button href={route('tenant.venue.profile')} variant="default" icon={Building2}>
+                        <Button
+                            href={route('tenant.venue.profile')}
+                            variant="default"
+                            icon={Building2}
+                        >
                             Venue Profile
                         </Button>
-                        <Button href={route('tenant.venue.spaces.create')} variant="primary" icon={Plus}>
+                        <Button
+                            href={route('tenant.venue.spaces.create')}
+                            variant="primary"
+                            icon={Plus}
+                        >
                             Add Space
                         </Button>
                     </div>
@@ -79,15 +95,19 @@ export default function SpacesIndex({ shop, spaces }) {
                         {spaces.data.map((space) => {
                             const banquetCap = space.capacity_breakdown?.banquet;
                             const theaterCap = space.capacity_breakdown?.theater;
-                            const includedCount = space.amenities?.filter((a) => a.is_included).length ?? 0;
-                            const excludedCount = space.amenities?.filter((a) => !a.is_included).length ?? 0;
+                            const includedCount =
+                                space.amenities?.filter((a) => a.is_included).length ?? 0;
+                            const excludedCount =
+                                space.amenities?.filter((a) => !a.is_included).length ?? 0;
 
                             return (
                                 <Tr key={space.id}>
                                     <Td>
                                         <div className="font-semibold text-ink">{space.title}</div>
                                         <div className="text-xs text-ink-secondary">
-                                            {space.floor_area_sqm ? `${space.floor_area_sqm} m² · ` : ''}
+                                            {space.floor_area_sqm
+                                                ? `${space.floor_area_sqm} m² · `
+                                                : ''}
                                             {space.pricing_model.replace('_', ' ')}
                                         </div>
                                     </Td>
@@ -114,13 +134,19 @@ export default function SpacesIndex({ shop, spaces }) {
                                                     Theater: {theaterCap}
                                                 </span>
                                             )}
-                                            {!banquetCap && !theaterCap && <span className="text-ink-secondary">—</span>}
+                                            {!banquetCap && !theaterCap && (
+                                                <span className="text-ink-secondary">—</span>
+                                            )}
                                         </div>
                                     </Td>
                                     <Td>
                                         <div className="text-xs text-ink-secondary">
-                                            <span className="text-success-fg font-medium">{includedCount} included</span>
-                                            {excludedCount > 0 && <span> · {excludedCount} excluded</span>}
+                                            <span className="text-success-fg font-medium">
+                                                {includedCount} included
+                                            </span>
+                                            {excludedCount > 0 && (
+                                                <span> · {excludedCount} excluded</span>
+                                            )}
                                         </div>
                                     </Td>
                                     <Td>
@@ -131,7 +157,9 @@ export default function SpacesIndex({ shop, spaces }) {
                                     <Td align="right">
                                         <div className="flex items-center justify-end gap-2">
                                             <Link
-                                                href={route('tenant.venue.spaces.edit', { listing: space.id })}
+                                                href={route('tenant.venue.spaces.edit', {
+                                                    listing: space.id,
+                                                })}
                                                 className="rounded p-1 text-ink-secondary hover:bg-surface-hover hover:text-ink"
                                                 title="Edit Space"
                                             >
@@ -155,27 +183,34 @@ export default function SpacesIndex({ shop, spaces }) {
             ) : (
                 <div className="rounded-lg border border-dashed border-border p-12 text-center">
                     <Building2 className="mx-auto h-12 w-12 text-ink-secondary opacity-40" />
-                    <h3 className="mt-4 text-base font-semibold text-ink">No venue spaces listed yet</h3>
+                    <h3 className="mt-4 text-base font-semibold text-ink">
+                        No venue spaces listed yet
+                    </h3>
                     <p className="mt-1 text-sm text-ink-secondary">
-                        List your auditoriums, banquet halls, or meeting rooms to showcase them on the MiConvener Marketplace.
+                        List your auditoriums, banquet halls, or meeting rooms to showcase them on
+                        the MiConvener Marketplace.
                     </p>
                     <div className="mt-6 flex justify-center">
-                        <Button href={route('tenant.venue.spaces.create')} variant="primary" icon={Plus}>
+                        <Button
+                            href={route('tenant.venue.spaces.create')}
+                            variant="primary"
+                            icon={Plus}
+                        >
                             Add Your First Space
                         </Button>
                     </div>
                 </div>
             )}
 
-            {deletingSpace && (
-                <ConfirmModal
-                    title="Delete Venue Space"
-                    onConfirm={confirmDelete}
-                    onClose={() => setDeletingSpace(null)}
-                >
-                    Are you sure you want to delete <span className="font-semibold">{deletingSpace.title}</span>? This action cannot be undone.
-                </ConfirmModal>
-            )}
+            <ConfirmModal
+                open={Boolean(deletingSpace)}
+                title="Delete Venue Space"
+                description={`Are you sure you want to delete ${deletingSpace?.title ?? 'this space'}? This action cannot be undone.`}
+                confirmLabel="Delete Space"
+                danger
+                onConfirm={confirmDelete}
+                onClose={() => setDeletingSpace(null)}
+            />
         </div>
     );
 }

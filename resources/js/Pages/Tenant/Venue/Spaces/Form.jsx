@@ -4,7 +4,18 @@ import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
 import PageHeader from '@/Components/Console/PageHeader';
-import { ArrowLeft, Save, CheckCircle2, XCircle, Building2, Zap, Armchair, Volume2, ShieldCheck, Utensils } from 'lucide-react';
+import {
+    ArrowLeft,
+    Save,
+    CheckCircle2,
+    XCircle,
+    Building2,
+    Zap,
+    Armchair,
+    Volume2,
+    ShieldCheck,
+    Utensils,
+} from 'lucide-react';
 import { useState } from 'react';
 
 const CATEGORY_META = {
@@ -39,7 +50,9 @@ export default function SpaceForm({ space, amenities }) {
         rental_price: space ? (space.rental_price_pesewas / 100).toString() : '',
         pricing_model: space?.pricing_model || 'per_day',
         price_visibility: space?.price_visibility || 'public',
-        security_deposit: space?.security_deposit_pesewas ? (space.security_deposit_pesewas / 100).toString() : '',
+        security_deposit: space?.security_deposit_pesewas
+            ? (space.security_deposit_pesewas / 100).toString()
+            : '',
         capacity_breakdown: {
             banquet: space?.capacity_breakdown?.banquet || '',
             theater: space?.capacity_breakdown?.theater || '',
@@ -105,7 +118,12 @@ export default function SpaceForm({ space, amenities }) {
         setData((prev) => ({
             ...prev,
             title: val,
-            slug: isEdit ? prev.slug : val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            slug: isEdit
+                ? prev.slug
+                : val
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/(^-|-$)/g, ''),
         }));
     };
 
@@ -120,9 +138,12 @@ export default function SpaceForm({ space, amenities }) {
         <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl pb-12">
             <PageHeader
                 title={isEdit ? `Edit ${space.title}` : 'Add Venue Space'}
-                description="Configure hall capacity, pricing visibility, and the transparent Included vs Excluded amenities grid."
-                action={
-                    <Button href={route('tenant.venue.spaces.index')} variant="default" icon={ArrowLeft}>
+                actions={
+                    <Button
+                        href={route('tenant.venue.spaces.index')}
+                        variant="default"
+                        icon={ArrowLeft}
+                    >
                         Back to Spaces
                     </Button>
                 }
@@ -149,7 +170,9 @@ export default function SpaceForm({ space, amenities }) {
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-ink-secondary mb-1">Description</label>
+                    <label className="block text-xs font-medium text-ink-secondary mb-1">
+                        Description
+                    </label>
                     <textarea
                         rows={3}
                         className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-secondary focus:border-accent focus:outline-none"
@@ -157,7 +180,9 @@ export default function SpaceForm({ space, amenities }) {
                         value={data.description}
                         onChange={(e) => setData('description', e.target.value)}
                     />
-                    {errors.description && <p className="mt-1 text-xs text-danger-fg">{errors.description}</p>}
+                    {errors.description && (
+                        <p className="mt-1 text-xs text-danger-fg">{errors.description}</p>
+                    )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <Input
@@ -185,7 +210,8 @@ export default function SpaceForm({ space, amenities }) {
             <div className="rounded-lg border border-border bg-surface p-6 space-y-4">
                 <h3 className="text-base font-semibold text-ink">2. Seating Capacity Matrix</h3>
                 <p className="text-xs text-ink-secondary">
-                    Specify maximum attendee capacities across common seating arrangements. Organizers search by seating style.
+                    Specify maximum attendee capacities across common seating arrangements.
+                    Organizers search by seating style.
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <Input
@@ -194,7 +220,10 @@ export default function SpaceForm({ space, amenities }) {
                         placeholder="e.g. 350"
                         value={data.capacity_breakdown.banquet}
                         onChange={(e) =>
-                            setData('capacity_breakdown', { ...data.capacity_breakdown, banquet: e.target.value })
+                            setData('capacity_breakdown', {
+                                ...data.capacity_breakdown,
+                                banquet: e.target.value,
+                            })
                         }
                     />
                     <Input
@@ -203,7 +232,10 @@ export default function SpaceForm({ space, amenities }) {
                         placeholder="e.g. 600"
                         value={data.capacity_breakdown.theater}
                         onChange={(e) =>
-                            setData('capacity_breakdown', { ...data.capacity_breakdown, theater: e.target.value })
+                            setData('capacity_breakdown', {
+                                ...data.capacity_breakdown,
+                                theater: e.target.value,
+                            })
                         }
                     />
                     <Input
@@ -212,7 +244,10 @@ export default function SpaceForm({ space, amenities }) {
                         placeholder="e.g. 800"
                         value={data.capacity_breakdown.cocktail}
                         onChange={(e) =>
-                            setData('capacity_breakdown', { ...data.capacity_breakdown, cocktail: e.target.value })
+                            setData('capacity_breakdown', {
+                                ...data.capacity_breakdown,
+                                cocktail: e.target.value,
+                            })
                         }
                     />
                     <Input
@@ -221,7 +256,10 @@ export default function SpaceForm({ space, amenities }) {
                         placeholder="e.g. 250"
                         value={data.capacity_breakdown.classroom}
                         onChange={(e) =>
-                            setData('capacity_breakdown', { ...data.capacity_breakdown, classroom: e.target.value })
+                            setData('capacity_breakdown', {
+                                ...data.capacity_breakdown,
+                                classroom: e.target.value,
+                            })
                         }
                     />
                 </div>
@@ -246,13 +284,12 @@ export default function SpaceForm({ space, amenities }) {
                         value={data.pricing_model}
                         onChange={(e) => setData('pricing_model', e.target.value)}
                         error={errors.pricing_model}
-                        options={[
-                            { value: 'per_day', label: 'Per Day (Full Day)' },
-                            { value: 'per_half_day', label: 'Per Half Day (4 Hours)' },
-                            { value: 'per_hour', label: 'Per Hour' },
-                            { value: 'flat_rate', label: 'Flat Rate per Event' },
-                        ]}
-                    />
+                    >
+                        <option value="per_day">Per Day (Full Day)</option>
+                        <option value="per_half_day">Per Half Day (4 Hours)</option>
+                        <option value="per_hour">Per Hour</option>
+                        <option value="flat_rate">Flat Rate per Event</option>
+                    </Select>
                     <Input
                         label="Refundable Security Deposit (GHS)"
                         type="number"
@@ -265,7 +302,9 @@ export default function SpaceForm({ space, amenities }) {
                 </div>
 
                 <div className="pt-2">
-                    <label className="block text-xs font-medium text-ink-secondary mb-2">Price Visibility on Marketplace</label>
+                    <label className="block text-xs font-medium text-ink-secondary mb-2">
+                        Price Visibility on Marketplace
+                    </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label
                             className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
@@ -285,7 +324,8 @@ export default function SpaceForm({ space, amenities }) {
                             <div>
                                 <div className="text-sm font-semibold">Publicly Display Price</div>
                                 <div className="text-xs text-ink-secondary">
-                                    Shows exact price on search cards (e.g. "GHS 15,000 / day"). Attracts direct inquiries.
+                                    Shows exact price on search cards (e.g. "GHS 15,000 / day").
+                                    Attracts direct inquiries.
                                 </div>
                             </div>
                         </label>
@@ -308,7 +348,8 @@ export default function SpaceForm({ space, amenities }) {
                             <div>
                                 <div className="text-sm font-semibold">Price on Request</div>
                                 <div className="text-xs text-ink-secondary">
-                                    Hides the exact figure on public cards. Displays "Price on request / Request a quote".
+                                    Hides the exact figure on public cards. Displays "Price on
+                                    request / Request a quote".
                                 </div>
                             </div>
                         </label>
@@ -319,10 +360,13 @@ export default function SpaceForm({ space, amenities }) {
             {/* SECTION 4: The Included vs Excluded Amenities Grid */}
             <div className="rounded-lg border border-border bg-surface p-6 space-y-6">
                 <div>
-                    <h3 className="text-base font-semibold text-ink">4. Included vs. Excluded Amenities Grid</h3>
+                    <h3 className="text-base font-semibold text-ink">
+                        4. Included vs. Excluded Amenities Grid
+                    </h3>
                     <p className="text-xs text-ink-secondary mt-1">
-                        Select which amenities are included in the base rental versus which are excluded or require additional fees.
-                        Total transparency prevents event-day disputes.
+                        Select which amenities are included in the base rental versus which are
+                        excluded or require additional fees. Total transparency prevents event-day
+                        disputes.
                     </p>
                 </div>
 
@@ -331,14 +375,19 @@ export default function SpaceForm({ space, amenities }) {
                     const CategoryIcon = meta.icon;
 
                     return (
-                        <div key={category} className="space-y-3 pt-2 border-t border-border first:border-t-0 first:pt-0">
+                        <div
+                            key={category}
+                            className="space-y-3 pt-2 border-t border-border first:border-t-0 first:pt-0"
+                        >
                             <div className="flex items-center gap-2 text-sm font-semibold text-ink">
                                 <CategoryIcon className="h-4 w-4 text-accent" />
                                 {meta.label}
                             </div>
                             <div className="grid grid-cols-1 gap-2.5">
                                 {items.map((amenity) => {
-                                    const selection = amenitySelections[amenity.slug] || amenitySelections[amenity.id];
+                                    const selection =
+                                        amenitySelections[amenity.slug] ||
+                                        amenitySelections[amenity.id];
                                     const isIncluded = selection?.is_included === true;
                                     const isExcluded = selection?.is_included === false;
 
@@ -347,12 +396,16 @@ export default function SpaceForm({ space, amenities }) {
                                             key={amenity.id}
                                             className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border border-border p-3 text-sm bg-surface-hover/30"
                                         >
-                                            <div className="font-medium text-ink min-w-[200px]">{amenity.name}</div>
+                                            <div className="font-medium text-ink min-w-[200px]">
+                                                {amenity.name}
+                                            </div>
 
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleAmenityToggle(amenity.id, true)}
+                                                    onClick={() =>
+                                                        handleAmenityToggle(amenity.id, true)
+                                                    }
                                                     className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                                                         isIncluded
                                                             ? 'bg-success-bg text-success-fg border border-success-border font-semibold'
@@ -365,7 +418,9 @@ export default function SpaceForm({ space, amenities }) {
 
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleAmenityToggle(amenity.id, false)}
+                                                    onClick={() =>
+                                                        handleAmenityToggle(amenity.id, false)
+                                                    }
                                                     className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                                                         isExcluded
                                                             ? 'bg-danger-bg text-danger-fg border border-danger-border font-semibold'
@@ -380,7 +435,12 @@ export default function SpaceForm({ space, amenities }) {
                                                     type="text"
                                                     placeholder="Optional notes (e.g. 300 chairs, extra fee)"
                                                     value={selection?.notes || ''}
-                                                    onChange={(e) => handleAmenityNoteChange(amenity.id, e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleAmenityNoteChange(
+                                                            amenity.id,
+                                                            e.target.value
+                                                        )
+                                                    }
                                                     className="w-full sm:w-64 rounded border border-border bg-surface px-2.5 py-1 text-xs text-ink placeholder:text-ink-secondary focus:border-accent focus:outline-none"
                                                 />
                                             </div>
@@ -399,12 +459,11 @@ export default function SpaceForm({ space, amenities }) {
                     label="Listing Status"
                     value={data.status}
                     onChange={(e) => setData('status', e.target.value)}
-                    options={[
-                        { value: 'published', label: 'Published (Visible in Marketplace)' },
-                        { value: 'draft', label: 'Draft (Hidden from Marketplace)' },
-                        { value: 'suspended', label: 'Suspended (Temporarily Unavailable)' },
-                    ]}
-                />
+                >
+                    <option value="published">Published (Visible in Marketplace)</option>
+                    <option value="draft">Draft (Hidden from Marketplace)</option>
+                    <option value="suspended">Suspended (Temporarily Unavailable)</option>
+                </Select>
 
                 <div className="flex items-center gap-3">
                     <Button href={route('tenant.venue.spaces.index')} variant="default">

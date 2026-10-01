@@ -106,6 +106,13 @@ final class StoreListing extends Model
         return $this->hasOne(StoreListingMedia::class, 'listing_id')->where('is_primary', true);
     }
 
+    public function getPrimaryMediaAttribute(): ?StoreListingMedia
+    {
+        return $this->relationLoaded('primaryMedia')
+            ? $this->getRelation('primaryMedia')
+            : $this->primaryMedia()->first();
+    }
+
     public function isPublished(): bool
     {
         return $this->status === self::STATUS_PUBLISHED;

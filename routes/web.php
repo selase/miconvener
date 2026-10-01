@@ -97,13 +97,15 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('index');
     });
 
-    // Marketplace Merchant Verification Queue
-    Route::group(['prefix' => 'marketplace-verifications', 'as' => 'admin.marketplace-verifications.'], function (): void {
+    // Marketplace Merchant Verification Queue (accessible at /admin/marketplace-verifications and /marketplace-verifications)
+    Route::group(['prefix' => 'admin/marketplace-verifications', 'as' => 'admin.marketplace-verifications.'], function (): void {
         Route::get('/', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'index'])->name('index');
         Route::get('/{shop}', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'show'])->name('show');
         Route::post('/{shop}/approve', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'approve'])->name('approve');
         Route::post('/{shop}/reject', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'reject'])->name('reject');
     });
+    Route::get('marketplace-verifications', fn () => redirect()->route('admin.marketplace-verifications.index'));
+    Route::get('marketplace-verifications/{shop}', fn ($shop) => redirect()->route('admin.marketplace-verifications.show', $shop));
 
     // Tenant routes
     Route::group(['prefix' => 'tenants', 'as' => 'tenants.'], function (): void {

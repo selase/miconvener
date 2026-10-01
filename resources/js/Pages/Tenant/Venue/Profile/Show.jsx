@@ -3,7 +3,16 @@ import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 import PageHeader from '@/Components/Console/PageHeader';
-import { Building2, MapPin, CheckCircle2, AlertCircle, Clock, Shield, Save, ArrowLeft } from 'lucide-react';
+import {
+    Building2,
+    MapPin,
+    CheckCircle2,
+    AlertCircle,
+    Clock,
+    Shield,
+    Save,
+    ArrowLeft,
+} from 'lucide-react';
 import { useState } from 'react';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
 
@@ -29,18 +38,25 @@ export default function VenueProfileShow({ shop }) {
     };
 
     const handleRequestVerification = () => {
-        router.post(route('tenant.venue.profile.verify'), {}, {
-            onFinish: () => setConfirmModalOpen(false),
-        });
+        router.post(
+            route('tenant.venue.profile.verify'),
+            {},
+            {
+                onFinish: () => setConfirmModalOpen(false),
+            }
+        );
     };
 
     return (
         <div className="space-y-8 max-w-4xl pb-12">
             <PageHeader
                 title="Venue & Storefront Profile"
-                description="Manage your venue brand profile, GPS coordinates for proximity search, and Blue Tick verification status."
-                action={
-                    <Button href={route('tenant.venue.spaces.index')} variant="default" icon={Building2}>
+                actions={
+                    <Button
+                        href={route('tenant.venue.spaces.index')}
+                        variant="default"
+                        icon={Building2}
+                    >
                         View Spaces
                     </Button>
                 }
@@ -73,7 +89,9 @@ export default function VenueProfileShow({ shop }) {
 
                         <div>
                             <div className="flex items-center gap-2">
-                                <h3 className="text-base font-semibold text-ink">Trust & Verification</h3>
+                                <h3 className="text-base font-semibold text-ink">
+                                    Trust & Verification
+                                </h3>
                                 {shop.verification_status === 'verified' && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-success-bg px-2.5 py-0.5 text-xs font-semibold text-success-fg">
                                         <CheckCircle2 className="h-3 w-3" /> Blue Tick Verified
@@ -112,7 +130,10 @@ export default function VenueProfileShow({ shop }) {
             </div>
 
             {/* Venue Profile Form */}
-            <form onSubmit={handleSave} className="rounded-lg border border-border bg-surface p-6 space-y-6">
+            <form
+                onSubmit={handleSave}
+                className="rounded-lg border border-border bg-surface p-6 space-y-6"
+            >
                 <h3 className="text-base font-semibold text-ink">Venue Brand & Contact Details</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -133,7 +154,9 @@ export default function VenueProfileShow({ shop }) {
                 </div>
 
                 <div>
-                    <label className="block text-xs font-medium text-ink-secondary mb-1">About the Venue</label>
+                    <label className="block text-xs font-medium text-ink-secondary mb-1">
+                        About the Venue
+                    </label>
                     <textarea
                         rows={3}
                         className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-secondary focus:border-accent focus:outline-none"
@@ -141,7 +164,9 @@ export default function VenueProfileShow({ shop }) {
                         value={data.description}
                         onChange={(e) => setData('description', e.target.value)}
                     />
-                    {errors.description && <p className="mt-1 text-xs text-danger-fg">{errors.description}</p>}
+                    {errors.description && (
+                        <p className="mt-1 text-xs text-danger-fg">{errors.description}</p>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -164,10 +189,12 @@ export default function VenueProfileShow({ shop }) {
 
                 <div className="space-y-4 pt-4 border-t border-border">
                     <h4 className="text-sm font-semibold text-ink flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4 text-accent" /> Physical Location & Proximity Search
+                        <MapPin className="h-4 w-4 text-accent" /> Physical Location & Proximity
+                        Search
                     </h4>
                     <p className="text-xs text-ink-secondary">
-                        Organizers search for venues "near [landmark/city]". Providing exact coordinates enables accurate proximity sorting.
+                        Organizers search for venues "near [landmark/city]". Providing exact
+                        coordinates enables accurate proximity sorting.
                     </p>
 
                     <Input
@@ -224,15 +251,14 @@ export default function VenueProfileShow({ shop }) {
                 </div>
             </form>
 
-            {confirmModalOpen && (
-                <ConfirmModal
-                    title="Submit for Blue Tick Verification"
-                    onConfirm={handleRequestVerification}
-                    onClose={() => setConfirmModalOpen(false)}
-                >
-                    Are you ready to submit <span className="font-semibold">{data.name}</span> for verification? Our team will review your business credentials and contact details.
-                </ConfirmModal>
-            )}
+            <ConfirmModal
+                open={confirmModalOpen}
+                title="Submit for Blue Tick Verification"
+                description={`Are you ready to submit ${data.name} for verification? Our team will review your business credentials and contact details.`}
+                confirmLabel="Submit for Verification"
+                onConfirm={handleRequestVerification}
+                onClose={() => setConfirmModalOpen(false)}
+            />
         </div>
     );
 }
