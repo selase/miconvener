@@ -44,6 +44,22 @@ final class StoreListingMedia extends Model
     ];
 
     /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'url',
+    ];
+
+    public function getUrlAttribute(): string
+    {
+        if (str_starts_with($this->file_path, 'http://') || str_starts_with($this->file_path, 'https://')) {
+            return $this->file_path;
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->file_path);
+    }
+
+    /**
      * @return BelongsTo<StoreListing, $this>
      */
     public function listing(): BelongsTo
