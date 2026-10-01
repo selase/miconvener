@@ -98,6 +98,8 @@ final class Event extends Model
         'visibility',
         'speaker_slide_policy',
         'plan_your_visit_content',
+        'store_listing_id',
+        'venue_booking_id',
         'platform_fee_percentage',
         'platform_fee_cap_amount',
         'fee_bearer',
@@ -203,6 +205,9 @@ final class Event extends Model
     /**
      * @return HasMany<EventMaterial, $this>
      */
+    /**
+     * @return HasMany<EventMaterial, $this>
+     */
     public function materials(): HasMany
     {
         return $this->hasMany(EventMaterial::class)->orderBy('created_at');
@@ -211,6 +216,27 @@ final class Event extends Model
     public function venueRooms(): HasMany
     {
         return $this->hasMany(EventVenueRoom::class)->orderBy('sort_order');
+    }
+
+    /**
+     * @return BelongsTo<StoreListing, $this>
+     */
+    public function venueListing(): BelongsTo
+    {
+        return $this->belongsTo(StoreListing::class, 'store_listing_id');
+    }
+
+    /**
+     * @return BelongsTo<VenueBooking, $this>
+     */
+    public function venueBooking(): BelongsTo
+    {
+        return $this->belongsTo(VenueBooking::class, 'venue_booking_id');
+    }
+
+    public function isMarketplaceVenue(): bool
+    {
+        return $this->store_listing_id !== null;
     }
 
     /**
@@ -318,11 +344,17 @@ final class Event extends Model
     /**
      * @return HasMany<EventDynamicForm, $this>
      */
+    /**
+     * @return HasMany<EventDynamicForm, $this>
+     */
     public function dynamicForms(): HasMany
     {
         return $this->hasMany(EventDynamicForm::class)->latest('created_at');
     }
 
+    /**
+     * @return HasMany<EventParticipantGroup, $this>
+     */
     /**
      * @return HasMany<EventParticipantGroup, $this>
      */

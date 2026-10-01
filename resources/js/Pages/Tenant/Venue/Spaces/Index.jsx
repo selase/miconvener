@@ -7,6 +7,7 @@ import { Table, Thead, Tr, Th, Td } from '@/Components/Console/Table';
 import {
     Plus,
     Building2,
+    Inbox,
     MapPin,
     Users,
     CheckCircle2,
@@ -44,6 +45,13 @@ export default function SpacesIndex({ shop, spaces }) {
                 title="Venue Spaces & Halls"
                 actions={
                     <div className="flex items-center gap-3">
+                        <Button
+                            href={route('tenant.venue.inquiries.index')}
+                            variant="default"
+                            icon={Inbox}
+                        >
+                            Inquiries
+                        </Button>
                         <Button
                             href={route('tenant.venue.profile')}
                             variant="default"

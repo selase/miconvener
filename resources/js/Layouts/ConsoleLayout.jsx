@@ -23,7 +23,12 @@ import ThemeToggle from '@/Components/Console/ThemeToggle';
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'tenant.dashboard', icon: LayoutDashboard },
     { label: 'Events', href: 'tenant.events.index', icon: Calendar },
-    { label: 'Venue Spaces', href: 'tenant.venue.spaces.index', icon: Building2, permission: 'manage_venue' },
+    {
+        label: 'Venue Spaces',
+        href: 'tenant.venue.spaces.index',
+        icon: Building2,
+        permission: 'manage_venue',
+    },
     { label: 'Team', href: 'tenant.users.index', icon: Users },
     { label: 'Roles', href: 'tenant.roles.index', icon: ShieldCheck },
     { label: 'API Keys', href: 'tenant.api-keys.index', icon: KeyRound },

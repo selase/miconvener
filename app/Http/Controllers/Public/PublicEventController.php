@@ -41,7 +41,14 @@ final class PublicEventController extends Controller
         $eventModel = Event::where('tenant_id', $tenant->id)
             ->where('slug', $event)
             ->published()
-            ->with(['sessions' => fn ($query) => $query->withCount('registrations'), 'sessions.speakers', 'speakers', 'sponsors'])
+            ->with([
+                'sessions' => fn ($query) => $query->withCount('registrations'),
+                'sessions.speakers',
+                'speakers',
+                'sponsors',
+                'venueListing.shop',
+                'venueListing.primaryMedia',
+            ])
             ->firstOrFail();
 
         return Inertia::render('Public/Events/Show', [
@@ -594,6 +601,24 @@ final class PublicEventController extends Controller
                 'is_sold_out' => $t->isSoldOut(),
                 'is_invite_only' => $t->isInviteOnly(),
             ])->values(),
+            'is_marketplace_venue' => $event->isMarketplaceVenue(),
+            'venue_listing' => $event->relationLoaded('venueListing') && $event->venueListing ? [
+                'id' => $event->venueListing->id,
+                'title' => $event->venueListing->title,
+                'slug' => $event->venueListing->slug,
+                'floor_area_sqm' => $event->venueListing->floor_area_sqm,
+                'ceiling_height_meters' => $event->venueListing->ceiling_height_meters,
+                'capacity_breakdown' => $event->venueListing->capacity_breakdown,
+                'primary_media' => $event->venueListing->primaryMedia,
+                'shop' => [
+                    'name' => $event->venueListing->shop?->name,
+                    'slug' => $event->venueListing->shop?->slug,
+                    'address' => $event->venueListing->shop?->address,
+                    'city' => $event->venueListing->shop?->city,
+                    'region' => $event->venueListing->shop?->region,
+                    'verification_status' => $event->venueListing->shop?->verification_status,
+                ],
+            ] : null,
             'sessions' => ! $withhold && $event->relationLoaded('sessions') ? $event->sessions->map(fn ($s): array => [
                 'id' => $s->id,
                 'title' => $s->title,

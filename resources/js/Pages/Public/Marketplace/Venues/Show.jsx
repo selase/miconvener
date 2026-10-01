@@ -18,6 +18,7 @@ import {
     Info,
     Share2,
 } from 'lucide-react';
+import VenueBookingDrawer from '@/Components/Marketplace/VenueBookingDrawer';
 
 export default function VenueShow({ venue, otherSpaces = [] }) {
     const [selectedMediaIdx, setSelectedMediaIdx] = useState(0);
@@ -590,50 +591,12 @@ export default function VenueShow({ venue, otherSpaces = [] }) {
                 )}
             </div>
 
-            {/* Inquiry / Booking Preview Modal */}
-            {inquiryModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                    <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl space-y-4">
-                        <div className="flex items-center justify-between border-b border-border pb-3">
-                            <h3 className="text-sm font-semibold text-ink">
-                                Request to Book {venue.title}
-                            </h3>
-                            <button
-                                type="button"
-                                onClick={() => setInquiryModalOpen(false)}
-                                className="text-ink-secondary hover:text-ink"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <p className="text-xs text-ink-secondary leading-relaxed">
-                            Booking workflows and instant date holds will unlock in{' '}
-                            <strong>Build 2 (Booking & Negotiation Engine)</strong>. In the
-                            meantime, you can directly reach out to the venue host team:
-                        </p>
-
-                        <div className="rounded-lg bg-canvas p-4 border border-border space-y-2 text-xs">
-                            <div className="font-semibold text-ink">{venue.shop?.name}</div>
-                            {venue.shop?.phone && <div>📞 {venue.shop.phone}</div>}
-                            {venue.shop?.email && <div>✉️ {venue.shop.email}</div>}
-                            {venue.shop?.address && (
-                                <div>
-                                    📍 {venue.shop.address}, {venue.shop.city}
-                                </div>
-                            )}
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => setInquiryModalOpen(false)}
-                            className="w-full rounded-lg bg-accent py-2 text-xs font-semibold text-white"
-                        >
-                            Got It
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Venue Booking & Preferred Date/Time Drawer */}
+            <VenueBookingDrawer
+                isOpen={inquiryModalOpen}
+                onClose={() => setInquiryModalOpen(false)}
+                venue={venue}
+            />
         </MarketplaceLayout>
     );
 }

@@ -7,7 +7,6 @@ namespace App\Mcp\Tools;
 use App\Models\StoreListing;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -72,8 +71,33 @@ final class RequestQuoteTool extends Tool
         /** @var \App\Models\TenantApiKey|null $partnerApiKey */
         $partnerApiKey = request()->attributes->get('mcp_partner_api_key');
 
-        $inquiryRef = 'INQ-'.mb_strtoupper(Str::random(8));
-        $date = Carbon::parse((string) $request->get('event_date'))->toFormattedDateString();
+        $dateStr = (string) $request->get('event_date');
+        $startsAt = Carbon::parse($dateStr)->setTime(9, 0);
+        $endsAt = Carbon::parse($dateStr)->setTime(17, 0);
+
+        $bookingService = app(\App\Services\Marketplace\VenueBookingService::class);
+        try {
+            $booking = $bookingService->createBooking($listing, [
+                'planner_name' => $request->get('planner_name'),
+                'planner_email' => $request->get('planner_email'),
+                'planner_phone' => $request->get('planner_phone'),
+                'planner_company' => $partnerTenant?->name,
+                'event_type' => $request->get('event_type'),
+                'guest_count' => (int) $request->get('guest_count'),
+                'layout_style' => 'banquet',
+                'starts_at' => $startsAt->toDateTimeString(),
+                'ends_at' => $endsAt->toDateTimeString(),
+                'special_requests' => $request->get('notes'),
+                'request_quote_only' => true,
+            ], null, $partnerTenant);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $errors = implode(' ', array_map(fn ($msgs) => implode(' ', (array) $msgs), $e->errors()));
+
+            return Response::error('Venue quote validation failed: '.$errors);
+        }
+
+        $inquiryRef = $booking->booking_reference;
+        $date = Carbon::parse($dateStr)->toFormattedDateString();
         $rateGhs = (! $listing->isPriceOnRequest() && $listing->rental_price_pesewas > 0)
             ? $listing->rental_price_pesewas / 100
             : null;
@@ -83,7 +107,7 @@ final class RequestQuoteTool extends Tool
 
         $inquiry = [
             'inquiry_reference' => $inquiryRef,
-            'status' => 'prepared',
+            'status' => 'submitted',
             'venue' => [
                 'title' => $listing->title,
                 'host_name' => $listing->shop?->name,
@@ -108,9 +132,9 @@ final class RequestQuoteTool extends Tool
                 'is_price_on_request' => $listing->isPriceOnRequest(),
             ],
             'next_steps' => $partnerTenant !== null
-                ? "Submit this priority partner inquiry reference ({$inquiryRef}) directly to {$listing->shop?->email} or initiate formal contract booking via MiConvener Marketplace."
-                : "Submit this inquiry reference ({$inquiryRef}) directly to {$listing->shop?->email} or initiate formal contract booking via MiConvener Marketplace.",
-            'booking_url' => route('marketplace.venues.show', $listing->slug),
+                ? "This priority partner inquiry reference ({$inquiryRef}) has been routed to the host inbox at {$listing->shop?->email}. You can track status or proceed to booking via the link below."
+                : "This venue inquiry reference ({$inquiryRef}) has been routed to the host inbox at {$listing->shop?->email}. You can track status or proceed to booking via the link below.",
+            'booking_url' => route('marketplace.bookings.show', $booking->booking_reference),
         ];
 
         if ($partnerTenant !== null) {

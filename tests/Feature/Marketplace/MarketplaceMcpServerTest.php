@@ -242,7 +242,7 @@ test('mcp request_venue_quote formats structured booking inquiry', function (): 
     $response->assertOk();
     $data = json_decode($response->json('result.content.0.text'), true);
 
-    expect($data['status'])->toBe('prepared')
+    expect($data['status'])->toBe('submitted')
         ->and($data['inquiry_reference'])->toStartWith('INQ-')
         ->and($data['estimated_costs']['space_rate_ghs'])->toBe(14000)
         ->and($data['venue']['host_email'])->toBe('sales@ridgeroyalhotel.com');

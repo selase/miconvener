@@ -668,5 +668,54 @@ Integration of the **Laravel AI SDK** (`laravel/ai` v0.11), **Laravel MCP** (`la
   - [x] Partner tier documentation & interactive API key testing in MCP Explorer UI with live response rate limit telemetry.
   - [x] Verified with 53 passing tests (320 assertions) across `tests/Feature/Marketplace/`, PHPStan Level 5 passed with 0 errors, ESLint clean, Laravel Pint clean, and fresh Vite build.
 
+---
+
+## [x] Track: MiConvener Marketplace (Build 3: Venue Booking & Checkout, Host Inquiries Inbox & Event Linking)
+
+Full venue booking engine with custom date/time slot selection, real-time calendar lockouts, Paystack deposit checkout, host email alerts, dedicated venue manager console inbox (`/venue/inquiries`), and event-to-venue organizer linking.
+
+- [x] **Phase 1: Formal Venue Booking & Reservation Checkout Flow (Option 1)**:
+  - [x] Landlord migration `database/migrations/landlord/2026_10_01_130000_create_venue_bookings_table.php` with integer pesewas financials, date/time ranges (`starts_at`, `ends_at`), layout style, attendee count, contract snapshot, and unique `paystack_reference`.
+  - [x] Model `App\Models\VenueBooking` with statuses (`pending_quote`, `pending_payment`, `confirmed`, `rejected`, `cancelled`, `completed`), payment statuses (`unpaid`, `deposit_paid`, `fully_paid`, `refunded`), landlord connection, scopes (`blockingCalendar`, `overlapping`), and Eloquent relationships (`listing`, `shop`, `tenant`, `plannerTenant`, `user`).
+  - [x] Availability engine `App\Services\Marketplace\VenueAvailabilityService` validating date & time slots, computing duration units (hourly, full-day, multi-day, flat-rate), enforcing layout capacities, and preventing double-booking overlaps.
+  - [x] Booking & checkout service `App\Services\Marketplace\VenueBookingService` initializing Paystack deposit payments with idempotent reference tracking, contract terms snapshotting, and automatic hold TTL (`quote_valid_until`).
+  - [x] Controller `App\Http\Controllers\Marketplace\VenueBookingController` handling slot checks, booking submissions, checkout re-initiation (`/marketplace/bookings/{reference}/checkout`), secure Paystack callbacks (verifying booking ID match, GHS currency, and minimum deposit amount), and booking dossier views.
+  - [x] Public frontend booking drawer & preferred date/time selector in `resources/js/Pages/Public/Marketplace/Venues/Show.jsx` and booking confirmation dossier `resources/js/Pages/Public/Marketplace/Bookings/Show.jsx` with direct deposit checkout action banner.
+  - [x] Hardened MCP tools `CheckAvailabilityTool` (live date/time slot checks) and `RequestQuoteTool` (database persistence, validation error handling, and host notification).
+- [x] **Phase 2: Host Notification System & Inquiries / Leads Console Inbox (Option 2)**:
+  - [x] Mailables `NewVenueBookingNotification` (immediate queued email to `Shop::email` with direct lead dossier link), `BookingConfirmationGuest` (confirmation and receipt for guest), and `QuoteSentNotification` (custom quote notification).
+  - [x] Subdomain route `/venue/inquiries` and controller `App\Http\Controllers\Tenant\Venue\VenueInquiryController` (`index`, `show`, `acceptAndHold`, `sendQuote`, `reject`) strictly gated with `manage venue` permission and tenant isolation.
+  - [x] State guards on `acceptAndHold`, `sendQuote`, and `reject` preventing modification or decline of already confirmed/paid bookings.
+  - [x] Console inbox frontend `resources/js/Pages/Tenant/Venue/Inquiries/Index.jsx` and detailed lead dossier `Show.jsx` with 48h hold modal, custom quote modal, and decline modal compliant with Console Design System (`StatusPill` status prop, `ConfirmModal` description, `Button` variants).
+  - [x] Navigation updates in `ConsoleLayout.jsx` and `Spaces/Index.jsx` header actions.
+- [x] **Phase 3: Event-to-Venue Organizer Linking (Option 3)**:
+  - [x] Landlord migration `database/migrations/landlord/2026_10_01_130100_add_venue_booking_to_events_table.php` adding nullable `store_listing_id` and `venue_booking_id`.
+  - [x] `Event` model relationships `venueListing()` and `venueBooking()`, plus `isMarketplaceVenue()` helper.
+  - [x] Event creation & editing integration in `EventController` with conditional address validation and auto-population of address/capacity from linked venue listing.
+  - [x] Public event landing page update in `resources/js/Pages/Public/Events/Show.jsx` displaying Verified Venue Partner card, shop location, included capacity, and direct marketplace link.
+- [x] **Phase 4: Automated Verification, Quality Gates & Mandatory Self-Review**:
+  - [x] Pest test suite: 79 passing tests (461 assertions) covering calendar lockouts, double-booking prevention, Paystack deposit checkout, callback security verification, expired TTL slot release, host inbox gating, and event-to-venue linking:
+    - `tests/Feature/Marketplace/VenueBookingTest.php`: 11 tests, 52 assertions passing.
+    - `tests/Feature/Tenant/VenueInquiryTest.php`: 7 tests, 43 assertions passing.
+    - `tests/Feature/Events/EventVenueLinkingTest.php`: 4 tests, 41 assertions passing.
+    - `tests/Feature/Components/ConsoleComponentUsageTest.php`: 4 tests, 5 assertions passing.
+    - Full marketplace suite: 79 tests, 461 assertions passing.
+  - [x] Static analysis: PHPStan Level 5 passed with 0 errors across all modified/created files.
+  - [x] Frontend Quality: ESLint passed with 0 errors/warnings on all modified/created JSX components.
+  - [x] Frontend Bundling: `npm run build` compiled cleanly (2,589 modules transformed) in 7.01s.
+  - [x] Code Style: Laravel Pint clean (`vendor/bin/pint --dirty`).
+  - [x] 3-agent post-implementation self-review audit (Security, Logic/Edge Cases, Architecture/Performance) completed and all MUST/SHOULD FIX remediation items resolved:
+    - Added security validation in `VenueBookingController::callback` checking Paystack transaction metadata matches booking ID, currency is GHS, and verified amount covers the required deposit.
+    - Added dedicated `/marketplace/bookings/{reference}/checkout` route and "Pay Deposit" checkout button in `Bookings/Show.jsx` for quoted inquiries.
+    - Normalized Paystack webhook metadata via `BillingWebhookController::metadata()` in `SettlementWebhookController` and `VenueBookingService::confirmBookingPayment`.
+    - Added calendar lockout TTL expiration (`quote_valid_until`) to avoid abandoned checkouts blocking slots forever, and updated `scopeBlockingCalendar` to respect TTLs.
+    - Fixed Console Component usage in `Inquiries/Index.jsx` and `Show.jsx` (`StatusPill`, `ConfirmModal`, `Button`).
+    - Added state guards in `VenueInquiryController` preventing modification of confirmed/paid reservations.
+    - Transformed raw Eloquent models into explicit array props in `VenueInquiryController`.
+    - Handled `PRICING_MODEL_FLAT_RATE` explicitly in `VenueAvailabilityService::calculatePricing`.
+    - Wrapped MCP `RequestQuoteTool` with `ValidationException` error handling.
+
+
+
 
 

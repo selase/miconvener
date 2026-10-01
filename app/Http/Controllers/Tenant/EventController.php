@@ -104,6 +104,17 @@ final class EventController extends Controller
             $validated['hero_image_path'] = Helper::processUploadedFile($request, 'hero_image', 'event_hero', 'events/hero', config('app.env') === 'production' ? 's3' : 'public');
         }
 
+        if (! empty($validated['store_listing_id'])) {
+            $listing = \App\Models\StoreListing::with('shop')->find($validated['store_listing_id']);
+            if ($listing && empty($validated['address']) && $listing->shop) {
+                $validated['address'] = "{$listing->shop->address}, {$listing->shop->city}";
+            }
+            if ($listing && empty($validated['capacity'])) {
+                $capacities = $listing->capacity_breakdown ?? [];
+                $validated['capacity'] = $capacities['banquet'] ?? $capacities['theater'] ?? 100;
+            }
+        }
+
         $event = Event::create([
             ...$validated,
             'tenant_id' => $tenant->id,
@@ -172,6 +183,17 @@ final class EventController extends Controller
             // nothing referenced.
             if ($previousHeroImage) {
                 Helper::deleteFile($previousHeroImage, Event::uploadDisk());
+            }
+        }
+
+        if (! empty($validated['store_listing_id'])) {
+            $listing = \App\Models\StoreListing::with('shop')->find($validated['store_listing_id']);
+            if ($listing && empty($validated['address']) && $listing->shop) {
+                $validated['address'] = "{$listing->shop->address}, {$listing->shop->city}";
+            }
+            if ($listing && empty($validated['capacity'])) {
+                $capacities = $listing->capacity_breakdown ?? [];
+                $validated['capacity'] = $capacities['banquet'] ?? $capacities['theater'] ?? 100;
             }
         }
 
@@ -450,7 +472,12 @@ final class EventController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'timezone' => ['required', 'string', 'max:64'],
             'location_type' => ['required', Rule::in([Event::LOCATION_IN_PERSON, Event::LOCATION_VIRTUAL])],
-            'address' => ['nullable', 'required_if:location_type,in_person', 'string', 'max:255'],
+            'address' => [
+                'nullable',
+                Rule::requiredIf(fn () => $request->input('location_type') === Event::LOCATION_IN_PERSON && ! $request->filled('store_listing_id')),
+                'string',
+                'max:255',
+            ],
             'virtual_link' => ['nullable', 'required_if:location_type,virtual', 'url', 'max:255'],
             'contact_email' => ['nullable', 'email', 'max:255'],
             'capacity' => ['nullable', 'integer', 'min:1'],
@@ -459,6 +486,8 @@ final class EventController extends Controller
             'currency' => ['required', 'string', 'size:3'],
             'plan_your_visit_content' => ['nullable', 'string'],
             'hero_image' => ['nullable', 'image', 'max:20480'],
+            'store_listing_id' => ['nullable', 'uuid', 'exists:landlord.store_listings,id'],
+            'venue_booking_id' => ['nullable', 'uuid', 'exists:landlord.venue_bookings,id'],
         ], [
             'hero_image.max' => 'The hero image must not be greater than 20MB.',
             'hero_image.image' => 'The hero image must be a valid image file (JPG, PNG, WebP, GIF, or SVG).',
@@ -581,6 +610,9 @@ final class EventController extends Controller
                     'registration_name' => $a->registration?->full_name,
                 ])->values(),
             ])->values() : [],
+            'store_listing_id' => $event->store_listing_id,
+            'venue_booking_id' => $event->venue_booking_id,
+            'is_marketplace_venue' => $event->isMarketplaceVenue(),
         ];
     }
 }

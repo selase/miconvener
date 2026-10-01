@@ -542,6 +542,18 @@ final class Tenant extends Model
     }
 
     /**
+     * Get the tenant's subdomain (alias of slug for routing).
+     *
+     * @return Attribute<string, never>
+     */
+    protected function subdomain(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->slug,
+        );
+    }
+
+    /**
      * Determine whether a package_features pivot "value" column represents a
      * truthy boolean. The column is a plain, uncast string (e.g. "true",
      * "1", "false", "0", or empty), so this mirrors the check already used

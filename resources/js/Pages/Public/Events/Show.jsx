@@ -389,9 +389,8 @@ function LivePollSection({ event }) {
 
                 <div className="border border-border bg-surface-muted px-3.5 py-3">
                     <p className="text-[13.5px] text-ink">
-                        Answering is for people who are here. Open your ticket in
-                        your MiConvener portal and check in — your answer counts
-                        towards attendance.
+                        Answering is for people who are here. Open your ticket in your MiConvener
+                        portal and check in — your answer counts towards attendance.
                     </p>
                     <a
                         href="/my"
