@@ -56,6 +56,14 @@ final class Shop extends Model
     ];
 
     /**
+     * @var list<string>
+     */
+    protected $hidden = [
+        'verified_by_user_id',
+        'rejection_reason',
+    ];
+
+    /**
      * @return BelongsTo<Tenant, $this>
      */
     public function tenant(): BelongsTo

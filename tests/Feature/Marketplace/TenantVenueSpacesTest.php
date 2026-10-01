@@ -284,3 +284,53 @@ test('cross-tenant boundary holds: tenant cannot edit or delete another tenants 
     expect(StoreListing::find($listingA->id))->not->toBeNull()
         ->and(StoreListing::find($listingA->id)->title)->toBe('Space A');
 });
+
+test('global uniqueness: two tenants cannot create a venue space with colliding slug', function (): void {
+    // Tenant A creates Space with slug 'grand-ballroom'
+    $tenantA = Tenant::factory()->create(['slug' => 'tenant-a-resort']);
+    $shopA = Shop::create([
+        'tenant_id' => $tenantA->id,
+        'name' => 'Resort A',
+        'slug' => 'resort-a',
+        'email' => 'a@resort.com',
+        'phone' => '+233200000010',
+        'address' => 'Accra',
+        'city' => 'Accra',
+        'region' => 'Greater Accra',
+    ]);
+    StoreListing::create([
+        'shop_id' => $shopA->id,
+        'listing_kind' => StoreListing::KIND_VENUE,
+        'title' => 'Grand Ballroom',
+        'slug' => 'grand-ballroom',
+        'rental_price_pesewas' => 500000,
+        'status' => StoreListing::STATUS_PUBLISHED,
+    ]);
+
+    // Tenant B attempts to create space with identical slug 'grand-ballroom'
+    $userB = User::factory()->create();
+    $tenantB = setActiveTenantForTest($userB, ['slug' => 'tenant-b-hotel']);
+    $userB->assignRole('Org Superadmin');
+    Shop::create([
+        'tenant_id' => $tenantB->id,
+        'name' => 'Hotel B',
+        'slug' => 'hotel-b',
+        'email' => 'b@hotel.com',
+        'phone' => '+233200000020',
+        'address' => 'Kumasi',
+        'city' => 'Kumasi',
+        'region' => 'Ashanti',
+    ]);
+
+    $response = $this->actingAs($userB)
+        ->post(route('tenant.venue.spaces.store', ['subdomain' => $tenantB->slug]), [
+            'title' => 'Another Grand Ballroom',
+            'slug' => 'grand-ballroom',
+            'rental_price' => 4500.00,
+            'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+            'price_visibility' => StoreListing::PRICE_VISIBILITY_PUBLIC,
+            'status' => StoreListing::STATUS_PUBLISHED,
+        ]);
+
+    $response->assertSessionHasErrors(['slug']);
+});

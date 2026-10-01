@@ -34,9 +34,7 @@ final class StoreVenueListingRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('landlord.store_listings', 'slug')
-                    ->where('shop_id', $shopId)
-                    ->ignore($listingId),
+                Rule::unique('landlord.store_listings', 'slug')->ignore($listingId),
             ],
             'description' => ['nullable', 'string'],
             'rental_price' => ['required', 'numeric', 'min:0'],

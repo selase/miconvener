@@ -29,7 +29,7 @@ return new class extends Migration
             $table->integer('sort_order')->default(0);
             $table->timestamps();
 
-            $table->unique(['shop_id', 'slug']);
+            $table->unique('slug');
             $table->index(['status', 'listing_kind']);
             $table->index(['shop_id', 'status']);
         });

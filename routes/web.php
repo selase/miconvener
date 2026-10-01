@@ -97,6 +97,14 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('index');
     });
 
+    // Marketplace Merchant Verification Queue
+    Route::group(['prefix' => 'marketplace-verifications', 'as' => 'admin.marketplace-verifications.'], function (): void {
+        Route::get('/', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'index'])->name('index');
+        Route::get('/{shop}', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'show'])->name('show');
+        Route::post('/{shop}/approve', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'approve'])->name('approve');
+        Route::post('/{shop}/reject', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'reject'])->name('reject');
+    });
+
     // Tenant routes
     Route::group(['prefix' => 'tenants', 'as' => 'tenants.'], function (): void {
         Route::get('reset', [TenantController::class, 'resetTenant'])
@@ -232,5 +240,13 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 
 Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'verify'])->name('web.certificates.verify');
 Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('web.certificates.download');
+
+// MiConvener Marketplace (Public)
+Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
+    Route::get('/', [App\Http\Controllers\Marketplace\MarketplaceController::class, 'index'])->name('index');
+    Route::get('/venues', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'index'])->name('venues.index');
+    Route::get('/venues/{slug}', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'show'])->name('venues.show');
+    Route::get('/{merchant_slug}', [App\Http\Controllers\Marketplace\MarketplaceStorefrontController::class, 'show'])->name('storefront.show');
+});
 
 require __DIR__.'/auth.php';

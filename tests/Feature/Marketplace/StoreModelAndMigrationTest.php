@@ -6,7 +6,6 @@ use App\Models\Shop;
 use App\Models\StoreAmenity;
 use App\Models\StoreListing;
 use App\Models\StoreListingAmenity;
-use App\Models\StoreListingMedia;
 use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
