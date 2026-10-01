@@ -21,19 +21,27 @@ export default function VenuesIndex({
     amenities = [],
     filters = {},
 }) {
-    const [q, setQ] = useState(filters?.q || '');
-    const [city, setCity] = useState(filters?.city || '');
-    const [minCapacity, setMinCapacity] = useState(filters?.min_capacity || '');
-    const [capacityStyle, setCapacityStyle] = useState(filters?.capacity_style || 'banquet');
-    const [minPrice, setMinPrice] = useState(filters?.min_price || '');
-    const [maxPrice, setMaxPrice] = useState(filters?.max_price || '');
-    const [priceVisibility, setPriceVisibility] = useState(filters?.price_visibility || '');
+    const safeFilters = filters && !Array.isArray(filters) && typeof filters === 'object' ? filters : {};
+
+    const [q, setQ] = useState(typeof safeFilters.q === 'string' ? safeFilters.q : '');
+    const [city, setCity] = useState(typeof safeFilters.city === 'string' ? safeFilters.city : '');
+    const [minCapacity, setMinCapacity] = useState(safeFilters.min_capacity || '');
+    const [capacityStyle, setCapacityStyle] = useState(
+        typeof safeFilters.capacity_style === 'string' ? safeFilters.capacity_style : 'banquet'
+    );
+    const [minPrice, setMinPrice] = useState(safeFilters.min_price || '');
+    const [maxPrice, setMaxPrice] = useState(safeFilters.max_price || '');
+    const [priceVisibility, setPriceVisibility] = useState(
+        typeof safeFilters.price_visibility === 'string' ? safeFilters.price_visibility : ''
+    );
     const [selectedAmenities, setSelectedAmenities] = useState(() => {
-        if (Array.isArray(filters?.amenities)) return filters.amenities;
-        if (typeof filters?.amenities === 'string' && filters.amenities) return [filters.amenities];
+        if (Array.isArray(safeFilters.amenities)) return safeFilters.amenities;
+        if (typeof safeFilters.amenities === 'string' && safeFilters.amenities) return [safeFilters.amenities];
         return [];
     });
-    const [sort, setSort] = useState(filters?.sort || 'recommended');
+    const [sort, setSort] = useState(
+        typeof safeFilters.sort === 'string' ? safeFilters.sort : 'recommended'
+    );
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
     const getMediaUrl = (media) => {

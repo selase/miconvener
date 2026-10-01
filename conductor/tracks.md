@@ -617,6 +617,12 @@ Design: `docs/superpowers/specs/2026-09-20-event-store-build1-design.md`. Handof
   - [x] Static Analysis & Formatting: PHPStan Level 5 passed with 0 errors, Laravel Pint clean.
   - [x] Adversarial Self-Review Audit: Enforced global unique slug constraint in database migration and Form Request, hidden sensitive verification attributes (`verified_by_user_id`, `rejection_reason`) on `Shop`, and verified negative boundary tests (403 forbidden, 404 inactive/draft, cross-tenant isolation).
   - [x] Commits: `2b24bdf` (Stages 1 & 2), `3f259da` (Stages 3 & 4, Self-Review).
+- [x] **Stage 6: UI Polish & Browser Verification Hardening**:
+  - [x] Image resolution fallback: Added `getUrlAttribute()` on `StoreListingMedia` and `getMediaUrl(media)` helper across all public Marketplace views (`Index.jsx`, `Venues/Index.jsx`, `Venues/Show.jsx`, `Storefront/Show.jsx`) to safely resolve images from both `.url` and `.file_path` under snake_case and camelCase serialization.
+  - [x] Console component invariants: Corrected `PageHeader` prop to `actions` (plural) and removed undeclared `description` in `Spaces/Index.jsx`, `Spaces/Form.jsx`, and `Profile/Show.jsx`. Converted `ConfirmModal` to declare explicit `open` prop and migrated `Select` dropdowns to child `<option>` elements. All 4 tests in `ConsoleComponentUsageTest` pass cleanly.
+  - [x] Verification route prefix: Added `/admin/marketplace-verifications` route group and redirect alias from `/marketplace-verifications`.
+  - [x] Verified with 25 passing tests (192 assertions) across `tests/Feature/Marketplace/` and `tests/Feature/Components/ConsoleComponentUsageTest.php`, clean Pint, and fresh production Vite build.
+  - [x] Commit: `b8e26cd`.
 
 ---
 

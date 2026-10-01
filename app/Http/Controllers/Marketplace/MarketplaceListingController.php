@@ -44,7 +44,7 @@ final class MarketplaceListingController extends Controller
         return Inertia::render('Public/Marketplace/Venues/Index', [
             'venues' => $venues,
             'amenities' => $amenities,
-            'filters' => $filters,
+            'filters' => (object) array_filter($filters, fn ($val): bool => $val !== null && $val !== ''),
         ]);
     }
 
