@@ -357,7 +357,7 @@ export default function NotificationsPanel({ event }) {
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
                         Channels & Omnichannel
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
                         <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-medium">
                             <Mail className="w-3 h-3" /> Email
                         </span>
