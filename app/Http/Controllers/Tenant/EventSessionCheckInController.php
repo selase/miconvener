@@ -12,6 +12,7 @@ use App\Models\EventSessionAttendance;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 final class EventSessionCheckInController extends Controller
 {
@@ -283,7 +284,11 @@ final class EventSessionCheckInController extends Controller
     {
         return Event::where('tenant_id', $tenantId)
             ->where(function ($query) use ($event): void {
-                $query->where('id', $event)->orWhere('slug', $event);
+                if (Str::isUuid($event)) {
+                    $query->where('id', $event);
+                } else {
+                    $query->where('slug', $event);
+                }
             })
             ->firstOrFail();
     }

@@ -204,3 +204,26 @@ test('finance is hidden from a tenant that has never handled ticket money', func
         ->get("http://{$host}/events/{$event->id}", ['HTTP_HOST' => $host])
         ->assertInertia(fn ($page) => $page->where('sections', fn ($menu): bool => ! in_array('finance', menuSlugs($menu->all()), true)));
 });
+
+test('an event workspace can be opened using either its UUID or its slug', function () {
+    [, $user, $event, $host] = workspaceSetup('Org Superadmin');
+
+    // Access via slug
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->slug}", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tenant/Events/Show')
+            ->where('event.id', $event->id)
+            ->where('event.slug', $event->slug)
+        );
+
+    // Access via UUID
+    $this->actingAs($user)
+        ->get("http://{$host}/events/{$event->id}", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Tenant/Events/Show')
+            ->where('event.id', $event->id)
+        );
+});

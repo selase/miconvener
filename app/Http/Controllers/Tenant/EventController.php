@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\Tenant;
 use App\Services\Events\EventSections;
 use App\Services\Events\EventWorkspaceSnapshot;
 use App\Services\Tenancy\TenantContext;
@@ -134,7 +135,7 @@ final class EventController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->with('ticketTypes')->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event, ['ticketTypes']);
 
         $validated = $this->validateEvent($request);
 
@@ -216,7 +217,7 @@ final class EventController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event);
 
         $validated = $request->validate([
             'visibility' => ['required', Rule::in(Event::VISIBILITIES)],
@@ -237,7 +238,7 @@ final class EventController extends Controller
         $this->authorize('delete event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event);
         $eventModel->delete();
 
         if (request()->wantsJson()) {
@@ -274,7 +275,7 @@ final class EventController extends Controller
         $this->authorize('read event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event);
 
         $filename = "{$eventModel->slug}-guests.csv";
 
@@ -310,9 +311,10 @@ final class EventController extends Controller
         $this->authorize('read event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
-            ->with(['sessions' => fn ($query) => $query->withCount('registrations'), 'sessions.speakers'])
-            ->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event, [
+            'sessions' => fn ($query) => $query->withCount('registrations'),
+            'sessions.speakers',
+        ]);
 
         // Same gate as the check-in section: every scan endpoint needs it.
         abort_unless(app(EventSections::class)->allows(request()->user(), $tenant, $eventModel, 'check-in'), 403);
@@ -328,7 +330,7 @@ final class EventController extends Controller
         ]);
     }
 
-    protected function getTenant()
+    protected function getTenant(): Tenant
     {
         $tenant = app(TenantContext::class)->getTenant();
         if (! $tenant) {
@@ -336,6 +338,29 @@ final class EventController extends Controller
         }
 
         return $tenant;
+    }
+
+    /**
+     * Resolve an event by UUID or slug within the tenant scope.
+     *
+     * @param  array<int|string, mixed>  $relations
+     */
+    private function resolveEvent(Tenant $tenant, string $event, array $relations = []): Event
+    {
+        $query = Event::where('tenant_id', $tenant->id)
+            ->where(function ($query) use ($event): void {
+                if (Str::isUuid($event)) {
+                    $query->where('id', $event);
+                } else {
+                    $query->where('slug', $event);
+                }
+            });
+
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**
@@ -358,11 +383,10 @@ final class EventController extends Controller
             }
         }
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
-            // The fee cascade walks event -> tenant -> package, and the payload
-            // reads it three times.
-            ->with(['tenant.package', ...$relations])
-            ->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event, [
+            'tenant.package',
+            ...$relations,
+        ]);
 
         $sections = app(EventSections::class);
         abort_unless($sections->allows(request()->user(), $tenant, $eventModel, $section), 403);
