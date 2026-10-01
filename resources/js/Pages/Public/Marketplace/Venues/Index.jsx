@@ -5,15 +5,13 @@ import {
     Building2,
     Search,
     MapPin,
-    Users,
     ShieldCheck,
     CheckCircle2,
     ArrowRight,
     SlidersHorizontal,
     X,
     RotateCcw,
-    Zap,
-    ChevronDown,
+    Sparkles,
 } from 'lucide-react';
 
 export default function VenuesIndex({
@@ -21,9 +19,13 @@ export default function VenuesIndex({
     amenities = [],
     filters = {},
 }) {
-    const safeFilters = filters && !Array.isArray(filters) && typeof filters === 'object' ? filters : {};
+    const safeFilters =
+        filters && !Array.isArray(filters) && typeof filters === 'object' ? filters : {};
 
     const [q, setQ] = useState(typeof safeFilters.q === 'string' ? safeFilters.q : '');
+    const [aiPrompt, setAiPrompt] = useState(
+        typeof safeFilters.ai_prompt === 'string' ? safeFilters.ai_prompt : ''
+    );
     const [city, setCity] = useState(typeof safeFilters.city === 'string' ? safeFilters.city : '');
     const [minCapacity, setMinCapacity] = useState(safeFilters.min_capacity || '');
     const [capacityStyle, setCapacityStyle] = useState(
@@ -36,11 +38,16 @@ export default function VenuesIndex({
     );
     const [selectedAmenities, setSelectedAmenities] = useState(() => {
         if (Array.isArray(safeFilters.amenities)) return safeFilters.amenities;
-        if (typeof safeFilters.amenities === 'string' && safeFilters.amenities) return [safeFilters.amenities];
+        if (typeof safeFilters.amenities === 'string' && safeFilters.amenities)
+            return [safeFilters.amenities];
         return [];
     });
     const [sort, setSort] = useState(
-        typeof safeFilters.sort === 'string' ? safeFilters.sort : 'recommended'
+        typeof safeFilters.sort === 'string'
+            ? safeFilters.sort
+            : safeFilters.ai_prompt
+              ? 'ai_match'
+              : 'recommended'
     );
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
@@ -52,6 +59,7 @@ export default function VenuesIndex({
     const applyFilters = (overrides = {}) => {
         const query = {
             q: q || undefined,
+            ai_prompt: aiPrompt || undefined,
             city: city || undefined,
             min_capacity: minCapacity || undefined,
             capacity_style: minCapacity ? capacityStyle : undefined,
@@ -79,6 +87,7 @@ export default function VenuesIndex({
 
     const clearAll = () => {
         setQ('');
+        setAiPrompt('');
         setCity('');
         setMinCapacity('');
         setCapacityStyle('banquet');
@@ -110,6 +119,7 @@ export default function VenuesIndex({
 
     const hasActiveFilters = Boolean(
         q ||
+        aiPrompt ||
         city ||
         minCapacity ||
         minPrice ||
@@ -158,6 +168,7 @@ export default function VenuesIndex({
                                 <option value="recommended">
                                     Sort: Recommended (Verified First)
                                 </option>
+                                <option value="ai_match">✨ AI Relevance Match</option>
                                 <option value="price_asc">Price: Low to High</option>
                                 <option value="price_desc">Price: High to Low</option>
                                 <option value="capacity_desc">Highest Capacity</option>
@@ -364,6 +375,79 @@ export default function VenuesIndex({
 
                     {/* Right Results Grid (3 columns on desktop) */}
                     <div className="md:col-span-3 space-y-6">
+                        {/* AI Scout Search Bar */}
+                        <div className="rounded-xl border border-purple-500/30 bg-gradient-to-r from-purple-500/5 via-accent/5 to-transparent p-4 shadow-xs">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                <span className="text-xs font-semibold text-ink">
+                                    AI Semantic Venue Scout
+                                </span>
+                                <span className="text-[10px] text-ink-tertiary">
+                                    Powered by Laravel AI SDK & pgvector
+                                </span>
+                            </div>
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    applyFilters({ ai_prompt: aiPrompt, sort: 'ai_match' });
+                                }}
+                                className="flex flex-col sm:flex-row items-center gap-2"
+                            >
+                                <div className="relative flex-1 w-full">
+                                    <input
+                                        type="text"
+                                        placeholder="Describe what you need (e.g. 'Beachfront banquet hall for 200 with 3-phase generator')..."
+                                        value={aiPrompt}
+                                        onChange={(e) => setAiPrompt(e.target.value)}
+                                        className="w-full rounded-lg border border-border bg-surface py-2 pl-3 pr-8 text-xs text-ink placeholder:text-ink-tertiary focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                                    />
+                                    {aiPrompt && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAiPrompt('');
+                                                applyFilters({
+                                                    ai_prompt: undefined,
+                                                    sort: 'recommended',
+                                                });
+                                            }}
+                                            className="absolute right-2.5 top-2.5 text-ink-tertiary hover:text-ink cursor-pointer"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-accent px-4 py-2 text-xs font-semibold text-white shadow-xs hover:opacity-95 transition-opacity cursor-pointer"
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    <span>Scout Spaces</span>
+                                </button>
+                            </form>
+                            {safeFilters.ai_prompt && (
+                                <div className="mt-2.5 flex items-center gap-2 text-[11px] text-purple-700 dark:text-purple-300">
+                                    <span>
+                                        Matching semantically for:{' '}
+                                        <strong>"{safeFilters.ai_prompt}"</strong>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setAiPrompt('');
+                                            applyFilters({
+                                                ai_prompt: undefined,
+                                                sort: 'recommended',
+                                            });
+                                        }}
+                                        className="text-ink-tertiary hover:text-ink underline ml-1 cursor-pointer"
+                                    >
+                                        Clear AI filter
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         {venues.data.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-border bg-surface p-12 text-center">
                                 <Building2 className="mx-auto h-10 w-10 text-ink-tertiary" />
@@ -420,6 +504,15 @@ export default function VenuesIndex({
                                                     <MapPin className="h-3 w-3" />
                                                     <span>{venue.shop?.city ?? 'Ghana'}</span>
                                                 </div>
+
+                                                {venue.similarity_percentage > 0 && (
+                                                    <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded bg-purple-900/90 px-2 py-0.5 text-[10px] font-semibold text-purple-200 backdrop-blur-xs border border-purple-500/30 shadow-xs">
+                                                        <Sparkles className="h-3 w-3 text-purple-300" />
+                                                        <span>
+                                                            {venue.similarity_percentage}% Match
+                                                        </span>
+                                                    </div>
+                                                )}
 
                                                 {venue.shop?.verification_status === 'verified' && (
                                                     <div className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded bg-accent/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xs">

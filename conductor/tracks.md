@@ -626,20 +626,47 @@ Design: `docs/superpowers/specs/2026-09-20-event-store-build1-design.md`. Handof
 
 ---
 
-## [ ] Track: MiConvener Marketplace (Build 2: Laravel AI SDK, Vector Embeddings & Agentic MCP Concierge)
+## [x] Track: MiConvener Marketplace (Build 2: Laravel AI SDK, Vector Embeddings & Agentic MCP Concierge)
 
-Integration of the **Laravel AI SDK** (`https://laravel.com/ai`), **Laravel MCP** (`https://laravel.com/ai/mcp`), and **Laravel Boost** (`https://laravel.com/ai/boost`) to power semantic natural language venue discovery and AI concierge capabilities.
+Integration of the **Laravel AI SDK** (`laravel/ai` v0.11), **Laravel MCP** (`laravel/mcp` v0.9), and PostgreSQL **pgvector** (`vector` 0.8.0) to power semantic natural language venue discovery, HNSW vector indexing, and agentic AI concierge capabilities.
 
-- [ ] **Stage 1: Laravel AI SDK Integration & Embeddings Pipeline**:
-  - [ ] Configure `laravel/ai` SDK provider drivers (OpenAI, Gemini, Anthropic, or local Ollama).
-  - [ ] Synthesize venue space semantic documents (space specs, capacities, amenities included, atmosphere, location).
-  - [ ] Generate and index high-dimensional vector embeddings on `store_listings`. Support hybrid vector + PostgreSQL FTS similarity search with fallback when `pgvector` binary is uncompiled.
-- [ ] **Stage 2: Natural Language Semantic Venue Discovery (AI Venue Scout)**:
-  - [ ] Add conversational prompt input on `/marketplace` ("Find an executive banquet hall in Airport Residential for 200 doctors with 3-phase standby generator").
-  - [ ] Integrate vector similarity scoring into `MarketplaceSearchService`.
-- [ ] **Stage 3: Laravel MCP Server (`laravel/mcp`) for Agentic Venue Concierge**:
-  - [ ] Implement Model Context Protocol tools (`SearchVenuesTool`, `GetVenueDetailsTool`, `CheckAvailabilityTool`, `RequestQuoteTool`).
-  - [ ] Expose MCP server endpoint for external AI agents and in-platform concierge chat assistants.
-- [ ] **Stage 4: Automated Verification, Pest Tests & Self-Review**:
-  - [ ] Unit and Feature tests for embedding generation, vector similarity matching, and MCP tool invocations.
+- [x] **Stage 1: Laravel AI SDK Integration & Embeddings Pipeline**:
+  - [x] Installed and configured `laravel/ai` (`config/ai.php`) alongside `laravel/mcp`.
+  - [x] Landlord migration `2026_10_01_120000_add_embedding_to_store_listings_table.php` adding `embedding vector(1536)` and HNSW cosine index `store_listings_embedding_hnsw_idx`. Migrated successfully on landlord database and `miconvener_testing`.
+  - [x] `App\Services\Marketplace\VenueEmbeddingService` with document synthesis (specs, capacities, included/excluded amenities, rules, host and city details), Laravel AI SDK embedding generation, and deterministic unit-vector fallback.
+  - [x] Artisan command `php artisan marketplace:embed-venues` with `--force` option and memory-safe chunking (`chunkById(50)`).
+  - [x] Verified with 5 passing tests in `tests/Feature/Marketplace/VenueEmbeddingTest.php`.
+- [x] **Stage 2: Natural Language Semantic Venue Discovery (AI Venue Scout)**:
+  - [x] Integrated pgvector cosine distance `<=>` operator (`1 - (store_listings.embedding <=> ?::vector)`) and sort ordering into `MarketplaceSearchService`.
+  - [x] Scopes `withSimilarity` and `orderBySimilarity` in `StoreListing` model with column-preserving query builder composition and safe `similarity_percentage` accessor.
+  - [x] Public Marketplace frontend updates: Dual-mode Hero Search ("Quick Filter" vs "✨ AI Semantic Scout"), AI prompt input bar, match percentage pills on venue cards, and "✨ AI Relevance Match" sort option (`Index.jsx`, `Venues/Index.jsx`).
+  - [x] Form Request `MarketplaceVenueSearchRequest` with max length and numeric bounds protection.
+  - [x] Verified with 6 passing tests in `tests/Feature/Marketplace/AiSemanticSearchTest.php`.
+- [x] **Stage 3: Laravel MCP Server (`laravel/mcp`) for Agentic Venue Concierge**:
+  - [x] Registered MCP server `App\Mcp\MarketplaceMcpServer` under `routes/web.php` at `/mcp/marketplace` with `throttle:60,1` rate limiting and CSRF exemption.
+  - [x] 4 MCP tools implemented: `SearchVenuesTool`, `GetVenueDetailsTool`, `CheckAvailabilityTool`, and `RequestQuoteTool` returning standardized `Response::error()` on invalid/missing listings and protecting confidential "Price on request" rates.
+  - [x] Interactive slide-over assistant `AiConciergeDrawer.jsx` with direct JSON-RPC client communication and bottom-right floating trigger button.
+  - [x] Verified with 10 passing tests in `tests/Feature/Marketplace/MarketplaceMcpServerTest.php`.
+- [x] **Stage 4: Automated Verification, Quality Gates & Mandatory Self-Review**:
+  - [x] Pest test suite: 43 passing tests (284 assertions) across all Marketplace test files in `tests/Feature/Marketplace/`.
+  - [x] Static Analysis & Formatting: PHPStan Level 5 passed with 0 errors, ESLint passed with 0 errors/warnings, Laravel Pint clean.
+  - [x] Frontend Build: `npm run build` compiled cleanly (2,584 modules transformed, 0 errors) in 31.5s using Node 22 via NVM.
+  - [x] Mandatory Self-Review Audit: Ran 3-agent post-implementation review (Security, Logic/Edge Cases, Performance/Architecture). Mitigated:
+    - Added `throttle:60,1` to public `/mcp/marketplace` endpoint to prevent LLM token & DB exhaustion.
+    - Added `protected $hidden = ['embedding']` on `StoreListing` eliminating ~200 KB per page payload drag to Inertia frontend.
+    - Resolved Eloquent select collision between vector similarity and geo-proximity queries.
+    - Protected confidential "Price on request" rates in MCP quote inquiries.
+    - Added Form Request `MarketplaceVenueSearchRequest` with 1000-char input capping.
+    - Added adversarial negative tests proving draft rejection, inactive shop isolation, and confidential pricing protection.
+- [x] **Stage 5: Browser-Aware MCP Explorer, Query Caching & Partner Tier**:
+  - [x] Browser-Aware Explorer & Content Negotiation (`MarketplaceMcpController` & `resources/js/Pages/Public/Marketplace/Mcp/Index.jsx`). Renders interactive explorer on browser GET, returns 405 with `Allow: POST` for machine requests, and handles POST tool calls via `MarketplaceMcpServer`.
+  - [x] SHA-256 Normalized Embedding Query Caching in `App\Services\Marketplace\VenueEmbeddingService` with 7-day TTL, preventing LLM token burn on repeated vector searches.
+  - [x] Middleware `IdentifyMarketplaceMcpPartner` (`app/Http/Middleware/IdentifyMarketplaceMcpPartner.php`) providing seamless `sk_...` tenant API key authentication via `X-Api-Key` or `Authorization: Bearer`, enforcing key validity, tenant status, IP restrictions, and brute-force throttling (`RateLimiter::tooManyAttempts('mcp_invalid_auth:...', 20)`).
+  - [x] Named rate limiter `mcp-marketplace` in `RouteServiceProvider` (300 req/min for partner keys partitioned by `mcp_partner_{id}`, 60 req/min for anonymous IP). Prioritized in `Kernel::$middlewarePriority` ahead of `ThrottleRequests`.
+  - [x] Priority partner attribution in `RequestQuoteTool` draft inquiries (tags partner tenant ID, organization name, key name, and priority processing message).
+  - [x] Tool JSON Schema hardening (`RequestQuoteTool`, `GetVenueDetailsTool`, `CheckAvailabilityTool`) declaring explicit `->required()` parameters for AI clients (Claude Desktop, Cursor).
+  - [x] Partner tier documentation & interactive API key testing in MCP Explorer UI with live response rate limit telemetry.
+  - [x] Verified with 53 passing tests (320 assertions) across `tests/Feature/Marketplace/`, PHPStan Level 5 passed with 0 errors, ESLint clean, Laravel Pint clean, and fresh Vite build.
+
+
 

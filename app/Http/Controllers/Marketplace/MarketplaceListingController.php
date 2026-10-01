@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Marketplace\MarketplaceVenueSearchRequest;
 use App\Models\StoreAmenity;
 use App\Models\StoreListing;
 use App\Services\Marketplace\MarketplaceSearchService;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,23 +16,9 @@ final class MarketplaceListingController extends Controller
 {
     public function __construct(private readonly MarketplaceSearchService $searchService) {}
 
-    public function index(Request $request): Response
+    public function index(MarketplaceVenueSearchRequest $request): Response
     {
-        $filters = $request->only([
-            'q',
-            'city',
-            'region',
-            'lat',
-            'lng',
-            'radius',
-            'min_capacity',
-            'capacity_style',
-            'min_price',
-            'max_price',
-            'price_visibility',
-            'amenities',
-            'sort',
-        ]);
+        $filters = $request->validated();
 
         $venues = $this->searchService->searchVenues($filters, 12);
 
@@ -48,7 +34,7 @@ final class MarketplaceListingController extends Controller
         ]);
     }
 
-    public function show(Request $request, string $slug): Response
+    public function show(string $slug): Response
     {
         /** @var StoreListing $listing */
         $listing = StoreListing::query()
@@ -64,6 +50,7 @@ final class MarketplaceListingController extends Controller
         // Other spaces from this venue host
         $otherSpaces = StoreListing::query()
             ->with(['shop', 'primaryMedia'])
+            ->where('listing_kind', StoreListing::KIND_VENUE)
             ->where('shop_id', $listing->shop_id)
             ->where('id', '!=', $listing->id)
             ->where('status', StoreListing::STATUS_PUBLISHED)

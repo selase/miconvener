@@ -251,4 +251,11 @@ Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
     Route::get('/{merchant_slug}', [App\Http\Controllers\Marketplace\MarketplaceStorefrontController::class, 'show'])->name('storefront.show');
 });
 
+// Model Context Protocol (MCP) Server for Marketplace AI Agents
+Laravel\Mcp\Facades\Mcp::web('mcp/marketplace', App\Mcp\MarketplaceMcpServer::class)
+    ->middleware(['mcp_tier', 'throttle:mcp-marketplace']);
+Route::get('mcp/marketplace', [App\Http\Controllers\Marketplace\MarketplaceMcpController::class, 'show'])
+    ->middleware(['mcp_tier', 'throttle:mcp-marketplace'])
+    ->name('mcp.marketplace.show');
+
 require __DIR__.'/auth.php';

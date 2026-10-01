@@ -59,6 +59,14 @@ final class StoreListing extends Model
         'rules_and_policies',
         'status',
         'sort_order',
+        'embedding',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $hidden = [
+        'embedding',
     ];
 
     /**
@@ -170,12 +178,99 @@ final class StoreListing extends Model
             .'cos(radians(shops.longitude) - radians(?)) + '
             .'sin(radians(?)) * sin(radians(shops.latitude))))))';
 
+        if (! $query->getQuery()->columns) {
+            $query->select('store_listings.*');
+        }
+
         return $query->join('shops', 'store_listings.shop_id', '=', 'shops.id')
-            ->select('store_listings.*')
             ->selectRaw("{$haversine} AS distance_km", [$latitude, $longitude, $latitude])
             ->whereNotNull('shops.latitude')
             ->whereNotNull('shops.longitude')
             ->whereRaw("{$haversine} <= ?", [$latitude, $longitude, $latitude, $radiusKm])
             ->orderBy('distance_km');
+    }
+
+    /**
+     * @param  array<int, float>|string|null  $value
+     */
+    public function setEmbeddingAttribute(mixed $value): void
+    {
+        if (is_array($value)) {
+            $this->attributes['embedding'] = '['.implode(',', array_map('floatval', $value)).']';
+        } else {
+            $this->attributes['embedding'] = $value;
+        }
+    }
+
+    /**
+     * @return array<int, float>|null
+     */
+    public function getEmbeddingAttribute(mixed $value): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        $trimmed = mb_trim((string) $value, '[]');
+        if ($trimmed === '') {
+            return [];
+        }
+
+        return array_map('floatval', explode(',', $trimmed));
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @param  array<int, float>  $vector
+     * @return Builder<self>
+     */
+    public function scopeWithSimilarity(Builder $query, array $vector): Builder
+    {
+        if (empty($vector)) {
+            return $query;
+        }
+
+        $vectorString = '['.implode(',', array_map('floatval', $vector)).']';
+
+        if (! $query->getQuery()->columns) {
+            $query->select('store_listings.*');
+        }
+
+        return $query->selectRaw('COALESCE((1 - (store_listings.embedding <=> ?::vector)), 0.0) AS similarity_score', [$vectorString]);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @param  array<int, float>  $vector
+     * @return Builder<self>
+     */
+    public function scopeOrderBySimilarity(Builder $query, array $vector): Builder
+    {
+        if (empty($vector)) {
+            return $query;
+        }
+
+        $vectorString = '['.implode(',', array_map('floatval', $vector)).']';
+
+        return $query->orderByRaw('store_listings.embedding <=> ?::vector ASC', [$vectorString]);
+    }
+
+    public function getSimilarityPercentageAttribute(): ?int
+    {
+        if (array_key_exists('similarity_percentage', $this->attributes)) {
+            return (int) $this->attributes['similarity_percentage'];
+        }
+
+        if (array_key_exists('similarity_score', $this->attributes)) {
+            $score = (float) $this->attributes['similarity_score'];
+
+            return (int) round(max(0.0, min(1.0, $score)) * 100);
+        }
+
+        return null;
     }
 }

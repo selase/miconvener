@@ -16,5 +16,6 @@ final class PreventRequestForgery extends Middleware
     protected $except = [
         'webhooks/*',
         'webhooks/merchant/*',
+        'mcp/*',
     ];
 }

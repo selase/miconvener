@@ -10,15 +10,15 @@ import {
     CheckCircle2,
     ArrowRight,
     Sparkles,
-    Calendar,
-    Zap,
     Utensils,
     Tv,
     FileText,
 } from 'lucide-react';
 
 export default function MarketplaceIndex({ featuredVenues = [], featuredMerchants = [] }) {
+    const [searchMode, setSearchMode] = useState('keyword'); // 'keyword' | 'ai'
     const [q, setQ] = useState('');
+    const [aiPrompt, setAiPrompt] = useState('');
     const [city, setCity] = useState('');
     const [minCapacity, setMinCapacity] = useState('');
 
@@ -28,6 +28,15 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
             q: q || undefined,
             city: city || undefined,
             min_capacity: minCapacity || undefined,
+        });
+    };
+
+    const handleAiSearch = (e) => {
+        e.preventDefault();
+        if (!aiPrompt.trim()) return;
+        router.get('/marketplace/venues', {
+            ai_prompt: aiPrompt,
+            sort: 'ai_match',
         });
     };
 
@@ -76,63 +85,117 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                         with approval-first bookings.
                     </p>
 
-                    {/* Quick Search Card */}
-                    <div className="mt-8 max-w-4xl mx-auto">
-                        <form
-                            onSubmit={handleSearch}
-                            className="flex flex-col md:flex-row items-stretch gap-3 rounded-xl border border-border bg-surface p-3 shadow-lg"
+                    {/* Search Mode Tabs */}
+                    <div className="mt-8 max-w-4xl mx-auto flex items-center justify-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setSearchMode('keyword')}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                                searchMode === 'keyword'
+                                    ? 'bg-ink text-surface shadow-xs'
+                                    : 'bg-surface border border-border text-ink-secondary hover:text-ink'
+                            }`}
                         >
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-ink-tertiary" />
-                                <input
-                                    type="text"
-                                    placeholder="Search by venue name or keyword..."
-                                    value={q}
-                                    onChange={(e) => setQ(e.target.value)}
-                                    className="w-full rounded-lg border border-border/60 bg-canvas py-2.5 pl-10 pr-3 text-xs text-ink placeholder:text-ink-tertiary focus:border-accent focus:ring-1 focus:ring-accent"
-                                />
-                            </div>
+                            <Search className="h-3.5 w-3.5" />
+                            <span>Quick Filter</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSearchMode('ai')}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                                searchMode === 'ai'
+                                    ? 'bg-gradient-to-r from-purple-600 to-accent text-white shadow-xs'
+                                    : 'bg-surface border border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10'
+                            }`}
+                        >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span>AI Semantic Scout</span>
+                        </button>
+                    </div>
 
-                            <div className="relative md:w-52">
-                                <MapPin className="absolute left-3.5 top-3.5 h-4 w-4 text-ink-tertiary" />
-                                <select
-                                    value={city}
-                                    onChange={(e) => setCity(e.target.value)}
-                                    className="w-full rounded-lg border border-border/60 bg-canvas py-2.5 pl-10 pr-8 text-xs text-ink focus:border-accent focus:ring-1 focus:ring-accent"
-                                >
-                                    <option value="">All Cities (Ghana)</option>
-                                    <option value="Accra">Accra</option>
-                                    <option value="Kumasi">Kumasi</option>
-                                    <option value="Takoradi">Takoradi</option>
-                                    <option value="Cape Coast">Cape Coast</option>
-                                    <option value="Tamale">Tamale</option>
-                                </select>
-                            </div>
-
-                            <div className="relative md:w-44">
-                                <Users className="absolute left-3.5 top-3.5 h-4 w-4 text-ink-tertiary" />
-                                <select
-                                    value={minCapacity}
-                                    onChange={(e) => setMinCapacity(e.target.value)}
-                                    className="w-full rounded-lg border border-border/60 bg-canvas py-2.5 pl-10 pr-8 text-xs text-ink focus:border-accent focus:ring-1 focus:ring-accent"
-                                >
-                                    <option value="">Any Capacity</option>
-                                    <option value="50">50+ Attendees</option>
-                                    <option value="150">150+ Attendees</option>
-                                    <option value="300">300+ Attendees</option>
-                                    <option value="500">500+ Attendees</option>
-                                    <option value="1000">1,000+ Attendees</option>
-                                </select>
-                            </div>
-
-                            <button
-                                type="submit"
-                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-accent/90 transition-colors"
+                    {/* Quick Search Card */}
+                    <div className="mt-3 max-w-4xl mx-auto">
+                        {searchMode === 'keyword' ? (
+                            <form
+                                onSubmit={handleSearch}
+                                className="flex flex-col md:flex-row items-stretch gap-3 rounded-xl border border-border bg-surface p-3 shadow-lg"
                             >
-                                <Search className="h-4 w-4" />
-                                <span>Find Spaces</span>
-                            </button>
-                        </form>
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-ink-tertiary" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by venue name or keyword..."
+                                        value={q}
+                                        onChange={(e) => setQ(e.target.value)}
+                                        className="w-full rounded-lg border border-border/60 bg-canvas py-2.5 pl-10 pr-3 text-xs text-ink placeholder:text-ink-tertiary focus:border-accent focus:ring-1 focus:ring-accent"
+                                    />
+                                </div>
+
+                                <div className="relative md:w-52">
+                                    <MapPin className="absolute left-3.5 top-3.5 h-4 w-4 text-ink-tertiary" />
+                                    <select
+                                        value={city}
+                                        onChange={(e) => setCity(e.target.value)}
+                                        className="w-full rounded-lg border border-border/60 bg-canvas py-2.5 pl-10 pr-8 text-xs text-ink focus:border-accent focus:ring-1 focus:ring-accent"
+                                    >
+                                        <option value="">All Cities (Ghana)</option>
+                                        <option value="Accra">Accra</option>
+                                        <option value="Kumasi">Kumasi</option>
+                                        <option value="Takoradi">Takoradi</option>
+                                        <option value="Cape Coast">Cape Coast</option>
+                                        <option value="Tamale">Tamale</option>
+                                    </select>
+                                </div>
+
+                                <div className="relative md:w-44">
+                                    <Users className="absolute left-3.5 top-3.5 h-4 w-4 text-ink-tertiary" />
+                                    <select
+                                        value={minCapacity}
+                                        onChange={(e) => setMinCapacity(e.target.value)}
+                                        className="w-full rounded-lg border border-border/60 bg-canvas py-2.5 pl-10 pr-8 text-xs text-ink focus:border-accent focus:ring-1 focus:ring-accent"
+                                    >
+                                        <option value="">Any Capacity</option>
+                                        <option value="50">50+ Attendees</option>
+                                        <option value="150">150+ Attendees</option>
+                                        <option value="300">300+ Attendees</option>
+                                        <option value="500">500+ Attendees</option>
+                                        <option value="1000">1,000+ Attendees</option>
+                                    </select>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-accent/90 transition-colors cursor-pointer"
+                                >
+                                    <Search className="h-4 w-4" />
+                                    <span>Find Spaces</span>
+                                </button>
+                            </form>
+                        ) : (
+                            <form
+                                onSubmit={handleAiSearch}
+                                className="flex flex-col md:flex-row items-stretch gap-3 rounded-xl border border-purple-500/30 bg-surface p-3 shadow-lg"
+                            >
+                                <div className="relative flex-1">
+                                    <Sparkles className="absolute left-3.5 top-3.5 h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Describe what you need in natural language (e.g., 'Executive ocean view boardroom with generator in Accra')..."
+                                        value={aiPrompt}
+                                        onChange={(e) => setAiPrompt(e.target.value)}
+                                        className="w-full rounded-lg border border-purple-500/20 bg-canvas py-2.5 pl-10 pr-3 text-xs text-ink placeholder:text-ink-tertiary focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-accent px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
+                                >
+                                    <Sparkles className="h-4 w-4" />
+                                    <span>Scout with AI</span>
+                                </button>
+                            </form>
+                        )}
                     </div>
 
                     {/* Quick Pill Suggestions */}
