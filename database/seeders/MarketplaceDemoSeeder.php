@@ -10,7 +10,9 @@ use App\Models\StoreListing;
 use App\Models\StoreListingAmenity;
 use App\Models\StoreListingMedia;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 final class MarketplaceDemoSeeder extends Seeder
 {
@@ -215,8 +217,30 @@ final class MarketplaceDemoSeeder extends Seeder
                 [
                     'name' => $m['tenant_name'],
                     'isolation_mode' => 'shared',
+                    'onboarding_completed_at' => now(),
                 ]
             );
+
+            // Create or ensure Venue Host User exists for the merchant tenant
+            $userEmail = "venue@{$m['tenant_slug']}.test";
+            $hostUser = User::firstOrCreate(
+                ['email' => $userEmail],
+                [
+                    'first_name' => $m['shop_name'],
+                    'last_name' => 'Host',
+                    'password' => Hash::make('password'),
+                    'status' => 'active',
+                    'email_verified_at' => now(),
+                    'tenant_id' => $tenant->id,
+                ]
+            );
+
+            if (! $tenant->users()->where('users.id', $hostUser->id)->exists()) {
+                $tenant->users()->attach($hostUser->id);
+            }
+
+            setPermissionsTeamId($tenant->id);
+            $hostUser->syncRoles(['Org Admin']);
 
             // Create or update Shop profile
             $shop = Shop::updateOrCreate(
