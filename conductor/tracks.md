@@ -587,25 +587,53 @@ Replacing the single-tenant `/my` portal with a single platform-wide passwordles
 
 ---
 
-## [ ] Track: MiConvener Marketplace (Build 1: Venue Supply, Catalog & Discovery)
+## [x] Track: MiConvener Marketplace (Build 1: Venue Supply, Catalog & Discovery)
 
 Foundational supply, listing catalog, amenities transparency grid, and public discovery engine for the **MiConvener Marketplace** (`miconvener.com/marketplace`).
-Design: `docs/superpowers/specs/2026-09-20-event-store-build1-design.md`. Handoff: `docs/superpowers/specs/2026-09-20-event-store-handoff.md`. In-flight plan: `implementation.md`.
+Design: `docs/superpowers/specs/2026-09-20-event-store-build1-design.md`. Handoff: `docs/superpowers/specs/2026-09-20-event-store-handoff.md`.
 
-- [ ] **Stage 1: Database Migrations, Standard Seeders & Eloquent Models**:
-  - [ ] Landlord migrations for `shops`, `store_amenities`, `store_listings`, `store_listing_amenities`, and `store_listing_media`.
-  - [ ] Standard seeders for conference & venue amenities (`StoreAmenitySeeder.php`).
-  - [ ] Eloquent models (`Shop`, `StoreAmenity`, `StoreListing`, `StoreListingAmenity`, `StoreListingMedia`) with relationships and scopes (`active()`, `verified()`, `published()`, `venues()`, `nearLocation()`).
-- [ ] **Stage 2: Tenant Console (Venue Profile & Spaces Manager)**:
-  - [ ] Controllers and Form Requests for activating/updating tenant `Shop` profile and CRUD for venue spaces.
-  - [ ] Frontend Console views under `Venue Operations → Spaces`: listing table, space editor with **Included vs Excluded Amenities checklist**, photo uploads.
-  - [ ] Navigation updates in `ConsoleLayout.jsx`.
-- [ ] **Stage 3: Public Marketplace Discovery & Geo-Search Engine**:
-  - [ ] Routing in `routes/marketplace.php` (`/marketplace`, `/marketplace/venues`, `/marketplace/{merchant_slug}`).
-  - [ ] `MarketplaceSearchService` executing native PostgreSQL Haversine distance calculations with bounding-box index filtering.
-  - [ ] React/Inertia views: Marketplace landing hub, venue catalog with proximity and capacity filters, space detail page with Included/Excluded grid, and Merchant Storefront.
-- [ ] **Stage 4: Superadmin Verification & Trust Review Queue**:
-  - [ ] Superadmin controller and Blade views (`/admin/marketplace/verifications`) to review business registration, Ghana Card, and grant Blue Tick verification.
-- [ ] **Stage 5: Verification, Tests & Quality Gates**:
-  - [ ] Pest feature test suite in `tests/Feature/Marketplace/`.
-  - [ ] Quality gates: Pint clean, PHPStan 0 errors, full test suite green.
+- [x] **Stage 1: Database Migrations, Standard Seeders & Eloquent Models**:
+  - [x] Landlord migrations executed: `create_shops_table.php`, `create_store_amenities_table.php`, `create_store_listings_table.php`, `create_store_listing_amenities_table.php`, and `create_store_listing_media_table.php`.
+  - [x] Standard conference & venue amenities seeded: 23 amenities across power & climate, furniture, AV tech, facilities, and catering rules via `StoreAmenitySeeder.php`.
+  - [x] Eloquent models implemented: `Shop`, `StoreAmenity`, `StoreListing`, `StoreListingAmenity`, and `StoreListingMedia` with `Tenant::shop()` relation, integer pesewas casting, `capacity_breakdown` JSON casting, and scopes (`active()`, `verified()`, `published()`, `venues()`, `minCapacity()`, `nearLocation()`).
+  - [x] Verified with 5 passing tests (22 assertions) in `tests/Feature/Marketplace/StoreModelAndMigrationTest.php`, 0 PHPStan errors, and clean Pint.
+- [x] **Stage 2: Tenant Console (Venue Profile & Spaces Manager)**:
+  - [x] Controllers and Form Requests for activating/updating tenant `Shop` profile and CRUD for venue spaces (`VenueProfileController.php`, `VenueListingController.php`, `UpdateVenueProfileRequest.php`, `StoreVenueListingRequest.php`).
+  - [x] Frontend Console views under `Venue Operations → Spaces`: listing table, space editor with **Included vs Excluded Amenities checklist**, photo uploads (`Tenant/Venue/Profile/Show.jsx`, `Tenant/Venue/Spaces/Index.jsx`, `Tenant/Venue/Spaces/Form.jsx`).
+  - [x] Navigation updates in `ConsoleLayout.jsx` with `Building2` icon and `manage_venue` permission check in `HandleInertiaRequests.php`.
+  - [x] Verified with 6 passing tests (39 assertions) in `tests/Feature/Marketplace/TenantVenueSpacesTest.php`.
+- [x] **Stage 3: Public Marketplace Discovery & Geo-Search Engine**:
+  - [x] Routing in `routes/web.php` (`/marketplace`, `/marketplace/venues`, `/marketplace/venues/{slug}`, `/marketplace/{merchant_slug}`).
+  - [x] `MarketplaceSearchService` executing native PostgreSQL Haversine distance calculations (`nearLocation`), capacity breakdown filtering, price range, price visibility toggle, amenity matching, and verified merchant boost.
+  - [x] React/Inertia views: Marketplace landing hub (`Pages/Public/Marketplace/Index.jsx`), venue catalog with proximity and capacity filters (`Venues/Index.jsx`), space detail page with Included/Excluded grid (`Venues/Show.jsx`), and Merchant Storefront (`Storefront/Show.jsx`) with `MarketplaceLayout.jsx`.
+  - [x] Verified with 6 passing tests (46 assertions) in `tests/Feature/Marketplace/PublicMarketplaceDiscoveryTest.php`.
+- [x] **Stage 4: Superadmin Verification & Trust Review Queue**:
+  - [x] Superadmin controller and Blade views (`/admin/marketplace-verifications`) to review business registration, Ghana Card, and grant Blue Tick verification (`MarketplaceVerificationController.php`, `resources/views/admin/marketplace/verifications/index.blade.php`, `show.blade.php`).
+  - [x] Route gated strictly by `access-superadmin-dashboard` gate.
+  - [x] Verified with 3 passing tests (18 assertions) in `tests/Feature/Marketplace/SuperadminVerificationTest.php`.
+- [x] **Stage 5: Quality Gates, Self-Review & Adversarial Hardening**:
+  - [x] Pest feature test suite: 20 passing tests (184 assertions) across `tests/Feature/Marketplace/`.
+  - [x] Frontend asset compilation: `npm run build` compiled cleanly (2,583 modules transformed, 0 errors) using Node 22 via NVM.
+  - [x] Static Analysis & Formatting: PHPStan Level 5 passed with 0 errors, Laravel Pint clean.
+  - [x] Adversarial Self-Review Audit: Enforced global unique slug constraint in database migration and Form Request, hidden sensitive verification attributes (`verified_by_user_id`, `rejection_reason`) on `Shop`, and verified negative boundary tests (403 forbidden, 404 inactive/draft, cross-tenant isolation).
+  - [x] Commits: `2b24bdf` (Stages 1 & 2), `3f259da` (Stages 3 & 4, Self-Review).
+
+---
+
+## [ ] Track: MiConvener Marketplace (Build 2: Laravel AI SDK, Vector Embeddings & Agentic MCP Concierge)
+
+Integration of the **Laravel AI SDK** (`https://laravel.com/ai`), **Laravel MCP** (`https://laravel.com/ai/mcp`), and **Laravel Boost** (`https://laravel.com/ai/boost`) to power semantic natural language venue discovery and AI concierge capabilities.
+
+- [ ] **Stage 1: Laravel AI SDK Integration & Embeddings Pipeline**:
+  - [ ] Configure `laravel/ai` SDK provider drivers (OpenAI, Gemini, Anthropic, or local Ollama).
+  - [ ] Synthesize venue space semantic documents (space specs, capacities, amenities included, atmosphere, location).
+  - [ ] Generate and index high-dimensional vector embeddings on `store_listings`. Support hybrid vector + PostgreSQL FTS similarity search with fallback when `pgvector` binary is uncompiled.
+- [ ] **Stage 2: Natural Language Semantic Venue Discovery (AI Venue Scout)**:
+  - [ ] Add conversational prompt input on `/marketplace` ("Find an executive banquet hall in Airport Residential for 200 doctors with 3-phase standby generator").
+  - [ ] Integrate vector similarity scoring into `MarketplaceSearchService`.
+- [ ] **Stage 3: Laravel MCP Server (`laravel/mcp`) for Agentic Venue Concierge**:
+  - [ ] Implement Model Context Protocol tools (`SearchVenuesTool`, `GetVenueDetailsTool`, `CheckAvailabilityTool`, `RequestQuoteTool`).
+  - [ ] Expose MCP server endpoint for external AI agents and in-platform concierge chat assistants.
+- [ ] **Stage 4: Automated Verification, Pest Tests & Self-Review**:
+  - [ ] Unit and Feature tests for embedding generation, vector similarity matching, and MCP tool invocations.
+
