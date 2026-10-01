@@ -166,6 +166,14 @@ final class Tenant extends Model
         return $this->hasMany(TenantFeature::class);
     }
 
+    /**
+     * @return HasOne<Shop, $this>
+     */
+    public function shop(): HasOne
+    {
+        return $this->hasOne(Shop::class);
+    }
+
     public function featureEnabled(string $key): bool
     {
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();

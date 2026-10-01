@@ -249,6 +249,19 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
 
+    Route::prefix('venue')->name('tenant.venue.')->group(function (): void {
+        Route::get('profile', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'show'])->name('profile');
+        Route::post('profile', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'update'])->name('profile.update');
+        Route::post('profile/verify', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'submitVerification'])->name('profile.verify');
+
+        Route::get('spaces', [App\Http\Controllers\Tenant\Venue\VenueListingController::class, 'index'])->name('spaces.index');
+        Route::get('spaces/create', [App\Http\Controllers\Tenant\Venue\VenueListingController::class, 'create'])->name('spaces.create');
+        Route::post('spaces', [App\Http\Controllers\Tenant\Venue\VenueListingController::class, 'store'])->name('spaces.store');
+        Route::get('spaces/{listing}/edit', [App\Http\Controllers\Tenant\Venue\VenueListingController::class, 'edit'])->name('spaces.edit');
+        Route::put('spaces/{listing}', [App\Http\Controllers\Tenant\Venue\VenueListingController::class, 'update'])->name('spaces.update');
+        Route::delete('spaces/{listing}', [App\Http\Controllers\Tenant\Venue\VenueListingController::class, 'destroy'])->name('spaces.destroy');
+    });
+
     Route::get('events/{event}/data/sponsors', [EventSponsorController::class, 'index'])->name('tenant.events.sponsors.index');
     Route::post('events/{event}/sponsors', [EventSponsorController::class, 'store'])->name('tenant.events.sponsors.store');
     Route::delete('events/{event}/sponsors/{sponsor}', [EventSponsorController::class, 'destroy'])->name('tenant.events.sponsors.destroy');

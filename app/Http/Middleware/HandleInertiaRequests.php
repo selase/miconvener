@@ -55,6 +55,7 @@ final class HandleInertiaRequests extends Middleware
                     'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
                     'update_user' => fn (): bool => (bool) $request->user()?->can('update user'),
                     'delete_user' => fn (): bool => (bool) $request->user()?->can('delete user'),
+                    'manage_venue' => fn (): bool => (bool) $request->user()?->can('manage venue'),
                 ],
             ],
             'tenant' => $tenant ? [

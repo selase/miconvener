@@ -199,6 +199,12 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'notifications',
             ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage venue',
+                'guard_name' => 'web',
+                'category' => 'venue',
+            ],
         ];
     }
 

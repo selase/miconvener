@@ -585,7 +585,27 @@ Replacing the single-tenant `/my` portal with a single platform-wide passwordles
     - **D2 (Latency Measurement: PASS)**: Measured delay from attendee submission to organiser console notification banner was **~0.8 seconds** (< 1s, confirming active Reverb WebSocket connection; did not degrade to the 8s polling fallback).
     - **D3 (Urgent First Aid Escalation: PASS)**: Urgent medical request generated non-fading RED console banner (`⚠ First aid requested Medical / first aid from Selase Kwawu, seat C-14 in Main Auditorium`), turned venue map seat C-14 **RED (`First aid`)** with active pulse, and dispatched urgent transactional alert email confirmed received with subject *"Urgent: an attendee needs help at Probe Full Experience"*, naming attendee, seat C-14, and Main Auditorium. Ordinary water request generated zero email.
 
+---
 
+## [ ] Track: MiConvener Marketplace (Build 1: Venue Supply, Catalog & Discovery)
 
+Foundational supply, listing catalog, amenities transparency grid, and public discovery engine for the **MiConvener Marketplace** (`miconvener.com/marketplace`).
+Design: `docs/superpowers/specs/2026-09-20-event-store-build1-design.md`. Handoff: `docs/superpowers/specs/2026-09-20-event-store-handoff.md`. In-flight plan: `implementation.md`.
 
-
+- [ ] **Stage 1: Database Migrations, Standard Seeders & Eloquent Models**:
+  - [ ] Landlord migrations for `shops`, `store_amenities`, `store_listings`, `store_listing_amenities`, and `store_listing_media`.
+  - [ ] Standard seeders for conference & venue amenities (`StoreAmenitySeeder.php`).
+  - [ ] Eloquent models (`Shop`, `StoreAmenity`, `StoreListing`, `StoreListingAmenity`, `StoreListingMedia`) with relationships and scopes (`active()`, `verified()`, `published()`, `venues()`, `nearLocation()`).
+- [ ] **Stage 2: Tenant Console (Venue Profile & Spaces Manager)**:
+  - [ ] Controllers and Form Requests for activating/updating tenant `Shop` profile and CRUD for venue spaces.
+  - [ ] Frontend Console views under `Venue Operations → Spaces`: listing table, space editor with **Included vs Excluded Amenities checklist**, photo uploads.
+  - [ ] Navigation updates in `ConsoleLayout.jsx`.
+- [ ] **Stage 3: Public Marketplace Discovery & Geo-Search Engine**:
+  - [ ] Routing in `routes/marketplace.php` (`/marketplace`, `/marketplace/venues`, `/marketplace/{merchant_slug}`).
+  - [ ] `MarketplaceSearchService` executing native PostgreSQL Haversine distance calculations with bounding-box index filtering.
+  - [ ] React/Inertia views: Marketplace landing hub, venue catalog with proximity and capacity filters, space detail page with Included/Excluded grid, and Merchant Storefront.
+- [ ] **Stage 4: Superadmin Verification & Trust Review Queue**:
+  - [ ] Superadmin controller and Blade views (`/admin/marketplace/verifications`) to review business registration, Ghana Card, and grant Blue Tick verification.
+- [ ] **Stage 5: Verification, Tests & Quality Gates**:
+  - [ ] Pest feature test suite in `tests/Feature/Marketplace/`.
+  - [ ] Quality gates: Pint clean, PHPStan 0 errors, full test suite green.
