@@ -128,6 +128,11 @@
             font-size: 11px;
             color: #64748b;
         }
+        .signature-image {
+            max-width: 180px;
+            max-height: 50px;
+            margin-bottom: 4px;
+        }
         .qr-area {
             text-align: right;
             width: 35%;
@@ -181,7 +186,7 @@
                     {{ $bodyText }}
                 </div>
 
-                @if($certificate->cpd_hours > 0)
+                @if(($template?->show_cpd_hours ?? true) && $certificate->cpd_hours > 0)
                     <div class="cpd-badge">
                         Accredited for {{ number_format($certificate->cpd_hours, 1) }} Continuing Education (CPD/CME) Contact Hours
                     </div>
@@ -191,6 +196,9 @@
                     <table class="bottom-table">
                         <tr>
                             <td class="sign-area">
+                                @if(!empty($signatureDataUri))
+                                    <img src="{{ $signatureDataUri }}" class="signature-image" alt="Issuer signature">
+                                @endif
                                 <div class="sign-line"></div>
                                 <div class="issuer-name">{{ $template?->issuer_name ?? 'Academic Board & Convener' }}</div>
                                 <div class="issuer-title">{{ $template?->issuer_title ?? 'Organizing Committee Chair' }}</div>

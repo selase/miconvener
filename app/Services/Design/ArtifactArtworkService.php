@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Design;
 
 use App\ValueObjects\Design\StoredArtwork;
+use finfo;
 use GdImage;
 use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Http\UploadedFile;
@@ -48,7 +49,7 @@ final class ArtifactArtworkService
 
         $bytes = file_get_contents($file->getRealPath());
 
-        if (! is_string($bytes) || $bytes === '' || strlen($bytes) > self::MAX_FILE_BYTES) {
+        if (! is_string($bytes) || $bytes === '' || mb_strlen($bytes) > self::MAX_FILE_BYTES) {
             $this->invalid('Artwork could not be read or exceeds 10 MB.');
         }
 
@@ -109,8 +110,17 @@ final class ArtifactArtworkService
 
     public function dataUri(string $disk, string $path): string
     {
-        $bytes = $this->filesystems->disk($disk)->get($path);
-        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        try {
+            $bytes = $this->filesystems->disk($disk)->get($path);
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Stored artwork is unavailable.', previous: $exception);
+        }
+
+        if (! is_string($bytes) || $bytes === '') {
+            throw new RuntimeException('Stored artwork is unavailable.');
+        }
+
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
 
         if (! is_string($mime) || ! isset(self::EXTENSIONS[$mime])) {
             throw new RuntimeException('Stored artwork is not a supported image.');

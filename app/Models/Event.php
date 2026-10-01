@@ -349,6 +349,7 @@ final class Event extends Model
         return $this->hasMany(EventSession::class)->orderBy('starts_at')->orderBy('sort_order');
     }
 
+    /** @return BelongsToMany<Speaker, $this> */
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'event_speakers', 'event_id', 'speaker_id')

@@ -10,14 +10,21 @@ use App\Models\EventAbstract;
 use App\Models\EventCertificate;
 use App\Models\EventCertificateTemplate;
 use App\Models\EventRegistration;
+use App\Services\Certificates\CertificateDesignVersionService;
 use App\Services\Certificates\CertificatePdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
 final class EventCertificateController extends Controller
 {
+    public function __construct(
+        private readonly CertificatePdfService $pdfs,
+        private readonly CertificateDesignVersionService $designVersions,
+    ) {}
+
     public function index(Request $request, string $subdomain, Event $event): JsonResponse
     {
         Gate::authorize('read certificate');
@@ -130,6 +137,7 @@ final class EventCertificateController extends Controller
     public function issue(Request $request, string $subdomain, Event $event): JsonResponse
     {
         Gate::authorize('issue certificates');
+        $this->ensureDefaultTemplates($event);
 
         $validated = $request->validate([
             'target_group' => ['required', 'string', 'in:checked_in_delegates,all_delegates,speakers,presenters,custom'],
@@ -155,12 +163,16 @@ final class EventCertificateController extends Controller
         if ($template === null) {
             $template = $event->certificateTemplates()->where('role', $role)->first();
         }
+        if (! $template instanceof EventCertificateTemplate) {
+            $template = null;
+        }
 
         $cpdHours = isset($validated['cpd_hours']) && $validated['cpd_hours'] > 0
             ? (float) $validated['cpd_hours']
             : ($template?->default_cpd_hours ?? 0.0);
 
         $recipients = [];
+        $missingRecipientCount = 0;
 
         if ($targetGroup === 'checked_in_delegates') {
             $regs = $event->registrations()->where('status', EventRegistration::STATUS_CHECKED_IN)->get();
@@ -185,9 +197,15 @@ final class EventCertificateController extends Controller
         } elseif ($targetGroup === 'speakers') {
             $speakers = $event->speakers()->get();
             foreach ($speakers as $speaker) {
+                if (blank($speaker->email)) {
+                    $missingRecipientCount++;
+
+                    continue;
+                }
+
                 $recipients[] = [
                     'name' => $speaker->name,
-                    'email' => "speaker-{$speaker->id}@miconvener.local",
+                    'email' => mb_strtolower(mb_trim((string) $speaker->email)),
                     'registration_id' => null,
                     'user_id' => null,
                 ];
@@ -201,6 +219,12 @@ final class EventCertificateController extends Controller
             foreach ($abstracts as $abs) {
                 $primaryAuthor = $abs->authors->where('is_presenter', true)->first() ?? $abs->authors->first();
                 if ($primaryAuthor) {
+                    if (blank($primaryAuthor->email)) {
+                        $missingRecipientCount++;
+
+                        continue;
+                    }
+
                     $recipients[] = [
                         'name' => "{$primaryAuthor->first_name} {$primaryAuthor->last_name}",
                         'email' => $primaryAuthor->email,
@@ -220,40 +244,52 @@ final class EventCertificateController extends Controller
             }
         }
 
-        $issuedCount = 0;
-        $skippedCount = 0;
+        [$issuedCount, $skippedCount] = DB::connection('landlord')->transaction(
+            function () use ($event, $recipients, $role, $template, $cpdHours): array {
+                $issuedCount = 0;
+                $skippedCount = 0;
+                $designVersion = $template !== null
+                    ? $this->designVersions->snapshot($template)
+                    : null;
 
-        foreach ($recipients as $item) {
-            $exists = $event->certificates()
-                ->where('recipient_email', $item['email'])
-                ->where('role', $role)
-                ->exists();
+                foreach ($recipients as $item) {
+                    $exists = $event->certificates()
+                        ->whereRaw('lower(recipient_email) = ?', [mb_strtolower($item['email'])])
+                        ->where('role', $role)
+                        ->exists();
 
-            if ($exists) {
-                $skippedCount++;
+                    if ($exists) {
+                        $skippedCount++;
 
-                continue;
-            }
+                        continue;
+                    }
 
-            $event->certificates()->create([
-                'tenant_id' => $event->tenant_id,
-                'registration_id' => $item['registration_id'],
-                'user_id' => $item['user_id'],
-                'template_id' => $template?->id,
-                'recipient_name' => $item['name'],
-                'recipient_email' => $item['email'],
-                'role' => $role,
-                'cpd_hours' => $cpdHours,
-                'issued_at' => now(),
-            ]);
+                    $event->certificates()->create([
+                        'tenant_id' => $event->tenant_id,
+                        'registration_id' => $item['registration_id'],
+                        'user_id' => $item['user_id'],
+                        'template_id' => $template?->id,
+                        'design_version_id' => $designVersion?->id,
+                        'recipient_name' => $item['name'],
+                        'recipient_email' => mb_strtolower(mb_trim($item['email'])),
+                        'role' => $role,
+                        'cpd_hours' => $cpdHours,
+                        'issued_at' => now(),
+                    ]);
 
-            $issuedCount++;
-        }
+                    $issuedCount++;
+                }
+
+                return [$issuedCount, $skippedCount];
+            },
+            3,
+        );
 
         return response()->json([
-            'message' => "Successfully issued {$issuedCount} certificates. ({$skippedCount} skipped as already issued)",
+            'message' => "Successfully issued {$issuedCount} certificates. ({$skippedCount} skipped as already issued; {$missingRecipientCount} skipped without an email address)",
             'issued_count' => $issuedCount,
             'skipped_count' => $skippedCount,
+            'missing_recipient_count' => $missingRecipientCount,
         ]);
     }
 
@@ -261,10 +297,8 @@ final class EventCertificateController extends Controller
     {
         Gate::authorize('read certificate');
 
+        $domPdf = $this->pdfs->generatePdf($certificate);
         $certificate->increment('download_count');
-
-        $pdfService = app(CertificatePdfService::class);
-        $domPdf = $pdfService->generatePdf($certificate);
 
         return $domPdf->download("certificate-{$certificate->verification_code}.pdf");
     }
