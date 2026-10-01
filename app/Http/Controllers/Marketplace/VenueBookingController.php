@@ -88,7 +88,7 @@ final class VenueBookingController extends Controller
             ->firstOrFail();
 
         $from = isset($validated['from']) ? Carbon::parse($validated['from']) : now()->startOfDay();
-        $to = isset($validated['to']) ? Carbon::parse($validated['to']) : now()->addMonths(3)->endOfDay();
+        $to = isset($validated['to']) ? Carbon::parse($validated['to']) : now()->addMonths(6)->endOfDay();
 
         $slots = $this->availabilityService->getBookedSlots($listing, $from, $to);
 

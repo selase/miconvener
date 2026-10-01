@@ -1,17 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { router } from '@inertiajs/react';
 import {
     Calendar,
-    Clock,
-    Users,
-    ShieldCheck,
     CheckCircle2,
     AlertCircle,
     X,
-    FileText,
     CreditCard,
-    Building2,
     Sparkles,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react';
 
 export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
@@ -21,7 +18,12 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
     const tomorrowStr = () => {
         const d = new Date();
         d.setDate(d.getDate() + 1);
-        return d.toISOString().split('T')[0];
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const todayLocalStr = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
 
     const [dateMode, setDateMode] = useState('single'); // 'single' | 'multi'
@@ -39,6 +41,11 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
     const [specialRequests, setSpecialRequests] = useState('');
     const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+    // Mini visual calendar state
+    const [calendarDate, setCalendarDate] = useState(() => new Date());
+    const [bookedSlots, setBookedSlots] = useState([]);
+    const [loadingSlots, setLoadingSlots] = useState(false);
+
     const [checking, setChecking] = useState(false);
     const [availability, setAvailability] = useState({
         available: true,
@@ -46,6 +53,86 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
     });
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
+
+    // Fetch occupied and blackout slots for this listing
+    useEffect(() => {
+        if (!isOpen || !venue?.slug) return;
+        let isMounted = true;
+        setLoadingSlots(true);
+
+        fetch(`/marketplace/venues/${venue.slug}/booked-slots`)
+            .then((res) => (res.ok ? res.json() : { slots: [] }))
+            .then((data) => {
+                if (isMounted) {
+                    setBookedSlots(data.slots || []);
+                }
+            })
+            .catch((err) => console.error('Failed to load booked slots:', err))
+            .finally(() => {
+                if (isMounted) setLoadingSlots(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isOpen, venue?.slug]);
+
+    const getSlotForDate = useCallback(
+        (dayStr) => {
+            return bookedSlots.find((slot) => {
+                const startDay = slot.starts_at.slice(0, 10);
+                const endDay = slot.ends_at.slice(0, 10);
+                return dayStr >= startDay && dayStr <= endDay;
+            });
+        },
+        [bookedSlots]
+    );
+
+    const calendarDays = useMemo(() => {
+        const year = calendarDate.getFullYear();
+        const month = calendarDate.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        const days = [];
+        for (let i = 0; i < firstDay; i++) {
+            days.push(null);
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            const mStr = String(month + 1).padStart(2, '0');
+            const dStr = String(d).padStart(2, '0');
+            const dateStr = `${year}-${mStr}-${dStr}`;
+            days.push({
+                day: d,
+                dateStr,
+            });
+        }
+        return days;
+    }, [calendarDate]);
+
+    const handleCalendarDayClick = (dayObj) => {
+        if (!dayObj) return;
+        const todayStr = todayLocalStr();
+        if (dayObj.dateStr < todayStr) return;
+
+        const slot = getSlotForDate(dayObj.dateStr);
+        if (slot) return;
+
+        if (dateMode === 'single') {
+            setStartDate(dayObj.dateStr);
+            setEndDate(dayObj.dateStr);
+        } else {
+            if (!startDate || (startDate && endDate && startDate !== endDate)) {
+                setStartDate(dayObj.dateStr);
+                setEndDate(dayObj.dateStr);
+            } else if (dayObj.dateStr < startDate) {
+                setStartDate(dayObj.dateStr);
+                setEndDate(dayObj.dateStr);
+            } else {
+                setEndDate(dayObj.dateStr);
+            }
+        }
+    };
 
     const formatCurrency = (pesewas) => {
         if (!pesewas && pesewas !== 0) return 'GHS 0.00';
@@ -203,9 +290,120 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
 
                     {/* Preferred Date & Time Selection */}
                     <div className="space-y-4 rounded-xl border border-border bg-canvas/40 p-4">
-                        <div className="flex items-center gap-1.5 font-semibold text-ink text-sm">
-                            <Clock className="h-4 w-4 text-accent" />
-                            <span>Preferred Date & Time Schedule</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 font-semibold text-ink text-sm">
+                                <Calendar className="h-4 w-4 text-accent" />
+                                <span>Availability & Date Schedule</span>
+                            </div>
+                            <span className="text-[11px] text-ink-muted">
+                                Click a date on calendar or input below
+                            </span>
+                        </div>
+
+                        {/* Interactive Availability Calendar */}
+                        <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+                                <span className="font-semibold text-ink text-xs">
+                                    {calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                                        className="p-1 rounded hover:bg-surface-hover text-ink-secondary hover:text-ink transition-colors"
+                                        title="Previous Month"
+                                    >
+                                        <ChevronLeft className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCalendarDate(new Date())}
+                                        className="px-1.5 py-0.5 text-[10px] rounded border border-border text-ink-secondary hover:text-ink hover:bg-surface-hover transition-colors"
+                                    >
+                                        Today
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                                        className="p-1 rounded hover:bg-surface-hover text-ink-secondary hover:text-ink transition-colors"
+                                        title="Next Month"
+                                    >
+                                        <ChevronRight className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Days of week header */}
+                            <div className="grid grid-cols-7 text-center text-[10px] font-medium text-ink-muted py-0.5">
+                                <span>Su</span>
+                                <span>Mo</span>
+                                <span>Tu</span>
+                                <span>We</span>
+                                <span>Th</span>
+                                <span>Fr</span>
+                                <span>Sa</span>
+                            </div>
+
+                            {/* Month days grid */}
+                            <div className="grid grid-cols-7 gap-1">
+                                {calendarDays.map((dayObj, idx) => {
+                                    if (!dayObj) {
+                                        return <div key={`empty-${idx}`} className="h-7" />;
+                                    }
+                                    const todayStr = todayLocalStr();
+                                    const isPast = dayObj.dateStr < todayStr;
+                                    const slot = getSlotForDate(dayObj.dateStr);
+                                    const isBlocked = !!slot;
+                                    const isSelected =
+                                        dateMode === 'single'
+                                            ? dayObj.dateStr === startDate
+                                            : dayObj.dateStr >= startDate && dayObj.dateStr <= endDate;
+
+                                    let cellClasses = 'h-7 w-full flex items-center justify-center rounded-md text-[11px] transition-colors ';
+
+                                    if (isSelected) {
+                                        cellClasses += 'bg-accent text-white font-bold shadow-2xs';
+                                    } else if (isBlocked) {
+                                        cellClasses += 'bg-rose-500/10 text-rose-500 line-through cursor-not-allowed opacity-70';
+                                    } else if (isPast) {
+                                        cellClasses += 'text-ink-muted/40 cursor-not-allowed';
+                                    } else {
+                                        cellClasses += 'text-ink hover:bg-accent/15 cursor-pointer font-medium';
+                                    }
+
+                                    return (
+                                        <button
+                                            type="button"
+                                            key={dayObj.dateStr}
+                                            disabled={isPast || isBlocked}
+                                            onClick={() => handleCalendarDayClick(dayObj)}
+                                            title={isBlocked ? 'Unavailable / Reserved' : isPast ? 'Past Date' : `Select ${dayObj.dateStr}`}
+                                            className={cellClasses}
+                                        >
+                                            {dayObj.day}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Calendar Legend */}
+                            <div className="flex items-center justify-between pt-1.5 border-t border-border/60 text-[10px] text-ink-muted">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1">
+                                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                        <span>Available</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <span className="h-2 w-2 rounded-full bg-rose-500" />
+                                        <span>Reserved / Blocked</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <span className="h-2 w-2 rounded-full bg-accent" />
+                                        <span>Selected</span>
+                                    </div>
+                                </div>
+                                {loadingSlots && <span>Updating...</span>}
+                            </div>
                         </div>
 
                         {dateMode === 'single' ? (

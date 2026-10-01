@@ -715,7 +715,48 @@ Full venue booking engine with custom date/time slot selection, real-time calend
     - Handled `PRICING_MODEL_FLAT_RATE` explicitly in `VenueAvailabilityService::calculatePricing`.
     - Wrapped MCP `RequestQuoteTool` with `ValidationException` error handling.
 
+---
 
+## [x] Track: MiConvener Marketplace (Build 4: Master Venue Calendar, Manual Blackout Engine & Console Navigation)
 
+Interactive Master Venue Calendar for hotel and venue managers (e.g. Labadi Beach Hotel, Kempinski Hotel), manual blackout/maintenance engine, console navigation integration, and public booking drawer visual calendar.
 
+- [x] **Phase 1: Model & Availability Lockout Engine for Manual Blackouts**:
+  - [x] Added `VenueBooking::STATUS_BLOCKED = 'blocked'` and `isBlocked(): bool` helper on `VenueBooking`.
+  - [x] Updated `scopeBlockingCalendar` to automatically include `STATUS_BLOCKED` alongside confirmed bookings and active 48-hour holds with unexpired quotes.
+  - [x] `VenueAvailabilityService::isSlotAvailable` and `calculatePricing` automatically treat blackouts as unavailable, protecting both human planners and MCP AI agents (`check_availability`, `request_quote`).
+- [x] **Phase 2: Venue Calendar Controller & Blackout API**:
+  - [x] Created `App\Http\Controllers\Tenant\Venue\VenueCalendarController` with:
+    - `index()`: Generates month calendar window aligned to Sunday–Saturday week boundaries, eager-loading listing relations, with space filtering tabs.
+    - `storeBlock()`: Validates date ranges, enforces strict collision checks against confirmed bookings, active unexpired holds, and existing blackouts, and generates globally unique `BLK-...` references using collision-resistant probing.
+    - `destroyBlock()`: Allows authorized host admins to remove blackout blocks and immediately restore availability, guarded by `Str::isUuid` and route `->whereUuid('block')`.
+  - [x] Registered routes under `tenant.venue.` prefix in `routes/subdomain.php`:
+    - `GET /venue/calendar` (`tenant.venue.calendar.index`)
+    - `POST /venue/calendar/blocks` (`tenant.venue.calendar.blocks.store`)
+    - `DELETE /venue/calendar/blocks/{block}` (`tenant.venue.calendar.blocks.destroy`)
+- [x] **Phase 3: Host Master Calendar Frontend & Console Navigation**:
+  - [x] Created `resources/js/Pages/Tenant/Venue/Calendar/Index.jsx`:
+    - Month and year navigation with Today shortcut button.
+    - Multi-space property filter tabs (filter across all spaces or individual halls like Labadi's *Omanye Plenary Hall*).
+    - Status badges on date cells: 🟢 Confirmed reservations (Green), 🟡 48-hour holds (Amber), ⚪ Maintenance/Blackout blocks (Slate/Gray).
+    - Event details flyout showing planner details, guest count, layout style, total revenue, and direct link to lead dossier.
+    - Blackout date scheduling modal with custom reason and collision feedback.
+    - Delete blackout confirmation modal adhering to console design system invariants.
+  - [x] Updated `resources/js/Layouts/ConsoleLayout.jsx` with `Venue Calendar` (`CalendarDays`) and `Inquiries & Leads` (`Inbox`) visible for users with `manage venue` permissions.
+- [x] **Phase 4: Public Booking Drawer Visual Calendar Picker**:
+  - [x] Enhanced `resources/js/Components/Marketplace/VenueBookingDrawer.jsx` with an interactive month availability calendar.
+  - [x] Visual indicators showing open vs. occupied/blacked-out days, with single-day and multi-day click selection and timezone-safe date key construction.
+  - [x] Expanded default booking horizon to 6 months in `VenueBookingController::bookedSlots`.
+- [x] **Phase 5: Automated Verification & Mandatory Self-Review**:
+  - [x] Pest test suite: 10 dedicated tests in `tests/Feature/Tenant/VenueCalendarTest.php` (57 assertions) and 4 tests in `tests/Feature/Components/ConsoleComponentUsageTest.php` (5 assertions) passing cleanly.
+  - [x] Full regression test suite: 69 tests, 334 assertions passing across calendar, inquiries, bookings, event linking, MCP server, and semantic search.
+  - [x] Code style: Laravel Pint formatted (`vendor/bin/pint --dirty`).
+  - [x] Frontend bundling: `npm run build` compiled cleanly (2,590 modules) with 0 errors.
+  - [x] 3-agent post-implementation self-review audit (Security, Logic/Edge Cases, Architecture/Performance) completed with all findings resolved:
+    - Fixed `ConsoleComponentUsageTest` violations in `Index.jsx` (removed undeclared `description` on `PageHeader` and undeclared `variant="danger"` on `Button`).
+    - Fixed Carbon week boundary alignment (`startOfWeek(CarbonInterface::SUNDAY)` and `endOfWeek(CarbonInterface::SATURDAY)`) to match the Sunday-start UI grid.
+    - Hardened `storeBlock` collision checks to prevent overlapping active 48-hour holds and duplicate blackouts.
+    - Implemented collision-resistant generation loop for `booking_reference`.
+    - Removed unused icon imports across `Index.jsx` and `VenueBookingDrawer.jsx`.
+    - Fixed local date key formatting to prevent timezone shifts across UTC+ timezones.
 

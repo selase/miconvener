@@ -77,6 +77,8 @@ final class VenueBooking extends Model
 
     public const STATUS_COMPLETED = 'completed';
 
+    public const STATUS_BLOCKED = 'blocked';
+
     public const PAYMENT_UNPAID = 'unpaid';
 
     public const PAYMENT_DEPOSIT_PAID = 'deposit_paid';
@@ -187,7 +189,7 @@ final class VenueBooking extends Model
     public function scopeBlockingCalendar(Builder $query): void
     {
         $query->where(function (Builder $q): void {
-            $q->where('status', self::STATUS_CONFIRMED)
+            $q->whereIn('status', [self::STATUS_CONFIRMED, self::STATUS_BLOCKED])
                 ->orWhere(function (Builder $pending): void {
                     $pending->where('status', self::STATUS_PENDING_PAYMENT)
                         ->where(function (Builder $valid): void {
@@ -214,6 +216,11 @@ final class VenueBooking extends Model
     public function isConfirmed(): bool
     {
         return $this->status === self::STATUS_CONFIRMED;
+    }
+
+    public function isBlocked(): bool
+    {
+        return $this->status === self::STATUS_BLOCKED;
     }
 
     public function isDepositPaid(): bool

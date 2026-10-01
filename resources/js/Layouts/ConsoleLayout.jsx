@@ -15,6 +15,8 @@ import {
     Settings,
     UserRound,
     Building2,
+    CalendarDays,
+    Inbox,
     Menu,
     X,
 } from 'lucide-react';
@@ -27,6 +29,18 @@ const NAV_ITEMS = [
         label: 'Venue Spaces',
         href: 'tenant.venue.spaces.index',
         icon: Building2,
+        permission: 'manage_venue',
+    },
+    {
+        label: 'Venue Calendar',
+        href: 'tenant.venue.calendar.index',
+        icon: CalendarDays,
+        permission: 'manage_venue',
+    },
+    {
+        label: 'Inquiries & Leads',
+        href: 'tenant.venue.inquiries.index',
+        icon: Inbox,
         permission: 'manage_venue',
     },
     { label: 'Team', href: 'tenant.users.index', icon: Users },
