@@ -24,6 +24,9 @@ use App\Mail\Events\EventTicketTransferCode;
 use App\Mail\Events\EventTicketTransferred;
 use App\Mail\Events\PlatformAttendeeAccessCodeMail;
 use App\Mail\Events\UrgentServiceRequestRaised;
+use App\Mail\Marketplace\BookingConfirmationGuest;
+use App\Mail\Marketplace\NewVenueBookingNotification;
+use App\Mail\Marketplace\QuoteSentNotification;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
@@ -34,8 +37,11 @@ use App\Models\EventBlast;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationTransfer;
 use App\Models\Lead;
+use App\Models\Shop;
+use App\Models\StoreListing;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\VenueBooking;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\URL;
 
@@ -116,6 +122,51 @@ test('every mailable renders', function (): void {
         'note' => 'Feeling faint, near the back of the hall.',
     ]);
 
+    $shop = Shop::create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Grand Arena',
+        'slug' => 'grand-arena-'.$tenant->id,
+        'email' => 'venue@grandarena.com',
+        'phone' => '+233 24 000 0000',
+        'address' => 'Independence Ave',
+        'city' => 'Accra',
+        'region' => 'Greater Accra',
+        'verification_status' => 'verified',
+        'is_active' => true,
+    ]);
+
+    $listing = StoreListing::create([
+        'shop_id' => $shop->id,
+        'listing_kind' => StoreListing::KIND_VENUE,
+        'title' => 'Main Auditorium',
+        'slug' => 'main-auditorium-'.$tenant->id,
+        'rental_price_pesewas' => 100000,
+        'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+        'price_visibility' => StoreListing::PRICE_VISIBILITY_PUBLIC,
+        'security_deposit_pesewas' => 50000,
+        'status' => StoreListing::STATUS_PUBLISHED,
+    ]);
+
+    $booking = VenueBooking::create([
+        'store_listing_id' => $listing->id,
+        'tenant_id' => $tenant->id,
+        'shop_id' => $shop->id,
+        'booking_reference' => 'BK-RENDER-001',
+        'planner_name' => 'Ama Serwaa',
+        'planner_email' => 'ama@stem.org',
+        'planner_phone' => '+233 24 111 2222',
+        'event_type' => 'Science Congress',
+        'guest_count' => 100,
+        'starts_at' => now()->addDays(7)->setTime(9, 0),
+        'ends_at' => now()->addDays(7)->setTime(17, 0),
+        'rental_amount_pesewas' => 100000,
+        'security_deposit_pesewas' => 50000,
+        'total_amount_pesewas' => 150000,
+        'deposit_required_pesewas' => 50000,
+        'status' => VenueBooking::STATUS_CONFIRMED,
+        'payment_status' => VenueBooking::PAYMENT_DEPOSIT_PAID,
+    ]);
+
     // Shape taken from BillingDailySummary's documented return type, so this
     // fails if the producer and the template drift apart.
     $summary = [
@@ -154,6 +205,9 @@ test('every mailable renders', function (): void {
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),
         'WelcomeMail' => fn () => new WelcomeMail($user),
+        'BookingConfirmationGuest' => fn () => new BookingConfirmationGuest($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'NewVenueBookingNotification' => fn () => new NewVenueBookingNotification($booking, 'https://acme.test/console/venue/inquiries/BK-RENDER-001'),
+        'QuoteSentNotification' => fn () => new QuoteSentNotification($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001/checkout'),
     ];
 
     $failures = [];
