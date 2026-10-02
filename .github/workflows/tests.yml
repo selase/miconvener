@@ -12,7 +12,7 @@ jobs:
     # MiConvener runs on PostgreSQL only, in production and in every test run.
     services:
       postgres:
-        image: postgres:15
+        image: pgvector/pgvector:pg15
         env:
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testing

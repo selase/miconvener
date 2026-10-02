@@ -193,8 +193,8 @@ final class EventSession extends Model
     }
 
     /**
-     * @param  Builder<self>  $query
-     * @return Builder<self>
+     * @param  Builder<EventSession>  $query
+     * @return Builder<EventSession>
      */
     public function scopeOccurrences(Builder $query): Builder
     {
@@ -202,8 +202,8 @@ final class EventSession extends Model
     }
 
     /**
-     * @param  Builder<self>  $query
-     * @return Builder<self>
+     * @param  Builder<EventSession>  $query
+     * @return Builder<EventSession>
      */
     public function scopeUpcomingOccurrences(Builder $query): Builder
     {
