@@ -97,3 +97,10 @@ test('badge template endpoint remains constrained to the tenant event', function
     $this->actingAs($user)->postJson("http://{$host}/events/{$otherEvent->id}/badges/template", validBadgeDesign(), ['HTTP_HOST' => $host])
         ->assertNotFound();
 });
+
+test('badge console uses the server pdf instead of browser printing', function (): void {
+    $panel = file_get_contents(resource_path('js/Pages/Tenant/Events/panels/BadgesPanel.jsx'));
+
+    expect($panel)->toContain('tenant.events.badges.sheet')
+        ->not->toContain('window.print');
+});

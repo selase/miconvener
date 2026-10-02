@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Button from '@/Components/Console/Button';
 import SearchInput from '@/Components/Console/SearchInput';
-import { Printer, History } from 'lucide-react';
-import csrfFetch from '@/lib/csrfFetch';
+import Modal from '@/Components/Console/Modal';
+import BadgeDesignEditor from '@/Pages/Tenant/Events/Badges/BadgeDesignEditor';
+import { Download, History, Palette, Printer } from 'lucide-react';
+import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 
 const TIER_STYLE = {
     general: { band: 'bg-accent', label: null },
@@ -55,6 +57,11 @@ export default function BadgesPanel({ event }) {
     const [recentPrints, setRecentPrints] = useState([]);
     const [query, setQuery] = useState('');
     const [printing, setPrinting] = useState(false);
+    const [template, setTemplate] = useState(null);
+    const [designerOpen, setDesignerOpen] = useState(false);
+    const [savingDesign, setSavingDesign] = useState(false);
+    const [error, setError] = useState(null);
+    const [designForm, setDesignForm] = useState(null);
 
     const load = () => {
         csrfFetch(route('tenant.events.badges.index', { event: event.id }))
@@ -62,6 +69,7 @@ export default function BadgesPanel({ event }) {
             .then((data) => {
                 setBadges(data.badges);
                 setRecentPrints(data.recent_prints);
+                setTemplate(data.template);
             });
     };
 
@@ -80,15 +88,93 @@ export default function BadgesPanel({ event }) {
         );
     }, [badges, query]);
 
-    const print = async () => {
+    const downloadPdf = async () => {
         setPrinting(true);
-        await csrfFetch(route('tenant.events.badges.print-log', { event: event.id }), {
-            method: 'POST',
-            body: JSON.stringify({ registration_ids: filtered.map((b) => b.id) }),
+        setError(null);
+        try {
+            const response = await csrfFetch(
+                route('tenant.events.badges.sheet', { event: event.id }),
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ registration_ids: filtered.map((badge) => badge.id) }),
+                }
+            );
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'The badge PDF could not be generated.');
+            }
+            const url = URL.createObjectURL(await response.blob());
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${event.name || 'event'}-badges.pdf`;
+            link.click();
+            URL.revokeObjectURL(url);
+            load();
+        } catch (reason) {
+            setError(reason.message);
+        } finally {
+            setPrinting(false);
+        }
+    };
+
+    const openDesigner = () => {
+        setDesignForm({
+            ...template,
+            background: null,
+            remove_background: false,
+            layout: template?.layout || {},
+            tier_styles: template?.tier_styles || {},
+            sheet_settings: template?.sheet_settings || {
+                paper: 'a4',
+                margin_mm: 8,
+                gap_mm: 3,
+                crop_marks: true,
+            },
         });
-        setPrinting(false);
-        window.print();
-        load();
+        setDesignerOpen(true);
+    };
+
+    const saveDesign = async (eventObject) => {
+        eventObject.preventDefault();
+        setSavingDesign(true);
+        setError(null);
+        const payload = new FormData();
+        Object.entries(designForm).forEach(([key, value]) => {
+            if (
+                value === null ||
+                value === undefined ||
+                [
+                    'id',
+                    'tenant_id',
+                    'event_id',
+                    'created_at',
+                    'updated_at',
+                    'background_path',
+                    'background_disk',
+                    'design_version',
+                ].includes(key)
+            )
+                return;
+            if (['layout', 'tier_styles', 'sheet_settings'].includes(key))
+                payload.append(key, JSON.stringify(value));
+            else if (typeof value === 'boolean') payload.append(key, value ? '1' : '0');
+            else payload.append(key, value);
+        });
+        try {
+            const response = await csrfFetchFormData(
+                route('tenant.events.badges.template.update', { event: event.id }),
+                payload
+            );
+            const data = await response.json();
+            if (!response.ok)
+                throw new Error(data.message || 'The badge design could not be saved.');
+            setTemplate(data.template);
+            setDesignerOpen(false);
+        } catch (reason) {
+            setError(reason.message);
+        } finally {
+            setSavingDesign(false);
+        }
     };
 
     return (
@@ -103,16 +189,28 @@ export default function BadgesPanel({ event }) {
                         whole batch.
                     </p>
                 </div>
-                <Button
-                    icon={Printer}
-                    variant="primary"
-                    onClick={print}
-                    disabled={filtered.length === 0 || printing}
-                >
-                    Print {filtered.length > 0 ? filtered.length : ''} badge
-                    {filtered.length === 1 ? '' : 's'}
-                </Button>
+                <div className="flex gap-2">
+                    <Button icon={Palette} onClick={openDesigner} disabled={!template}>
+                        Design badges
+                    </Button>
+                    <Button
+                        icon={Download}
+                        variant="primary"
+                        onClick={downloadPdf}
+                        disabled={filtered.length === 0 || printing}
+                    >
+                        {printing
+                            ? 'Generating…'
+                            : `Download ${filtered.length || ''} badge${filtered.length === 1 ? '' : 's'} PDF`}
+                    </Button>
+                </div>
             </div>
+
+            {error && (
+                <div className="no-print mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                    {error}
+                </div>
+            )}
 
             <div className="no-print mb-5">
                 <SearchInput
@@ -177,6 +275,24 @@ export default function BadgesPanel({ event }) {
                     </ul>
                 </div>
             )}
+
+            <Modal
+                open={designerOpen}
+                onClose={() => setDesignerOpen(false)}
+                title="Badge print studio"
+                className="max-w-6xl"
+            >
+                {designForm && (
+                    <BadgeDesignEditor
+                        form={designForm}
+                        setForm={setDesignForm}
+                        existingBackground={template?.background_path}
+                        saving={savingDesign}
+                        onSave={saveDesign}
+                        onCancel={() => setDesignerOpen(false)}
+                    />
+                )}
+            </Modal>
         </div>
     );
 }
