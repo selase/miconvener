@@ -1693,12 +1693,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\Tenant\EventController::getTenant() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: argument.unresolvableType
 			count: 3

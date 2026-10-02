@@ -100,7 +100,7 @@ final class VenueCalendarController extends Controller
                 'guest_count' => $b->guest_count,
                 'layout_style' => $b->layout_style,
                 'space_id' => $b->store_listing_id,
-                'space_title' => $b->listing?->title ?? 'Venue Space',
+                'space_title' => $b->listing->title ?? 'Venue Space',
                 'starts_at' => $b->starts_at->toIso8601String(),
                 'ends_at' => $b->ends_at->toIso8601String(),
                 'duration_units' => $b->duration_units,
@@ -232,7 +232,7 @@ final class VenueCalendarController extends Controller
             ->where('status', VenueBooking::STATUS_BLOCKED)
             ->firstOrFail();
 
-        $listingTitle = $booking->listing?->title ?? 'Space';
+        $listingTitle = $booking->listing->title ?? 'Space';
         $booking->delete();
 
         return redirect()->back()->with('success', "Blackout block removed for {$listingTitle}. Dates are now available on the calendar.");
