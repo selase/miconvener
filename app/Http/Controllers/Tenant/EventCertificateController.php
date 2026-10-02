@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StoreCertificateTemplateRequest;
+use App\Http\Requests\Tenant\UpdateCertificateTemplateRequest;
 use App\Models\Event;
 use App\Models\EventAbstract;
 use App\Models\EventCertificate;
@@ -12,17 +14,22 @@ use App\Models\EventCertificateTemplate;
 use App\Models\EventRegistration;
 use App\Services\Certificates\CertificateDesignVersionService;
 use App\Services\Certificates\CertificatePdfService;
+use App\Services\Design\ArtifactArtworkService;
+use App\Services\Design\ArtifactLayoutValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 final class EventCertificateController extends Controller
 {
     public function __construct(
         private readonly CertificatePdfService $pdfs,
         private readonly CertificateDesignVersionService $designVersions,
+        private readonly ArtifactArtworkService $artwork,
+        private readonly ArtifactLayoutValidator $layouts,
     ) {}
 
     public function index(Request $request, string $subdomain, Event $event): JsonResponse
@@ -74,37 +81,21 @@ final class EventCertificateController extends Controller
         ]);
     }
 
-    public function storeTemplate(Request $request, string $subdomain, Event $event): JsonResponse
+    public function storeTemplate(StoreCertificateTemplateRequest $request, string $subdomain, Event $event): JsonResponse
     {
         Gate::authorize('create certificate');
 
-        $validated = $request->validate([
-            'role' => ['required', 'string', 'in:delegate,speaker,presenter,volunteer,custom'],
-            'title' => ['required', 'string', 'max:255'],
-            'body_template' => ['nullable', 'string'],
-            'issuer_name' => ['nullable', 'string', 'max:255'],
-            'issuer_title' => ['nullable', 'string', 'max:255'],
-            'show_qr' => ['nullable', 'boolean'],
-            'show_cpd_hours' => ['nullable', 'boolean'],
-            'default_cpd_hours' => ['nullable', 'numeric', 'min:0'],
-        ]);
-
-        $template = $event->certificateTemplates()->updateOrCreate(
+        $validated = $request->validated();
+        $template = $event->certificateTemplates()->firstOrNew(
             [
                 'event_id' => $event->id,
                 'role' => $validated['role'],
-            ],
-            [
-                'tenant_id' => $event->tenant_id,
-                'title' => $validated['title'],
-                'body_template' => $validated['body_template'] ?? EventCertificateTemplate::defaultBodyTemplate($validated['role']),
-                'issuer_name' => $validated['issuer_name'] ?? null,
-                'issuer_title' => $validated['issuer_title'] ?? null,
-                'show_qr' => $validated['show_qr'] ?? true,
-                'show_cpd_hours' => $validated['show_cpd_hours'] ?? false,
-                'default_cpd_hours' => (float) ($validated['default_cpd_hours'] ?? 0.0),
             ]
         );
+        if (! $template instanceof EventCertificateTemplate) {
+            abort(500, 'Certificate template could not be resolved.');
+        }
+        $this->persistTemplate($request, $event, $template, $validated);
 
         return response()->json([
             'message' => 'Certificate template saved successfully.',
@@ -112,26 +103,37 @@ final class EventCertificateController extends Controller
         ]);
     }
 
-    public function updateTemplate(Request $request, string $subdomain, Event $event, EventCertificateTemplate $template): JsonResponse
+    public function updateTemplate(UpdateCertificateTemplateRequest $request, string $subdomain, Event $event, EventCertificateTemplate $template): JsonResponse
     {
         Gate::authorize('update certificate');
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'body_template' => ['nullable', 'string'],
-            'issuer_name' => ['nullable', 'string', 'max:255'],
-            'issuer_title' => ['nullable', 'string', 'max:255'],
-            'show_qr' => ['nullable', 'boolean'],
-            'show_cpd_hours' => ['nullable', 'boolean'],
-            'default_cpd_hours' => ['nullable', 'numeric', 'min:0'],
-        ]);
-
-        $template->update($validated);
+        abort_unless($template->event_id === $event->id, 404);
+        $this->persistTemplate($request, $event, $template, $request->validated());
 
         return response()->json([
             'message' => 'Certificate template updated successfully.',
             'template' => $template,
         ]);
+    }
+
+    public function preview(string $subdomain, Event $event, EventCertificateTemplate $template): Response
+    {
+        Gate::authorize('read certificate');
+        abort_unless($template->event_id === $event->id, 404);
+
+        $certificate = new EventCertificate([
+            'recipient_name' => 'Akosua Élise Mensah',
+            'recipient_email' => 'preview@example.test',
+            'role' => $template->role,
+            'cpd_hours' => $template->default_cpd_hours,
+            'verification_code' => 'MC-PREVIEW-2026',
+        ]);
+        $certificate->setRelation('event', $event);
+        $certificate->setRelation('template', $template);
+        $certificate->setRelation('designVersion', null);
+        $certificate->setRelation('registration', null);
+
+        return $this->pdfs->generatePdf($certificate)->stream('certificate-preview.pdf');
     }
 
     public function issue(Request $request, string $subdomain, Event $event): JsonResponse
@@ -340,6 +342,66 @@ final class EventCertificateController extends Controller
                     'default_cpd_hours' => 6.0,
                 ]
             );
+        }
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function persistTemplate(
+        StoreCertificateTemplateRequest|UpdateCertificateTemplateRequest $request,
+        Event $event,
+        EventCertificateTemplate $template,
+        array $validated,
+    ): void {
+        $oldAssets = [
+            'background' => [$template->background_disk, $template->background_path],
+            'signature' => [$template->signature_disk, $template->signature_path],
+        ];
+        $newAssets = [];
+
+        try {
+            foreach (['background', 'signature'] as $type) {
+                $file = $request->file($type);
+                if ($file !== null) {
+                    $stored = $this->artwork->store(
+                        $file,
+                        (string) $event->tenant_id,
+                        (string) $event->id,
+                        "certificate-{$type}",
+                    );
+                    $validated["{$type}_disk"] = $stored->disk;
+                    $validated["{$type}_path"] = $stored->path;
+                    $newAssets[] = [$stored->disk, $stored->path];
+                } elseif ($request->boolean("remove_{$type}")) {
+                    $validated["{$type}_disk"] = null;
+                    $validated["{$type}_path"] = null;
+                }
+            }
+
+            unset($validated['background'], $validated['signature'], $validated['remove_background'], $validated['remove_signature']);
+            $validated['tenant_id'] = $event->tenant_id;
+            $validated['event_id'] = $event->id;
+            $validated['layout'] = $this->layouts->validate($validated['layout'] ?? [], 'certificate');
+
+            DB::connection('landlord')->transaction(function () use ($template, $validated): void {
+                $template->fill($validated)->save();
+            }, 3);
+        } catch (Throwable $exception) {
+            foreach ($newAssets as [$disk, $path]) {
+                $this->artwork->delete($disk, $path);
+            }
+
+            throw $exception;
+        }
+
+        foreach ($oldAssets as $type => [$disk, $path]) {
+            if (! is_string($disk) || ! is_string($path) || $path === $template->getAttribute("{$type}_path")) {
+                continue;
+            }
+
+            $isRetained = $template->designVersions()->where("{$type}_disk", $disk)->where("{$type}_path", $path)->exists();
+            if (! $isRetained) {
+                $this->artwork->delete($disk, $path);
+            }
         }
     }
 }

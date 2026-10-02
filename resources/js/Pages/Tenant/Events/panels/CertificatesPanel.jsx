@@ -6,7 +6,8 @@ import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
 import Checkbox from '@/Components/Console/Checkbox';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
-import csrfFetch from '@/lib/csrfFetch';
+import CertificateDesignEditor from '@/Pages/Tenant/Events/Certificates/CertificateDesignEditor';
+import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import {
     Award,
     Download,
@@ -81,6 +82,14 @@ export default function CertificatesPanel({ event }) {
         show_qr: true,
         show_cpd_hours: true,
         default_cpd_hours: '6.0',
+        design_mode: 'miconvener',
+        orientation: 'landscape',
+        page_size: 'a4',
+        layout: {},
+        background: null,
+        signature: null,
+        remove_background: false,
+        remove_signature: false,
     });
 
     // Issue Modal
@@ -146,6 +155,14 @@ export default function CertificatesPanel({ event }) {
             show_qr: tmpl.show_qr !== false,
             show_cpd_hours: !!tmpl.show_cpd_hours,
             default_cpd_hours: tmpl.default_cpd_hours ? String(tmpl.default_cpd_hours) : '0',
+            design_mode: tmpl.design_mode || 'miconvener',
+            orientation: 'landscape',
+            page_size: 'a4',
+            layout: tmpl.layout || {},
+            background: null,
+            signature: null,
+            remove_background: false,
+            remove_signature: false,
         });
         setTemplateModalOpen(true);
     };
@@ -161,12 +178,16 @@ export default function CertificatesPanel({ event }) {
                       template: selectedTemplate.id,
                   })
                 : route('tenant.events.certificates.templates.store', { event: event.id });
-            const method = selectedTemplate ? 'PUT' : 'POST';
-
-            const res = await csrfFetch(url, {
-                method,
-                body: JSON.stringify(templateForm),
+            const payload = new FormData();
+            Object.entries(templateForm).forEach(([key, value]) => {
+                if (value === null || value === undefined) return;
+                if (key === 'layout') payload.append(key, JSON.stringify(value));
+                else if (typeof value === 'boolean') payload.append(key, value ? '1' : '0');
+                else payload.append(key, value);
             });
+            if (selectedTemplate) payload.append('_method', 'PUT');
+
+            const res = await csrfFetchFormData(url, payload);
 
             if (res.ok) {
                 setTemplateModalOpen(false);
@@ -569,13 +590,23 @@ export default function CertificatesPanel({ event }) {
             {/* Template Editor Modal */}
             <Modal
                 open={templateModalOpen}
-                className="max-w-2xl"
+                className="max-w-6xl"
                 onClose={() => setTemplateModalOpen(false)}
                 title={`Customize ${templateForm.role.toUpperCase()} Certificate Template`}
             >
+                <CertificateDesignEditor
+                    form={templateForm}
+                    setForm={setTemplateForm}
+                    template={selectedTemplate}
+                    eventId={event.id}
+                    saving={savingTemplate}
+                    onSave={handleSaveTemplate}
+                    onCancel={() => setTemplateModalOpen(false)}
+                />
                 <form
                     onSubmit={handleSaveTemplate}
-                    className="space-y-4 max-h-[75vh] overflow-y-auto pr-1"
+                    className="hidden"
+                    aria-hidden="true"
                 >
                     <div>
                         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">

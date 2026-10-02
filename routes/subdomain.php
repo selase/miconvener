@@ -298,6 +298,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('events/{event}/data/certificates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'index'])->name('tenant.events.certificates.index');
     Route::post('events/{event}/certificates/templates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'storeTemplate'])->name('tenant.events.certificates.templates.store');
     Route::put('events/{event}/certificates/templates/{template}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'updateTemplate'])->name('tenant.events.certificates.templates.update');
+    Route::get('events/{event}/certificates/templates/{template}/preview', [App\Http\Controllers\Tenant\EventCertificateController::class, 'preview'])->name('tenant.events.certificates.templates.preview');
     Route::post('events/{event}/certificates/issue', [App\Http\Controllers\Tenant\EventCertificateController::class, 'issue'])->name('tenant.events.certificates.issue');
     Route::get('events/{event}/certificates/{certificate}/download', [App\Http\Controllers\Tenant\EventCertificateController::class, 'download'])->name('tenant.events.certificates.download');
     Route::delete('events/{event}/certificates/{certificate}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'destroy'])->name('tenant.events.certificates.destroy');

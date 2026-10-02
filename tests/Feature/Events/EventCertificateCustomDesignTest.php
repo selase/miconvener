@@ -9,6 +9,7 @@ use App\Services\Certificates\CertificateDesignVersionService;
 use App\Services\Certificates\CertificatePdfService;
 use App\Services\Design\ArtifactLayoutValidator;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -66,6 +67,12 @@ function customCertificateFixture(array $templateOverrides = [], array $certific
     ]);
 
     return [$template, $version, $certificate];
+}
+
+function prepareCertificateDesignerHost(): void
+{
+    Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
+    Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 }
 
 test('certificate layouts accept only canonical allowlisted elements and styles', function (): void {
@@ -155,4 +162,76 @@ test('custom certificate pdf uses exact a4 landscape output settings', function 
     $pdf = app(CertificatePdfService::class)->outputPdf($certificate);
 
     expect($pdf)->toStartWith('%PDF-');
+});
+
+test('organizer can upload replace and remove certificate artwork', function (): void {
+    prepareCertificateDesignerHost();
+    Storage::fake('public');
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+
+    $create = $this->actingAs($user)->post("http://{$host}/events/{$event->id}/certificates/templates", [
+        'role' => 'delegate',
+        'design_mode' => 'custom_background',
+        'title' => 'Tenant certificate',
+        'background' => UploadedFile::fake()->image('first.png', 1120, 800),
+        'layout' => json_encode([]),
+    ], ['HTTP_HOST' => $host]);
+    $create->assertOk();
+    $template = $event->certificateTemplates()->where('role', 'delegate')->firstOrFail();
+    $firstPath = $template->background_path;
+    Storage::disk('public')->assertExists($firstPath);
+
+    $update = $this->actingAs($user)->post("http://{$host}/events/{$event->id}/certificates/templates/{$template->id}", [
+        '_method' => 'PUT',
+        'title' => 'Tenant certificate',
+        'design_mode' => 'miconvener',
+        'remove_background' => '1',
+    ], ['HTTP_HOST' => $host]);
+
+    $update->assertOk();
+    expect($template->fresh()->background_path)->toBeNull();
+    Storage::disk('public')->assertMissing($firstPath);
+});
+
+test('certificate template and preview routes reject a template from another event', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $otherEvent = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $template = EventCertificateTemplate::query()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $otherEvent->id,
+        'role' => 'delegate',
+        'title' => 'Other event',
+    ]);
+
+    $this->actingAs($user)->putJson("http://{$host}/events/{$event->id}/certificates/templates/{$template->id}", [
+        'title' => 'Cross event update',
+    ], ['HTTP_HOST' => $host])->assertNotFound();
+    $this->actingAs($user)->get("http://{$host}/events/{$event->id}/certificates/templates/{$template->id}/preview", [
+        'HTTP_HOST' => $host,
+    ])->assertNotFound();
+});
+
+test('organizer can download a representative certificate preview without issuing it', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $template = EventCertificateTemplate::query()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'role' => 'delegate',
+        'title' => 'Preview certificate',
+    ]);
+
+    $response = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/certificates/templates/{$template->id}/preview", [
+        'HTTP_HOST' => $host,
+    ]);
+
+    $response->assertOk()->assertHeader('content-type', 'application/pdf');
+    expect($event->certificates()->count())->toBe(0);
 });
