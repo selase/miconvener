@@ -119,6 +119,7 @@ test('organizer can bulk issue certificates to checked-in attendees', function (
 
     $cert = $event->certificates()->where('recipient_email', 'alice@hospital.org')->first();
     expect($cert->cpd_hours)->toBe(8.0)
+        ->and($cert->design_version_id)->not->toBeNull()
         ->and($cert->verification_code)->toStartWith('MC-')
         ->and($cert->uuid)->not->toBeEmpty();
 });
@@ -136,6 +137,7 @@ test('organizer can issue certificates to distinguished speakers and presenters'
     $speaker = Speaker::create([
         'tenant_id' => $tenant->id,
         'name' => 'Dr. Elena Rostova',
+        'email' => 'elena.rostova@example.test',
         'title' => 'Lead Neurosurgeon',
         'bio' => 'Lead neurosurgeon.',
     ]);
@@ -164,6 +166,34 @@ test('organizer can issue certificates to distinguished speakers and presenters'
     expect($speakerCert)->not->toBeNull()
         ->and($speakerCert->role)->toBe('speaker')
         ->and($speakerCert->recipient_name)->toBe('Dr. Elena Rostova');
+});
+
+test('speaker issuance reports recipients who have no email address', function () {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $speaker = Speaker::create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Dr. No Address',
+        'email' => null,
+    ]);
+    $event->speakers()->attach($speaker->id, [
+        'id' => (string) \Illuminate\Support\Str::uuid(),
+        'tenant_id' => $tenant->id,
+        'role' => 'speaker',
+        'portal_token' => \Illuminate\Support\Str::random(40),
+    ]);
+
+    $response = $this->actingAs($user)
+        ->postJson("http://{$host}/events/{$event->id}/certificates/issue", [
+            'target_group' => 'speakers',
+            'role' => 'speaker',
+        ], ['HTTP_HOST' => $host]);
+
+    $response->assertOk()
+        ->assertJsonPath('issued_count', 0)
+        ->assertJsonPath('missing_recipient_count', 1);
+    expect($event->certificates()->count())->toBe(0);
 });
 
 test('organizer can download certificate as PDF', function () {

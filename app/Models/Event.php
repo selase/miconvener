@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class Event extends Model
 {
@@ -265,6 +266,12 @@ final class Event extends Model
         return $this->hasMany(EventBadgePrint::class);
     }
 
+    /** @return HasOne<EventBadgeTemplate, $this> */
+    public function badgeTemplate(): HasOne
+    {
+        return $this->hasOne(EventBadgeTemplate::class);
+    }
+
     /**
      * @return HasMany<EventPoll, $this>
      */
@@ -311,7 +318,7 @@ final class Event extends Model
         return $this->hasMany(EventAbstract::class)->orderByDesc('created_at');
     }
 
-    public function payoutSchedule(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function payoutSchedule(): HasOne
     {
         return $this->hasOne(EventPayoutSchedule::class);
     }
@@ -381,6 +388,7 @@ final class Event extends Model
         return $this->hasMany(EventSession::class)->orderBy('starts_at')->orderBy('sort_order');
     }
 
+    /** @return BelongsToMany<Speaker, $this> */
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'event_speakers', 'event_id', 'speaker_id')

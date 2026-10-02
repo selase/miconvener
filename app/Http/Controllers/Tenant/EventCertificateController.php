@@ -5,19 +5,34 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StoreCertificateTemplateRequest;
+use App\Http\Requests\Tenant\UpdateCertificateTemplateRequest;
 use App\Models\Event;
 use App\Models\EventAbstract;
 use App\Models\EventCertificate;
 use App\Models\EventCertificateTemplate;
 use App\Models\EventRegistration;
+use App\Services\Certificates\CertificateDesignVersionService;
 use App\Services\Certificates\CertificatePdfService;
+use App\Services\Design\ArtifactArtworkService;
+use App\Services\Design\ArtifactLayoutValidator;
+use finfo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 final class EventCertificateController extends Controller
 {
+    public function __construct(
+        private readonly CertificatePdfService $pdfs,
+        private readonly CertificateDesignVersionService $designVersions,
+        private readonly ArtifactArtworkService $artwork,
+        private readonly ArtifactLayoutValidator $layouts,
+    ) {}
+
     public function index(Request $request, string $subdomain, Event $event): JsonResponse
     {
         Gate::authorize('read certificate');
@@ -67,37 +82,21 @@ final class EventCertificateController extends Controller
         ]);
     }
 
-    public function storeTemplate(Request $request, string $subdomain, Event $event): JsonResponse
+    public function storeTemplate(StoreCertificateTemplateRequest $request, string $subdomain, Event $event): JsonResponse
     {
         Gate::authorize('create certificate');
 
-        $validated = $request->validate([
-            'role' => ['required', 'string', 'in:delegate,speaker,presenter,volunteer,custom'],
-            'title' => ['required', 'string', 'max:255'],
-            'body_template' => ['nullable', 'string'],
-            'issuer_name' => ['nullable', 'string', 'max:255'],
-            'issuer_title' => ['nullable', 'string', 'max:255'],
-            'show_qr' => ['nullable', 'boolean'],
-            'show_cpd_hours' => ['nullable', 'boolean'],
-            'default_cpd_hours' => ['nullable', 'numeric', 'min:0'],
-        ]);
-
-        $template = $event->certificateTemplates()->updateOrCreate(
+        $validated = $request->validated();
+        $template = $event->certificateTemplates()->firstOrNew(
             [
                 'event_id' => $event->id,
                 'role' => $validated['role'],
-            ],
-            [
-                'tenant_id' => $event->tenant_id,
-                'title' => $validated['title'],
-                'body_template' => $validated['body_template'] ?? EventCertificateTemplate::defaultBodyTemplate($validated['role']),
-                'issuer_name' => $validated['issuer_name'] ?? null,
-                'issuer_title' => $validated['issuer_title'] ?? null,
-                'show_qr' => $validated['show_qr'] ?? true,
-                'show_cpd_hours' => $validated['show_cpd_hours'] ?? false,
-                'default_cpd_hours' => (float) ($validated['default_cpd_hours'] ?? 0.0),
             ]
         );
+        if (! $template instanceof EventCertificateTemplate) {
+            abort(500, 'Certificate template could not be resolved.');
+        }
+        $this->persistTemplate($request, $event, $template, $validated);
 
         return response()->json([
             'message' => 'Certificate template saved successfully.',
@@ -105,21 +104,12 @@ final class EventCertificateController extends Controller
         ]);
     }
 
-    public function updateTemplate(Request $request, string $subdomain, Event $event, EventCertificateTemplate $template): JsonResponse
+    public function updateTemplate(UpdateCertificateTemplateRequest $request, string $subdomain, Event $event, EventCertificateTemplate $template): JsonResponse
     {
         Gate::authorize('update certificate');
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'body_template' => ['nullable', 'string'],
-            'issuer_name' => ['nullable', 'string', 'max:255'],
-            'issuer_title' => ['nullable', 'string', 'max:255'],
-            'show_qr' => ['nullable', 'boolean'],
-            'show_cpd_hours' => ['nullable', 'boolean'],
-            'default_cpd_hours' => ['nullable', 'numeric', 'min:0'],
-        ]);
-
-        $template->update($validated);
+        abort_unless($template->event_id === $event->id, 404);
+        $this->persistTemplate($request, $event, $template, $request->validated());
 
         return response()->json([
             'message' => 'Certificate template updated successfully.',
@@ -127,9 +117,44 @@ final class EventCertificateController extends Controller
         ]);
     }
 
+    public function preview(string $subdomain, Event $event, EventCertificateTemplate $template): Response
+    {
+        Gate::authorize('read certificate');
+        abort_unless($template->event_id === $event->id, 404);
+
+        $certificate = new EventCertificate([
+            'recipient_name' => 'Akosua Élise Mensah',
+            'recipient_email' => 'preview@example.test',
+            'role' => $template->role,
+            'cpd_hours' => $template->default_cpd_hours,
+            'verification_code' => 'MC-PREVIEW-2026',
+        ]);
+        $certificate->setRelation('event', $event);
+        $certificate->setRelation('template', $template);
+        $certificate->setRelation('designVersion', null);
+        $certificate->setRelation('registration', null);
+
+        return $this->pdfs->generatePdf($certificate)->stream('certificate-preview.pdf');
+    }
+
+    public function artwork(string $subdomain, Event $event, EventCertificateTemplate $template, string $type): Response
+    {
+        Gate::authorize('read certificate');
+        abort_unless($template->event_id === $event->id && in_array($type, ['background', 'signature'], true), 404);
+        $disk = $template->getAttribute("{$type}_disk");
+        $path = $template->getAttribute("{$type}_path");
+        abort_unless(is_string($disk) && is_string($path), 404);
+        $bytes = $this->artwork->contents($disk, $path);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        abort_unless(is_string($mime) && in_array($mime, ['image/png', 'image/jpeg'], true), 404);
+
+        return response($bytes, 200, ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=300']);
+    }
+
     public function issue(Request $request, string $subdomain, Event $event): JsonResponse
     {
         Gate::authorize('issue certificates');
+        $this->ensureDefaultTemplates($event);
 
         $validated = $request->validate([
             'target_group' => ['required', 'string', 'in:checked_in_delegates,all_delegates,speakers,presenters,custom'],
@@ -155,12 +180,16 @@ final class EventCertificateController extends Controller
         if ($template === null) {
             $template = $event->certificateTemplates()->where('role', $role)->first();
         }
+        if (! $template instanceof EventCertificateTemplate) {
+            $template = null;
+        }
 
         $cpdHours = isset($validated['cpd_hours']) && $validated['cpd_hours'] > 0
             ? (float) $validated['cpd_hours']
             : ($template?->default_cpd_hours ?? 0.0);
 
         $recipients = [];
+        $missingRecipientCount = 0;
 
         if ($targetGroup === 'checked_in_delegates') {
             $regs = $event->registrations()->where('status', EventRegistration::STATUS_CHECKED_IN)->get();
@@ -185,9 +214,15 @@ final class EventCertificateController extends Controller
         } elseif ($targetGroup === 'speakers') {
             $speakers = $event->speakers()->get();
             foreach ($speakers as $speaker) {
+                if (blank($speaker->email)) {
+                    $missingRecipientCount++;
+
+                    continue;
+                }
+
                 $recipients[] = [
                     'name' => $speaker->name,
-                    'email' => "speaker-{$speaker->id}@miconvener.local",
+                    'email' => mb_strtolower(mb_trim((string) $speaker->email)),
                     'registration_id' => null,
                     'user_id' => null,
                 ];
@@ -201,6 +236,12 @@ final class EventCertificateController extends Controller
             foreach ($abstracts as $abs) {
                 $primaryAuthor = $abs->authors->where('is_presenter', true)->first() ?? $abs->authors->first();
                 if ($primaryAuthor) {
+                    if (blank($primaryAuthor->email)) {
+                        $missingRecipientCount++;
+
+                        continue;
+                    }
+
                     $recipients[] = [
                         'name' => "{$primaryAuthor->first_name} {$primaryAuthor->last_name}",
                         'email' => $primaryAuthor->email,
@@ -220,40 +261,52 @@ final class EventCertificateController extends Controller
             }
         }
 
-        $issuedCount = 0;
-        $skippedCount = 0;
+        [$issuedCount, $skippedCount] = DB::connection('landlord')->transaction(
+            function () use ($event, $recipients, $role, $template, $cpdHours): array {
+                $issuedCount = 0;
+                $skippedCount = 0;
+                $designVersion = $template !== null
+                    ? $this->designVersions->snapshot($template)
+                    : null;
 
-        foreach ($recipients as $item) {
-            $exists = $event->certificates()
-                ->where('recipient_email', $item['email'])
-                ->where('role', $role)
-                ->exists();
+                foreach ($recipients as $item) {
+                    $exists = $event->certificates()
+                        ->whereRaw('lower(recipient_email) = ?', [mb_strtolower($item['email'])])
+                        ->where('role', $role)
+                        ->exists();
 
-            if ($exists) {
-                $skippedCount++;
+                    if ($exists) {
+                        $skippedCount++;
 
-                continue;
-            }
+                        continue;
+                    }
 
-            $event->certificates()->create([
-                'tenant_id' => $event->tenant_id,
-                'registration_id' => $item['registration_id'],
-                'user_id' => $item['user_id'],
-                'template_id' => $template?->id,
-                'recipient_name' => $item['name'],
-                'recipient_email' => $item['email'],
-                'role' => $role,
-                'cpd_hours' => $cpdHours,
-                'issued_at' => now(),
-            ]);
+                    $event->certificates()->create([
+                        'tenant_id' => $event->tenant_id,
+                        'registration_id' => $item['registration_id'],
+                        'user_id' => $item['user_id'],
+                        'template_id' => $template?->id,
+                        'design_version_id' => $designVersion?->id,
+                        'recipient_name' => $item['name'],
+                        'recipient_email' => mb_strtolower(mb_trim($item['email'])),
+                        'role' => $role,
+                        'cpd_hours' => $cpdHours,
+                        'issued_at' => now(),
+                    ]);
 
-            $issuedCount++;
-        }
+                    $issuedCount++;
+                }
+
+                return [$issuedCount, $skippedCount];
+            },
+            3,
+        );
 
         return response()->json([
-            'message' => "Successfully issued {$issuedCount} certificates. ({$skippedCount} skipped as already issued)",
+            'message' => "Successfully issued {$issuedCount} certificates. ({$skippedCount} skipped as already issued; {$missingRecipientCount} skipped without an email address)",
             'issued_count' => $issuedCount,
             'skipped_count' => $skippedCount,
+            'missing_recipient_count' => $missingRecipientCount,
         ]);
     }
 
@@ -261,10 +314,8 @@ final class EventCertificateController extends Controller
     {
         Gate::authorize('read certificate');
 
+        $domPdf = $this->pdfs->generatePdf($certificate);
         $certificate->increment('download_count');
-
-        $pdfService = app(CertificatePdfService::class);
-        $domPdf = $pdfService->generatePdf($certificate);
 
         return $domPdf->download("certificate-{$certificate->verification_code}.pdf");
     }
@@ -306,6 +357,66 @@ final class EventCertificateController extends Controller
                     'default_cpd_hours' => 6.0,
                 ]
             );
+        }
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function persistTemplate(
+        StoreCertificateTemplateRequest|UpdateCertificateTemplateRequest $request,
+        Event $event,
+        EventCertificateTemplate $template,
+        array $validated,
+    ): void {
+        $oldAssets = [
+            'background' => [$template->background_disk, $template->background_path],
+            'signature' => [$template->signature_disk, $template->signature_path],
+        ];
+        $newAssets = [];
+
+        try {
+            foreach (['background', 'signature'] as $type) {
+                $file = $request->file($type);
+                if ($file !== null) {
+                    $stored = $this->artwork->store(
+                        $file,
+                        (string) $event->tenant_id,
+                        (string) $event->id,
+                        "certificate-{$type}",
+                    );
+                    $validated["{$type}_disk"] = $stored->disk;
+                    $validated["{$type}_path"] = $stored->path;
+                    $newAssets[] = [$stored->disk, $stored->path];
+                } elseif ($request->boolean("remove_{$type}")) {
+                    $validated["{$type}_disk"] = null;
+                    $validated["{$type}_path"] = null;
+                }
+            }
+
+            unset($validated['background'], $validated['signature'], $validated['remove_background'], $validated['remove_signature']);
+            $validated['tenant_id'] = $event->tenant_id;
+            $validated['event_id'] = $event->id;
+            $validated['layout'] = $this->layouts->validate($validated['layout'] ?? [], 'certificate');
+
+            DB::connection('landlord')->transaction(function () use ($template, $validated): void {
+                $template->fill($validated)->save();
+            }, 3);
+        } catch (Throwable $exception) {
+            foreach ($newAssets as [$disk, $path]) {
+                $this->artwork->delete($disk, $path);
+            }
+
+            throw $exception;
+        }
+
+        foreach ($oldAssets as $type => [$disk, $path]) {
+            if (! is_string($disk) || ! is_string($path) || $path === $template->getAttribute("{$type}_path")) {
+                continue;
+            }
+
+            $isRetained = $template->designVersions()->where("{$type}_disk", $disk)->where("{$type}_path", $path)->exists();
+            if (! $isRetained) {
+                $this->artwork->delete($disk, $path);
+            }
         }
     }
 }

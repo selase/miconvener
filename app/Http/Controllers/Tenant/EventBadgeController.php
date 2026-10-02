@@ -5,21 +5,38 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\GenerateBadgeSheetRequest;
+use App\Http\Requests\Tenant\UpdateEventBadgeTemplateRequest;
 use App\Models\Event;
 use App\Models\EventBadgePrint;
 use App\Models\EventRegistration;
+use App\Services\Badges\BadgePdfService;
+use App\Services\Badges\BadgeTemplateService;
+use App\Services\Design\ArtifactArtworkService;
+use App\Services\Design\ArtifactLayoutValidator;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Tenancy\TenantContext;
+use finfo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 final class EventBadgeController extends Controller
 {
+    public function __construct(
+        private readonly BadgeTemplateService $templates,
+        private readonly BadgePdfService $pdfs,
+        private readonly ArtifactArtworkService $artwork,
+        private readonly ArtifactLayoutValidator $layouts,
+    ) {}
+
     public function index(string $subdomain, string $event): JsonResponse
     {
-        $this->authorize('read event');
+        $this->authorize('read badge-template');
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
 
@@ -43,6 +60,7 @@ final class EventBadgeController extends Controller
             ->get();
 
         return response()->json([
+            'template' => $this->templates->forEvent($eventModel),
             'badges' => $registrations->map(fn (EventRegistration $r): array => [
                 'id' => $r->id,
                 'full_name' => $r->full_name,
@@ -59,6 +77,62 @@ final class EventBadgeController extends Controller
                 'printed_at' => $p->created_at->toIso8601String(),
             ])->values(),
         ]);
+    }
+
+    public function updateTemplate(UpdateEventBadgeTemplateRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update badge-template');
+        $tenant = $this->getTenant();
+        $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
+        $template = $this->templates->forEvent($eventModel);
+        $validated = $request->validated();
+        $oldDisk = $template->background_disk;
+        $oldPath = $template->background_path;
+        $newArtwork = null;
+
+        if ($request->file('background') !== null) {
+            $newArtwork = $this->artwork->store($request->file('background'), (string) $tenant->id, (string) $eventModel->id, 'badge-background');
+            $validated['background_disk'] = $newArtwork->disk;
+            $validated['background_path'] = $newArtwork->path;
+        } elseif ($request->boolean('remove_background')) {
+            $validated['background_disk'] = null;
+            $validated['background_path'] = null;
+        }
+
+        unset($validated['background'], $validated['remove_background']);
+        $validated['layout'] = $this->layouts->validate($validated['layout'], 'badge');
+        $nextDesignVersion = max(1, (int) $template->design_version) + 1;
+
+        try {
+            $template->fill($validated);
+            $template->design_version = $nextDesignVersion;
+            $template->save();
+        } catch (Throwable $exception) {
+            if ($newArtwork !== null) {
+                $this->artwork->delete($newArtwork->disk, $newArtwork->path);
+            }
+            throw $exception;
+        }
+
+        if (is_string($oldDisk) && is_string($oldPath) && $oldPath !== $template->background_path) {
+            $this->artwork->delete($oldDisk, $oldPath);
+        }
+
+        return response()->json(['message' => 'Badge design saved.', 'template' => $template->fresh()]);
+    }
+
+    public function artwork(string $subdomain, string $event): Response
+    {
+        $this->authorize('read badge-template');
+        $tenant = $this->getTenant();
+        $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
+        $template = $this->templates->forEvent($eventModel);
+        abort_unless(is_string($template->background_disk) && is_string($template->background_path), 404);
+        $bytes = $this->artwork->contents($template->background_disk, $template->background_path);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        abort_unless(is_string($mime) && in_array($mime, ['image/png', 'image/jpeg'], true), 404);
+
+        return response($bytes, 200, ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=300']);
     }
 
     public function logPrint(Request $request, string $subdomain, string $event): JsonResponse
@@ -85,6 +159,46 @@ final class EventBadgeController extends Controller
         EventBadgePrint::insert($rows);
 
         return response()->json(['message' => 'Print logged.']);
+    }
+
+    public function sheet(GenerateBadgeSheetRequest $request, string $subdomain, string $event): Response
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
+        $ids = $request->validated('registration_ids');
+        $registrations = $eventModel->registrations()
+            ->whereIn('id', $ids)
+            ->with(['ticketType:id,name,badge_tier', 'seatAssignment'])
+            ->orderBy('full_name')
+            ->orderBy('id')
+            ->get();
+
+        if ($registrations->count() !== count($ids)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'registration_ids' => 'Every selected registration must belong to this event.',
+            ]);
+        }
+
+        $template = $this->templates->forEvent($eventModel);
+        $output = $this->pdfs->generate($eventModel, $template, $registrations)->output();
+
+        $now = now();
+        $rows = $registrations->map(fn (EventRegistration $registration): array => [
+            'id' => (string) Str::uuid(),
+            'tenant_id' => $tenant->id,
+            'event_id' => $eventModel->id,
+            'registration_id' => $registration->id,
+            'printed_by' => $request->user()->id,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
+        DB::connection('landlord')->transaction(fn () => EventBadgePrint::query()->insert($rows), 3);
+
+        return response($output, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="badges-'.$eventModel->id.'.pdf"',
+        ]);
     }
 
     private function getTenant()

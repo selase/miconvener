@@ -41,12 +41,19 @@ final class EventCertificateTemplate extends Model
         'tenant_id',
         'event_id',
         'role',
+        'design_mode',
+        'orientation',
+        'page_size',
+        'layout',
+        'design_version',
         'title',
         'body_template',
         'issuer_name',
         'issuer_title',
         'signature_path',
+        'signature_disk',
         'background_path',
+        'background_disk',
         'show_qr',
         'show_cpd_hours',
         'default_cpd_hours',
@@ -83,6 +90,30 @@ final class EventCertificateTemplate extends Model
     }
 
     /**
+     * @return HasMany<EventCertificateDesignVersion, $this>
+     */
+    public function designVersions(): HasMany
+    {
+        return $this->hasMany(EventCertificateDesignVersion::class, 'template_id');
+    }
+
+    protected static function booted(): void
+    {
+        self::updating(function (self $template): void {
+            $renderingFields = [
+                'design_mode', 'orientation', 'page_size', 'layout', 'title', 'body_template',
+                'issuer_name', 'issuer_title', 'signature_disk', 'signature_path',
+                'background_disk', 'background_path', 'show_qr', 'show_cpd_hours',
+                'default_cpd_hours',
+            ];
+
+            if ($template->isDirty($renderingFields)) {
+                $template->design_version = max(1, (int) $template->design_version + 1);
+            }
+        });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -91,6 +122,8 @@ final class EventCertificateTemplate extends Model
             'show_qr' => 'boolean',
             'show_cpd_hours' => 'boolean',
             'default_cpd_hours' => 'float',
+            'design_version' => 'integer',
+            'layout' => 'array',
         ];
     }
 }

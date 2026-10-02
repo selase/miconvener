@@ -32,6 +32,7 @@ final class EventCertificate extends Model
         'registration_id',
         'user_id',
         'template_id',
+        'design_version_id',
         'recipient_name',
         'recipient_email',
         'role',
@@ -76,6 +77,14 @@ final class EventCertificate extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(EventCertificateTemplate::class, 'template_id');
+    }
+
+    /**
+     * @return BelongsTo<EventCertificateDesignVersion, $this>
+     */
+    public function designVersion(): BelongsTo
+    {
+        return $this->belongsTo(EventCertificateDesignVersion::class, 'design_version_id');
     }
 
     protected static function booted(): void

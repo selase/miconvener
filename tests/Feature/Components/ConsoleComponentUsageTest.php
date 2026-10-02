@@ -192,3 +192,9 @@ test('every console Button uses a variant that exists and no size prop', functio
 
     expect($problems)->toBe([]);
 });
+
+test('notification channel pills wrap inside their summary card', function (): void {
+    $panel = (string) file_get_contents(resource_path('js/Pages/Tenant/Events/panels/NotificationsPanel.jsx'));
+
+    expect($panel)->toContain('className="flex flex-wrap items-center gap-2 mt-1"');
+});
