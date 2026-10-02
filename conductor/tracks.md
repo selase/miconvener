@@ -828,3 +828,38 @@ Creation and publishing of the University of Ghana Medical Centre (UGMC) and its
   - [x] Pint formatting: `vendor/bin/pint --dirty` passed with 0 errors.
   - [x] Frontend bundling: `npm run build` compiled 2,590 modules in 4.34s with 0 errors.
   - [x] 3-agent post-implementation self-review audit (Security, Logic/Edge Cases, Architecture/Performance) completed with all checks passing cleanly.
+
+---
+
+## [x] Track: Public Event Page Refinements & Luma-Inspired Clean Layout
+
+Refinements to the public event display page (`resources/js/Pages/Public/Events/Show.jsx`) based on user feedback and modern event design patterns (inspired by Luma):
+- Removed "Open to anyone" label/badge on public events, preserving the `<Lock /> Private event` badge on private events.
+- Fixed missing left padding on "Where" column (`px-5` instead of `sm:pl-0`).
+- Redesigned Speakers tab with `SpeakerCard` component featuring 140-character bio excerpt and interactive "Read more" / "Show less" toggle with chevrons.
+- Scoped inline `RegistrationPanel` strictly to the "About" tab, freeing full width (`max-w-4xl`) for Programme, Speakers, Workshops, Plan Your Visit, Q&A, and Live Poll.
+- Added cross-tab registration access:
+  - Header/tab bar pill CTA (`Register · {price}`) visible on non-About tabs that switches active tab to 'about' and smoothly scrolls to `#register-section`.
+  - Bottom callout card on non-About tabs prompting attendees to register.
+- Progressive disclosure & sizable height on `RegistrationPanel`:
+  - Keeps core identity inputs (ticket choice, title, first name, last name, email) visible.
+  - Encloses additional fields (phone, custom form fields, dietary/accessibility needs) in a collapsible container (`max-h-60 overflow-hidden relative` with bottom gradient fade mask) when collapsed, with a toggle button showing `Show all registration questions ({N} details)`.
+  - Auto-expands on validation errors or submit attempt.
+
+- [x] **Phase 1: Header & Info Row Corrections**:
+  - Removed "Open to anyone" badge (removed unused `Globe` import).
+  - Fixed "Where" column left padding with `px-5`.
+- [x] **Phase 2: Speakers Section Redesign**:
+  - `SpeakerCard` component with 140-char bio excerpt, `ChevronDown`/`ChevronUp` toggle, and responsive grid layout.
+- [x] **Phase 3: Tab-Scoped Registration & Cross-Tab Register CTA**:
+  - `RegistrationPanel` rendered in two-column grid only on `active === 'about'`.
+  - Single full-width column on other tabs with tab-bar CTA and bottom card.
+- [x] **Phase 4: Sizable Height & Progressive Disclosure on Registration Form**:
+  - Collapsible container with gradient fade mask and toggle button.
+  - Auto-expands on field errors (`useEffect`) and form submit.
+- [x] **Phase 5: Automated Verification & Self-Review**:
+  - Pest test suites: `tests/Feature/Events/EventVisibilityTest.php` (8 tests, 24 assertions passed) and `tests/Feature/Events/EventRegistrationTest.php` (10 tests, 58 assertions passed).
+  - Code style: `vendor/bin/pint --dirty` passed with 0 errors.
+  - Frontend bundling: `npm run build` compiled 2,590 modules in 7.11s with 0 errors.
+  - 3-agent self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
+

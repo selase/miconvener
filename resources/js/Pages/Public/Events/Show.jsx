@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
-import { Globe, Lock, User, Download, Trophy } from 'lucide-react';
+import { Lock, User, Download, Trophy, ChevronDown, ChevronUp, Ticket } from 'lucide-react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import CoverBars from '@/Components/Console/CoverBars';
 import Input from '@/Components/Console/Input';
@@ -38,34 +38,70 @@ function lowestPrice(event) {
     return event.ticket_price;
 }
 
-function SpeakersSection({ speakers }) {
+function SpeakerCard({ speaker }) {
+    const [expanded, setExpanded] = useState(false);
+    const bio = speaker.bio || '';
+    const EXCERPT_LENGTH = 140;
+    const isLong = bio.length > EXCERPT_LENGTH;
+    const displayBio = !isLong || expanded ? bio : bio.slice(0, EXCERPT_LENGTH).trim() + '…';
+
     return (
-        <div className="grid grid-cols-2 gap-5">
-            {speakers.map((speaker) => (
-                <div key={speaker.id} className="flex gap-3.5">
-                    {speaker.photo_url ? (
-                        <img
-                            src={speaker.photo_url}
-                            alt={speaker.name}
-                            className="h-16 w-16 shrink-0 rounded-full object-cover"
-                        />
-                    ) : (
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-ink-secondary">
-                            <User className="h-6 w-6" strokeWidth={1.5} />
-                        </div>
-                    )}
-                    <div className="min-w-0">
-                        <h3 className="text-[15px] font-medium text-ink">{speaker.name}</h3>
-                        <p className="mt-0.5 text-[13px] text-ink-secondary">
-                            {[speaker.title, speaker.organization].filter(Boolean).join(', ')}
-                        </p>
-                        {speaker.bio && (
-                            <p className="mt-2 text-[13px] leading-relaxed text-ink-secondary">
-                                {speaker.bio}
-                            </p>
+        <div className="flex gap-4 rounded-xl border border-border/80 bg-surface/70 p-4.5 sm:p-5 transition-all hover:border-border hover:bg-surface">
+            {speaker.photo_url ? (
+                <img
+                    src={speaker.photo_url}
+                    alt={speaker.name}
+                    className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-full object-cover border border-border/70"
+                />
+            ) : (
+                <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-ink-secondary border border-border/60">
+                    <User className="h-6 w-6" strokeWidth={1.5} />
+                </div>
+            )}
+            <div className="min-w-0 flex-1">
+                <h3 className="text-[15px] font-semibold text-ink leading-snug">{speaker.name}</h3>
+                {[speaker.title, speaker.organization].some(Boolean) && (
+                    <p className="mt-0.5 text-[13px] text-ink-secondary">
+                        {[speaker.title, speaker.organization].filter(Boolean).join(', ')}
+                    </p>
+                )}
+                {bio && (
+                    <div className="mt-2 text-[13px] leading-relaxed text-ink-secondary">
+                        <p className="whitespace-pre-line">{displayBio}</p>
+                        {isLong && (
+                            <button
+                                type="button"
+                                onClick={() => setExpanded(!expanded)}
+                                className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:underline cursor-pointer transition-colors"
+                            >
+                                <span>{expanded ? 'Show less' : 'Read more'}</span>
+                                {expanded ? (
+                                    <ChevronUp className="h-3 w-3" />
+                                ) : (
+                                    <ChevronDown className="h-3 w-3" />
+                                )}
+                            </button>
                         )}
                     </div>
-                </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function SpeakersSection({ speakers }) {
+    if (!speakers || speakers.length === 0) {
+        return (
+            <p className="text-sm text-ink-secondary">
+                No speakers have been announced for this event yet.
+            </p>
+        );
+    }
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {speakers.map((speaker) => (
+                <SpeakerCard key={speaker.id} speaker={speaker} />
             ))}
         </div>
     );
@@ -473,6 +509,30 @@ function RegistrationPanel({ event }) {
     });
 
     const [showExtras, setShowExtras] = useState(false);
+    const [fieldsExpanded, setFieldsExpanded] = useState(false);
+
+    const totalExtraCount = useMemo(() => {
+        let count = formFields.length;
+        if (settings.phone !== 'hidden') count += 1;
+        if (settings.dietary_requirements !== 'hidden' || settings.accessibility_needs !== 'hidden') {
+            count += 1;
+        }
+        return count;
+    }, [formFields, settings]);
+
+    // Automatically expand fields when validation errors exist on any collapsible fields
+    useEffect(() => {
+        const hasCollapsibleError = Object.keys(errors).some(
+            (key) =>
+                key.startsWith('form_answers') ||
+                key === 'phone' ||
+                key === 'dietary_requirements' ||
+                key === 'accessibility_needs'
+        );
+        if (hasCollapsibleError) {
+            setFieldsExpanded(true);
+        }
+    }, [errors]);
 
     const selectedTicketType = hasTicketTypes
         ? availableTicketTypes.find((t) => t.id === data.ticket_type_id) || availableTicketTypes[0]
@@ -690,13 +750,17 @@ function RegistrationPanel({ event }) {
 
     const submit = (e) => {
         e.preventDefault();
+        setFieldsExpanded(true);
         post(route('public.events.register', { event: event.slug }));
     };
 
     const titles = ['Mr', 'Mrs', 'Ms', 'Miss', 'Dr', 'Prof', 'Rev', 'Hon', 'Other'];
 
     return (
-        <aside className="border border-border bg-surface p-5 lg:sticky lg:top-6">
+        <aside
+            id="register-section"
+            className="rounded-xl border border-border bg-surface p-5 lg:sticky lg:top-6 shadow-xs"
+        >
             <h3 className="text-[15px] font-medium text-ink">Register</h3>
 
             {flash?.error && (
@@ -870,192 +934,229 @@ function RegistrationPanel({ event }) {
                     required
                 />
 
-                {/* Standard Configurable Requirements */}
-                {settings.phone !== 'hidden' && (
-                    <Input
-                        label={`Phone ${settings.phone === 'required' ? '*' : '(optional)'}`}
-                        type="tel"
-                        value={data.phone}
-                        onChange={(e) => setData('phone', e.target.value)}
-                        error={errors.phone}
-                        required={settings.phone === 'required'}
-                    />
-                )}
-
-                {/* Custom Event Form Fields (Conditional & Dynamic Pricing) */}
-                {formFields.map((field) => {
-                    const visible = isConditionSatisfied(field, data.form_answers);
-                    if (!visible) return null;
-
-                    const fieldError = errors[`form_answers.${field.field_key}`];
-                    const val = data.form_answers[field.field_key] ?? '';
-
-                    return (
-                        <div key={field.id} className="border-t border-border/60 pt-3">
-                            <label className="block text-[13px] font-medium text-ink">
-                                {field.label}{' '}
-                                {field.is_required && <span className="text-danger-fg">*</span>}
-                            </label>
-                            {field.help_text && (
-                                <p className="mt-0.5 text-[11.5px] text-ink-secondary">
-                                    {field.help_text}
-                                </p>
+                {/* Additional registration fields (Phone, Custom fields, Dietary/Accessibility) */}
+                {totalExtraCount > 0 && (
+                    <div className="space-y-3">
+                        <div
+                            className={`transition-all duration-300 ${
+                                !fieldsExpanded && totalExtraCount >= 2
+                                    ? 'max-h-60 overflow-hidden relative'
+                                    : ''
+                            }`}
+                        >
+                            {/* Standard Configurable Requirements */}
+                            {settings.phone !== 'hidden' && (
+                                <Input
+                                    label={`Phone ${settings.phone === 'required' ? '*' : '(optional)'}`}
+                                    type="tel"
+                                    value={data.phone}
+                                    onChange={(e) => setData('phone', e.target.value)}
+                                    error={errors.phone}
+                                    required={settings.phone === 'required'}
+                                />
                             )}
 
-                            {field.field_type === 'select' && (
-                                <select
-                                    value={val}
-                                    onChange={(e) =>
-                                        handleAnswerChange(field.field_key, e.target.value)
-                                    }
-                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                    required={field.is_required}
-                                >
-                                    <option value="">Select an option...</option>
-                                    {(field.options || []).map((opt, i) => (
-                                        <option key={i} value={opt.value}>
-                                            {opt.label}
-                                            {opt.price
-                                                ? ` (${opt.is_override ? 'Set to' : '+'} ${formatMoney(Number(opt.price), event.currency)})`
-                                                : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
+                            {/* Custom Event Form Fields (Conditional & Dynamic Pricing) */}
+                            {formFields.map((field) => {
+                                const visible = isConditionSatisfied(field, data.form_answers);
+                                if (!visible) return null;
 
-                            {field.field_type === 'radio' && (
-                                <div className="mt-2 space-y-1.5">
-                                    {(field.options || []).map((opt, i) => (
-                                        <label
-                                            key={i}
-                                            className="flex cursor-pointer items-center justify-between gap-2 border border-border/70 p-2 text-[13px] hover:bg-surface-sunken"
-                                        >
-                                            <span className="flex items-center gap-2">
+                                const fieldError = errors[`form_answers.${field.field_key}`];
+                                const val = data.form_answers[field.field_key] ?? '';
+
+                                return (
+                                    <div key={field.id} className="border-t border-border/60 pt-3 mt-3">
+                                        <label className="block text-[13px] font-medium text-ink">
+                                            {field.label}{' '}
+                                            {field.is_required && <span className="text-danger-fg">*</span>}
+                                        </label>
+                                        {field.help_text && (
+                                            <p className="mt-0.5 text-[11.5px] text-ink-secondary">
+                                                {field.help_text}
+                                            </p>
+                                        )}
+
+                                        {field.field_type === 'select' && (
+                                            <select
+                                                value={val}
+                                                onChange={(e) =>
+                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                }
+                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                                required={field.is_required}
+                                            >
+                                                <option value="">Select an option...</option>
+                                                {(field.options || []).map((opt, i) => (
+                                                    <option key={i} value={opt.value}>
+                                                        {opt.label}
+                                                        {opt.price
+                                                            ? ` (${opt.is_override ? 'Set to' : '+'} ${formatMoney(Number(opt.price), event.currency)})`
+                                                            : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+
+                                        {field.field_type === 'radio' && (
+                                            <div className="mt-2 space-y-1.5">
+                                                {(field.options || []).map((opt, i) => (
+                                                    <label
+                                                        key={i}
+                                                        className="flex cursor-pointer items-center justify-between gap-2 border border-border/70 p-2 text-[13px] hover:bg-surface-sunken"
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            <input
+                                                                type="radio"
+                                                                name={`custom_${field.field_key}`}
+                                                                value={opt.value}
+                                                                checked={String(val) === String(opt.value)}
+                                                                onChange={(e) =>
+                                                                    handleAnswerChange(
+                                                                        field.field_key,
+                                                                        e.target.value
+                                                                    )
+                                                                }
+                                                                required={field.is_required}
+                                                            />
+                                                            <span className="text-ink">{opt.label}</span>
+                                                        </span>
+                                                        {opt.price ? (
+                                                            <span className="font-mono text-xs text-accent">
+                                                                {opt.is_override ? 'Total ' : '+'}
+                                                                {formatMoney(Number(opt.price), event.currency)}
+                                                            </span>
+                                                        ) : null}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {field.field_type === 'text' && (
+                                            <input
+                                                type="text"
+                                                value={val}
+                                                onChange={(e) =>
+                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                }
+                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                                required={field.is_required}
+                                            />
+                                        )}
+
+                                        {field.field_type === 'textarea' && (
+                                            <textarea
+                                                rows={2}
+                                                value={val}
+                                                onChange={(e) =>
+                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                }
+                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                                required={field.is_required}
+                                            />
+                                        )}
+
+                                        {field.field_type === 'number' && (
+                                            <input
+                                                type="number"
+                                                value={val}
+                                                onChange={(e) =>
+                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                }
+                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                                required={field.is_required}
+                                            />
+                                        )}
+
+                                        {field.field_type === 'checkbox' && (
+                                            <label className="mt-2 flex items-center gap-2 cursor-pointer text-[13px] text-ink">
                                                 <input
-                                                    type="radio"
-                                                    name={`custom_${field.field_key}`}
-                                                    value={opt.value}
-                                                    checked={String(val) === String(opt.value)}
+                                                    type="checkbox"
+                                                    checked={Boolean(val)}
                                                     onChange={(e) =>
-                                                        handleAnswerChange(
-                                                            field.field_key,
-                                                            e.target.value
-                                                        )
+                                                        handleAnswerChange(field.field_key, e.target.checked)
                                                     }
                                                     required={field.is_required}
                                                 />
-                                                <span className="text-ink">{opt.label}</span>
-                                            </span>
-                                            {opt.price ? (
-                                                <span className="font-mono text-xs text-accent">
-                                                    {opt.is_override ? 'Total ' : '+'}
-                                                    {formatMoney(Number(opt.price), event.currency)}
-                                                </span>
-                                            ) : null}
-                                        </label>
-                                    ))}
+                                                <span>{field.label}</span>
+                                            </label>
+                                        )}
+
+                                        {fieldError && (
+                                            <p className="mt-1 text-[11.5px] text-danger-fg">{fieldError}</p>
+                                        )}
+                                    </div>
+                                );
+                            })}
+
+                            {/* Dietary and Accessibility standard options */}
+                            {(settings.dietary_requirements !== 'hidden' ||
+                                settings.accessibility_needs !== 'hidden') && (
+                                <div className="border-t border-border/60 pt-3 mt-3">
+                                    {settings.dietary_requirements === 'required' ||
+                                    settings.accessibility_needs === 'required' ||
+                                    fieldsExpanded ||
+                                    showExtras ? (
+                                        <div className="space-y-3">
+                                            {settings.dietary_requirements !== 'hidden' && (
+                                                <Input
+                                                    label={`Dietary requirements ${settings.dietary_requirements === 'required' ? '*' : '(optional)'}`}
+                                                    type="text"
+                                                    placeholder="e.g. Vegetarian, nut allergy"
+                                                    value={data.dietary_requirements}
+                                                    onChange={(e) =>
+                                                        setData('dietary_requirements', e.target.value)
+                                                    }
+                                                    error={errors.dietary_requirements}
+                                                    required={settings.dietary_requirements === 'required'}
+                                                />
+                                            )}
+                                            {settings.accessibility_needs !== 'hidden' && (
+                                                <Input
+                                                    label={`Accessibility needs ${settings.accessibility_needs === 'required' ? '*' : '(optional)'}`}
+                                                    type="text"
+                                                    placeholder="e.g. Step-free access, sign language"
+                                                    value={data.accessibility_needs}
+                                                    onChange={(e) =>
+                                                        setData('accessibility_needs', e.target.value)
+                                                    }
+                                                    error={errors.accessibility_needs}
+                                                    required={settings.accessibility_needs === 'required'}
+                                                />
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowExtras(true)}
+                                            className="text-[12.5px] text-ink-secondary underline hover:text-accent"
+                                        >
+                                            Add dietary or accessibility needs
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
-                            {field.field_type === 'text' && (
-                                <input
-                                    type="text"
-                                    value={val}
-                                    onChange={(e) =>
-                                        handleAnswerChange(field.field_key, e.target.value)
-                                    }
-                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                    required={field.is_required}
-                                />
-                            )}
-
-                            {field.field_type === 'textarea' && (
-                                <textarea
-                                    rows={2}
-                                    value={val}
-                                    onChange={(e) =>
-                                        handleAnswerChange(field.field_key, e.target.value)
-                                    }
-                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                    required={field.is_required}
-                                />
-                            )}
-
-                            {field.field_type === 'number' && (
-                                <input
-                                    type="number"
-                                    value={val}
-                                    onChange={(e) =>
-                                        handleAnswerChange(field.field_key, e.target.value)
-                                    }
-                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                    required={field.is_required}
-                                />
-                            )}
-
-                            {field.field_type === 'checkbox' && (
-                                <label className="mt-2 flex items-center gap-2 cursor-pointer text-[13px] text-ink">
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(val)}
-                                        onChange={(e) =>
-                                            handleAnswerChange(field.field_key, e.target.checked)
-                                        }
-                                        required={field.is_required}
-                                    />
-                                    <span>{field.label}</span>
-                                </label>
-                            )}
-
-                            {fieldError && (
-                                <p className="mt-1 text-[11.5px] text-danger-fg">{fieldError}</p>
+                            {!fieldsExpanded && totalExtraCount >= 2 && (
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface to-transparent" />
                             )}
                         </div>
-                    );
-                })}
 
-                {/* Dietary and Accessibility standard options */}
-                {(settings.dietary_requirements !== 'hidden' ||
-                    settings.accessibility_needs !== 'hidden') && (
-                    <div className="border-t border-border/60 pt-3">
-                        {settings.dietary_requirements === 'required' ||
-                        settings.accessibility_needs === 'required' ||
-                        showExtras ? (
-                            <div className="space-y-3">
-                                {settings.dietary_requirements !== 'hidden' && (
-                                    <Input
-                                        label={`Dietary requirements ${settings.dietary_requirements === 'required' ? '*' : '(optional)'}`}
-                                        type="text"
-                                        placeholder="e.g. Vegetarian, nut allergy"
-                                        value={data.dietary_requirements}
-                                        onChange={(e) =>
-                                            setData('dietary_requirements', e.target.value)
-                                        }
-                                        error={errors.dietary_requirements}
-                                        required={settings.dietary_requirements === 'required'}
-                                    />
-                                )}
-                                {settings.accessibility_needs !== 'hidden' && (
-                                    <Input
-                                        label={`Accessibility needs ${settings.accessibility_needs === 'required' ? '*' : '(optional)'}`}
-                                        type="text"
-                                        placeholder="e.g. Step-free access, sign language"
-                                        value={data.accessibility_needs}
-                                        onChange={(e) =>
-                                            setData('accessibility_needs', e.target.value)
-                                        }
-                                        error={errors.accessibility_needs}
-                                        required={settings.accessibility_needs === 'required'}
-                                    />
-                                )}
-                            </div>
-                        ) : (
+                        {totalExtraCount >= 2 && (
                             <button
                                 type="button"
-                                onClick={() => setShowExtras(true)}
-                                className="text-[12.5px] text-ink-secondary underline hover:text-accent"
+                                onClick={() => setFieldsExpanded(!fieldsExpanded)}
+                                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-alt/60 hover:bg-surface-alt py-2 px-3 text-[12px] font-medium text-accent transition-colors cursor-pointer"
                             >
-                                Add dietary or accessibility needs
+                                <span>
+                                    {fieldsExpanded
+                                        ? 'Show fewer fields'
+                                        : `Show all registration questions (${totalExtraCount} details)`}
+                                </span>
+                                {fieldsExpanded ? (
+                                    <ChevronUp className="h-3.5 w-3.5" />
+                                ) : (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                )}
                             </button>
                         )}
                     </div>
@@ -1307,17 +1408,10 @@ export default function Show({ event, org, isPrivate = false }) {
             )}
 
             <div className="mx-auto max-w-[1100px] px-6 pt-8 sm:px-10">
-                {/* The badge was hardcoded open, which on a private event told a
-                    visitor the opposite of the truth. */}
-                {isPrivate ? (
+                {isPrivate && (
                     <span className="inline-flex items-center gap-1.5 border border-border px-2 py-0.5 text-[11.5px] text-ink-secondary">
                         <Lock className="h-3 w-3" strokeWidth={1.75} />
                         Private event
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center gap-1.5 border border-accent px-2 py-0.5 text-[11.5px] text-accent">
-                        <Globe className="h-3 w-3" strokeWidth={1.75} />
-                        Open to anyone
                     </span>
                 )}
 
@@ -1339,13 +1433,13 @@ export default function Show({ event, org, isPrivate = false }) {
                             {formatDateRange(event.starts_at, event.ends_at, event.timezone)}
                         </b>
                     </div>
-                    <div className="border-r border-border py-4 pr-5 pl-5 sm:pl-0">
+                    <div className="border-r border-border py-4 px-5">
                         <span className="block text-[11.5px] text-ink-tertiary">Where</span>
                         <b className="mt-1.5 block truncate text-[14px] font-normal text-ink">
                             {event.location_type === 'virtual' ? 'Virtual' : event.address}
                         </b>
                     </div>
-                    <div className="border-r border-border py-4 pr-5 pl-5 sm:border-r sm:pl-5">
+                    <div className="border-r border-border py-4 px-5">
                         <span className="block text-[11.5px] text-ink-tertiary">Format</span>
                         <b className="mt-1.5 block text-[14px] font-normal text-ink">
                             {event.location_type === 'virtual' ? 'Online' : 'In person'}
@@ -1359,30 +1453,61 @@ export default function Show({ event, org, isPrivate = false }) {
                     </div>
                 </div>
 
-                <nav className="mt-1 flex gap-0 overflow-x-auto border-b border-border">
-                    {sections.map((section) => (
+                <div className="mt-1 flex items-center justify-between border-b border-border">
+                    <nav className="flex gap-0 overflow-x-auto">
+                        {sections.map((section) => (
+                            <button
+                                key={section.key}
+                                type="button"
+                                onClick={() => setActive(section.key)}
+                                className={`-mb-px shrink-0 border-b px-4 py-3 text-[13px] transition-colors first:pl-0 ${
+                                    active === section.key
+                                        ? 'border-accent text-accent'
+                                        : 'border-transparent text-ink-secondary hover:text-ink'
+                                }`}
+                            >
+                                {section.label}
+                            </button>
+                        ))}
+                    </nav>
+                    {active !== 'about' && (
                         <button
-                            key={section.key}
                             type="button"
-                            onClick={() => setActive(section.key)}
-                            className={`-mb-px shrink-0 border-b px-4 py-3 text-[13px] transition-colors first:pl-0 ${
-                                active === section.key
-                                    ? 'border-accent text-accent'
-                                    : 'border-transparent text-ink-secondary hover:text-ink'
-                            }`}
+                            onClick={() => {
+                                setActive('about');
+                                setTimeout(() => {
+                                    document
+                                        .getElementById('register-section')
+                                        ?.scrollIntoView({ behavior: 'smooth' });
+                                }, 50);
+                            }}
+                            className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded-full bg-accent/10 hover:bg-accent/15 text-accent border border-accent/25 px-3 py-1 text-[12.5px] font-medium transition-colors cursor-pointer"
                         >
-                            {section.label}
+                            <Ticket className="h-3.5 w-3.5" />
+                            <span>Register · {formatMoney(price, event.currency)}</span>
                         </button>
-                    ))}
-                </nav>
+                    )}
+                </div>
 
-                <div className="grid gap-14 py-11 lg:grid-cols-[1fr_330px]">
-                    <div className="min-w-0">
-                        {active === 'about' && event.description && (
-                            <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
-                                {event.description}
-                            </p>
-                        )}
+                {/* Main Content Area */}
+                {active === 'about' ? (
+                    <div className="grid gap-12 py-10 lg:grid-cols-[1fr_360px]">
+                        <div className="min-w-0">
+                            {event.description ? (
+                                <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
+                                    {event.description}
+                                </p>
+                            ) : (
+                                <p className="text-[14px] text-ink-secondary">
+                                    No description provided for this event.
+                                </p>
+                            )}
+                        </div>
+
+                        <RegistrationPanel event={event} />
+                    </div>
+                ) : (
+                    <div className="max-w-4xl py-10">
                         {active === 'schedule' && (
                             <ScheduleSection
                                 sessions={event.sessions}
@@ -1401,10 +1526,36 @@ export default function Show({ event, org, isPrivate = false }) {
                         )}
                         {active === 'qa' && <ForumSection event={event} />}
                         {active === 'live' && <LivePollSection event={event} />}
-                    </div>
 
-                    <RegistrationPanel event={event} />
-                </div>
+                        {/* Bottom CTA for quick registration on non-about tabs */}
+                        <div className="mt-12 rounded-xl border border-border/80 bg-surface/80 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h4 className="text-[15px] font-semibold text-ink">
+                                    Ready to attend {event.name}?
+                                </h4>
+                                <p className="mt-1 text-[13px] text-ink-secondary">
+                                    Join us in person or online. Tickets from{' '}
+                                    {formatMoney(price, event.currency)}.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setActive('about');
+                                    setTimeout(() => {
+                                        document
+                                            .getElementById('register-section')
+                                            ?.scrollIntoView({ behavior: 'smooth' });
+                                    }, 50);
+                                }}
+                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13.5px] font-medium text-white shadow-xs hover:bg-accent/90 transition-colors cursor-pointer"
+                            >
+                                <Ticket className="h-4 w-4" />
+                                Go to Registration
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {event.sponsors.length > 0 && (
                     <div className="border-t border-border py-10">
