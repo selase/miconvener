@@ -215,6 +215,146 @@ final class MarketplaceDemoSeeder extends Seeder
                     ],
                 ],
             ],
+            [
+                'tenant_name' => 'University of Ghana Medical Centre',
+                'tenant_slug' => 'ugmc',
+                'shop_name' => 'University of Ghana Medical Centre (UGMC)',
+                'shop_slug' => 'ugmc',
+                'description' => "West Africa's premier quaternary healthcare, academic, and medical training facility. Featuring the world-class Medical Training and Simulation Centre (MTSC) with state-of-the-art auditoriums, smart seminar suites, interactive simulation debriefing theaters, and an expansive glass atrium for symposiums, corporate workshops, and professional conferences.",
+                'city' => 'Accra',
+                'region' => 'Greater Accra',
+                'address' => 'University of Ghana Medical Centre, Legon Bypass, Accra',
+                'latitude' => 5.6325,
+                'longitude' => -0.1855,
+                'phone' => '+233 302 550843',
+                'email' => 'mtsc@ugmc.ug.edu.gh',
+                'logo_path' => 'https://ugmedicalcentre.org/front/images/ugmclogo.jpg',
+                'cover_image_path' => 'https://ugmedicalcentre.org/front/images/buildings/sim_tuition@2x-min.jpg',
+                'verification_status' => Shop::VERIFICATION_VERIFIED,
+                'verified_at' => now()->subMonths(2),
+                'spaces' => [
+                    [
+                        'title' => 'MTSC Main Auditorium',
+                        'slug' => 'mtsc-main-auditorium',
+                        'description' => 'Flagship 150-seater plenary auditorium situated in the Medical Training and Simulation Centre (MTSC). Features sloped theatre seating, an expansive stage with speaker lectern, dual high-definition projection, sound reinforcement, acoustic wall paneling, and high-resolution event recording capabilities.',
+                        'rental_price_pesewas' => 1500000, // GHS 15,000
+                        'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+                        'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST,
+                        'is_bookable' => false,
+                        'capacity' => ['theater' => 150, 'classroom' => 80],
+                        'floor_area' => 220.00,
+                        'ceiling_height' => 5.20,
+                        'image' => 'https://ugmedicalcentre.org/front/images/simulation/tour/3A-50-Seater-Auditorium.jpg',
+                        'gallery' => [
+                            'https://ugmedicalcentre.org/front/images/simulation/mtsc-rooms/auditorium.jpg',
+                            'https://ugmedicalcentre.org/front/images/buildings/sim_tuition@2x-min.jpg',
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/11-Staff-coffee-break.jpg',
+                        ],
+                        'included_amenities' => ['central_ac', 'generator_standby', 'pa_sound_system', 'wireless_mics', 'projector_screens', 'podium', 'stage', 'wifi_high_speed', 'parking_on_site', 'executive_restrooms', 'wheelchair_access', 'security_guards', 'in_house_catering'],
+                        'excluded_amenities' => [
+                            ['slug' => 'led_video_wall', 'notes' => 'LED screen package available upon request for symposiums'],
+                        ],
+                    ],
+                    [
+                        'title' => 'Executive Seminar Room A (60-Seater)',
+                        'slug' => 'executive-seminar-room-a-60-seater',
+                        'description' => 'Spacious modular seminar and training suite designed for corporate workshops, health symposiums, and professional certification programs. Features flexible table layouts, ergonomic executive seating, interactive smart displays, hybrid videoconferencing, and natural lighting.',
+                        'rental_price_pesewas' => 600000, // GHS 6,000
+                        'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+                        'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST,
+                        'is_bookable' => false,
+                        'capacity' => ['classroom' => 60, 'theater' => 80, 'banquet' => 45],
+                        'floor_area' => 110.00,
+                        'ceiling_height' => 3.80,
+                        'image' => 'https://ugmedicalcentre.org/front/images/simulation/mtsc-rooms/sixty-seater-rooms.jpg',
+                        'gallery' => [
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/4-Pre-simulation-training-test.jpg',
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/12A-Cafeteria-services-at-the-Centre.jpg',
+                        ],
+                        'included_amenities' => ['central_ac', 'generator_standby', 'wifi_high_speed', 'projector_screens', 'podium', 'parking_on_site', 'executive_restrooms', 'wheelchair_access'],
+                        'excluded_amenities' => [
+                            ['slug' => 'pa_sound_system', 'notes' => 'Supplemental wireless lapel mic package available on request'],
+                        ],
+                    ],
+                    [
+                        'title' => 'Executive Seminar Room B (40-Seater)',
+                        'slug' => 'executive-seminar-room-b-40-seater',
+                        'description' => 'Comfortable and focused workshop room ideal for interactive seminars, department retreats, and breakout sessions. Equipped with high-speed Wi-Fi, digital presentation display, mobile whiteboards, and climate control.',
+                        'rental_price_pesewas' => 400000, // GHS 4,000
+                        'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+                        'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST,
+                        'is_bookable' => false,
+                        'capacity' => ['classroom' => 40, 'theater' => 50, 'banquet' => 30],
+                        'floor_area' => 80.00,
+                        'ceiling_height' => 3.80,
+                        'image' => 'https://ugmedicalcentre.org/front/images/simulation/mtsc-rooms/forty-seater-rooms.jpg',
+                        'gallery' => [
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/10B-State-of-the-art-E-library.jpg',
+                        ],
+                        'included_amenities' => ['central_ac', 'generator_standby', 'wifi_high_speed', 'projector_screens', 'parking_on_site', 'executive_restrooms', 'wheelchair_access'],
+                        'excluded_amenities' => [],
+                    ],
+                    [
+                        'title' => 'The MTSC Atrium & Exhibition Foyer',
+                        'slug' => 'the-mtsc-atrium-and-exhibition-foyer',
+                        'description' => 'An expansive, light-filled multi-story reception and networking atrium featuring polished floors and glass architecture. Perfect for conference registration hubs, welcome cocktail receptions, poster presentations, medical equipment exhibitions, and catering breaks.',
+                        'rental_price_pesewas' => 1000000, // GHS 10,000
+                        'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+                        'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST,
+                        'is_bookable' => false,
+                        'capacity' => ['cocktail' => 250, 'banquet' => 120, 'theater' => 150],
+                        'floor_area' => 350.00,
+                        'ceiling_height' => 8.50,
+                        'image' => 'https://ugmedicalcentre.org/front/images/simulation/tour/1-The-atrium.jpg',
+                        'gallery' => [
+                            'https://ugmedicalcentre.org/front/images/simulation/mtsc-rooms/atrium.jpg',
+                            'https://ugmedicalcentre.org/front/images/buildings/sim_tuition@2x-min.jpg',
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/12A-Cafeteria-services-at-the-Centre.jpg',
+                        ],
+                        'included_amenities' => ['central_ac', 'generator_standby', 'wifi_high_speed', 'parking_on_site', 'wheelchair_access', 'executive_restrooms', 'security_guards'],
+                        'excluded_amenities' => [
+                            ['slug' => 'cocktail_tables', 'notes' => 'High cocktail tables available from venue rental inventory'],
+                        ],
+                    ],
+                    [
+                        'title' => 'Debriefing & Focus Suite',
+                        'slug' => 'debriefing-and-focus-suite',
+                        'description' => 'High-tech debriefing and deliberation boardroom equipped with one-way observation capabilities, dual camera audio/video playback, and presentation displays. Specially tailored for medical reviews, focus groups, arbitration, and confidential committee sessions.',
+                        'rental_price_pesewas' => 300000, // GHS 3,000
+                        'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+                        'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST,
+                        'is_bookable' => false,
+                        'capacity' => ['theater' => 25, 'classroom' => 20, 'banquet' => 15],
+                        'floor_area' => 50.00,
+                        'ceiling_height' => 3.50,
+                        'image' => 'https://ugmedicalcentre.org/front/images/simulation/mtsc-rooms/debriefing-rooms.jpg',
+                        'gallery' => [
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/8B-Debriefing-after-Simulation-Training.jpg',
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/6-Instructor-monitoring.jpg',
+                        ],
+                        'included_amenities' => ['central_ac', 'generator_standby', 'wifi_high_speed', 'projector_screens', 'parking_on_site', 'executive_restrooms'],
+                        'excluded_amenities' => [],
+                    ],
+                    [
+                        'title' => 'Computer-Based Testing & Assessment Suite',
+                        'slug' => 'computer-based-testing-and-assessment-suite',
+                        'description' => 'Dedicated digital assessment laboratory equipped with 30 networked workstations, high-speed fiber internet, uninterruptible power supply, and invigilator monitoring station. Ideal for professional board exams, certification testing, and software training workshops.',
+                        'rental_price_pesewas' => 500000, // GHS 5,000
+                        'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+                        'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST,
+                        'is_bookable' => false,
+                        'capacity' => ['classroom' => 30],
+                        'floor_area' => 75.00,
+                        'ceiling_height' => 3.50,
+                        'image' => 'https://ugmedicalcentre.org/front/images/simulation/mtsc-rooms/test-rooms.jpg',
+                        'gallery' => [
+                            'https://ugmedicalcentre.org/front/images/simulation/tour/10B-State-of-the-art-E-library.jpg',
+                        ],
+                        'included_amenities' => ['central_ac', 'generator_standby', 'wifi_high_speed', 'parking_on_site', 'executive_restrooms', 'security_guards'],
+                        'excluded_amenities' => [],
+                    ],
+                ],
+            ],
         ];
 
         foreach ($merchants as $m) {
@@ -256,6 +396,8 @@ final class MarketplaceDemoSeeder extends Seeder
                     'name' => $m['shop_name'],
                     'slug' => $m['shop_slug'],
                     'description' => $m['description'],
+                    'logo_path' => $m['logo_path'] ?? null,
+                    'cover_image_path' => $m['cover_image_path'] ?? null,
                     'city' => $m['city'],
                     'region' => $m['region'],
                     'address' => $m['address'],
@@ -281,7 +423,7 @@ final class MarketplaceDemoSeeder extends Seeder
                         'rental_price_pesewas' => $s['rental_price_pesewas'],
                         'pricing_model' => $s['pricing_model'],
                         'price_visibility' => $s['price_visibility'],
-                        'is_bookable' => (bool) ($s['is_bookable'] ?? false),
+                        'is_bookable' => (bool) $s['is_bookable'],
                         'capacity_breakdown' => $s['capacity'],
                         'floor_area_sqm' => $s['floor_area'],
                         'ceiling_height_meters' => $s['ceiling_height'],
@@ -304,6 +446,25 @@ final class MarketplaceDemoSeeder extends Seeder
                         'status' => StoreListingMedia::STATUS_APPROVED,
                     ]
                 );
+
+                // Add Additional Gallery Media
+                if (! empty($s['gallery'])) {
+                    foreach ($s['gallery'] as $gIdx => $galleryUrl) {
+                        StoreListingMedia::updateOrCreate(
+                            [
+                                'listing_id' => $listing->id,
+                                'file_path' => $galleryUrl,
+                            ],
+                            [
+                                'media_type' => StoreListingMedia::TYPE_PHOTO,
+                                'title' => $s['title'].' - Photo '.($gIdx + 2),
+                                'sort_order' => $gIdx + 2,
+                                'is_primary' => false,
+                                'status' => StoreListingMedia::STATUS_APPROVED,
+                            ]
+                        );
+                    }
+                }
 
                 // Attach Included Amenities
                 foreach ($s['included_amenities'] as $amenitySlug) {

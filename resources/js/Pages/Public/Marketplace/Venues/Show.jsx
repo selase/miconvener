@@ -497,7 +497,9 @@ export default function VenueShow({ venue, otherSpaces = [] }) {
                                             Online Booking Unavailable
                                         </button>
                                         <p className="text-[11px] text-center text-ink-secondary leading-relaxed">
-                                            Online reservations are temporarily paused for this venue while onboarding completes. Please contact the host directly via phone or email below.
+                                            Online reservations are temporarily paused for this
+                                            venue while onboarding completes. Please contact the
+                                            host directly via phone or email below.
                                         </p>
                                     </div>
                                 ) : (

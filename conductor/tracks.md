@@ -795,4 +795,36 @@ Direct link to the Venue Marketplace from the root landing page (`miconvener.com
     - Added `$path !== ''` guard against root path collisions in `product.blade.php`.
     - Imported `ValidationException` cleanly in `VenueBookingController`.
 
+---
 
+## [x] Track: UGMC Medical Training and Simulation Centre (MTSC) Facilities Creation
+
+Creation and publishing of the University of Ghana Medical Centre (UGMC) and its 6 rentable event, training, and conference spaces at the Medical Training and Simulation Centre (MTSC) with official high-resolution imagery, pricing on request, and disabled online booking.
+
+- [x] **Phase 1: Update MarketplaceDemoSeeder with UGMC Merchant & Spaces**:
+  - [x] Added UGMC merchant profile under tenant slug `ugmc` with official logo (`ugmclogo.jpg`), cover image (`sim_tuition@2x-min.jpg`), coordinates (`5.6325, -0.1855`), and contact info (`mtsc@ugmc.ug.edu.gh`, `+233 302 550843`).
+  - [x] Added `logo_path` and `cover_image_path` persistence to `Shop::updateOrCreate`.
+  - [x] Added secondary media gallery persistence to `StoreListingMedia::updateOrCreate` with sequential `sort_order` and `is_primary = false`.
+  - [x] Configured all 6 UGMC spaces with exact specs:
+    1. `MTSC Main Auditorium` (`mtsc-main-auditorium`, 150 theater / 80 classroom, 220 sqm, 5.2m ceiling, 1,500,000 pesewas / GHS 15,000, 4 photos).
+    2. `Executive Seminar Room A (60-Seater)` (`executive-seminar-room-a-60-seater`, 60 classroom / 80 theater / 45 banquet, 110 sqm, 3.8m ceiling, 600,000 pesewas / GHS 6,000, 3 photos).
+    3. `Executive Seminar Room B (40-Seater)` (`executive-seminar-room-b-40-seater`, 40 classroom / 50 theater / 30 banquet, 80 sqm, 3.8m ceiling, 400,000 pesewas / GHS 4,000, 2 photos).
+    4. `The MTSC Atrium & Exhibition Foyer` (`the-mtsc-atrium-and-exhibition-foyer`, 250 cocktail / 120 banquet / 150 theater, 350 sqm, 8.5m ceiling, 1,000,000 pesewas / GHS 10,000, 4 photos).
+    5. `Debriefing & Focus Suite` (`debriefing-and-focus-suite`, 25 theater / 20 classroom / 15 banquet, 50 sqm, 3.5m ceiling, 300,000 pesewas / GHS 3,000, 3 photos).
+    6. `Computer-Based Testing & Assessment Suite` (`computer-based-testing-and-assessment-suite`, 30 classroom, 75 sqm, 3.5m ceiling, 500,000 pesewas / GHS 5,000, 2 photos).
+  - [x] Set all 6 spaces to `'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST` and `'is_bookable' => false`.
+- [x] **Phase 2: Database Seeding & Vector Embedding Execution**:
+  - [x] Ran `php artisan db:seed --class=MarketplaceDemoSeeder --force` (753ms, created UGMC shop and 6 spaces).
+  - [x] Ran `php artisan marketplace:embed-venues` (generated and indexed vector embeddings for all 6 spaces).
+  - [x] Verified database state via tinker and curl against local Herd server.
+- [x] **Phase 3: Automated Verification & Pest Testing**:
+  - [x] Created `tests/Feature/Marketplace/UgmcVenuesTest.php` with 4 tests:
+    - Shop profile and branding verification.
+    - All 6 spaces by slug, `is_bookable === false`, `price_visibility === 'on_request'`, integer pesewas, primary media, media count (>= 2), and amenities.
+    - Public marketplace show route (`/marketplace/venues/mtsc-main-auditorium`).
+    - Negative boundary: booking attempts rejected for both web form submissions (redirect with session errors) and JSON API requests (HTTP 422 with `starts_at` error).
+  - [x] Test suite: 4 tests, 72 assertions passing cleanly.
+- [x] **Phase 4: Post-Implementation Self-Review & Formatting**:
+  - [x] Pint formatting: `vendor/bin/pint --dirty` passed with 0 errors.
+  - [x] Frontend bundling: `npm run build` compiled 2,590 modules in 4.34s with 0 errors.
+  - [x] 3-agent post-implementation self-review audit (Security, Logic/Edge Cases, Architecture/Performance) completed with all checks passing cleanly.
