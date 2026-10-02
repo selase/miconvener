@@ -97,6 +97,16 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('index');
     });
 
+    // Marketplace Merchant Verification Queue (accessible at /admin/marketplace-verifications and /marketplace-verifications)
+    Route::group(['prefix' => 'admin/marketplace-verifications', 'as' => 'admin.marketplace-verifications.'], function (): void {
+        Route::get('/', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'index'])->name('index');
+        Route::get('/{shop}', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'show'])->name('show');
+        Route::post('/{shop}/approve', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'approve'])->name('approve');
+        Route::post('/{shop}/reject', [App\Http\Controllers\Admin\MarketplaceVerificationController::class, 'reject'])->name('reject');
+    });
+    Route::get('marketplace-verifications', fn () => redirect()->route('admin.marketplace-verifications.index'));
+    Route::get('marketplace-verifications/{shop}', fn ($shop) => redirect()->route('admin.marketplace-verifications.show', $shop));
+
     // Tenant routes
     Route::group(['prefix' => 'tenants', 'as' => 'tenants.'], function (): void {
         Route::get('reset', [TenantController::class, 'resetTenant'])
@@ -232,5 +242,26 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 
 Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'verify'])->name('web.certificates.verify');
 Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('web.certificates.download');
+
+// MiConvener Marketplace (Public)
+Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
+    Route::get('/', [App\Http\Controllers\Marketplace\MarketplaceController::class, 'index'])->name('index');
+    Route::get('/venues', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'index'])->name('venues.index');
+    Route::get('/venues/{slug}', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'show'])->name('venues.show');
+    Route::post('/venues/{slug}/check-availability', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkAvailability'])->name('venues.check-availability');
+    Route::get('/venues/{slug}/booked-slots', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'bookedSlots'])->name('venues.booked-slots');
+    Route::post('/venues/{slug}/book', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'book'])->name('venues.book');
+    Route::get('/bookings/{reference}', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'show'])->name('bookings.show');
+    Route::post('/bookings/{reference}/checkout', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkout'])->name('bookings.checkout');
+    Route::get('/bookings/{reference}/callback', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'callback'])->name('bookings.callback');
+    Route::get('/{merchant_slug}', [App\Http\Controllers\Marketplace\MarketplaceStorefrontController::class, 'show'])->name('storefront.show');
+});
+
+// Model Context Protocol (MCP) Server for Marketplace AI Agents
+Laravel\Mcp\Facades\Mcp::web('mcp/marketplace', App\Mcp\MarketplaceMcpServer::class)
+    ->middleware(['mcp_tier', 'throttle:mcp-marketplace']);
+Route::get('mcp/marketplace', [App\Http\Controllers\Marketplace\MarketplaceMcpController::class, 'show'])
+    ->middleware(['mcp_tier', 'throttle:mcp-marketplace'])
+    ->name('mcp.marketplace.show');
 
 require __DIR__.'/auth.php';

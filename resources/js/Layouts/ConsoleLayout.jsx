@@ -14,6 +14,9 @@ import {
     SlidersHorizontal,
     Settings,
     UserRound,
+    Building2,
+    CalendarDays,
+    Inbox,
     Menu,
     X,
 } from 'lucide-react';
@@ -22,6 +25,24 @@ import ThemeToggle from '@/Components/Console/ThemeToggle';
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'tenant.dashboard', icon: LayoutDashboard },
     { label: 'Events', href: 'tenant.events.index', icon: Calendar },
+    {
+        label: 'Venue Spaces',
+        href: 'tenant.venue.spaces.index',
+        icon: Building2,
+        permission: 'manage_venue',
+    },
+    {
+        label: 'Venue Calendar',
+        href: 'tenant.venue.calendar.index',
+        icon: CalendarDays,
+        permission: 'manage_venue',
+    },
+    {
+        label: 'Inquiries & Leads',
+        href: 'tenant.venue.inquiries.index',
+        icon: Inbox,
+        permission: 'manage_venue',
+    },
     { label: 'Team', href: 'tenant.users.index', icon: Users },
     { label: 'Roles', href: 'tenant.roles.index', icon: ShieldCheck },
     { label: 'API Keys', href: 'tenant.api-keys.index', icon: KeyRound },

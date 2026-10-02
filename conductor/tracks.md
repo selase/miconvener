@@ -585,7 +585,178 @@ Replacing the single-tenant `/my` portal with a single platform-wide passwordles
     - **D2 (Latency Measurement: PASS)**: Measured delay from attendee submission to organiser console notification banner was **~0.8 seconds** (< 1s, confirming active Reverb WebSocket connection; did not degrade to the 8s polling fallback).
     - **D3 (Urgent First Aid Escalation: PASS)**: Urgent medical request generated non-fading RED console banner (`⚠ First aid requested Medical / first aid from Selase Kwawu, seat C-14 in Main Auditorium`), turned venue map seat C-14 **RED (`First aid`)** with active pulse, and dispatched urgent transactional alert email confirmed received with subject *"Urgent: an attendee needs help at Probe Full Experience"*, naming attendee, seat C-14, and Main Auditorium. Ordinary water request generated zero email.
 
+---
 
+## [x] Track: MiConvener Marketplace (Build 1: Venue Supply, Catalog & Discovery)
 
+Foundational supply, listing catalog, amenities transparency grid, and public discovery engine for the **MiConvener Marketplace** (`miconvener.com/marketplace`).
+Design: `docs/superpowers/specs/2026-09-20-event-store-build1-design.md`. Handoff: `docs/superpowers/specs/2026-09-20-event-store-handoff.md`.
 
+- [x] **Stage 1: Database Migrations, Standard Seeders & Eloquent Models**:
+  - [x] Landlord migrations executed: `create_shops_table.php`, `create_store_amenities_table.php`, `create_store_listings_table.php`, `create_store_listing_amenities_table.php`, and `create_store_listing_media_table.php`.
+  - [x] Standard conference & venue amenities seeded: 23 amenities across power & climate, furniture, AV tech, facilities, and catering rules via `StoreAmenitySeeder.php`.
+  - [x] Eloquent models implemented: `Shop`, `StoreAmenity`, `StoreListing`, `StoreListingAmenity`, and `StoreListingMedia` with `Tenant::shop()` relation, integer pesewas casting, `capacity_breakdown` JSON casting, and scopes (`active()`, `verified()`, `published()`, `venues()`, `minCapacity()`, `nearLocation()`).
+  - [x] Verified with 5 passing tests (22 assertions) in `tests/Feature/Marketplace/StoreModelAndMigrationTest.php`, 0 PHPStan errors, and clean Pint.
+- [x] **Stage 2: Tenant Console (Venue Profile & Spaces Manager)**:
+  - [x] Controllers and Form Requests for activating/updating tenant `Shop` profile and CRUD for venue spaces (`VenueProfileController.php`, `VenueListingController.php`, `UpdateVenueProfileRequest.php`, `StoreVenueListingRequest.php`).
+  - [x] Frontend Console views under `Venue Operations → Spaces`: listing table, space editor with **Included vs Excluded Amenities checklist**, photo uploads (`Tenant/Venue/Profile/Show.jsx`, `Tenant/Venue/Spaces/Index.jsx`, `Tenant/Venue/Spaces/Form.jsx`).
+  - [x] Navigation updates in `ConsoleLayout.jsx` with `Building2` icon and `manage_venue` permission check in `HandleInertiaRequests.php`.
+  - [x] Verified with 6 passing tests (39 assertions) in `tests/Feature/Marketplace/TenantVenueSpacesTest.php`.
+- [x] **Stage 3: Public Marketplace Discovery & Geo-Search Engine**:
+  - [x] Routing in `routes/web.php` (`/marketplace`, `/marketplace/venues`, `/marketplace/venues/{slug}`, `/marketplace/{merchant_slug}`).
+  - [x] `MarketplaceSearchService` executing native PostgreSQL Haversine distance calculations (`nearLocation`), capacity breakdown filtering, price range, price visibility toggle, amenity matching, and verified merchant boost.
+  - [x] React/Inertia views: Marketplace landing hub (`Pages/Public/Marketplace/Index.jsx`), venue catalog with proximity and capacity filters (`Venues/Index.jsx`), space detail page with Included/Excluded grid (`Venues/Show.jsx`), and Merchant Storefront (`Storefront/Show.jsx`) with `MarketplaceLayout.jsx`.
+  - [x] Verified with 6 passing tests (46 assertions) in `tests/Feature/Marketplace/PublicMarketplaceDiscoveryTest.php`.
+- [x] **Stage 4: Superadmin Verification & Trust Review Queue**:
+  - [x] Superadmin controller and Blade views (`/admin/marketplace-verifications`) to review business registration, Ghana Card, and grant Blue Tick verification (`MarketplaceVerificationController.php`, `resources/views/admin/marketplace/verifications/index.blade.php`, `show.blade.php`).
+  - [x] Route gated strictly by `access-superadmin-dashboard` gate.
+  - [x] Verified with 3 passing tests (18 assertions) in `tests/Feature/Marketplace/SuperadminVerificationTest.php`.
+- [x] **Stage 5: Quality Gates, Self-Review & Adversarial Hardening**:
+  - [x] Pest feature test suite: 20 passing tests (184 assertions) across `tests/Feature/Marketplace/`.
+  - [x] Frontend asset compilation: `npm run build` compiled cleanly (2,583 modules transformed, 0 errors) using Node 22 via NVM.
+  - [x] Static Analysis & Formatting: PHPStan Level 5 passed with 0 errors, Laravel Pint clean.
+  - [x] Adversarial Self-Review Audit: Enforced global unique slug constraint in database migration and Form Request, hidden sensitive verification attributes (`verified_by_user_id`, `rejection_reason`) on `Shop`, and verified negative boundary tests (403 forbidden, 404 inactive/draft, cross-tenant isolation).
+  - [x] Commits: `2b24bdf` (Stages 1 & 2), `3f259da` (Stages 3 & 4, Self-Review).
+- [x] **Stage 6: UI Polish & Browser Verification Hardening**:
+  - [x] Image resolution fallback: Added `getUrlAttribute()` on `StoreListingMedia` and `getMediaUrl(media)` helper across all public Marketplace views (`Index.jsx`, `Venues/Index.jsx`, `Venues/Show.jsx`, `Storefront/Show.jsx`) to safely resolve images from both `.url` and `.file_path` under snake_case and camelCase serialization.
+  - [x] Console component invariants: Corrected `PageHeader` prop to `actions` (plural) and removed undeclared `description` in `Spaces/Index.jsx`, `Spaces/Form.jsx`, and `Profile/Show.jsx`. Converted `ConfirmModal` to declare explicit `open` prop and migrated `Select` dropdowns to child `<option>` elements. All 4 tests in `ConsoleComponentUsageTest` pass cleanly.
+  - [x] Verification route prefix: Added `/admin/marketplace-verifications` route group and redirect alias from `/marketplace-verifications`.
+  - [x] Verified with 25 passing tests (192 assertions) across `tests/Feature/Marketplace/` and `tests/Feature/Components/ConsoleComponentUsageTest.php`, clean Pint, and fresh production Vite build.
+  - [x] Commit: `b8e26cd`.
+
+---
+
+## [x] Track: MiConvener Marketplace (Build 2: Laravel AI SDK, Vector Embeddings & Agentic MCP Concierge)
+
+Integration of the **Laravel AI SDK** (`laravel/ai` v0.11), **Laravel MCP** (`laravel/mcp` v0.9), and PostgreSQL **pgvector** (`vector` 0.8.0) to power semantic natural language venue discovery, HNSW vector indexing, and agentic AI concierge capabilities.
+
+- [x] **Stage 1: Laravel AI SDK Integration & Embeddings Pipeline**:
+  - [x] Installed and configured `laravel/ai` (`config/ai.php`) alongside `laravel/mcp`.
+  - [x] Landlord migration `2026_10_01_120000_add_embedding_to_store_listings_table.php` adding `embedding vector(1536)` and HNSW cosine index `store_listings_embedding_hnsw_idx`. Migrated successfully on landlord database and `miconvener_testing`.
+  - [x] `App\Services\Marketplace\VenueEmbeddingService` with document synthesis (specs, capacities, included/excluded amenities, rules, host and city details), Laravel AI SDK embedding generation, and deterministic unit-vector fallback.
+  - [x] Artisan command `php artisan marketplace:embed-venues` with `--force` option and memory-safe chunking (`chunkById(50)`).
+  - [x] Verified with 5 passing tests in `tests/Feature/Marketplace/VenueEmbeddingTest.php`.
+- [x] **Stage 2: Natural Language Semantic Venue Discovery (AI Venue Scout)**:
+  - [x] Integrated pgvector cosine distance `<=>` operator (`1 - (store_listings.embedding <=> ?::vector)`) and sort ordering into `MarketplaceSearchService`.
+  - [x] Scopes `withSimilarity` and `orderBySimilarity` in `StoreListing` model with column-preserving query builder composition and safe `similarity_percentage` accessor.
+  - [x] Public Marketplace frontend updates: Dual-mode Hero Search ("Quick Filter" vs "✨ AI Semantic Scout"), AI prompt input bar, match percentage pills on venue cards, and "✨ AI Relevance Match" sort option (`Index.jsx`, `Venues/Index.jsx`).
+  - [x] Form Request `MarketplaceVenueSearchRequest` with max length and numeric bounds protection.
+  - [x] Verified with 6 passing tests in `tests/Feature/Marketplace/AiSemanticSearchTest.php`.
+- [x] **Stage 3: Laravel MCP Server (`laravel/mcp`) for Agentic Venue Concierge**:
+  - [x] Registered MCP server `App\Mcp\MarketplaceMcpServer` under `routes/web.php` at `/mcp/marketplace` with `throttle:60,1` rate limiting and CSRF exemption.
+  - [x] 4 MCP tools implemented: `SearchVenuesTool`, `GetVenueDetailsTool`, `CheckAvailabilityTool`, and `RequestQuoteTool` returning standardized `Response::error()` on invalid/missing listings and protecting confidential "Price on request" rates.
+  - [x] Interactive slide-over assistant `AiConciergeDrawer.jsx` with direct JSON-RPC client communication and bottom-right floating trigger button.
+  - [x] Verified with 10 passing tests in `tests/Feature/Marketplace/MarketplaceMcpServerTest.php`.
+- [x] **Stage 4: Automated Verification, Quality Gates & Mandatory Self-Review**:
+  - [x] Pest test suite: 43 passing tests (284 assertions) across all Marketplace test files in `tests/Feature/Marketplace/`.
+  - [x] Static Analysis & Formatting: PHPStan Level 5 passed with 0 errors, ESLint passed with 0 errors/warnings, Laravel Pint clean.
+  - [x] Frontend Build: `npm run build` compiled cleanly (2,584 modules transformed, 0 errors) in 31.5s using Node 22 via NVM.
+  - [x] Mandatory Self-Review Audit: Ran 3-agent post-implementation review (Security, Logic/Edge Cases, Performance/Architecture). Mitigated:
+    - Added `throttle:60,1` to public `/mcp/marketplace` endpoint to prevent LLM token & DB exhaustion.
+    - Added `protected $hidden = ['embedding']` on `StoreListing` eliminating ~200 KB per page payload drag to Inertia frontend.
+    - Resolved Eloquent select collision between vector similarity and geo-proximity queries.
+    - Protected confidential "Price on request" rates in MCP quote inquiries.
+    - Added Form Request `MarketplaceVenueSearchRequest` with 1000-char input capping.
+    - Added adversarial negative tests proving draft rejection, inactive shop isolation, and confidential pricing protection.
+- [x] **Stage 5: Browser-Aware MCP Explorer, Query Caching & Partner Tier**:
+  - [x] Browser-Aware Explorer & Content Negotiation (`MarketplaceMcpController` & `resources/js/Pages/Public/Marketplace/Mcp/Index.jsx`). Renders interactive explorer on browser GET, returns 405 with `Allow: POST` for machine requests, and handles POST tool calls via `MarketplaceMcpServer`.
+  - [x] SHA-256 Normalized Embedding Query Caching in `App\Services\Marketplace\VenueEmbeddingService` with 7-day TTL, preventing LLM token burn on repeated vector searches.
+  - [x] Middleware `IdentifyMarketplaceMcpPartner` (`app/Http/Middleware/IdentifyMarketplaceMcpPartner.php`) providing seamless `sk_...` tenant API key authentication via `X-Api-Key` or `Authorization: Bearer`, enforcing key validity, tenant status, IP restrictions, and brute-force throttling (`RateLimiter::tooManyAttempts('mcp_invalid_auth:...', 20)`).
+  - [x] Named rate limiter `mcp-marketplace` in `RouteServiceProvider` (300 req/min for partner keys partitioned by `mcp_partner_{id}`, 60 req/min for anonymous IP). Prioritized in `Kernel::$middlewarePriority` ahead of `ThrottleRequests`.
+  - [x] Priority partner attribution in `RequestQuoteTool` draft inquiries (tags partner tenant ID, organization name, key name, and priority processing message).
+  - [x] Tool JSON Schema hardening (`RequestQuoteTool`, `GetVenueDetailsTool`, `CheckAvailabilityTool`) declaring explicit `->required()` parameters for AI clients (Claude Desktop, Cursor).
+  - [x] Partner tier documentation & interactive API key testing in MCP Explorer UI with live response rate limit telemetry.
+  - [x] Verified with 53 passing tests (320 assertions) across `tests/Feature/Marketplace/`, PHPStan Level 5 passed with 0 errors, ESLint clean, Laravel Pint clean, and fresh Vite build.
+
+---
+
+## [x] Track: MiConvener Marketplace (Build 3: Venue Booking & Checkout, Host Inquiries Inbox & Event Linking)
+
+Full venue booking engine with custom date/time slot selection, real-time calendar lockouts, Paystack deposit checkout, host email alerts, dedicated venue manager console inbox (`/venue/inquiries`), and event-to-venue organizer linking.
+
+- [x] **Phase 1: Formal Venue Booking & Reservation Checkout Flow (Option 1)**:
+  - [x] Landlord migration `database/migrations/landlord/2026_10_01_130000_create_venue_bookings_table.php` with integer pesewas financials, date/time ranges (`starts_at`, `ends_at`), layout style, attendee count, contract snapshot, and unique `paystack_reference`.
+  - [x] Model `App\Models\VenueBooking` with statuses (`pending_quote`, `pending_payment`, `confirmed`, `rejected`, `cancelled`, `completed`), payment statuses (`unpaid`, `deposit_paid`, `fully_paid`, `refunded`), landlord connection, scopes (`blockingCalendar`, `overlapping`), and Eloquent relationships (`listing`, `shop`, `tenant`, `plannerTenant`, `user`).
+  - [x] Availability engine `App\Services\Marketplace\VenueAvailabilityService` validating date & time slots, computing duration units (hourly, full-day, multi-day, flat-rate), enforcing layout capacities, and preventing double-booking overlaps.
+  - [x] Booking & checkout service `App\Services\Marketplace\VenueBookingService` initializing Paystack deposit payments with idempotent reference tracking, contract terms snapshotting, and automatic hold TTL (`quote_valid_until`).
+  - [x] Controller `App\Http\Controllers\Marketplace\VenueBookingController` handling slot checks, booking submissions, checkout re-initiation (`/marketplace/bookings/{reference}/checkout`), secure Paystack callbacks (verifying booking ID match, GHS currency, and minimum deposit amount), and booking dossier views.
+  - [x] Public frontend booking drawer & preferred date/time selector in `resources/js/Pages/Public/Marketplace/Venues/Show.jsx` and booking confirmation dossier `resources/js/Pages/Public/Marketplace/Bookings/Show.jsx` with direct deposit checkout action banner.
+  - [x] Hardened MCP tools `CheckAvailabilityTool` (live date/time slot checks) and `RequestQuoteTool` (database persistence, validation error handling, and host notification).
+- [x] **Phase 2: Host Notification System & Inquiries / Leads Console Inbox (Option 2)**:
+  - [x] Mailables `NewVenueBookingNotification` (immediate queued email to `Shop::email` with direct lead dossier link), `BookingConfirmationGuest` (confirmation and receipt for guest), and `QuoteSentNotification` (custom quote notification).
+  - [x] Subdomain route `/venue/inquiries` and controller `App\Http\Controllers\Tenant\Venue\VenueInquiryController` (`index`, `show`, `acceptAndHold`, `sendQuote`, `reject`) strictly gated with `manage venue` permission and tenant isolation.
+  - [x] State guards on `acceptAndHold`, `sendQuote`, and `reject` preventing modification or decline of already confirmed/paid bookings.
+  - [x] Console inbox frontend `resources/js/Pages/Tenant/Venue/Inquiries/Index.jsx` and detailed lead dossier `Show.jsx` with 48h hold modal, custom quote modal, and decline modal compliant with Console Design System (`StatusPill` status prop, `ConfirmModal` description, `Button` variants).
+  - [x] Navigation updates in `ConsoleLayout.jsx` and `Spaces/Index.jsx` header actions.
+- [x] **Phase 3: Event-to-Venue Organizer Linking (Option 3)**:
+  - [x] Landlord migration `database/migrations/landlord/2026_10_01_130100_add_venue_booking_to_events_table.php` adding nullable `store_listing_id` and `venue_booking_id`.
+  - [x] `Event` model relationships `venueListing()` and `venueBooking()`, plus `isMarketplaceVenue()` helper.
+  - [x] Event creation & editing integration in `EventController` with conditional address validation and auto-population of address/capacity from linked venue listing.
+  - [x] Public event landing page update in `resources/js/Pages/Public/Events/Show.jsx` displaying Verified Venue Partner card, shop location, included capacity, and direct marketplace link.
+- [x] **Phase 4: Automated Verification, Quality Gates & Mandatory Self-Review**:
+  - [x] Pest test suite: 79 passing tests (461 assertions) covering calendar lockouts, double-booking prevention, Paystack deposit checkout, callback security verification, expired TTL slot release, host inbox gating, and event-to-venue linking:
+    - `tests/Feature/Marketplace/VenueBookingTest.php`: 11 tests, 52 assertions passing.
+    - `tests/Feature/Tenant/VenueInquiryTest.php`: 7 tests, 43 assertions passing.
+    - `tests/Feature/Events/EventVenueLinkingTest.php`: 4 tests, 41 assertions passing.
+    - `tests/Feature/Components/ConsoleComponentUsageTest.php`: 4 tests, 5 assertions passing.
+    - Full marketplace suite: 79 tests, 461 assertions passing.
+  - [x] Static analysis: PHPStan Level 5 passed with 0 errors across all modified/created files.
+  - [x] Frontend Quality: ESLint passed with 0 errors/warnings on all modified/created JSX components.
+  - [x] Frontend Bundling: `npm run build` compiled cleanly (2,589 modules transformed) in 7.01s.
+  - [x] Code Style: Laravel Pint clean (`vendor/bin/pint --dirty`).
+  - [x] 3-agent post-implementation self-review audit (Security, Logic/Edge Cases, Architecture/Performance) completed and all MUST/SHOULD FIX remediation items resolved:
+    - Added security validation in `VenueBookingController::callback` checking Paystack transaction metadata matches booking ID, currency is GHS, and verified amount covers the required deposit.
+    - Added dedicated `/marketplace/bookings/{reference}/checkout` route and "Pay Deposit" checkout button in `Bookings/Show.jsx` for quoted inquiries.
+    - Normalized Paystack webhook metadata via `BillingWebhookController::metadata()` in `SettlementWebhookController` and `VenueBookingService::confirmBookingPayment`.
+    - Added calendar lockout TTL expiration (`quote_valid_until`) to avoid abandoned checkouts blocking slots forever, and updated `scopeBlockingCalendar` to respect TTLs.
+    - Fixed Console Component usage in `Inquiries/Index.jsx` and `Show.jsx` (`StatusPill`, `ConfirmModal`, `Button`).
+    - Added state guards in `VenueInquiryController` preventing modification of confirmed/paid reservations.
+    - Transformed raw Eloquent models into explicit array props in `VenueInquiryController`.
+    - Handled `PRICING_MODEL_FLAT_RATE` explicitly in `VenueAvailabilityService::calculatePricing`.
+    - Wrapped MCP `RequestQuoteTool` with `ValidationException` error handling.
+
+---
+
+## [x] Track: MiConvener Marketplace (Build 4: Master Venue Calendar, Manual Blackout Engine & Console Navigation)
+
+Interactive Master Venue Calendar for hotel and venue managers (e.g. Labadi Beach Hotel, Kempinski Hotel), manual blackout/maintenance engine, console navigation integration, and public booking drawer visual calendar.
+
+- [x] **Phase 1: Model & Availability Lockout Engine for Manual Blackouts**:
+  - [x] Added `VenueBooking::STATUS_BLOCKED = 'blocked'` and `isBlocked(): bool` helper on `VenueBooking`.
+  - [x] Updated `scopeBlockingCalendar` to automatically include `STATUS_BLOCKED` alongside confirmed bookings and active 48-hour holds with unexpired quotes.
+  - [x] `VenueAvailabilityService::isSlotAvailable` and `calculatePricing` automatically treat blackouts as unavailable, protecting both human planners and MCP AI agents (`check_availability`, `request_quote`).
+- [x] **Phase 2: Venue Calendar Controller & Blackout API**:
+  - [x] Created `App\Http\Controllers\Tenant\Venue\VenueCalendarController` with:
+    - `index()`: Generates month calendar window aligned to Sunday–Saturday week boundaries, eager-loading listing relations, with space filtering tabs.
+    - `storeBlock()`: Validates date ranges, enforces strict collision checks against confirmed bookings, active unexpired holds, and existing blackouts, and generates globally unique `BLK-...` references using collision-resistant probing.
+    - `destroyBlock()`: Allows authorized host admins to remove blackout blocks and immediately restore availability, guarded by `Str::isUuid` and route `->whereUuid('block')`.
+  - [x] Registered routes under `tenant.venue.` prefix in `routes/subdomain.php`:
+    - `GET /venue/calendar` (`tenant.venue.calendar.index`)
+    - `POST /venue/calendar/blocks` (`tenant.venue.calendar.blocks.store`)
+    - `DELETE /venue/calendar/blocks/{block}` (`tenant.venue.calendar.blocks.destroy`)
+- [x] **Phase 3: Host Master Calendar Frontend & Console Navigation**:
+  - [x] Created `resources/js/Pages/Tenant/Venue/Calendar/Index.jsx`:
+    - Month and year navigation with Today shortcut button.
+    - Multi-space property filter tabs (filter across all spaces or individual halls like Labadi's *Omanye Plenary Hall*).
+    - Status badges on date cells: 🟢 Confirmed reservations (Green), 🟡 48-hour holds (Amber), ⚪ Maintenance/Blackout blocks (Slate/Gray).
+    - Event details flyout showing planner details, guest count, layout style, total revenue, and direct link to lead dossier.
+    - Blackout date scheduling modal with custom reason and collision feedback.
+    - Delete blackout confirmation modal adhering to console design system invariants.
+  - [x] Updated `resources/js/Layouts/ConsoleLayout.jsx` with `Venue Calendar` (`CalendarDays`) and `Inquiries & Leads` (`Inbox`) visible for users with `manage venue` permissions.
+- [x] **Phase 4: Public Booking Drawer Visual Calendar Picker**:
+  - [x] Enhanced `resources/js/Components/Marketplace/VenueBookingDrawer.jsx` with an interactive month availability calendar.
+  - [x] Visual indicators showing open vs. occupied/blacked-out days, with single-day and multi-day click selection and timezone-safe date key construction.
+  - [x] Expanded default booking horizon to 6 months in `VenueBookingController::bookedSlots`.
+- [x] **Phase 5: Automated Verification & Mandatory Self-Review**:
+  - [x] Pest test suite: 10 dedicated tests in `tests/Feature/Tenant/VenueCalendarTest.php` (57 assertions) and 4 tests in `tests/Feature/Components/ConsoleComponentUsageTest.php` (5 assertions) passing cleanly.
+  - [x] Full regression test suite: 69 tests, 334 assertions passing across calendar, inquiries, bookings, event linking, MCP server, and semantic search.
+  - [x] Code style: Laravel Pint formatted (`vendor/bin/pint --dirty`).
+  - [x] Frontend bundling: `npm run build` compiled cleanly (2,590 modules) with 0 errors.
+  - [x] 3-agent post-implementation self-review audit (Security, Logic/Edge Cases, Architecture/Performance) completed with all findings resolved:
+    - Fixed `ConsoleComponentUsageTest` violations in `Index.jsx` (removed undeclared `description` on `PageHeader` and undeclared `variant="danger"` on `Button`).
+    - Fixed Carbon week boundary alignment (`startOfWeek(CarbonInterface::SUNDAY)` and `endOfWeek(CarbonInterface::SATURDAY)`) to match the Sunday-start UI grid.
+    - Hardened `storeBlock` collision checks to prevent overlapping active 48-hour holds and duplicate blackouts.
+    - Implemented collision-resistant generation loop for `booking_reference`.
+    - Removed unused icon imports across `Index.jsx` and `VenueBookingDrawer.jsx`.
+    - Fixed local date key formatting to prevent timezone shifts across UTC+ timezones.
 

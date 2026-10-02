@@ -141,6 +141,7 @@ final class RolePermissions
             'update notification-rule',
             'delete notification-rule',
             'manage notification-settings',
+            'manage venue',
         ];
     }
 
@@ -206,6 +207,7 @@ final class RolePermissions
             'update notification-rule',
             'delete notification-rule',
             'manage notification-settings',
+            'manage venue',
         ];
     }
 
@@ -267,6 +269,7 @@ final class RolePermissions
             'update notification-rule',
             'delete notification-rule',
             'manage notification-settings',
+            'manage venue',
         ];
     }
 }

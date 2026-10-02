@@ -48,7 +48,8 @@ final class ApiKeyService
     {
         $hash = hash('sha256', $plainKey);
 
-        $key = TenantApiKey::where('key_hash', $hash)
+        $key = TenantApiKey::with('tenant')
+            ->where('key_hash', $hash)
             ->whereNull('revoked_at')
             ->where(function ($query): void {
                 $query->whereNull('expires_at')

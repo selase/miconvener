@@ -81,5 +81,15 @@ final class RouteServiceProvider extends ServiceProvider
 
         RateLimiter::for('settlement-webhooks', fn (Request $request) => Limit::perMinute(120)
             ->by($request->ip()));
+
+        RateLimiter::for('mcp-marketplace', function (Request $request) {
+            /** @var \App\Models\TenantApiKey|null $apiKey */
+            $apiKey = $request->attributes->get('mcp_partner_api_key');
+            if ($apiKey) {
+                return Limit::perMinute(300)->by('mcp_partner_'.$apiKey->id);
+            }
+
+            return Limit::perMinute(60)->by($request->ip() ?: 'anonymous');
+        });
     }
 }

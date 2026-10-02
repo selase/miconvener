@@ -166,6 +166,14 @@ final class Tenant extends Model
         return $this->hasMany(TenantFeature::class);
     }
 
+    /**
+     * @return HasOne<Shop, $this>
+     */
+    public function shop(): HasOne
+    {
+        return $this->hasOne(Shop::class);
+    }
+
     public function featureEnabled(string $key): bool
     {
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();
@@ -530,6 +538,18 @@ final class Tenant extends Model
     {
         return Attribute::make(
             get: fn () => $this->attributes['email_sender_address'] ?? null,
+        );
+    }
+
+    /**
+     * Get the tenant's subdomain (alias of slug for routing).
+     *
+     * @return Attribute<string, never>
+     */
+    protected function subdomain(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->slug,
         );
     }
 

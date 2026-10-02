@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
 use App\Models\Event;
 use App\Models\EventRegistration;
+use App\Models\Tenant;
 use App\Services\Events\EventSections;
 use App\Services\Events\EventWorkspaceSnapshot;
 use App\Services\Tenancy\TenantContext;
@@ -104,6 +105,17 @@ final class EventController extends Controller
             $validated['hero_image_path'] = Helper::processUploadedFile($request, 'hero_image', 'event_hero', 'events/hero', config('app.env') === 'production' ? 's3' : 'public');
         }
 
+        if (! empty($validated['store_listing_id'])) {
+            $listing = \App\Models\StoreListing::with('shop')->find($validated['store_listing_id']);
+            if ($listing && empty($validated['address']) && $listing->shop) {
+                $validated['address'] = "{$listing->shop->address}, {$listing->shop->city}";
+            }
+            if ($listing && empty($validated['capacity'])) {
+                $capacities = $listing->capacity_breakdown ?? [];
+                $validated['capacity'] = $capacities['banquet'] ?? $capacities['theater'] ?? 100;
+            }
+        }
+
         $event = Event::create([
             ...$validated,
             'tenant_id' => $tenant->id,
@@ -123,7 +135,7 @@ final class EventController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->with('ticketTypes')->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event, ['ticketTypes']);
 
         $validated = $this->validateEvent($request);
 
@@ -175,6 +187,17 @@ final class EventController extends Controller
             }
         }
 
+        if (! empty($validated['store_listing_id'])) {
+            $listing = \App\Models\StoreListing::with('shop')->find($validated['store_listing_id']);
+            if ($listing && empty($validated['address']) && $listing->shop) {
+                $validated['address'] = "{$listing->shop->address}, {$listing->shop->city}";
+            }
+            if ($listing && empty($validated['capacity'])) {
+                $capacities = $listing->capacity_breakdown ?? [];
+                $validated['capacity'] = $capacities['banquet'] ?? $capacities['theater'] ?? 100;
+            }
+        }
+
         $eventModel->update($validated);
 
         if ($request->wantsJson()) {
@@ -194,7 +217,7 @@ final class EventController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event);
 
         $validated = $request->validate([
             'visibility' => ['required', Rule::in(Event::VISIBILITIES)],
@@ -215,7 +238,7 @@ final class EventController extends Controller
         $this->authorize('delete event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event);
         $eventModel->delete();
 
         if (request()->wantsJson()) {
@@ -252,7 +275,7 @@ final class EventController extends Controller
         $this->authorize('read event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event);
 
         $filename = "{$eventModel->slug}-guests.csv";
 
@@ -288,9 +311,10 @@ final class EventController extends Controller
         $this->authorize('read event');
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
-            ->with(['sessions' => fn ($query) => $query->withCount('registrations'), 'sessions.speakers'])
-            ->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event, [
+            'sessions' => fn ($query) => $query->withCount('registrations'),
+            'sessions.speakers',
+        ]);
 
         // Same gate as the check-in section: every scan endpoint needs it.
         abort_unless(app(EventSections::class)->allows(request()->user(), $tenant, $eventModel, 'check-in'), 403);
@@ -306,7 +330,7 @@ final class EventController extends Controller
         ]);
     }
 
-    protected function getTenant()
+    protected function getTenant(): Tenant
     {
         $tenant = app(TenantContext::class)->getTenant();
         if (! $tenant) {
@@ -314,6 +338,29 @@ final class EventController extends Controller
         }
 
         return $tenant;
+    }
+
+    /**
+     * Resolve an event by UUID or slug within the tenant scope.
+     *
+     * @param  array<int|string, mixed>  $relations
+     */
+    private function resolveEvent(Tenant $tenant, string $event, array $relations = []): Event
+    {
+        $query = Event::where('tenant_id', $tenant->id)
+            ->where(function ($query) use ($event): void {
+                if (Str::isUuid($event)) {
+                    $query->where('id', $event);
+                } else {
+                    $query->where('slug', $event);
+                }
+            });
+
+        if (! empty($relations)) {
+            $query->with($relations);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**
@@ -336,11 +383,10 @@ final class EventController extends Controller
             }
         }
 
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)
-            // The fee cascade walks event -> tenant -> package, and the payload
-            // reads it three times.
-            ->with(['tenant.package', ...$relations])
-            ->firstOrFail();
+        $eventModel = $this->resolveEvent($tenant, $event, [
+            'tenant.package',
+            ...$relations,
+        ]);
 
         $sections = app(EventSections::class);
         abort_unless($sections->allows(request()->user(), $tenant, $eventModel, $section), 403);
@@ -450,7 +496,12 @@ final class EventController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'timezone' => ['required', 'string', 'max:64'],
             'location_type' => ['required', Rule::in([Event::LOCATION_IN_PERSON, Event::LOCATION_VIRTUAL])],
-            'address' => ['nullable', 'required_if:location_type,in_person', 'string', 'max:255'],
+            'address' => [
+                'nullable',
+                Rule::requiredIf(fn () => $request->input('location_type') === Event::LOCATION_IN_PERSON && ! $request->filled('store_listing_id')),
+                'string',
+                'max:255',
+            ],
             'virtual_link' => ['nullable', 'required_if:location_type,virtual', 'url', 'max:255'],
             'contact_email' => ['nullable', 'email', 'max:255'],
             'capacity' => ['nullable', 'integer', 'min:1'],
@@ -459,6 +510,8 @@ final class EventController extends Controller
             'currency' => ['required', 'string', 'size:3'],
             'plan_your_visit_content' => ['nullable', 'string'],
             'hero_image' => ['nullable', 'image', 'max:20480'],
+            'store_listing_id' => ['nullable', 'uuid', 'exists:landlord.store_listings,id'],
+            'venue_booking_id' => ['nullable', 'uuid', 'exists:landlord.venue_bookings,id'],
         ], [
             'hero_image.max' => 'The hero image must not be greater than 20MB.',
             'hero_image.image' => 'The hero image must be a valid image file (JPG, PNG, WebP, GIF, or SVG).',
@@ -581,6 +634,9 @@ final class EventController extends Controller
                     'registration_name' => $a->registration?->full_name,
                 ])->values(),
             ])->values() : [],
+            'store_listing_id' => $event->store_listing_id,
+            'venue_booking_id' => $event->venue_booking_id,
+            'is_marketplace_venue' => $event->isMarketplaceVenue(),
         ];
     }
 }

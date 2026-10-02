@@ -97,7 +97,9 @@ final class SettlementWebhookController extends Controller
 
         try {
             match ($event) {
-                'charge.success' => $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
+                'charge.success' => ($metadata['type'] ?? null) === 'venue_booking'
+                    ? $this->confirmVenueBookingCharge($data, $data['reference'] ?? null)
+                    : $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
                 'transfer.success', 'transfer.failed' => $this->confirmTransfer($event, (string) ($data['reference'] ?? ''), $data),
                 default => null,
             };
@@ -130,7 +132,7 @@ final class SettlementWebhookController extends Controller
     }
 
     /**
-     * A charge belongs to settlement only when it carries event ticket metadata;
+     * A charge belongs to settlement only when it carries event ticket or venue booking metadata;
      * a subscription charge from the billing account looks otherwise identical.
      *
      * @param  array<string, mixed>  $metadata
@@ -141,7 +143,24 @@ final class SettlementWebhookController extends Controller
             return true;
         }
 
-        return $event === 'charge.success' && ($metadata['type'] ?? null) === 'event_ticket';
+        $type = $metadata['type'] ?? null;
+
+        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking'], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function confirmVenueBookingCharge(array $data, ?string $reference): void
+    {
+        if (! $reference) {
+            return;
+        }
+
+        $metadata = BillingWebhookController::metadata($data['metadata'] ?? null);
+        $data['metadata'] = $metadata;
+
+        app(\App\Services\Marketplace\VenueBookingService::class)->confirmBookingPayment($reference, $data);
     }
 
     private function confirmPlatformDefaultCharge(array $metadata, ?string $reference, int $amount, int $gatewayFeeAmount, string $currency): void

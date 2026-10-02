@@ -111,5 +111,29 @@ final class Kernel extends HttpKernel
         'throttle_llm' => Middleware\ThrottleLlmRequests::class,
         '2fa' => \PragmaRX\Google2FALaravel\Middleware::class,
         '2fa_challenge' => Middleware\TwoFactorChallenge::class,
+        'mcp_tier' => Middleware\IdentifyMarketplaceMcpPartner::class,
+    ];
+
+    /**
+     * The priority-sorted list of middleware.
+     *
+     * Forces non-global middleware to always be in the given order.
+     *
+     * @var string[]
+     */
+    protected $middlewarePriority = [
+        \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
+        \Illuminate\Cookie\Middleware\EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+        Middleware\AuthenticateWithApiKey::class,
+        Middleware\IdentifyMarketplaceMcpPartner::class,
+        ThrottleRequests::class,
+        \Illuminate\Routing\Middleware\ThrottleRequestsWithRedis::class,
+        \Illuminate\Contracts\Session\Middleware\AuthenticatesSessions::class,
+        SubstituteBindings::class,
+        Authorize::class,
     ];
 }
