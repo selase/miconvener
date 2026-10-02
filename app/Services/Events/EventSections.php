@@ -34,6 +34,7 @@ final class EventSections
         ['group' => 'Registration', 'sections' => [
             'guests' => ['label' => 'Guests', 'permission' => 'read event'],
             'tickets' => ['label' => 'Tickets', 'permission' => 'read event'],
+            'contributions' => ['label' => 'Contributions', 'permission' => 'read event'],
             'promo-codes' => ['label' => 'Promo codes', 'permission' => 'read event'],
             'registration-form' => ['label' => 'Registration form', 'permission' => 'read event'],
             'attendee-groups' => ['label' => 'Attendee groups', 'permission' => 'manage participant-groups'],

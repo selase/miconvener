@@ -35,6 +35,7 @@ import CertificatesPanel from './panels/CertificatesPanel';
 import FormsPanel from './panels/FormsPanel';
 import StratificationPanel from './panels/StratificationPanel';
 import NotificationsPanel from './panels/NotificationsPanel';
+import ContributionsPanel from './panels/ContributionsPanel';
 
 const STATUS_VARIANT = {
     pending_payment: 'pending',
@@ -337,6 +338,8 @@ export default function Show({
     badges,
     phase,
     overview,
+    contributions = [],
+    contributionsStats = {},
 }) {
     const [editing, setEditing] = useState(false);
     const current = section ?? 'overview';
@@ -363,6 +366,13 @@ export default function Show({
                 event={event}
                 ticketTypes={event.ticket_types}
                 onChange={reloadEvent}
+            />
+        ),
+        contributions: () => (
+            <ContributionsPanel
+                event={event}
+                contributions={contributions}
+                stats={contributionsStats}
             />
         ),
         'promo-codes': () => <PromoCodePanel event={event} onChange={reloadEvent} />,

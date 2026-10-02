@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Finance;
 
 use App\Models\Event;
+use App\Models\EventContribution;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
 use App\Models\EventRegistration;
@@ -253,6 +254,91 @@ final class LedgerService
         ], [
             'event_id' => $event->id,
             'registration_id' => $registration->id,
+            'gross_amount' => $grossAmount,
+            'gateway_fee_amount' => $gatewayFee,
+            'commission_amount' => $platformFee,
+            'net_amount' => $netAmount,
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => $provider,
+        ]);
+
+        return $transaction;
+    }
+
+    /**
+     * Record a voluntary event contribution / donation:
+     * Debit:  Payment Gateway Clearing (gross collected less gateway processing fee)
+     * Credit: Organizer Payable (net to organizer)
+     * Credit: Platform Revenue (platform commission fee, if any)
+     */
+    public function recordContribution(
+        Event $event,
+        EventContribution $contribution,
+        int $grossAmount,
+        int $platformFee,
+        string $reference,
+        int $gatewayFee = 0,
+        string $provider = 'paystack',
+        ?string $providerReference = null
+    ): ?LedgerTransaction {
+        if ($grossAmount <= 0) {
+            return null;
+        }
+
+        if ($gatewayFee < 0 || $gatewayFee >= $grossAmount) {
+            throw new InvalidArgumentException(
+                "Gateway fee ({$gatewayFee}) must be non-negative and smaller than the gross amount ({$grossAmount})."
+            );
+        }
+
+        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
+
+        $cashReceived = $grossAmount - $gatewayFee;
+        $netAmount = $cashReceived - $platformFee;
+        $displayName = $contribution->displayName();
+
+        $entries = [
+            [
+                'code' => LedgerAccount::CODE_GATEWAY_CLEARING,
+                'direction' => LedgerEntry::DIRECTION_DEBIT,
+                'amount' => $cashReceived,
+                'description' => "Contribution payment net of processing fee: {$displayName}",
+            ],
+            [
+                'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
+                'direction' => LedgerEntry::DIRECTION_CREDIT,
+                'amount' => $netAmount,
+                'description' => 'Net contribution revenue payable to organizer',
+            ],
+        ];
+
+        if ($platformFee > 0) {
+            $entries[] = [
+                'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
+                'direction' => LedgerEntry::DIRECTION_CREDIT,
+                'amount' => $platformFee,
+                'description' => 'Platform commission fee ('.$event->effectivePlatformFeePercentage().'%)',
+            ];
+        }
+
+        $transaction = $this->postTransaction(
+            $tenant,
+            $event,
+            LedgerTransaction::TYPE_CONTRIBUTION,
+            "Contribution: {$event->name} - {$displayName}",
+            $reference,
+            $entries,
+            null,
+            $event->currency ?: 'GHS'
+        );
+
+        EventLedgerEntry::firstOrCreate([
+            'tenant_id' => $tenant->id,
+            'type' => EventLedgerEntry::TYPE_CHARGE,
+            'provider_reference' => $providerReference ?? $reference,
+        ], [
+            'event_id' => $event->id,
+            'contribution_id' => $contribution->id,
             'gross_amount' => $grossAmount,
             'gateway_fee_amount' => $gatewayFee,
             'commission_amount' => $platformFee,

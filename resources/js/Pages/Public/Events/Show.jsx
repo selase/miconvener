@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
-import { Lock, User, Download, Trophy, ChevronDown, ChevronUp, Ticket } from 'lucide-react';
+import { Lock, User, Download, Trophy, ChevronDown, ChevronUp, Ticket, Heart } from 'lucide-react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import CoverBars from '@/Components/Console/CoverBars';
 import Input from '@/Components/Console/Input';
 import Button from '@/Components/Console/Button';
+import ContributionWidget from '@/Components/Events/ContributionWidget';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import respondentToken from '@/lib/respondentToken';
 
@@ -514,7 +515,10 @@ function RegistrationPanel({ event }) {
     const totalExtraCount = useMemo(() => {
         let count = formFields.length;
         if (settings.phone !== 'hidden') count += 1;
-        if (settings.dietary_requirements !== 'hidden' || settings.accessibility_needs !== 'hidden') {
+        if (
+            settings.dietary_requirements !== 'hidden' ||
+            settings.accessibility_needs !== 'hidden'
+        ) {
             count += 1;
         }
         return count;
@@ -965,10 +969,15 @@ function RegistrationPanel({ event }) {
                                 const val = data.form_answers[field.field_key] ?? '';
 
                                 return (
-                                    <div key={field.id} className="border-t border-border/60 pt-3 mt-3">
+                                    <div
+                                        key={field.id}
+                                        className="border-t border-border/60 pt-3 mt-3"
+                                    >
                                         <label className="block text-[13px] font-medium text-ink">
                                             {field.label}{' '}
-                                            {field.is_required && <span className="text-danger-fg">*</span>}
+                                            {field.is_required && (
+                                                <span className="text-danger-fg">*</span>
+                                            )}
                                         </label>
                                         {field.help_text && (
                                             <p className="mt-0.5 text-[11.5px] text-ink-secondary">
@@ -980,7 +989,10 @@ function RegistrationPanel({ event }) {
                                             <select
                                                 value={val}
                                                 onChange={(e) =>
-                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                    handleAnswerChange(
+                                                        field.field_key,
+                                                        e.target.value
+                                                    )
                                                 }
                                                 className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                                 required={field.is_required}
@@ -1009,7 +1021,10 @@ function RegistrationPanel({ event }) {
                                                                 type="radio"
                                                                 name={`custom_${field.field_key}`}
                                                                 value={opt.value}
-                                                                checked={String(val) === String(opt.value)}
+                                                                checked={
+                                                                    String(val) ===
+                                                                    String(opt.value)
+                                                                }
                                                                 onChange={(e) =>
                                                                     handleAnswerChange(
                                                                         field.field_key,
@@ -1018,12 +1033,17 @@ function RegistrationPanel({ event }) {
                                                                 }
                                                                 required={field.is_required}
                                                             />
-                                                            <span className="text-ink">{opt.label}</span>
+                                                            <span className="text-ink">
+                                                                {opt.label}
+                                                            </span>
                                                         </span>
                                                         {opt.price ? (
                                                             <span className="font-mono text-xs text-accent">
                                                                 {opt.is_override ? 'Total ' : '+'}
-                                                                {formatMoney(Number(opt.price), event.currency)}
+                                                                {formatMoney(
+                                                                    Number(opt.price),
+                                                                    event.currency
+                                                                )}
                                                             </span>
                                                         ) : null}
                                                     </label>
@@ -1036,7 +1056,10 @@ function RegistrationPanel({ event }) {
                                                 type="text"
                                                 value={val}
                                                 onChange={(e) =>
-                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                    handleAnswerChange(
+                                                        field.field_key,
+                                                        e.target.value
+                                                    )
                                                 }
                                                 className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                                 required={field.is_required}
@@ -1048,7 +1071,10 @@ function RegistrationPanel({ event }) {
                                                 rows={2}
                                                 value={val}
                                                 onChange={(e) =>
-                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                    handleAnswerChange(
+                                                        field.field_key,
+                                                        e.target.value
+                                                    )
                                                 }
                                                 className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                                 required={field.is_required}
@@ -1060,7 +1086,10 @@ function RegistrationPanel({ event }) {
                                                 type="number"
                                                 value={val}
                                                 onChange={(e) =>
-                                                    handleAnswerChange(field.field_key, e.target.value)
+                                                    handleAnswerChange(
+                                                        field.field_key,
+                                                        e.target.value
+                                                    )
                                                 }
                                                 className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                                 required={field.is_required}
@@ -1073,7 +1102,10 @@ function RegistrationPanel({ event }) {
                                                     type="checkbox"
                                                     checked={Boolean(val)}
                                                     onChange={(e) =>
-                                                        handleAnswerChange(field.field_key, e.target.checked)
+                                                        handleAnswerChange(
+                                                            field.field_key,
+                                                            e.target.checked
+                                                        )
                                                     }
                                                     required={field.is_required}
                                                 />
@@ -1082,7 +1114,9 @@ function RegistrationPanel({ event }) {
                                         )}
 
                                         {fieldError && (
-                                            <p className="mt-1 text-[11.5px] text-danger-fg">{fieldError}</p>
+                                            <p className="mt-1 text-[11.5px] text-danger-fg">
+                                                {fieldError}
+                                            </p>
                                         )}
                                     </div>
                                 );
@@ -1104,10 +1138,15 @@ function RegistrationPanel({ event }) {
                                                     placeholder="e.g. Vegetarian, nut allergy"
                                                     value={data.dietary_requirements}
                                                     onChange={(e) =>
-                                                        setData('dietary_requirements', e.target.value)
+                                                        setData(
+                                                            'dietary_requirements',
+                                                            e.target.value
+                                                        )
                                                     }
                                                     error={errors.dietary_requirements}
-                                                    required={settings.dietary_requirements === 'required'}
+                                                    required={
+                                                        settings.dietary_requirements === 'required'
+                                                    }
                                                 />
                                             )}
                                             {settings.accessibility_needs !== 'hidden' && (
@@ -1117,10 +1156,15 @@ function RegistrationPanel({ event }) {
                                                     placeholder="e.g. Step-free access, sign language"
                                                     value={data.accessibility_needs}
                                                     onChange={(e) =>
-                                                        setData('accessibility_needs', e.target.value)
+                                                        setData(
+                                                            'accessibility_needs',
+                                                            e.target.value
+                                                        )
                                                     }
                                                     error={errors.accessibility_needs}
-                                                    required={settings.accessibility_needs === 'required'}
+                                                    required={
+                                                        settings.accessibility_needs === 'required'
+                                                    }
                                                 />
                                             )}
                                         </div>
@@ -1383,6 +1427,12 @@ export default function Show({ event, org, isPrivate = false }) {
 
     const sections = useMemo(() => {
         const list = [{ key: 'about', label: 'About' }];
+        if (event.allow_contributions) {
+            list.push({
+                key: 'contributions',
+                label: event.contribution_title || 'Contributions & Tributes',
+            });
+        }
         if (event.sessions.length > 0) list.push({ key: 'schedule', label: 'Programme' });
         if (event.speakers.length > 0) list.push({ key: 'speakers', label: 'Speakers' });
         if (workshops.length > 0) list.push({ key: 'workshops', label: 'Workshops' });
@@ -1493,6 +1543,34 @@ export default function Show({ event, org, isPrivate = false }) {
                 {active === 'about' ? (
                     <div className="grid gap-12 py-10 lg:grid-cols-[1fr_360px]">
                         <div className="min-w-0">
+                            {event.allow_contributions && (
+                                <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-accent/25 bg-accent/5 p-4 sm:p-5">
+                                    <div className="flex items-start gap-3">
+                                        <div className="h-9 w-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                                            <Heart className="h-4.5 w-4.5 fill-current" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-ink">
+                                                {event.contribution_title ||
+                                                    'Voluntary Contributions & Tributes'}
+                                            </h4>
+                                            <p className="text-xs text-ink-secondary mt-0.5">
+                                                {event.contributions_total_pesewas > 0
+                                                    ? `${event.currency} ${(event.contributions_total_pesewas / 100).toFixed(2)} contributed so far. Mobile Money & Cards accepted.`
+                                                    : 'Voluntary contributions and tributes are warmly welcomed for this gathering via Mobile Money & Card.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActive('contributions')}
+                                        className="inline-flex shrink-0 items-center justify-center rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent/90 transition-colors cursor-pointer"
+                                    >
+                                        Contribute / Leave Tribute
+                                    </button>
+                                </div>
+                            )}
+
                             {event.description ? (
                                 <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
                                     {event.description}
@@ -1508,6 +1586,7 @@ export default function Show({ event, org, isPrivate = false }) {
                     </div>
                 ) : (
                     <div className="max-w-4xl py-10">
+                        {active === 'contributions' && <ContributionWidget event={event} />}
                         {active === 'schedule' && (
                             <ScheduleSection
                                 sessions={event.sessions}

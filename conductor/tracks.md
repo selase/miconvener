@@ -863,3 +863,38 @@ Refinements to the public event display page (`resources/js/Pages/Public/Events/
   - Frontend bundling: `npm run build` compiled 2,590 modules in 7.11s with 0 errors.
   - 3-agent self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
 
+---
+
+## [x] Track: Voluntary Contributions, Collections & Tributes Engine
+
+Decoupled event finances from fixed-ticket admission, allowing events (funerals, memorial services, churches, academic alumni funds, community fundraisers) to collect voluntary donations, tithes, and offerings via Paystack Mobile Money and Card, complete with condolence/tribute messages, live tribute wall, and double-entry accounting ledger integration.
+
+- [x] **Phase 1: Database Migrations & Models**:
+  - `database/migrations/landlord/2026_10_02_150000_add_contribution_settings_to_events_table.php`: Added `allow_contributions`, `contribution_title`, `contribution_description`, `contribution_presets`, `contribution_min_amount_pesewas`, `contribution_goal_amount_pesewas`, `show_tribute_wall`, `show_contributor_amounts` to `events` table in landlord database.
+  - `database/migrations/landlord/2026_10_02_150100_create_event_contributions_table.php`: Created `event_contributions` table in landlord database (`tenant_id`, `event_id`, `contributor_name`, `contributor_email`, `contributor_phone`, `amount`, `gateway_fee_amount`, `platform_fee_amount`, `net_amount`, `currency`, `status`, `payment_reference`, `paystack_reference`, `provider`, `tribute_message`, `is_anonymous`, `is_approved`, `paid_at`).
+  - `database/migrations/landlord/2026_10_02_150200_add_contribution_id_to_event_ledger_entries_table.php`: Added `contribution_id` foreign key to `event_ledger_entries` table.
+  - Models: Created `EventContribution` with status constants, helper methods, tenant/event relations; updated `Event` with `contributions()` relation, `allowsContributions()`, and `effectiveContributionPresets()`; updated `EventLedgerEntry` with `contribution_id` and `contribution()` relation.
+- [x] **Phase 2: LedgerService Integration & Financial Invariants**:
+  - Added `recordContribution()` in `LedgerService` with `CODE_GATEWAY_CLEARING` debited, `CODE_ORGANIZER_PAYABLE` credited, `CODE_PLATFORM_REVENUE` credited, and flat `EventLedgerEntry` recorded.
+  - Adhered strictly to MiConvener finance invariants: single-writer ledger path preserved, integer minor units (pesewas), Paystack reference keyed everywhere.
+- [x] **Phase 3: Checkout Controller & Settlement Webhook**:
+  - Created `EventContributionController` with `POST /e/{event}/contribute` initiating Paystack checkout sessions with rich metadata, and `callback` verifying transactions with Paystack before confirming.
+  - Updated `SettlementWebhookController` to recognize `event_contribution` type and idempotently confirm charges.
+  - Hardened callback and webhook handlers against unknown references, mismatched amounts/currencies, and duplicate deliveries.
+- [x] **Phase 4: Public Event UI (Contribution Form & Tribute Wall)**:
+  - Created `resources/js/Components/Events/ContributionWidget.jsx` with quick preset buttons, custom amount input, MoMo/card details, tribute/condolence textarea, anonymous toggle, and real-time goal progress bar.
+  - Connected `ContributionWidget` into public event page (`resources/js/Pages/Public/Events/Show.jsx`) with a dedicated tab and callout card.
+  - Integrated public Tribute Wall with approved tributes, contributor names, and timestamps.
+- [x] **Phase 5: Tenant Console Management & Export**:
+  - Added "contributions" workspace section in `EventSections`.
+  - Created `ContributionsPanel.jsx` in `resources/js/Pages/Tenant/Events/panels/` with KPI cards (Total Raised, Net Settlement, Donors, Pending), search/filter toolbar, tribute moderation toggle (`Eye`/`EyeOff`), settings modal, and CSV export.
+  - Sanitized CSV export fields against formula injection (`=`, `+`, `-`, `@`).
+  - Enforced strict console component contracts (`Modal` with `open`/`onClose`, `Button` with valid variants and no `size`, `TableEmpty` inside table body).
+- [x] **Phase 6: Automated Testing & Verification**:
+  - Pest test suite: `tests/Feature/Events/EventContributionTest.php` (10 tests, 83 assertions passed) verifying validation, checkout initialization, callback verification, Paystack metadata, webhook idempotency, console settings, tribute moderation, and CSV export.
+  - Financial invariant test suite: `tests/Feature/Finance/LedgerSingleWritePathTest.php` and `tests/Feature/Components/ConsoleComponentUsageTest.php` (9 tests, 14 assertions passed).
+  - Finance regression test suite: `EventFinanceLedgerTest.php`, `ChargeLedgerEntryTest.php`, `EventLedgerAndPayoutScheduleTest.php`, `EventFeeSettingsTest.php` (26 tests, 117 assertions passed).
+  - Code formatting: `vendor/bin/pint --dirty` passed with 0 errors.
+  - Frontend bundling: `npm run build` compiled 2,598 modules in 3.41s with 0 errors.
+  - Post-implementation 3-agent self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
+

@@ -646,6 +646,32 @@ final class PublicEventController extends Controller
                 'tier' => $s->tier,
                 'logo_url' => Helper::storageUrl($s->logo_path),
             ])->values() : [],
+            'allow_contributions' => (bool) $event->allow_contributions,
+            'contribution_title' => $event->contribution_title ?: 'Voluntary Contributions & Tributes',
+            'contribution_description' => $event->contribution_description,
+            'contribution_presets' => $event->effectiveContributionPresets(),
+            'contribution_min_amount_pesewas' => $event->contribution_min_amount_pesewas ?? 100,
+            'contribution_goal_amount_pesewas' => $event->contribution_goal_amount_pesewas,
+            'show_tribute_wall' => (bool) $event->show_tribute_wall,
+            'show_contributor_amounts' => (bool) $event->show_contributor_amounts,
+            'contributions_total_pesewas' => $event->allow_contributions ? (int) $event->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('amount') : 0,
+            'contributions_count' => $event->allow_contributions ? (int) $event->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->count() : 0,
+            'tributes' => $event->allow_contributions && $event->show_tribute_wall ? $event->contributions()
+                ->where('status', \App\Models\EventContribution::STATUS_COMPLETED)
+                ->where('is_approved', true)
+                ->whereNotNull('tribute_message')
+                ->where('tribute_message', '!=', '')
+                ->orderByDesc('paid_at')
+                ->limit(50)
+                ->get()
+                ->map(fn (\App\Models\EventContribution $c): array => [
+                    'id' => $c->id,
+                    'contributor_name' => $c->displayName(),
+                    'is_anonymous' => $c->is_anonymous,
+                    'tribute_message' => $c->tribute_message,
+                    'amount' => $event->show_contributor_amounts ? $c->amount : null,
+                    'created_at' => $c->paid_at?->diffForHumans() ?? $c->created_at->diffForHumans(),
+                ])->values() : [],
         ];
     }
 }

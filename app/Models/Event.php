@@ -105,6 +105,14 @@ final class Event extends Model
         'platform_fee_cap_amount',
         'fee_bearer',
         'registration_settings',
+        'allow_contributions',
+        'contribution_title',
+        'contribution_description',
+        'contribution_presets',
+        'contribution_min_amount_pesewas',
+        'contribution_goal_amount_pesewas',
+        'show_tribute_wall',
+        'show_contributor_amounts',
     ];
 
     protected $casts = [
@@ -120,6 +128,12 @@ final class Event extends Model
         'platform_fee_cap_amount' => 'integer',
         'registration_settings' => 'array',
         'speaker_slide_policy' => 'string',
+        'allow_contributions' => 'boolean',
+        'contribution_presets' => 'array',
+        'contribution_min_amount_pesewas' => 'integer',
+        'contribution_goal_amount_pesewas' => 'integer',
+        'show_tribute_wall' => 'boolean',
+        'show_contributor_amounts' => 'boolean',
     ];
 
     /**
@@ -296,6 +310,29 @@ final class Event extends Model
     public function ledgerEntries(): HasMany
     {
         return $this->hasMany(EventLedgerEntry::class, 'event_id');
+    }
+
+    /**
+     * @return HasMany<EventContribution, $this>
+     */
+    public function contributions(): HasMany
+    {
+        return $this->hasMany(EventContribution::class)->orderByDesc('created_at');
+    }
+
+    public function allowsContributions(): bool
+    {
+        return (bool) $this->allow_contributions;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function effectiveContributionPresets(): array
+    {
+        return ! empty($this->contribution_presets)
+            ? $this->contribution_presets
+            : [5000, 10000, 20000, 50000]; // 50, 100, 200, 500 GHS
     }
 
     public function sponsors(): HasMany

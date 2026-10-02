@@ -35,6 +35,7 @@ final class EventController extends Controller
         'check-in' => ['sessions', 'sessions.speakers'],
         'materials' => ['materials'],
         'venue' => ['venueRooms.seatAssignments.registration:id,full_name'],
+        'contributions' => ['contributions'],
     ];
 
     public function index(string $subdomain): Response
@@ -303,6 +304,78 @@ final class EventController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
+    public function exportContributions(string $subdomain, string $event): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->resolveEvent($tenant, $event);
+
+        $filename = "{$eventModel->slug}-contributions.csv";
+
+        return response()->streamDownload(function () use ($eventModel): void {
+            $handle = fopen('php://output', 'wb');
+            fputcsv($handle, ['Reference', 'Contributor Name', 'Email', 'Phone', 'Amount (Pesewas)', 'Amount (GHS)', 'Net (GHS)', 'Currency', 'Status', 'Is Anonymous', 'Tribute Message', 'Paid At', 'Created At']);
+
+            $eventModel->contributions()->orderByDesc('created_at')->chunk(200, function ($contributions) use ($handle): void {
+                foreach ($contributions as $c) {
+                    fputcsv($handle, [
+                        $c->payment_reference,
+                        $c->contributor_name,
+                        $c->contributor_email,
+                        $c->contributor_phone,
+                        $c->amount,
+                        number_format($c->amount / 100, 2),
+                        number_format($c->net_amount / 100, 2),
+                        $c->currency,
+                        $c->status,
+                        $c->is_anonymous ? 'Yes' : 'No',
+                        $c->tribute_message,
+                        $c->paid_at?->toIso8601String(),
+                        $c->created_at->toIso8601String(),
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    public function updateContributionSettings(Request $request, string $subdomain, string $event): RedirectResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->resolveEvent($tenant, $event);
+
+        $validated = $request->validate([
+            'allow_contributions' => ['required', 'boolean'],
+            'contribution_title' => ['nullable', 'string', 'max:255'],
+            'contribution_description' => ['nullable', 'string', 'max:1000'],
+            'contribution_presets' => ['nullable', 'array'],
+            'contribution_presets.*' => ['integer', 'min:100'],
+            'contribution_min_amount_pesewas' => ['nullable', 'integer', 'min:100'],
+            'contribution_goal_amount_pesewas' => ['nullable', 'integer', 'min:100'],
+            'show_tribute_wall' => ['required', 'boolean'],
+            'show_contributor_amounts' => ['required', 'boolean'],
+        ]);
+
+        $eventModel->update($validated);
+
+        return redirect()->back()->with('success', 'Contribution settings updated successfully.');
+    }
+
+    public function toggleContributionApproval(string $subdomain, string $event, string $contribution): RedirectResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->resolveEvent($tenant, $event);
+
+        /** @var \App\Models\EventContribution $c */
+        $c = $eventModel->contributions()->where('id', $contribution)->firstOrFail();
+        $c->update(['is_approved' => ! $c->is_approved]);
+
+        return redirect()->back()->with('success', 'Tribute visibility toggled.');
+    }
+
     /**
      * Check-in with nothing else on screen, for whoever is on the door.
      */
@@ -412,6 +485,34 @@ final class EventController extends Controller
                     ->toArray(),
             ],
             'registrations' => $section === 'guests' ? $this->registrationRows($eventModel) : [],
+            'contributions' => $section === 'contributions' ? $eventModel->contributions()
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn (\App\Models\EventContribution $c): array => [
+                    'id' => $c->id,
+                    'contributor_name' => $c->contributor_name,
+                    'contributor_email' => $c->contributor_email,
+                    'contributor_phone' => $c->contributor_phone,
+                    'amount' => $c->amount,
+                    'gateway_fee_amount' => $c->gateway_fee_amount,
+                    'platform_fee_amount' => $c->platform_fee_amount,
+                    'net_amount' => $c->net_amount,
+                    'currency' => $c->currency,
+                    'status' => $c->status,
+                    'payment_reference' => $c->payment_reference,
+                    'paystack_reference' => $c->paystack_reference,
+                    'tribute_message' => $c->tribute_message,
+                    'is_anonymous' => $c->is_anonymous,
+                    'is_approved' => $c->is_approved,
+                    'paid_at' => $c->paid_at?->toIso8601String(),
+                    'created_at' => $c->created_at->toIso8601String(),
+                ])->values() : [],
+            'contributionsStats' => $section === 'contributions' ? [
+                'total_raised' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('amount'),
+                'net_payout' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('net_amount'),
+                'contributors_count' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->count(),
+                'pending_count' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_PENDING_PAYMENT)->count(),
+            ] : null,
             'stats' => $section === EventSections::OVERVIEW ? $this->overviewStats($eventModel) : null,
             'hasActiveGateway' => $hasActiveGateway,
             'settlementMode' => $tenant->settlement_mode,

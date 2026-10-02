@@ -32,6 +32,7 @@ final class EventLedgerEntry extends Model
         'type',
         'registration_id',
         'payout_id',
+        'contribution_id',
         'gross_amount',
         'gateway_fee_amount',
         'commission_amount',
@@ -62,5 +63,10 @@ final class EventLedgerEntry extends Model
     public function payout(): BelongsTo
     {
         return $this->belongsTo(EventPayout::class, 'payout_id');
+    }
+
+    public function contribution(): BelongsTo
+    {
+        return $this->belongsTo(EventContribution::class, 'contribution_id');
     }
 }

@@ -149,6 +149,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->where('section', implode('|', array_diff(App\Services\Events\EventSections::slugs(), [App\Services\Events\EventSections::OVERVIEW])))
         ->name('tenant.events.section');
     Route::get('events/{event}/guests/export', [EventController::class, 'exportGuests'])->name('tenant.events.guests.export');
+    Route::get('events/{event}/contributions/export', [EventController::class, 'exportContributions'])->name('tenant.events.contributions.export');
+    Route::patch('events/{event}/contributions/settings', [EventController::class, 'updateContributionSettings'])->name('tenant.events.contributions.settings');
+    Route::patch('events/{event}/contributions/{contribution}/toggle-approval', [EventController::class, 'toggleContributionApproval'])->name('tenant.events.contributions.toggle-approval');
     Route::post('events/{event}/registrations/{registration}/approve', [EventRegistrationController::class, 'approve'])->name('tenant.events.registrations.approve');
     Route::post('events/{event}/registrations/{registration}/reject', [EventRegistrationController::class, 'reject'])->name('tenant.events.registrations.reject');
     Route::post('events/{event}/registrations/{registration}/cancel', [EventRegistrationController::class, 'cancel'])->name('tenant.events.registrations.cancel');
@@ -375,6 +378,8 @@ Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.e
 Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');
 Route::post('/e/{event}/unlock-tickets', [PublicEventController::class, 'unlockTicketTypes'])->name('public.events.unlock-tickets');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
+Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.contribute');
+Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
 Route::post('/e/{event}/find-ticket', [App\Http\Controllers\Public\TicketRecoveryController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.find-ticket');
 Route::get('/e/{event}/registrations/{registration}/verify', [PublicEventController::class, 'verify'])->middleware('signed')->name('public.events.registrations.verify');
