@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Heart, Sparkles, Shield, User, MessageCircle, Send } from 'lucide-react';
+import { Heart, Sparkles, Shield, MessageCircle, Send } from 'lucide-react';
 
 export default function ContributionWidget({ event }) {
     const presets = event.contribution_presets && event.contribution_presets.length > 0
@@ -264,13 +264,13 @@ export default function ContributionWidget({ event }) {
 
                                 <div>
                                     <label className="block text-xs font-medium text-ink mb-1">
-                                        Message / Tribute / Condolence (Optional)
+                                        {event.lexicon?.message_field_label || 'Message / Note (Optional)'}
                                     </label>
                                     <textarea
                                         rows={3}
                                         value={tributeMessage}
                                         onChange={(e) => setTributeMessage(e.target.value)}
-                                        placeholder="Share a memory, word of comfort, or congratulatory message..."
+                                        placeholder={event.lexicon?.message_placeholder || 'Share a thought, note, or word of encouragement...'}
                                         className="w-full rounded-xl border border-border bg-surface px-3.5 py-2 text-xs text-ink placeholder:text-ink-secondary/50 focus:border-accent focus:outline-none"
                                     />
                                 </div>
@@ -283,7 +283,7 @@ export default function ContributionWidget({ event }) {
                                         className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
                                     />
                                     <span className="text-xs text-ink-secondary select-none">
-                                        Keep my name anonymous on the public tribute wall
+                                        Keep my name anonymous on the public message wall
                                     </span>
                                 </label>
                             </div>
@@ -303,7 +303,7 @@ export default function ContributionWidget({ event }) {
                                 <span>
                                     {isSubmitting
                                         ? 'Connecting to Payment…'
-                                        : `Contribute ${event.currency || 'GHS'} ${parseFloat(customAmount || 0).toFixed(2)}`}
+                                        : `${event.lexicon?.contributions_cta_label || 'Contribute'} ${event.currency || 'GHS'} ${parseFloat(customAmount || 0).toFixed(2)}`}
                                 </span>
                             </button>
                         </form>
@@ -311,7 +311,7 @@ export default function ContributionWidget({ event }) {
                 </div>
             </div>
 
-            {/* Live Tribute Wall */}
+            {/* Live Message / Tribute Wall */}
             {event.show_tribute_wall && (
                 <div className="space-y-6">
                     <div className="flex items-center justify-between border-b border-border pb-4">
@@ -320,9 +320,9 @@ export default function ContributionWidget({ event }) {
                                 <MessageCircle className="h-4 w-4" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-ink">Tribute & Condolence Wall</h3>
+                                <h3 className="text-lg font-bold text-ink">{event.lexicon?.wall_title || 'Community Message Wall'}</h3>
                                 <p className="text-xs text-ink-secondary">
-                                    Words of remembrance, encouragement, and solidarity from attendees and well-wishers
+                                    {event.lexicon?.wall_subtitle || 'Words of encouragement and solidarity from attendees and well-wishers'}
                                 </p>
                             </div>
                         </div>
@@ -369,9 +369,9 @@ export default function ContributionWidget({ event }) {
                     ) : (
                         <div className="rounded-2xl border border-dashed border-border bg-surface-alt/30 p-10 text-center">
                             <Sparkles className="mx-auto h-8 w-8 text-ink-secondary/40 mb-2" />
-                            <p className="text-xs font-semibold text-ink">No tributes shared yet</p>
+                            <p className="text-xs font-semibold text-ink">No messages shared yet</p>
                             <p className="text-xs text-ink-secondary mt-1 max-w-sm mx-auto">
-                                Be the first to share a tribute, condolence, or word of blessing alongside your contribution.
+                                Be the first to share a message or note of encouragement alongside your contribution.
                             </p>
                         </div>
                     )}

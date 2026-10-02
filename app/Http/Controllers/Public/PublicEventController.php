@@ -19,6 +19,7 @@ use App\Models\EventTicketType;
 use App\Models\Tenant;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
+use App\Services\Events\RecurrenceService;
 use App\Services\Events\RegistrationPricingService;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
@@ -630,6 +631,11 @@ final class PublicEventController extends Controller
                 'type' => $s->type,
                 'capacity' => $s->capacity,
                 'signup_count' => $s->registrations_count ?? $s->signupCount(),
+                'is_occurrence' => (bool) $s->is_occurrence,
+                'occurrence_date' => $s->occurrence_date?->toDateString(),
+                'occurrence_status' => $s->occurrence_status,
+                'notes' => $s->notes,
+                'presentation_url' => $s->presentation_url,
                 'speaker_names' => $s->speakers->pluck('name')->values(),
             ])->values() : [],
             'speakers' => ! $withhold && $event->relationLoaded('speakers') ? $event->speakers->map(fn ($s): array => [
@@ -646,8 +652,47 @@ final class PublicEventController extends Controller
                 'tier' => $s->tier,
                 'logo_url' => Helper::storageUrl($s->logo_path),
             ])->values() : [],
+            'is_recurring' => (bool) $event->is_recurring,
+            'recurrence_pattern' => $event->recurrence_pattern,
+            'recurrence_days' => $event->recurrenceDays(),
+            'recurrence_time_start' => $event->recurrence_time_start,
+            'recurrence_time_end' => $event->recurrence_time_end,
+            'recurrence_summary' => app(RecurrenceService::class)->describeSchedule($event),
+            'upcoming_occurrences' => (! $withhold && $event->is_recurring)
+                ? ($event->relationLoaded('sessions')
+                    ? $event->sessions
+                        ->where('is_occurrence', true)
+                        ->where('starts_at', '>=', now()->startOfDay())
+                        ->take(12)
+                        ->map(fn ($s): array => [
+                            'id' => $s->id,
+                            'title' => $s->title,
+                            'description' => $s->description,
+                            'starts_at' => $s->starts_at->toIso8601String(),
+                            'ends_at' => $s->ends_at->toIso8601String(),
+                            'location' => $s->location,
+                            'type' => $s->type,
+                            'notes' => $s->notes,
+                            'presentation_url' => $s->presentation_url,
+                            'speaker_names' => $s->relationLoaded('speakers') ? $s->speakers->pluck('name')->values() : [],
+                        ])->values()
+                    : $event->upcomingRecurringSessions()->with('speakers')->limit(12)->get()->map(fn ($s): array => [
+                        'id' => $s->id,
+                        'title' => $s->title,
+                        'description' => $s->description,
+                        'starts_at' => $s->starts_at->toIso8601String(),
+                        'ends_at' => $s->ends_at->toIso8601String(),
+                        'location' => $s->location,
+                        'type' => $s->type,
+                        'notes' => $s->notes,
+                        'presentation_url' => $s->presentation_url,
+                        'speaker_names' => $s->speakers->pluck('name')->values(),
+                    ])->values())
+                : [],
+            'event_category' => $event->event_category ?? Event::CATEGORY_GENERAL,
+            'lexicon' => $event->lexicon(),
             'allow_contributions' => (bool) $event->allow_contributions,
-            'contribution_title' => $event->contribution_title ?: 'Voluntary Contributions & Tributes',
+            'contribution_title' => $event->contribution_title ?: $event->lexicon()['contributions_title'],
             'contribution_description' => $event->contribution_description,
             'contribution_presets' => $event->effectiveContributionPresets(),
             'contribution_min_amount_pesewas' => $event->contribution_min_amount_pesewas ?? 100,

@@ -169,10 +169,27 @@ export default function CheckInPanel({
     sessions = [],
     preselectedSessionId = null,
 }) {
-    const [targetMode, setTargetMode] = useState(preselectedSessionId ? 'room' : 'event');
-    const [selectedSessionId, setSelectedSessionId] = useState(
-        preselectedSessionId || sessions[0]?.id || ''
+    // Find best default session:
+    // 1. preselectedSessionId
+    // 2. If event.is_recurring: find today's occurrence or nearest upcoming occurrence
+    // 3. Otherwise first session
+    const defaultSessionId = useMemo(() => {
+        if (preselectedSessionId) return preselectedSessionId;
+        if (!sessions.length) return '';
+        if (event?.is_recurring) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayOccurrence = sessions.find((s) => s.occurrence_date === todayStr);
+            if (todayOccurrence) return todayOccurrence.id;
+            const upcoming = sessions.find((s) => new Date(s.starts_at) >= new Date());
+            if (upcoming) return upcoming.id;
+        }
+        return sessions[0]?.id || '';
+    }, [preselectedSessionId, sessions, event?.is_recurring]);
+
+    const [targetMode, setTargetMode] = useState(
+        preselectedSessionId || (event?.is_recurring && sessions.length > 0) ? 'room' : 'event'
     );
+    const [selectedSessionId, setSelectedSessionId] = useState(defaultSessionId);
     const [scanAction, setScanAction] = useState('check_in'); // 'check_in' | 'check_out'
     const [overrideCapacity, setOverrideCapacity] = useState(false);
     const [mode, setMode] = useState('scan');
@@ -239,7 +256,7 @@ export default function CheckInPanel({
                                     : 'bg-surface text-ink hover:bg-surface-sunken border-border'
                             }`}
                         >
-                            Main Event Gate
+                            {event?.is_recurring ? 'All-Access Gate' : 'Main Event Gate'}
                         </button>
                         <button
                             type="button"
@@ -251,7 +268,7 @@ export default function CheckInPanel({
                             }`}
                         >
                             <DoorOpen className="h-3.5 w-3.5" />
-                            Breakout Room
+                            {event?.is_recurring ? 'Service / Occurrence' : 'Breakout Room'}
                         </button>
                     </div>
 
@@ -259,7 +276,9 @@ export default function CheckInPanel({
                         <div className="mt-3 pt-3 border-t border-border/70 space-y-3">
                             <div>
                                 <label className="block text-xs font-medium text-ink mb-1">
-                                    Select Session / Room:
+                                    {event?.is_recurring
+                                        ? 'Select Gathering / Occurrence:'
+                                        : 'Select Session / Room:'}
                                 </label>
                                 <select
                                     value={selectedSessionId}
@@ -268,6 +287,7 @@ export default function CheckInPanel({
                                 >
                                     {sessions.map((s) => (
                                         <option key={s.id} value={s.id}>
+                                            {s.occurrence_date ? `[${s.occurrence_date}] ` : ''}
                                             {s.title} ({s.location || 'Hall'}
                                             {s.capacity ? ` · Cap: ${s.capacity}` : ''})
                                         </option>

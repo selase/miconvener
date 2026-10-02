@@ -13,7 +13,6 @@ import {
     EyeOff,
     Search,
     MessageSquareQuote,
-    Check,
 } from 'lucide-react';
 
 function formatMoney(pesewas, currency = 'GHS') {
@@ -33,7 +32,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
     // Settings form
     const { data, setData, patch, processing, errors, recentlySuccessful } = useForm({
         allow_contributions: Boolean(event.allow_contributions),
-        contribution_title: event.contribution_title || 'Voluntary Contributions & Tributes',
+        contribution_title: event.contribution_title || event.lexicon?.contributions_title || 'Voluntary Contributions',
         contribution_description: event.contribution_description || '',
         contribution_presets: Array.isArray(event.contribution_presets) && event.contribution_presets.length > 0
             ? event.contribution_presets.map((p) => Math.round(p / 100)).join(', ')
@@ -133,10 +132,10 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                 <div>
                     <h2 className="text-xl font-bold tracking-tight text-ink flex items-center gap-2">
                         <HeartHandshake className="h-6 w-6 text-accent" />
-                        Voluntary Contributions & Tributes
+                        {event.lexicon?.contributions_panel_title || 'Voluntary Contributions & Support'}
                     </h2>
                     <p className="mt-1 text-sm text-ink-secondary">
-                        Collect funeral donations, tithes, memorial gifts, and condolences with live tribute moderation.
+                        {event.lexicon?.contributions_panel_subtitle || 'Collect voluntary contributions with live message moderation.'}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -370,7 +369,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             type="text"
                             value={data.contribution_title}
                             onChange={(e) => setData('contribution_title', e.target.value)}
-                            placeholder="e.g. Funeral Donations & Condolences (Nsawa)"
+                            placeholder={event.lexicon?.contributions_title ? `e.g. ${event.lexicon.contributions_title}` : 'e.g. Voluntary Contributions'}
                         />
                         {errors.contribution_title && (
                             <p className="mt-1 text-xs text-danger-fg">{errors.contribution_title}</p>
@@ -385,7 +384,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             rows={3}
                             value={data.contribution_description}
                             onChange={(e) => setData('contribution_description', e.target.value)}
-                            placeholder="e.g. Your generous support and condolences help honor our beloved family member."
+                            placeholder={event.lexicon?.contributions_subtitle ? `e.g. ${event.lexicon.contributions_subtitle}` : 'Describe what contributions will be used for...'}
                             className="w-full rounded-md border border-border bg-surface p-2.5 text-sm text-ink placeholder:text-ink-secondary focus:border-accent focus:outline-none"
                         />
                     </div>

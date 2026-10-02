@@ -1,12 +1,30 @@
 import { useMemo, useState } from 'react';
-import { Trash2, Plus, GripVertical, Download, AlertTriangle } from 'lucide-react';
+import {
+    Trash2,
+    Plus,
+    GripVertical,
+    Download,
+    AlertTriangle,
+    Repeat,
+    RefreshCw,
+    FileText,
+    ExternalLink,
+    Edit3,
+} from 'lucide-react';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
 import Button from '@/Components/Console/Button';
+import Modal from '@/Components/Console/Modal';
 import { useToast } from '@/Components/Console/Toast';
 import csrfFetch from '@/lib/csrfFetch';
 
 const TYPES = [
+    'session',
+    'service',
+    'lecture',
+    'lab',
+    'bible_study',
+    'prayer',
     'keynote',
     'plenary',
     'workshop',
@@ -14,7 +32,6 @@ const TYPES = [
     'panel',
     'break',
     'networking',
-    'session',
 ];
 
 const EMPTY = {
@@ -58,10 +75,68 @@ function groupByDay(sessions) {
 export default function SchedulePanel({ event, sessions, speakers, onChange }) {
     const [form, setForm] = useState(EMPTY);
     const [saving, setSaving] = useState(false);
+    const [generating, setGenerating] = useState(false);
+    const [editingOccurrence, setEditingOccurrence] = useState(null);
+    const [savingOccurrence, setSavingOccurrence] = useState(false);
     const [dragging, setDragging] = useState(null);
     const toast = useToast();
 
     const days = useMemo(() => groupByDay(sessions), [sessions]);
+
+    const handleGenerateRecurrence = async () => {
+        setGenerating(true);
+        try {
+            const res = await csrfFetch(
+                route('tenant.events.recurrence.generate', { event: event.id }),
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ weeks: 4 }),
+                }
+            );
+            const json = await res.json();
+            toast?.(json.message || 'Occurrences synchronized.');
+            onChange();
+        } catch {
+            toast?.('Could not generate recurring sessions.');
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const handleSaveOccurrence = async (e) => {
+        e.preventDefault();
+        if (!editingOccurrence) return;
+
+        setSavingOccurrence(true);
+        try {
+            const res = await csrfFetch(
+                route('tenant.events.sessions.occurrence', {
+                    event: event.id,
+                    session: editingOccurrence.id,
+                }),
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        title: editingOccurrence.title,
+                        type: editingOccurrence.type,
+                        location: editingOccurrence.location,
+                        occurrence_status: editingOccurrence.occurrence_status,
+                        notes: editingOccurrence.notes || null,
+                        presentation_url: editingOccurrence.presentation_url || null,
+                        speaker_ids: editingOccurrence.speaker_ids || [],
+                    }),
+                }
+            );
+            const json = await res.json();
+            toast?.(json.message || 'Occurrence updated.');
+            setEditingOccurrence(null);
+            onChange();
+        } catch {
+            toast?.('Could not update occurrence.');
+        } finally {
+            setSavingOccurrence(false);
+        }
+    };
 
     const addSession = async (e) => {
         e.preventDefault();
@@ -116,6 +191,33 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
 
     return (
         <div className="max-w-2xl">
+            {event.is_recurring && (
+                <div className="mb-6 rounded-lg border border-border bg-surface-sunken/40 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                            <Repeat className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                            <div>
+                                <h3 className="text-sm font-semibold text-ink">
+                                    Recurring Gathering Series
+                                </h3>
+                                <p className="text-xs text-ink-secondary mt-0.5">
+                                    {event.recurrence_summary || 'Weekly recurring schedule'}
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            onClick={handleGenerateRecurrence}
+                            disabled={generating}
+                            className="shrink-0"
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-1.5 ${generating ? 'animate-spin' : ''}`} />
+                            {generating ? 'Synchronizing...' : 'Generate Next 4 Weeks'}
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             <div className="mb-5 flex items-center justify-between">
                 <p className="text-sm text-ink-secondary">
                     Drag a session within its day to reorder — times shift to stay back-to-back.
@@ -168,28 +270,77 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                             />
                                         )}
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-sm font-medium text-ink">
-                                                {session.title}
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-sm font-medium text-ink">
+                                                    {session.title}
+                                                </span>
+                                                {session.is_occurrence && (
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider ${
+                                                        session.occurrence_status === 'completed'
+                                                            ? 'bg-success-bg text-success-fg'
+                                                            : session.occurrence_status === 'cancelled'
+                                                            ? 'bg-danger-bg text-danger-fg'
+                                                            : 'bg-surface-sunken text-ink-secondary border border-border'
+                                                    }`}>
+                                                        {session.occurrence_status || 'scheduled'}
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="text-xs text-ink-secondary">
-                                                {formatTime(session.starts_at)}–
-                                                {formatTime(session.ends_at)} · {session.type}
-                                                {session.location ? ` · ${session.location}` : ''}
-                                                {session.speaker_names?.length
-                                                    ? ` · ${session.speaker_names.join(', ')}`
-                                                    : ''}
-                                                {session.capacity
-                                                    ? ` · ${session.signup_count ?? 0}/${session.capacity} signed up`
-                                                    : ''}
+                                            <div className="text-xs text-ink-secondary flex items-center flex-wrap gap-1.5 mt-0.5">
+                                                <span>
+                                                    {formatTime(session.starts_at)}–{formatTime(session.ends_at)} · {session.type}
+                                                </span>
+                                                {session.location ? <span>· {session.location}</span> : null}
+                                                {session.speaker_names?.length ? (
+                                                    <span>· {session.speaker_names.join(', ')}</span>
+                                                ) : null}
+                                                {session.capacity ? (
+                                                    <span>· {session.signup_count ?? 0}/{session.capacity} signed up</span>
+                                                ) : null}
+                                                {session.attendances_count > 0 ? (
+                                                    <span className="text-accent font-medium">· {session.attendances_count} attended</span>
+                                                ) : null}
+                                                {session.notes && (
+                                                    <span className="inline-flex items-center gap-0.5 text-accent font-medium">
+                                                        <FileText className="h-3 w-3" /> Notes
+                                                    </span>
+                                                )}
+                                                {session.presentation_url && (
+                                                    <a
+                                                        href={session.presentation_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-0.5 text-accent hover:underline font-medium"
+                                                    >
+                                                        <ExternalLink className="h-3 w-3" /> Deck
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeSession(session)}
-                                            className="shrink-0 text-ink-secondary hover:text-danger-fg"
-                                        >
-                                            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
-                                        </button>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {session.is_occurrence && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingOccurrence({
+                                                        ...session,
+                                                        notes: session.notes || '',
+                                                        presentation_url: session.presentation_url || '',
+                                                        speaker_ids: session.speaker_ids || [],
+                                                    })}
+                                                    className="p-1 text-ink-secondary hover:text-accent rounded"
+                                                    title="Edit sermon notes, presentation, & occurrence details"
+                                                >
+                                                    <Edit3 className="h-4 w-4" strokeWidth={1.75} />
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeSession(session)}
+                                                className="shrink-0 text-ink-secondary hover:text-danger-fg"
+                                            >
+                                                <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -243,11 +394,19 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                             value={form.type}
                             onChange={(e) => setForm({ ...form, type: e.target.value })}
                         >
-                            {TYPES.map((t) => (
-                                <option key={t} value={t}>
-                                    {t}
-                                </option>
-                            ))}
+                            {event.lexicon?.session_types ? (
+                                Object.entries(event.lexicon.session_types).map(([key, label]) => (
+                                    <option key={key} value={key}>
+                                        {label}
+                                    </option>
+                                ))
+                            ) : (
+                                TYPES.map((t) => (
+                                    <option key={t} value={t}>
+                                        {t.replace('_', ' ')}
+                                    </option>
+                                ))
+                            )}
                         </Select>
                         <Input
                             label="Capacity"
@@ -305,6 +464,157 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                     <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.75} />
                     Some sessions share a room at an overlapping time — check the schedule above.
                 </p>
+            )}
+
+            {editingOccurrence && (
+                <Modal
+                    open
+                    onClose={() => setEditingOccurrence(null)}
+                    title={`Edit Gathering: ${editingOccurrence.title}`}
+                    className="max-w-xl"
+                >
+                    <form onSubmit={handleSaveOccurrence} className="space-y-4">
+                        <Input
+                            label="Title / Topic"
+                            value={editingOccurrence.title}
+                            onChange={(e) =>
+                                setEditingOccurrence({ ...editingOccurrence, title: e.target.value })
+                            }
+                            required
+                        />
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Select
+                                label="Session Type"
+                                value={editingOccurrence.type}
+                                onChange={(e) =>
+                                    setEditingOccurrence({ ...editingOccurrence, type: e.target.value })
+                                }
+                            >
+                                {event.lexicon?.session_types ? (
+                                    Object.entries(event.lexicon.session_types).map(([key, label]) => (
+                                        <option key={key} value={key}>
+                                            {label}
+                                        </option>
+                                    ))
+                                ) : (
+                                    TYPES.map((t) => (
+                                        <option key={t} value={t}>
+                                            {t.replace('_', ' ')}
+                                        </option>
+                                    ))
+                                )}
+                            </Select>
+
+                            <Select
+                                label="Status"
+                                value={editingOccurrence.occurrence_status || 'scheduled'}
+                                onChange={(e) =>
+                                    setEditingOccurrence({
+                                        ...editingOccurrence,
+                                        occurrence_status: e.target.value,
+                                    })
+                                }
+                            >
+                                <option value="scheduled">Scheduled</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </Select>
+                        </div>
+
+                        <Input
+                            label="Location / Room"
+                            value={editingOccurrence.location || ''}
+                            onChange={(e) =>
+                                setEditingOccurrence({ ...editingOccurrence, location: e.target.value })
+                            }
+                            placeholder="e.g. Main Sanctuary, Lecture Hall 1"
+                        />
+
+                        {speakers?.length > 0 && (
+                            <div>
+                                <label className="mb-1.5 block text-xs font-medium text-ink">
+                                    {event.event_category === 'faith'
+                                        ? 'Preacher / Minister'
+                                        : event.event_category === 'academic'
+                                          ? 'Lecturer / Instructor'
+                                          : event.event_category === 'memorial'
+                                            ? 'Officiant / Speaker'
+                                            : 'Speaker / Presenter'}
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {speakers.map((s) => {
+                                        const isSelected = editingOccurrence.speaker_ids?.includes(s.id);
+                                        return (
+                                            <button
+                                                key={s.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    const cur = editingOccurrence.speaker_ids || [];
+                                                    setEditingOccurrence({
+                                                        ...editingOccurrence,
+                                                        speaker_ids: isSelected
+                                                            ? cur.filter((id) => id !== s.id)
+                                                            : [...cur, s.id],
+                                                    });
+                                                }}
+                                                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                                                    isSelected
+                                                        ? 'bg-accent text-white border-accent'
+                                                        : 'bg-surface border-border text-ink-secondary hover:text-ink'
+                                                }`}
+                                            >
+                                                {s.name}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="mb-1.5 block text-xs font-medium text-ink">
+                                {event.lexicon?.notes_label || 'Session Notes & Handouts'}
+                            </label>
+                            <textarea
+                                value={editingOccurrence.notes || ''}
+                                onChange={(e) =>
+                                    setEditingOccurrence({ ...editingOccurrence, notes: e.target.value })
+                                }
+                                rows={4}
+                                placeholder={event.lexicon?.notes_placeholder || 'Add key notes, outlines, or references...'}
+                                className="w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                            />
+                        </div>
+
+                        <Input
+                            label="Presentation / Slides URL"
+                            type="url"
+                            value={editingOccurrence.presentation_url || ''}
+                            onChange={(e) =>
+                                setEditingOccurrence({
+                                    ...editingOccurrence,
+                                    presentation_url: e.target.value,
+                                })
+                            }
+                            placeholder="https://docs.google.com/presentation/... or Canva deck"
+                            hint="Link to Google Slides, Canva deck, or YouTube stream recording."
+                        />
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                            <Button
+                                type="button"
+                                variant="default"
+                                onClick={() => setEditingOccurrence(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" variant="primary" disabled={savingOccurrence}>
+                                {savingOccurrence ? 'Saving...' : 'Save Gathering Details'}
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
             )}
         </div>
     );

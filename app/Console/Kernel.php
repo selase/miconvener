@@ -28,6 +28,9 @@ final class Kernel extends ConsoleKernel
         $schedule->command('backup:run')->daily()->at('01:30');
         $schedule->command('backup:monitor')->dailyAt('02:00');
 
+        // Recurring events — maintain rolling window of upcoming session occurrences
+        $schedule->command('events:generate-recurring-sessions')->dailyAt('02:30')->withoutOverlapping();
+
         // Usage Metering & Billing
         $schedule->command('tenants:audit-storage')->dailyAt('03:00');
         $schedule->command('tenants:audit-db')->dailyAt('03:30');

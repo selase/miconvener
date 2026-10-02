@@ -168,7 +168,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/sessions', [EventSessionController::class, 'store'])->name('tenant.events.sessions.store');
     Route::patch('events/{event}/sessions/reorder', [EventSessionController::class, 'reorder'])->name('tenant.events.sessions.reorder');
     Route::put('events/{event}/sessions/{session}', [EventSessionController::class, 'update'])->name('tenant.events.sessions.update');
+    Route::patch('events/{event}/sessions/{session}/occurrence', [EventSessionController::class, 'updateOccurrence'])->name('tenant.events.sessions.occurrence');
     Route::delete('events/{event}/sessions/{session}', [EventSessionController::class, 'destroy'])->name('tenant.events.sessions.destroy');
+    Route::post('events/{event}/recurrence/generate', [EventSessionController::class, 'generateRecurrence'])->name('tenant.events.recurrence.generate');
     Route::get('events/{event}/sessions/occupancy', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'occupancy'])->name('tenant.events.sessions.occupancy');
     Route::post('events/{event}/sessions/{session}/scan', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'scan'])->name('tenant.events.sessions.scan');
     Route::get('events/{event}/sessions/{session}/attendees', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'attendees'])->name('tenant.events.sessions.attendees');

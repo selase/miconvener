@@ -898,3 +898,65 @@ Decoupled event finances from fixed-ticket admission, allowing events (funerals,
   - Frontend bundling: `npm run build` compiled 2,598 modules in 3.41s with 0 errors.
   - Post-implementation 3-agent self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
 
+---
+
+## [x] Track: Generalized Recurring Events Engine (Churches, Lectures & Gatherings)
+
+Engine supporting recurring events across churches (Sunday services, Wednesday Bible studies, Friday prayer vigils), academic courses (recurring weekly lectures, seminars, and labs for lecturers and students), and community gatherings. Features recurrence pattern modeling, automated occurrence generator service, sermon/lecture notes & presentations attachment per occurrence, one-time member QR pass with session-level attendance check-in, and public schedule view with integrated voluntary giving.
+
+- [x] **Phase 1: Database Migrations & Model Enhancements**:
+  - `database/migrations/landlord/2026_10_02_160000_add_recurrence_settings_to_events_table.php`: Added `is_recurring`, `recurrence_pattern`, `recurrence_days` (JSON), `recurrence_time_start`, `recurrence_time_end`, `recurrence_interval`, `recurrence_until`, `recurrence_auto_generate_weeks` to `events` table in landlord database.
+  - `database/migrations/landlord/2026_10_02_160100_add_occurrence_fields_to_event_sessions_table.php`: Added `is_occurrence`, `occurrence_date`, `occurrence_status`, `notes`, `presentation_url` to `event_sessions` table in landlord database with compound index on `(event_id, is_occurrence, occurrence_date)`.
+  - Models: Enhanced `Event` with recurrence fillable/casts, `isRecurring()`, `recurrenceDays()`, `recurringSessions()`, and `upcomingRecurringSessions()`. Enhanced `EventSession` with session type constants (`TYPE_SERVICE`, `TYPE_LECTURE`, `TYPE_LAB`, `TYPE_BIBLE_STUDY`, `TYPE_PRAYER`, `TYPE_BREAK`), status constants (`STATUS_SCHEDULED`, `STATUS_COMPLETED`, `STATUS_CANCELLED`), `isOccurrence()`, and scopes.
+- [x] **Phase 2: Recurrence Engine & Occurrence Generator Service**:
+  - `App\Services\Events\RecurrenceService`: Implemented pattern calculations (weekly, biweekly, monthly, custom days, daily) with timezone awareness, idempotent atomic session generation via `firstOrCreate`, human-readable schedule description (`describeSchedule`), and date previews (`previewOccurrences`).
+  - `App\Console\Commands\GenerateRecurringSessionsCommand`: Registered `events:generate-recurring-sessions` streaming published recurring events with `chunk(50)` for minimal memory footprint; registered in `App\Console\Kernel` to run daily at 02:30.
+- [x] **Phase 3: Tenant Console Management & Controllers**:
+  - Routes in `routes/subdomain.php`: `POST /events/{event}/recurrence/generate`, `PATCH /events/{event}/sessions/{session}/occurrence`.
+  - Controllers: Updated `Tenant\EventController` to validate recurrence configuration, auto-generate occurrences on save, and eager-load attendance counts to prevent N+1 queries. Updated `Tenant\EventSessionController` with `updateOccurrence` (supporting sermon notes, slide decks, and speaker assignments) and hardened validation.
+  - Console UI: Added recurrence configuration controls to `EventFormModal.jsx` (pattern selector, day pills, time range, horizon); added recurrence banner, "Generate Next 4 Weeks" action, occurrence badges, and `OccurrenceModal` to `SchedulePanel.jsx`.
+- [x] **Phase 4: Attendance Tracking & QR Check-In Integration**:
+  - Enhanced `CheckInPanel.jsx` to detect recurring events, auto-select today's/upcoming occurrence session, and record session attendance via `EventSessionAttendance` with dwell time calculations (`checked_out_at`).
+- [x] **Phase 5: Public Event Page & Attendee Experience**:
+  - Updated `PublicEventController::toPublicPayload` to provide `is_recurring`, `recurrence_summary`, and `upcoming_occurrences` (strictly gated behind `! $withhold` to safeguard private events).
+  - Updated `resources/js/Pages/Public/Events/Show.jsx` with recurrence banner in "When" card and Schedule tab, `ScheduleSection` displaying upcoming occurrences, and `NotesModal` for sermon/lecture notes, slide deck links, and speaker tags.
+- [x] **Phase 6: Automated Verification & Self-Review**:
+  - Feature test suite: `tests/Feature/Events/EventRecurrenceTest.php` (9 tests, 55 assertions passed in ~11.6s) testing rule validation, occurrence generation, idempotency, on-demand generation, sermon notes/deck editing, member check-in & dwell time, unauthorized rejection, and cross-tenant isolation negative boundaries.
+  - Regression test suites: `EventScheduleTest.php`, `EventSessionAttendanceTest.php`, `EventContributionTest.php` (22 tests, 138 assertions passed).
+  - Code formatting: `vendor/bin/pint --dirty` passed with 0 errors.
+  - Frontend bundling: `npm run build` compiled 2,598 modules in 4.35s with 0 errors.
+  - 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
+
+---
+
+## [x] Track: Event Archetypes & Adaptive Lexicon Engine (Context-Aware Vocabulary)
+
+Adaptive terminology engine replacing generic and mismatched vocabulary across contributions, schedules, occurrence notes, and public pages. Archetypes (`church`/`faith`, `memorial`/`funeral`, `academic`/`course`, `conference`, `fundraiser`, `general`) dynamically govern defaults and labels: tithes & blessings for churches, tributes & condolences for funerals, lecture notes & syllabus for universities, and donations for fundraisers.
+
+- [x] **Phase 1: Database Migration & Model Constants**:
+  - `database/migrations/landlord/2026_10_02_170000_add_event_category_to_events_table.php`: Added indexed `event_category` (`string`, default `'general'`) to `events` table in landlord database.
+  - `Event.php`: Added category constants (`CATEGORY_GENERAL`, `CATEGORY_CONFERENCE`, `CATEGORY_FAITH`, `CATEGORY_MEMORIAL`, `CATEGORY_ACADEMIC`, `CATEGORY_FUNDRAISER`), fillable/casts, boolean helpers (`isFaith()`, `isMemorial()`, `isAcademic()`, `isFundraiser()`, `isConference()`), and `lexicon(): array`.
+  - `EventSession.php`: Added domain session type constants: `TYPE_SUNDAY_SCHOOL`, `TYPE_SEMINAR`, `TYPE_TUTORIAL`, `TYPE_OFFICE_HOURS`, `TYPE_PRE_BURIAL`, `TYPE_BURIAL_SERVICE`, `TYPE_THANKSGIVING_SERVICE`, `TYPE_REPAST`.
+- [x] **Phase 2: EventLexicon Domain Service**:
+  - `App\Services\Events\EventLexicon`: Comprehensive in-memory domain dictionary resolving `forCategory()` and `forEvent()` with 0 database queries. Maps tailored `contributions_title`, `contributions_subtitle`, `contributions_tab_label`, `contributions_cta_label`, `contributions_panel_title`, `contributions_panel_subtitle`, `message_field_label`, `message_placeholder`, `wall_title`, `wall_subtitle`, `notes_label`, `notes_placeholder`, `notes_action_label`, and contextual `session_types`.
+- [x] **Phase 3: Controller & Payload Adaptation**:
+  - `Tenant\EventController`: Validates `event_category` (strictly disallows null, enforcing `Event::CATEGORIES`); auto-assigns category-tailored `contribution_title` on `store()`; automatically migrates default titles if `event_category` is updated without custom override; sanitizes CSV exports against formula injection (`=`, `+`, `-`, `@`); exposes contribution settings in `toPayload()`.
+  - `Public\PublicEventController`: Serializes `event_category` and `lexicon` in `toPublicPayload()`, dynamically falling back to archetype defaults when `contribution_title` or description is null.
+  - `Tenant\EventSessionController`: Hardened session type validation to prevent `null` type updates and accept newly added domain types.
+- [x] **Phase 4: Tenant Console UI Polish**:
+  - `EventFormModal.jsx`: Added Event Archetype selector with descriptive icons and help copy.
+  - `ContributionsPanel.jsx`: Dynamic header, icon, and description based on event archetype; updated settings modal placeholders.
+  - `SchedulePanel.jsx`: Dynamic occurrence speaker labels (`Preacher / Minister`, `Lecturer / Instructor`, `Officiant / Speaker`), dynamic notes label, and archetype-filtered session types in both occurrence modal and "Add schedule item" form.
+- [x] **Phase 5: Public Attendee Page Experience**:
+  - `Show.jsx`: Contextual tab label for contributions with custom title precedence; About tab callout card uses adaptive lexicon; `ScheduleSection` and `NotesModal` use adaptive `lexicon.notes_action_label` and `lexicon.notes_label`.
+  - `ContributionWidget.jsx`: Message input label, placeholder, CTA button, anonymous wall label, and message wall title/subtitle adapt dynamically via `event.lexicon`.
+- [x] **Phase 6: Automated Verification & Self-Review**:
+  - Pest feature test suite: `tests/Feature/Events/EventLexiconTest.php` (11 tests, 145 assertions passed in ~14.6s) testing vocabulary across all 6 archetypes, invalid category rejection, model helpers, default and custom contribution title assignment, archetype switching, public payload serialization, and session type validation.
+  - Full event regression suites: 42 tests, 338 assertions passed in 26.5s (`EventLexiconTest`, `EventRecurrenceTest`, `EventContributionTest`, `EventScheduleTest`, `EventSessionAttendanceTest`).
+  - Code formatting: `vendor/bin/pint --dirty` passed with 0 errors.
+  - Frontend bundling: `npm run build` compiled 2,598 modules in 4.88s with 0 errors.
+  - 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
+
+
+
+

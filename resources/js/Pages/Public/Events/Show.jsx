@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
-import { Lock, User, Download, Trophy, ChevronDown, ChevronUp, Ticket, Heart } from 'lucide-react';
+import {
+    Lock,
+    User,
+    Download,
+    Trophy,
+    ChevronDown,
+    ChevronUp,
+    Ticket,
+    Heart,
+    Repeat,
+    BookOpen,
+    ExternalLink,
+    X,
+    Copy,
+    Check,
+} from 'lucide-react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import CoverBars from '@/Components/Console/CoverBars';
 import Input from '@/Components/Console/Input';
@@ -108,43 +123,243 @@ function SpeakersSection({ speakers }) {
     );
 }
 
-function ScheduleSection({ sessions, timezone, icsUrl }) {
+function NotesModal({ session, lexicon, onClose }) {
+    const [copied, setCopied] = useState(false);
+    if (!session) return null;
+
+    const handleCopy = () => {
+        if (session.notes) {
+            navigator.clipboard.writeText(session.notes);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="w-full max-w-xl rounded-2xl border border-border bg-surface p-6 shadow-2xl transition-all">
+                <div className="flex items-start justify-between gap-4 border-b border-border/80 pb-4">
+                    <div>
+                        <span className="inline-block rounded bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent uppercase tracking-wider">
+                            {lexicon?.notes_action_label ||
+                                (session.type === 'service'
+                                    ? 'Sermon Notes'
+                                    : session.type === 'lecture'
+                                      ? 'Lecture Outline'
+                                      : 'Session Notes')}
+                        </span>
+                        <h3 className="mt-1 text-lg font-bold text-ink leading-snug">
+                            {session.title}
+                        </h3>
+                        {session.speaker_names?.length > 0 && (
+                            <p className="mt-0.5 text-xs text-ink-secondary">
+                                {session.speaker_names.join(', ')}
+                            </p>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg p-1.5 text-ink-secondary hover:bg-surface-sunken hover:text-ink transition-colors cursor-pointer"
+                        title="Close"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div className="my-5 max-h-[60vh] overflow-y-auto rounded-lg bg-surface-sunken p-4 border border-border/60">
+                    <div className="text-[13.5px] leading-relaxed text-ink whitespace-pre-wrap font-sans">
+                        {session.notes}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 pt-4">
+                    {session.presentation_url ? (
+                        <a
+                            href={session.presentation_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                        >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Open Presentation Slides
+                        </a>
+                    ) : (
+                        <span />
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleCopy}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken transition-colors cursor-pointer"
+                        >
+                            {copied ? (
+                                <Check className="h-3.5 w-3.5 text-success-fg" />
+                            ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                            )}
+                            {copied ? 'Copied' : 'Copy Notes'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 transition-colors cursor-pointer"
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexicon }) {
+    const [viewingNotesSession, setViewingNotesSession] = useState(null);
+
     return (
         <div>
+            {recurrenceSummary && (
+                <div className="mb-6 flex items-start gap-3 rounded-xl border border-accent/25 bg-accent/5 p-4 text-xs sm:text-sm text-ink">
+                    <Repeat className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                    <div>
+                        <span className="font-semibold text-accent">
+                            Recurring Series Schedule:{' '}
+                        </span>
+                        <span>{recurrenceSummary}</span>
+                        <p className="mt-1 text-[11.5px] text-ink-secondary">
+                            Attendance is tracked per occurrence.{' '}
+                            {lexicon?.notes_label
+                                ? `${lexicon.notes_label} and materials are shared below.`
+                                : 'Notes and presentation decks are shared below.'}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {icsUrl && (
                 <a
                     href={icsUrl}
-                    className="mb-4 inline-flex h-control items-center gap-1.5 border border-border px-3 text-[12.5px] text-ink-secondary hover:border-accent hover:text-accent"
+                    className="mb-4 inline-flex h-control items-center gap-1.5 border border-border px-3 text-[12.5px] text-ink-secondary hover:border-accent hover:text-accent rounded-md"
                 >
                     <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
                     Add to calendar
                 </a>
             )}
-            <ul className="flex flex-col">
-                {sessions.map((session) => (
-                    <li
-                        key={session.id}
-                        className="flex items-baseline gap-4 border-t border-border py-3.5 first:border-t-0"
-                    >
-                        <span className="w-32 shrink-0 font-mono text-[12px] text-ink-secondary">
-                            {formatSessionTime(session.starts_at, session.ends_at, timezone)}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                            <div className="text-[14px] text-ink">{session.title}</div>
-                            {session.speaker_names?.length > 0 && (
-                                <div className="mt-0.5 text-[12px] text-ink-secondary">
-                                    {session.speaker_names.join(', ')}
+
+            {sessions.length === 0 ? (
+                <p className="text-sm text-ink-secondary py-4">
+                    No scheduled sessions or occurrences announced yet.
+                </p>
+            ) : (
+                <ul className="flex flex-col divide-y divide-border/80">
+                    {sessions.map((session) => (
+                        <li
+                            key={session.id}
+                            className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 py-4 first:pt-0"
+                        >
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                                <div className="w-36 shrink-0 font-mono text-[12px] text-ink-secondary">
+                                    <div>
+                                        {formatSessionTime(
+                                            session.starts_at,
+                                            session.ends_at,
+                                            timezone
+                                        )}
+                                    </div>
+                                    {session.is_occurrence && session.occurrence_status && (
+                                        <span
+                                            className={`mt-1 inline-block text-[10.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                                                session.occurrence_status === 'completed'
+                                                    ? 'bg-success-bg text-success-fg border border-success-fg/30'
+                                                    : session.occurrence_status === 'cancelled'
+                                                      ? 'bg-danger-bg text-danger-fg border border-danger-fg/30'
+                                                      : 'bg-surface-sunken text-ink-secondary'
+                                            }`}
+                                        >
+                                            {session.occurrence_status}
+                                        </span>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                        {session.location && (
-                            <span className="shrink-0 text-[12px] text-ink-secondary">
-                                {session.location}
-                            </span>
-                        )}
-                    </li>
-                ))}
-            </ul>
+
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h4 className="text-[14px] font-semibold text-ink leading-snug">
+                                            {session.title}
+                                        </h4>
+                                        {session.type && session.type !== 'session' && (
+                                            <span className="rounded bg-surface-sunken px-2 py-0.5 text-[11px] font-medium text-ink-secondary border border-border/60 capitalize">
+                                                {session.type.replace('_', ' ')}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {session.description && (
+                                        <p className="mt-1 text-[12.5px] text-ink-secondary leading-relaxed">
+                                            {session.description}
+                                        </p>
+                                    )}
+
+                                    {session.speaker_names?.length > 0 && (
+                                        <div className="mt-1.5 text-[12px] text-ink-secondary flex items-center gap-1.5">
+                                            <User className="h-3.5 w-3.5 text-accent shrink-0" />
+                                            <span>{session.speaker_names.join(', ')}</span>
+                                        </div>
+                                    )}
+
+                                    {session.location && (
+                                        <div className="mt-1 text-[11.5px] text-ink-tertiary">
+                                            📍 {session.location}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Occurrence Actions: Notes & Deck */}
+                            <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0 pt-2 sm:pt-0">
+                                {session.notes && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewingNotesSession(session)}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors cursor-pointer"
+                                    >
+                                        <BookOpen className="h-3.5 w-3.5" />
+                                        <span>
+                                            {lexicon?.notes_action_label ||
+                                                (session.type === 'service'
+                                                    ? 'Sermon Notes'
+                                                    : session.type === 'lecture'
+                                                      ? 'Lecture Outline'
+                                                      : 'Notes')}
+                                        </span>
+                                    </button>
+                                )}
+
+                                {session.presentation_url && (
+                                    <a
+                                        href={session.presentation_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken transition-colors"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5 text-ink-secondary" />
+                                        <span>Slide Deck</span>
+                                    </a>
+                                 )}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {viewingNotesSession && (
+                <NotesModal
+                    session={viewingNotesSession}
+                    lexicon={lexicon}
+                    onClose={() => setViewingNotesSession(null)}
+                />
+            )}
         </div>
     );
 }
@@ -1430,7 +1645,7 @@ export default function Show({ event, org, isPrivate = false }) {
         if (event.allow_contributions) {
             list.push({
                 key: 'contributions',
-                label: event.contribution_title || 'Contributions & Tributes',
+                label: event.contribution_title || event.lexicon?.contributions_tab_label || 'Contributions',
             });
         }
         if (event.sessions.length > 0) list.push({ key: 'schedule', label: 'Programme' });
@@ -1469,6 +1684,13 @@ export default function Show({ event, org, isPrivate = false }) {
                     {event.name}
                 </h1>
                 <p className="mt-3.5 text-[13.5px] text-ink-secondary">Hosted by {org.name}</p>
+                {event.is_recurring && event.recurrence_summary && (
+                    <div className="mt-3.5 inline-flex items-center gap-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-1.5 text-xs font-medium text-ink">
+                        <Repeat className="h-3.5 w-3.5 text-accent shrink-0" />
+                        <span className="font-semibold text-accent">Recurring Series:</span>
+                        <span>{event.recurrence_summary}</span>
+                    </div>
+                )}
                 {isPrivate && (
                     <p className="mt-2 max-w-xl text-[13px] text-ink-secondary">
                         The speakers, programme and materials for this event are shown to registered
@@ -1482,6 +1704,11 @@ export default function Show({ event, org, isPrivate = false }) {
                         <b className="mt-1.5 block text-[14px] font-normal text-ink">
                             {formatDateRange(event.starts_at, event.ends_at, event.timezone)}
                         </b>
+                        {event.is_recurring && event.recurrence_summary && (
+                            <span className="mt-1 block text-[11.5px] text-accent font-medium leading-snug">
+                                {event.recurrence_summary}
+                            </span>
+                        )}
                     </div>
                     <div className="border-r border-border py-4 px-5">
                         <span className="block text-[11.5px] text-ink-tertiary">Where</span>
@@ -1552,12 +1779,13 @@ export default function Show({ event, org, isPrivate = false }) {
                                         <div>
                                             <h4 className="text-sm font-semibold text-ink">
                                                 {event.contribution_title ||
-                                                    'Voluntary Contributions & Tributes'}
+                                                    event.lexicon?.contributions_title ||
+                                                    'Voluntary Contributions'}
                                             </h4>
                                             <p className="text-xs text-ink-secondary mt-0.5">
                                                 {event.contributions_total_pesewas > 0
                                                     ? `${event.currency} ${(event.contributions_total_pesewas / 100).toFixed(2)} contributed so far. Mobile Money & Cards accepted.`
-                                                    : 'Voluntary contributions and tributes are warmly welcomed for this gathering via Mobile Money & Card.'}
+                                                    : (event.lexicon?.contributions_subtitle || 'Voluntary contributions are warmly welcomed for this gathering via Mobile Money & Card.')}
                                             </p>
                                         </div>
                                     </div>
@@ -1566,7 +1794,7 @@ export default function Show({ event, org, isPrivate = false }) {
                                         onClick={() => setActive('contributions')}
                                         className="inline-flex shrink-0 items-center justify-center rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent/90 transition-colors cursor-pointer"
                                     >
-                                        Contribute / Leave Tribute
+                                        {event.lexicon?.contributions_cta_label || 'Contribute'}
                                     </button>
                                 </div>
                             )}
@@ -1589,9 +1817,17 @@ export default function Show({ event, org, isPrivate = false }) {
                         {active === 'contributions' && <ContributionWidget event={event} />}
                         {active === 'schedule' && (
                             <ScheduleSection
-                                sessions={event.sessions}
+                                sessions={
+                                    event.is_recurring && event.upcoming_occurrences?.length
+                                        ? event.upcoming_occurrences
+                                        : event.sessions
+                                }
                                 timezone={event.timezone}
                                 icsUrl={route('public.events.schedule.ics', { event: event.slug })}
+                                recurrenceSummary={
+                                    event.is_recurring ? event.recurrence_summary : null
+                                }
+                                lexicon={event.lexicon}
                             />
                         )}
                         {active === 'speakers' && <SpeakersSection speakers={event.speakers} />}

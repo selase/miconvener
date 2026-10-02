@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
-import { AlertCircle, ArrowUp } from 'lucide-react';
+import { AlertCircle, ArrowUp, Repeat } from 'lucide-react';
 import Modal from '@/Components/Console/Modal';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
@@ -27,6 +27,7 @@ export default function EventFormModal({ mode, event, onClose }) {
 
     const { data, setData, transform, post, put, processing, errors } = useForm({
         name: event?.name ?? '',
+        event_category: event?.event_category ?? 'general',
         description: event?.description ?? '',
         status: event?.status ?? 'draft',
         starts_at: toDateTimeLocal(event?.starts_at) ?? '',
@@ -43,6 +44,14 @@ export default function EventFormModal({ mode, event, onClose }) {
         fee_bearer: event?.fee_bearer ?? 'organizer',
         plan_your_visit_content: event?.plan_your_visit_content ?? '',
         hero_image: null,
+        is_recurring: event?.is_recurring ?? false,
+        recurrence_pattern: event?.recurrence_pattern ?? 'weekly',
+        recurrence_days: event?.recurrence_days ?? ['sunday'],
+        recurrence_time_start: event?.recurrence_time_start ?? '09:00',
+        recurrence_time_end: event?.recurrence_time_end ?? '11:00',
+        recurrence_interval: event?.recurrence_interval ?? 1,
+        recurrence_until: event?.recurrence_until ?? '',
+        recurrence_auto_generate_weeks: event?.recurrence_auto_generate_weeks ?? 4,
     });
 
     const activeErrors = {
@@ -149,6 +158,25 @@ export default function EventFormModal({ mode, event, onClose }) {
                 />
 
                 <div>
+                    <Select
+                        label="Event archetype"
+                        value={data.event_category}
+                        onChange={(e) => setData('event_category', e.target.value)}
+                        error={errors.event_category}
+                    >
+                        <option value="general">🌐 General / Community & Meetup</option>
+                        <option value="faith">⛪ Church / Faith & Religious Gathering</option>
+                        <option value="memorial">🕊️ Funeral / Memorial & Celebration of Life</option>
+                        <option value="academic">🎓 Academic / Course, Lecture & Seminar</option>
+                        <option value="conference">💼 Conference / Summit & Corporate</option>
+                        <option value="fundraiser">🎗️ Nonprofit / Charity & Fundraiser</option>
+                    </Select>
+                    <p className="mt-1 text-xs text-ink-secondary">
+                        MiConvener automatically tailors giving terms, schedules, and occurrence notes to match this event archetype.
+                    </p>
+                </div>
+
+                <div>
                     <div className="flex items-center justify-between">
                         <label className="mb-1.5 block text-sm font-medium text-ink">
                             Hero image
@@ -218,6 +246,145 @@ export default function EventFormModal({ mode, event, onClose }) {
                         onChange={(e) => setData('ends_at', e.target.value)}
                         error={errors.ends_at}
                     />
+                </div>
+
+                <div className="rounded-xl border border-border/80 bg-surface-muted/40 p-4 space-y-3.5">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={data.is_recurring}
+                            onChange={(e) => setData('is_recurring', e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                        />
+                        <div>
+                            <span className="text-sm font-semibold text-ink flex items-center gap-1.5">
+                                <Repeat className="h-4 w-4 text-accent" />
+                                Recurring Event Series
+                            </span>
+                            <p className="text-xs text-ink-secondary mt-0.5">
+                                For church services, recurring lectures, prayer vigils, Bible
+                                studies, or regular gatherings. MiConvener automatically generates
+                                upcoming session occurrences.
+                            </p>
+                        </div>
+                    </label>
+
+                    {data.is_recurring && (
+                        <div className="pt-2 border-t border-border/60 space-y-3.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                <Select
+                                    label="Recurrence pattern"
+                                    value={data.recurrence_pattern}
+                                    onChange={(e) => setData('recurrence_pattern', e.target.value)}
+                                    error={errors.recurrence_pattern}
+                                >
+                                    <option value="weekly">Weekly</option>
+                                    <option value="biweekly">Every 2 weeks (Bi-weekly)</option>
+                                    <option value="custom_days">Custom days of the week</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="daily">Daily</option>
+                                </Select>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-medium text-ink">
+                                        Auto-generate horizon
+                                    </label>
+                                    <select
+                                        value={data.recurrence_auto_generate_weeks}
+                                        onChange={(e) =>
+                                            setData(
+                                                'recurrence_auto_generate_weeks',
+                                                parseInt(e.target.value, 10)
+                                            )
+                                        }
+                                        className="h-control w-full rounded-md border border-border bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none"
+                                    >
+                                        <option value={2}>Next 2 weeks</option>
+                                        <option value={4}>Next 4 weeks (1 month)</option>
+                                        <option value={8}>Next 8 weeks (2 months)</option>
+                                        <option value={12}>Next 12 weeks (3 months)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {(data.recurrence_pattern === 'weekly' ||
+                                data.recurrence_pattern === 'biweekly' ||
+                                data.recurrence_pattern === 'custom_days') && (
+                                <div>
+                                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-secondary">
+                                        Days of the week
+                                    </label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[
+                                            'sunday',
+                                            'monday',
+                                            'tuesday',
+                                            'wednesday',
+                                            'thursday',
+                                            'friday',
+                                            'saturday',
+                                        ].map((day) => {
+                                            const isSelected = (
+                                                data.recurrence_days || []
+                                            ).includes(day);
+                                            return (
+                                                <button
+                                                    key={day}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const current = data.recurrence_days || [];
+                                                        const next = isSelected
+                                                            ? current.filter((d) => d !== day)
+                                                            : [...current, day];
+                                                        setData('recurrence_days', next);
+                                                    }}
+                                                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors capitalize ${
+                                                        isSelected
+                                                            ? 'bg-accent text-white border-accent shadow-xs'
+                                                            : 'bg-surface border-border text-ink-secondary hover:text-ink hover:border-ink-secondary'
+                                                    }`}
+                                                >
+                                                    {day.slice(0, 3)}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {errors.recurrence_days && (
+                                        <p className="mt-1 text-xs text-danger-fg">
+                                            {errors.recurrence_days}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                <Input
+                                    label="Occurrence start time"
+                                    type="time"
+                                    value={data.recurrence_time_start}
+                                    onChange={(e) =>
+                                        setData('recurrence_time_start', e.target.value)
+                                    }
+                                    error={errors.recurrence_time_start}
+                                />
+                                <Input
+                                    label="Occurrence end time"
+                                    type="time"
+                                    value={data.recurrence_time_end}
+                                    onChange={(e) => setData('recurrence_time_end', e.target.value)}
+                                    error={errors.recurrence_time_end}
+                                />
+                            </div>
+
+                            <Input
+                                label="Recurrence end date (optional)"
+                                type="date"
+                                value={data.recurrence_until}
+                                onChange={(e) => setData('recurrence_until', e.target.value)}
+                                error={errors.recurrence_until}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <Select

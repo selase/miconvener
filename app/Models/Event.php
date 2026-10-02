@@ -51,6 +51,27 @@ final class Event extends Model
 
     public const array VISIBILITIES = [self::VISIBILITY_PUBLIC, self::VISIBILITY_PRIVATE];
 
+    public const string CATEGORY_GENERAL = 'general';
+
+    public const string CATEGORY_CONFERENCE = 'conference';
+
+    public const string CATEGORY_FAITH = 'faith';
+
+    public const string CATEGORY_MEMORIAL = 'memorial';
+
+    public const string CATEGORY_ACADEMIC = 'academic';
+
+    public const string CATEGORY_FUNDRAISER = 'fundraiser';
+
+    public const array CATEGORIES = [
+        self::CATEGORY_GENERAL,
+        self::CATEGORY_CONFERENCE,
+        self::CATEGORY_FAITH,
+        self::CATEGORY_MEMORIAL,
+        self::CATEGORY_ACADEMIC,
+        self::CATEGORY_FUNDRAISER,
+    ];
+
     public const string SPEAKER_POLICY_BEFORE = 'before';
 
     public const string SPEAKER_POLICY_DURING = 'during';
@@ -71,6 +92,7 @@ final class Event extends Model
      */
     protected $attributes = [
         'visibility' => self::VISIBILITY_PUBLIC,
+        'event_category' => self::CATEGORY_GENERAL,
         'speaker_slide_policy' => self::SPEAKER_POLICY_AFTER,
     ];
 
@@ -81,6 +103,7 @@ final class Event extends Model
         'slug',
         'present_token',
         'description',
+        'event_category',
         'cover_image_path',
         'status',
         'starts_at',
@@ -113,6 +136,14 @@ final class Event extends Model
         'contribution_goal_amount_pesewas',
         'show_tribute_wall',
         'show_contributor_amounts',
+        'is_recurring',
+        'recurrence_pattern',
+        'recurrence_days',
+        'recurrence_time_start',
+        'recurrence_time_end',
+        'recurrence_interval',
+        'recurrence_until',
+        'recurrence_auto_generate_weeks',
     ];
 
     protected $casts = [
@@ -127,6 +158,7 @@ final class Event extends Model
         'platform_fee_percentage' => 'float',
         'platform_fee_cap_amount' => 'integer',
         'registration_settings' => 'array',
+        'event_category' => 'string',
         'speaker_slide_policy' => 'string',
         'allow_contributions' => 'boolean',
         'contribution_presets' => 'array',
@@ -134,6 +166,11 @@ final class Event extends Model
         'contribution_goal_amount_pesewas' => 'integer',
         'show_tribute_wall' => 'boolean',
         'show_contributor_amounts' => 'boolean',
+        'is_recurring' => 'boolean',
+        'recurrence_days' => 'array',
+        'recurrence_interval' => 'integer',
+        'recurrence_until' => 'date',
+        'recurrence_auto_generate_weeks' => 'integer',
     ];
 
     /**
@@ -323,6 +360,68 @@ final class Event extends Model
     public function allowsContributions(): bool
     {
         return (bool) $this->allow_contributions;
+    }
+
+    public function isRecurring(): bool
+    {
+        return (bool) $this->is_recurring;
+    }
+
+    public function isFaith(): bool
+    {
+        return $this->event_category === self::CATEGORY_FAITH;
+    }
+
+    public function isMemorial(): bool
+    {
+        return $this->event_category === self::CATEGORY_MEMORIAL;
+    }
+
+    public function isAcademic(): bool
+    {
+        return $this->event_category === self::CATEGORY_ACADEMIC;
+    }
+
+    public function isFundraiser(): bool
+    {
+        return $this->event_category === self::CATEGORY_FUNDRAISER;
+    }
+
+    public function isConference(): bool
+    {
+        return $this->event_category === self::CATEGORY_CONFERENCE;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function lexicon(): array
+    {
+        return \App\Services\Events\EventLexicon::forEvent($this);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function recurrenceDays(): array
+    {
+        return is_array($this->recurrence_days) ? $this->recurrence_days : [];
+    }
+
+    /**
+     * @return HasMany<EventSession, $this>
+     */
+    public function recurringSessions(): HasMany
+    {
+        return $this->hasMany(EventSession::class)->where('is_occurrence', true)->orderBy('starts_at');
+    }
+
+    /**
+     * @return HasMany<EventSession, $this>
+     */
+    public function upcomingRecurringSessions(): HasMany
+    {
+        return $this->recurringSessions()->where('starts_at', '>=', now()->startOfDay());
     }
 
     /**

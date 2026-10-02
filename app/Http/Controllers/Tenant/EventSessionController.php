@@ -69,6 +69,64 @@ final class EventSessionController extends Controller
         return response()->json(['message' => 'Session deleted.']);
     }
 
+    public function generateRecurrence(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+
+        $validated = $request->validate([
+            'weeks' => ['nullable', 'integer', 'min:1', 'max:52'],
+        ]);
+
+        if (isset($validated['weeks'])) {
+            $eventModel->recurrence_auto_generate_weeks = (int) $validated['weeks'];
+            $eventModel->save();
+        }
+
+        $sessions = app(\App\Services\Events\RecurrenceService::class)->generateOccurrences($eventModel);
+
+        return response()->json([
+            'message' => "Synchronized {$sessions->count()} recurring occurrences.",
+            'sessions' => $eventModel->sessions()->with('speakers')->orderBy('starts_at')->get(),
+        ]);
+    }
+
+    public function updateOccurrence(Request $request, string $subdomain, string $event, string $session): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+        $sessionModel = $eventModel->sessions()->where('id', $session)->firstOrFail();
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:65000'],
+            'presentation_url' => ['nullable', 'url:http,https', 'max:500'],
+            'occurrence_status' => ['required', Rule::in([
+                \App\Models\EventSession::STATUS_SCHEDULED,
+                \App\Models\EventSession::STATUS_COMPLETED,
+                \App\Models\EventSession::STATUS_CANCELLED,
+            ])],
+            'type' => ['sometimes', 'string', Rule::in(\App\Models\EventSession::TYPES)],
+            'location' => ['nullable', 'string', 'max:255'],
+            'speaker_ids' => ['nullable', 'array'],
+            'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenant->id)],
+        ]);
+
+        $sessionModel->update(collect($validated)->except('speaker_ids')->all());
+
+        if (array_key_exists('speaker_ids', $validated)) {
+            $sessionModel->speakers()->sync($this->pivotData((array) ($validated['speaker_ids'] ?? [])));
+        }
+
+        return response()->json([
+            'message' => 'Occurrence updated successfully.',
+            'session' => $sessionModel->fresh(['speakers']),
+        ]);
+    }
+
     /**
      * Reorder a same-day group of sessions. Each session keeps its own
      * duration; the group is laid out back-to-back starting from the
@@ -114,15 +172,22 @@ final class EventSessionController extends Controller
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:65000'],
+            'presentation_url' => ['nullable', 'url:http,https', 'max:500'],
+            'occurrence_status' => ['nullable', Rule::in([
+                \App\Models\EventSession::STATUS_SCHEDULED,
+                \App\Models\EventSession::STATUS_COMPLETED,
+                \App\Models\EventSession::STATUS_CANCELLED,
+            ])],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
             'track' => ['nullable', 'string', 'max:100'],
-            'type' => ['required', Rule::in([
-                'keynote', 'plenary', 'workshop', 'breakout', 'panel', 'break', 'networking', 'session',
-                'oral_presentation', 'poster_session', 'simulation_skills',
-            ])],
-            'abstract_id' => ['nullable', 'exists:event_abstracts,id'],
+            'type' => ['required', Rule::in(\App\Models\EventSession::TYPES)],
+            'abstract_id' => [
+                'nullable',
+                Rule::exists('event_abstracts', 'id')->where('tenant_id', $tenantId),
+            ],
             'capacity' => ['nullable', 'integer', 'min:1'],
             'sort_order' => ['integer'],
             'speaker_ids' => ['nullable', 'array'],

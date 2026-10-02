@@ -38,6 +38,40 @@ final class EventSession extends Model
 
     public const string TYPE_SESSION = 'session';
 
+    public const string TYPE_SERVICE = 'service';
+
+    public const string TYPE_SUNDAY_SCHOOL = 'sunday_school';
+
+    public const string TYPE_LECTURE = 'lecture';
+
+    public const string TYPE_LAB = 'lab';
+
+    public const string TYPE_SEMINAR = 'seminar';
+
+    public const string TYPE_TUTORIAL = 'tutorial';
+
+    public const string TYPE_OFFICE_HOURS = 'office_hours';
+
+    public const string TYPE_BIBLE_STUDY = 'bible_study';
+
+    public const string TYPE_PRAYER = 'prayer';
+
+    public const string TYPE_PRE_BURIAL = 'pre_burial';
+
+    public const string TYPE_BURIAL_SERVICE = 'burial_service';
+
+    public const string TYPE_THANKSGIVING_SERVICE = 'thanksgiving_service';
+
+    public const string TYPE_REPAST = 'repast';
+
+    public const string TYPE_BREAK = 'break';
+
+    public const string STATUS_SCHEDULED = 'scheduled';
+
+    public const string STATUS_COMPLETED = 'completed';
+
+    public const string STATUS_CANCELLED = 'cancelled';
+
     public const array TYPES = [
         self::TYPE_KEYNOTE,
         self::TYPE_PLENARY,
@@ -49,6 +83,20 @@ final class EventSession extends Model
         self::TYPE_BREAKOUT,
         self::TYPE_NETWORKING,
         self::TYPE_SESSION,
+        self::TYPE_SERVICE,
+        self::TYPE_SUNDAY_SCHOOL,
+        self::TYPE_LECTURE,
+        self::TYPE_LAB,
+        self::TYPE_SEMINAR,
+        self::TYPE_TUTORIAL,
+        self::TYPE_OFFICE_HOURS,
+        self::TYPE_BIBLE_STUDY,
+        self::TYPE_PRAYER,
+        self::TYPE_PRE_BURIAL,
+        self::TYPE_BURIAL_SERVICE,
+        self::TYPE_THANKSGIVING_SERVICE,
+        self::TYPE_REPAST,
+        self::TYPE_BREAK,
     ];
 
     protected $connection = 'landlord';
@@ -66,6 +114,11 @@ final class EventSession extends Model
         'abstract_id',
         'capacity',
         'sort_order',
+        'is_occurrence',
+        'occurrence_date',
+        'occurrence_status',
+        'notes',
+        'presentation_url',
     ];
 
     protected $casts = [
@@ -73,6 +126,8 @@ final class EventSession extends Model
         'ends_at' => 'datetime',
         'capacity' => 'integer',
         'sort_order' => 'integer',
+        'is_occurrence' => 'boolean',
+        'occurrence_date' => 'date',
     ];
 
     public function abstract(): BelongsTo
@@ -130,6 +185,21 @@ final class EventSession extends Model
         }
 
         return (int) min(100, round(($this->liveHeadcount() / $this->capacity) * 100));
+    }
+
+    public function isOccurrence(): bool
+    {
+        return (bool) $this->is_occurrence;
+    }
+
+    public function scopeOccurrences(Builder $query): Builder
+    {
+        return $query->where('is_occurrence', true);
+    }
+
+    public function scopeUpcomingOccurrences(Builder $query): Builder
+    {
+        return $query->where('is_occurrence', true)->where('starts_at', '>=', now()->startOfDay());
     }
 
     public function scopeWorkshops(Builder $query): Builder

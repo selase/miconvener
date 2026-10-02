@@ -11,6 +11,7 @@ use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Events\EventSections;
 use App\Services\Events\EventWorkspaceSnapshot;
+use App\Services\Events\RecurrenceService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -117,12 +118,21 @@ final class EventController extends Controller
             }
         }
 
+        $category = $validated['event_category'] ?? Event::CATEGORY_GENERAL;
+        $lexicon = \App\Services\Events\EventLexicon::forCategory($category);
+
         $event = Event::create([
             ...$validated,
+            'event_category' => $category,
+            'contribution_title' => $validated['contribution_title'] ?? $lexicon['contributions_title'],
             'tenant_id' => $tenant->id,
             'created_by' => $request->user()->id,
             'slug' => $this->uniqueSlug($validated['name'], $tenant->id),
         ]);
+
+        if ($event->isRecurring()) {
+            app(RecurrenceService::class)->generateOccurrences($event);
+        }
 
         if ($request->wantsJson()) {
             return response()->json($this->toPayload($event));
@@ -199,7 +209,19 @@ final class EventController extends Controller
             }
         }
 
+        if (isset($validated['event_category']) && $validated['event_category'] !== $eventModel->event_category) {
+            $oldLexicon = \App\Services\Events\EventLexicon::forCategory($eventModel->event_category);
+            $newLexicon = \App\Services\Events\EventLexicon::forCategory($validated['event_category']);
+            if (empty($validated['contribution_title']) || $eventModel->contribution_title === $oldLexicon['contributions_title']) {
+                $validated['contribution_title'] = $newLexicon['contributions_title'];
+            }
+        }
+
         $eventModel->update($validated);
+
+        if ($eventModel->isRecurring()) {
+            app(RecurrenceService::class)->generateOccurrences($eventModel);
+        }
 
         if ($request->wantsJson()) {
             return response()->json($this->toPayload($eventModel));
@@ -316,11 +338,13 @@ final class EventController extends Controller
             $handle = fopen('php://output', 'wb');
             fputcsv($handle, ['Reference', 'Contributor Name', 'Email', 'Phone', 'Amount (Pesewas)', 'Amount (GHS)', 'Net (GHS)', 'Currency', 'Status', 'Is Anonymous', 'Tribute Message', 'Paid At', 'Created At']);
 
-            $eventModel->contributions()->orderByDesc('created_at')->chunk(200, function ($contributions) use ($handle): void {
+            $sanitizeCsv = fn (?string $v): ?string => ($v !== null && in_array($v[0] ?? '', ['=', '+', '-', '@'], true)) ? "'".$v : $v;
+
+            $eventModel->contributions()->orderByDesc('created_at')->chunk(200, function ($contributions) use ($handle, $sanitizeCsv): void {
                 foreach ($contributions as $c) {
                     fputcsv($handle, [
                         $c->payment_reference,
-                        $c->contributor_name,
+                        $sanitizeCsv($c->contributor_name),
                         $c->contributor_email,
                         $c->contributor_phone,
                         $c->amount,
@@ -329,7 +353,7 @@ final class EventController extends Controller
                         $c->currency,
                         $c->status,
                         $c->is_anonymous ? 'Yes' : 'No',
-                        $c->tribute_message,
+                        $sanitizeCsv($c->tribute_message),
                         $c->paid_at?->toIso8601String(),
                         $c->created_at->toIso8601String(),
                     ]);
@@ -385,7 +409,7 @@ final class EventController extends Controller
         $tenant = $this->getTenant();
 
         $eventModel = $this->resolveEvent($tenant, $event, [
-            'sessions' => fn ($query) => $query->withCount('registrations'),
+            'sessions' => fn ($query) => $query->withCount(['registrations', 'attendances']),
             'sessions.speakers',
         ]);
 
@@ -449,8 +473,8 @@ final class EventController extends Controller
         $relations = [];
         foreach (self::SECTION_RELATIONS[$section] ?? [] as $relation) {
             if ($relation === 'sessions') {
-                // Sessions carry their sign-up count, which the payload reads.
-                $relations['sessions'] = fn ($query) => $query->withCount('registrations');
+                // Sessions carry their sign-up and attendance counts, which the payload reads.
+                $relations['sessions'] = fn ($query) => $query->withCount(['registrations', 'attendances']);
             } else {
                 $relations[] = $relation;
             }
@@ -587,6 +611,9 @@ final class EventController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'event_category' => ['sometimes', 'string', Rule::in(Event::CATEGORIES)],
+            'contribution_title' => ['nullable', 'string', 'max:255'],
+            'contribution_description' => ['nullable', 'string', 'max:1000'],
             'status' => ['required', Rule::in([Event::STATUS_DRAFT, Event::STATUS_PUBLISHED, Event::STATUS_CANCELLED])],
             'visibility' => ['sometimes', Rule::in(Event::VISIBILITIES)],
             'fee_bearer' => ['nullable', Rule::in([
@@ -595,7 +622,7 @@ final class EventController extends Controller
             ])],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
-            'timezone' => ['required', 'string', 'max:64'],
+            'timezone' => ['required', 'string', 'timezone:all', 'max:64'],
             'location_type' => ['required', Rule::in([Event::LOCATION_IN_PERSON, Event::LOCATION_VIRTUAL])],
             'address' => [
                 'nullable',
@@ -613,6 +640,15 @@ final class EventController extends Controller
             'hero_image' => ['nullable', 'image', 'max:20480'],
             'store_listing_id' => ['nullable', 'uuid', 'exists:landlord.store_listings,id'],
             'venue_booking_id' => ['nullable', 'uuid', 'exists:landlord.venue_bookings,id'],
+            'is_recurring' => ['sometimes', 'boolean'],
+            'recurrence_pattern' => ['nullable', 'required_if:is_recurring,true', Rule::in(RecurrenceService::PATTERNS)],
+            'recurrence_days' => ['nullable', 'array'],
+            'recurrence_days.*' => ['string', Rule::in(RecurrenceService::DAYS_OF_WEEK)],
+            'recurrence_time_start' => ['nullable', 'date_format:H:i'],
+            'recurrence_time_end' => ['nullable', 'date_format:H:i'],
+            'recurrence_interval' => ['nullable', 'integer', 'min:1'],
+            'recurrence_until' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'recurrence_auto_generate_weeks' => ['nullable', 'integer', 'min:1', 'max:52'],
         ], [
             'hero_image.max' => 'The hero image must not be greater than 20MB.',
             'hero_image.image' => 'The hero image must be a valid image file (JPG, PNG, WebP, GIF, or SVG).',
@@ -699,6 +735,12 @@ final class EventController extends Controller
                 'type' => $s->type,
                 'capacity' => $s->capacity,
                 'signup_count' => $s->registrations_count,
+                'is_occurrence' => (bool) $s->is_occurrence,
+                'occurrence_date' => $s->occurrence_date?->toDateString(),
+                'occurrence_status' => $s->occurrence_status,
+                'notes' => $s->notes,
+                'presentation_url' => $s->presentation_url,
+                'attendances_count' => $s->attendances_count ?? ($s->relationLoaded('attendances') ? $s->attendances->count() : $s->attendances()->count()),
                 'speaker_ids' => $s->speakers->pluck('id')->values(),
                 'speaker_names' => $s->speakers->pluck('name')->values(),
             ])->values() : [],
@@ -738,6 +780,25 @@ final class EventController extends Controller
             'store_listing_id' => $event->store_listing_id,
             'venue_booking_id' => $event->venue_booking_id,
             'is_marketplace_venue' => $event->isMarketplaceVenue(),
+            'event_category' => $event->event_category ?? Event::CATEGORY_GENERAL,
+            'lexicon' => $event->lexicon(),
+            'allow_contributions' => (bool) $event->allow_contributions,
+            'contribution_title' => $event->contribution_title ?: $event->lexicon()['contributions_title'],
+            'contribution_description' => $event->contribution_description,
+            'contribution_presets' => $event->effectiveContributionPresets(),
+            'contribution_min_amount_pesewas' => $event->contribution_min_amount_pesewas ?? 100,
+            'contribution_goal_amount_pesewas' => $event->contribution_goal_amount_pesewas,
+            'show_tribute_wall' => (bool) $event->show_tribute_wall,
+            'show_contributor_amounts' => (bool) $event->show_contributor_amounts,
+            'is_recurring' => (bool) $event->is_recurring,
+            'recurrence_pattern' => $event->recurrence_pattern,
+            'recurrence_days' => $event->recurrenceDays(),
+            'recurrence_time_start' => $event->recurrence_time_start,
+            'recurrence_time_end' => $event->recurrence_time_end,
+            'recurrence_interval' => $event->recurrence_interval ?? 1,
+            'recurrence_until' => $event->recurrence_until?->toDateString(),
+            'recurrence_auto_generate_weeks' => $event->recurrence_auto_generate_weeks ?? 4,
+            'recurrence_summary' => app(RecurrenceService::class)->describeSchedule($event),
         ];
     }
 }
