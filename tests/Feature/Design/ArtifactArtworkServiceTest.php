@@ -45,7 +45,7 @@ test('it re-encodes jpeg artwork and reports the detected content type', functio
 
 test('it strips trailing metadata while re-encoding artwork', function (): void {
     $source = UploadedFile::fake()->image('source.png', 100, 100);
-    $bytes = (string) file_get_contents($source->getRealPath())."EXIF-PRIVATE-METADATA";
+    $bytes = (string) file_get_contents($source->getRealPath()).'EXIF-PRIVATE-METADATA';
 
     $artwork = app(ArtifactArtworkService::class)->store(
         UploadedFile::fake()->createWithContent('source.png', $bytes),

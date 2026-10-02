@@ -841,15 +841,9 @@ parameters:
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$bio.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
-			count: 3
+			count: 2
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -860,18 +854,6 @@ parameters:
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$organization.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$photo_path.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Public/PublicEventController.php
@@ -884,12 +866,6 @@ parameters:
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$tier.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Public/PublicEventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$title.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Public/PublicEventController.php
@@ -939,7 +915,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: argument.unresolvableType
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -963,7 +939,7 @@ parameters:
 		-
 			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: method.unresolvableReturnType
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Public/PublicEventController.php
 
 		-
@@ -1543,33 +1519,9 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventBlastController.php
 
 		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$default_cpd_hours.'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventCertificateController.php
-
-		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventCertificateController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$authors.
 			identifier: property.notFound
 			count: 2
-			path: app/Http/Controllers/Tenant/EventCertificateController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventCertificateController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
-			identifier: property.notFound
-			count: 1
 			path: app/Http/Controllers/Tenant/EventCertificateController.php
 
 		-
@@ -1591,12 +1543,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$bio.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$capacity.
 			identifier: property.notFound
 			count: 1
@@ -1611,7 +1557,7 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
-			count: 3
+			count: 2
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
@@ -1623,25 +1569,7 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$name.
 			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$organization.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$photo_path.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$pivot.
-			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
@@ -1669,12 +1597,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$title.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventController.php
-
-		-
 			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::confirmedCount().'
 			identifier: method.notFound
 			count: 1
@@ -1695,13 +1617,13 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: argument.unresolvableType
-			count: 3
+			count: 2
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
 			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
 			identifier: method.unresolvableReturnType
-			count: 3
+			count: 2
 			path: app/Http/Controllers/Tenant/EventController.php
 
 		-
@@ -3085,12 +3007,6 @@ parameters:
 			path: app/Models/Event.php
 
 		-
-			rawMessage: 'Method App\Models\Event::speakers() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsToMany does not specify its types: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor (2-4 required)'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Event.php
-
-		-
 			rawMessage: 'Method App\Models\Event::sponsors() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -3464,6 +3380,12 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\EventLedgerEntry uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/EventLedgerEntry.php
+
+		-
+			rawMessage: 'Method App\Models\EventLedgerEntry::contribution() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventLedgerEntry.php

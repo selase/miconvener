@@ -80,11 +80,11 @@ final class RecurrenceService
         $endTimeStr = $event->recurrence_time_end ?: '11:00';
 
         $startParts = explode(':', (string) $startTimeStr);
-        $startHour = (int) ($startParts[0] ?? 9);
+        $startHour = (int) $startParts[0];
         $startMinute = (int) ($startParts[1] ?? 0);
 
         $endParts = explode(':', (string) $endTimeStr);
-        $endHour = (int) ($endParts[0] ?? 11);
+        $endHour = (int) $endParts[0];
         $endMinute = (int) ($endParts[1] ?? 0);
 
         foreach ($targetDates as $date) {

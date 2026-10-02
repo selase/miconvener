@@ -192,11 +192,19 @@ final class EventSession extends Model
         return (bool) $this->is_occurrence;
     }
 
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopeOccurrences(Builder $query): Builder
     {
         return $query->where('is_occurrence', true);
     }
 
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopeUpcomingOccurrences(Builder $query): Builder
     {
         return $query->where('is_occurrence', true)->where('starts_at', '>=', now()->startOfDay());

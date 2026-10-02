@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -23,7 +24,7 @@ final class EventSessionController extends Controller
         $validated = $this->validateSession($request, $tenant->id);
 
         $session = $eventModel->sessions()->create([
-            ...collect($validated)->except(['speaker_ids', 'speaker_roles'])->all(),
+            ...Arr::except($validated, ['speaker_ids', 'speaker_roles']),
             'tenant_id' => $tenant->id,
         ]);
 
@@ -115,7 +116,7 @@ final class EventSessionController extends Controller
             'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenant->id)],
         ]);
 
-        $sessionModel->update(collect($validated)->except('speaker_ids')->all());
+        $sessionModel->update(Arr::except($validated, ['speaker_ids']));
 
         if (array_key_exists('speaker_ids', $validated)) {
             $sessionModel->speakers()->sync($this->pivotData((array) ($validated['speaker_ids'] ?? [])));

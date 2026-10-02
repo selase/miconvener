@@ -751,7 +751,7 @@ final class EventController extends Controller
                 'organization' => $s->organization,
                 'bio' => $s->bio,
                 'photo_url' => Helper::storageUrl($s->photo_path),
-                'role' => $s->pivot->role,
+                'role' => data_get($s, 'pivot.role'),
             ])->values() : [],
             'materials' => $event->relationLoaded('materials') ? $event->materials->map(fn ($m): array => [
                 'id' => $m->id,
