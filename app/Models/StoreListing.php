@@ -60,6 +60,7 @@ final class StoreListing extends Model
         'status',
         'sort_order',
         'embedding',
+        'is_bookable',
     ];
 
     /**
@@ -80,7 +81,13 @@ final class StoreListing extends Model
         'floor_area_sqm' => 'decimal:2',
         'ceiling_height_meters' => 'decimal:2',
         'sort_order' => 'integer',
+        'is_bookable' => 'boolean',
     ];
+
+    public function isBookable(): bool
+    {
+        return (bool) ($this->is_bookable ?? true);
+    }
 
     /**
      * @return BelongsTo<Shop, $this>

@@ -43,6 +43,12 @@ final class VenueBookingService
         $guestCount = (int) ($payload['guest_count'] ?? 1);
         $layoutStyle = (string) ($payload['layout_style'] ?? 'banquet');
 
+        if (! $listing->isBookable()) {
+            throw ValidationException::withMessages([
+                'starts_at' => ['Direct online reservations are currently unavailable for this venue. Please contact the host directly.'],
+            ]);
+        }
+
         // Verify calendar availability
         if (! $this->availabilityService->isSlotAvailable($listing, $startsAt, $endsAt)) {
             throw ValidationException::withMessages([

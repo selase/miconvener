@@ -760,3 +760,39 @@ Interactive Master Venue Calendar for hotel and venue managers (e.g. Labadi Beac
     - Removed unused icon imports across `Index.jsx` and `VenueBookingDrawer.jsx`.
     - Fixed local date key formatting to prevent timezone shifts across UTC+ timezones.
 
+---
+
+## [x] Track: Root Homepage Marketplace Navigation, Unbookable Demo Institutions & Price On Request
+
+Direct link to the Venue Marketplace from the root landing page (`miconvener.com`), transition of seeded demo venues (Labadi Beach Hotel, Kempinski Hotel, Ridge Royal Hotel, Lancaster Kumasi) to "Price on Request", and disabling direct online bookings with host contact guidance.
+
+- [x] **Phase 1: Database Migration & Model Support for Listing Bookability**:
+  - [x] Landlord migration `database/migrations/landlord/2026_10_02_140000_add_is_bookable_to_store_listings_table.php` adding boolean column `is_bookable` (defaulting to `true`).
+  - [x] `StoreListing` model updated with fillable `'is_bookable'`, cast `'is_bookable' => 'boolean'`, and safe accessor `isBookable(): bool` defaulting nulls to `true`.
+- [x] **Phase 2: Root Homepage Navigation & Footer Integration**:
+  - [x] Updated `config/product-page.php` with direct Marketplace link in primary header navigation (`nav.links`) and footer (`footer.columns.Product`).
+  - [x] Updated `resources/views/layouts/product.blade.php` with robust subpath active highlighting (`request()->is($path.'*')`) and root path guard (`$path !== ''`).
+- [x] **Phase 3: Demo Institutions Seeding (Price on Request & Unbookable)**:
+  - [x] Updated `database/seeders/MarketplaceDemoSeeder.php` to set all 7 venue spaces across all 4 merchant institutions to `'price_visibility' => StoreListing::PRICE_VISIBILITY_ON_REQUEST` and `'is_bookable' => false`.
+  - [x] Re-seeded local landlord database and confirmed all demo spaces exhibit `price_visibility: 'on_request'` and `is_bookable: false`.
+- [x] **Phase 4: Public Frontend Gating & Contact Advisory**:
+  - [x] In `resources/js/Pages/Public/Marketplace/Venues/Show.jsx`, when `venue.is_bookable === false`, replaced booking trigger with a disabled `Online Booking Unavailable` button and direct host advisory directing inquiries to host phone/email.
+  - [x] In `resources/js/Components/Marketplace/VenueBookingDrawer.jsx`, disabled submission CTA when `venue.is_bookable === false` and updated feedback banner to show `availability.message`.
+- [x] **Phase 5: Backend & MCP AI Agent Gating**:
+  - [x] In `VenueBookingController::checkAvailability`: Returns `available: false, is_bookable: false, message: 'Online reservations are temporarily unavailable...'`.
+  - [x] In `VenueBookingController::book`: Rejects booking attempts for unbookable venues with `ValidationException` (HTTP 422).
+  - [x] In `VenueBookingService::createBooking`: Enforces defense-in-depth domain check rejecting unbookable listings before pricing and slot calculations.
+  - [x] In `CheckAvailabilityTool`: Returns `is_slot_available: false, is_bookable: false` along with direct host contact information.
+  - [x] In `RequestQuoteTool`: Rejects automated quotes for unbookable venues with host contact guidance.
+- [x] **Phase 6: Automated Verification & Mandatory Self-Review**:
+  - [x] Pest test suite: Added `tests/Feature/Marketplace/UnbookableVenueTest.php` (5 tests, 13 assertions) and `tests/Feature/Marketing/LandingPageTest.php` (4 tests, 12 assertions).
+  - [x] Full marketplace suite: All tests passing cleanly (86 tests, 485 assertions across `tests/Feature/Marketplace/` and `Marketing/`).
+  - [x] Laravel Pint formatting: Clean (`vendor/bin/pint --dirty`).
+  - [x] Frontend bundling: `npm run build` compiled cleanly (2,590 modules transformed, 0 errors).
+  - [x] Mandatory 3-agent post-implementation self-review audit (Security, Logic/Edge Cases, Architecture/Performance) completed with all findings resolved:
+    - Added defense-in-depth check in `VenueBookingService::createBooking`.
+    - Added fallback for `availability.message` in `VenueBookingDrawer.jsx`.
+    - Added `$path !== ''` guard against root path collisions in `product.blade.php`.
+    - Imported `ValidationException` cleanly in `VenueBookingController`.
+
+

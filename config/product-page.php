@@ -16,6 +16,7 @@ return [
     'nav' => [
         'links' => [
             ['label' => 'Features', 'href' => '/#features'],
+            ['label' => 'Marketplace', 'href' => '/marketplace'],
             ['label' => 'Pricing', 'href' => '/#pricing'],
             ['label' => 'Enterprise', 'href' => '/product-enterprise'],
         ],
@@ -189,6 +190,7 @@ return [
         'columns' => [
             'Product' => [
                 ['label' => 'Features', 'href' => '/product-template#features'],
+                ['label' => 'Venue Marketplace', 'href' => '/marketplace'],
                 ['label' => 'Pricing', 'href' => '/product-template#pricing'],
                 ['label' => 'Enterprise', 'href' => '/product-enterprise'],
             ],

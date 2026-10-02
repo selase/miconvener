@@ -487,13 +487,28 @@ export default function VenueShow({ venue, otherSpaces = [] }) {
                                     </span>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={() => setInquiryModalOpen(true)}
-                                    className="w-full rounded-lg bg-accent py-3 text-xs font-semibold text-white shadow-xs hover:bg-accent/90 transition-colors"
-                                >
-                                    Request to Book / Inquire
-                                </button>
+                                {venue.is_bookable === false ? (
+                                    <div className="space-y-2">
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="w-full rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-3 text-xs font-semibold text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none"
+                                        >
+                                            Online Booking Unavailable
+                                        </button>
+                                        <p className="text-[11px] text-center text-ink-secondary leading-relaxed">
+                                            Online reservations are temporarily paused for this venue while onboarding completes. Please contact the host directly via phone or email below.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => setInquiryModalOpen(true)}
+                                        className="w-full rounded-lg bg-accent py-3 text-xs font-semibold text-white shadow-xs hover:bg-accent/90 transition-colors"
+                                    >
+                                        Request to Book / Inquire
+                                    </button>
+                                )}
                             </div>
 
                             {/* Host Contact Snapshot */}

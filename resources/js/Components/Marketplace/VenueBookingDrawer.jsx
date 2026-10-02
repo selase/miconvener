@@ -497,6 +497,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 <AlertCircle className="h-3.5 w-3.5" />
                                 <span>
                                     {availability.errorMessage ||
+                                        availability.message ||
                                         'Selected time is already booked or held. Please select another slot.'}
                                 </span>
                             </div>
@@ -703,7 +704,15 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
 
                     {/* Submission CTA */}
                     <div className="pt-2">
-                        {isPriceOnRequest ? (
+                        {venue.is_bookable === false ? (
+                            <button
+                                type="button"
+                                disabled
+                                className="w-full rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-3 text-xs font-semibold text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none flex items-center justify-center gap-2"
+                            >
+                                <span>Online Booking Unavailable</span>
+                            </button>
+                        ) : isPriceOnRequest ? (
                             <button
                                 type="submit"
                                 disabled={submitting || !availability.available}

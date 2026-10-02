@@ -66,6 +66,10 @@ final class RequestQuoteTool extends Tool
             return Response::error("Venue space '{$slug}' not found.");
         }
 
+        if (! $listing->isBookable()) {
+            return Response::error("Venue space '{$listing->title}' is not currently accepting automated online quote requests. Please contact host directly at {$listing->shop?->email} or {$listing->shop?->phone}.");
+        }
+
         /** @var \App\Models\Tenant|null $partnerTenant */
         $partnerTenant = request()->attributes->get('mcp_partner_tenant');
         /** @var \App\Models\TenantApiKey|null $partnerApiKey */

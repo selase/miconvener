@@ -72,8 +72,13 @@
 
                 <nav class="hidden items-center gap-8 md:flex">
                     @foreach (config('product-page.nav.links') as $l)
+                        @php
+                            $path = trim($l['href'], '/');
+                            $isActive = request()->url() == $l['href']
+                                || (str_starts_with($l['href'], '/') && !str_starts_with($l['href'], '/#') && $path !== '' && request()->is($path.'*'));
+                        @endphp
                         <a href="{{ $l['href'] }}"
-                            class="text-sm {{ request()->url() == $l['href'] ? 'text-slate-900 font-semibold' : 'text-slate-500 hover:text-slate-900' }} transition">
+                            class="text-sm {{ $isActive ? 'text-slate-900 font-semibold' : 'text-slate-500 hover:text-slate-900' }} transition">
                             {{ $l['label'] }}
                         </a>
                     @endforeach

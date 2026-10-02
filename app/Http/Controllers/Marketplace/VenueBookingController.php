@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -45,6 +46,15 @@ final class VenueBookingController extends Controller
             ->where('listing_kind', StoreListing::KIND_VENUE)
             ->where('status', StoreListing::STATUS_PUBLISHED)
             ->firstOrFail();
+
+        if (! $listing->isBookable()) {
+            return response()->json([
+                'available' => false,
+                'is_bookable' => false,
+                'message' => 'Online reservations are temporarily unavailable for this venue space.',
+                'pricing' => null,
+            ]);
+        }
 
         $startsAt = Carbon::parse($validated['starts_at']);
         $endsAt = Carbon::parse($validated['ends_at']);
@@ -125,6 +135,12 @@ final class VenueBookingController extends Controller
             ->where('status', StoreListing::STATUS_PUBLISHED)
             ->whereHas('shop', fn ($q) => $q->where('is_active', true))
             ->firstOrFail();
+
+        if (! $listing->isBookable()) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'Direct online reservations are currently unavailable for this venue. Please contact the host directly.',
+            ]);
+        }
 
         $user = $request->user();
         /** @var \App\Models\Tenant|null $plannerTenant */

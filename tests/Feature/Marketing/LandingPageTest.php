@@ -34,3 +34,11 @@ test('the landing page shows prices in the currency that is actually charged', f
 test('the enterprise page renders', function (): void {
     $this->get('/product-enterprise')->assertOk();
 });
+
+test('the landing page renders direct links to the marketplace in navigation and footer', function (): void {
+    $response = $this->get('/');
+
+    $response->assertOk();
+    $response->assertSee('/marketplace', false);
+    $response->assertSee('Marketplace', false);
+});

@@ -64,6 +64,22 @@ final class CheckAvailabilityTool extends Tool
             return Response::error("Venue space '{$slug}' is either inactive or does not exist.");
         }
 
+        if (! $listing->isBookable()) {
+            return Response::text(json_encode([
+                'venue' => $listing->title,
+                'host' => $listing->shop?->name,
+                'is_operational' => true,
+                'is_slot_available' => false,
+                'is_bookable' => false,
+                'note' => 'Direct online reservations are currently paused for this venue while onboarding completes. Please contact the venue directly.',
+                'contact' => [
+                    'phone' => $listing->shop?->phone,
+                    'email' => $listing->shop?->email,
+                ],
+                'direct_url' => url("/marketplace/venues/{$listing->slug}"),
+            ], JSON_PRETTY_PRINT));
+        }
+
         $dateStr = $request->get('date') ? (string) $request->get('date') : null;
         $startTime = $request->get('start_time') ? (string) $request->get('start_time') : null;
         $endTime = $request->get('end_time') ? (string) $request->get('end_time') : null;
