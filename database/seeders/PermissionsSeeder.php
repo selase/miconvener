@@ -189,6 +189,18 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'read badge-template',
+                'guard_name' => 'web',
+                'category' => 'event',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'update badge-template',
+                'guard_name' => 'web',
+                'category' => 'event',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'manage participant-groups',
                 'guard_name' => 'web',
                 'category' => 'stratification',

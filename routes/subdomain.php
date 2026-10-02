@@ -234,6 +234,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/decks/{deck}/end', [EventPollDeckController::class, 'end'])->whereUuid('deck')->name('tenant.events.decks.end');
 
     Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
+    Route::post('events/{event}/badges/template', [EventBadgeController::class, 'updateTemplate'])->name('tenant.events.badges.template.update');
     Route::post('events/{event}/badges/print-log', [EventBadgeController::class, 'logPrint'])->name('tenant.events.badges.print-log');
 
     Route::get('events/{event}/data/finance', [EventFinanceController::class, 'index'])->name('tenant.events.finance.index');

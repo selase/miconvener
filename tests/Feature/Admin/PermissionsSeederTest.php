@@ -125,6 +125,14 @@ test('every permission the code checks is one the seeder defines', function () {
     expect(array_values(array_unique($undefined)))->toBe([]);
 });
 
+test('badge template permissions are deployed to built in organizer roles', function (): void {
+    Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+
+    foreach (['Superadmin', 'Org Superadmin', 'Org Admin'] as $role) {
+        expect(Role::findByName($role)->hasAllPermissions(['read badge-template', 'update badge-template']))->toBeTrue();
+    }
+});
+
 test('the cross-tenant LLM usage screen is for the application superadmin only', function () {
     $tenant = App\Models\Tenant::factory()->create(['slug' => 'acme', 'isolation_mode' => 'shared']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
