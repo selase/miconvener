@@ -144,7 +144,19 @@ export default function CertificateDesignEditor({
                 </div>
             </div>
             <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
-                <ArtifactLayoutPreview form={form} backgroundUrl={backgroundUrl} />
+                <ArtifactLayoutPreview
+                    form={form}
+                    backgroundUrl={
+                        backgroundUrl ||
+                        (!form.remove_background && template?.background_path
+                            ? route('tenant.events.certificates.templates.artwork', {
+                                  event: eventId,
+                                  template: template.id,
+                                  type: 'background',
+                              })
+                            : null)
+                    }
+                />
                 <p className="text-[11px] text-slate-500">
                     Preview uses representative data. Download the PDF to confirm print output.
                 </p>

@@ -110,6 +110,18 @@ final class ArtifactArtworkService
 
     public function dataUri(string $disk, string $path): string
     {
+        $bytes = $this->contents($disk, $path);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+
+        if (! is_string($mime) || ! isset(self::EXTENSIONS[$mime])) {
+            throw new RuntimeException('Stored artwork is not a supported image.');
+        }
+
+        return sprintf('data:%s;base64,%s', $mime, base64_encode($bytes));
+    }
+
+    public function contents(string $disk, string $path): string
+    {
         try {
             $bytes = $this->filesystems->disk($disk)->get($path);
         } catch (Throwable $exception) {
@@ -120,13 +132,7 @@ final class ArtifactArtworkService
             throw new RuntimeException('Stored artwork is unavailable.');
         }
 
-        $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
-
-        if (! is_string($mime) || ! isset(self::EXTENSIONS[$mime])) {
-            throw new RuntimeException('Stored artwork is not a supported image.');
-        }
-
-        return sprintf('data:%s;base64,%s', $mime, base64_encode($bytes));
+        return $bytes;
     }
 
     public function delete(string $disk, ?string $path): void

@@ -74,6 +74,8 @@ test('organizer can update badge dimensions layout tier styles and artwork', fun
     $template = EventBadgeTemplate::query()->where('event_id', $event->id)->firstOrFail();
     Storage::disk('public')->assertExists($template->background_path);
     expect($template->tier_styles['vip']['background_color'])->toBe('#7C3AED');
+    $this->actingAs($user)->get("http://{$host}/events/{$event->id}/badges/template/artwork", ['HTTP_HOST' => $host])
+        ->assertOk()->assertHeader('content-type', 'image/png');
 });
 
 test('badge template validation rejects unsafe dimensions and unknown elements', function (array $overrides, string $field): void {

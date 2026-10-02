@@ -16,6 +16,7 @@ export default function BadgeDesignEditor({
     form,
     setForm,
     existingBackground,
+    existingBackgroundUrl,
     saving,
     onSave,
     onCancel,
@@ -212,7 +213,12 @@ export default function BadgeDesignEditor({
                 </div>
             </div>
             <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
-                <BadgeLayoutPreview template={form} backgroundUrl={backgroundUrl} />
+                <BadgeLayoutPreview
+                    template={form}
+                    backgroundUrl={
+                        backgroundUrl || (!form.remove_background ? existingBackgroundUrl : null)
+                    }
+                />
                 <div className="flex justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
                     <Button
                         type="button"

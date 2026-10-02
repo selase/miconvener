@@ -235,6 +235,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
     Route::post('events/{event}/badges/template', [EventBadgeController::class, 'updateTemplate'])->name('tenant.events.badges.template.update');
+    Route::get('events/{event}/badges/template/artwork', [EventBadgeController::class, 'artwork'])->name('tenant.events.badges.template.artwork');
     Route::post('events/{event}/badges/print-log', [EventBadgeController::class, 'logPrint'])->name('tenant.events.badges.print-log');
     Route::post('events/{event}/badges/sheet', [EventBadgeController::class, 'sheet'])->name('tenant.events.badges.sheet');
 
@@ -301,6 +302,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/certificates/templates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'storeTemplate'])->name('tenant.events.certificates.templates.store');
     Route::put('events/{event}/certificates/templates/{template}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'updateTemplate'])->name('tenant.events.certificates.templates.update');
     Route::get('events/{event}/certificates/templates/{template}/preview', [App\Http\Controllers\Tenant\EventCertificateController::class, 'preview'])->name('tenant.events.certificates.templates.preview');
+    Route::get('events/{event}/certificates/templates/{template}/artwork/{type}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'artwork'])->name('tenant.events.certificates.templates.artwork');
     Route::post('events/{event}/certificates/issue', [App\Http\Controllers\Tenant\EventCertificateController::class, 'issue'])->name('tenant.events.certificates.issue');
     Route::get('events/{event}/certificates/{certificate}/download', [App\Http\Controllers\Tenant\EventCertificateController::class, 'download'])->name('tenant.events.certificates.download');
     Route::delete('events/{event}/certificates/{certificate}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'destroy'])->name('tenant.events.certificates.destroy');

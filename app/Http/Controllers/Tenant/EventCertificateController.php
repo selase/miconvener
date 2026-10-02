@@ -16,6 +16,7 @@ use App\Services\Certificates\CertificateDesignVersionService;
 use App\Services\Certificates\CertificatePdfService;
 use App\Services\Design\ArtifactArtworkService;
 use App\Services\Design\ArtifactLayoutValidator;
+use finfo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -134,6 +135,20 @@ final class EventCertificateController extends Controller
         $certificate->setRelation('registration', null);
 
         return $this->pdfs->generatePdf($certificate)->stream('certificate-preview.pdf');
+    }
+
+    public function artwork(string $subdomain, Event $event, EventCertificateTemplate $template, string $type): Response
+    {
+        Gate::authorize('read certificate');
+        abort_unless($template->event_id === $event->id && in_array($type, ['background', 'signature'], true), 404);
+        $disk = $template->getAttribute("{$type}_disk");
+        $path = $template->getAttribute("{$type}_path");
+        abort_unless(is_string($disk) && is_string($path), 404);
+        $bytes = $this->artwork->contents($disk, $path);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        abort_unless(is_string($mime) && in_array($mime, ['image/png', 'image/jpeg'], true), 404);
+
+        return response($bytes, 200, ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=300']);
     }
 
     public function issue(Request $request, string $subdomain, Event $event): JsonResponse

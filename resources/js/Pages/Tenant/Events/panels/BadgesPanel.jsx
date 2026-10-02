@@ -287,6 +287,13 @@ export default function BadgesPanel({ event }) {
                         form={designForm}
                         setForm={setDesignForm}
                         existingBackground={template?.background_path}
+                        existingBackgroundUrl={
+                            template?.background_path
+                                ? route('tenant.events.badges.template.artwork', {
+                                      event: event.id,
+                                  })
+                                : null
+                        }
                         saving={savingDesign}
                         onSave={saveDesign}
                         onCancel={() => setDesignerOpen(false)}

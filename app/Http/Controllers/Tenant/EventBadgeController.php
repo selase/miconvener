@@ -16,6 +16,7 @@ use App\Services\Design\ArtifactArtworkService;
 use App\Services\Design\ArtifactLayoutValidator;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Tenancy\TenantContext;
+use finfo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -118,6 +119,20 @@ final class EventBadgeController extends Controller
         }
 
         return response()->json(['message' => 'Badge design saved.', 'template' => $template->fresh()]);
+    }
+
+    public function artwork(string $subdomain, string $event): Response
+    {
+        $this->authorize('read badge-template');
+        $tenant = $this->getTenant();
+        $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
+        $template = $this->templates->forEvent($eventModel);
+        abort_unless(is_string($template->background_disk) && is_string($template->background_path), 404);
+        $bytes = $this->artwork->contents($template->background_disk, $template->background_path);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        abort_unless(is_string($mime) && in_array($mime, ['image/png', 'image/jpeg'], true), 404);
+
+        return response($bytes, 200, ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=300']);
     }
 
     public function logPrint(Request $request, string $subdomain, string $event): JsonResponse

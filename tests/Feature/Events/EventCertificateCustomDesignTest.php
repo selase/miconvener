@@ -182,6 +182,8 @@ test('organizer can upload replace and remove certificate artwork', function ():
     $template = $event->certificateTemplates()->where('role', 'delegate')->firstOrFail();
     $firstPath = $template->background_path;
     Storage::disk('public')->assertExists($firstPath);
+    $this->actingAs($user)->get("http://{$host}/events/{$event->id}/certificates/templates/{$template->id}/artwork/background", ['HTTP_HOST' => $host])
+        ->assertOk()->assertHeader('content-type', 'image/png');
 
     $update = $this->actingAs($user)->post("http://{$host}/events/{$event->id}/certificates/templates/{$template->id}", [
         '_method' => 'PUT',
