@@ -28,6 +28,35 @@ final class EventBadgeTemplate extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /** @return array<string, array<string, bool|float|int|string>> */
+    public function layoutSettings(): array
+    {
+        $layout = $this->getAttribute('layout');
+
+        return is_array($layout) ? $layout : [];
+    }
+
+    /** @return array<string, array<string, string>> */
+    public function tierStyleSettings(): array
+    {
+        $styles = $this->getAttribute('tier_styles');
+
+        return is_array($styles) ? $styles : [];
+    }
+
+    /** @return array{paper: string, margin_mm: float, gap_mm: float, crop_marks: bool} */
+    public function sheetSettings(): array
+    {
+        $settings = $this->getAttribute('sheet_settings');
+
+        return [
+            'paper' => is_array($settings) && is_string($settings['paper'] ?? null) ? $settings['paper'] : 'a4',
+            'margin_mm' => is_array($settings) && is_numeric($settings['margin_mm'] ?? null) ? (float) $settings['margin_mm'] : 8.0,
+            'gap_mm' => is_array($settings) && is_numeric($settings['gap_mm'] ?? null) ? (float) $settings['gap_mm'] : 3.0,
+            'crop_marks' => is_array($settings) && is_bool($settings['crop_marks'] ?? null) ? $settings['crop_marks'] : true,
+        ];
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {

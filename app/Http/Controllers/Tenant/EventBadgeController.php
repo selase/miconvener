@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\GenerateBadgeSheetRequest;
 use App\Http\Requests\Tenant\UpdateEventBadgeTemplateRequest;
 use App\Models\Event;
 use App\Models\EventBadgePrint;
 use App\Models\EventRegistration;
+use App\Services\Badges\BadgePdfService;
 use App\Services\Badges\BadgeTemplateService;
 use App\Services\Design\ArtifactArtworkService;
 use App\Services\Design\ArtifactLayoutValidator;
@@ -16,14 +18,17 @@ use App\Services\Events\QrCodeGenerator;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 final class EventBadgeController extends Controller
 {
     public function __construct(
         private readonly BadgeTemplateService $templates,
+        private readonly BadgePdfService $pdfs,
         private readonly ArtifactArtworkService $artwork,
         private readonly ArtifactLayoutValidator $layouts,
     ) {}
@@ -139,6 +144,46 @@ final class EventBadgeController extends Controller
         EventBadgePrint::insert($rows);
 
         return response()->json(['message' => 'Print logged.']);
+    }
+
+    public function sheet(GenerateBadgeSheetRequest $request, string $subdomain, string $event): Response
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
+        $ids = $request->validated('registration_ids');
+        $registrations = $eventModel->registrations()
+            ->whereIn('id', $ids)
+            ->with(['ticketType:id,name,badge_tier', 'seatAssignment'])
+            ->orderBy('full_name')
+            ->orderBy('id')
+            ->get();
+
+        if ($registrations->count() !== count($ids)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'registration_ids' => 'Every selected registration must belong to this event.',
+            ]);
+        }
+
+        $template = $this->templates->forEvent($eventModel);
+        $output = $this->pdfs->generate($eventModel, $template, $registrations)->output();
+
+        $now = now();
+        $rows = $registrations->map(fn (EventRegistration $registration): array => [
+            'id' => (string) Str::uuid(),
+            'tenant_id' => $tenant->id,
+            'event_id' => $eventModel->id,
+            'registration_id' => $registration->id,
+            'printed_by' => $request->user()->id,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->all();
+        DB::connection('landlord')->transaction(fn () => EventBadgePrint::query()->insert($rows), 3);
+
+        return response($output, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="badges-'.$eventModel->id.'.pdf"',
+        ]);
     }
 
     private function getTenant()
