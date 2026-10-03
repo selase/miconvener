@@ -129,6 +129,54 @@ new class extends Component
             @endforeach
         </div>
 
+        {{-- Modular Add-Ons Section --}}
+        <div class="mt-16 rounded-2xl border border-slate-200 bg-slate-50/70 p-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-200/80">
+                <div>
+                    <div class="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                        Modular Capacity
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mt-2">Need extra capability without upgrading tiers?</h3>
+                    <p class="text-sm text-slate-500 mt-0.5">Activate workspace add-ons or purchase single-event passes anytime in your console.</p>
+                </div>
+                <div class="flex-none">
+                    <a href="/register?plan=starter" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors shadow-sm">
+                        Get Started
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Team Capacity</div>
+                    <div class="text-base font-bold text-slate-900 mt-1">Extra Team Seat</div>
+                    <div class="text-sm font-semibold text-blue-600 mt-0.5">{{ $currency }} 75.00 <span class="text-xs font-normal text-slate-400">/ seat / mo</span></div>
+                    <p class="text-xs text-slate-500 mt-2">Add unlimited collaborating team members with granular permission roles.</p>
+                </div>
+                <div class="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">On-Site Gate Control</div>
+                    <div class="text-base font-bold text-slate-900 mt-1">Usher / Scanner Pack</div>
+                    <div class="text-sm font-semibold text-blue-600 mt-0.5">{{ $currency }} 60.00 <span class="text-xs font-normal text-slate-400">/ mo</span></div>
+                    <p class="text-xs text-slate-500 mt-2">5 dedicated mobile scanning passes for door staff and check-in teams.</p>
+                </div>
+                <div class="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Audience Engagement</div>
+                    <div class="text-base font-bold text-slate-900 mt-1">Live Polling & Q&A</div>
+                    <div class="text-sm font-semibold text-blue-600 mt-0.5">{{ $currency }} 85.00 <span class="text-xs font-normal text-slate-400">/ mo</span> <span class="text-[11px] text-slate-400">or {{ $currency }} 50 / event</span></div>
+                    <p class="text-xs text-slate-500 mt-2">Real-time audience voting, live charts, leaderboard quizzes, and moderated Q&A.</p>
+                </div>
+                <div class="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Communication Packs</div>
+                    <div class="text-base font-bold text-slate-900 mt-1">Prepaid SMS & Email</div>
+                    <div class="text-sm font-semibold text-blue-600 mt-0.5">From {{ $currency }} 25.00 <span class="text-xs font-normal text-slate-400">prepaid</span></div>
+                    <p class="text-xs text-slate-500 mt-2">Prepaid SMS bundles (500, 1.5k, 5k) and high-volume email blast packs (5k, 25k).</p>
+                </div>
+            </div>
+        </div>
+
         {{-- Enterprise footer note --}}
         <div class="mt-10 text-center">
             <p class="text-sm text-slate-400">

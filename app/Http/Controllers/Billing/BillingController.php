@@ -94,6 +94,7 @@ final class BillingController extends Controller
         $tenant = $tenantContext->getTenant();
         $packages = Package::where('is_active', true)->with('features')->orderBy('sort_order')->get();
         $planWarnings = app(PlanChangeWarnings::class);
+        $catalogPlans = collect(config('product-page.plans'))->keyBy('slug');
 
         return Inertia::render('Billing/Pricing', [
             'packages' => $packages->map(fn (Package $package): array => [
@@ -103,7 +104,8 @@ final class BillingController extends Controller
                 'price' => (float) $package->price,
                 'yearly_price' => (float) ($package->yearly_price ?? $package->price * 10),
                 'is_free' => $package->isFree(),
-                'features' => $package->features->pluck('name'),
+                'is_custom' => $package->slug === 'enterprise' || (! $package->isFree() && (float) $package->price === 0.0),
+                'features' => $catalogPlans->get($package->slug)['features'] ?? $package->features->pluck('name'),
                 // What this plan would cost them, so the choice is made with
                 // the facts rather than discovered afterwards.
                 'warnings' => $package->slug === $tenant->package?->slug

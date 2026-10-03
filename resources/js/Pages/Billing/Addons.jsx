@@ -76,15 +76,14 @@ export default function Addons({
 
             <PageHeader
                 title="Modular Add-Ons"
-                description="Scale team seats, live polling, usher passes, and messaging credits dynamically without changing your base tier."
                 actions={
                     <div className="flex items-center gap-2">
-                        <Link href={route('tenant.pricing')}>
-                            <Button variant="outline">View Core Plans</Button>
-                        </Link>
-                        <Link href={route('billing.index')}>
-                            <Button variant="default">Billing Overview</Button>
-                        </Link>
+                        <Button href={route('tenant.pricing')} variant="default">
+                            View Core Plans
+                        </Button>
+                        <Button href={route('billing.index')} variant="default">
+                            Billing Overview
+                        </Button>
                     </div>
                 }
             />
@@ -340,28 +339,34 @@ export default function Addons({
                                     <Th>Billing Interval</Th>
                                     <Th>Status</Th>
                                     <Th>Event / Period</Th>
-                                    <Th className="text-right">Action</Th>
+                                    <Th align="right">Action</Th>
                                 </Tr>
                             </Thead>
                             <tbody>
                                 {activeAddons.length === 0 ? (
-                                    <TableEmpty colSpan={7}>
-                                        No active modular add-ons yet. Pick from the catalog above
-                                        to add seats, polling, or message packs.
-                                    </TableEmpty>
+                                    <tr>
+                                        <td colSpan={7}>
+                                            <TableEmpty
+                                                title="No active modular add-ons yet"
+                                                description="Pick from the catalog above to add seats, polling, or message packs."
+                                            />
+                                        </td>
+                                    </tr>
                                 ) : (
                                     activeAddons.map((addon) => (
                                         <Tr key={addon.id}>
-                                            <Td className="font-medium text-ink">{addon.name}</Td>
+                                            <Td>
+                                                <span className="font-medium text-ink">{addon.name}</span>
+                                            </Td>
                                             <Td>{addon.quantity}</Td>
                                             <Td>{addon.total_price}</Td>
-                                            <Td className="capitalize">
-                                                {addon.billing_interval.replace('_', ' ')}
+                                            <Td>
+                                                <span className="capitalize">{addon.billing_interval.replace('_', ' ')}</span>
                                             </Td>
                                             <Td>
                                                 <StatusPill status={addon.status} />
                                             </Td>
-                                            <Td className="text-xs text-ink-secondary">
+                                            <Td muted>
                                                 {addon.event_name ? (
                                                     <span>Event: {addon.event_name}</span>
                                                 ) : addon.period_end ? (
@@ -372,10 +377,10 @@ export default function Addons({
                                                     <span>One-off credit</span>
                                                 )}
                                             </Td>
-                                            <Td className="text-right">
+                                            <Td align="right">
                                                 {addon.can_cancel && (
                                                     <Button
-                                                        variant="ghost"
+                                                        variant="default"
                                                         className="text-xs text-rose-600 hover:text-rose-700"
                                                         onClick={() =>
                                                             handleCancel(addon.id, addon.name)

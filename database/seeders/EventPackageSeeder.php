@@ -168,6 +168,8 @@ final class EventPackageSeeder extends Seeder
 
     private function seedPackages(): void
     {
+        Package::whereNotIn('slug', array_keys($this->packages))->update(['is_active' => false]);
+
         foreach ($this->packages as $slug => $config) {
             $package = Package::updateOrCreate(
                 ['slug' => $slug],
