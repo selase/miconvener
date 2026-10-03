@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="200" viewBox="0 0 640 200">
+  <rect width="640" height="200" fill="#ffffff"/>
+  <polygon points="100,38 158,100 100,162 42,100" fill="#b45309"/>
+  <polygon points="100,66 130,100 100,134 70,100" fill="#fcd34d"/>
+  <text x="185" y="98" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" fill="#1c1917">Ashanti</text>
+  <text x="187" y="142" font-family="Helvetica, Arial, sans-serif" font-size="27" letter-spacing="6" fill="#b45309">PHARMA GROUP</text>
+</svg>

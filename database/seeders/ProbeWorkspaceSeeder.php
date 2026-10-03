@@ -419,6 +419,7 @@ final class ProbeWorkspaceSeeder extends Seeder
                     'booth' => $booth,
                     'contact_name' => $contact,
                     'contact_email' => sprintf('%s+sponsor-%s@%s', $local, Str::slug($name), $domain),
+                    'logo_path' => $this->storeImage('sponsors/'.Str::slug($name).'.png', 'events/sponsors/'.self::EVENT_SLUG.'-'.Str::slug($name).'.png'),
                     'amount' => $amount,
                     'currency' => 'GHS',
                     'sort_order' => $order,
