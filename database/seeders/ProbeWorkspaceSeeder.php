@@ -61,6 +61,9 @@ final class ProbeWorkspaceSeeder extends Seeder
     /** What the demo event was called before it was given a realistic identity. */
     public const string LEGACY_EVENT_SLUG = 'probe-full-experience';
 
+    /** The deck that walks through every newer question type. */
+    public const string SHOWCASE_DECK = 'Interactive showcase';
+
     /** Every paid ticket, in pesewas: cheap enough to buy for real in a demo. */
     public const int DEMO_PRICE = 200;
 
@@ -923,13 +926,120 @@ final class ProbeWorkspaceSeeder extends Seeder
         }
 
         // Anything this seeder no longer owns goes, so a question dropped from
-        // the plan cannot linger on the wall.
+        // the plan cannot linger on the wall. The showcase deck's questions
+        // are owned by showcase() and left for it to maintain.
+        $showcase = PollDeck::query()->where('event_id', $event->id)->where('title', self::SHOWCASE_DECK)->value('id');
+
         EventPoll::query()
             ->where('event_id', $event->id)
             ->whereNotIn('id', $kept)
+            ->when($showcase !== null, fn ($query) => $query->where(fn ($q) => $q->whereNull('deck_id')->orWhere('deck_id', '!=', $showcase)))
             ->delete();
 
         $this->deck($event);
+        $this->showcase($event);
+    }
+
+    /**
+     * A second deck with one question of every newer type, already answered
+     * by the room, so a demo can walk through every chart the product draws
+     * without waiting for votes. Draft, like the first deck: starting it is the
+     * thing being shown.
+     */
+    private function showcase(Event $event): void
+    {
+        /** @var PollDeck $deck */
+        $deck = PollDeck::query()->updateOrCreate(
+            ['event_id' => $event->id, 'title' => self::SHOWCASE_DECK],
+            [
+                'tenant_id' => $event->tenant_id,
+                'join_code' => PollDeck::query()->where('event_id', $event->id)->where('title', self::SHOWCASE_DECK)->value('join_code') ?? PollDeck::generateJoinCode(),
+                'status' => PollDeck::STATUS_DRAFT,
+                'present_token' => PollDeck::query()->where('event_id', $event->id)->where('title', self::SHOWCASE_DECK)->value('present_token') ?? Str::random(48),
+            ]
+        );
+        $deck->setCurrentPoll(null);
+
+        $plan = [
+            [EventPoll::TYPE_YES_NO, 'Does your facility use an electronic health record today?', [], null,
+                fn (array $o): array => [...array_fill(0, 34, ['option_id' => $o['Yes']]), ...array_fill(0, 18, ['option_id' => $o['No']])]],
+            [EventPoll::TYPE_RATING, 'How would you rate the summit so far?', [], null,
+                fn (array $o): array => array_merge(...array_map(fn (string $star, int $n): array => array_fill(0, $n, ['option_id' => $o[$star]]), ['5', '4', '3', '2', '1'], [21, 17, 6, 2, 1]))],
+            [EventPoll::TYPE_SCALE, 'How ready is your facility for NHIA e-claims?', [], ['min' => 1, 'max' => 10, 'label_min' => 'Not ready', 'label_max' => 'Fully ready'],
+                fn (array $o): array => array_map(fn (int $v): array => ['response_number' => $v], [2, 3, 3, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 3, 5, 6, 7, 8, 4, 6, 7])],
+            [EventPoll::TYPE_NUMBER, 'How many beds does your facility have?', [], ['unit' => 'beds'],
+                fn (array $o): array => array_map(fn (int $v): array => ['response_number' => $v], [12, 18, 24, 30, 30, 40, 45, 60, 60, 80, 96, 120, 150, 180, 200, 240, 300, 400, 420, 650])],
+            [EventPoll::TYPE_MULTI_SELECT, 'Which of these would you fund first? Pick any.', ['Connectivity', 'Staff training', 'Hardware', 'Data security', 'Patient-facing apps'], null,
+                fn (array $o): array => array_map(fn (array $picks): array => ['response_payload' => array_map(fn (string $p): string => $o[$p], $picks)], [
+                    ...array_fill(0, 14, ['Connectivity', 'Staff training']),
+                    ...array_fill(0, 9, ['Staff training', 'Data security']),
+                    ...array_fill(0, 7, ['Connectivity', 'Hardware', 'Staff training']),
+                    ...array_fill(0, 5, ['Patient-facing apps']),
+                    ...array_fill(0, 6, ['Connectivity', 'Data security']),
+                ])],
+            [EventPoll::TYPE_WORD_CLOUD, 'In one to three words: what does digital health in Ghana need most?', [], null,
+                fn (array $o): array => array_map(fn (array $words): array => ['response_payload' => $words, 'response_text' => implode(', ', $words)], [
+                    ...array_fill(0, 11, ['connectivity', 'training']),
+                    ...array_fill(0, 7, ['funding']),
+                    ...array_fill(0, 6, ['interoperability', 'trust']),
+                    ...array_fill(0, 4, ['data security']),
+                    ...array_fill(0, 3, ['leadership', 'funding']),
+                    ['power supply'], ['patient privacy'], ['local developers'], ['policy', 'trust'], ['standards'],
+                ])],
+            [EventPoll::TYPE_RANKING, 'Rank these priorities for the next national strategy.', ['Interoperability', 'Workforce', 'Funding', 'Data privacy'], null,
+                fn (array $o): array => array_map(fn (array $order): array => ['response_payload' => array_map(fn (string $p): string => $o[$p], $order)], [
+                    ...array_fill(0, 12, ['Funding', 'Workforce', 'Interoperability', 'Data privacy']),
+                    ...array_fill(0, 8, ['Workforce', 'Funding', 'Interoperability', 'Data privacy']),
+                    ...array_fill(0, 6, ['Interoperability', 'Funding', 'Data privacy', 'Workforce']),
+                    ...array_fill(0, 4, ['Data privacy', 'Interoperability', 'Workforce', 'Funding']),
+                ])],
+        ];
+
+        foreach ($plan as $position => [$type, $question, $labels, $settings, $answers]) {
+            /** @var EventPoll $poll */
+            $poll = EventPoll::query()->updateOrCreate(
+                ['event_id' => $event->id, 'question' => $question],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'deck_id' => $deck->id,
+                    'position' => $position,
+                    'type' => $type,
+                    'status' => EventPoll::STATUS_DRAFT,
+                    'settings' => $settings,
+                    'requires_moderation' => false,
+                    'points' => 0,
+                ]
+            );
+
+            $labels = match ($type) {
+                EventPoll::TYPE_YES_NO => ['Yes', 'No'],
+                EventPoll::TYPE_RATING => ['1', '2', '3', '4', '5'],
+                default => $labels,
+            };
+
+            foreach ($labels as $order => $label) {
+                EventPollOption::query()->updateOrCreate(
+                    ['poll_id' => $poll->id, 'label' => $label],
+                    ['tenant_id' => $event->tenant_id, 'sort_order' => $order, 'is_correct' => false]
+                );
+            }
+
+            $options = EventPollOption::query()->where('poll_id', $poll->id)->pluck('id', 'label')->all();
+
+            // Rebuilt from the plan each time, so demo votes cast on a previous
+            // run do not accumulate on top of the room's seeded answers.
+            $poll->responses()->delete();
+
+            foreach ($answers($options) as $i => $answer) {
+                EventPollResponse::query()->create([
+                    'tenant_id' => $event->tenant_id,
+                    'poll_id' => $poll->id,
+                    'respondent_token' => "showcase-{$i}",
+                    'is_approved' => true,
+                    ...$answer,
+                ]);
+            }
+        }
     }
 
     /**

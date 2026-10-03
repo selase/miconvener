@@ -5,8 +5,26 @@ import Select from '@/Components/Console/Select';
 import StatusPill from '@/Components/Console/StatusPill';
 import { Trash2, Plus, X, Check, Trophy } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
+import PollChart from '@/Components/Polls/PollChart';
 
 const STATUS_TONE = { draft: 'neutral', live: 'success', closed: 'failed' };
+
+/** Types where the organiser writes the options. Yes/no and rating fix their own. */
+const AUTHORED_OPTION_TYPES = ['multiple_choice', 'quiz', 'multi_select', 'ranking'];
+
+/** Types the console draws with the wall's own chart. */
+const CHARTED_TYPES = ['yes_no', 'rating', 'scale', 'number', 'multi_select', 'word_cloud', 'ranking'];
+
+const TYPE_LABELS = {
+    quiz: 'Quiz',
+    yes_no: 'Yes / No',
+    rating: 'Rating',
+    scale: 'Scale',
+    number: 'Number',
+    multi_select: 'Multiple select',
+    word_cloud: 'Word cloud',
+    ranking: 'Ranking',
+};
 
 function NewPollForm({ event, onCreated }) {
     const [type, setType] = useState('multiple_choice');
@@ -16,7 +34,16 @@ function NewPollForm({ event, onCreated }) {
     const [timerSeconds, setTimerSeconds] = useState(20);
     const [points, setPoints] = useState(10);
     const [requiresModeration, setRequiresModeration] = useState(true);
+    const [scaleMin, setScaleMin] = useState(1);
+    const [scaleMax, setScaleMax] = useState(10);
+    const [labelMin, setLabelMin] = useState('');
+    const [labelMax, setLabelMax] = useState('');
+    const [unit, setUnit] = useState('');
+    const [formError, setFormError] = useState(null);
     const [saving, setSaving] = useState(false);
+
+    const authored = AUTHORED_OPTION_TYPES.includes(type);
+    const moderated = type === 'open' || type === 'word_cloud';
 
     const setOption = (i, value) =>
         setOptions((prev) => prev.map((o, idx) => (idx === i ? value : o)));
@@ -27,22 +54,37 @@ function NewPollForm({ event, onCreated }) {
         e.preventDefault();
         setSaving(true);
 
-        const withOptions = type === 'multiple_choice' || type === 'quiz';
+        setFormError(null);
 
-        await csrfFetch(route('tenant.events.polls.store', { event: event.id }), {
+        const response = await csrfFetch(route('tenant.events.polls.store', { event: event.id }), {
             method: 'POST',
             body: JSON.stringify({
                 question,
                 type,
-                options: withOptions ? options.filter((o) => o.trim() !== '') : undefined,
+                options: authored ? options.filter((o) => o.trim() !== '') : undefined,
                 correct_option_index: type === 'quiz' ? correctIndex : undefined,
                 timer_seconds: type === 'quiz' ? timerSeconds : undefined,
                 points: type === 'quiz' ? points : undefined,
-                requires_moderation: type === 'open' ? requiresModeration : undefined,
+                requires_moderation: moderated ? requiresModeration : undefined,
+                settings:
+                    type === 'scale'
+                        ? { min: Number(scaleMin), max: Number(scaleMax), label_min: labelMin, label_max: labelMax }
+                        : type === 'number'
+                          ? { unit }
+                          : undefined,
             }),
         });
 
         setSaving(false);
+
+        // A refused question stays in the form with the reason, rather than
+        // vanishing as though it had been created.
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            const first = data.errors ? Object.values(data.errors)[0] : null;
+            setFormError((Array.isArray(first) ? first[0] : first) || data.message || 'Could not create that question.');
+            return;
+        }
         setQuestion('');
         setOptions(['', '']);
         setCorrectIndex(0);
@@ -60,12 +102,39 @@ function NewPollForm({ event, onCreated }) {
                     required
                 />
                 <Select label="Type" value={type} onChange={(e) => setType(e.target.value)}>
-                    <option value="multiple_choice">Multiple choice</option>
+                    <option value="multiple_choice">Multiple choice — pick one</option>
+                    <option value="multi_select">Multiple select — pick any</option>
+                    <option value="yes_no">Yes / No</option>
+                    <option value="rating">Rating — 1 to 5 stars</option>
+                    <option value="scale">Scale — a point between two ends</option>
+                    <option value="number">Number</option>
+                    <option value="word_cloud">Word cloud</option>
+                    <option value="ranking">Ranking — put options in order</option>
                     <option value="open">Open response</option>
                     <option value="quiz">Quiz (timed, auto-graded)</option>
                 </Select>
 
-                {(type === 'multiple_choice' || type === 'quiz') && (
+                {type === 'scale' && (
+                    <div className="grid grid-cols-2 gap-3">
+                        <Input label="Lowest value" type="number" min="0" max="99" value={scaleMin} onChange={(e) => setScaleMin(e.target.value)} />
+                        <Input label="Highest value" type="number" min="1" max="100" value={scaleMax} onChange={(e) => setScaleMax(e.target.value)} />
+                        <Input label="Label at the low end" placeholder="e.g. Not at all" value={labelMin} onChange={(e) => setLabelMin(e.target.value)} />
+                        <Input label="Label at the high end" placeholder="e.g. Completely" value={labelMax} onChange={(e) => setLabelMax(e.target.value)} />
+                    </div>
+                )}
+
+                {type === 'number' && (
+                    <Input label="Unit (optional)" placeholder="e.g. beds, years, GHS" value={unit} onChange={(e) => setUnit(e.target.value)} />
+                )}
+
+                {['rating', 'scale', 'number'].includes(type) && (
+                    <p className="text-xs text-ink-secondary">
+                        Results stay hidden until five people have answered, so no one's answer can be picked out
+                        in a small room.
+                    </p>
+                )}
+
+                {authored && (
                     <div>
                         <label className="mb-1.5 block text-sm font-medium text-ink">
                             {type === 'quiz' ? 'Options — pick the correct one' : 'Options'}
@@ -127,7 +196,7 @@ function NewPollForm({ event, onCreated }) {
                     </div>
                 )}
 
-                {type === 'open' && (
+                {moderated && (
                     <label className="flex items-center gap-2 text-sm text-ink">
                         <input
                             type="checkbox"
@@ -137,6 +206,8 @@ function NewPollForm({ event, onCreated }) {
                         Review responses before they're shown
                     </label>
                 )}
+
+                {formError && <p className="text-sm text-danger-fg">{formError}</p>}
 
                 <Button type="submit" icon={Plus} variant="primary" disabled={saving}>
                     Create
@@ -185,7 +256,9 @@ function PollCard({ event, poll, onChange }) {
                 <div>
                     <div className="flex items-center gap-2">
                         <b className="text-[13.5px] text-ink">{poll.question}</b>
-                        {poll.type === 'quiz' && <StatusPill status="neutral">Quiz</StatusPill>}
+                        {poll.type !== 'multiple_choice' && poll.type !== 'open' && (
+                            <StatusPill status="neutral">{TYPE_LABELS[poll.type] ?? poll.type}</StatusPill>
+                        )}
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-ink-secondary">
                         <StatusPill status={STATUS_TONE[poll.status]}>{poll.status}</StatusPill>
@@ -258,36 +331,46 @@ function PollCard({ event, poll, onChange }) {
                         )}
                     </ul>
 
-                    {poll.pending_responses.length > 0 && (
-                        <div className="mt-3 border-t border-border pt-3">
-                            <b className="mb-2 block text-xs uppercase tracking-wide text-warning-fg">
-                                Pending review ({poll.pending_responses.length})
-                            </b>
-                            <ul className="space-y-2">
-                                {poll.pending_responses.map((r) => (
-                                    <li
-                                        key={r.id}
-                                        className="flex items-center justify-between gap-3 border border-border px-3 py-2"
-                                    >
-                                        <span className="text-[13px] text-ink">{r.text}</span>
-                                        <div className="flex shrink-0 gap-1.5">
-                                            <Button
-                                                onClick={() => moderate(r.id, true)}
-                                                variant="primary"
-                                            >
-                                                Approve
-                                            </Button>
-                                            <Button onClick={() => moderate(r.id, false)}>
-                                                Reject
-                                            </Button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                    <PendingReview pending={poll.pending_responses} moderate={moderate} />
+                </>
+            )}
+
+            {CHARTED_TYPES.includes(poll.type) && poll.results && (
+                <>
+                    {/* The wall's own chart, so the organiser sees exactly what the room sees. */}
+                    <div className="mt-3 h-56 bg-neutral-950 p-4 text-white">
+                        <PollChart poll={poll.results} />
+                    </div>
+                    {poll.type === 'word_cloud' && (
+                        <PendingReview pending={poll.pending_responses} moderate={moderate} />
                     )}
                 </>
             )}
+        </div>
+    );
+}
+
+function PendingReview({ pending, moderate }) {
+    if (!pending || pending.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="mt-3 border-t border-border pt-3">
+            <b className="mb-2 block text-xs uppercase tracking-wide text-warning-fg">Pending review ({pending.length})</b>
+            <ul className="space-y-2">
+                {pending.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-3 border border-border px-3 py-2">
+                        <span className="text-[13px] text-ink">{r.text}</span>
+                        <div className="flex shrink-0 gap-1.5">
+                            <Button onClick={() => moderate(r.id, true)} variant="primary">
+                                Approve
+                            </Button>
+                            <Button onClick={() => moderate(r.id, false)}>Reject</Button>
+                        </div>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }

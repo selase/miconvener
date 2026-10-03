@@ -51,7 +51,9 @@ final class PollResults
         // Summed across every group, including the null one an open answer
         // falls into, so an open poll still reports how many people replied.
         $total = (int) $grouped->sum('total');
-        $counts = $grouped->pluck('total', 'option_id');
+        // Answers with no option -- a number, a scale point, words -- group
+        // under a null option_id, which is no array key: PHP 8.5 deprecates it.
+        $counts = $grouped->whereNotNull('option_id')->pluck('total', 'option_id');
 
         $options = $poll->options
             ->sortBy('sort_order')
