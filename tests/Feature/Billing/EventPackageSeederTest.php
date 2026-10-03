@@ -43,6 +43,9 @@ test('EventPackageSeeder creates all eleven catalog features', function () {
         'team_seats',
         'email_credits',
         'sms_credits',
+        'paid_tickets',
+        'live_polling',
+        'event_materials',
         'remove_platform_branding',
         'custom-domains',
         'csv_settlement_export',
@@ -51,8 +54,9 @@ test('EventPackageSeeder creates all eleven catalog features', function () {
         'api_access',
     ];
 
-    expect(Feature::whereIn('slug', $catalogSlugs)->count())->toBe(11);
+    expect(Feature::whereIn('slug', $catalogSlugs)->count())->toBe(14);
     expect(Feature::where('slug', 'events_in_flight')->where('type', 'limit')->exists())->toBeTrue();
+    expect(Feature::where('slug', 'live_polling')->where('type', 'boolean')->exists())->toBeTrue();
     expect(Feature::where('slug', 'custom-domains')->where('type', 'boolean')->exists())->toBeTrue();
 });
 

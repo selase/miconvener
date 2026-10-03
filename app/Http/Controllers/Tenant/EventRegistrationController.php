@@ -8,6 +8,7 @@ use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdateEventRegistrationRequest;
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Mail\Events\EventRegistrationOfflineRejected;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationRejected;
 use App\Mail\Events\EventRegistrationVerifyEmail;
@@ -18,6 +19,9 @@ use App\Models\EventRegistrationTransfer;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
+use App\Services\Finance\FeeCalculator;
+use App\Services\Finance\LedgerService;
+use App\Services\Notifications\EventRuleTriggerService;
 use App\Services\Payment\PaystackGateway;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
@@ -26,6 +30,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 final class EventRegistrationController extends Controller
 {
@@ -85,6 +91,164 @@ final class EventRegistrationController extends Controller
         return response()->json(['message' => 'Registration rejected.']);
     }
 
+    public function approveOfflinePayment(string $subdomain, string $event, string $registration): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        return DB::transaction(function () use ($tenant, $eventModel, $registration): JsonResponse {
+            /** @var EventRegistration $registrationModel */
+            $registrationModel = $eventModel->registrations()
+                ->where('id', $registration)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($registrationModel->isConfirmed()) {
+                return response()->json(['message' => 'This registration is already confirmed.'], 422);
+            }
+
+            if ($registrationModel->isCancelled()) {
+                return response()->json(['message' => 'A cancelled registration cannot be approved.'], 422);
+            }
+
+            $effectiveAmount = $registrationModel->effectiveChargedAmount();
+            if ($effectiveAmount <= 0) {
+                return response()->json(['message' => 'Free registrations do not require offline payment approval.'], 422);
+            }
+
+            if (! in_array($registrationModel->offline_payment_status, [
+                EventRegistration::OFFLINE_STATUS_PENDING_VERIFICATION,
+                EventRegistration::OFFLINE_STATUS_PENDING_PROOF,
+                EventRegistration::OFFLINE_STATUS_REJECTED,
+            ], true)) {
+                return response()->json(['message' => 'This registration is not awaiting offline payment verification.'], 422);
+            }
+
+            $fees = app(FeeCalculator::class)->for($eventModel, $effectiveAmount);
+            $platformFee = $fees->platformFee;
+
+            $reference = $registrationModel->payment_reference ?: 'OFFLINE-'.$registrationModel->id;
+
+            $registrationModel->email_verified_at ??= now();
+            $registrationModel->issueTicket();
+            $registrationModel->fill([
+                'status' => EventRegistration::STATUS_CONFIRMED,
+                'payment_method' => $registrationModel->payment_method ?: EventRegistration::PAYMENT_METHOD_OFFLINE_BANK,
+                'offline_payment_status' => EventRegistration::OFFLINE_STATUS_APPROVED,
+                'offline_payment_verified_at' => now(),
+                'offline_payment_verified_by' => auth()->id(),
+                'payment_reference' => $reference,
+            ]);
+            $registrationModel->save();
+
+            app(LedgerService::class)->recordOfflineTicketSale(
+                $eventModel,
+                $registrationModel,
+                $effectiveAmount,
+                $platformFee,
+                $reference,
+                'offline',
+                $reference
+            );
+
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            app(EventRuleTriggerService::class)->registrationCompleted($registrationModel);
+            app(\App\Services\Webhooks\WebhookDispatcherService::class)->dispatchOfflinePaymentApproved($registrationModel);
+            app(\App\Services\Webhooks\WebhookDispatcherService::class)->dispatchRegistrationConfirmed($registrationModel);
+
+            Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
+
+            return response()->json([
+                'message' => 'Offline payment verified and registration confirmed.',
+                'registration' => $registrationModel,
+            ]);
+        });
+    }
+
+    public function rejectOfflinePayment(Request $request, string $subdomain, string $event, string $registration): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        return DB::transaction(function () use ($eventModel, $registration, $validated): JsonResponse {
+            /** @var EventRegistration $registrationModel */
+            $registrationModel = $eventModel->registrations()
+                ->where('id', $registration)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($registrationModel->isConfirmed()) {
+                return response()->json(['message' => 'A confirmed registration cannot be rejected.'], 422);
+            }
+
+            if (! in_array($registrationModel->offline_payment_status, [
+                EventRegistration::OFFLINE_STATUS_PENDING_VERIFICATION,
+                EventRegistration::OFFLINE_STATUS_PENDING_PROOF,
+            ], true)) {
+                return response()->json(['message' => 'This registration is not awaiting offline payment verification.'], 422);
+            }
+
+            $reason = $validated['reason'] ?? $validated['note'] ?? 'Payment proof could not be verified against statement.';
+
+            $registrationModel->update([
+                'offline_payment_status' => EventRegistration::OFFLINE_STATUS_REJECTED,
+                'offline_payment_notes' => $reason,
+            ]);
+
+            Mail::to($registrationModel->email)->queue(
+                new EventRegistrationOfflineRejected($registrationModel, $reason)
+            );
+
+            return response()->json(['message' => 'Offline payment rejected and attendee notified.']);
+        });
+    }
+
+    public function downloadProof(string $subdomain, string $event, string $registration): SymfonyResponse
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+        $eventModel = $this->findEvent($tenant->id, $event);
+
+        /** @var EventRegistration $registrationModel */
+        $registrationModel = $eventModel->registrations()
+            ->where('id', $registration)
+            ->firstOrFail();
+
+        if (! $registrationModel->offline_payment_proof_path) {
+            abort(404, 'No payment proof uploaded.');
+        }
+
+        $expectedPrefix = "events/{$registrationModel->event_id}/proofs/";
+        if (! str_starts_with($registrationModel->offline_payment_proof_path, $expectedPrefix) || str_contains($registrationModel->offline_payment_proof_path, '..')) {
+            abort(403, 'Invalid proof storage path.');
+        }
+
+        $disk = Event::uploadDisk();
+        if (! Storage::disk($disk)->exists($registrationModel->offline_payment_proof_path)) {
+            abort(404, 'Proof file not found on storage.');
+        }
+
+        $mime = Storage::disk($disk)->mimeType($registrationModel->offline_payment_proof_path) ?: 'application/octet-stream';
+        $ext = pathinfo($registrationModel->offline_payment_proof_path, PATHINFO_EXTENSION);
+
+        return Storage::disk($disk)->response(
+            $registrationModel->offline_payment_proof_path,
+            "payment-proof-{$registrationModel->id}.{$ext}",
+            [
+                'Content-Type' => $mime,
+                'Cache-Control' => 'private, no-store',
+            ]
+        );
+    }
+
     public function cancel(string $subdomain, string $event, string $registration): JsonResponse
     {
         $this->authorize('update event');
@@ -108,9 +272,15 @@ final class EventRegistrationController extends Controller
                 && $registrationModel->payment_reference !== null;
 
             if ($wasPaid) {
-                $refundFailure = $this->refundPaidRegistration($tenant, $registrationModel);
-                if ($refundFailure !== null) {
-                    return $refundFailure;
+                if ($registrationModel->isOfflinePayment()) {
+                    // Offline ticket payment: money was collected directly out-of-band by the organizer.
+                    // Reverse the platform commission on the ledger so organizer payable isn't unfairly charged.
+                    app(LedgerService::class)->reverseOfflineTicketCommission($eventModel, $registrationModel);
+                } else {
+                    $refundFailure = $this->refundPaidRegistration($tenant, $registrationModel);
+                    if ($refundFailure !== null) {
+                        return $refundFailure;
+                    }
                 }
             }
 
@@ -291,7 +461,7 @@ final class EventRegistrationController extends Controller
         if ($chargeEntry) {
             $ref = $this->hasNoProviderRefundId($refundId) ? 'REF_'.$chargeEntry->provider_reference : $refundId;
 
-            app(\App\Services\Finance\LedgerService::class)->recordRefund(
+            app(LedgerService::class)->recordRefund(
                 $registrationModel->event,
                 $registrationModel,
                 $chargeEntry->gross_amount,
@@ -322,7 +492,7 @@ final class EventRegistrationController extends Controller
             $registration->email_verified_at ??= now();
             $registration->issueTicket();
             $registration->save();
-            app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
+            app(EventRuleTriggerService::class)->registrationCompleted($registration);
             Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
 
             return;

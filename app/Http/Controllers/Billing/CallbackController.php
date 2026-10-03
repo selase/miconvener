@@ -69,6 +69,11 @@ final class CallbackController extends Controller
                     return $this->handleRenewalFulfillment($result, $tenantContext);
                 }
 
+                // Modular add-on purchase
+                if ($type === 'tenant_addon') {
+                    return $this->handleTenantAddonFulfillment($result, $tenantContext);
+                }
+
                 // Metadata-driven plan subscription (no Paystack plan codes required)
                 if ($type === 'plan_subscription') {
                     return $this->handlePlanSubscriptionFulfillment($result, $tenantContext, $provisioningService);
@@ -259,6 +264,26 @@ final class CallbackController extends Controller
 
         return redirect()->route('tenant.llm-usage.index', ['subdomain' => $tenant->slug])
             ->with('success', 'Success! '.number_format($tokens).' tokens have been added to your balance.');
+    }
+
+    private function handleTenantAddonFulfillment(array $result, TenantContext $tenantContext): RedirectResponse
+    {
+        $tenant = $tenantContext->getTenant();
+        $reference = (string) ($result['reference'] ?? '');
+        $metadata = (array) data_get($result, 'metadata', []);
+
+        $addonService = app(\App\Services\Billing\TenantAddonService::class);
+        $addon = $addonService->fulfillAddonPurchase($tenant, $reference, $metadata);
+
+        $this->sendReceipt($tenant, $result);
+
+        if (! $addon) {
+            return redirect()->route('billing.addons.index', ['subdomain' => $tenant->slug])
+                ->with('error', 'Unable to process add-on purchase.');
+        }
+
+        return redirect()->route('billing.addons.index', ['subdomain' => $tenant->slug])
+            ->with('success', "{$addon->name} is now active!");
     }
 
     /**

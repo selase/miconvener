@@ -61,6 +61,13 @@ final class EventPollDeckController extends Controller
             ->where('id', $event)
             ->firstOrFail();
 
+        if (! $this->tenant()->canUseLivePolling($eventModel)) {
+            return response()->json([
+                'message' => 'Live Polling & Audience Q&A requires the Growth plan or an active Live Polling add-on/event pass.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
         $deck = PollDeck::create([
             'tenant_id' => $eventModel->tenant_id,
             'event_id' => $eventModel->id,
@@ -162,7 +169,17 @@ final class EventPollDeckController extends Controller
 
     public function start(string $subdomain, string $event, string $deck): JsonResponse
     {
-        $this->presenter->start($this->findDeck($event, $deck));
+        $deckModel = $this->findDeck($event, $deck);
+        $eventModel = Event::where('tenant_id', $this->tenant()->id)->where('id', $event)->firstOrFail();
+
+        if (! $this->tenant()->canUseLivePolling($eventModel)) {
+            return response()->json([
+                'message' => 'Live Polling & Audience Q&A requires the Growth plan or an active Live Polling add-on/event pass.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
+        $this->presenter->start($deckModel);
 
         return $this->payload($event, $deck);
     }

@@ -26,7 +26,7 @@ final class UpdateVenueProfileRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', Rule::unique('landlord.shops', 'slug')->ignore($shopId)],
+            'slug' => ['nullable', 'string', 'max:255', Rule::unique('landlord.shops', 'slug')->ignore($shopId)],
             'description' => ['nullable', 'string', 'max:3000'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['required', 'string', 'max:50'],
@@ -35,6 +35,13 @@ final class UpdateVenueProfileRequest extends FormRequest
             'region' => ['required', 'string', 'max:100'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'vendor_categories' => ['nullable', 'array'],
+            'vendor_categories.*' => ['string', 'max:64'],
+            'business_registration_number' => ['nullable', 'string', 'max:100'],
+            'tax_id' => ['nullable', 'string', 'max:100'],
+            'past_clients' => ['nullable', 'array', 'max:50'],
+            'past_clients.*.name' => ['required_with:past_clients', 'string', 'max:255'],
+            'past_clients.*.event' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

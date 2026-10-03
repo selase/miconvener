@@ -266,6 +266,164 @@ final class LedgerService
     }
 
     /**
+     * Reverse platform commission debited for an offline ticket sale upon cancellation.
+     * When an offline ticket is cancelled:
+     * - The organizer handles any attendee cash/MoMo refund directly.
+     * - The platform reverses the commission receivable that was charged against the organizer:
+     *     Debit:  Platform Revenue (reversing commission earned)
+     *     Credit: Organizer Payable (restoring the debited payable)
+     * - Flat EventLedgerEntry:
+     *     type: TYPE_REFUND
+     *     provider: 'offline'
+     *     gross_amount: $chargeEntry->gross_amount
+     *     gateway_fee_amount: 0
+     *     commission_amount: $chargeEntry->commission_amount
+     *     net_amount: $chargeEntry->commission_amount
+     */
+    public function reverseOfflineTicketCommission(
+        Event $event,
+        EventRegistration $registration
+    ): ?LedgerTransaction {
+        $reference = $registration->payment_reference ?: 'OFFLINE-'.$registration->id;
+        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
+
+        $chargeEntry = EventLedgerEntry::where('tenant_id', $tenant->id)
+            ->where('type', EventLedgerEntry::TYPE_CHARGE)
+            ->where('provider_reference', $reference)
+            ->first();
+
+        if (! $chargeEntry) {
+            return null;
+        }
+
+        $commission = (int) $chargeEntry->commission_amount;
+        $refundRef = 'REF_'.$reference;
+        $transaction = null;
+
+        if ($commission > 0) {
+            $entries = [
+                [
+                    'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
+                    'direction' => LedgerEntry::DIRECTION_DEBIT,
+                    'amount' => $commission,
+                    'description' => "Platform commission reversal on offline ticket cancellation: {$registration->full_name}",
+                ],
+                [
+                    'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
+                    'direction' => LedgerEntry::DIRECTION_CREDIT,
+                    'amount' => $commission,
+                    'description' => "Restoring commission receivable for cancelled offline ticket: {$registration->email}",
+                ],
+            ];
+
+            $transaction = $this->postTransaction(
+                $tenant,
+                $event,
+                LedgerTransaction::TYPE_REFUND,
+                "Offline Ticket Reversal: {$event->name} - {$registration->full_name}",
+                $refundRef,
+                $entries,
+                null,
+                $event->currency ?: 'GHS'
+            );
+        }
+
+        EventLedgerEntry::firstOrCreate([
+            'tenant_id' => $tenant->id,
+            'type' => EventLedgerEntry::TYPE_REFUND,
+            'provider_reference' => $refundRef,
+        ], [
+            'event_id' => $event->id,
+            'registration_id' => $registration->id,
+            'gross_amount' => (int) $chargeEntry->gross_amount,
+            'gateway_fee_amount' => 0,
+            'commission_amount' => $commission,
+            'net_amount' => $commission,
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => 'offline',
+        ]);
+
+        return $transaction;
+    }
+
+    /**
+     * Record an offline direct ticket sale (bank transfer, direct MoMo, or cash on-site):
+     * The attendee paid the organizer directly outside the platform.
+     * The platform is owed the platform commission (if any).
+     * If platformFee > 0:
+     *   Debit:  Organizer Payable (debited to recover commission from future payouts)
+     *   Credit: Platform Revenue (platform commission earned)
+     * Flat EventLedgerEntry:
+     *   type: TYPE_CHARGE
+     *   provider: 'offline'
+     *   gross_amount: $grossAmount
+     *   gateway_fee_amount: 0
+     *   commission_amount: $platformFee
+     *   net_amount: -$platformFee
+     */
+    public function recordOfflineTicketSale(
+        Event $event,
+        EventRegistration $registration,
+        int $grossAmount,
+        int $platformFee,
+        string $reference,
+        string $provider = 'offline',
+        ?string $providerReference = null
+    ): ?LedgerTransaction {
+        if ($grossAmount <= 0) {
+            return null;
+        }
+
+        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
+        $transaction = null;
+
+        if ($platformFee > 0) {
+            $entries = [
+                [
+                    'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
+                    'direction' => LedgerEntry::DIRECTION_DEBIT,
+                    'amount' => $platformFee,
+                    'description' => "Commission receivable for offline ticket: {$registration->full_name} ({$registration->email})",
+                ],
+                [
+                    'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
+                    'direction' => LedgerEntry::DIRECTION_CREDIT,
+                    'amount' => $platformFee,
+                    'description' => 'Platform commission fee ('.$event->effectivePlatformFeePercentage().'%) on offline ticket sale',
+                ],
+            ];
+
+            $transaction = $this->postTransaction(
+                $tenant,
+                $event,
+                LedgerTransaction::TYPE_OFFLINE_TICKET_SALE,
+                "Offline Ticket Commission: {$event->name} - {$registration->full_name}",
+                $reference,
+                $entries,
+                null,
+                $event->currency ?: 'GHS'
+            );
+        }
+
+        EventLedgerEntry::firstOrCreate([
+            'tenant_id' => $tenant->id,
+            'type' => EventLedgerEntry::TYPE_CHARGE,
+            'provider_reference' => $providerReference ?? $reference,
+        ], [
+            'event_id' => $event->id,
+            'registration_id' => $registration->id,
+            'gross_amount' => $grossAmount,
+            'gateway_fee_amount' => 0,
+            'commission_amount' => $platformFee,
+            'net_amount' => -$platformFee,
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => $provider,
+        ]);
+
+        return $transaction;
+    }
+
+    /**
      * Record a voluntary event contribution / donation:
      * Debit:  Payment Gateway Clearing (gross collected less gateway processing fee)
      * Credit: Organizer Payable (net to organizer)

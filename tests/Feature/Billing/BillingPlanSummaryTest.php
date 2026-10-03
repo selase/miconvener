@@ -61,7 +61,7 @@ test('a pay-link plan within a week of renewal offers to pay now', function (): 
     billingPage($user, $tenant)->assertInertia(fn ($page) => $page
         ->where('subscription.auto_renews', false)
         ->where('subscription.can_pay_now', true)
-        ->where('subscription.renew_amount', 'GHS 99.00'));
+        ->where('subscription.renew_amount', 'GHS 499.00'));
 });
 
 test('an overdue plan shows the grace deadline', function (): void {

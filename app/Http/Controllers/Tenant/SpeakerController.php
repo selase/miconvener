@@ -49,6 +49,9 @@ final class SpeakerController extends Controller
         $validated = $this->validateSpeaker($request);
 
         if ($request->hasFile('photo')) {
+            if ($speakerModel->photo_path) {
+                Helper::deleteFile($speakerModel->photo_path, config('app.env') === 'production' ? 's3' : 'public');
+            }
             $validated['photo_path'] = Helper::processUploadedFile($request, 'photo', 'speaker', 'speakers', config('app.env') === 'production' ? 's3' : 'public');
         }
 
@@ -62,7 +65,20 @@ final class SpeakerController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
 
-        Speaker::where('tenant_id', $tenant->id)->where('id', $speaker)->firstOrFail()->delete();
+        $speakerModel = Speaker::where('tenant_id', $tenant->id)->where('id', $speaker)->firstOrFail();
+
+        if ($speakerModel->photo_path) {
+            Helper::deleteFile($speakerModel->photo_path, config('app.env') === 'production' ? 's3' : 'public');
+        }
+
+        foreach ($speakerModel->eventSpeakers as $eventSpeaker) {
+            if ($eventSpeaker->slidesMaterial && $eventSpeaker->slidesMaterial->provenance === \App\Models\EventMaterial::PROVENANCE_SPEAKER) {
+                Helper::deleteFile($eventSpeaker->slidesMaterial->file_path, config('app.env') === 'production' ? 's3' : 'public');
+                $eventSpeaker->slidesMaterial->delete();
+            }
+        }
+
+        $speakerModel->delete();
 
         return response()->json(['message' => 'Speaker deleted.']);
     }
@@ -77,8 +93,11 @@ final class SpeakerController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'title' => ['nullable', 'string', 'max:255'],
             'organization' => ['nullable', 'string', 'max:255'],
-            'bio' => ['nullable', 'string'],
-            'photo' => ['nullable', 'image', 'max:2048'],
+            'bio' => ['nullable', 'string', 'max:5000'],
+            'website_url' => ['nullable', 'url', 'max:255'],
+            'linkedin_url' => ['nullable', 'url', 'max:255'],
+            'twitter_url' => ['nullable', 'url', 'max:255'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:3072'],
         ]);
 
         unset($validated['photo']);
@@ -94,10 +113,14 @@ final class SpeakerController extends Controller
         return [
             'id' => $speaker->id,
             'name' => $speaker->name,
+            'email' => $speaker->email,
             'title' => $speaker->title,
             'organization' => $speaker->organization,
             'bio' => $speaker->bio,
             'photo_url' => Helper::storageUrl($speaker->photo_path),
+            'website_url' => $speaker->website_url,
+            'linkedin_url' => $speaker->linkedin_url,
+            'twitter_url' => $speaker->twitter_url,
         ];
     }
 

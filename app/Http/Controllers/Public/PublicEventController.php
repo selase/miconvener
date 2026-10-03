@@ -35,7 +35,7 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 final class PublicEventController extends Controller
 {
-    public function show(string $subdomain, string $event): Response
+    public function show(string $subdomain, string $event): Response|SymfonyResponse
     {
         $tenant = $this->getTenant();
 
@@ -50,13 +50,56 @@ final class PublicEventController extends Controller
                 'venueListing.shop',
                 'venueListing.primaryMedia',
             ])
-            ->firstOrFail();
+            ->first();
+
+        if (! $eventModel) {
+            $suspendedEvent = Event::onlyTrashed()
+                ->where('tenant_id', $tenant->id)
+                ->where('slug', $event)
+                ->first();
+
+            if ($suspendedEvent && $suspendedEvent->isPendingPurge() && $suspendedEvent->isPublished()) {
+                return Inertia::render('Public/Events/Suspended', [
+                    'event' => [
+                        'name' => $suspendedEvent->name,
+                        'slug' => $suspendedEvent->slug,
+                        'starts_at' => $suspendedEvent->starts_at->toIso8601String(),
+                        'ends_at' => $suspendedEvent->ends_at->toIso8601String(),
+                    ],
+                    'org' => ['name' => $tenant->name],
+                ])->toResponse(request())->setStatusCode(SymfonyResponse::HTTP_GONE);
+            }
+
+            abort(404);
+        }
 
         return Inertia::render('Public/Events/Show', [
             // A private event shows enough to register and nothing more.
             'event' => $this->toPublicPayload($eventModel, revealDetails: ! $eventModel->isPrivate()),
             'org' => ['name' => $tenant->name],
             'isPrivate' => $eventModel->isPrivate(),
+        ]);
+    }
+
+    public function calendarFeed(Request $request, string $subdomain, string $event): SymfonyResponse
+    {
+        $tenant = $this->getTenant();
+
+        $eventModel = Event::where('tenant_id', $tenant->id)
+            ->where('slug', $event)
+            ->published()
+            ->firstOrFail();
+
+        if ($eventModel->isPrivate()) {
+            abort(404);
+        }
+
+        $feed = app(\App\Services\Events\EventCalendarFeedService::class)->generate($eventModel);
+
+        return response($feed, 200, [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'Content-Disposition' => 'inline; filename="'.$eventModel->slug.'.ics"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
         ]);
     }
 
@@ -658,6 +701,7 @@ final class PublicEventController extends Controller
             'recurrence_time_start' => $event->recurrence_time_start,
             'recurrence_time_end' => $event->recurrence_time_end,
             'recurrence_summary' => app(RecurrenceService::class)->describeSchedule($event),
+            'calendar_feed_url' => (! $withhold && $event->is_recurring) ? url("/e/{$event->slug}/calendar.ics") : null,
             'upcoming_occurrences' => (! $withhold && $event->is_recurring)
                 ? ($event->relationLoaded('sessions')
                     ? $event->sessions
@@ -717,6 +761,13 @@ final class PublicEventController extends Controller
                     'amount' => $event->show_contributor_amounts ? $c->amount : null,
                     'created_at' => $c->paid_at?->diffForHumans() ?? $c->created_at->diffForHumans(),
                 ])->values() : [],
+            'allow_offline_payments' => (bool) $event->allow_offline_payments,
+            'offline_payment_instructions' => $event->offline_payment_instructions,
+            'offline_payment_bank_name' => $event->offline_payment_bank_name,
+            'offline_payment_account_name' => $event->offline_payment_account_name,
+            'offline_payment_account_number' => $event->offline_payment_account_number,
+            'offline_payment_momo_number' => $event->offline_payment_momo_number,
+            'offline_payment_momo_network' => $event->offline_payment_momo_network,
         ];
     }
 }

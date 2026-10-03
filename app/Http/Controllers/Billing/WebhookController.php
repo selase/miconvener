@@ -208,6 +208,17 @@ final class WebhookController extends Controller
             return;
         }
 
+        if ($metaType === 'tenant_addon') {
+            $addonTenant = ! empty($metadata['tenant_id'])
+                ? (Tenant::find($metadata['tenant_id']) ?? $tenant)
+                : $tenant;
+
+            app(\App\Services\Billing\TenantAddonService::class)->fulfillAddonPurchase($addonTenant, $reference, $metadata);
+            $sendReceipt();
+
+            return;
+        }
+
         if (in_array($metaType, ['invoice_payment', 'metered_invoice'], true)) {
             $invoiceId = $metadata['invoice_id'] ?? null;
 

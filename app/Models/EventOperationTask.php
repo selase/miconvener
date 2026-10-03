@@ -64,6 +64,8 @@ final class EventOperationTask extends Model
         'estimated_budget',
         'actual_budget',
         'completed_at',
+        'is_venue_task',
+        'venue_shop_id',
     ];
 
     public function event(): BelongsTo
@@ -79,6 +81,16 @@ final class EventOperationTask extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function venueShop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class, 'venue_shop_id');
+    }
+
+    public function isVenueTask(): bool
+    {
+        return (bool) $this->is_venue_task;
     }
 
     public function dependencyTask(): BelongsTo
@@ -101,6 +113,7 @@ final class EventOperationTask extends Model
             'estimated_budget' => 'integer',
             'actual_budget' => 'integer',
             'completed_at' => 'datetime',
+            'is_venue_task' => 'boolean',
         ];
     }
 }

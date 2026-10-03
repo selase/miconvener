@@ -100,6 +100,7 @@ final class SettlementWebhookController extends Controller
                 'charge.success' => match ($metadata['type'] ?? null) {
                     'venue_booking' => $this->confirmVenueBookingCharge($data, $data['reference'] ?? null),
                     'event_contribution' => $this->confirmContributionCharge($data, $data['reference'] ?? null),
+                    'marketplace_quote' => $this->confirmMarketplaceQuoteCharge($data, $data['reference'] ?? null),
                     default => $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
                 },
                 'transfer.success', 'transfer.failed' => $this->confirmTransfer($event, (string) ($data['reference'] ?? ''), $data),
@@ -147,7 +148,22 @@ final class SettlementWebhookController extends Controller
 
         $type = $metadata['type'] ?? null;
 
-        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution'], true);
+        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution', 'marketplace_quote'], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function confirmMarketplaceQuoteCharge(array $data, ?string $reference): void
+    {
+        if (! $reference) {
+            return;
+        }
+
+        $metadata = BillingWebhookController::metadata($data['metadata'] ?? null);
+        $data['metadata'] = $metadata;
+
+        app(\App\Services\Marketplace\MarketplaceVendorService::class)->confirmPayment($reference, $data);
     }
 
     /**

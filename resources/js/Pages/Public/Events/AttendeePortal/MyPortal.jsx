@@ -9,6 +9,7 @@ import OrganiserEventsSection from './components/OrganiserEventsSection';
 import CertificatesSection from './components/CertificatesSection';
 import AbstractsSection from './components/AbstractsSection';
 import AttendanceSection from './components/AttendanceSection';
+import ContributionsSection from './components/ContributionsSection';
 import HistorySkeleton from './components/HistorySkeleton';
 import { AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
 import { clearAllOfflineTickets, purgeExpiredOfflineTickets } from '@/lib/offlineTicketStore';
@@ -26,12 +27,14 @@ export default function MyPortal({
     initialCertificates = null,
     initialAbstracts = null,
     initialAttendance = null,
+    initialContributions = null,
 }) {
     const [verifiedEmail, setVerifiedEmail] = useState(provenAtLoad);
     const [history, setHistory] = useState(initialHistory);
     const [certificates, setCertificates] = useState(initialCertificates || []);
     const [abstracts, setAbstracts] = useState(initialAbstracts || []);
     const [attendance, setAttendance] = useState(initialAttendance || []);
+    const [contributions, setContributions] = useState(initialContributions || []);
     const [loading, setLoading] = useState(Boolean(provenAtLoad && !initialHistory));
     const [error, setError] = useState(null);
     const [selectedOrganiser, setSelectedOrganiser] = useState(organiser);
@@ -52,6 +55,7 @@ export default function MyPortal({
     const certificatesRoute = window.route ? route('attendee.my.certificates') : '/my/certificates';
     const abstractsRoute = window.route ? route('attendee.my.abstracts') : '/my/abstracts';
     const attendanceRoute = window.route ? route('attendee.my.attendance') : '/my/attendance';
+    const contributionsRoute = window.route ? route('attendee.my.contributions') : '/my/contributions';
 
     const fetchData = useCallback(
         async (orgSlug = null) => {
@@ -67,18 +71,20 @@ export default function MyPortal({
             };
 
             try {
-                const [eventsRes, certsRes, abstractsRes, attendanceRes] = await Promise.all([
+                const [eventsRes, certsRes, abstractsRes, attendanceRes, contribsRes] = await Promise.all([
                     fetch(buildUrl(eventsRoute), { headers: { Accept: 'application/json' } }),
                     fetch(buildUrl(certificatesRoute), { headers: { Accept: 'application/json' } }),
                     fetch(buildUrl(abstractsRoute), { headers: { Accept: 'application/json' } }),
                     fetch(buildUrl(attendanceRoute), { headers: { Accept: 'application/json' } }),
+                    fetch(buildUrl(contributionsRoute), { headers: { Accept: 'application/json' } }),
                 ]);
 
                 if (
                     eventsRes.status === 401 ||
                     certsRes.status === 401 ||
                     abstractsRes.status === 401 ||
-                    attendanceRes.status === 401
+                    attendanceRes.status === 401 ||
+                    contribsRes.status === 401
                 ) {
                     // Session expired or proof invalid
                     setVerifiedEmail(null);
@@ -86,6 +92,7 @@ export default function MyPortal({
                     setCertificates([]);
                     setAbstracts([]);
                     setAttendance([]);
+                    setContributions([]);
                     setActiveTab('events');
                     setLoading(false);
                     return;
@@ -114,13 +121,18 @@ export default function MyPortal({
                     const attendanceData = await attendanceRes.json();
                     setAttendance(attendanceData);
                 }
+
+                if (contribsRes.ok) {
+                    const contribsData = await contribsRes.json();
+                    setContributions(contribsData);
+                }
             } catch {
                 setError("Couldn't connect to the server. Please check your connection.");
             } finally {
                 setLoading(false);
             }
         },
-        [eventsRoute, certificatesRoute, abstractsRoute, attendanceRoute]
+        [eventsRoute, certificatesRoute, abstractsRoute, attendanceRoute, contributionsRoute]
     );
 
     useEffect(() => {
@@ -167,6 +179,7 @@ export default function MyPortal({
             setCertificates([]);
             setAbstracts([]);
             setAttendance([]);
+            setContributions([]);
             setActiveTab('events');
         } catch {
             setSignOutError(true);
@@ -189,6 +202,9 @@ export default function MyPortal({
         ...(attendance.length > 0 || certifiedHoursCount > 0
             ? [{ key: 'attendance', label: 'Attendance', count: attendance.length }]
             : []),
+        ...(contributions.length > 0
+            ? [{ key: 'contributions', label: 'Giving & Tributes', count: contributions.length }]
+            : []),
     ];
 
     // Gracefully fallback if the selected tab is not available
@@ -209,11 +225,17 @@ export default function MyPortal({
         window.history.replaceState({}, '', url.toString());
     };
 
+    const handleContributionUpdated = (updated) => {
+        setContributions((prev) =>
+            prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
+        );
+    };
+
     const hasNeedsAttention = (history?.needs_attention?.length ?? 0) > 0;
     const hasLiveNow = (history?.live_now?.length ?? 0) > 0;
     const hasOrganisers = (history?.organisers?.length ?? 0) > 0;
     const hasUrgent = hasNeedsAttention || hasLiveNow;
-    const hasAnyRecords = certificates.length > 0 || abstracts.length > 0 || attendance.length > 0;
+    const hasAnyRecords = certificates.length > 0 || abstracts.length > 0 || attendance.length > 0 || contributions.length > 0;
     const isEmpty =
         history &&
         !hasNeedsAttention &&
@@ -387,6 +409,13 @@ export default function MyPortal({
                                     <AttendanceSection
                                         attendance={attendance}
                                         certificates={certificates}
+                                    />
+                                )}
+
+                                {activeTab === 'contributions' && (
+                                    <ContributionsSection
+                                        contributions={contributions}
+                                        onContributionUpdated={handleContributionUpdated}
                                     />
                                 )}
                             </div>

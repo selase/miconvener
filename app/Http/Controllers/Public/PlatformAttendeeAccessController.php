@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Public;
 
+use App\Enum\TenantStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendee\PlatformConfirmAccessCodeRequest;
 use App\Http\Requests\Attendee\PlatformSendAccessCodeRequest;
+use App\Http\Requests\Attendee\UpdateContributionTributeRequest;
+use App\Models\EventContribution;
 use App\Models\Tenant;
 use App\Services\Events\AttendeePortalRateLimiter;
+use App\Services\Events\DonationReceiptPdfService;
 use App\Services\Events\PlatformAttendeeHistory;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Support\ContactMask;
@@ -16,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 final class PlatformAttendeeAccessController extends Controller
 {
@@ -23,6 +28,7 @@ final class PlatformAttendeeAccessController extends Controller
         private readonly PlatformAttendeeVerification $verification,
         private readonly AttendeePortalRateLimiter $rateLimiter,
         private readonly PlatformAttendeeHistory $history,
+        private readonly DonationReceiptPdfService $pdfService,
     ) {}
 
     public function page(Request $request): Response
@@ -45,11 +51,13 @@ final class PlatformAttendeeAccessController extends Controller
         $certificates = null;
         $abstracts = null;
         $attendance = null;
+        $contributions = null;
         if ($verifiedEmail !== null) {
             $history = $this->history->getHistory($verifiedEmail, $organiserSlug);
             $certificates = $this->history->getCertificates($verifiedEmail, $organiserSlug);
             $abstracts = $this->history->getAbstracts($verifiedEmail, $organiserSlug);
             $attendance = $this->history->getAttendance($verifiedEmail, $organiserSlug);
+            $contributions = $this->history->getContributions($verifiedEmail, $organiserSlug);
         }
 
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
@@ -59,6 +67,7 @@ final class PlatformAttendeeAccessController extends Controller
             'initialCertificates' => $certificates,
             'initialAbstracts' => $abstracts,
             'initialAttendance' => $attendance,
+            'initialContributions' => $contributions,
         ]);
     }
 
@@ -172,6 +181,114 @@ final class PlatformAttendeeAccessController extends Controller
         $organiserSlug = $request->filled('organiser') ? (string) $request->input('organiser') : null;
 
         return response()->json($this->history->getAttendance($email, $organiserSlug));
+    }
+
+    public function contributions(Request $request): JsonResponse
+    {
+        $email = (string) $request->attributes->get('attendee_email');
+        $organiserSlug = $request->filled('organiser') ? (string) $request->input('organiser') : null;
+
+        return response()->json($this->history->getContributions($email, $organiserSlug));
+    }
+
+    public function downloadReceipt(Request $request, string $contribution): SymfonyResponse
+    {
+        $email = (string) $request->attributes->get('attendee_email');
+        $emailNormalized = PlatformAttendeeVerification::normalise($email);
+
+        /** @var EventContribution|null $record */
+        $record = EventContribution::withoutGlobalScopes()
+            ->with([
+                'event' => fn ($query) => $query->withoutGlobalScopes(),
+                'tenant' => fn ($query) => $query->withoutGlobalScopes(),
+            ])
+            ->where('id', $contribution)
+            ->first();
+
+        if ($record === null) {
+            abort(404, 'Contribution record not found.');
+        }
+
+        if ($record->tenant?->status === TenantStatusEnum::BANNED) {
+            abort(404, 'Contribution record not found.');
+        }
+
+        if (PlatformAttendeeVerification::normalise((string) $record->contributor_email) !== $emailNormalized) {
+            abort(403, 'You are not authorized to access this receipt.');
+        }
+
+        if (! $record->isCompleted()) {
+            abort(422, 'Receipt is only available for completed contributions.');
+        }
+
+        $pdfContent = $this->pdfService->generate($record);
+        $filename = $this->pdfService->filename($record);
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    public function updateTribute(UpdateContributionTributeRequest $request, string $contribution): JsonResponse
+    {
+        $email = (string) $request->attributes->get('attendee_email');
+        $emailNormalized = PlatformAttendeeVerification::normalise($email);
+
+        /** @var EventContribution|null $record */
+        $record = EventContribution::withoutGlobalScopes()
+            ->with(['tenant' => fn ($query) => $query->withoutGlobalScopes()])
+            ->where('id', $contribution)
+            ->first();
+
+        if ($record === null) {
+            abort(404, 'Contribution record not found.');
+        }
+
+        if ($record->tenant?->status === TenantStatusEnum::BANNED) {
+            abort(404, 'Contribution record not found.');
+        }
+
+        if (PlatformAttendeeVerification::normalise((string) $record->contributor_email) !== $emailNormalized) {
+            abort(403, 'You are not authorized to edit this tribute.');
+        }
+
+        if (! $record->isCompleted()) {
+            abort(422, 'Tributes can only be updated for completed contributions.');
+        }
+
+        $validated = $request->validated();
+
+        $message = array_key_exists('tribute_message', $validated)
+            ? ($validated['tribute_message'] !== null ? mb_trim(strip_tags((string) $validated['tribute_message'])) : null)
+            : $record->tribute_message;
+
+        if ($message === '') {
+            $message = null;
+        }
+
+        $isAnonymous = array_key_exists('is_anonymous', $validated)
+            ? (bool) $validated['is_anonymous']
+            : $record->is_anonymous;
+
+        // If tribute note changed, reset approval so it goes through moderation
+        if ($message !== $record->tribute_message) {
+            $record->tribute_message = $message;
+            $record->is_approved = false;
+        }
+
+        $record->is_anonymous = $isAnonymous;
+        $record->save();
+
+        return response()->json([
+            'message' => 'Tribute message updated successfully.',
+            'contribution' => [
+                'id' => $record->id,
+                'tribute_message' => $record->tribute_message,
+                'is_anonymous' => $record->is_anonymous,
+                'is_approved' => $record->is_approved,
+            ],
+        ]);
     }
 
     public function manifest(): JsonResponse

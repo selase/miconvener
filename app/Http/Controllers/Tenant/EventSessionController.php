@@ -6,7 +6,10 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\EventSession;
+use App\Models\EventSessionAttendance;
 use App\Services\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -106,11 +109,11 @@ final class EventSessionController extends Controller
             'notes' => ['nullable', 'string', 'max:65000'],
             'presentation_url' => ['nullable', 'url:http,https', 'max:500'],
             'occurrence_status' => ['required', Rule::in([
-                \App\Models\EventSession::STATUS_SCHEDULED,
-                \App\Models\EventSession::STATUS_COMPLETED,
-                \App\Models\EventSession::STATUS_CANCELLED,
+                EventSession::STATUS_SCHEDULED,
+                EventSession::STATUS_COMPLETED,
+                EventSession::STATUS_CANCELLED,
             ])],
-            'type' => ['sometimes', 'string', Rule::in(\App\Models\EventSession::TYPES)],
+            'type' => ['sometimes', 'string', Rule::in(EventSession::TYPES)],
             'location' => ['nullable', 'string', 'max:255'],
             'speaker_ids' => ['nullable', 'array'],
             'speaker_ids.*' => [Rule::exists('speakers', 'id')->where('tenant_id', $tenant->id)],
@@ -166,6 +169,197 @@ final class EventSessionController extends Controller
     }
 
     /**
+     * Bulk cancel occurrences within a date window for holidays, closures, etc.
+     */
+    public function batchCancel(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $startDate = CarbonImmutable::parse($validated['start_date'])->startOfDay();
+        $endDate = CarbonImmutable::parse($validated['end_date'])->endOfDay();
+        $reason = (string) $validated['reason'];
+
+        $updatedCount = $eventModel->sessions()
+            ->where('is_occurrence', true)
+            ->where('occurrence_status', '!=', EventSession::STATUS_CANCELLED)
+            ->where('starts_at', '>=', $startDate)
+            ->where('starts_at', '<=', $endDate)
+            ->update([
+                'occurrence_status' => EventSession::STATUS_CANCELLED,
+                'cancellation_reason' => $reason,
+            ]);
+
+        return response()->json([
+            'message' => "Successfully blacked out {$updatedCount} occurrence(s).",
+            'cancelled_count' => $updatedCount,
+        ]);
+    }
+
+    /**
+     * Shift times across upcoming occurrences in a recurring series.
+     */
+    public function batchReschedule(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+
+        $timeStart = (string) ($request->input('time_start') ?? $request->input('new_start_time') ?? '');
+        $timeEnd = (string) ($request->input('time_end') ?? $request->input('new_end_time') ?? '');
+
+        if ($timeStart === '' || $timeEnd === '') {
+            return response()->json([
+                'message' => 'Start and end times are required.',
+                'errors' => [
+                    'time_start' => ['The time start field is required.'],
+                    'time_end' => ['The time end field is required.'],
+                ],
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'time_start' => ['nullable', 'string'],
+            'time_end' => ['nullable', 'string'],
+            'new_start_time' => ['nullable', 'string'],
+            'new_end_time' => ['nullable', 'string'],
+            'from_date' => ['nullable', 'date'],
+            'future_only' => ['nullable', 'boolean'],
+            'update_series_defaults' => ['nullable', 'boolean'],
+            'update_default_schedule' => ['nullable', 'boolean'],
+        ]);
+
+        $updateDefaults = $request->boolean('update_series_defaults', true) || $request->boolean('update_default_schedule', false);
+
+        if ($updateDefaults) {
+            $eventModel->update([
+                'recurrence_time_start' => $timeStart,
+                'recurrence_time_end' => $timeEnd,
+            ]);
+        }
+
+        $query = $eventModel->sessions()
+            ->where('is_occurrence', true)
+            ->where('occurrence_status', EventSession::STATUS_SCHEDULED);
+
+        $fromDate = $request->input('from_date');
+        if ($fromDate) {
+            $query->where('starts_at', '>=', CarbonImmutable::parse($fromDate)->startOfDay());
+        } elseif ($request->boolean('future_only', true)) {
+            $query->where('starts_at', '>=', CarbonImmutable::now());
+        }
+
+        $sessions = $query->get();
+        $updatedCount = 0;
+
+        $startParts = explode(':', $timeStart);
+        $endParts = explode(':', $timeEnd);
+        $startHour = (int) $startParts[0];
+        $startMinute = (int) ($startParts[1] ?? 0);
+        $endHour = (int) $endParts[0];
+        $endMinute = (int) ($endParts[1] ?? 0);
+
+        foreach ($sessions as $session) {
+            $baseDate = $session->occurrence_date
+                ? CarbonImmutable::parse($session->occurrence_date)
+                : $session->starts_at->toImmutable();
+
+            $newStartsAt = $baseDate->setTime($startHour, $startMinute);
+            $newEndsAt = $baseDate->setTime($endHour, $endMinute);
+
+            $session->update([
+                'starts_at' => $newStartsAt,
+                'ends_at' => $newEndsAt,
+            ]);
+            $updatedCount++;
+        }
+
+        return response()->json([
+            'message' => "Successfully rescheduled {$updatedCount} occurrence(s).",
+            'updated_count' => $updatedCount,
+        ]);
+    }
+
+    /**
+     * Compute series attendance rollup, retention rate, and recent occurrence check-ins.
+     */
+    public function analytics(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
+
+        $allOccurrences = $eventModel->sessions()
+            ->where('is_occurrence', true)
+            ->get();
+
+        $totalOccurrences = $allOccurrences->count();
+        $completedOccurrences = $allOccurrences->where('occurrence_status', EventSession::STATUS_COMPLETED)->count();
+        $scheduledOccurrences = $allOccurrences->where('occurrence_status', EventSession::STATUS_SCHEDULED)->count();
+        $cancelledOccurrences = $allOccurrences->where('occurrence_status', EventSession::STATUS_CANCELLED)->count();
+
+        $attendances = EventSessionAttendance::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('event_id', $eventModel->id)
+            ->get();
+
+        $uniqueAttendees = $attendances->pluck('registration_id')->unique()->count();
+
+        $completedSessionIds = $allOccurrences->where('occurrence_status', EventSession::STATUS_COMPLETED)->pluck('id');
+        $completedAttendancesCount = $attendances->whereIn('session_id', $completedSessionIds)->count();
+        $avgAttendance = $completedOccurrences > 0 ? round($completedAttendancesCount / $completedOccurrences, 1) : 0.0;
+
+        $attendanceCountsPerPerson = $attendances->groupBy('registration_id')->map->count();
+        $retainedCount = $attendanceCountsPerPerson->filter(fn (int $count) => $count >= 2)->count();
+        $retentionRate = $uniqueAttendees > 0 ? round(($retainedCount / $uniqueAttendees) * 100, 1) : 0.0;
+
+        $history = $allOccurrences
+            ->sortByDesc('starts_at')
+            ->take(10)
+            ->values()
+            ->map(function ($s) use ($attendances) {
+                return [
+                    'id' => $s->id,
+                    'title' => $s->title,
+                    'date' => $s->occurrence_date?->toDateString() ?: $s->starts_at->toDateString(),
+                    'status' => $s->occurrence_status,
+                    'checkins_count' => $attendances->where('session_id', $s->id)->count(),
+                ];
+            });
+
+        return response()->json([
+            'total_occurrences' => $totalOccurrences,
+            'completed_occurrences' => $completedOccurrences,
+            'scheduled_occurrences' => $scheduledOccurrences,
+            'scheduled_count' => $scheduledOccurrences,
+            'cancelled_occurrences' => $cancelledOccurrences,
+            'cancelled_count' => $cancelledOccurrences,
+            'total_unique_attendees' => $uniqueAttendees,
+            'unique_attendees' => $uniqueAttendees,
+            'avg_attendance_per_occurrence' => $avgAttendance,
+            'average_attendance' => $avgAttendance,
+            'retention_rate_pct' => $retentionRate,
+            'retention_rate' => $retentionRate,
+            'retained_attendees' => $retainedCount,
+            'occurrence_history' => $history,
+            'recent_trend' => $history->map(fn (array $h): array => [
+                'id' => $h['id'],
+                'title' => $h['title'],
+                'date' => $h['date'],
+                'status' => $h['status'],
+                'attendees_count' => $h['checkins_count'],
+            ]),
+        ]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validateSession(Request $request, string $tenantId): array
@@ -176,15 +370,15 @@ final class EventSessionController extends Controller
             'notes' => ['nullable', 'string', 'max:65000'],
             'presentation_url' => ['nullable', 'url:http,https', 'max:500'],
             'occurrence_status' => ['nullable', Rule::in([
-                \App\Models\EventSession::STATUS_SCHEDULED,
-                \App\Models\EventSession::STATUS_COMPLETED,
-                \App\Models\EventSession::STATUS_CANCELLED,
+                EventSession::STATUS_SCHEDULED,
+                EventSession::STATUS_COMPLETED,
+                EventSession::STATUS_CANCELLED,
             ])],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
             'track' => ['nullable', 'string', 'max:100'],
-            'type' => ['required', Rule::in(\App\Models\EventSession::TYPES)],
+            'type' => ['required', Rule::in(EventSession::TYPES)],
             'abstract_id' => [
                 'nullable',
                 Rule::exists('event_abstracts', 'id')->where('tenant_id', $tenantId),

@@ -88,9 +88,12 @@ final class VenueListingController extends Controller
         $securityDepositGhs = isset($validated['security_deposit']) ? (float) $validated['security_deposit'] : null;
 
         DB::connection('landlord')->transaction(function () use ($shop, $validated, $rentalPriceGhs, $securityDepositGhs): void {
+            $listingKind = $validated['listing_kind'] ?? StoreListing::KIND_VENUE;
+
             $listing = StoreListing::create([
                 'shop_id' => $shop->id,
-                'listing_kind' => StoreListing::KIND_VENUE,
+                'listing_kind' => $listingKind,
+                'category' => $validated['category'] ?? ($listingKind === StoreListing::KIND_VENUE ? StoreListing::CATEGORY_VENUE : null),
                 'title' => $validated['title'],
                 'slug' => $validated['slug'],
                 'description' => $validated['description'] ?? null,
@@ -98,7 +101,10 @@ final class VenueListingController extends Controller
                 'pricing_model' => $validated['pricing_model'],
                 'price_visibility' => $validated['price_visibility'],
                 'security_deposit_pesewas' => $securityDepositGhs !== null ? (int) round($securityDepositGhs * 100) : null,
+                'min_order_pesewas' => (int) ($validated['min_order_pesewas'] ?? 0),
+                'lead_time_days' => (int) ($validated['lead_time_days'] ?? 1),
                 'capacity_breakdown' => $validated['capacity_breakdown'] ?? [],
+                'service_scope' => $validated['service_scope'] ?? [],
                 'floor_area_sqm' => $validated['floor_area_sqm'] ?? null,
                 'ceiling_height_meters' => $validated['ceiling_height_meters'] ?? null,
                 'rules_and_policies' => $validated['rules_and_policies'] ?? [],
@@ -150,6 +156,8 @@ final class VenueListingController extends Controller
 
         DB::connection('landlord')->transaction(function () use ($listing, $validated, $rentalPriceGhs, $securityDepositGhs): void {
             $listing->update([
+                'listing_kind' => $validated['listing_kind'] ?? $listing->listing_kind,
+                'category' => $validated['category'] ?? $listing->category,
                 'title' => $validated['title'],
                 'slug' => $validated['slug'],
                 'description' => $validated['description'] ?? null,
@@ -157,7 +165,10 @@ final class VenueListingController extends Controller
                 'pricing_model' => $validated['pricing_model'],
                 'price_visibility' => $validated['price_visibility'],
                 'security_deposit_pesewas' => $securityDepositGhs !== null ? (int) round($securityDepositGhs * 100) : null,
+                'min_order_pesewas' => (int) ($validated['min_order_pesewas'] ?? $listing->min_order_pesewas),
+                'lead_time_days' => (int) ($validated['lead_time_days'] ?? $listing->lead_time_days),
                 'capacity_breakdown' => $validated['capacity_breakdown'] ?? [],
+                'service_scope' => $validated['service_scope'] ?? [],
                 'floor_area_sqm' => $validated['floor_area_sqm'] ?? null,
                 'ceiling_height_meters' => $validated['ceiling_height_meters'] ?? null,
                 'rules_and_policies' => $validated['rules_and_policies'] ?? [],

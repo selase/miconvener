@@ -100,9 +100,9 @@ test('a scheduled downgrade to a cheaper paid plan is what gets renewed', functi
     $service = app(SubscriptionRenewalService::class);
 
     expect($service->packageToRenew($subscription)?->slug)->toBe('starter')
-        ->and($subscription->priceMinorFor($starter))->toBe(2900);
+        ->and($subscription->priceMinorFor($starter))->toBe(24900);
 
-    $service->recordRenewal($subscription, $starter, 'renew-down', 2900, 'GHS');
+    $service->recordRenewal($subscription, $starter, 'renew-down', 24900, 'GHS');
 
     expect($tenant->fresh()->package_id)->toEqual($starter->id)
         ->and($subscription->fresh()->pending_package_id)->toBeNull()

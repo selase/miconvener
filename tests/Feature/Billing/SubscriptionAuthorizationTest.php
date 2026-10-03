@@ -136,6 +136,6 @@ test('a yearly subscription costs the yearly price and a monthly one the monthly
     $growth = Package::query()->where('slug', 'growth')->firstOrFail();
 
     expect((new Subscription(['interval' => 'year']))->priceMinorFor($growth))->toBe((int) round((float) $growth->yearly_price * 100))
-        ->and((new Subscription(['provider_plan' => 'growth_month']))->priceMinorFor($growth))->toBe(9900)
+        ->and((new Subscription(['provider_plan' => 'growth_month']))->priceMinorFor($growth))->toBe(49900)
         ->and((new Subscription(['provider_plan' => 'growth_year']))->billingInterval())->toBe('year');
 });

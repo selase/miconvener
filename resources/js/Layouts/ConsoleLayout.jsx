@@ -17,6 +17,8 @@ import {
     Building2,
     CalendarDays,
     Inbox,
+    ClipboardCheck,
+    FileText,
     Menu,
     X,
 } from 'lucide-react';
@@ -25,6 +27,12 @@ import ThemeToggle from '@/Components/Console/ThemeToggle';
 const NAV_ITEMS = [
     { label: 'Dashboard', href: 'tenant.dashboard', icon: LayoutDashboard },
     { label: 'Events', href: 'tenant.events.index', icon: Calendar },
+    {
+        label: 'Facility Operations',
+        href: 'tenant.venue.operations.index',
+        icon: ClipboardCheck,
+        permission: 'manage_venue',
+    },
     {
         label: 'Venue Spaces',
         href: 'tenant.venue.spaces.index',
@@ -41,6 +49,12 @@ const NAV_ITEMS = [
         label: 'Inquiries & Leads',
         href: 'tenant.venue.inquiries.index',
         icon: Inbox,
+        permission: 'manage_venue',
+    },
+    {
+        label: 'RFQs & Proposals',
+        href: 'tenant.venue.quotes.index',
+        icon: FileText,
         permission: 'manage_venue',
     },
     { label: 'Team', href: 'tenant.users.index', icon: Users },

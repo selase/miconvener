@@ -83,6 +83,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('billing.checkout');
     Route::get('/billing/renew', [App\Http\Controllers\Billing\CheckoutController::class, 'renew'])
         ->name('billing.renew');
+    Route::get('/billing/addons', [App\Http\Controllers\Tenant\Billing\TenantAddonController::class, 'index'])
+        ->name('billing.addons.index');
+    Route::post('/billing/addons/checkout', [App\Http\Controllers\Tenant\Billing\TenantAddonController::class, 'checkout'])
+        ->name('billing.addons.checkout');
+    Route::post('/billing/addons/{addon}/cancel', [App\Http\Controllers\Tenant\Billing\TenantAddonController::class, 'cancel'])
+        ->name('billing.addons.cancel');
 
     Route::get('/settings', [OrgSettingsController::class, 'index'])
         ->name('tenant.settings.index');
@@ -104,6 +110,17 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('tenant.settings.payments.settlement-mode');
     Route::post('/settings/payments/platform-fee', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'updatePlatformFee'])
         ->name('tenant.settings.payments.platform-fee');
+
+    Route::prefix('settings/webhooks')->name('tenant.settings.webhooks.')->group(function (): void {
+        Route::get('/', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'store'])->name('store');
+        Route::put('/{endpoint}', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'update'])->name('update');
+        Route::delete('/{endpoint}', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'destroy'])->name('destroy');
+        Route::post('/{endpoint}/rotate-secret', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'rotateSecret'])->name('rotate-secret');
+        Route::post('/{endpoint}/test', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'test'])->name('test');
+        Route::get('/{endpoint}/calls', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'calls'])->name('calls');
+        Route::post('/calls/{call}/retry', [App\Http\Controllers\Tenant\WebhookEndpointController::class, 'retryCall'])->name('calls.retry');
+    });
 
     Route::resource('users', UserController::class)->names('tenant.users')->except(['show', 'create', 'edit']);
     Route::get('roles/{role}/duplicate', [RoleController::class, 'duplicateForm'])->name('tenant.roles.duplicate.form');
@@ -139,6 +156,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     // Events (host console)
     Route::resource('events', EventController::class)->names('tenant.events')->except(['create', 'edit']);
+    Route::post('events/{event}/restore', [EventController::class, 'restore'])->name('tenant.events.restore');
+    Route::delete('events/{event}/force-purge', [EventController::class, 'forcePurge'])->name('tenant.events.force-purge');
     // Each section of an event's workspace has its own address, so refresh, the back
     // button and bookmarks land where you were. Constrained to the known sections so
     // it can never swallow an address meant for something else; the JSON feeds that
@@ -154,6 +173,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::patch('events/{event}/contributions/{contribution}/toggle-approval', [EventController::class, 'toggleContributionApproval'])->name('tenant.events.contributions.toggle-approval');
     Route::post('events/{event}/registrations/{registration}/approve', [EventRegistrationController::class, 'approve'])->name('tenant.events.registrations.approve');
     Route::post('events/{event}/registrations/{registration}/reject', [EventRegistrationController::class, 'reject'])->name('tenant.events.registrations.reject');
+    Route::post('events/{event}/registrations/{registration}/approve-offline', [EventRegistrationController::class, 'approveOfflinePayment'])->name('tenant.events.registrations.approve-offline');
+    Route::post('events/{event}/registrations/{registration}/reject-offline', [EventRegistrationController::class, 'rejectOfflinePayment'])->name('tenant.events.registrations.reject-offline');
+    Route::get('events/{event}/registrations/{registration}/offline-proof', [EventRegistrationController::class, 'downloadProof'])->name('tenant.events.registrations.offline-proof');
     Route::post('events/{event}/registrations/{registration}/cancel', [EventRegistrationController::class, 'cancel'])->name('tenant.events.registrations.cancel');
     Route::patch('events/{event}/registrations/{registration}', [EventRegistrationController::class, 'update'])->name('tenant.events.registrations.update');
     Route::get('events/{event}/checkin/search', [EventCheckInController::class, 'search'])->name('tenant.events.checkin.search');
@@ -171,6 +193,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::patch('events/{event}/sessions/{session}/occurrence', [EventSessionController::class, 'updateOccurrence'])->name('tenant.events.sessions.occurrence');
     Route::delete('events/{event}/sessions/{session}', [EventSessionController::class, 'destroy'])->name('tenant.events.sessions.destroy');
     Route::post('events/{event}/recurrence/generate', [EventSessionController::class, 'generateRecurrence'])->name('tenant.events.recurrence.generate');
+    Route::post('events/{event}/occurrences/batch-cancel', [EventSessionController::class, 'batchCancel'])->name('tenant.events.occurrences.batch-cancel');
+    Route::post('events/{event}/occurrences/batch-reschedule', [EventSessionController::class, 'batchReschedule'])->name('tenant.events.occurrences.batch-reschedule');
+    Route::get('events/{event}/occurrences/analytics', [EventSessionController::class, 'analytics'])->name('tenant.events.occurrences.analytics');
     Route::get('events/{event}/sessions/occupancy', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'occupancy'])->name('tenant.events.sessions.occupancy');
     Route::post('events/{event}/sessions/{session}/scan', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'scan'])->name('tenant.events.sessions.scan');
     Route::get('events/{event}/sessions/{session}/attendees', [App\Http\Controllers\Tenant\EventSessionCheckInController::class, 'attendees'])->name('tenant.events.sessions.attendees');
@@ -193,6 +218,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/venue/rooms/{room}/seats', [EventVenueController::class, 'assignSeat'])->name('tenant.events.venue.seats.assign');
     Route::delete('events/{event}/venue/rooms/{room}/seats/{assignment}', [EventVenueController::class, 'unassignSeat'])->name('tenant.events.venue.seats.unassign');
     Route::get('events/{event}/venue/unseated', [EventVenueController::class, 'searchUnseated'])->name('tenant.events.venue.unseated');
+    Route::get('events/{event}/venue-collaboration', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'show'])->name('tenant.events.venue-collaboration.show');
+    Route::post('events/{event}/venue-collaboration/messages', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'storeMessage'])->name('tenant.events.venue-collaboration.messages.store');
+    Route::post('events/{event}/venue-collaboration/inspections', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'storeInspection'])->name('tenant.events.venue-collaboration.inspections.store');
 
     Route::get('events/{event}/form-fields', [EventFormFieldController::class, 'index'])->name('tenant.events.form-fields.index');
     Route::post('events/{event}/form-fields', [EventFormFieldController::class, 'store'])->name('tenant.events.form-fields.store');
@@ -259,7 +287,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     Route::prefix('venue')->name('tenant.venue.')->group(function (): void {
         Route::get('profile', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'show'])->name('profile');
-        Route::post('profile', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'update'])->name('profile.update');
+        Route::match(['post', 'put'], 'profile', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'update'])->name('profile.update');
         Route::post('profile/verify', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'submitVerification'])->name('profile.verify');
 
         Route::get('spaces', [App\Http\Controllers\Tenant\Venue\VenueListingController::class, 'index'])->name('spaces.index');
@@ -280,6 +308,18 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         Route::delete('calendar/blocks/{block}', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'destroyBlock'])
             ->whereUuid('block')
             ->name('calendar.blocks.destroy');
+
+        Route::get('operations', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'index'])->name('operations.index');
+        Route::get('operations/{booking}', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'show'])->name('operations.show');
+        Route::post('operations/{booking}/tasks', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'createTask'])->name('operations.tasks.store');
+        Route::patch('operations/{booking}/tasks/{task}', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'updateTaskStatus'])->name('operations.tasks.update');
+        Route::post('operations/{booking}/messages', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'storeMessage'])->name('operations.messages.store');
+        Route::post('operations/{booking}/inspections', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'storeInspection'])->name('operations.inspections.store');
+
+        Route::get('quotes', [App\Http\Controllers\Tenant\Venue\VenueQuoteController::class, 'index'])->name('quotes.index');
+        Route::get('quotes/{quote}', [App\Http\Controllers\Tenant\Venue\VenueQuoteController::class, 'show'])->name('quotes.show');
+        Route::post('quotes/{quote}/proposal', [App\Http\Controllers\Tenant\Venue\VenueQuoteController::class, 'storeProposal'])->name('quotes.proposal');
+        Route::post('quotes/{quote}/reject', [App\Http\Controllers\Tenant\Venue\VenueQuoteController::class, 'reject'])->name('quotes.reject');
     });
 
     Route::get('events/{event}/data/sponsors', [EventSponsorController::class, 'index'])->name('tenant.events.sponsors.index');
@@ -315,6 +355,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     Route::patch('events/{event}/visibility', [EventController::class, 'updateVisibility'])->name('tenant.events.visibility');
     Route::get('events/{event}/speakers/{speaker}/portal-link', [EventSpeakerController::class, 'portalLink'])->name('tenant.events.speakers.portal-link');
+    Route::post('events/{event}/speakers/{speaker}/invite', [EventSpeakerController::class, 'invite'])->name('tenant.events.speakers.invite');
 
     // Operations & 8-Pillars Project Management
     Route::get('events/{event}/operations', [App\Http\Controllers\Tenant\EventOperationController::class, 'index'])->name('tenant.events.operations.index');
@@ -377,12 +418,16 @@ Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCe
 
 // Public event pages (no auth — attendees register here)
 Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.events.show');
+Route::get('/e/{event}/calendar.ics', [PublicEventController::class, 'calendarFeed'])->name('public.events.calendar.ics');
 Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');
 Route::post('/e/{event}/unlock-tickets', [PublicEventController::class, 'unlockTicketTypes'])->name('public.events.unlock-tickets');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.contribute');
 Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
+Route::post('/e/{event}/checkout/{registration}/paystack', [EventCheckoutController::class, 'payWithPaystack'])->name('public.events.checkout.paystack');
+Route::post('/e/{event}/checkout/{registration}/offline-proof', [EventCheckoutController::class, 'submitOfflineProof'])->middleware('throttle:public-registration')->name('public.events.checkout.offline-proof');
+Route::get('/e/{event}/checkout/{registration}/proof', [EventCheckoutController::class, 'downloadProof'])->name('public.events.checkout.proof');
 Route::post('/e/{event}/find-ticket', [App\Http\Controllers\Public\TicketRecoveryController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.find-ticket');
 Route::get('/e/{event}/registrations/{registration}/verify', [PublicEventController::class, 'verify'])->middleware('signed')->name('public.events.registrations.verify');
 Route::get('/e/{event}/registrations/{registration}', [PublicEventController::class, 'confirmation'])->name('public.events.confirmation');
@@ -435,9 +480,13 @@ Route::get('/e/{event}/poll', [PublicPollController::class, 'show'])->name('publ
 Route::post('/e/{event}/poll/{poll}/respond', [PublicPollController::class, 'respond'])->name('public.events.poll.respond');
 Route::get('/e/{event}/quiz/leaderboard', [PublicPollController::class, 'leaderboard'])->name('public.events.quiz.leaderboard');
 
-Route::get('/e/{event}/speaker-portal/{token}', [SpeakerPortalController::class, 'show'])->name('public.events.speaker-portal');
-Route::post('/e/{event}/speaker-portal/{token}/confirm', [SpeakerPortalController::class, 'confirm'])->name('public.events.speaker-portal.confirm');
-Route::post('/e/{event}/speaker-portal/{token}/slides', [SpeakerPortalController::class, 'uploadSlides'])->name('public.events.speaker-portal.slides');
+Route::middleware(['throttle:60,1'])->group(function () {
+    Route::get('/e/{event}/speaker-portal/{token}', [SpeakerPortalController::class, 'show'])->name('public.events.speaker-portal');
+    Route::post('/e/{event}/speaker-portal/{token}/confirm', [SpeakerPortalController::class, 'confirm'])->name('public.events.speaker-portal.confirm');
+    Route::post('/e/{event}/speaker-portal/{token}/profile', [SpeakerPortalController::class, 'updateProfile'])->name('public.events.speaker-portal.profile');
+    Route::post('/e/{event}/speaker-portal/{token}/photo', [SpeakerPortalController::class, 'uploadPhoto'])->name('public.events.speaker-portal.photo');
+    Route::post('/e/{event}/speaker-portal/{token}/slides', [SpeakerPortalController::class, 'uploadSlides'])->name('public.events.speaker-portal.slides');
+});
 
 Route::get('/blasts/{recipient}/open.gif', BlastOpenController::class)->name('public.blasts.open');
 

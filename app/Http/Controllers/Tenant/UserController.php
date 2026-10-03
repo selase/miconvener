@@ -68,7 +68,7 @@ final class UserController extends Controller
 
         $limit = $tenant->featureLimitValue('team_seats');
         if ($limit !== null && $tenant->users()->count() >= $limit) {
-            $message = "Your plan allows {$limit} team member(s). Remove an existing member, or upgrade your plan, to invite another.";
+            $message = "Your workspace allows {$limit} team member(s) (including active seat add-ons). Purchase additional team seats, remove an existing member, or upgrade your plan to invite another.";
 
             return redirect()->back()->withErrors(['email' => $message]);
         }

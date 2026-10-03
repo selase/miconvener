@@ -14,14 +14,43 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class WebhookCall extends Model
 {
     use BelongsToTenant;
-    use HasFactory, HasUuids;
+    use HasFactory;
+    use HasUuids;
     use SpatieActivityLogs;
 
-    protected $guarded = [];
+    protected $connection = 'landlord';
+
+    protected $fillable = [
+        'tenant_id',
+        'webhook_endpoint_id',
+        'event_name',
+        'payload',
+        'status',
+        'duration_ms',
+        'response',
+        'exception',
+    ];
 
     protected $casts = [
         'payload' => 'array',
+        'status' => 'integer',
+        'duration_ms' => 'integer',
     ];
+
+    public function isSuccessful(): bool
+    {
+        return $this->status !== null && $this->status >= 200 && $this->status < 300;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === null && $this->exception === null;
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->exception !== null || ($this->status !== null && $this->status >= 400);
+    }
 
     /**
      * @return BelongsTo<WebhookEndpoint, $this>

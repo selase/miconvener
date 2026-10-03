@@ -14,15 +14,20 @@ use App\Mail\Events\AutomatedNotificationMail;
 use App\Mail\Events\EventBlastMail;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationNeedsApproval;
+use App\Mail\Events\EventRegistrationOfflineProofSubmitted;
+use App\Mail\Events\EventRegistrationOfflineRejected;
 use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationPendingApproval;
+use App\Mail\Events\EventRegistrationPendingVerification;
 use App\Mail\Events\EventRegistrationRejected;
 use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Mail\Events\EventRegistrationWaitlisted;
 use App\Mail\Events\EventTicketLink;
 use App\Mail\Events\EventTicketTransferCode;
 use App\Mail\Events\EventTicketTransferred;
+use App\Mail\Events\OccurrenceReminderMail;
 use App\Mail\Events\PlatformAttendeeAccessCodeMail;
+use App\Mail\Events\SpeakerPortalInvitationMail;
 use App\Mail\Events\UrgentServiceRequestRaised;
 use App\Mail\Marketplace\BookingConfirmationGuest;
 use App\Mail\Marketplace\NewVenueBookingNotification;
@@ -84,6 +89,25 @@ test('every mailable renders', function (): void {
     ]);
 
     $lead = Lead::factory()->create();
+
+    $session = App\Models\EventSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'title' => 'Keynote Presentation',
+    ]);
+
+    $speaker = App\Models\Speaker::create([
+        'tenant_id' => $tenant->id,
+        'name' => 'Prof. Kwame Nkrumah',
+        'email' => 'kwame@science.edu',
+    ]);
+
+    $eventSpeaker = App\Models\EventSpeaker::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'speaker_id' => $speaker->id,
+        'portal_token' => 'sample-test-token-123456',
+    ]);
 
     // Every real send happens with a tenant resolved, so the templates are
     // rendered the same way here. Whether a queued job actually restores this
@@ -194,9 +218,14 @@ test('every mailable renders', function (): void {
         'EventRegistrationNeedsApproval' => fn () => new EventRegistrationNeedsApproval($registration),
         'EventRegistrationPaymentInvite' => fn () => new EventRegistrationPaymentInvite($registration, 'Your seat is held until payment.'),
         'EventRegistrationPendingApproval' => fn () => new EventRegistrationPendingApproval($registration),
+        'EventRegistrationPendingVerification' => fn () => new EventRegistrationPendingVerification($registration, 'https://acme.test/checkout/reg-123'),
+        'EventRegistrationOfflineRejected' => fn () => new EventRegistrationOfflineRejected($registration, 'Receipt could not be matched on statement.', 'https://acme.test/checkout/reg-123'),
+        'EventRegistrationOfflineProofSubmitted' => fn () => new EventRegistrationOfflineProofSubmitted($registration, 'https://acme.test/console/events/123'),
         'EventRegistrationRejected' => fn () => new EventRegistrationRejected($registration),
         'EventRegistrationVerifyEmail' => fn () => new EventRegistrationVerifyEmail($registration),
         'EventRegistrationWaitlisted' => fn () => new EventRegistrationWaitlisted($registration),
+        'OccurrenceReminderMail' => fn () => new OccurrenceReminderMail($event, $session, $registration),
+        'SpeakerPortalInvitationMail' => fn () => new SpeakerPortalInvitationMail($event, $speaker, $eventSpeaker),
         'EventTicketLink' => fn () => new EventTicketLink($registration),
         'EventTicketTransferCode' => fn () => new EventTicketTransferCode($transfer, '123456'),
         'EventTicketTransferred' => fn () => new EventTicketTransferred($registration, 'Ama Serwaa', 'Kofi Mensah', 'kofi@stem.org'),

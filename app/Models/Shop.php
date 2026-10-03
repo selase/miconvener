@@ -6,12 +6,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class Shop extends Model
 {
+    use HasFactory;
     use HasUuids;
 
     public const string VERIFICATION_UNVERIFIED = 'unverified';
@@ -36,6 +38,13 @@ final class Shop extends Model
         'address',
         'city',
         'region',
+        'vendor_categories',
+        'business_registration_number',
+        'tax_id',
+        'verification_documents',
+        'past_clients',
+        'average_rating',
+        'reviews_count',
         'latitude',
         'longitude',
         'verification_status',
@@ -49,6 +58,11 @@ final class Shop extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'vendor_categories' => 'array',
+        'verification_documents' => 'array',
+        'past_clients' => 'array',
+        'average_rating' => 'decimal:2',
+        'reviews_count' => 'integer',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
         'verified_at' => 'datetime',
@@ -72,6 +86,54 @@ final class Shop extends Model
     }
 
     /**
+     * @return HasMany<StoreListing, $this>
+     */
+    public function listings(): HasMany
+    {
+        return $this->hasMany(StoreListing::class);
+    }
+
+    /**
+     * @return HasMany<VenueBooking, $this>
+     */
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(VenueBooking::class);
+    }
+
+    /**
+     * @return HasMany<VenueFacilityMessage, $this>
+     */
+    public function facilityMessages(): HasMany
+    {
+        return $this->hasMany(VenueFacilityMessage::class);
+    }
+
+    /**
+     * @return HasMany<VenueInspectionLog, $this>
+     */
+    public function inspectionLogs(): HasMany
+    {
+        return $this->hasMany(VenueInspectionLog::class);
+    }
+
+    /**
+     * @return HasMany<MarketplaceQuote, $this>
+     */
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(MarketplaceQuote::class);
+    }
+
+    /**
+     * @return HasMany<MarketplaceReview, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(MarketplaceReview::class)->where('is_published', true);
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function verifiedBy(): BelongsTo
@@ -79,12 +141,21 @@ final class Shop extends Model
         return $this->belongsTo(User::class, 'verified_by_user_id');
     }
 
-    /**
-     * @return HasMany<StoreListing, $this>
-     */
-    public function listings(): HasMany
+    public function recalculateRating(): void
     {
-        return $this->hasMany(StoreListing::class);
+        $stats = $this->reviews()
+            ->selectRaw('COUNT(*) as total_count, AVG(rating) as avg_rating')
+            ->first();
+
+        $this->update([
+            'reviews_count' => (int) ($stats->total_count ?? 0),
+            'average_rating' => round((float) ($stats->avg_rating ?? 0.0), 2),
+        ]);
+    }
+
+    public function hasVendorCategory(string $category): bool
+    {
+        return in_array($category, $this->vendor_categories ?? [], true);
     }
 
     public function isVerified(): bool

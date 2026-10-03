@@ -20,6 +20,9 @@ Route::prefix('my')->group(function (): void {
         Route::get('/certificates', [PlatformAttendeeAccessController::class, 'certificates'])->name('attendee.my.certificates');
         Route::get('/abstracts', [PlatformAttendeeAccessController::class, 'abstracts'])->name('attendee.my.abstracts');
         Route::get('/attendance', [PlatformAttendeeAccessController::class, 'attendance'])->name('attendee.my.attendance');
+        Route::get('/contributions', [PlatformAttendeeAccessController::class, 'contributions'])->name('attendee.my.contributions');
+        Route::get('/contributions/{contribution}/receipt', [PlatformAttendeeAccessController::class, 'downloadReceipt'])->middleware('throttle:60,1')->name('attendee.my.contributions.receipt');
+        Route::patch('/contributions/{contribution}/tribute', [PlatformAttendeeAccessController::class, 'updateTribute'])->name('attendee.my.contributions.tribute');
     });
 
     // Event workspace endpoints (authorized via platform email proof or checkout grant)

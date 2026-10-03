@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link, router } from '@inertiajs/react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Clock } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
-import ConfirmModal from '@/Components/Console/ConfirmModal';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import StatusPill from '@/Components/Console/StatusPill';
 import EventFormModal from './EventFormModal';
+import DeleteEventModal from './DeleteEventModal';
 
 const STATUS_VARIANT = {
     draft: 'neutral',
@@ -29,13 +29,14 @@ function formatMoney(amount, currency) {
     return amount > 0 ? `${currency} ${(amount / 100).toFixed(2)}` : 'Free';
 }
 
-export default function Index({ events, stats }) {
+export default function Index({ events, stats, recentlyDeletedEvents = [] }) {
     const [modal, setModal] = useState(null);
     const [deleting, setDeleting] = useState(null);
+    const [forcePurging, setForcePurging] = useState(null);
 
-    const confirmDelete = () => {
-        router.delete(route('tenant.events.destroy', { event: deleting.id }), {
-            onFinish: () => setDeleting(null),
+    const handleRestore = (delEvent) => {
+        router.post(route('tenant.events.restore', { event: delEvent.id }), {}, {
+            preserveScroll: true,
         });
     };
 
@@ -77,6 +78,60 @@ export default function Index({ events, stats }) {
                         </div>
                     </div>
                 </div>
+
+                {recentlyDeletedEvents?.length > 0 && (
+                    <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50/70 p-5">
+                        <div className="mb-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-amber-700" />
+                                <h3 className="font-semibold text-amber-950">
+                                    Recently Deleted Events (6-Hour Recovery Window Active)
+                                </h3>
+                            </div>
+                            <span className="text-xs font-medium text-amber-800">
+                                {recentlyDeletedEvents.length} event{recentlyDeletedEvents.length > 1 ? 's' : ''} in recovery
+                            </span>
+                        </div>
+                        <div className="space-y-2">
+                            {recentlyDeletedEvents.map((delEvent) => (
+                                <div
+                                    key={delEvent.id}
+                                    className="flex flex-col justify-between gap-3 rounded-lg border border-amber-200 bg-surface px-4 py-3 sm:flex-row sm:items-center"
+                                >
+                                    <div>
+                                        <p className="font-medium text-ink">{delEvent.name}</p>
+                                        <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-secondary">
+                                            <span>Deleted {formatDate(delEvent.deleted_at)}</span>
+                                            <span>·</span>
+                                            <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
+                                                <Clock className="h-3.5 w-3.5" />
+                                                {delEvent.remaining_human}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRestore(delEvent)}
+                                            className="inline-flex h-control items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                                        >
+                                            <RotateCcw className="h-3.5 w-3.5" />
+                                            Restore Event
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setForcePurging(delEvent)}
+                                            className="inline-flex h-control items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-xs font-medium text-ink-secondary transition-colors hover:border-red-300 hover:text-red-600"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Purge Now
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {events.length > 0 ? (
                     <Table>
@@ -164,14 +219,17 @@ export default function Index({ events, stats }) {
                 />
             )}
 
-            <ConfirmModal
+            <DeleteEventModal
                 open={deleting !== null}
                 onClose={() => setDeleting(null)}
-                onConfirm={confirmDelete}
-                title="Delete event"
-                description={deleting && `Delete "${deleting.name}"? This cannot be undone.`}
-                confirmLabel="Delete"
-                danger
+                event={deleting}
+            />
+
+            <DeleteEventModal
+                open={forcePurging !== null}
+                onClose={() => setForcePurging(null)}
+                event={forcePurging}
+                isForcePurge
             />
         </ConsoleLayout>
     );

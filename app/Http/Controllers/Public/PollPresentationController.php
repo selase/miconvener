@@ -31,6 +31,10 @@ final class PollPresentationController extends Controller
     {
         $eventModel = $this->findByToken($event, $token);
 
+        if (! $this->tenant()->canUseLivePolling($eventModel)) {
+            abort(403, 'Live Polling presentation is locked on this event. An upgrade or event pass is required.');
+        }
+
         $joinUrl = route('public.events.poll.show', [
             'subdomain' => $this->tenant()->slug,
             'event' => $eventModel->slug,
@@ -79,6 +83,10 @@ final class PollPresentationController extends Controller
     public function results(string $subdomain, string $event, string $token): JsonResponse
     {
         $eventModel = $this->findByToken($event, $token);
+
+        if (! $this->tenant()->canUseLivePolling($eventModel)) {
+            abort(403, 'Live Polling presentation is locked on this event.');
+        }
 
         return response()->json(['poll' => $this->livePayload($eventModel)]);
     }

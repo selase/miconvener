@@ -25,7 +25,14 @@ export default function Pricing({ packages, currentPackageSlug, currency = 'GHS'
 
     return (
         <ConsoleLayout>
-            <PageHeader title="Plans" />
+            <PageHeader
+                title="Plans"
+                actions={
+                    <Button href={route('billing.addons.index')}>
+                        Modular Add-Ons
+                    </Button>
+                }
+            />
 
             <div className="px-4 py-6 sm:px-8">
                 <SegmentedControl

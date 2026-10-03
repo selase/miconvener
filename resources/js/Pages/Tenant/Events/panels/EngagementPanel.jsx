@@ -41,6 +41,7 @@ function NewPollForm({ event, onCreated }) {
     const [unit, setUnit] = useState('');
     const [formError, setFormError] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
 
     const authored = AUTHORED_OPTION_TYPES.includes(type);
     const moderated = type === 'open' || type === 'word_cloud';
@@ -53,6 +54,7 @@ function NewPollForm({ event, onCreated }) {
     const submit = async (e) => {
         e.preventDefault();
         setSaving(true);
+        setError(null);
 
         setFormError(null);
 
@@ -75,6 +77,13 @@ function NewPollForm({ event, onCreated }) {
             }),
         });
 
+        if (response.status === 403) {
+            const data = await response.json().catch(() => ({}));
+            setError(data.message || 'Live Polling requires the Growth plan or an active add-on/pass.');
+            setSaving(false);
+            return;
+        }
+
         setSaving(false);
 
         // A refused question stays in the form with the reason, rather than
@@ -94,6 +103,17 @@ function NewPollForm({ event, onCreated }) {
     return (
         <form onSubmit={submit} className="border border-border p-4">
             <b className="text-sm font-medium text-ink">New poll or quiz question</b>
+            {error && (
+                <div className="mt-2 p-3 rounded border border-warning-fg/30 bg-warning-bg text-sm text-warning-fg flex flex-col gap-1.5">
+                    <span>{error}</span>
+                    <a
+                        href={route('billing.addons.index')}
+                        className="font-semibold underline text-ink hover:text-accent"
+                    >
+                        Unlock via Modular Add-Ons or Single-Event Pass →
+                    </a>
+                </div>
+            )}
             <div className="mt-3 space-y-3">
                 <Input
                     label="Question"

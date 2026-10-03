@@ -38,6 +38,22 @@ final class EventRegistration extends Model
 
     public const string STATUS_WAITLISTED = 'waitlisted';
 
+    public const string PAYMENT_METHOD_PAYSTACK = 'paystack';
+
+    public const string PAYMENT_METHOD_OFFLINE_BANK = 'offline_bank';
+
+    public const string PAYMENT_METHOD_OFFLINE_MOMO = 'offline_momo';
+
+    public const string PAYMENT_METHOD_OFFLINE_CASH = 'offline_cash';
+
+    public const string OFFLINE_STATUS_PENDING_PROOF = 'pending_proof';
+
+    public const string OFFLINE_STATUS_PENDING_VERIFICATION = 'pending_verification';
+
+    public const string OFFLINE_STATUS_APPROVED = 'approved';
+
+    public const string OFFLINE_STATUS_REJECTED = 'rejected';
+
     protected $connection = 'landlord';
 
     protected $fillable = [
@@ -67,6 +83,14 @@ final class EventRegistration extends Model
         'gateway_fee_amount',
         'currency',
         'payment_reference',
+        'payment_method',
+        'offline_payment_status',
+        'offline_payment_proof_path',
+        'offline_payment_reference',
+        'offline_payment_notes',
+        'offline_payment_submitted_at',
+        'offline_payment_verified_at',
+        'offline_payment_verified_by',
         'checked_in_at',
         'checked_in_by',
         'checked_in_source',
@@ -81,6 +105,8 @@ final class EventRegistration extends Model
         'waitlist_position' => 'integer',
         'checked_in_at' => 'datetime',
         'email_verified_at' => 'datetime',
+        'offline_payment_submitted_at' => 'datetime',
+        'offline_payment_verified_at' => 'datetime',
         'form_answers' => 'array',
     ];
 
@@ -199,6 +225,11 @@ final class EventRegistration extends Model
         return in_array($this->status, [self::STATUS_CONFIRMED, self::STATUS_CHECKED_IN], true);
     }
 
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
     /**
      * Present means someone recorded this person as being here -- scanned at a
      * door, or self-reported at a virtual event. Confirmed is not present: a
@@ -217,6 +248,48 @@ final class EventRegistration extends Model
     public function scopeWaitlisted(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_WAITLISTED);
+    }
+
+    public function scopePendingOfflineVerification(Builder $query): Builder
+    {
+        return $query->where('offline_payment_status', self::OFFLINE_STATUS_PENDING_VERIFICATION);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function offlinePaymentVerifiedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'offline_payment_verified_by');
+    }
+
+    public function isOfflinePayment(): bool
+    {
+        return in_array($this->payment_method, [
+            self::PAYMENT_METHOD_OFFLINE_BANK,
+            self::PAYMENT_METHOD_OFFLINE_MOMO,
+            self::PAYMENT_METHOD_OFFLINE_CASH,
+        ], true);
+    }
+
+    public function isAwaitingOfflineProof(): bool
+    {
+        return $this->offline_payment_status === self::OFFLINE_STATUS_PENDING_PROOF;
+    }
+
+    public function isAwaitingOfflineVerification(): bool
+    {
+        return $this->offline_payment_status === self::OFFLINE_STATUS_PENDING_VERIFICATION;
+    }
+
+    public function isOfflineApproved(): bool
+    {
+        return $this->offline_payment_status === self::OFFLINE_STATUS_APPROVED;
+    }
+
+    public function isOfflineRejected(): bool
+    {
+        return $this->offline_payment_status === self::OFFLINE_STATUS_REJECTED;
     }
 
     /**

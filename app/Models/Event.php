@@ -15,12 +15,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Event extends Model
 {
     use BelongsToTenant;
     use HasFactory;
     use HasUuids;
+    use SoftDeletes;
     use SpatieActivityLogs;
 
     public const string STATUS_DRAFT = 'draft';
@@ -144,6 +146,14 @@ final class Event extends Model
         'recurrence_interval',
         'recurrence_until',
         'recurrence_auto_generate_weeks',
+        'allow_offline_payments',
+        'offline_payment_instructions',
+        'offline_payment_bank_name',
+        'offline_payment_account_name',
+        'offline_payment_account_number',
+        'offline_payment_momo_number',
+        'offline_payment_momo_network',
+        'purge_at',
     ];
 
     protected $casts = [
@@ -151,6 +161,7 @@ final class Event extends Model
         'grandfathered_at' => 'datetime',
         'terms_locked_at' => 'datetime',
         'ends_at' => 'datetime',
+        'purge_at' => 'datetime',
         'capacity' => 'integer',
         'requires_approval' => 'boolean',
         'allows_self_check_in' => 'boolean',
@@ -171,6 +182,7 @@ final class Event extends Model
         'recurrence_interval' => 'integer',
         'recurrence_until' => 'date',
         'recurrence_auto_generate_weeks' => 'integer',
+        'allow_offline_payments' => 'boolean',
     ];
 
     /**
@@ -286,6 +298,30 @@ final class Event extends Model
         return $this->belongsTo(VenueBooking::class, 'venue_booking_id');
     }
 
+    /**
+     * @return HasMany<VenueFacilityMessage, $this>
+     */
+    public function facilityMessages(): HasMany
+    {
+        return $this->hasMany(VenueFacilityMessage::class)->orderBy('created_at');
+    }
+
+    /**
+     * @return HasMany<VenueInspectionLog, $this>
+     */
+    public function inspectionLogs(): HasMany
+    {
+        return $this->hasMany(VenueInspectionLog::class)->orderByDesc('created_at');
+    }
+
+    /**
+     * @return HasMany<EventOperationTask, $this>
+     */
+    public function venueTasks(): HasMany
+    {
+        return $this->hasMany(EventOperationTask::class)->where('is_venue_task', true)->orderBy('due_date')->orderBy('created_at');
+    }
+
     public function isMarketplaceVenue(): bool
     {
         return $this->store_listing_id !== null;
@@ -360,6 +396,11 @@ final class Event extends Model
     public function allowsContributions(): bool
     {
         return (bool) $this->allow_contributions;
+    }
+
+    public function allowsOfflinePayments(): bool
+    {
+        return (bool) $this->allow_offline_payments;
     }
 
     public function isRecurring(): bool
@@ -528,7 +569,7 @@ final class Event extends Model
     public function speakers(): BelongsToMany
     {
         return $this->belongsToMany(Speaker::class, 'event_speakers', 'event_id', 'speaker_id')
-            ->withPivot(['role', 'sort_order'])
+            ->withPivot(['role', 'sort_order', 'is_confirmed', 'confirmed_at', 'last_invited_at', 'portal_token'])
             ->orderBy('event_speakers.sort_order');
     }
 
@@ -637,6 +678,70 @@ final class Event extends Model
         return $this->status === self::STATUS_PUBLISHED;
     }
 
+    public function isPendingPurge(): bool
+    {
+        return $this->trashed() && $this->purge_at !== null && $this->purge_at->isFuture();
+    }
+
+    public function recoveryWindowRemainingSeconds(): int
+    {
+        if (! $this->isPendingPurge()) {
+            return 0;
+        }
+
+        return max(0, (int) now()->diffInSeconds($this->purge_at, false));
+    }
+
+    public function recoveryWindowRemainingHuman(): string
+    {
+        $remainingSeconds = $this->recoveryWindowRemainingSeconds();
+        if ($remainingSeconds <= 0) {
+            return 'Purge pending';
+        }
+
+        $hours = (int) floor($remainingSeconds / 3600);
+        $minutes = (int) floor(($remainingSeconds % 3600) / 60);
+
+        if ($hours > 0) {
+            return "{$hours}h {$minutes}m left to restore";
+        }
+
+        return "{$minutes}m left to restore";
+    }
+
+    /**
+     * Audit whether this event is safe to be deleted.
+     * Blocks deletion if in-flight payouts or unverified offline payments exist.
+     */
+    public function canBeDeleted(?string &$reason = null): bool
+    {
+        $inFlightPayouts = $this->payouts()
+            ->whereIn('status', [
+                EventPayout::STATUS_PROCESSING,
+                EventPayout::STATUS_AWAITING_OTP,
+                EventPayout::STATUS_SCHEDULED,
+            ])
+            ->exists();
+
+        if ($inFlightPayouts) {
+            $reason = 'Cannot delete this event while a financial payout is in progress or awaiting OTP verification. Resolve the payout first.';
+
+            return false;
+        }
+
+        $pendingOffline = $this->registrations()
+            ->where('offline_payment_status', EventRegistration::OFFLINE_STATUS_PENDING_VERIFICATION)
+            ->exists();
+
+        if ($pendingOffline) {
+            $reason = 'Cannot delete this event while attendee registrations are awaiting offline payment proof verification. Approve or reject pending proofs first.';
+
+            return false;
+        }
+
+        return true;
+    }
+
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_PUBLISHED);
@@ -644,12 +749,14 @@ final class Event extends Model
 
     protected static function booted(): void
     {
-        // event_materials cascades at the database level, so the rows that point
-        // at these files disappear the instant the event does -- taking with them
-        // the only record of what to delete. The files have to go first, and this
-        // lives on the model rather than the controller so every deletion path is
-        // covered, not just the one the UI happens to use.
+        // When soft-deleting with a 6-hour recovery window, files must be
+        // preserved in case the event is restored. Files are only cleaned
+        // up when force-deleting permanently.
         self::deleting(function (self $event): void {
+            if (! $event->isForceDeleting()) {
+                return;
+            }
+
             $disk = self::uploadDisk();
 
             foreach ($event->materials()->pluck('file_path') as $path) {

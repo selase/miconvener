@@ -6,6 +6,7 @@ import ConfirmModal from '@/Components/Console/ConfirmModal';
 import Input from '@/Components/Console/Input';
 import SearchInput from '@/Components/Console/SearchInput';
 import csrfFetch from '@/lib/csrfFetch';
+import FacilityCollaborationView from './FacilityCollaborationView';
 
 const ACTIVE_REQUEST_STATUSES = ['open', 'acknowledged', 'in_progress'];
 
@@ -228,9 +229,48 @@ export default function VenuePanel({ event, venueRooms }) {
         reload();
     };
 
+    const [venueSection, setVenueSection] = useState('seating'); // 'seating' or 'facility'
+
+    const renderTabs = () => (
+        <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
+            <button
+                type="button"
+                onClick={() => setVenueSection('seating')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                    venueSection === 'seating'
+                        ? 'bg-ink text-surface'
+                        : 'text-ink-secondary hover:text-ink'
+                }`}
+            >
+                Rooms & Seating Charts
+            </button>
+            <button
+                type="button"
+                onClick={() => setVenueSection('facility')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                    venueSection === 'facility'
+                        ? 'bg-ink text-surface'
+                        : 'text-ink-secondary hover:text-ink'
+                }`}
+            >
+                Facility Collaboration & Host
+            </button>
+        </div>
+    );
+
+    if (venueSection === 'facility') {
+        return (
+            <div className="max-w-3xl">
+                {renderTabs()}
+                <FacilityCollaborationView event={event} />
+            </div>
+        );
+    }
+
     if (venueRooms.length === 0) {
         return (
-            <div className="max-w-2xl">
+            <div className="max-w-3xl">
+                {renderTabs()}
                 <p className="mb-4 text-sm text-ink-secondary">
                     No rooms set up yet. Add one to start assigning seats.
                 </p>
@@ -241,6 +281,7 @@ export default function VenuePanel({ event, venueRooms }) {
 
     return (
         <div className="max-w-3xl">
+            {renderTabs()}
             <div className="mb-5 flex gap-px overflow-x-auto bg-border">
                 {venueRooms.map((r) => (
                     <div

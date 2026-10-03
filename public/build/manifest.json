@@ -1,10 +1,10 @@
 {
-  "_pusher-Bu-WqXVr.js": {
-    "file": "assets/pusher-Bu-WqXVr.js",
+  "_pusher-CXw59jkQ.js": {
+    "file": "assets/pusher-CXw59jkQ.js",
     "name": "pusher"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CRId0g2l.css",
+    "file": "assets/app-BkNJSuaJ.css",
     "name": "app",
     "names": [
       "app.css"
@@ -13,21 +13,21 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-Dq2yfCfD.js",
+    "file": "assets/app-CavptxyQ.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_pusher-Bu-WqXVr.js"
+      "_pusher-CXw59jkQ.js"
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-Di4Hf1eK.js",
+    "file": "assets/app-3gK9uP1H.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
     "imports": [
-      "_pusher-Bu-WqXVr.js"
+      "_pusher-CXw59jkQ.js"
     ]
   }
 }

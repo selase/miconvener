@@ -119,6 +119,8 @@ final class EventSession extends Model
         'occurrence_status',
         'notes',
         'presentation_url',
+        'cancellation_reason',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
@@ -128,7 +130,28 @@ final class EventSession extends Model
         'sort_order' => 'integer',
         'is_occurrence' => 'boolean',
         'occurrence_date' => 'date',
+        'reminder_sent_at' => 'datetime',
     ];
+
+    public function isCancelled(): bool
+    {
+        return $this->occurrence_status === self::STATUS_CANCELLED;
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->occurrence_status === self::STATUS_COMPLETED;
+    }
+
+    public function isScheduled(): bool
+    {
+        return $this->occurrence_status === self::STATUS_SCHEDULED;
+    }
+
+    public function hasReminderBeenSent(): bool
+    {
+        return $this->reminder_sent_at !== null;
+    }
 
     public function abstract(): BelongsTo
     {

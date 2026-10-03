@@ -179,6 +179,30 @@ final class VenueBooking extends Model
     }
 
     /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<Event, $this>
+     */
+    public function event(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Event::class, 'venue_booking_id')->withoutGlobalScopes();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<VenueFacilityMessage, $this>
+     */
+    public function facilityMessages(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(VenueFacilityMessage::class, 'venue_booking_id')->orderBy('created_at');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<VenueInspectionLog, $this>
+     */
+    public function inspectionLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(VenueInspectionLog::class, 'venue_booking_id')->orderByDesc('created_at');
+    }
+
+    /**
      * Scope bookings that currently block the venue calendar.
      *
      * Confirmed bookings always block. Pending payment bookings block only while

@@ -27,7 +27,15 @@ final class Speaker extends Model
         'organization',
         'bio',
         'photo_path',
+        'website_url',
+        'linkedin_url',
+        'twitter_url',
     ];
+
+    public function photoUrl(): ?string
+    {
+        return \App\Libraries\Helper::storageUrl($this->photo_path);
+    }
 
     /** @return HasMany<EventSpeaker, $this> */
     public function eventSpeakers(): HasMany

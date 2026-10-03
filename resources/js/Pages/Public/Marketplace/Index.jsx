@@ -270,60 +270,80 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                             </div>
                         </Link>
 
-                        {/* Catering - Future */}
-                        <div className="rounded-xl border border-border bg-surface p-5 opacity-75">
+                        {/* Catering & Banqueting */}
+                        <Link
+                            href="/marketplace/venues?category=catering_beverages&listing_kind=all"
+                            className="group relative rounded-xl border border-border bg-surface p-5 transition-all hover:border-accent/40 hover:shadow-md"
+                        >
                             <div className="flex items-center justify-between">
-                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-ink-secondary">
+                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-accent">
                                     <Utensils className="h-5 w-5" />
                                 </div>
-                                <span className="rounded-full bg-border px-2 py-0.5 text-[10px] font-medium text-ink-tertiary">
-                                    Coming Soon
+                                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent uppercase">
+                                    Active
                                 </span>
                             </div>
-                            <h3 className="mt-4 text-sm font-semibold text-ink">
+                            <h3 className="mt-4 text-sm font-semibold text-ink group-hover:text-accent transition-colors">
                                 Catering & Banqueting
                             </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                Full-course plated dinners, buffets, cocktail canapés, and coffee
-                                break catering.
+                                Plated dinners, conference coffee breaks, cocktail hors d'oeuvres, and banquets.
                             </p>
-                        </div>
+                            <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-accent">
+                                <span>Find Caterers</span>
+                                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                            </div>
+                        </Link>
 
-                        {/* AV & Production - Future */}
-                        <div className="rounded-xl border border-border bg-surface p-5 opacity-75">
+                        {/* AV & Production */}
+                        <Link
+                            href="/marketplace/venues?category=pa_sound&listing_kind=all"
+                            className="group relative rounded-xl border border-border bg-surface p-5 transition-all hover:border-accent/40 hover:shadow-md"
+                        >
                             <div className="flex items-center justify-between">
-                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-ink-secondary">
+                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-indigo-600 dark:text-indigo-400">
                                     <Tv className="h-5 w-5" />
                                 </div>
-                                <span className="rounded-full bg-border px-2 py-0.5 text-[10px] font-medium text-ink-tertiary">
-                                    Coming Soon
+                                <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300 uppercase">
+                                    Active
                                 </span>
                             </div>
-                            <h3 className="mt-4 text-sm font-semibold text-ink">
-                                Audiovisual & Tech
+                            <h3 className="mt-4 text-sm font-semibold text-ink group-hover:text-indigo-600 transition-colors">
+                                Audiovisual, Sound & Video
                             </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                LED video walls, multi-mic sound systems, livestreaming rigs, and
-                                stage lighting.
+                                PA sound engineering, multi-camera live streaming, LED video walls, and stage lighting.
                             </p>
-                        </div>
+                            <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                                <span>Browse Audio/Visual</span>
+                                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                            </div>
+                        </Link>
 
-                        {/* Decor & Infrastructure - Future */}
-                        <div className="rounded-xl border border-border bg-surface p-5 opacity-75">
+                        {/* Canopies, Decor & Rentals */}
+                        <Link
+                            href="/marketplace/venues?category=canopies_tents&listing_kind=all"
+                            className="group relative rounded-xl border border-border bg-surface p-5 transition-all hover:border-accent/40 hover:shadow-md"
+                        >
                             <div className="flex items-center justify-between">
-                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-ink-secondary">
+                                <div className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-amber-600 dark:text-amber-400">
                                     <FileText className="h-5 w-5" />
                                 </div>
-                                <span className="rounded-full bg-border px-2 py-0.5 text-[10px] font-medium text-ink-tertiary">
-                                    Coming Soon
+                                <span className="rounded-full bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-300 uppercase">
+                                    Active
                                 </span>
                             </div>
-                            <h3 className="mt-4 text-sm font-semibold text-ink">Decor & Rentals</h3>
+                            <h3 className="mt-4 text-sm font-semibold text-ink group-hover:text-amber-600 transition-colors">
+                                Canopies, Decor & Rentals
+                            </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                High-peak canopies, Chiavari chairs, ambient drapery, and exhibition
-                                booths.
+                                Marquees, high-peak canopies, banquet furniture, generators, and exhibition booths.
                             </p>
-                        </div>
+                            <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                                <span>Browse Rentals</span>
+                                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                            </div>
+                        </Link>
                     </div>
                 </div>
             </section>

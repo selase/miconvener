@@ -62,9 +62,26 @@ final class EventController extends Controller
                 ->sum('amount'),
         ];
 
+        $recentlyDeletedEvents = Event::onlyTrashed()
+            ->where('tenant_id', $tenant->id)
+            ->where('purge_at', '>', $now)
+            ->orderByDesc('deleted_at')
+            ->get()
+            ->map(fn (Event $event): array => [
+                'id' => $event->id,
+                'name' => $event->name,
+                'slug' => $event->slug,
+                'status' => $event->status,
+                'deleted_at' => $event->deleted_at?->toIso8601String(),
+                'purge_at' => $event->purge_at?->toIso8601String(),
+                'remaining_seconds' => $event->recoveryWindowRemainingSeconds(),
+                'remaining_human' => $event->recoveryWindowRemainingHuman(),
+            ]);
+
         return Inertia::render('Tenant/Events/Index', [
             'events' => $events,
             'stats' => $stats,
+            'recentlyDeletedEvents' => $recentlyDeletedEvents,
         ]);
     }
 
@@ -256,19 +273,155 @@ final class EventController extends Controller
         ]);
     }
 
-    public function destroy(string $subdomain, string $event): JsonResponse|RedirectResponse
+    public function destroy(Request $request, string $subdomain, string $event): JsonResponse|RedirectResponse
     {
         $this->authorize('delete event');
         $tenant = $this->getTenant();
 
         $eventModel = $this->resolveEvent($tenant, $event);
-        $eventModel->delete();
 
-        if (request()->wantsJson()) {
-            return response()->json(['message' => 'Event deleted successfully.']);
+        $validated = $request->validate([
+            'confirm_name' => ['required', 'string'],
+        ], [
+            'confirm_name.required' => 'Please type the event title to confirm deletion.',
+        ]);
+
+        if (mb_trim(mb_strtolower($validated['confirm_name'])) !== mb_trim(mb_strtolower($eventModel->name))) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'The entered title does not match the event title.',
+                    'errors' => ['confirm_name' => ['The entered title does not match the event title.']],
+                ], 422);
+            }
+
+            return redirect()->back()->withErrors(['confirm_name' => 'The entered title does not match the event title.']);
         }
 
-        return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', 'Event deleted successfully.');
+        $blockReason = null;
+        if (! $eventModel->canBeDeleted($blockReason)) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => $blockReason,
+                    'errors' => ['event' => [$blockReason]],
+                ], 422);
+            }
+
+            return redirect()->back()->withErrors(['event' => $blockReason]);
+        }
+
+        $eventModel->update(['purge_at' => now()->addHours(6)]);
+        $eventModel->delete();
+
+        $message = "Event \"{$eventModel->name}\" was moved to recovery. It can be restored within 6 hours before permanent deletion.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'recovery_window_human' => '6h 0m left to restore',
+            ]);
+        }
+
+        return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', $message);
+    }
+
+    public function restore(Request $request, string $subdomain, string $event): JsonResponse|RedirectResponse
+    {
+        $this->authorize('delete event');
+        $tenant = $this->getTenant();
+
+        $query = Event::onlyTrashed()->where('tenant_id', $tenant->id);
+        if (Str::isUuid($event)) {
+            $query->where('id', $event);
+        } else {
+            $query->where('slug', $event);
+        }
+        $eventModel = $query->firstOrFail();
+
+        $limit = $tenant->featureLimitValue('events_in_flight');
+        if ($limit !== null && $eventModel->ends_at->gte(now()) && $eventModel->status !== Event::STATUS_CANCELLED) {
+            $currentCount = Event::where('tenant_id', $tenant->id)
+                ->where('status', '!=', Event::STATUS_CANCELLED)
+                ->where('ends_at', '>=', now())
+                ->count();
+
+            if ($currentCount >= $limit) {
+                $message = "Your plan allows {$limit} concurrent event(s). Upgrade your plan or cancel an existing upcoming event to restore this one.";
+
+                if ($request->wantsJson()) {
+                    return response()->json(['message' => $message], 422);
+                }
+
+                return redirect()->back()->withErrors(['event' => $message]);
+            }
+        }
+
+        $eventModel->restore();
+        $eventModel->update(['purge_at' => null]);
+
+        $message = "Event \"{$eventModel->name}\" was successfully restored.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'event' => $this->toPayload($eventModel),
+            ]);
+        }
+
+        return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', $message);
+    }
+
+    public function forcePurge(Request $request, string $subdomain, string $event): JsonResponse|RedirectResponse
+    {
+        $this->authorize('delete event');
+        $tenant = $this->getTenant();
+
+        $query = Event::onlyTrashed()->where('tenant_id', $tenant->id);
+        if (Str::isUuid($event)) {
+            $query->where('id', $event);
+        } else {
+            $query->where('slug', $event);
+        }
+        $eventModel = $query->firstOrFail();
+
+        $validated = $request->validate([
+            'confirm_name' => ['required', 'string'],
+        ], [
+            'confirm_name.required' => 'Please type the event title to confirm permanent deletion.',
+        ]);
+
+        if (mb_trim(mb_strtolower($validated['confirm_name'])) !== mb_trim(mb_strtolower($eventModel->name))) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'The entered title does not match the event title.',
+                    'errors' => ['confirm_name' => ['The entered title does not match the event title.']],
+                ], 422);
+            }
+
+            return redirect()->back()->withErrors(['confirm_name' => 'The entered title does not match the event title.']);
+        }
+
+        $blockReason = null;
+        if (! $eventModel->canBeDeleted($blockReason)) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => $blockReason,
+                    'errors' => ['event' => [$blockReason]],
+                ], 422);
+            }
+
+            return redirect()->back()->withErrors(['event' => $blockReason]);
+        }
+
+        $eventName = $eventModel->name;
+        $eventModel->forceDelete();
+
+        $message = "Event \"{$eventName}\" was permanently deleted.";
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', $message);
     }
 
     /**
@@ -573,6 +726,12 @@ final class EventController extends Controller
                 'amount' => $registration->amount,
                 'platform_fee_amount' => $registration->platform_fee_amount,
                 'currency' => $registration->currency,
+                'payment_method' => $registration->payment_method,
+                'offline_payment_status' => $registration->offline_payment_status,
+                'offline_payment_reference' => $registration->offline_payment_reference,
+                'offline_payment_notes' => $registration->offline_payment_notes,
+                'offline_payment_submitted_at' => $registration->offline_payment_submitted_at?->toIso8601String(),
+                'has_offline_proof' => filled($registration->offline_payment_proof_path),
                 'seat_label' => $registration->seatAssignment?->seat_label,
                 'room_name' => $registration->seatAssignment?->room?->name,
                 'checked_in_at' => $registration->checked_in_at?->toIso8601String(),
@@ -649,6 +808,13 @@ final class EventController extends Controller
             'recurrence_interval' => ['nullable', 'integer', 'min:1'],
             'recurrence_until' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'recurrence_auto_generate_weeks' => ['nullable', 'integer', 'min:1', 'max:52'],
+            'allow_offline_payments' => ['sometimes', 'boolean'],
+            'offline_payment_instructions' => ['nullable', 'string', 'max:2000'],
+            'offline_payment_bank_name' => ['nullable', 'string', 'max:255'],
+            'offline_payment_account_name' => ['nullable', 'string', 'max:255'],
+            'offline_payment_account_number' => ['nullable', 'string', 'max:255'],
+            'offline_payment_momo_number' => ['nullable', 'string', 'max:64'],
+            'offline_payment_momo_network' => ['nullable', 'string', 'max:64'],
         ], [
             'hero_image.max' => 'The hero image must not be greater than 20MB.',
             'hero_image.image' => 'The hero image must be a valid image file (JPG, PNG, WebP, GIF, or SVG).',
@@ -676,7 +842,7 @@ final class EventController extends Controller
         $slug = $base;
         $suffix = 1;
 
-        while (Event::where('tenant_id', $tenantId)->where('slug', $slug)->exists()) {
+        while (Event::withTrashed()->where('tenant_id', $tenantId)->where('slug', $slug)->exists()) {
             $slug = "{$base}-{$suffix}";
             $suffix++;
         }
@@ -747,12 +913,21 @@ final class EventController extends Controller
             'speakers' => $event->relationLoaded('speakers') ? $event->speakers->map(fn ($s): array => [
                 'id' => $s->id,
                 'name' => $s->name,
+                'email' => $s->email,
                 'title' => $s->title,
                 'organization' => $s->organization,
                 'bio' => $s->bio,
                 'photo_url' => Helper::storageUrl($s->photo_path),
+                'website_url' => $s->website_url,
+                'linkedin_url' => $s->linkedin_url,
+                'twitter_url' => $s->twitter_url,
                 'role' => data_get($s, 'pivot.role'),
+                'is_confirmed' => data_get($s, 'pivot.is_confirmed') !== null ? (bool) data_get($s, 'pivot.is_confirmed') : null,
+                'confirmed_at' => data_get($s, 'pivot.confirmed_at') ? \Illuminate\Support\Carbon::parse(data_get($s, 'pivot.confirmed_at'))->toIso8601String() : null,
+                'last_invited_at' => data_get($s, 'pivot.last_invited_at') ? \Illuminate\Support\Carbon::parse(data_get($s, 'pivot.last_invited_at'))->toIso8601String() : null,
+                'portal_token' => data_get($s, 'pivot.portal_token'),
             ])->values() : [],
+
             'materials' => $event->relationLoaded('materials') ? $event->materials->map(fn ($m): array => [
                 'id' => $m->id,
                 'title' => $m->title,
@@ -799,6 +974,13 @@ final class EventController extends Controller
             'recurrence_until' => $event->recurrence_until?->toDateString(),
             'recurrence_auto_generate_weeks' => $event->recurrence_auto_generate_weeks ?? 4,
             'recurrence_summary' => app(RecurrenceService::class)->describeSchedule($event),
+            'allow_offline_payments' => (bool) $event->allow_offline_payments,
+            'offline_payment_instructions' => $event->offline_payment_instructions,
+            'offline_payment_bank_name' => $event->offline_payment_bank_name,
+            'offline_payment_account_name' => $event->offline_payment_account_name,
+            'offline_payment_account_number' => $event->offline_payment_account_number,
+            'offline_payment_momo_number' => $event->offline_payment_momo_number,
+            'offline_payment_momo_network' => $event->offline_payment_momo_network,
         ];
     }
 }

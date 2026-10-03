@@ -134,13 +134,16 @@ do not drive new plan renewals. See `tests/Feature/Billing/RenewalSchedulerTest.
 `RequireActiveSubscription` middleware, and simulator named in the original entry are
 not present in the current tree.
 
-## [-] Track: Outgoing Webhooks — delivery engine done, no console UI
+## [x] Track: Outgoing Webhooks (Console UI & Delivery Engine Complete)
 
-Built and wired: `WebhookEndpoint` / `WebhookCall` models, `SendWebhookJob`
-(`tests/Feature/Jobs/SendWebhookJobTest.php`), and `WebhookEventSubscriber` registered in
-`EventServiceProvider`. Missing: any route or page for a tenant to create, edit or inspect
-an endpoint — rows can only be created directly in the database. Also unbuilt: delivery-log
-replay, dead-letter queue, and the webhook simulator.
+Built, wired, and fully surfaced to tenants:
+- Database schema (`database/migrations/landlord/2026_10_03_080000_enhance_webhook_tables.php`) adding `name` and `description` to `webhook_endpoints`, high-resolution `duration_ms` latency tracking to `webhook_calls`, and composite index `['webhook_endpoint_id', 'created_at']` for fast delivery log pagination.
+- Model enhancements: `WebhookEndpoint` (encrypted secret cast, `$hidden = ['secret']`, domain event constants, `generateSecret()`, `rotateSecret()`) and `WebhookCall` (`isSuccessful()`, `isPending()`, `isFailed()`).
+- Core Service & Dispatcher: `App\Services\Webhooks\WebhookDispatcherService` supporting event topic subscriptions (`*` or specific topics), active state checks, live `sendTestPing()` simulator, and manual `retryCall()` replay. Domain dispatchers wired into door check-in (`EventCheckInController`), offline payment approval (`EventRegistrationController`), and contributions (`EventContributionService`).
+- Worker Hardening: `SendWebhookJob` instrumented with monotonic duration calculation (`hrtime`), SSRF protection rejecting internal/private/reserved IP destinations in production, payload size bounds (`mb_substr`), and tenant-isolated call lookup.
+- Tenant Console Controller: `App\Http\Controllers\Tenant\WebhookEndpointController` managing endpoints (`index`, `store`, `update`, `destroy`), secret rotation (`rotateSecret`), test ping execution (`test`), delivery logs inspection (`calls`), and manual replay (`retryCall`), gated by `manage organization settings`.
+- React Tenant Console Interface: `resources/js/Pages/Tenant/Settings/Webhooks/Index.jsx` with real-time delivery health cards (endpoints count, total deliveries, success rate %, average latency ms), endpoint creation & edit modal, one-time secret view with copy-to-clipboard banner, interactive delivery logs inspector with payload & response body viewer, and manual replay CTA. Integrated into `Settings/Index.jsx` navigation.
+- Verified by 14 passing Pest tests in `tests/Feature/Tenant/WebhookManagementTest.php` (79 assertions), `tests/Feature/Components/ConsoleComponentUsageTest.php` (5/5 passed), and clean Vite bundle compilation.
 
 ## [x] Track: Production Database Backups & Cloudflare R2 Storage
 
@@ -957,6 +960,379 @@ Adaptive terminology engine replacing generic and mismatched vocabulary across c
   - Frontend bundling: `npm run build` compiled 2,598 modules in 4.88s with 0 errors.
   - 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
 
+---
 
+## [x] Track: Offline & Direct Payments (Bank Transfer, MoMo Slip Upload & Verification)
 
+Comprehensive direct and offline payment channel enabling attendees to pay organizers directly via bank transfer, MoMo merchant line, or cash on-site, upload payment proof slips (images or PDFs), and receive verified digital tickets upon organizer audit in the Tenant Console. Adheres strictly to MiConvener finance invariants: `LedgerService` is the sole writer of both ledgers, money is in integer pesewas, platform commission is debited from `CODE_ORGANIZER_PAYABLE` to `CODE_PLATFORM_REVENUE`, and cancellation safely reverses debited commission without calling gateway refunds.
+
+- [x] **Phase 1: Database Schema & Models**:
+  - `database/migrations/landlord/2026_10_03_050000_add_offline_payment_settings_to_events_table.php`: Added `allow_offline_payments` (boolean default false), `offline_payment_instructions` (text nullable), `offline_payment_bank_name`, `offline_payment_account_name`, `offline_payment_account_number`, `offline_payment_momo_network`, `offline_payment_momo_number`.
+  - `database/migrations/landlord/2026_10_03_050100_add_offline_payment_fields_to_event_registrations_table.php`: Added `offline_payment_status` (`string`, nullable), `offline_payment_proof_path`, `offline_payment_reference`, `offline_payment_notes`, `offline_payment_submitted_at`, `offline_payment_verified_at`, `offline_payment_verified_by` (foreign key to users nullable). Added composite index `['event_id', 'offline_payment_status']`.
+  - `Event.php`: Added fillables, casts (`allow_offline_payments` as boolean), and `allowsOfflinePayments(): bool`.
+  - `EventRegistration.php`: Added payment method constants (`PAYMENT_METHOD_OFFLINE_BANK`, `PAYMENT_METHOD_OFFLINE_MOMO`, `PAYMENT_METHOD_OFFLINE_CASH`), status constants (`OFFLINE_STATUS_PENDING_PROOF`, `OFFLINE_STATUS_PENDING_VERIFICATION`, `OFFLINE_STATUS_APPROVED`, `OFFLINE_STATUS_REJECTED`), `offlinePaymentVerifiedBy` BelongsTo relation, helper methods (`isOfflinePayment()`, `isAwaitingOfflineProof()`, `isAwaitingOfflineVerification()`, `isOfflineApproved()`, `isOfflineRejected()`, `isCancelled()`), and query scope `scopePendingOfflineVerification`.
+  - `LedgerTransaction.php`: Added `TYPE_OFFLINE_TICKET_SALE = 'offline_ticket_sale'`.
+  - `LedgerService.php`: Implemented `recordOfflineTicketSale()` and `reverseOfflineTicketCommission()` strictly upholding MiConvener finance invariants: debits `ORGANIZER_PAYABLE` and credits `PLATFORM_REVENUE` for positive platform fees, creates flat settlement entry with `net_amount = -$platformFee`, and on cancellation cleanly reverses the debited commission (`PLATFORM_REVENUE` debited, `ORGANIZER_PAYABLE` credited, flat refund `net_amount = $commission`).
+- [x] **Phase 2: Mailables & Notifications**:
+  - `App\Mail\Events\EventRegistrationPendingVerification`: Transactional mailable sent to attendee when proof is submitted.
+  - `App\Mail\Events\EventRegistrationOfflineRejected`: Transactional mailable sent to attendee when organizer rejects payment, including review notes and checkout re-upload link.
+  - `App\Mail\Events\EventRegistrationOfflineProofSubmitted`: Transactional mailable notifying the organizer (`tenant->email`) of new payment slip ready for audit.
+  - Tested in `tests/Feature/Mail/MailableRenderTest.php` (7/7 passed).
+- [x] **Phase 3: Public Checkout Flow & Endpoints**:
+  - `EventCheckoutController`:
+    - `checkout`: Renders interactive gateway switcher between automated Paystack and manual direct transfer when offline payments are enabled.
+    - `submitOfflineProof`: Gated with `canClaimWorkspace()`, `allowsOfflinePayments()`, slug matching, cancelled status rejection, and 10MB image/PDF upload validation. Cleans up previous proof on re-upload, dispatches notifications, and updates status to `pending_verification`.
+    - `downloadProof`: Gated by workspace authorization and storage directory prefix containment check.
+  - `resources/js/Pages/Public/Events/Checkout.jsx`: Interactive checkout view featuring gateway tabs, copyable bank account and MoMo numbers with visual feedback, drag-and-drop slip uploader, pending review banner with auto-refresh, rejection banner with reason note and re-upload flow, and empty state when neither method is available.
+- [x] **Phase 4: Tenant Console Verification & Ledger Integration**:
+  - `EventRegistrationController`:
+    - `approveOfflinePayment`: Gated by `update event`, concurrency-protected with `DB::transaction()` and `lockForUpdate()`, validates against cancelled/confirmed status, calculates platform commission on `effectiveChargedAmount()`, issues ticket codes/QR tokens, books double-entry ledger entries via `LedgerService`, meters feature usage, triggers rules, and sends confirmation email.
+    - `rejectOfflinePayment`: Gated by `update event`, protected with `DB::transaction()` and `lockForUpdate()`, records rejection note/reason, and queues rejection email.
+    - `downloadProof`: Gated by `read event` with directory prefix containment validation.
+    - `cancel`: Bypasses Paystack gateway refund for offline payments, safely marks cancelled, and reverses the debited commission on the ledger.
+  - `EventFormModal.jsx`: Added offline payment configuration controls (toggle, bank details, MoMo number, instructions).
+  - `OfflineVerificationModal.jsx`: Console modal for reviewing registration details, viewing/downloading slips, approving offline payments, or rejecting with custom feedback.
+  - `Show.jsx` (Guests Tab): Added filter pills ("All", "Confirmed", "Offline Verification" with pending counter badge), inline status pills (`Pending Verification`, `Offline Approved`, `Slip Rejected`), and verification trigger actions.
+- [x] **Phase 5: Automated Verification & Adversarial Self-Review**:
+  - Pest test suite: `tests/Feature/Events/EventOfflinePaymentTest.php` (17 tests, 96 assertions passed in ~19.8s) covering:
+    - Settings persistence on event creation and update.
+    - Public checkout view rendering with offline options and account details.
+    - Proof submission with slip upload and notification queueing.
+    - Invalid file rejection and 10MB size limits.
+    - Organizer approval with ticket issuance and double-entry ledger booking.
+    - Cancellation of offline tickets with commission reversal on ledger.
+    - Commission calculation on discounted ticket (`effectiveChargedAmount()`).
+    - Rejection flow with note and email notification.
+    - Rejection of double approval or approval of cancelled registration (422).
+    - Unauthenticated redirect (302).
+    - Cross-tenant isolation (404).
+    - Session authorization gates on proof upload and download (403).
+    - Proof path traversal and containment security (403).
+  - Component tests: `ConsoleComponentUsageTest.php` (5/5 passed).
+  - Mail tests: `MailableRenderTest.php` (7/7 passed).
+  - Code formatting: `vendor/bin/pint --dirty` passed cleanly.
+  - Frontend bundling: `npm run build` compiled 2,600 modules in 5.07s with 0 errors.
+  - 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture, with all findings resolved.
+
+---
+
+## [x] Track: Attendee Portal Giving & Tribute Self-Service
+
+Connect voluntary contributions, collections, and live tribute walls directly into the Platform Attendee Portal (`/my` and `MyPortal.jsx`), giving donors and attendees a dedicated self-service hub to view their giving history across all landlord events/tenants, download official verifiable PDF donation/tax receipts, and manage their tribute messages and anonymity preferences.
+
+- [x] **Phase 1: Domain Service & PDF Generation**:
+  - `DonationReceiptPdfService`: Generates styled A4 PDF donation/tax receipts with embedded MiConvener brand marks, donor and purpose breakdown, formatted pesewas currency, reference numbers, and fallback slug filenames.
+  - `resources/views/pdf/donation-receipt.blade.php`: Metronic / DomPDF-safe table layout with verification badge, donor details, verified record pill, and legal tax disclaimer.
+  - `PlatformAttendeeHistory::getContributions`: Multi-tenant aggregation querying `EventContribution::withoutGlobalScopes()` with lower email matching, `STATUS_COMPLETED` filter, banned tenant exclusion, and `?organiser={slug}` filter support.
+  - Database migration: Added composite index `['contributor_email', 'status']` on `event_contributions` table (`2026_10_03_060000_add_email_index_to_event_contributions_table.php`).
+- [x] **Phase 2: Endpoints & Access Control**:
+  - Routes registered in `routes/attendee.php` under `platform_attendee_verified`:
+    - `GET /my/contributions` (`attendee.my.contributions`)
+    - `GET /my/contributions/{contribution}/receipt` (`attendee.my.contributions.receipt`) with `throttle:60,1`
+    - `PATCH /my/contributions/{contribution}/tribute` (`attendee.my.contributions.tribute`)
+  - `PlatformAttendeeAccessController`:
+    - `contributions`: Returns normalized contributions list for verified attendee.
+    - `downloadReceipt`: Strict session email matching, completed status check (422), eager loaded event/tenant models, banned tenant guard (404), and binary PDF download streaming.
+    - `updateTribute`: Handled via `UpdateContributionTributeRequest`, validates 1000-character max bounds, strips HTML tags, supports message clearing to `null`, toggles anonymity, blocks uncompleted contributions (422), and automatically resets `is_approved = false` on message modification for organizer re-moderation.
+    - `page`: Hydrates `initialContributions` into Inertia props on initial portal render.
+- [x] **Phase 3: Frontend Attendee Portal UI**:
+  - `EditTributeModal.jsx`: Modal with character counter (max 1000), autofocus textarea, anonymous toggle checkbox, and error handling.
+  - `ContributionsSection.jsx`: Attendee portal giving dashboard with KPI summary metric cards (total donated in GHS, causes supported, tributes posted), cards list with purpose badges, receipt download links, and tribute moderation status pills.
+  - `MyPortal.jsx`: Dynamically renders "Giving & Tributes" tab when `contributions.length > 0`, manages optimistic updates on tribute edit, and gracefully falls back to default tabs on zero state.
+  - Vite bundling verified: `npm run build` compiled 2,602 modules in 3.72s with 0 errors.
+- [x] **Phase 4: Automated Verification & Adversarial Self-Review**:
+  - Pest test suite: `tests/Feature/Events/PlatformAttendeeContributionsTest.php` (**19 tests, 70 assertions passed in ~10.5s**) covering:
+    - Multi-tenant contributions aggregation across distinct church/charity/memorial tenants.
+    - Organizer filter scoping (`?organiser={slug}`).
+    - Cross-attendee isolation (Ama cannot see Kofi's contributions).
+    - Unauthenticated access rejection (401).
+    - Incomplete/failed contributions exclusion.
+    - Banned tenant contributions exclusion and 404 enforcement.
+    - PDF receipt generation (`200 OK`, `application/pdf`, `%PDF-`).
+    - Cross-attendee receipt download rejection (403).
+    - Uncompleted receipt download rejection (422).
+    - Non-existent receipt rejection (404).
+    - Tribute updates and anonymity toggling.
+    - Clearing existing tribute notes to `null`.
+    - Automatic reset of `is_approved` to `false` for moderation on tribute text edits.
+    - Uncompleted contribution tribute edit rejection (422).
+    - Cross-attendee tribute edit rejection (403).
+    - Input length boundary enforcement (>1000 chars returns 422).
+    - Inertia `initialContributions` hydration.
+  - Regression test suites passing:
+    - `tests/Feature/Components/ConsoleComponentUsageTest.php` (5/5 passed).
+    - `tests/Feature/Events/EventOfflinePaymentTest.php` (8/8 passed).
+    - `tests/Feature/Mail/MailableRenderTest.php` (2/2 passed).
+  - Code formatting: `vendor/bin/pint --dirty` passed cleanly.
+  - Mandatory 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture, with all findings addressed.
+
+---
+
+## [x] Track: Recurring Events Series Management & Occurrence Automation
+
+Provide comprehensive batch operations, calendar sync, automated reminders, and attendance retention rollups in the Tenant Console for recurring events and series.
+
+- [x] **Phase 1: Database Migration & Model Extensions**:
+  - Landlord migration `database/migrations/landlord/2026_10_03_070000_add_automation_fields_to_event_sessions_table.php` adding `cancellation_reason`, `reminder_sent_at`, and composite index `idx_sessions_event_occ_status` (`['event_id', 'is_occurrence', 'occurrence_status']`).
+  - Updated `App\Models\EventSession`: fillables, `datetime` cast for `reminder_sent_at`, and status helper methods (`isCancelled()`, `isCompleted()`, `isScheduled()`, `hasReminderBeenSent()`).
+- [x] **Phase 2: Domain Services & iCalendar Feed**:
+  - `App\Services\Events\EventCalendarFeedService`: RFC 5545 generator producing valid `VCALENDAR`/`VEVENT` feeds, formatted timestamps in UTC, text escaping, and speaker/location inclusion.
+  - `App\Mail\Events\OccurrenceReminderMail`: Mailable with responsive Blade template (`resources/views/emails/events/occurrence-reminder.blade.php`), verified in `MailableRenderTest`.
+  - `App\Console\Commands\SendOccurrenceRemindersCommand`: `events:send-occurrence-reminders {--hours=24} {--event=}` with idempotent `reminder_sent_at` marking and `email_credits` feature metering via `FeatureMeteringService`.
+  - Registered public route `GET /e/{event}/calendar.ics` (`public.events.calendar.ics`) in `routes/subdomain.php`, gated against private events to prevent leaking unrevealed schedules.
+  - Updated `PublicEventController::calendarFeed` and `toPublicPayload` with `calendar_feed_url` (withheld on private unrevealed events).
+- [x] **Phase 3: Tenant Controller Endpoints**:
+  - `EventSessionController::batchCancel`: Bulk blackout with reason, safely updating matching date window occurrences.
+  - `EventSessionController::batchReschedule`: Bulk occurrence time shifting with start/end time validation and series default updates.
+  - `EventSessionController::analytics`: Series attendance aggregation, average check-ins per gathering, retention rate calculation, and recent gathering attendance rollup with canonical and frontend aliased keys.
+  - Registered routes in `routes/subdomain.php`:
+    - `POST events/{event}/occurrences/batch-cancel` (`tenant.events.occurrences.batch-cancel`)
+    - `POST events/{event}/occurrences/batch-reschedule` (`tenant.events.occurrences.batch-reschedule`)
+    - `GET events/{event}/occurrences/analytics` (`tenant.events.occurrences.analytics`)
+- [x] **Phase 4: Tenant Console Frontend**:
+  - Enhanced `resources/js/Pages/Tenant/Events/SchedulePanel.jsx` with recurrence action banner and 4 accessible Metronic modals:
+    - Holiday Blackout Modal (`batchCancelOpen`)
+    - Shift Gathering Times Modal (`batchRescheduleOpen`)
+    - Calendar Feed Subscription Modal (`feedModalOpen`) with copyable link and Apple/Google/Outlook setup instructions
+    - Series Retention & Attendance Rollup Modal (`analyticsModalOpen`) with KPI cards and check-in history.
+    - Speaker IDs fallback mapping from `speakers` relation.
+  - Vite bundling verified: `npm run build` compiled 2,602 modules in 4.13s with zero errors.
+- [x] **Phase 5: Automated Verification & Adversarial Self-Review**:
+  - Comprehensive Pest test suite: `tests/Feature/Events/EventSeriesManagementTest.php` (**10 tests, 74 assertions passed**) covering:
+    - Public RFC 5545 `.ics` calendar feed generation.
+    - Public event payload `calendar_feed_url` inclusion.
+    - Private recurring event calendar feed withholding and 404 enforcement.
+    - Batch blackout / cancellation with cancellation reasons.
+    - Inverted date range validation rejection (422).
+    - Batch rescheduling for future occurrences and series defaults.
+    - Attendance analytics and retention rates with alias parity.
+    - Pre-occurrence reminder command with idempotent re-run check and email credit metering.
+    - Unauthorized access rejection (401/403).
+    - Cross-tenant isolation enforcement (403/404).
+  - Regression test suites passing:
+    - `tests/Feature/Components/ConsoleComponentUsageTest.php` (5/5 passed).
+    - `tests/Feature/Events/EventRecurrenceTest.php` (9/9 passed, 55 assertions).
+    - `tests/Feature/Mail/MailableRenderTest.php` (2/2 passed, 3 assertions).
+  - Code formatting: `vendor/bin/pint --dirty` passed cleanly.
+  - Mandatory 3-agent post-implementation review completed and all findings resolved.
+
+---
+
+## [x] Track: Dedicated Speaker Portal & Speaker Management Polish
+
+Equip speakers with a dedicated self-service portal (bio, headshots, session alignment, and presentation slide uploads) and upgrade the Tenant Console with intuitive speaker headshot uploads, editing, and 1-click email invitation dispatches.
+
+- [x] **Phase 1: Database Migration & Model Extensions**:
+  - Landlord migration `database/migrations/landlord/2026_10_03_090000_enhance_speakers_and_portal_table.php` adding `website_url`, `linkedin_url`, `twitter_url` to `speakers` table, and `confirmed_at`, `last_invited_at` to `event_speakers` table.
+  - Enhanced `Speaker`: fillable attributes (`website_url`, `linkedin_url`, `twitter_url`), `photoUrl(): ?string` helper.
+  - Enhanced `EventSpeaker`: fillable attributes, casts (`is_confirmed` as boolean, `confirmed_at` as datetime, `last_invited_at` as datetime), and `portalUrl(): string` helper.
+  - Enhanced `Event`: pivot relation with `withPivot(['role', 'sort_order', 'is_confirmed', 'confirmed_at', 'last_invited_at', 'portal_token'])`.
+- [x] **Phase 2: Mailable & Tenant Communications**:
+  - `App\Mail\Events\SpeakerPortalInvitationMail`: responsive, tenant-branded mailable with markdown template `resources/views/emails/events/speaker-portal-invitation.blade.php`.
+  - Added `invite` action in `App\Http\Controllers\Tenant\EventSpeakerController`: validates email existence, verifies monthly credit quota (`canUse($tenant, 'email_credits')`), dispatches mailable, stamps `last_invited_at`, and meters `email_credits` only upon successful delivery.
+  - Route registered: `POST /events/{event}/speakers/{speaker}/invite` (`tenant.events.speakers.invite`).
+- [x] **Phase 3: Public Speaker Portal & Storage Pipeline**:
+  - `App\Http\Controllers\Public\SpeakerPortalController`:
+    - `show`: returns event overview, full speaker profile, assigned sessions with co-speakers list, and presentation slide status.
+    - `confirm`: safely parses boolean via `$request->boolean('attending')`, stamps `confirmed_at = now()` on acceptance and `null` on decline.
+    - `updateProfile`: allows speakers to update bio, title, organization, and social links.
+    - `uploadPhoto`: validates raster images (`mimes:jpeg,jpg,png,webp`, max 5MB), cleans up prior photo from storage, stores new headshot.
+    - `uploadSlides`: validates presentation formats (`mimes:pdf,ppt,pptx,key,zip`, max 20MB), creates or updates `EventMaterial`, deletes previous file, and triggers notification.
+  - Routes registered in `routes/subdomain.php` with `throttle:60,1`.
+- [x] **Phase 4: Tenant Console Polish & React Interface**:
+  - `App\Http\Controllers\Tenant\SpeakerController`: supports image upload with MIME restrictions (`jpeg,jpg,png,webp`), bio length limits (`max:5000`), photo replacement cleanup, and full payload serialization.
+  - `App\Http\Controllers\Tenant\EventController`: `toPayload` preserves `null` for pending `is_confirmed` status (preventing false "Declined" badges) and exposes social URLs and invitation timestamps.
+  - `resources/js/Pages/Tenant/Events/SpeakersPanel.jsx`: interactive speaker directory selection, headshot upload and live preview, required email field, "Send Invite" action, copy portal link, confirmation status badges, and edit profile modal.
+  - `resources/js/Pages/Public/Events/SpeakerPortal.jsx`: public responsive portal with confirmation banner, headshot uploader, profile editor, sessions list with co-speaker pills, and slide presentation uploader.
+- [x] **Phase 5: Automated Verification & Adversarial Self-Review**:
+  - Pest test suite: `tests/Feature/Events/SpeakerPortalTest.php` (**14 tests, 66 assertions passed in ~11.5s**) covering:
+    - Speaker creation with photo upload.
+    - Attaching existing speaker and preventing duplicate attach token overwrite.
+    - Sending invitation email with credit quota deduction and `last_invited_at` timestamp.
+    - Email requirement validation (422).
+    - Public portal rendering with sessions and co-speakers.
+    - Attendance confirmation and decline state transitions.
+    - Speaker profile editing and bio length validation.
+    - Speaker photo self-service upload and storage cleanup.
+    - Presentation slides upload, replacement, and material linking.
+    - Cross-tenant isolation enforcement (403/404).
+    - Unauthenticated access rejection.
+  - Regression test suites passing:
+    - `tests/Feature/Mail/MailableRenderTest.php` (2/2 passed, 3 assertions).
+    - `tests/Feature/Components/ConsoleComponentUsageTest.php` (5/5 passed, 6 assertions).
+  - Code formatting: `vendor/bin/pint --dirty` passed cleanly.
+  - Frontend bundling: `npm run build` compiled 2,603 modules in 3.38s with zero errors.
+  - Mandatory 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
+
+---
+
+## [x] Track: Event Deletion Safeguard & 6-Hour Recovery Window
+
+Prevent accidental or catastrophic event deletion by replacing immediate hard cascading deletes with a graceful soft-delete safeguard, strict title-typing confirmation, financial safety guards, a 6-hour undo/recovery window with 1-click restoration in the Tenant Console, and an automated background purge engine.
+
+- [x] **Phase 1: Database Migration & Model Layer**:
+  - `database/migrations/landlord/2026_10_03_100000_add_soft_deletes_and_purge_at_to_events_table.php`: added `deleted_at`, `purge_at`, composite index `idx_events_tenant_deleted_purge` (`['tenant_id', 'deleted_at', 'purge_at']`), and index `idx_events_purge_at`.
+  - `App\Models\Event`: added `SoftDeletes` trait, `purge_at` datetime cast and fillable, helper methods `isPendingPurge()`, `recoveryWindowRemainingSeconds()`, `recoveryWindowRemainingHuman()`, and `canBeDeleted()`.
+  - Guarded file deletion deleting hook with `if (! $event->isForceDeleting()) return;` so media assets survive during recovery window.
+- [x] **Phase 2: Controller Actions & Routes**:
+  - Registered routes `tenant.events.restore` and `tenant.events.force-purge` in `routes/subdomain.php`.
+  - `App\Http\Controllers\Tenant\EventController`:
+    - `destroy`: enforces exact title match (`confirm_name`), validates financial guards via `canBeDeleted()`, sets `purge_at = now()->addHours(6)`, and soft-deletes.
+    - `restore`: supports UUID and slug lookup, checks `events_in_flight` plan limit, restores event, and nulls `purge_at`.
+    - `forcePurge`: validates exact title match, verifies `canBeDeleted()`, and calls `forceDelete()`.
+    - `index`: exposes `recentlyDeletedEvents` with human countdown strings.
+    - `uniqueSlug`: uses `Event::withTrashed()` to prevent slug collisions with soft-deleted events.
+  - `App\Http\Controllers\Public\PublicEventController`: `show` returns HTTP 410 Gone with `Public/Events/Suspended` view for published events in recovery window; unpublished drafts return 404 to protect confidential metadata.
+- [x] **Phase 3: Background Purge Command & Scheduler**:
+  - `App\Console\Commands\PurgeDeletedEventsCommand` (`events:purge-deleted`): queries `Event::withoutGlobalScopes()->onlyTrashed()`, chunks by 50, skips and warns if financial blockers are present, supports `--dry-run`.
+  - Scheduled hourly in `App\Console\Kernel.php` with `withoutOverlapping()`.
+- [x] **Phase 4: Frontend UI (Modal, Banner, Suspended View)**:
+  - `resources/js/Pages/Tenant/Events/DeleteEventModal.jsx`: modal requiring exact title confirmation before delete or permanent purge.
+  - `resources/js/Pages/Tenant/Events/Index.jsx`: displays "Recently Deleted Events (6-Hour Recovery Window Active)" panel with countdown, 1-click restore, and purge actions.
+  - `resources/js/Pages/Public/Events/Suspended.jsx`: Metronic-styled public notice for suspended events.
+- [x] **Phase 5: Automated Verification & Adversarial Self-Review**:
+  - Pest test suite: `tests/Feature/Events/EventDeletionSafeguardTest.php` (**14 tests, 78 assertions passed in ~16.9s**) covering:
+    - Soft delete setting `purge_at` and preserving row.
+    - Blocking deletion when title doesn't match.
+    - Blocking deletion when payouts are in flight (processing, awaiting_otp, scheduled).
+    - Blocking deletion when offline payments are pending verification.
+    - 1-click restoration restoring event and clearing `purge_at`.
+    - Enforcing plan in-flight event limits on restoration.
+    - Immediate permanent force purge with title confirmation.
+    - Preserving media files during recovery window.
+    - Unique slug collision avoidance against soft-deleted events.
+    - Public 410 Gone with Suspended view during recovery window.
+    - Public 404 for draft unpublished soft-deleted events.
+    - Public 404 once purge window has expired.
+    - Artisan purge command dry run and real purging.
+    - Cross-tenant isolation and 403 permission gating.
+  - Code formatting: `vendor/bin/pint --dirty` passed cleanly.
+  - Mandatory 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
+
+---
+
+## [x] Track: Venue Host Aggregated Dashboard & Facility Collaboration (The "UGMC Model")
+
+Unified operational console and multi-event collaboration hub for venue facilities (e.g. UGMC) hosting external client events. Features multi-event operational aggregation, 8-pillar task integration with delegated facility task execution, direct in-app venue ↔ planner coordination messaging, and formal check-in/check-out equipment and room inspection logs.
+
+- [x] **Phase 1: Database Migration & Schema Design**:
+  - `database/migrations/landlord/2026_10_03_110000_create_venue_facility_collaboration_tables.php`: created `venue_facility_messages`, `venue_inspection_logs`, and enhanced `event_operation_tasks` with `is_venue_task` and `venue_shop_id` columns.
+  - Executed cleanly on landlord database.
+- [x] **Phase 2: Eloquent Model Layer**:
+  - `App\Models\VenueFacilityMessage`: sender types (`host`, `planner`), message types (`text`, `file`, `system`), attachments JSON casting, `toPayload()` helper, and relations.
+  - `App\Models\VenueInspectionLog`: inspection types (`check_in`, `check_out`), default checklist generator (`defaultChecklist()`), `toPayload()` helper, and relations.
+  - `App\Models\EventOperationTask`: added `is_venue_task`, `venue_shop_id`, and `isVenueTask()` method.
+  - Updated `App\Models\Shop`, `App\Models\Event`, and `App\Models\VenueBooking` (using `withoutGlobalScopes()` for cross-tenant event resolution).
+- [x] **Phase 3: Controller Actions & Routing**:
+  - `App\Http\Controllers\Tenant\Venue\VenueOperationsController`: `index` (aggregated KPIs: upcoming hosted events, active facility tasks, unread messages, today's room occupancy), `show` (unified workspace across details, tasks, messages, inspection logs), `createTask`, `updateTaskStatus`, `storeMessage`, `storeInspection`.
+  - `App\Http\Controllers\Tenant\EventVenueCollaborationController`: planner-facing facility collaboration hub, messaging, and inspection signing.
+  - Registered subdomain console routes under `tenant.venue.operations.*` and `tenant.events.venue.collaboration.*`.
+- [x] **Phase 4: Frontend UI Interfaces**:
+  - Added "Facility Operations" (`ClipboardCheck` icon) to `resources/js/Layouts/ConsoleLayout.jsx` under `manage_venue`.
+  - `resources/js/Pages/Tenant/Venue/Operations/Index.jsx`: aggregated multi-event dashboard with stat cards, occupancy badges, readiness indicators, and hosted booking list.
+  - `resources/js/Pages/Tenant/Venue/Operations/Show.jsx`: facility workspace with 4 tabs (Tasks, Messages, Inspections, Details), interactive task status toggles, chat feed with attachment uploads, inspection checklists and signature logging.
+  - `resources/js/Pages/Tenant/Events/panels/FacilityCollaborationView.jsx` & `VenuePanel.jsx`: planner-side facility collaboration view embedded in event console.
+- [x] **Phase 5: Automated Verification & Adversarial Self-Review**:
+  - Pest test suite: `tests/Feature/Tenant/VenueOperationsTest.php` (**12/12 passed, 56 assertions in ~15.2s**) verifying:
+    - Host operations hub rendering with aggregate statistics and hosted events.
+    - Graceful empty state when tenant has no venue listing.
+    - Venue host viewing single event workspace with 4 dimensions.
+    - Facility setup task creation under Venue & Logistics pillar with `is_venue_task = true`.
+    - Task status updates toggling `completed_at` timestamps.
+    - Host sending collaboration messages and auto-reading planner messages.
+    - Host logging check-in inspection checklists and signing off.
+    - Planner viewing facility collaboration view.
+    - Planner sending collaboration messages to venue host.
+    - Planner logging check-out inspection checklist.
+    - Cross-tenant security isolation (Venue Host B blocked from Host A bookings).
+    - Unauthenticated and unauthorized access rejection (403/302).
+  - Regression test suites passing:
+    - `tests/Feature/Tenant/WebhookManagementTest.php` (**14/14 passed, 79 assertions**).
+    - `tests/Feature/Components/ConsoleComponentUsageTest.php` (**5/5 passed, 6 assertions**).
+  - Code formatting: `vendor/bin/pint --dirty` passed cleanly.
+  - Frontend bundling: `npm run build` compiled 2,608 modules in 24.64s with zero errors.
+  - Mandatory 3-agent post-implementation self-review completed across Security, Logic & Edge Cases, and Performance & Architecture.
+
+---
+
+## [x] Track: Marketplace Vendors, Equipment & Services Expansion
+
+Expanded the MiConvener Marketplace beyond physical venue spaces into a comprehensive one-stop directory for event execution suppliers and service providers: PA & Sound Systems, Videography & Livestreaming, Canopies & Tents, Chairs & Banquet Decor, Catering, and Standby Power Generators. Features an end-to-end RFQ & custom proposal workflow, trust & verified vendor badges with superadmin document review, verified client reviews/ratings, and ledger-backed escrow deposit payments with platform fee monetization.
+
+- [x] **Phase 1: Database Schema Expansion**:
+  - `database/migrations/landlord/2026_10_03_120000_create_marketplace_vendor_expansion_tables.php`:
+    - Added `category`, `service_scope`, `min_order_pesewas`, `lead_time_days` to `store_listings`.
+    - Added `vendor_categories`, `business_registration_number`, `tax_id`, `verification_documents`, `past_clients`, `average_rating`, `reviews_count` to `shops`.
+    - Created `marketplace_quotes` table with itemized lines JSON, amounts in integer minor units (pesewas), validity window, Paystack reference, and quotation status.
+    - Created `marketplace_reviews` table for verified attendee/planner reviews and 1–5 star ratings.
+- [x] **Phase 2: Eloquent Models & Service Layer**:
+  - `app/Models/StoreListing.php`: Enhanced with category constants (`CATEGORY_PA_SOUND`, `CATEGORY_VIDEOGRAPHY`, `CATEGORY_CANOPIES`, `CATEGORY_CHAIRS_DECOR`, `CATEGORY_CATERING`, `CATEGORY_GENERATORS`, `CATEGORY_SECURITY`), fillables, array/integer casts, and `HasFactory`.
+  - `app/Models/Shop.php`: Enhanced with vendor categories, business registration number, tax ID, past clients, `recalculateRating()`, `verifiedBy()` relation, and `HasFactory`.
+  - `app/Models/MarketplaceQuote.php`: Created with rich `toPayload()` containing shop and listing details, status helpers, and financial accessors.
+  - `app/Models/MarketplaceReview.php`: Created with lifecycle hooks automatically recalculating shop rating and review count.
+  - `app/Services/Marketplace/MarketplaceVendorService.php`: Implemented RFQ creation, itemized proposal generation with line items, rigging/delivery fees, non-negative deposit percentages, expiration validity, atomic payment confirmation, Paystack checkout session generation, and balanced double-entry ledger posting via `LedgerService`.
+  - `app/Http/Controllers/Public/SettlementWebhookController.php`: Updated to handle incoming `marketplace_quote` Paystack charge events idempotently.
+- [x] **Phase 3: Tenant Console Interfaces**:
+  - `app/Http/Controllers/Tenant/Venue/VenueQuoteController.php`: Console controller for managing incoming client RFQs, constructing proposals with itemized lines, setting validity, and rejecting inquiries.
+  - `app/Http/Controllers/Tenant/Venue/VenueProfileController.php` & `UpdateVenueProfileRequest.php`: Venue/vendor profile controller updated with validation and storage for business registration, tax ID, vendor categories, and past client portfolio.
+  - `resources/js/Pages/Tenant/Venue/Quotes/Index.jsx`: Incoming RFQ and quote management interface with status filtering, quote value badges, and quick proposal triggers.
+  - `resources/js/Pages/Tenant/Venue/Quotes/Show.jsx`: Vendor quotation workspace with itemized line items builder (quantity, unit price, descriptions), delivery/rigging fees, deposit percentage calculator, notes, and rejection modal.
+  - `resources/js/Pages/Tenant/Venue/Profile/Show.jsx`: Vendor profile view with business registration and verification submission.
+- [x] **Phase 4: Public Marketplace & Proposal Checkout**:
+  - `resources/js/Components/Marketplace/VendorRfqModal.jsx`: Interactive modal for event planners to submit detailed RFQs for equipment, rentals, or vendor services.
+  - `resources/js/Pages/Public/Marketplace/Quotes/Show.jsx`: Client-facing quotation review page displaying itemized quotation breakdown, delivery/rigging fees, expiration countdown, deposit requirements, Paystack checkout initiation, and verified post-booking review submission.
+  - `resources/js/Pages/Public/Marketplace/Venues/Show.jsx` & `resources/js/Pages/Public/Marketplace/Index.jsx`: Multi-category directory and listing views with category tags and RFQ modal triggers.
+  - `app/Http/Controllers/Marketplace/MarketplaceQuotePublicController.php`: Public controller for RFQ submissions, proposal reviews, Paystack deposit checkout, return callback handling, and review creation.
+- [x] **Phase 5: Automated Verification & Adversarial Self-Review**:
+  - Pest test suite: `tests/Feature/Marketplace/MarketplaceVendorExpansionTest.php` (**8/8 passed, 58 assertions**) verifying:
+    - Attendees and planners submitting itemized RFQs on vendor and equipment listings.
+    - Vendors viewing RFQs, building itemized proposals with rigging fees and validity windows, and sending to clients.
+    - Clients reviewing proposals publicly, initiating Paystack deposit checkout, and verifying payment.
+    - Balanced double-entry ledger transaction posting via `LedgerService` with 10% platform commission and organizer payable split.
+    - Verified clients submitting 1–5 star ratings that recalculate vendor shop average ratings and counts.
+    - Shops storing business registration credentials, tax IDs, and past client references for verification.
+    - Superadmin reviewing and approving vendor verification requests.
+    - Cross-tenant quotation isolation: unauthorized tenants blocked (403) from viewing, building proposals for, or declining other shops' quotes.
+    - Unpaid quotes blocked from receiving reviews and expired quotes blocked from checking out.
+  - Full Marketplace regression suite: `tests/Feature/Marketplace/` (**81/81 passed, 515 assertions**).
+  - Console component enforcement: `tests/Feature/Components/ConsoleComponentUsageTest.php` (**5/5 passed, 6 assertions**).
+  - Superadmin verification test: `tests/Feature/Marketplace/SuperadminVerificationTest.php` (**3/3 passed, 22 assertions**).
+  - Code formatting: `vendor/bin/pint --dirty` ran with zero remaining issues.
+  - Frontend bundling: `npm run build` compiled 2,612 modules in 12.20s with zero errors.
+  - Mandatory 3-agent post-implementation self-review completed across Security, Logic & Financial Invariants, and Performance & Architecture.
+
+---
+
+## [x] Track: Modular Pricing, Seat Billing & Add-On Monetization (Option 9)
+
+Commercial benchmark pricing calibration and modular monetization engine based on Option 1 (GHS 249 Starter / GHS 499 Growth / GHS 75 Additional Seats / GHS 60 Usher Packs / GHS 85 Live Polling Module & GHS 50 Event Pass / SMS & Email Packs) benchmarked against USD market platforms (Luma, Slido, Eventbrite) at the calibrated exchange rate of 1 USD = 11.71 GHS.
+
+- [x] **Phase 1: Package Calibration & Feature Gating**:
+  - Registered `live_polling` feature flag in `features` table.
+  - Updated `EventPackageSeeder.php` with calibrated rates: Free (GHS 0), Starter (GHS 249/mo, 3 seats, 150 SMS, 3,000 emails, live polling disabled), Growth (GHS 499/mo, 6 seats, 500 SMS, 15,000 emails, live polling & Q&A included, white label).
+  - Seeded cleanly via `php artisan db:seed --class=EventPackageSeeder`.
+- [x] **Phase 2: Database Schema & Tenant Add-On Domain**:
+  - Created landlord migration `database/migrations/landlord/2026_10_03_130000_create_tenant_addons_tables.php` tracking active add-on subscriptions, seats, passes, expiration windows, and unique Paystack references.
+  - Created `App\Models\TenantAddon` with types, intervals, `scopeActive()`, `isActive()` supporting grace period on cancellation, and `TenantAddonFactory`.
+  - Enhanced `App\Models\Tenant` with dynamic seat calculation (`totalTeamSeatLimit()`, `purchasedTeamSeatsCount()`, `purchasedUsherPassesCount()`), and live polling entitlement (`canUseLivePolling(?Event $event = null)`).
+  - Updated `Tenant::featureLimitValue()` so purchased seat, SMS, and email add-ons automatically augment capacity limits across the entire platform.
+- [x] **Phase 3: Service Layer & Paystack Checkout Fulfillment**:
+  - Created `App\Services\Billing\TenantAddonService` defining the modular rate card catalog, Paystack checkout initialization, dev-bypass support, idempotent reference verification, and graceful cancellation.
+  - Implemented double-entry transaction posting on landlord database with reference idempotency.
+  - Integrated Paystack checkout callback in `App\Http\Controllers\Billing\CallbackController` (`tenant_addon` branch) and webhook processor in `App\Http\Controllers\Billing\WebhookController` (`metadata['tenant_id']` resolution).
+- [x] **Phase 4: Gating Enforcement & Role Protections**:
+  - Enforced seat limits in `App\Http\Controllers\Tenant\UserController::store` with add-on upsell guidance.
+  - Enforced live polling feature gating in `EventPollController::store`, `EventPollController::updateStatus` (live transition), `EventPollDeckController::store`, `EventPollDeckController::start`, `PollPresentationController::show`, `PollPresentationController::results`, and `DeckPresenterController` (`show`, `state`, `act`), returning 403 `upgrade_required` when un-entitled.
+- [x] **Phase 5: Console UI**:
+  - Created `resources/js/Pages/Billing/Addons.jsx` with capacity overview metrics, interactive catalog cards with checkout modal, and active subscriptions & passes table with cancellation controls complying with Console component prop rules.
+  - Updated `resources/js/Pages/Billing/Pricing.jsx` with direct "Modular Add-Ons" action navigation.
+  - Updated `resources/js/Pages/Billing/Index.jsx` with header action link to Add-ons hub.
+  - Updated `resources/js/Pages/Tenant/Events/panels/EngagementPanel.jsx` with upgrade/pass unlock guidance on 403 poll responses.
+- [x] **Phase 6: Automated Verification & Adversarial Self-Review**:
+  - `ModularAddonsTest.php`: 14 passing Pest tests, 66 assertions verifying calibrated package quotas, seat expansion, negative seat rejection, live polling gates, single-event pass scoping, workspace monthly polling unlocks, checkout session generation, callback/webhook fulfillment idempotency, prepaid SMS packs, recurring cancellation grace period, non-recurring cancellation rejection (422), presentation results gating, and invalid key validation (422).
+  - `ConsoleComponentUsageTest.php`: 5 passing tests, 6 assertions verifying table and console UI prop compliance.
+  - `BillingPlanSummaryTest.php`, `SubscriptionAuthorizationTest.php`, `SubscriptionRenewalTest.php`, `RenewalSchedulerTest.php`: 37 passing tests, 197 assertions verifying all billing renewal schedules and plans with calibrated commercial pricing.
+  - `EventPackageSeederTest.php`: 3 passing tests, 15 assertions.
+  - Frontend assets compiled with `npm run build` (2,613 modules in 23.01s with zero errors).
+  - Mandatory 3-agent self-review completed across Security, Logic & Financial Invariants, and Performance & Architecture.
 

@@ -35,6 +35,13 @@ final class EventPollController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
+        if (! $tenant->canUseLivePolling($eventModel)) {
+            return response()->json([
+                'message' => 'Live Polling & Audience Q&A requires the Growth plan or an active Live Polling add-on/event pass.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
         $validated = $request->validate([
             'question' => ['required', 'string', 'max:500'],
             'type' => ['required', Rule::in(EventPoll::TYPES)],
@@ -86,6 +93,13 @@ final class EventPollController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in([EventPoll::STATUS_DRAFT, EventPoll::STATUS_LIVE, EventPoll::STATUS_CLOSED])],
         ]);
+
+        if ($validated['status'] === EventPoll::STATUS_LIVE && ! $tenant->canUseLivePolling($eventModel)) {
+            return response()->json([
+                'message' => 'Live Polling & Audience Q&A requires the Growth plan or an active Live Polling add-on/event pass.',
+                'upgrade_required' => true,
+            ], 403);
+        }
 
         $pollModel->update([
             'status' => $validated['status'],

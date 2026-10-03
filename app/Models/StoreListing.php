@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class StoreListing extends Model
 {
+    use HasFactory;
     use HasUuids;
 
     public const string KIND_VENUE = 'venue';
@@ -22,6 +24,30 @@ final class StoreListing extends Model
     public const string KIND_SERVICE = 'service';
 
     public const string KIND_MERCHANDISE = 'merchandise';
+
+    public const string CATEGORY_VENUE = 'venue';
+
+    public const string CATEGORY_PA_SOUND = 'pa_sound';
+
+    public const string CATEGORY_VIDEOGRAPHY = 'videography_streaming';
+
+    public const string CATEGORY_CANOPIES = 'canopies_tents';
+
+    public const string CATEGORY_CHAIRS_DECOR = 'chairs_decor';
+
+    public const string CATEGORY_CATERING = 'catering_beverages';
+
+    public const string CATEGORY_GENERATORS = 'generators_power';
+
+    public const string CATEGORY_SECURITY = 'security_ushers';
+
+    public const string CATEGORY_OTHER = 'other';
+
+    public const string KIND_EQUIPMENT = self::KIND_RENTAL;
+
+    public const string CATEGORY_GENERATORS_POWER = self::CATEGORY_GENERATORS;
+
+    public const string CATEGORY_VIDEOGRAPHY_STREAMING = self::CATEGORY_VIDEOGRAPHY;
 
     public const string STATUS_DRAFT = 'draft';
 
@@ -46,6 +72,7 @@ final class StoreListing extends Model
     protected $fillable = [
         'shop_id',
         'listing_kind',
+        'category',
         'title',
         'slug',
         'description',
@@ -53,7 +80,10 @@ final class StoreListing extends Model
         'pricing_model',
         'price_visibility',
         'security_deposit_pesewas',
+        'min_order_pesewas',
+        'lead_time_days',
         'capacity_breakdown',
+        'service_scope',
         'floor_area_sqm',
         'ceiling_height_meters',
         'rules_and_policies',
@@ -76,7 +106,10 @@ final class StoreListing extends Model
     protected $casts = [
         'rental_price_pesewas' => 'integer',
         'security_deposit_pesewas' => 'integer',
+        'min_order_pesewas' => 'integer',
+        'lead_time_days' => 'integer',
         'capacity_breakdown' => 'array',
+        'service_scope' => 'array',
         'rules_and_policies' => 'array',
         'floor_area_sqm' => 'decimal:2',
         'ceiling_height_meters' => 'decimal:2',

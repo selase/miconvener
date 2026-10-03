@@ -255,6 +255,13 @@ Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
     Route::post('/bookings/{reference}/checkout', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkout'])->name('bookings.checkout');
     Route::get('/bookings/{reference}/callback', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'callback'])->name('bookings.callback');
     Route::get('/{merchant_slug}', [App\Http\Controllers\Marketplace\MarketplaceStorefrontController::class, 'show'])->name('storefront.show');
+
+    // RFQs, Proposals & Reviews
+    Route::post('/listings/{slug}/rfq', [App\Http\Controllers\Marketplace\MarketplaceQuotePublicController::class, 'storeRfq'])->middleware('throttle:60,1')->name('quotes.rfq');
+    Route::get('/quotes/{reference}', [App\Http\Controllers\Marketplace\MarketplaceQuotePublicController::class, 'showProposal'])->name('quotes.show');
+    Route::post('/quotes/{reference}/checkout', [App\Http\Controllers\Marketplace\MarketplaceQuotePublicController::class, 'checkout'])->middleware('throttle:30,1')->name('quotes.checkout');
+    Route::get('/quotes/{reference}/callback', [App\Http\Controllers\Marketplace\MarketplaceQuotePublicController::class, 'callback'])->name('quotes.callback');
+    Route::post('/quotes/{reference}/review', [App\Http\Controllers\Marketplace\MarketplaceQuotePublicController::class, 'storeReview'])->middleware('throttle:30,1')->name('quotes.review');
 });
 
 // Model Context Protocol (MCP) Server for Marketplace AI Agents

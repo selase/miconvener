@@ -37,6 +37,10 @@ final class DeckPresenterController extends Controller
         $eventModel = $deckModel->event;
         $tenant = $this->tenant();
 
+        if (! $tenant->canUseLivePolling($eventModel)) {
+            abort(403, 'Live Polling presentation is locked on this event. An upgrade or event pass is required.');
+        }
+
         return Inertia::render('Public/Events/DeckPresenter', [
             'event' => [
                 'id' => $eventModel->id,
@@ -73,12 +77,22 @@ final class DeckPresenterController extends Controller
      */
     public function state(string $subdomain, string $event, string $deck, string $token): JsonResponse
     {
-        return response()->json($this->snapshot($this->findByToken($event, $deck, $token)));
+        $deckModel = $this->findByToken($event, $deck, $token);
+
+        if (! $this->tenant()->canUseLivePolling($deckModel->event)) {
+            abort(403, 'Live Polling presentation is locked on this event.');
+        }
+
+        return response()->json($this->snapshot($deckModel));
     }
 
     public function act(string $subdomain, string $event, string $deck, string $token, string $action): JsonResponse
     {
         $deckModel = $this->findByToken($event, $deck, $token);
+
+        if (! $this->tenant()->canUseLivePolling($deckModel->event)) {
+            abort(403, 'Live Polling presentation is locked on this event.');
+        }
 
         match ($action) {
             'start' => $this->presenter->start($deckModel),

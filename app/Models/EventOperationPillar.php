@@ -98,7 +98,7 @@ final class EventOperationPillar extends Model
         $order = 0;
 
         foreach (self::defaultPillars() as $pillarDef) {
-            self::firstOrCreate(
+            self::withoutGlobalScopes()->firstOrCreate(
                 [
                     'event_id' => $event->id,
                     'slug' => $pillarDef['slug'],

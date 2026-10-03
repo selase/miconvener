@@ -19,6 +19,8 @@ final class LedgerTransaction extends Model
 
     public const TYPE_TICKET_SALE = 'ticket_sale';
 
+    public const TYPE_OFFLINE_TICKET_SALE = 'offline_ticket_sale';
+
     public const TYPE_CONTRIBUTION = 'contribution';
 
     public const TYPE_REFUND = 'refund';

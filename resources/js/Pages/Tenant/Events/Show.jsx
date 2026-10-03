@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
 import Button from '@/Components/Console/Button';
 import StatusPill from '@/Components/Console/StatusPill';
 import CopyField from '@/Components/Console/CopyField';
 import SegmentedControl from '@/Components/Console/SegmentedControl';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
-import { Download, Check, X, Pencil } from 'lucide-react';
+import { Download, Check, X, Pencil, FileText, Clock } from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 import EditRegistrationModal from './EditRegistrationModal';
+import OfflineVerificationModal from './OfflineVerificationModal';
 import EventFormModal from './EventFormModal';
 import EventWorkspace from './Workspace/EventWorkspace';
 import { sectionHref } from './Workspace/sections';
@@ -177,6 +178,25 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
 function GuestsTab({ event, registrations }) {
     const reload = () => router.reload({ only: ['registrations'] });
     const [editing, setEditing] = useState(null);
+    const [verifyingOffline, setVerifyingOffline] = useState(null);
+    const [activeFilter, setActiveFilter] = useState('all');
+
+    const pendingOfflineCount = useMemo(() => {
+        return registrations.filter((r) => r.offline_payment_status === 'pending_verification').length;
+    }, [registrations]);
+
+    const filteredRegistrations = useMemo(() => {
+        if (activeFilter === 'confirmed') {
+            return registrations.filter((r) => r.status === 'confirmed' || r.status === 'checked_in');
+        }
+        if (activeFilter === 'offline_pending') {
+            return registrations.filter((r) => r.offline_payment_status === 'pending_verification');
+        }
+        if (activeFilter === 'pending_approval') {
+            return registrations.filter((r) => r.status === 'pending_approval');
+        }
+        return registrations;
+    }, [registrations, activeFilter]);
 
     const act = async (registration, action, body) => {
         await csrfFetch(
@@ -199,7 +219,62 @@ function GuestsTab({ event, registrations }) {
 
     return (
         <div>
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => setActiveFilter('all')}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                            activeFilter === 'all'
+                                ? 'bg-accent text-accent-ink'
+                                : 'border border-border bg-surface text-ink hover:bg-surface-hover'
+                        }`}
+                    >
+                        All ({registrations.length})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveFilter('confirmed')}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                            activeFilter === 'confirmed'
+                                ? 'bg-accent text-accent-ink'
+                                : 'border border-border bg-surface text-ink hover:bg-surface-hover'
+                        }`}
+                    >
+                        Confirmed
+                    </button>
+                    {pendingOfflineCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveFilter('offline_pending')}
+                            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                activeFilter === 'offline_pending'
+                                    ? 'bg-amber-600 text-white'
+                                    : 'border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                            }`}
+                        >
+                            <Clock className="h-3.5 w-3.5" />
+                            Offline Verification
+                            <span className="rounded-full bg-amber-200 px-1.5 py-0.2 text-[10px] font-bold text-amber-950 dark:bg-amber-800 dark:text-amber-100">
+                                {pendingOfflineCount}
+                            </span>
+                        </button>
+                    )}
+                    {registrations.some((r) => r.status === 'pending_approval') && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveFilter('pending_approval')}
+                            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                activeFilter === 'pending_approval'
+                                    ? 'bg-accent text-accent-ink'
+                                    : 'border border-border bg-surface text-ink hover:bg-surface-hover'
+                            }`}
+                        >
+                            Pending Approval
+                        </button>
+                    )}
+                </div>
+
                 <Button
                     icon={Download}
                     href={route('tenant.events.guests.export', { event: event.id })}
@@ -208,12 +283,13 @@ function GuestsTab({ event, registrations }) {
                 </Button>
             </div>
 
-            {registrations.length > 0 ? (
+            {filteredRegistrations.length > 0 ? (
                 <Table>
                     <Thead>
                         <Th>Name</Th>
                         <Th>Email</Th>
                         <Th>Status</Th>
+                        <Th>Payment</Th>
                         <Th>Ticket type</Th>
                         <Th>Ticket code</Th>
                         <Th>Seat</Th>
@@ -221,7 +297,7 @@ function GuestsTab({ event, registrations }) {
                         <Th />
                     </Thead>
                     <tbody>
-                        {registrations.map((registration) => (
+                        {filteredRegistrations.map((registration) => (
                             <Tr key={registration.id}>
                                 <Td>{registration.full_name}</Td>
                                 <Td muted>{registration.email}</Td>
@@ -231,6 +307,30 @@ function GuestsTab({ event, registrations }) {
                                             ? `Waitlisted, #${registration.waitlist_position}`
                                             : registration.status.replace('_', ' ')}
                                     </StatusPill>
+                                </Td>
+                                <Td>
+                                    {registration.offline_payment_status === 'pending_verification' ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setVerifyingOffline(registration)}
+                                            className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300"
+                                        >
+                                            <Clock className="h-3 w-3" />
+                                            Verify Slip
+                                        </button>
+                                    ) : registration.offline_payment_status === 'approved' ? (
+                                        <span className="text-[11px] font-medium text-success-fg">
+                                            Offline (Approved)
+                                        </span>
+                                    ) : registration.offline_payment_status === 'rejected' ? (
+                                        <span className="text-[11px] font-medium text-danger-fg">
+                                            Offline (Rejected)
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-ink-muted">
+                                            {registration.payment_method === 'paystack' ? 'Paystack' : (registration.amount > 0 ? 'Online' : 'Free')}
+                                        </span>
+                                    )}
                                 </Td>
                                 <Td muted>{registration.ticket_type_name ?? '—'}</Td>
                                 <Td muted>{registration.ticket_code ?? '—'}</Td>
@@ -246,6 +346,16 @@ function GuestsTab({ event, registrations }) {
                                 </Td>
                                 <Td align="right">
                                     <div className="flex items-center justify-end gap-3">
+                                        {registration.offline_payment_status === 'pending_verification' && (
+                                            <button
+                                                onClick={() => setVerifyingOffline(registration)}
+                                                title="Inspect Slip & Verify"
+                                                className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+                                            >
+                                                <FileText className="h-3.5 w-3.5" />
+                                                Verify
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => setEditing(registration)}
                                             title="Edit"
@@ -293,6 +403,7 @@ function GuestsTab({ event, registrations }) {
                         <Th>Name</Th>
                         <Th>Email</Th>
                         <Th>Status</Th>
+                        <Th>Payment</Th>
                         <Th>Ticket type</Th>
                         <Th>Ticket code</Th>
                         <Th>Seat</Th>
@@ -301,10 +412,10 @@ function GuestsTab({ event, registrations }) {
                     </Thead>
                     <tbody>
                         <tr>
-                            <td colSpan={8}>
+                            <td colSpan={9}>
                                 <TableEmpty
-                                    title="No guests yet"
-                                    description="Share the event page to start collecting registrations."
+                                    title={activeFilter === 'all' ? 'No guests yet' : 'No registrations found'}
+                                    description={activeFilter === 'all' ? 'Share the event page to start collecting registrations.' : 'No registrations match the selected filter.'}
                                 />
                             </td>
                         </tr>
@@ -320,6 +431,15 @@ function GuestsTab({ event, registrations }) {
                         setEditing(null);
                         reload();
                     }}
+                />
+            )}
+            {verifyingOffline && (
+                <OfflineVerificationModal
+                    open={!!verifyingOffline}
+                    registration={verifyingOffline}
+                    event={event}
+                    onClose={() => setVerifyingOffline(null)}
+                    onSuccess={reload}
                 />
             )}
         </div>

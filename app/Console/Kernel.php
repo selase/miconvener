@@ -68,6 +68,9 @@ final class Kernel extends ConsoleKernel
             ->everyFifteenMinutes()
             ->withoutOverlapping();
 
+        // Event Deletion Safeguard — permanently purge events whose 6-hour recovery window has elapsed
+        $schedule->command('events:purge-deleted')->hourly()->withoutOverlapping();
+
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
     }

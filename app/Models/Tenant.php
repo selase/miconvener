@@ -227,6 +227,52 @@ final class Tenant extends Model
     }
 
     /**
+     * @return HasMany<TenantAddon, $this>
+     */
+    public function addons(): HasMany
+    {
+        return $this->hasMany(TenantAddon::class, 'tenant_id');
+    }
+
+    public function purchasedTeamSeatsCount(): int
+    {
+        return (int) $this->addons()
+            ->active()
+            ->ofType(TenantAddon::TYPE_TEAM_SEAT)
+            ->sum('quantity');
+    }
+
+    public function purchasedUsherPassesCount(): int
+    {
+        return (int) $this->addons()
+            ->active()
+            ->ofType(TenantAddon::TYPE_USHER_PACK)
+            ->sum('quantity') * 5;
+    }
+
+    public function totalTeamSeatLimit(): ?int
+    {
+        return $this->featureLimitValue('team_seats');
+    }
+
+    public function canUseLivePolling(?Event $event = null): bool
+    {
+        if ($this->planAllows('live_polling')) {
+            return true;
+        }
+
+        if ($this->addons()->active()->ofType(TenantAddon::TYPE_LIVE_POLLING)->whereNull('event_id')->exists()) {
+            return true;
+        }
+
+        if ($event !== null && $this->addons()->active()->ofType(TenantAddon::TYPE_LIVE_POLLING)->where('event_id', $event->id)->exists()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @return HasOne<Subscription, $this>
      */
     public function latestSubscription(): HasOne
@@ -389,24 +435,19 @@ final class Tenant extends Model
         }
 
         // 2. Is it a metered feature with a limit?
-        $meta = $feature->meta ?? [];
-        if (! isset($meta['type']) || $meta['type'] !== 'limit') {
-            // Boolean features are already checked by 'enabled'
-            return true;
-        }
+        $limit = $this->featureLimitValue($featureSlug);
+        if ($limit === null) {
+            // Negative stored value means unlimited; null means not a limit or not enabled
+            $feature = $this->features()->where('feature_key', $featureSlug)->first();
+            $meta = $feature ? $feature->meta : [];
 
-        // 3. Check limit vs usage
-        $limit = (int) ($meta['value'] ?? 0);
-        if ($limit < 0) {
-            return true;
+            return isset($meta['type']) && $meta['type'] === 'limit' && (int) ($meta['value'] ?? 0) < 0;
         }
 
         $usage = $this->usage()
             ->where('feature_slug', $featureSlug)
-            ->whereNull('period_start') // Assuming lifetime limit for now
+            ->whereNull('period_start')
             ->value('used_count') ?? 0;
-
-        // dump("Usage: $usage, Quantity: $quantity, Limit: $limit");
 
         return ($usage + $quantity) <= $limit;
     }
@@ -468,7 +509,19 @@ final class Tenant extends Model
 
         $limit = (int) ($meta['value'] ?? 0);
 
-        return $limit < 0 ? null : $limit;
+        if ($limit < 0) {
+            return null;
+        }
+
+        if ($featureSlug === 'team_seats') {
+            $limit += $this->purchasedTeamSeatsCount();
+        } elseif ($featureSlug === 'sms_credits') {
+            $limit += (int) $this->addons()->active()->ofType(TenantAddon::TYPE_SMS_PACK)->sum('quantity');
+        } elseif ($featureSlug === 'email_credits') {
+            $limit += (int) $this->addons()->active()->ofType(TenantAddon::TYPE_EMAIL_PACK)->sum('quantity');
+        }
+
+        return $limit;
     }
 
     /**

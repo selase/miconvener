@@ -82,7 +82,7 @@ test('a pay-link tenant is reminded 7 and 3 days ahead, once each', function ():
 
     Mail::assertQueued(RenewalReminderMail::class, 2);
     Mail::assertQueued(RenewalReminderMail::class, fn (RenewalReminderMail $mail): bool => ! $mail->overdue
-        && $mail->amountDisplay === 'GHS 99.00'
+        && $mail->amountDisplay === 'GHS 499.00'
         && $mail->dueOn === '10 October 2026'
         && $mail->hasTo('owner@example.com')
         && $mail->hasTo('accounts@acme.test')
@@ -92,7 +92,7 @@ test('a pay-link tenant is reminded 7 and 3 days ahead, once each', function ():
 test('a saved card is not reminded, and is charged when the period ends', function (): void {
     [$tenant, $subscription] = scheduledTenant(cardOnFile());
     Http::fake(['api.paystack.co/transaction/charge_authorization' => Http::response(['status' => true, 'data' => [
-        'status' => 'success', 'reference' => "renew-{$subscription->id}-20261010-1", 'amount' => 9900, 'currency' => 'GHS', 'channel' => 'card',
+        'status' => 'success', 'reference' => "renew-{$subscription->id}-20261010-1", 'amount' => 49900, 'currency' => 'GHS', 'channel' => 'card',
         'authorization' => ['authorization_code' => 'AUTH_card', 'reusable' => true, 'channel' => 'card', 'brand' => 'visa', 'last4' => '4081'],
     ]])]);
 
@@ -104,8 +104,8 @@ test('a saved card is not reminded, and is charged when the period ends', functi
     runRenewals('2026-10-10 19:00:00');
 
     Http::assertSentCount(1);
-    Http::assertSent(fn ($request): bool => $request['email'] === 'payer@example.com' && $request['amount'] === 9900 && $request['metadata']['subscription_id'] === $subscription->id);
-    expect($output)->toContain('acme: charged GHS 99.00 (attempt 1)')
+    Http::assertSent(fn ($request): bool => $request['email'] === 'payer@example.com' && $request['amount'] === 49900 && $request['metadata']['subscription_id'] === $subscription->id);
+    expect($output)->toContain('acme: charged GHS 499.00 (attempt 1)')
         ->and($subscription->fresh()->current_period_end->toDateTimeString())->toBe('2026-11-10 17:00:00')
         ->and($subscription->fresh()->provider_status)->toBe('active')
         ->and(Transaction::query()->where('tenant_id', $tenant->id)->count())->toBe(1);
@@ -114,7 +114,7 @@ test('a saved card is not reminded, and is charged when the period ends', functi
 
 test('a declined card is retried daily through grace and then the plan moves to Free', function (): void {
     [$tenant, $subscription] = scheduledTenant(cardOnFile());
-    Http::fake(['api.paystack.co/transaction/charge_authorization' => Http::response(['status' => true, 'data' => ['status' => 'failed', 'gateway_response' => 'Insufficient Funds', 'amount' => 9900, 'currency' => 'GHS']])]);
+    Http::fake(['api.paystack.co/transaction/charge_authorization' => Http::response(['status' => true, 'data' => ['status' => 'failed', 'gateway_response' => 'Insufficient Funds', 'amount' => 49900, 'currency' => 'GHS']])]);
 
     runRenewals('2026-10-11 07:00:00');
 
@@ -247,7 +247,7 @@ test('pretend lists the actions and changes nothing', function (): void {
 
     $this->travelTo('2026-10-11 07:00:00');
     $this->artisan('billing:process-renewals', ['--pretend' => true])
-        ->expectsOutput('acme: charge GHS 99.00 to Visa card ending 4081 (attempt 1)')
+        ->expectsOutput('acme: charge GHS 499.00 to Visa card ending 4081 (attempt 1)')
         ->assertSuccessful();
 
     Http::assertNothingSent();

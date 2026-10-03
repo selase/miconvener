@@ -26,11 +26,32 @@ final class MarketplaceSearchService
         /** @var Builder<StoreListing> $query */
         $query = StoreListing::query()
             ->with(['shop', 'primaryMedia', 'amenities.amenity'])
-            ->where('store_listings.listing_kind', StoreListing::KIND_VENUE)
             ->where('store_listings.status', StoreListing::STATUS_PUBLISHED)
             ->whereHas('shop', function (Builder $q): void {
                 $q->where('is_active', true);
             });
+
+        // Listing kind filter (defaults to venue only if no category or custom kind specified)
+        $listingKind = $filters['listing_kind'] ?? null;
+        $category = ! empty($filters['category']) && $filters['category'] !== 'all' ? (string) $filters['category'] : null;
+
+        if ($listingKind && $listingKind !== 'all') {
+            $query->where('store_listings.listing_kind', $listingKind);
+        } elseif ($category === null && empty($listingKind)) {
+            $query->where('store_listings.listing_kind', StoreListing::KIND_VENUE);
+        }
+
+        // Category filter
+        if ($category !== null) {
+            $query->where('store_listings.category', $category);
+        }
+
+        // Verified-only filter
+        if (! empty($filters['verified_only'])) {
+            $query->whereHas('shop', function (Builder $q): void {
+                $q->where('verification_status', 'verified');
+            });
+        }
 
         // 1. Vector AI Semantic Search Prompt
         $aiPrompt = ! empty($filters['ai_prompt']) ? mb_substr(mb_trim((string) $filters['ai_prompt']), 0, 1000) : null;

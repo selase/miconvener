@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Events;
 
 use App\Enum\TenantStatusEnum;
-use App\Models\Event;
 use App\Models\EventAbstractAuthor;
 use App\Models\EventCertificate;
+use App\Models\EventContribution;
 use App\Models\EventRegistration;
 use App\Models\EventSessionAttendance;
-use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
 
 final class PlatformAttendeeHistory
@@ -327,6 +326,65 @@ final class PlatformAttendeeHistory
         }
 
         return $result;
+    }
+
+    /**
+     * Retrieve voluntary contributions and giving history across organisers.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getContributions(string $emailNormalized, ?string $organiserSlug = null): array
+    {
+        $email = PlatformAttendeeVerification::normalise($emailNormalized);
+
+        /** @var \Illuminate\Database\Eloquent\Collection<int, EventContribution> $contributions */
+        $contributions = EventContribution::withoutGlobalScopes()
+            ->whereRaw('lower(contributor_email) = ?', [$email])
+            ->where('status', EventContribution::STATUS_COMPLETED)
+            ->whereHas('tenant', fn (Builder $q) => $q->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
+            ->when($organiserSlug !== null, fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $organiserSlug)))
+            ->with([
+                'event' => fn ($q) => $q->withoutGlobalScopes(),
+                'tenant' => fn ($q) => $q->withoutGlobalScopes(),
+            ])
+            ->latest('paid_at')
+            ->latest('created_at')
+            ->get();
+
+        $results = [];
+        foreach ($contributions as $c) {
+            $event = $c->event;
+            $tenant = $c->tenant;
+
+            $results[] = [
+                'id' => $c->id,
+                'payment_reference' => $c->payment_reference,
+                'amount' => $c->amount,
+                'formatted_amount' => $c->formattedAmount(),
+                'currency' => $c->currency,
+                'paid_at' => $c->paid_at?->toIso8601String() ?? $c->created_at?->toIso8601String(),
+                'tribute_message' => $c->tribute_message,
+                'is_anonymous' => (bool) $c->is_anonymous,
+                'is_approved' => (bool) $c->is_approved,
+                'contributor_name' => $c->contributor_name,
+                'event' => [
+                    'id' => $event?->id,
+                    'name' => $event?->name,
+                    'slug' => $event?->slug,
+                    'category' => $event?->event_category ?? 'general',
+                    'contribution_title' => $event?->contribution_title,
+                    'url' => $event ? url("/e/{$event->slug}") : null,
+                ],
+                'organiser' => [
+                    'id' => $tenant?->id,
+                    'name' => $tenant?->name,
+                    'slug' => $tenant?->slug,
+                ],
+                'receipt_url' => url("/my/contributions/{$c->id}/receipt"),
+            ];
+        }
+
+        return $results;
     }
 
     /**

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
-import { AlertCircle, ArrowUp, Repeat } from 'lucide-react';
+import { AlertCircle, ArrowUp, Repeat, Building2 } from 'lucide-react';
 import Modal from '@/Components/Console/Modal';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
@@ -52,6 +52,13 @@ export default function EventFormModal({ mode, event, onClose }) {
         recurrence_interval: event?.recurrence_interval ?? 1,
         recurrence_until: event?.recurrence_until ?? '',
         recurrence_auto_generate_weeks: event?.recurrence_auto_generate_weeks ?? 4,
+        allow_offline_payments: event?.allow_offline_payments ?? false,
+        offline_payment_instructions: event?.offline_payment_instructions ?? '',
+        offline_payment_bank_name: event?.offline_payment_bank_name ?? '',
+        offline_payment_account_name: event?.offline_payment_account_name ?? '',
+        offline_payment_account_number: event?.offline_payment_account_number ?? '',
+        offline_payment_momo_number: event?.offline_payment_momo_number ?? '',
+        offline_payment_momo_network: event?.offline_payment_momo_network ?? '',
     });
 
     const activeErrors = {
@@ -114,6 +121,7 @@ export default function EventFormModal({ mode, event, onClose }) {
             ...formData,
             capacity: formData.capacity === '' ? null : formData.capacity,
             requires_approval: formData.requires_approval ? '1' : '0',
+            allow_offline_payments: formData.allow_offline_payments ? '1' : '0',
             ticket_price: Math.round(Number(formData.ticket_price) * 100),
         }));
 
@@ -166,13 +174,16 @@ export default function EventFormModal({ mode, event, onClose }) {
                     >
                         <option value="general">🌐 General / Community & Meetup</option>
                         <option value="faith">⛪ Church / Faith & Religious Gathering</option>
-                        <option value="memorial">🕊️ Funeral / Memorial & Celebration of Life</option>
+                        <option value="memorial">
+                            🕊️ Funeral / Memorial & Celebration of Life
+                        </option>
                         <option value="academic">🎓 Academic / Course, Lecture & Seminar</option>
                         <option value="conference">💼 Conference / Summit & Corporate</option>
                         <option value="fundraiser">🎗️ Nonprofit / Charity & Fundraiser</option>
                     </Select>
                     <p className="mt-1 text-xs text-ink-secondary">
-                        MiConvener automatically tailors giving terms, schedules, and occurrence notes to match this event archetype.
+                        MiConvener automatically tailors giving terms, schedules, and occurrence
+                        notes to match this event archetype.
                     </p>
                 </div>
 
@@ -483,6 +494,112 @@ export default function EventFormModal({ mode, event, onClose }) {
                     />
                     Registrations need my approval before they're confirmed
                 </label>
+
+                <div className="rounded-xl border border-border/80 bg-surface-muted/40 p-4 space-y-3.5">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={data.allow_offline_payments}
+                            onChange={(e) => setData('allow_offline_payments', e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                        />
+                        <div>
+                            <span className="text-sm font-semibold text-ink flex items-center gap-1.5">
+                                <Building2 className="h-4 w-4 text-accent" />
+                                Accept Offline & Direct Payments
+                            </span>
+                            <p className="text-xs text-ink-secondary mt-0.5">
+                                Allow attendees to pay via bank transfer, MoMo merchant line, or
+                                cash on site and upload proof of payment for your manual
+                                verification.
+                            </p>
+                        </div>
+                    </label>
+
+                    {data.allow_offline_payments && (
+                        <div className="pt-2 border-t border-border/60 space-y-3.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <Input
+                                    label="Bank name"
+                                    type="text"
+                                    placeholder="e.g. Ecobank Ghana"
+                                    value={data.offline_payment_bank_name}
+                                    onChange={(e) =>
+                                        setData('offline_payment_bank_name', e.target.value)
+                                    }
+                                    error={errors.offline_payment_bank_name}
+                                />
+                                <Input
+                                    label="Account name"
+                                    type="text"
+                                    placeholder="e.g. Acme Organization Ltd"
+                                    value={data.offline_payment_account_name}
+                                    onChange={(e) =>
+                                        setData('offline_payment_account_name', e.target.value)
+                                    }
+                                    error={errors.offline_payment_account_name}
+                                />
+                                <Input
+                                    label="Account number"
+                                    type="text"
+                                    placeholder="e.g. 1441001234567"
+                                    value={data.offline_payment_account_number}
+                                    onChange={(e) =>
+                                        setData('offline_payment_account_number', e.target.value)
+                                    }
+                                    error={errors.offline_payment_account_number}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <Select
+                                    label="MoMo network"
+                                    value={data.offline_payment_momo_network}
+                                    onChange={(e) =>
+                                        setData('offline_payment_momo_network', e.target.value)
+                                    }
+                                    error={errors.offline_payment_momo_network}
+                                >
+                                    <option value="">Select network (optional)</option>
+                                    <option value="MTN MoMo">MTN MoMo</option>
+                                    <option value="Telecel Cash">Telecel Cash</option>
+                                    <option value="AT Money">AT Money</option>
+                                </Select>
+
+                                <Input
+                                    label="MoMo merchant / phone number"
+                                    type="text"
+                                    placeholder="e.g. 0244123456 or Merchant ID"
+                                    value={data.offline_payment_momo_number}
+                                    onChange={(e) =>
+                                        setData('offline_payment_momo_number', e.target.value)
+                                    }
+                                    error={errors.offline_payment_momo_number}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-medium text-ink">
+                                    Offline payment instructions & terms (optional)
+                                </label>
+                                <textarea
+                                    value={data.offline_payment_instructions}
+                                    onChange={(e) =>
+                                        setData('offline_payment_instructions', e.target.value)
+                                    }
+                                    rows={2}
+                                    placeholder="e.g. Use your registration email or reference code in the transfer memo. Tickets are confirmed within 24 hours."
+                                    className="w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                                />
+                                {errors.offline_payment_instructions && (
+                                    <p className="mt-1 text-sm text-danger-fg">
+                                        {errors.offline_payment_instructions}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 <div>
                     <label className="mb-1.5 block text-sm font-medium text-ink">
