@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
+use App\Services\Events\PollResults;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,33 +37,40 @@ final class EventPollController extends Controller
 
         $validated = $request->validate([
             'question' => ['required', 'string', 'max:500'],
-            'type' => ['required', Rule::in([EventPoll::TYPE_MULTIPLE_CHOICE, EventPoll::TYPE_OPEN, EventPoll::TYPE_QUIZ])],
-            'options' => ['required_if:type,multiple_choice,quiz', 'array', 'min:2'],
+            'type' => ['required', Rule::in(EventPoll::TYPES)],
+            'options' => [Rule::requiredIf(in_array($request->input('type'), EventPoll::AUTHORED_OPTION_TYPES, true)), 'array', 'min:2', 'max:12'],
             'options.*' => ['string', 'max:255'],
             'correct_option_index' => ['required_if:type,quiz', 'nullable', 'integer', 'min:0'],
             'timer_seconds' => ['nullable', 'integer', 'min:5', 'max:300'],
             'points' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'requires_moderation' => ['sometimes', 'boolean'],
+            'settings' => ['sometimes', 'array'],
+            'settings.min' => ['required_if:type,scale', 'integer', 'min:0', 'max:100'],
+            'settings.max' => ['required_if:type,scale', 'integer', 'gt:settings.min', 'max:100'],
+            'settings.label_min' => ['nullable', 'string', 'max:40'],
+            'settings.label_max' => ['nullable', 'string', 'max:40'],
+            'settings.unit' => ['nullable', 'string', 'max:20'],
         ]);
+
+        $type = $validated['type'];
 
         $poll = $eventModel->polls()->create([
             'tenant_id' => $tenant->id,
             'question' => $validated['question'],
-            'type' => $validated['type'],
-            'timer_seconds' => $validated['type'] === EventPoll::TYPE_QUIZ ? ($validated['timer_seconds'] ?? null) : null,
+            'type' => $type,
+            'timer_seconds' => $type === EventPoll::TYPE_QUIZ ? ($validated['timer_seconds'] ?? null) : null,
             'points' => $validated['points'] ?? 10,
-            'requires_moderation' => $validated['type'] === EventPoll::TYPE_OPEN ? (bool) ($validated['requires_moderation'] ?? false) : false,
+            'requires_moderation' => in_array($type, EventPoll::MODERATED_TYPES, true) ? (bool) ($validated['requires_moderation'] ?? false) : false,
+            'settings' => $this->settingsFor($type, $validated['settings'] ?? []),
         ]);
 
-        if (in_array($validated['type'], [EventPoll::TYPE_MULTIPLE_CHOICE, EventPoll::TYPE_QUIZ], true)) {
-            foreach ($validated['options'] as $i => $label) {
-                $poll->options()->create([
-                    'tenant_id' => $tenant->id,
-                    'label' => $label,
-                    'sort_order' => $i,
-                    'is_correct' => $validated['type'] === EventPoll::TYPE_QUIZ && (int) $validated['correct_option_index'] === $i,
-                ]);
-            }
+        foreach ($this->optionLabelsFor($type, $validated['options'] ?? []) as $i => $label) {
+            $poll->options()->create([
+                'tenant_id' => $tenant->id,
+                'label' => $label,
+                'sort_order' => $i,
+                'is_correct' => $type === EventPoll::TYPE_QUIZ && (int) $validated['correct_option_index'] === $i,
+            ]);
         }
 
         return response()->json($this->pollPayload($poll->fresh(['options.responses', 'responses'])));
@@ -211,13 +219,53 @@ final class EventPollController extends Controller
             'open_responses' => $poll->type === EventPoll::TYPE_OPEN
                 ? $poll->responses->where('is_approved', true)->pluck('response_text')->filter()->values()
                 : [],
-            'pending_responses' => $poll->type === EventPoll::TYPE_OPEN
+            'settings' => $poll->settings ?? (object) [],
+            // What the wall is showing, so the organiser sees the same chart.
+            'results' => app(PollResults::class)->forDisplay($poll),
+            'pending_responses' => in_array($poll->type, EventPoll::MODERATED_TYPES, true)
                 ? $poll->responses->whereNull('is_approved')->map(fn (EventPollResponse $r): array => [
                     'id' => $r->id,
                     'text' => $r->response_text,
                 ])->values()
                 : [],
         ];
+    }
+
+    /**
+     * Yes/no and rating fix their own options, so every such question is
+     * answered and counted the same way; the rest use what the organiser wrote.
+     *
+     * @param  array<int, string>  $authored  as submitted, which need not be numbered from zero
+     * @return list<string>
+     */
+    private function optionLabelsFor(string $type, array $authored): array
+    {
+        return match ($type) {
+            EventPoll::TYPE_YES_NO => ['Yes', 'No'],
+            EventPoll::TYPE_RATING => ['1', '2', '3', '4', '5'],
+            default => in_array($type, EventPoll::AUTHORED_OPTION_TYPES, true) ? array_values($authored) : [],
+        };
+    }
+
+    /**
+     * Only the settings the type uses are kept, so a scale's ends cannot leak
+     * onto a number question from a form that was switched type halfway.
+     *
+     * @param  array<string, mixed>  $settings
+     * @return array<string, mixed>|null
+     */
+    private function settingsFor(string $type, array $settings): ?array
+    {
+        return match ($type) {
+            EventPoll::TYPE_SCALE => [
+                'min' => (int) $settings['min'],
+                'max' => (int) $settings['max'],
+                'label_min' => $settings['label_min'] ?? null,
+                'label_max' => $settings['label_max'] ?? null,
+            ],
+            EventPoll::TYPE_NUMBER => ['unit' => $settings['unit'] ?? null],
+            default => null,
+        };
     }
 
     private function getTenant()

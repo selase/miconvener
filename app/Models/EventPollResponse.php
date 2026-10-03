@@ -30,6 +30,8 @@ final class EventPollResponse extends Model
         'poll_id',
         'option_id',
         'response_text',
+        'response_number',
+        'response_payload',
         'respondent_token',
         'respondent_name',
         'is_correct',
@@ -41,6 +43,8 @@ final class EventPollResponse extends Model
         'is_correct' => 'boolean',
         'points_awarded' => 'integer',
         'is_approved' => 'boolean',
+        'response_number' => 'float',
+        'response_payload' => 'array',
     ];
 
     public function poll(): BelongsTo

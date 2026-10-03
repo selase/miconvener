@@ -29,7 +29,9 @@ use App\Models\EventSessionAttendance;
 use App\Models\PollDeck;
 use App\Models\Speaker;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
+use App\Services\Events\PollAnswer;
 use App\Services\Events\PollBroadcastCoalescer;
+use App\Services\Events\PollResults;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\SelfCheckIn;
 use App\Services\Events\TicketPdfService;
@@ -613,10 +615,13 @@ final class PlatformAttendeeWorkspaceController extends Controller
         $existing = $poll->responses()->where('respondent_token', $token)->first();
 
         $totalVotes = (int) $poll->responses_count;
+        $suppressCounts = in_array($poll->type, EventPoll::SUPPRESSED_TYPES, true) && $totalVotes < EventPoll::SUPPRESS_BELOW;
 
         $userResponse = $existing ? [
             'option_id' => $existing->option_id,
-            'option_ids' => $existing->option_id ? [$existing->option_id] : [],
+            'option_ids' => $existing->option_id ? [$existing->option_id] : ($existing->response_payload ?? []),
+            'response_number' => $existing->response_number,
+            'words' => $poll->type === EventPoll::TYPE_WORD_CLOUD ? ($existing->response_payload ?? []) : [],
             'response_text' => $existing->response_text,
             'text_response' => $existing->response_text,
             'is_correct' => $existing->is_correct,
@@ -633,12 +638,21 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'points' => $poll->points,
                 'went_live_at' => $poll->went_live_at?->toIso8601String(),
                 'is_time_up' => $poll->type === EventPoll::TYPE_QUIZ && $poll->timeUp(),
+                'settings' => $poll->settings ?? (object) [],
+                'allows_multiple' => $poll->type === EventPoll::TYPE_MULTI_SELECT,
+                // The same counts-only aggregate the wall shows, so a phone that
+                // has answered can see the room without a second shape to keep
+                // in step with the first.
+                'results' => app(PollResults::class)->forDisplay($poll),
                 'total_votes' => $totalVotes,
+                // Withheld, not just hidden, below the threshold for the types
+                // that suppress detail: a phone's raw payload is as readable as
+                // its screen.
                 'options' => $poll->options->map(fn (EventPollOption $o): array => [
                     'id' => $o->id,
                     'label' => $o->label,
-                    'votes_count' => (int) ($o->responses_count ?? 0),
-                    'percentage' => $totalVotes > 0 ? (int) round((((int) ($o->responses_count ?? 0)) / $totalVotes) * 100) : 0,
+                    'votes_count' => $suppressCounts ? null : (int) ($o->responses_count ?? 0),
+                    'percentage' => $suppressCounts ? null : ($totalVotes > 0 ? (int) round((((int) ($o->responses_count ?? 0)) / $totalVotes) * 100) : 0),
                 ])->values()->all(),
                 'user_response' => $userResponse,
             ],
@@ -699,34 +713,25 @@ final class PlatformAttendeeWorkspaceController extends Controller
             $request->merge(['response_text' => $request->input('text_response')]);
         }
 
-        $validated = $request->validate([
-            'option_id' => [
-                in_array($pollModel->type, [EventPoll::TYPE_MULTIPLE_CHOICE, EventPoll::TYPE_QUIZ], true) ? 'required' : 'prohibited',
-                'nullable',
-                Rule::exists('event_poll_options', 'id')->where('poll_id', $pollModel->id),
-            ],
-            'response_text' => [
-                $pollModel->type === EventPoll::TYPE_OPEN ? 'required' : 'prohibited',
-                'nullable',
-                'string',
-                'max:1000',
-            ],
+        $answer = app(PollAnswer::class)->read($request, $pollModel);
+        $respondentName = $request->validate([
             'respondent_name' => ['nullable', 'string', 'max:100'],
-        ]);
+        ])['respondent_name'] ?? null;
 
         $selectedOption = $pollModel->type === EventPoll::TYPE_QUIZ
-            ? $pollModel->options->firstWhere('id', $validated['option_id'] ?? null)
+            ? $pollModel->options->firstWhere('id', $answer['option_id'])
             : null;
+
+        $moderated = in_array($pollModel->type, EventPoll::MODERATED_TYPES, true) && $pollModel->requires_moderation;
 
         $response = $pollModel->responses()->create([
             'tenant_id' => $registrationModel->tenant_id,
-            'option_id' => $validated['option_id'] ?? null,
-            'response_text' => $validated['response_text'] ?? null,
-            'respondent_name' => $validated['respondent_name'] ?? null,
+            ...$answer,
+            'respondent_name' => $respondentName,
             'respondent_token' => $token,
             'is_correct' => $selectedOption ? $selectedOption->is_correct : null,
             'points_awarded' => $selectedOption?->is_correct ? $pollModel->points : 0,
-            'is_approved' => $pollModel->type === EventPoll::TYPE_OPEN && $pollModel->requires_moderation ? null : true,
+            'is_approved' => $moderated ? null : true,
         ]);
 
         app(PollBroadcastCoalescer::class)->schedule($pollModel->fresh('options'));
