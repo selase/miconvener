@@ -1323,16 +1323,19 @@ Commercial benchmark pricing calibration and modular monetization engine based o
 - [x] **Phase 4: Gating Enforcement & Role Protections**:
   - Enforced seat limits in `App\Http\Controllers\Tenant\UserController::store` with add-on upsell guidance.
   - Enforced live polling feature gating in `EventPollController::store`, `EventPollController::updateStatus` (live transition), `EventPollDeckController::store`, `EventPollDeckController::start`, `PollPresentationController::show`, `PollPresentationController::results`, and `DeckPresenterController` (`show`, `state`, `act`), returning 403 `upgrade_required` when un-entitled.
-- [x] **Phase 5: Console UI**:
-  - Created `resources/js/Pages/Billing/Addons.jsx` with capacity overview metrics, interactive catalog cards with checkout modal, and active subscriptions & passes table with cancellation controls complying with Console component prop rules.
-  - Updated `resources/js/Pages/Billing/Pricing.jsx` with direct "Modular Add-Ons" action navigation.
-  - Updated `resources/js/Pages/Billing/Index.jsx` with header action link to Add-ons hub.
-  - Updated `resources/js/Pages/Tenant/Events/panels/EngagementPanel.jsx` with upgrade/pass unlock guidance on 403 poll responses.
+- [x] **Phase 5: Console & Customer-Facing UI Synchronization**:
+  - Synchronized `config/product-page.php` with the calibrated rates (Starter: GHS 249/mo, GHS 2,490/yr, 3 seats, 3k emails, 150 SMS, add-ons noted; Growth: GHS 499/mo, GHS 4,990/yr, 6 seats, 15k emails, 500 SMS, live polling included; Free: 50 registrations/mo).
+  - Enhanced `resources/views/livewire/pricing-table.blade.php` with a dedicated Modular Capacity add-on showcase section highlighting Team Seats (GHS 75/mo), Usher passes (GHS 60/mo), Live Polling & Q&A (GHS 85/mo or GHS 50/pass), and Prepaid SMS/Email packs.
+  - Updated `resources/js/Pages/Billing/Pricing.jsx` with responsive 4-column layout supporting negotiated Enterprise tier (`is_custom` with "Contact sales" CTA) and integrated modular capacity upsell banner.
+  - Refactored `resources/js/Pages/Billing/Addons.jsx` to achieve 100% strict compliance with Console design system components (`Th`, `Td`, `TableEmpty`, `Button`).
+  - Updated `BillingController::pricing` to deliver curated marketing features matching `config('product-page.plans')` rather than raw enum lists.
 - [x] **Phase 6: Automated Verification & Adversarial Self-Review**:
   - `ModularAddonsTest.php`: 14 passing Pest tests, 66 assertions verifying calibrated package quotas, seat expansion, negative seat rejection, live polling gates, single-event pass scoping, workspace monthly polling unlocks, checkout session generation, callback/webhook fulfillment idempotency, prepaid SMS packs, recurring cancellation grace period, non-recurring cancellation rejection (422), presentation results gating, and invalid key validation (422).
-  - `ConsoleComponentUsageTest.php`: 5 passing tests, 6 assertions verifying table and console UI prop compliance.
-  - `BillingPlanSummaryTest.php`, `SubscriptionAuthorizationTest.php`, `SubscriptionRenewalTest.php`, `RenewalSchedulerTest.php`: 37 passing tests, 197 assertions verifying all billing renewal schedules and plans with calibrated commercial pricing.
+  - `PlanCatalogueConsistencyTest.php`: 4 passing tests, 21 assertions verifying that all advertised plans, prices, limits, and slugs strictly match seeded packages.
+  - `ConsoleComponentUsageTest.php`: 5 passing tests, 6 assertions verifying table and console UI prop compliance with zero violations.
+  - Full billing suite: `tests/Feature/Billing/` (198 passing tests, 946 assertions, zero failures).
   - `EventPackageSeederTest.php`: 3 passing tests, 15 assertions.
-  - Frontend assets compiled with `npm run build` (2,613 modules in 23.01s with zero errors).
+  - Frontend assets compiled with `npm run build` (2,613 modules transformed, 0 errors).
   - Mandatory 3-agent self-review completed across Security, Logic & Financial Invariants, and Performance & Architecture.
+
 
