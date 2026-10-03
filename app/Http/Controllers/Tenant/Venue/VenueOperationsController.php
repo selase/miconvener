@@ -31,7 +31,19 @@ final class VenueOperationsController extends Controller
             abort(404, 'Tenant not found');
         }
 
-        $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
+        $shop = Shop::query()->where('tenant_id', $tenant->id)->first();
+        if (! $shop) {
+            $shop = Shop::create([
+                'tenant_id' => $tenant->id,
+                'name' => $tenant->name,
+                'slug' => \Illuminate\Support\Str::slug($tenant->name),
+                'email' => $tenant->email ?? '',
+                'phone' => $tenant->phone_number ?? '',
+                'address' => $tenant->address ?? '',
+                'city' => $tenant->city ?? 'Accra',
+                'region' => $tenant->state ?? 'Greater Accra',
+            ]);
+        }
 
         // Query all active and upcoming bookings hosted at this venue shop
         $bookings = VenueBooking::query()
