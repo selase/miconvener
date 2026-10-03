@@ -7,11 +7,17 @@ namespace Database\Seeders;
 use App\Models\Event;
 use App\Models\EventAbstract;
 use App\Models\EventAbstractAuthor;
+use App\Models\EventBlast;
 use App\Models\EventCertificate;
 use App\Models\EventDynamicForm;
 use App\Models\EventForumReply;
 use App\Models\EventForumThread;
 use App\Models\EventMaterial;
+use App\Models\EventNotificationRule;
+use App\Models\EventOperationPillar;
+use App\Models\EventOperationTask;
+use App\Models\EventParticipantGroup;
+use App\Models\EventParticipantGroupMember;
 use App\Models\EventPoll;
 use App\Models\EventPollOption;
 use App\Models\EventPollResponse;
@@ -21,12 +27,15 @@ use App\Models\EventSeatAssignment;
 use App\Models\EventSession;
 use App\Models\EventSessionAttendance;
 use App\Models\EventSpeaker;
+use App\Models\EventSponsor;
+use App\Models\EventSponsorDeliverable;
 use App\Models\EventTicketType;
 use App\Models\EventVenueRoom;
 use App\Models\PollDeck;
 use App\Models\Speaker;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -84,6 +93,13 @@ final class ProbeWorkspaceSeeder extends Seeder
         $this->attendance($event, $sessions, $registration);
         $this->certificate($event, $registration, $attendeeEmail);
         $this->abstractSubmission($event, $attendeeEmail);
+        $this->speakers($event, $sessions, $attendeeEmail);
+        $this->groups($event);
+        $this->sponsors($event, $attendeeEmail);
+        $this->announcements($event);
+        $this->automations($event);
+        $this->planning($event);
+        $this->crowdInTheRoom($event, $sessions);
 
         $this->command->info("Probe workspace ready: {$tenant->slug} / {$event->slug}");
         $this->command->info("Open https://miconvener.com/my as {$attendeeEmail}");
@@ -279,6 +295,317 @@ final class ProbeWorkspaceSeeder extends Seeder
     }
 
     /**
+     * A speaker for every session, with an address each -- a speaker without
+     * one cannot reach their own view of the event. The addresses are
+     * sub-addresses of the demo mailbox, like the crowd's.
+     *
+     * @param  array<string, EventSession>  $sessions
+     */
+    private function speakers(Event $event, array $sessions, string $attendeeEmail): void
+    {
+        [$local, $domain] = explode('@', $attendeeEmail) + [1 => 'example.com'];
+
+        $plan = [
+            ['Dr Ama Serwaa', 'Head of Digital Health', 'Ghana Health Service', 'running', 'serwaa',
+                'Leads clinical systems that have to run on the connection people actually have. Previously led EMR roll-outs across twelve districts.'],
+            ['Dr Kwabena Owusu-Ansah', 'Director of Claims Management', 'National Health Insurance Authority', 'workshop', 'owusu-ansah',
+                'Oversees e-claims adoption across accredited facilities and the rules that decide whether a claim is paid first time.'],
+            ['Prof. Nana Aba Appiah', 'Dean, School of Public Health', 'University of Ghana', 'opening', 'appiah',
+                "Researches health information systems in West Africa and advises on Ghana's digital health strategy."],
+            ['Esi Lamptey', 'Founder & CEO', 'CareLink Health', 'closing', 'lamptey',
+                'Builds offline-first patient record tools used in more than 40 clinics in the Volta and Oti regions.'],
+        ];
+
+        foreach ($plan as $order => [$name, $title, $organisation, $session, $handle, $bio]) {
+            /** @var Speaker $speaker */
+            $speaker = Speaker::query()->updateOrCreate(
+                ['tenant_id' => $event->tenant_id, 'name' => $name],
+                [
+                    'title' => $title,
+                    'organization' => $organisation,
+                    'bio' => $bio,
+                    'email' => "{$local}+speaker-{$handle}@{$domain}",
+                ]
+            );
+
+            EventSpeaker::query()->updateOrCreate(
+                ['event_id' => $event->id, 'speaker_id' => $speaker->id],
+                ['tenant_id' => $event->tenant_id]
+            );
+
+            if (! $sessions[$session]->speakers()->whereKey($speaker->id)->exists()) {
+                $sessions[$session]->speakers()->attach($speaker->id, [
+                    'id' => (string) Str::uuid(),
+                    'role' => $order === 2 ? 'moderator' : 'speaker',
+                    'sort_order' => 0,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Hand-picked groups, so an organiser can show messaging or badging one
+     * slice of the room rather than everyone.
+     */
+    private function groups(Event $event): void
+    {
+        $crowd = $this->crowdRegistrations($event)->values();
+
+        $plan = [
+            ['Clinicians', 'Doctors, nurses and midwives attending for CPD.', '#0EA5E9', 'stethoscope', 0],
+            ['Health administrators', 'Hospital, district and pharmacy managers.', '#8B5CF6', 'briefcase', 1],
+            ['Students & early career', 'Students and professionals in their first three years.', '#F59E0B', 'graduation-cap', 2],
+            ['Partners & exhibitors', 'Sponsor and exhibitor staff on site.', '#10B981', 'handshake', 3],
+        ];
+
+        foreach ($plan as [$name, $description, $color, $icon, $bucket]) {
+            /** @var EventParticipantGroup $group */
+            $group = EventParticipantGroup::query()->updateOrCreate(
+                ['event_id' => $event->id, 'slug' => Str::slug($name)],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'name' => $name,
+                    'description' => $description,
+                    'color' => $color,
+                    'icon' => $icon,
+                    'type' => EventParticipantGroup::TYPE_MANUAL,
+                    'criteria' => null,
+                ]
+            );
+
+            // Partners are a small group; the other three split the rest.
+            $members = $crowd->filter(fn (EventRegistration $registration, int $index): bool => $bucket === 3
+                ? $index % 12 === 11
+                : $index % 12 !== 11 && $index % 3 === $bucket);
+
+            foreach ($members as $registration) {
+                EventParticipantGroupMember::query()->updateOrCreate(
+                    ['group_id' => $group->id, 'registration_id' => $registration->id],
+                    ['tenant_id' => $event->tenant_id, 'event_id' => $event->id, 'is_manual' => true, 'matched_at' => now()->subDays(3)]
+                );
+            }
+
+            $group->update(['member_count' => EventParticipantGroupMember::query()->where('group_id', $group->id)->count()]);
+        }
+    }
+
+    /**
+     * Fictional companies on purpose: a demo shown to strangers must not imply
+     * a real brand sponsors anything. Amounts are what each package is worth,
+     * in pesewas; they are not payments and never reach finance.
+     */
+    private function sponsors(Event $event, string $attendeeEmail): void
+    {
+        [$local, $domain] = explode('@', $attendeeEmail) + [1 => 'example.com'];
+
+        $plan = [
+            ['Volta MedTech', EventSponsor::TIER_HEADLINE, 'Booth 1 · Main foyer', 'Akua Boateng', 5_000_000,
+                ['Logo on the hero banner and badges' => true, 'Five-minute welcome in the opening plenary' => true, 'Booth fitted with power and screen' => false]],
+            ['Ashanti Pharma Group', EventSponsor::TIER_SUPPORTING, 'Booth 4', 'Kojo Adjei', 2_000_000,
+                ['Logo on the programme' => true, 'Branded lunch tables' => false]],
+            ['Savannah Data Labs', EventSponsor::TIER_SUPPORTING, 'Booth 5', 'Fatima Seidu', 2_000_000,
+                ['Logo on the programme' => true, 'Sponsored Wi-Fi network name' => true]],
+            ['Coastal Health Insurance', EventSponsor::TIER_PARTNER, 'Table 9', 'Ekow Hammond', 800_000,
+                ['Leaflet in the delegate pack' => false]],
+        ];
+
+        foreach ($plan as $order => [$name, $tier, $booth, $contact, $amount, $deliverables]) {
+            /** @var EventSponsor $sponsor */
+            $sponsor = EventSponsor::query()->updateOrCreate(
+                ['event_id' => $event->id, 'name' => $name],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'tier' => $tier,
+                    'booth' => $booth,
+                    'contact_name' => $contact,
+                    'contact_email' => sprintf('%s+sponsor-%s@%s', $local, Str::slug($name), $domain),
+                    'amount' => $amount,
+                    'currency' => 'GHS',
+                    'sort_order' => $order,
+                ]
+            );
+
+            foreach ($deliverables as $description => $done) {
+                EventSponsorDeliverable::query()->updateOrCreate(
+                    ['sponsor_id' => $sponsor->id, 'description' => $description],
+                    ['tenant_id' => $event->tenant_id, 'is_done' => $done]
+                );
+            }
+        }
+    }
+
+    /**
+     * A history of messages already sent. Only sent ones: a scheduled blast
+     * would be dispatched for real, to every delegate, on every re-seed.
+     */
+    private function announcements(Event $event): void
+    {
+        $recipients = EventRegistration::query()->where('event_id', $event->id)->count();
+
+        $plan = [
+            ['Your ticket and how to get to the AICC', 'Your ticket is attached. Doors open at 7:30am; the east car park is reserved for delegates. We look forward to seeing you.', now()->subDays(2)],
+            ['Programme update: NHIA workshop moved to Room B', 'The e-claims workshop is now in Room B on the first floor, same time. Places are limited to 30, first come first served.', now()->subDay()],
+            ['Welcome to the summit', 'Wi-Fi: GDHS-Delegates. Live polls and Q&A are in your ticket under Live poll. Lunch is served in the main foyer from 12:30.', now()->subHours(2)],
+        ];
+
+        foreach ($plan as [$subject, $body, $sentAt]) {
+            EventBlast::query()->updateOrCreate(
+                ['event_id' => $event->id, 'subject' => $subject],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'body' => $body,
+                    'audience' => 'all',
+                    'audience_label' => 'All registrants',
+                    'recipients_count' => $recipients,
+                    'status' => EventBlast::STATUS_SENT,
+                    'scheduled_at' => null,
+                    'sent_at' => $sentAt,
+                ]
+            );
+        }
+    }
+
+    /**
+     * The welcome on registration is live, so a real purchase during a demo
+     * sends the buyer a real email. The timed ones are paused: they run on a
+     * schedule against the event's times, which every re-seed moves, and would
+     * mail the whole crowd on each run.
+     */
+    private function automations(Event $event): void
+    {
+        $plan = [
+            ['Welcome and ticket', EventNotificationRule::TRIGGER_ON_REGISTRATION, 'after', 0, 'minutes', true,
+                'Your place at {{event_name}} is confirmed', 'Thank you for registering for {{event_name}}. Your ticket and QR code are in your MiConvener portal.'],
+            ['Reminder the day before', EventNotificationRule::TRIGGER_SCHEDULED_OFFSET, 'before', 1, 'days', false,
+                '{{event_name}} is tomorrow', 'Doors open at 7:30am at the Accra International Conference Centre. Bring your ticket QR code.'],
+            ['Thank you and certificate', EventNotificationRule::TRIGGER_SCHEDULED_OFFSET, 'after', 2, 'hours', false,
+                'Thank you for joining {{event_name}}', 'Your CPD certificate is now in your MiConvener portal, along with the session slides.'],
+        ];
+
+        foreach ($plan as [$name, $trigger, $direction, $amount, $unit, $active, $subject, $body]) {
+            EventNotificationRule::query()->updateOrCreate(
+                ['event_id' => $event->id, 'name' => $name],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'target_role' => EventNotificationRule::ROLE_ATTENDEE,
+                    'target_audience' => 'all',
+                    'trigger_type' => $trigger,
+                    'offset_direction' => $direction,
+                    'offset_amount' => $amount,
+                    'offset_unit' => $unit,
+                    'channels' => ['email'],
+                    'subject' => $subject,
+                    'body_template' => $body,
+                    'is_active' => $active,
+                ]
+            );
+        }
+    }
+
+    /**
+     * The organiser's run sheet: the app's own default workstreams, with a mix
+     * of finished, moving and blocked tasks. Budgets are in pesewas.
+     */
+    private function planning(Event $event): void
+    {
+        EventOperationPillar::seedDefaultsForEvent($event);
+
+        $pillars = EventOperationPillar::query()->where('event_id', $event->id)->orderBy('sort_order')->pluck('id')->values();
+
+        $plan = [
+            ['Confirm all four speakers and collect slides', 0, 'Abena Owusu', -10, EventOperationTask::PRIORITY_HIGH, EventOperationTask::STATUS_DONE, null, null],
+            ['Print the programme and delegate packs', 0, 'Kofi Mensah', -2, EventOperationTask::PRIORITY_MEDIUM, EventOperationTask::STATUS_DONE, 450_000, 418_000],
+            ['Test the registration desk scanners on site', 1, 'Selorm Dogbe', -1, EventOperationTask::PRIORITY_HIGH, EventOperationTask::STATUS_DONE, null, null],
+            ['Venue Wi-Fi capacity for 400 devices', 1, 'Nii Quaye', 0, EventOperationTask::PRIORITY_URGENT, EventOperationTask::STATUS_IN_PROGRESS, 600_000, null],
+            ['Catering: lunch and two coffee breaks', 2, 'Adwoa Asante', -5, EventOperationTask::PRIORITY_HIGH, EventOperationTask::STATUS_DONE, 3_200_000, 3_050_000],
+            ['Settle AV hire invoice', 2, 'Kwesi Ofori', 3, EventOperationTask::PRIORITY_MEDIUM, EventOperationTask::STATUS_BLOCKED, 1_500_000, null],
+            ['Fit out the headline sponsor booth', 3, 'Akua Boateng', 0, EventOperationTask::PRIORITY_MEDIUM, EventOperationTask::STATUS_IN_PROGRESS, 250_000, 120_000],
+            ['Post-event sponsor report', 3, 'Akua Boateng', 7, EventOperationTask::PRIORITY_LOW, EventOperationTask::STATUS_NOT_STARTED, null, null],
+        ];
+
+        foreach ($plan as [$title, $pillarIndex, $owner, $dueInDays, $priority, $status, $estimated, $actual]) {
+            EventOperationTask::query()->updateOrCreate(
+                ['event_id' => $event->id, 'title' => $title],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'pillar_id' => $pillars->isEmpty() ? null : $pillars->get($pillarIndex % $pillars->count()),
+                    'owner_name' => $owner,
+                    'due_date' => now()->addDays($dueInDays)->toDateString(),
+                    'priority' => $priority,
+                    'status' => $status,
+                    'estimated_budget' => $estimated ?? 0,
+                    'actual_budget' => $actual ?? 0,
+                    'completed_at' => $status === EventOperationTask::STATUS_DONE ? now()->subDays(max(1, -$dueInDays)) : null,
+                ]
+            );
+        }
+    }
+
+    /**
+     * Seats for part of the crowd, and session attendance for everyone who is
+     * here, so the venue map and room headcount show a room filling up rather
+     * than one occupied seat in an empty hall.
+     *
+     * @param  array<string, EventSession>  $sessions
+     */
+    private function crowdInTheRoom(Event $event, array $sessions): void
+    {
+        $auditorium = EventVenueRoom::query()->where('event_id', $event->id)->where('name', 'Main Auditorium')->first();
+
+        EventVenueRoom::query()->updateOrCreate(
+            ['event_id' => $event->id, 'name' => 'Room B'],
+            ['tenant_id' => $event->tenant_id, 'rows' => 5, 'seats_per_row' => 6, 'sort_order' => 1]
+        );
+
+        foreach ($this->crowdRegistrations($event)->values() as $index => $registration) {
+            if ($auditorium !== null && $index < 48) {
+                // Rows A-H from the front, even seat numbers, never C-14:
+                // that is the demo attendee's own seat.
+                $row = chr(ord('A') + intdiv($index, 6));
+                $number = 4 + ($index % 6) * 2;
+                $label = "{$row}-{$number}" === 'C-14' ? "{$row}-15" : "{$row}-{$number}";
+
+                EventSeatAssignment::query()->updateOrCreate(
+                    ['event_id' => $event->id, 'registration_id' => $registration->id],
+                    ['tenant_id' => $event->tenant_id, 'room_id' => $auditorium->id, 'seat_label' => $label]
+                );
+            }
+
+            if (! $registration->isPresent()) {
+                continue;
+            }
+
+            foreach (['opening' => true, 'running' => $index % 3 !== 0] as $key => $attended) {
+                if (! $attended) {
+                    continue;
+                }
+
+                EventSessionAttendance::query()->updateOrCreate(
+                    ['session_id' => $sessions[$key]->id, 'registration_id' => $registration->id],
+                    [
+                        'tenant_id' => $event->tenant_id,
+                        'event_id' => $event->id,
+                        'checked_in_at' => $sessions[$key]->starts_at->copy()->addMinutes($index % 15),
+                        'checked_out_at' => $key === 'opening' ? $sessions[$key]->ends_at : null,
+                    ]
+                );
+            }
+        }
+    }
+
+    /**
+     * @return Collection<int, EventRegistration>
+     */
+    private function crowdRegistrations(Event $event): Collection
+    {
+        return EventRegistration::query()
+            ->where('event_id', $event->id)
+            ->where('email', 'like', '%+ghs-%')
+            ->orderBy('email')
+            ->get();
+    }
+
+    /**
      * A day with something already finished, something happening now, and
      * something still to come, so My day has all three states to render.
      *
@@ -287,22 +614,43 @@ final class ProbeWorkspaceSeeder extends Seeder
     private function sessions(Event $event): array
     {
         $plan = [
-            'opening' => ['Opening plenary: what the portal is for', now()->subHours(2), now()->subHour(), 'Main Auditorium', 'Plenary'],
-            'running' => ['Designing for attendees who arrive on mobile data', now()->subMinutes(20), now()->addMinutes(40), 'Main Auditorium', 'Product'],
-            'workshop' => ['Workshop: running a hybrid conference on one laptop', now()->addHours(2), now()->addHours(3), 'Room B', 'Workshop'],
-            'closing' => ['Closing remarks and certificates', now()->addHours(5), now()->addHours(6), 'Main Auditorium', 'Plenary'],
+            'opening' => ["Opening plenary: Ghana's digital health strategy to 2030", now()->subHours(2), now()->subHour(), 'Main Auditorium', 'Plenary',
+                'Where the national strategy stands, what changes for facilities this year, and how interoperability and NHIA e-claims fit together.'],
+            'running' => ['Designing for patients who arrive on mobile data', now()->subMinutes(20), now()->addMinutes(40), 'Main Auditorium', 'Technology',
+                'Most patients and many health workers reach digital services on a prepaid 3G bundle. What that means for how health systems should be built.'],
+            'workshop' => ['Workshop: getting NHIA e-claims right first time', now()->addHours(2), now()->addHours(3), 'Room B', 'Workshop',
+                'Hands-on: the claim fields that cause most rejections, and how to catch them before submission. Limited to 30 places.'],
+            'closing' => ['Closing panel and CPD certificates', now()->addHours(5), now()->addHours(6), 'Main Auditorium', 'Plenary',
+                'What we heard today and what to take back to your facility, followed by the presentation of CPD certificates.'],
         ];
+
+        // Earlier versions of this fixture used placeholder titles. Renaming
+        // them in place keeps the attendance, forum threads and agenda entries
+        // attached to them, where creating new sessions would orphan all three.
+        $legacy = [
+            'opening' => 'Opening plenary: what the portal is for',
+            'running' => 'Designing for attendees who arrive on mobile data',
+            'workshop' => 'Workshop: running a hybrid conference on one laptop',
+            'closing' => 'Closing remarks and certificates',
+        ];
+
+        foreach ($legacy as $key => $oldTitle) {
+            $newTitle = $plan[$key][0];
+            if (! EventSession::query()->where('event_id', $event->id)->where('title', $newTitle)->exists()) {
+                EventSession::query()->where('event_id', $event->id)->where('title', $oldTitle)->update(['title' => $newTitle]);
+            }
+        }
 
         $sessions = [];
         $order = 0;
 
-        foreach ($plan as $key => [$title, $startsAt, $endsAt, $location, $track]) {
+        foreach ($plan as $key => [$title, $startsAt, $endsAt, $location, $track, $description]) {
             /** @var EventSession $session */
             $session = EventSession::query()->updateOrCreate(
                 ['event_id' => $event->id, 'title' => $title],
                 [
                     'tenant_id' => $event->tenant_id,
-                    'description' => 'Seeded by ProbeWorkspaceSeeder so the workspace has a real programme to show.',
+                    'description' => $description,
                     'starts_at' => $startsAt,
                     'ends_at' => $endsAt,
                     'location' => $location,
