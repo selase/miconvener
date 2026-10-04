@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Billing\TenantAddonService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use InvalidArgumentException;
 use Mockery;
 use Tests\TestCase;
 
@@ -373,6 +374,46 @@ final class ModularAddonsTest extends TestCase
             ], ['HTTP_HOST' => $host]);
 
         $response->assertSessionHasErrors('addon_key');
+    }
+
+    public function test_checkout_accepts_a_catalog_addon_key(): void
+    {
+        [$tenant, $user, $host] = $this->createTenantOnPackage('starter', 'real-key-test');
+        config(['services.payment.dev_bypass' => false]);
+
+        $gateway = Mockery::mock(PaymentGateway::class);
+        $gateway->shouldReceive('createCustomer')->andReturn('CUS_TEST123');
+        $gateway->shouldReceive('createOneTimeCheckoutSession')->once()->andReturn('https://paystack.com/checkout/real-key');
+        $this->swap(PaymentGateway::class, $gateway);
+
+        // Validation once compared the key against the catalog's list
+        // positions (0, 1, 2...), so every real purchase was refused.
+        $this->actingAs($user)
+            ->post("http://{$host}/billing/addons/checkout", [
+                'addon_key' => 'team_seat',
+            ], ['HTTP_HOST' => $host])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('https://paystack.com/checkout/real-key');
+    }
+
+    public function test_addons_not_yet_delivered_cannot_be_bought(): void
+    {
+        [$tenant, $user, $host] = $this->createTenantOnPackage('starter', 'unavailable-addon-test');
+
+        foreach (['usher_pack', 'sms_500', 'sms_1500', 'sms_5000'] as $key) {
+            $this->actingAs($user)
+                ->post("http://{$host}/billing/addons/checkout", [
+                    'addon_key' => $key,
+                ], ['HTTP_HOST' => $host])
+                ->assertSessionHasErrors('addon_key');
+        }
+
+        expect(fn () => app(TenantAddonService::class)->initializeCheckout($tenant, $user, 'sms_500'))
+            ->toThrow(InvalidArgumentException::class);
+
+        $listed = collect(app(TenantAddonService::class)->getCatalog())->keyBy('key');
+        expect($listed['sms_500']['available'])->toBeFalse()
+            ->and($listed['team_seat']['available'])->toBeTrue();
     }
 
     private function createTenantOnPackage(string $slug, string $tenantSlug): array

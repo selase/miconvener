@@ -85,7 +85,7 @@ final class TenantAddonController extends Controller
         $tenant = $tenantContext->getTenant();
 
         $validated = $request->validate([
-            'addon_key' => ['required', 'string', \Illuminate\Validation\Rule::in(array_keys($this->addonService->getCatalog()))],
+            'addon_key' => ['required', 'string', \Illuminate\Validation\Rule::in($this->addonService->purchasableKeys())],
             'multiplier' => ['nullable', 'integer', 'min:1', 'max:50'],
             'event_id' => ['nullable', 'uuid', \Illuminate\Validation\Rule::exists('events', 'id')->where('tenant_id', $tenant->id)],
         ]);

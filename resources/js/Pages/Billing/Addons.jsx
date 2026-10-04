@@ -282,41 +282,54 @@ export default function Addons({
                                     </div>
 
                                     <div className="mt-6 pt-4 border-t border-border flex items-center gap-3">
-                                        {(item.category === 'team' ||
-                                            item.category === 'operations') && (
-                                            <div className="flex items-center gap-1.5">
-                                                <label className="text-xs text-ink-secondary">
-                                                    Qty:
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    max="50"
-                                                    value={quantities[item.key] || 1}
-                                                    onChange={(e) =>
-                                                        handleQuantityChange(
-                                                            item.key,
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    className="w-14 rounded-md border-border bg-surface px-2 py-1 text-xs text-ink shadow-xs text-center"
-                                                />
-                                            </div>
-                                        )}
-
-                                        <Button
-                                            variant="default"
-                                            className="w-full flex justify-center items-center gap-1.5 text-xs"
-                                            disabled={isSubmitting}
-                                            onClick={() => handleCheckout(item.key)}
-                                        >
-                                            {isSubmitting ? (
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            ) : (
-                                                <Plus className="h-3.5 w-3.5" />
+                                        {item.available &&
+                                            (item.category === 'team' ||
+                                                item.category === 'operations') && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <label className="text-xs text-ink-secondary">
+                                                        Qty:
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="50"
+                                                        value={quantities[item.key] || 1}
+                                                        onChange={(e) =>
+                                                            handleQuantityChange(
+                                                                item.key,
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="w-14 rounded-md border-border bg-surface px-2 py-1 text-xs text-ink shadow-xs text-center"
+                                                    />
+                                                </div>
                                             )}
-                                            {isSubmitting ? 'Redirecting...' : 'Add to Workspace'}
-                                        </Button>
+
+                                        {item.available ? (
+                                            <Button
+                                                variant="default"
+                                                className="w-full flex justify-center items-center gap-1.5 text-xs"
+                                                disabled={isSubmitting}
+                                                onClick={() => handleCheckout(item.key)}
+                                            >
+                                                {isSubmitting ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Plus className="h-3.5 w-3.5" />
+                                                )}
+                                                {isSubmitting
+                                                    ? 'Redirecting...'
+                                                    : 'Add to Workspace'}
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                variant="default"
+                                                className="w-full flex justify-center items-center text-xs"
+                                                disabled
+                                            >
+                                                Coming soon
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -356,12 +369,16 @@ export default function Addons({
                                     activeAddons.map((addon) => (
                                         <Tr key={addon.id}>
                                             <Td>
-                                                <span className="font-medium text-ink">{addon.name}</span>
+                                                <span className="font-medium text-ink">
+                                                    {addon.name}
+                                                </span>
                                             </Td>
                                             <Td>{addon.quantity}</Td>
                                             <Td>{addon.total_price}</Td>
                                             <Td>
-                                                <span className="capitalize">{addon.billing_interval.replace('_', ' ')}</span>
+                                                <span className="capitalize">
+                                                    {addon.billing_interval.replace('_', ' ')}
+                                                </span>
                                             </Td>
                                             <Td>
                                                 <StatusPill status={addon.status} />

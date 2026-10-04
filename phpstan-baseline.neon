@@ -5149,12 +5149,6 @@ parameters:
 			path: app/Services/Billing/TenantAddonService.php
 
 		-
-			rawMessage: 'PHPDoc tag @var for constant App\Services\Billing\TenantAddonService::CATALOG with type array<string, array{name: string, description: string, addon_type: string, unit_price: int, billing_interval: string, quantity: int, category: string}> is incompatible with value array{team_seat: array{key: ''team_seat'', name: ''Additional Team…'', description: ''Full workspace…'', addon_type: ''team_seat'', unit_price: 7500, billing_interval: ''monthly'', quantity: 1, category: ''team''}, usher_pack: array{key: ''usher_pack'', name: ''Event Day Usher /…'', description: ''Dedicated check-in…'', addon_type: ''usher_pack'', unit_price: 6000, billing_interval: ''monthly'', quantity: 1, category: ''operations''}, live_polling_monthly: array{key: ''live_polling_monthly'', name: ''Live Polling &…'', description: ''Unlock real-time…'', addon_type: ''live_polling'', unit_price: 8500, billing_interval: ''monthly'', quantity: 1, category: ''engagement''}, live_polling_event_pass: array{key: ''live_polling_event…'', name: ''Live Polling Single…'', description: ''Unlock live polling…'', addon_type: ''live_polling'', unit_price: 5000, billing_interval: ''event_pass'', quantity: 1, category: ''engagement''}, sms_500: array{key: ''sms_500'', name: ''Prepaid SMS Pack …'', description: ''Send SMS…'', addon_type: ''sms_pack'', unit_price: 3500, billing_interval: ''one_off'', quantity: 500, category: ''messaging''}, sms_1500: array{key: ''sms_1500'', name: ''Prepaid SMS Pack (1…'', description: ''High-volume SMS…'', addon_type: ''sms_pack'', unit_price: 9500, billing_interval: ''one_off'', quantity: 1500, category: ''messaging''}, sms_5000: array{key: ''sms_5000'', name: ''Prepaid SMS Pack (5…'', description: ''Large conference…'', addon_type: ''sms_pack'', unit_price: 29000, billing_interval: ''one_off'', quantity: 5000, category: ''messaging''}, email_5000: array{key: ''email_5000'', name: ''Email Blast Pack (5…'', description: ''Additional…'', addon_type: ''email_pack'', unit_price: 2500, billing_interval: ''one_off'', quantity: 5000, category: ''messaging''}, ...}.'
-			identifier: classConstant.phpDocType
-			count: 1
-			path: app/Services/Billing/TenantAddonService.php
-
-		-
 			rawMessage: Left side of && is always true.
 			identifier: booleanAnd.leftAlwaysTrue
 			count: 1

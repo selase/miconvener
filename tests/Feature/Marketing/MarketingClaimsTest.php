@@ -51,12 +51,7 @@ test('every internal link in the homepage navigation, calls to action and footer
         ...array_merge(...array_map(fn (array $column): array => array_column($column, 'href'), array_values($config['footer']['columns']))),
     ];
 
-    // Terms and Privacy are linked but not yet written. They are legal
-    // documents, so they are not generated here; the todo test below keeps the
-    // gap visible on every run until they exist.
-    $unwritten = ['/terms', '/privacy'];
-
-    foreach (array_diff(array_unique($links), $unwritten) as $href) {
+    foreach (array_unique($links) as $href) {
         // A bare '#' goes nowhere; it was the About link's target.
         expect($href)->not->toBe('#');
 
@@ -67,8 +62,19 @@ test('every internal link in the homepage navigation, calls to action and footer
     }
 });
 
-test('the Terms and Privacy pages exist, since every form says people agree to them')
-    ->todo('Needs the documents themselves, reviewed by the business, not generated copy.');
+test('the Terms and Privacy pages exist, since every form says people agree to them', function (): void {
+    $this->get('/terms')->assertOk()->assertSee('Terms of Service')->assertSee('Paystack');
+    $this->get('/privacy')->assertOk()->assertSee('Privacy Policy')->assertSee('Act 843');
+
+    // The enterprise form's consent line once pointed at '#'.
+    $this->get('/product-enterprise')->assertSee(route('privacy'), false);
+});
+
+test('no plan advertises SMS or API access, neither of which is delivered yet', function (): void {
+    $features = collect(config('product-page.plans'))->pluck('features')->flatten();
+
+    expect($features->filter(fn (string $line): bool => str_contains($line, 'SMS') || str_contains($line, 'API')))->toBeEmpty();
+});
 
 test('the template-era address sends people to the real homepage', function (): void {
     $this->get('/product-template')->assertStatus(301)->assertRedirect('/');

@@ -70,7 +70,6 @@ return [
                 '500 registrations per month',
                 '3 team seats',
                 '3,000 email credits per month',
-                '150 SMS credits per month',
                 'Speaker material downloads',
                 'CSV settlement export',
                 '3.5% commission on ticket sales (GHS 25 cap)',
@@ -94,7 +93,6 @@ return [
                 '3,000 registrations per month',
                 '6 team seats',
                 '15,000 email credits per month',
-                '500 SMS credits per month',
                 'Live Polling & Audience Q&A included',
                 'Your own domain',
                 'No platform branding & white label',
@@ -117,9 +115,8 @@ return [
             'features' => [
                 'Everything in Growth',
                 'Unlimited events, registrations and seats',
-                'Unlimited email and SMS credits',
+                'Unlimited email credits',
                 'White label portals',
-                'API access',
                 'Negotiated commission',
             ],
             'cta' => [

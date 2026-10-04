@@ -20,7 +20,11 @@ use InvalidArgumentException;
 final class TenantAddonService
 {
     /**
-     * @var array<string, array{name: string, description: string, addon_type: string, unit_price: int, billing_interval: string, quantity: int, category: string}>
+     * @var array<string, array{key: string, name: string, description: string, addon_type: string, unit_price: int, billing_interval: string, quantity: int, category: string, available: bool}>
+     *
+     * An entry marked unavailable stays listed, so the offer is visible, but it
+     * cannot be bought until what it sells is delivered: SMS has no sending
+     * gateway yet, and nothing issues a scanner-only pass.
      */
     public const CATALOG = [
         'team_seat' => [
@@ -32,6 +36,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1,
             'category' => 'team',
+            'available' => true,
         ],
         'usher_pack' => [
             'key' => 'usher_pack',
@@ -42,6 +47,8 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1, // 1 pack = 5 passes
             'category' => 'operations',
+            // Nothing grants a scanner-only pass yet: every door scanner is a full team seat.
+            'available' => false,
         ],
         'live_polling_monthly' => [
             'key' => 'live_polling_monthly',
@@ -52,6 +59,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1,
             'category' => 'engagement',
+            'available' => true,
         ],
         'live_polling_event_pass' => [
             'key' => 'live_polling_event_pass',
@@ -62,6 +70,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_EVENT_PASS,
             'quantity' => 1,
             'category' => 'engagement',
+            'available' => true,
         ],
         'sms_500' => [
             'key' => 'sms_500',
@@ -72,6 +81,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 500,
             'category' => 'messaging',
+            'available' => false,
         ],
         'sms_1500' => [
             'key' => 'sms_1500',
@@ -82,6 +92,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 1500,
             'category' => 'messaging',
+            'available' => false,
         ],
         'sms_5000' => [
             'key' => 'sms_5000',
@@ -92,6 +103,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 5000,
             'category' => 'messaging',
+            'available' => false,
         ],
         'email_5000' => [
             'key' => 'email_5000',
@@ -102,6 +114,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 5000,
             'category' => 'messaging',
+            'available' => true,
         ],
         'email_25000' => [
             'key' => 'email_25000',
@@ -112,10 +125,21 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 25000,
             'category' => 'messaging',
+            'available' => true,
         ],
     ];
 
     public function __construct(private readonly PaymentGateway $gateway) {}
+
+    /**
+     * The catalog keys that can be bought today.
+     *
+     * @return list<string>
+     */
+    public function purchasableKeys(): array
+    {
+        return array_keys(array_filter(self::CATALOG, fn (array $item): bool => $item['available']));
+    }
 
     /**
      * @return array<int, array<string, mixed>>
@@ -137,6 +161,10 @@ final class TenantAddonService
     {
         if (! isset(self::CATALOG[$addonKey])) {
             throw new InvalidArgumentException("Unknown add-on product [{$addonKey}].");
+        }
+
+        if (! in_array($addonKey, $this->purchasableKeys(), true)) {
+            throw new InvalidArgumentException("The add-on [{$addonKey}] is not on sale yet.");
         }
 
         $config = self::CATALOG[$addonKey];

@@ -51,6 +51,8 @@ Route::get('/sample-product', fn (): Factory|View => view('sample-product-page')
 // redirect so old links and search results land on the real homepage.
 Route::permanentRedirect('/product-template', '/')->name('product.template');
 Route::get('/product-enterprise', fn (): Factory|View => view('product.enterprise'))->name('product.enterprise');
+Route::get('/terms', fn (): Factory|View => view('product.terms'))->name('terms');
+Route::get('/privacy', fn (): Factory|View => view('product.privacy'))->name('privacy');
 Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadController::class, 'store'])->name('product.enterprise.lead');
 Route::get('/product-docs/{section?}', function (?string $section = 'start-guide') {
     return view('product.docs', ['section' => $section]);

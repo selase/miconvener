@@ -114,7 +114,7 @@
 
                             <p class="text-center text-xs text-slate-400 mt-4">
                                 By clicking send, you agree to our
-                                <a href="#" class="text-slate-600 underline hover:text-slate-900 transition">Privacy Policy</a>.
+                                <a href="{{ route('privacy') }}" class="text-slate-600 underline hover:text-slate-900 transition">Privacy Policy</a>.
                             </p>
                         </form>
                     </div>
