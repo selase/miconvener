@@ -61,6 +61,13 @@ Route::get('/staff-worker.js', fn () => response()->file(resource_path('js/worke
     'Cache-Control' => 'no-cache, no-store, must-revalidate',
     'Service-Worker-Allowed' => '/staff/',
 ]))->name('staff.worker');
+
+// The attendee portal's offline worker, served uncached for the same reason.
+Route::get('/attendee-worker.js', fn () => response()->file(resource_path('js/workers/attendee-sw.js'), [
+    'Content-Type' => 'application/javascript; charset=utf-8',
+    'Cache-Control' => 'no-cache, no-store, must-revalidate',
+    'Service-Worker-Allowed' => '/my/',
+]))->name('attendee.worker');
 Route::get('/privacy', fn (): Factory|View => view('product.privacy'))->name('privacy');
 Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadController::class, 'store'])->name('product.enterprise.lead');
 Route::get('/product-docs/{section?}', function (?string $section = 'start-guide') {

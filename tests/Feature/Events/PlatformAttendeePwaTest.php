@@ -39,11 +39,16 @@ test('manifest endpoint returns valid PWA web app manifest scoped to /my/', func
         ->and(count($data['icons']))->toBeGreaterThanOrEqual(2);
 });
 
-test('service worker file exists and contains scoped attendee cache logic', function (): void {
-    $swPath = public_path('attendee-sw.js');
-    expect(file_exists($swPath))->toBeTrue();
+test('service worker is served uncached and contains scoped attendee cache logic', function (): void {
+    $response = $this->get('/attendee-worker.js')->assertOk();
 
-    $content = file_get_contents($swPath);
+    // Served by the app, never from the edge cache, so a fixed worker reaches
+    // attendees' phones on their next visit.
+    expect($response->headers->get('Content-Type'))->toContain('javascript')
+        ->and($response->headers->get('Cache-Control'))->toContain('no-cache')
+        ->and($response->headers->get('Service-Worker-Allowed'))->toBe('/my/');
+
+    $content = file_get_contents($response->baseResponse->getFile()->getPathname());
     expect($content)
         ->toContain('miconvener-attendee-')
         ->toContain('/my/manifest.json')

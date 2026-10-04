@@ -6,7 +6,7 @@ export function registerAttendeeServiceWorker() {
     ) {
         window.addEventListener('load', () => {
             navigator.serviceWorker
-                .register('/attendee-sw.js', { scope: '/my/' })
+                .register('/attendee-worker.js', { scope: '/my/' })
                 .catch(() => {
                     // Service worker registration failures fail safely without disrupting user experience
                 });
