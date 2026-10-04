@@ -253,19 +253,6 @@ final class ProbeWorkspaceSeeder extends Seeder
     }
 
     /**
-     * A room's worth of delegates, so the guest list, check-in, badges and
-     * headcount look like an event rather than a test.
-     *
-     * Every one is complimentary: finance and payouts are computed from these
-     * rows, and inventing paid ones on a tenant that holds real charges would
-     * report money that was never taken. Their addresses are sub-addresses of
-     * the demo mailbox, so an announcement sent in a demo lands in an inbox the
-     * presenter owns instead of bouncing and damaging deliverability for every
-     * organiser on the platform.
-     *
-     * @param  array<string, EventTicketType>  $tickets
-     */
-    /**
      * The event-day crew: two gate ushers and a floor steward on staff links,
      * the crowd's check-ins credited to the gates, and attendee requests in
      * every state -- one waiting, one being handled, two done, one of them
@@ -309,29 +296,53 @@ final class ProbeWorkspaceSeeder extends Seeder
             ->get();
         $floor = $links['Floor – Efua'];
 
-        foreach ([
-            [$attendee, EventServiceRequest::TYPE_REFRESHMENT, EventServiceRequest::STATUS_OPEN, 'Still water, please', 4, null],
-            [$crowd[0], EventServiceRequest::TYPE_TECHNICAL, EventServiceRequest::STATUS_ACKNOWLEDGED, 'The microphone at our table is not working', 9, $floor],
-            [$crowd[1], EventServiceRequest::TYPE_MEDICAL, EventServiceRequest::STATUS_RESOLVED, 'Feeling faint, need to sit somewhere cool', 41, $floor],
-            [$crowd[2], EventServiceRequest::TYPE_ACCESSIBILITY, EventServiceRequest::STATUS_RESOLVED, 'Step-free way to the breakout room?', 63, $floor],
-        ] as [$registration, $type, $status, $note, $minutesAgo, $handler]) {
-            $request = EventServiceRequest::query()->updateOrCreate(
-                ['event_id' => $event->id, 'registration_id' => $registration->id, 'type' => $type],
-                [
-                    'tenant_id' => $event->tenant_id,
-                    'priority' => $type === EventServiceRequest::TYPE_MEDICAL ? EventServiceRequest::PRIORITY_URGENT : EventServiceRequest::PRIORITY_NORMAL,
-                    'status' => $status,
-                    'location' => 'Main Hall',
-                    'note' => $note,
-                    'assigned_staff_link_id' => $handler?->id,
-                    'acknowledged_at' => $handler ? now()->subMinutes($minutesAgo - 2) : null,
-                    'resolved_at' => $status === EventServiceRequest::STATUS_RESOLVED ? now()->subMinutes($minutesAgo - 12) : null,
-                ],
-            );
-            $request->forceFill(['created_at' => now()->subMinutes($minutesAgo)])->saveQuietly();
-        }
+        $this->helpRequest($event, $attendee, EventServiceRequest::TYPE_REFRESHMENT, 'Still water, please', 4);
+        $this->helpRequest($event, $crowd[0], EventServiceRequest::TYPE_TECHNICAL, 'The microphone at our table is not working', 9, $floor);
+        $this->helpRequest($event, $crowd[1], EventServiceRequest::TYPE_MEDICAL, 'Feeling faint, need to sit somewhere cool', 41, $floor, resolved: true);
+        $this->helpRequest($event, $crowd[2], EventServiceRequest::TYPE_ACCESSIBILITY, 'Step-free way to the breakout room?', 63, $floor, resolved: true);
     }
 
+    /**
+     * One attendee request: open when nobody has it, acknowledged once a
+     * steward has it, resolved when they are done.
+     */
+    private function helpRequest(Event $event, EventRegistration $registration, string $type, string $note, int $minutesAgo, ?EventStaffLink $handler = null, bool $resolved = false): void
+    {
+        $status = match (true) {
+            $resolved => EventServiceRequest::STATUS_RESOLVED,
+            $handler !== null => EventServiceRequest::STATUS_ACKNOWLEDGED,
+            default => EventServiceRequest::STATUS_OPEN,
+        };
+
+        $request = EventServiceRequest::query()->updateOrCreate(
+            ['event_id' => $event->id, 'registration_id' => $registration->id, 'type' => $type],
+            [
+                'tenant_id' => $event->tenant_id,
+                'priority' => $type === EventServiceRequest::TYPE_MEDICAL ? EventServiceRequest::PRIORITY_URGENT : EventServiceRequest::PRIORITY_NORMAL,
+                'status' => $status,
+                'location' => 'Main Hall',
+                'note' => $note,
+                'assigned_staff_link_id' => $handler?->id,
+                'acknowledged_at' => $handler !== null ? now()->subMinutes($minutesAgo - 2) : null,
+                'resolved_at' => $resolved ? now()->subMinutes($minutesAgo - 12) : null,
+            ],
+        );
+        $request->forceFill(['created_at' => now()->subMinutes($minutesAgo)])->saveQuietly();
+    }
+
+    /**
+     * A room's worth of delegates, so the guest list, check-in, badges and
+     * headcount look like an event rather than a test.
+     *
+     * Every one is complimentary: finance and payouts are computed from these
+     * rows, and inventing paid ones on a tenant that holds real charges would
+     * report money that was never taken. Their addresses are sub-addresses of
+     * the demo mailbox, so an announcement sent in a demo lands in an inbox the
+     * presenter owns instead of bouncing and damaging deliverability for every
+     * organiser on the platform.
+     *
+     * @param  array<string, EventTicketType>  $tickets
+     */
     private function crowd(Event $event, array $tickets, string $attendeeEmail): void
     {
         [$local, $domain] = explode('@', $attendeeEmail) + [1 => 'example.com'];
