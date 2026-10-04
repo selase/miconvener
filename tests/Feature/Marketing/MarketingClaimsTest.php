@@ -87,7 +87,7 @@ test('the commission cap each plan advertises is the cap billing applies', funct
 
         preg_match('/GHS (\d+) cap/', $advertised, $match);
 
-        // The page once promised a GHS 25 cap on Starter while billing charged GHS 20.
+        // The page and the seeded package must agree, or buyers are promised one cap and charged another.
         expect((int) $match[1] * 100)->toBe((int) $package->default_platform_fee_cap_amount, "{$plan['slug']} cap");
     }
 });

@@ -23,7 +23,7 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 });
 
-test('deleting an event removes its hero image and material files', function () {
+test('deleting an event keeps its files through the recovery window and removes them when purged', function () {
     Storage::fake('public');
 
     $tenant = Tenant::factory()->create(['slug' => 'cleanup-one', 'isolation_mode' => 'shared']);
@@ -47,6 +47,12 @@ test('deleting an event removes its hero image and material files', function () 
     Storage::disk('public')->assertExists('event-materials/deck.pdf');
 
     $event->delete();
+
+    // A soft delete can still be restored, so nothing is thrown away yet.
+    Storage::disk('public')->assertExists('events/hero/hero.jpg');
+    Storage::disk('public')->assertExists('event-materials/deck.pdf');
+
+    $event->forceDelete();
 
     Storage::disk('public')->assertMissing('events/hero/hero.jpg');
     Storage::disk('public')->assertMissing('event-materials/deck.pdf');

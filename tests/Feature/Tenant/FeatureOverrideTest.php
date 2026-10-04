@@ -32,7 +32,7 @@ function tenantOn(string $plan): Tenant
 }
 
 test('a plan change does not revoke what an administrator granted by hand', function () {
-    $tenant = tenantOn('growth');
+    $tenant = tenantOn('starter');
 
     expect($tenant->planAllows('white_label'))->toBeFalse();
 
@@ -45,7 +45,7 @@ test('a plan change does not revoke what an administrator granted by hand', func
     expect($tenant->fresh()->planAllows('white_label'))->toBeTrue();
 
     // Anything that touches the subscription re-syncs; the comp must survive.
-    $tenant->update(['package_id' => Package::where('slug', 'starter')->firstOrFail()->id]);
+    $tenant->update(['package_id' => Package::where('slug', 'free')->firstOrFail()->id]);
     $tenant->syncFeaturesFromPackage();
 
     expect($tenant->fresh()->planAllows('white_label'))->toBeTrue();

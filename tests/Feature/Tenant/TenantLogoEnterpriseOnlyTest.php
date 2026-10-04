@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Showing your own logo instead of MiConvener's is white-labelling, which is an
- * Enterprise capability. Everyone else runs on the platform's mark.
+ * Showing your own logo instead of MiConvener's is white-labelling, which is a
+ * Growth and Enterprise capability. Everyone else runs on the platform's mark.
  */
 beforeEach(function () {
     refreshTenantDatabases();
@@ -53,8 +53,8 @@ test('an enterprise tenant shows its own logo', function () {
     expect(Helper::getTenantLogoUrl())->toContain('theirs.png');
 });
 
-test('a growth tenant falls back to the platform mark even with a logo on file', function () {
-    [$tenant] = tenantOnPlan('logo-growth', 'growth');
+test('a starter tenant falls back to the platform mark even with a logo on file', function () {
+    [$tenant] = tenantOnPlan('logo-starter', 'starter');
 
     expect($tenant->canUseOwnLogo())->toBeFalse();
 

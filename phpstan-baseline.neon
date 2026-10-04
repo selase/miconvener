@@ -5749,24 +5749,6 @@ parameters:
 			path: app/Services/TenantStatsService.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\EventContribution::$amount_pesewas.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Webhooks/WebhookDispatcherService.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\EventRegistration::$amount_pesewas.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Webhooks/WebhookDispatcherService.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\EventRegistration::$name.
-			identifier: property.notFound
-			count: 3
-			path: app/Services/Webhooks/WebhookDispatcherService.php
-
-		-
 			rawMessage: Trait App\Traits\TenantAware is used zero times and is not analysed.
 			identifier: trait.unused
 			count: 1

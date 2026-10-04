@@ -109,7 +109,7 @@ test('every permission the code checks is one the seeder defines', function () {
         }
     }
 
-    $pattern = '/(?:authorize|allows|denies|->can|->cannot|@can|@cannot|can:|permission:)\(?\s*[\'"]?([a-z]+(?: [a-z][a-z-]*)+)[\'"]/';
+    $pattern = '/(?:authorize|allows|denies|->can|->cannot|@can|@cannot|can:|permission:)(?![a-z])\(?\s*[\'"]?([a-z]+(?: [a-z][a-z-]*)+)[\'"]/';
     $undefined = [];
 
     foreach ([app_path(), resource_path('views'), base_path('routes')] as $directory) {

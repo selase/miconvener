@@ -93,15 +93,16 @@ final class WebhookDispatcherService
 
         return $this->dispatch($event->tenant_id, WebhookEndpoint::EVENT_REGISTRATION_CONFIRMED, [
             'event_id' => $event->id,
-            'event_name' => $event->title,
+            'event_name' => $event->name,
             'registration_id' => $registration->id,
             'ticket_code' => $registration->ticket_code,
-            'attendee_name' => $registration->name,
+            'attendee_name' => $registration->full_name,
             'attendee_email' => $registration->email,
             'attendee_phone' => $registration->phone,
             'status' => $registration->status,
             'ticket_type_id' => $registration->ticket_type_id,
-            'confirmed_at' => $registration->confirmed_at?->toIso8601String() ?? now()->toIso8601String(),
+            // Sent at the moment of confirmation; registrations keep no separate timestamp for it.
+            'confirmed_at' => now()->toIso8601String(),
         ]);
     }
 
@@ -117,10 +118,10 @@ final class WebhookDispatcherService
 
         return $this->dispatch($event->tenant_id, WebhookEndpoint::EVENT_TICKET_CHECKED_IN, [
             'event_id' => $event->id,
-            'event_name' => $event->title,
+            'event_name' => $event->name,
             'registration_id' => $registration->id,
             'ticket_code' => $registration->ticket_code,
-            'attendee_name' => $registration->name,
+            'attendee_name' => $registration->full_name,
             'attendee_email' => $registration->email,
             'checked_in_at' => $registration->checked_in_at?->toIso8601String() ?? now()->toIso8601String(),
         ]);
@@ -136,12 +137,12 @@ final class WebhookDispatcherService
             'event_id' => $contribution->event_id,
             'contributor_name' => $contribution->is_anonymous ? 'Anonymous' : $contribution->contributor_name,
             'contributor_email' => $contribution->contributor_email,
-            'amount_pesewas' => $contribution->amount_pesewas,
+            'amount_pesewas' => (int) $contribution->amount,
             'currency' => $contribution->currency,
             'payment_reference' => $contribution->payment_reference,
             'status' => $contribution->status,
             'tribute_message' => $contribution->tribute_message,
-            'completed_at' => $contribution->completed_at?->toIso8601String() ?? now()->toIso8601String(),
+            'completed_at' => $contribution->paid_at?->toIso8601String() ?? now()->toIso8601String(),
         ]);
     }
 
@@ -159,9 +160,9 @@ final class WebhookDispatcherService
             'event_id' => $event->id,
             'registration_id' => $registration->id,
             'ticket_code' => $registration->ticket_code,
-            'attendee_name' => $registration->name,
+            'attendee_name' => $registration->full_name,
             'attendee_email' => $registration->email,
-            'amount_pesewas' => $registration->amount_pesewas,
+            'amount_pesewas' => $registration->effectiveChargedAmount(),
             'approved_at' => now()->toIso8601String(),
         ]);
     }

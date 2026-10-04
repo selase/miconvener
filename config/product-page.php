@@ -73,7 +73,7 @@ return [
                 '150 SMS credits per month',
                 'Speaker material downloads',
                 'CSV settlement export',
-                '3.5% commission on ticket sales (GHS 20 cap)',
+                '3.5% commission on ticket sales (GHS 25 cap)',
                 'Modular add-ons available (Live Polling, extra seats)',
             ],
             'cta' => [

@@ -61,7 +61,7 @@ function brandingRegistrationFor(Tenant $tenant, array $eventAttributes = []): E
 }
 
 test('an attendee sees the organizer, credited to the platform, on a plan without white label', function () {
-    $registration = brandingRegistrationFor(brandingTenantOnPlan('growth'));
+    $registration = brandingRegistrationFor(brandingTenantOnPlan('starter'));
 
     $envelope = new EventTicketLink($registration)->envelope();
 
@@ -112,7 +112,7 @@ test('a tenant with no address on file gets no reply-to rather than a broken one
 });
 
 test('every mail an attendee receives about an event carries the branding, not just one', function () {
-    $tenant = brandingTenantOnPlan('growth');
+    $tenant = brandingTenantOnPlan('starter');
     $registration = brandingRegistrationFor($tenant);
     $blast = EventBlast::factory()->create([
         'tenant_id' => $tenant->id,
