@@ -24,11 +24,13 @@ use App\Models\EventPollResponse;
 use App\Models\EventPromoCode;
 use App\Models\EventRegistration;
 use App\Models\EventSeatAssignment;
+use App\Models\EventServiceRequest;
 use App\Models\EventSession;
 use App\Models\EventSessionAttendance;
 use App\Models\EventSpeaker;
 use App\Models\EventSponsor;
 use App\Models\EventSponsorDeliverable;
+use App\Models\EventStaffLink;
 use App\Models\EventTicketType;
 use App\Models\EventVenueRoom;
 use App\Models\PollDeck;
@@ -103,6 +105,7 @@ final class ProbeWorkspaceSeeder extends Seeder
         $this->automations($event);
         $this->planning($event);
         $this->crowdInTheRoom($event, $sessions);
+        $this->staff($event, $registration);
 
         $this->command->info("Probe workspace ready: {$tenant->slug} / {$event->slug}");
         $this->command->info("Open https://miconvener.com/my as {$attendeeEmail}");
@@ -262,6 +265,73 @@ final class ProbeWorkspaceSeeder extends Seeder
      *
      * @param  array<string, EventTicketType>  $tickets
      */
+    /**
+     * The event-day crew: two gate ushers and a floor steward on staff links,
+     * the crowd's check-ins credited to the gates, and attendee requests in
+     * every state -- one waiting, one being handled, two done, one of them
+     * medical -- so the help desk has something to show on both screens.
+     */
+    private function staff(Event $event, EventRegistration $attendee): void
+    {
+        $links = [];
+        foreach ([
+            'Gate A – Kwame' => ['can_check_in' => true, 'can_handle_requests' => false],
+            'Gate B – Adjoa' => ['can_check_in' => true, 'can_handle_requests' => false],
+            'Floor – Efua' => ['can_check_in' => true, 'can_handle_requests' => true],
+        ] as $name => $switches) {
+            $links[$name] = EventStaffLink::query()->firstOrCreate(
+                ['event_id' => $event->id, 'name' => $name],
+                ['tenant_id' => $event->tenant_id, 'token' => EventStaffLink::newToken(), ...$switches],
+            );
+            // A re-seed re-dates the event; a link switched off during a demo comes back.
+            $links[$name]->update(['revoked_at' => null, ...$switches]);
+        }
+
+        $gates = [$links['Gate A – Kwame'], $links['Gate B – Adjoa']];
+        EventRegistration::query()
+            ->where('event_id', $event->id)
+            ->where('status', EventRegistration::STATUS_CHECKED_IN)
+            ->whereNull('checked_in_by_staff_link_id')
+            ->where('id', '!=', $attendee->id)
+            ->orderBy('checked_in_at')
+            ->get()
+            ->each(fn (EventRegistration $registration, int $i) => $registration->update([
+                'checked_in_by_staff_link_id' => $gates[$i % 2]->id,
+                'checked_in_source' => 'staff_link',
+            ]));
+
+        $crowd = EventRegistration::query()
+            ->where('event_id', $event->id)
+            ->where('status', EventRegistration::STATUS_CHECKED_IN)
+            ->where('id', '!=', $attendee->id)
+            ->orderBy('full_name')
+            ->limit(3)
+            ->get();
+        $floor = $links['Floor – Efua'];
+
+        foreach ([
+            [$attendee, EventServiceRequest::TYPE_REFRESHMENT, EventServiceRequest::STATUS_OPEN, 'Still water, please', 4, null],
+            [$crowd[0], EventServiceRequest::TYPE_TECHNICAL, EventServiceRequest::STATUS_ACKNOWLEDGED, 'The microphone at our table is not working', 9, $floor],
+            [$crowd[1], EventServiceRequest::TYPE_MEDICAL, EventServiceRequest::STATUS_RESOLVED, 'Feeling faint, need to sit somewhere cool', 41, $floor],
+            [$crowd[2], EventServiceRequest::TYPE_ACCESSIBILITY, EventServiceRequest::STATUS_RESOLVED, 'Step-free way to the breakout room?', 63, $floor],
+        ] as [$registration, $type, $status, $note, $minutesAgo, $handler]) {
+            $request = EventServiceRequest::query()->updateOrCreate(
+                ['event_id' => $event->id, 'registration_id' => $registration->id, 'type' => $type],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'priority' => $type === EventServiceRequest::TYPE_MEDICAL ? EventServiceRequest::PRIORITY_URGENT : EventServiceRequest::PRIORITY_NORMAL,
+                    'status' => $status,
+                    'location' => 'Main Hall',
+                    'note' => $note,
+                    'assigned_staff_link_id' => $handler?->id,
+                    'acknowledged_at' => $handler ? now()->subMinutes($minutesAgo - 2) : null,
+                    'resolved_at' => $status === EventServiceRequest::STATUS_RESOLVED ? now()->subMinutes($minutesAgo - 12) : null,
+                ],
+            );
+            $request->forceFill(['created_at' => now()->subMinutes($minutesAgo)])->saveQuietly();
+        }
+    }
+
     private function crowd(Event $event, array $tickets, string $attendeeEmail): void
     {
         [$local, $domain] = explode('@', $attendeeEmail) + [1 => 'example.com'];

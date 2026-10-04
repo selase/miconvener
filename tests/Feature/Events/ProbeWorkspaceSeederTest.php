@@ -6,6 +6,8 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventMaterial;
+use App\Models\EventServiceRequest;
+use App\Models\EventStaffLink;
 use App\Models\Tenant;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Tenancy\TenantHostMatcher;
@@ -109,6 +111,21 @@ test('the seeded attendee has records behind every dashboard panel', function ()
     expect(collect($history['live_now'])->pluck('registration_id'))->toContain($registration->id);
 });
 
+test('the event-day crew is seeded: staff links that work, credited check-ins and requests in every state', function (): void {
+    [$tenant, $event] = seedProbeWorkspace();
+
+    $links = EventStaffLink::withoutGlobalScopes()->where('event_id', $event->id)->get()->keyBy('name');
+    expect($links->keys()->sort()->values()->all())->toBe(['Floor – Efua', 'Gate A – Kwame', 'Gate B – Adjoa'])
+        ->and($links->every(fn (EventStaffLink $link): bool => $link->isUsable()))->toBeTrue()
+        ->and($links['Floor – Efua']->can_handle_requests)->toBeTrue();
+
+    $credited = $event->registrations()->withoutGlobalScopes()->whereNotNull('checked_in_by_staff_link_id')->count();
+    expect($credited)->toBeGreaterThan(50);
+
+    $statuses = EventServiceRequest::withoutGlobalScopes()->where('event_id', $event->id)->pluck('status')->sort()->values()->all();
+    expect($statuses)->toBe(['acknowledged', 'open', 'resolved', 'resolved']);
+});
+
 test('running the seeder twice changes nothing and moves the event to the new now', function (): void {
     [$tenant, $event] = seedProbeWorkspace();
     $firstStart = $event->starts_at;
@@ -117,6 +134,8 @@ test('running the seeder twice changes nothing and moves the event to the new no
         'sessions' => $event->sessions()->withoutGlobalScopes()->count(),
         'materials' => $event->materials()->withoutGlobalScopes()->count(),
         'registrations' => $event->registrations()->withoutGlobalScopes()->count(),
+        'staff links' => EventStaffLink::withoutGlobalScopes()->where('event_id', $event->id)->count(),
+        'requests' => EventServiceRequest::withoutGlobalScopes()->where('event_id', $event->id)->count(),
     ];
 
     $this->travel(3)->hours();
@@ -128,6 +147,8 @@ test('running the seeder twice changes nothing and moves the event to the new no
     expect($event->sessions()->withoutGlobalScopes()->count())->toBe($countsBefore['sessions'])
         ->and($event->materials()->withoutGlobalScopes()->count())->toBe($countsBefore['materials'])
         ->and($event->registrations()->withoutGlobalScopes()->count())->toBe($countsBefore['registrations'])
+        ->and(EventStaffLink::withoutGlobalScopes()->where('event_id', $event->id)->count())->toBe($countsBefore['staff links'])
+        ->and(EventServiceRequest::withoutGlobalScopes()->where('event_id', $event->id)->count())->toBe($countsBefore['requests'])
         ->and($event->starts_at->greaterThan($firstStart))->toBeTrue()
         ->and($event->ends_at->isFuture())->toBeTrue();
 });
