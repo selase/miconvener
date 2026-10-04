@@ -1324,9 +1324,10 @@ Commercial benchmark pricing calibration and modular monetization engine based o
   - Enforced seat limits in `App\Http\Controllers\Tenant\UserController::store` with add-on upsell guidance.
   - Enforced live polling feature gating in `EventPollController::store`, `EventPollController::updateStatus` (live transition), `EventPollDeckController::store`, `EventPollDeckController::start`, `PollPresentationController::show`, `PollPresentationController::results`, and `DeckPresenterController` (`show`, `state`, `act`), returning 403 `upgrade_required` when un-entitled.
 - [x] **Phase 5: Console & Customer-Facing UI Synchronization**:
-  - Synchronized `config/product-page.php` with the calibrated rates (Starter: GHS 249/mo, GHS 2,490/yr, 3 seats, 3k emails, 150 SMS, add-ons noted; Growth: GHS 499/mo, GHS 4,990/yr, 6 seats, 15k emails, 500 SMS, live polling included; Free: 50 registrations/mo).
-  - Enhanced `resources/views/livewire/pricing-table.blade.php` with a dedicated Modular Capacity add-on showcase section highlighting Team Seats (GHS 75/mo), Usher passes (GHS 60/mo), Live Polling & Q&A (GHS 85/mo or GHS 50/pass), and Prepaid SMS/Email packs.
-  - Updated `resources/js/Pages/Billing/Pricing.jsx` with responsive 4-column layout supporting negotiated Enterprise tier (`is_custom` with "Contact sales" CTA) and integrated modular capacity upsell banner.
+  - Synchronized `config/product-page.php` with the calibrated rates (Starter: GHS 249/mo, GHS 2,490/yr, 3 seats, 3k emails, 150 SMS; Growth: GHS 499/mo, GHS 4,990/yr, 6 seats, 15k emails, 500 SMS; Free: 50 registrations/mo).
+  - Upgraded the public product capabilities catalog (`config/product-page.php`) from 6 to 12 comprehensive platform capabilities, showcasing Speaker Portal, Live Polling & Q&A, Venue Marketplace, Facility Operations, Vendor RFQs & Quotes, Webhooks & Integrations, and Event Safeguards in a balanced 3-column grid.
+  - Kept public pricing clean and streamlined by removing unnecessary badges and promotional callout boxes.
+  - Updated `resources/js/Pages/Billing/Pricing.jsx` with responsive 4-column layout supporting negotiated Enterprise tier (`is_custom` with "Contact sales" CTA).
   - Refactored `resources/js/Pages/Billing/Addons.jsx` to achieve 100% strict compliance with Console design system components (`Th`, `Td`, `TableEmpty`, `Button`).
   - Updated `BillingController::pricing` to deliver curated marketing features matching `config('product-page.plans')` rather than raw enum lists.
 - [x] **Phase 6: Automated Verification & Adversarial Self-Review**:
