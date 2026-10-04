@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import Button from '@/Components/Console/Button';
 import StatusPill from '@/Components/Console/StatusPill';
 import CopyField from '@/Components/Console/CopyField';
@@ -22,6 +22,7 @@ import EngagementPanel from './panels/EngagementPanel';
 import BadgesPanel from './panels/BadgesPanel';
 import VenuePanel from './panels/VenuePanel';
 import RequestsPanel from './panels/RequestsPanel';
+import StaffLinksPanel from './panels/StaffLinksPanel';
 import ForumPanel from './panels/ForumPanel';
 import MaterialsPanel from './panels/MaterialsPanel';
 import ReportsPanel from './panels/ReportsPanel';
@@ -182,12 +183,15 @@ function GuestsTab({ event, registrations }) {
     const [activeFilter, setActiveFilter] = useState('all');
 
     const pendingOfflineCount = useMemo(() => {
-        return registrations.filter((r) => r.offline_payment_status === 'pending_verification').length;
+        return registrations.filter((r) => r.offline_payment_status === 'pending_verification')
+            .length;
     }, [registrations]);
 
     const filteredRegistrations = useMemo(() => {
         if (activeFilter === 'confirmed') {
-            return registrations.filter((r) => r.status === 'confirmed' || r.status === 'checked_in');
+            return registrations.filter(
+                (r) => r.status === 'confirmed' || r.status === 'checked_in'
+            );
         }
         if (activeFilter === 'offline_pending') {
             return registrations.filter((r) => r.offline_payment_status === 'pending_verification');
@@ -309,7 +313,8 @@ function GuestsTab({ event, registrations }) {
                                     </StatusPill>
                                 </Td>
                                 <Td>
-                                    {registration.offline_payment_status === 'pending_verification' ? (
+                                    {registration.offline_payment_status ===
+                                    'pending_verification' ? (
                                         <button
                                             type="button"
                                             onClick={() => setVerifyingOffline(registration)}
@@ -328,7 +333,11 @@ function GuestsTab({ event, registrations }) {
                                         </span>
                                     ) : (
                                         <span className="text-xs text-ink-muted">
-                                            {registration.payment_method === 'paystack' ? 'Paystack' : (registration.amount > 0 ? 'Online' : 'Free')}
+                                            {registration.payment_method === 'paystack'
+                                                ? 'Paystack'
+                                                : registration.amount > 0
+                                                  ? 'Online'
+                                                  : 'Free'}
                                         </span>
                                     )}
                                 </Td>
@@ -346,7 +355,8 @@ function GuestsTab({ event, registrations }) {
                                 </Td>
                                 <Td align="right">
                                     <div className="flex items-center justify-end gap-3">
-                                        {registration.offline_payment_status === 'pending_verification' && (
+                                        {registration.offline_payment_status ===
+                                            'pending_verification' && (
                                             <button
                                                 onClick={() => setVerifyingOffline(registration)}
                                                 title="Inspect Slip & Verify"
@@ -414,8 +424,16 @@ function GuestsTab({ event, registrations }) {
                         <tr>
                             <td colSpan={9}>
                                 <TableEmpty
-                                    title={activeFilter === 'all' ? 'No guests yet' : 'No registrations found'}
-                                    description={activeFilter === 'all' ? 'Share the event page to start collecting registrations.' : 'No registrations match the selected filter.'}
+                                    title={
+                                        activeFilter === 'all'
+                                            ? 'No guests yet'
+                                            : 'No registrations found'
+                                    }
+                                    description={
+                                        activeFilter === 'all'
+                                            ? 'Share the event page to start collecting registrations.'
+                                            : 'No registrations match the selected filter.'
+                                    }
                                 />
                             </td>
                         </tr>
@@ -462,6 +480,7 @@ export default function Show({
     contributionsStats = {},
 }) {
     const [editing, setEditing] = useState(false);
+    const canManageEvent = Boolean(usePage().props.auth?.can?.update_event);
     const current = section ?? 'overview';
     const hrefFor = (slug) => sectionHref(event.id, slug);
     const reloadEvent = () => router.reload({ only: ['event'] });
@@ -533,6 +552,7 @@ export default function Show({
                         })
                     }
                 />
+                {canManageEvent && <StaffLinksPanel event={event} />}
             </div>
         ),
         badges: () => <BadgesPanel event={event} />,

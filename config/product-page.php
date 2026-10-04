@@ -50,6 +50,7 @@ return [
                 '1 live event at a time',
                 '50 registrations per month',
                 '1 team seat',
+                '1 staff link for door and floor crew',
                 '200 email credits per month',
             ],
             'cta' => [
@@ -69,6 +70,7 @@ return [
                 '3 live events at a time',
                 '500 registrations per month',
                 '3 team seats',
+                '2 staff links for door and floor crew',
                 '3,000 email credits per month',
                 'Speaker material downloads',
                 'CSV settlement export',
@@ -92,6 +94,7 @@ return [
                 '15 live events at a time',
                 '3,000 registrations per month',
                 '6 team seats',
+                '5 staff links for door and floor crew',
                 '15,000 email credits per month',
                 'Live Polling & Audience Q&A included',
                 'Your own domain',
@@ -114,7 +117,7 @@ return [
             'most_popular' => false,
             'features' => [
                 'Everything in Growth',
-                'Unlimited events, registrations and seats',
+                'Unlimited events, registrations, seats and staff links',
                 'Unlimited email credits',
                 'White label portals',
                 'Negotiated commission',

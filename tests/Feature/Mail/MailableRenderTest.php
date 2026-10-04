@@ -30,7 +30,9 @@ use App\Mail\Events\PlatformAttendeeAccessCodeMail;
 use App\Mail\Events\SpeakerPortalInvitationMail;
 use App\Mail\Events\UrgentServiceRequestRaised;
 use App\Mail\Marketplace\BookingConfirmationGuest;
+use App\Mail\Marketplace\NewQuoteRequestNotification;
 use App\Mail\Marketplace\NewVenueBookingNotification;
+use App\Mail\Marketplace\QuoteProposalReady;
 use App\Mail\Marketplace\QuoteSentNotification;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Users\ResendAccountPassword;
@@ -42,6 +44,7 @@ use App\Models\EventBlast;
 use App\Models\EventRegistration;
 use App\Models\EventRegistrationTransfer;
 use App\Models\Lead;
+use App\Models\MarketplaceQuote;
 use App\Models\Shop;
 use App\Models\StoreListing;
 use App\Models\Tenant;
@@ -191,6 +194,28 @@ test('every mailable renders', function (): void {
         'payment_status' => VenueBooking::PAYMENT_DEPOSIT_PAID,
     ]);
 
+    $quote = MarketplaceQuote::create([
+        'quote_reference' => 'RFQ-RENDER001',
+        'tenant_id' => $tenant->id,
+        'shop_id' => $shop->id,
+        'store_listing_id' => $listing->id,
+        'planner_name' => 'Ama Serwaa',
+        'planner_email' => 'ama@stem.org',
+        'planner_phone' => '+233 24 111 2222',
+        'event_title' => 'Science Congress',
+        'event_date' => now()->addDays(14),
+        'guest_count' => 300,
+        'location_address' => 'Accra International Conference Centre',
+        'requirements_description' => 'Line array PA and two wireless microphones.',
+        'items' => [['description' => 'Line array PA, one day', 'quantity' => 1, 'unit_price_pesewas' => 500000]],
+        'subtotal_pesewas' => 500000,
+        'total_amount_pesewas' => 500000,
+        'deposit_required_pesewas' => 250000,
+        'valid_until' => now()->addDays(7),
+        'vendor_notes' => 'Includes delivery and a technician.',
+        'status' => MarketplaceQuote::STATUS_QUOTED,
+    ]);
+
     // Shape taken from BillingDailySummary's documented return type, so this
     // fails if the producer and the template drift apart.
     $summary = [
@@ -237,6 +262,8 @@ test('every mailable renders', function (): void {
         'BookingConfirmationGuest' => fn () => new BookingConfirmationGuest($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
         'NewVenueBookingNotification' => fn () => new NewVenueBookingNotification($booking, 'https://acme.test/console/venue/inquiries/BK-RENDER-001'),
         'QuoteSentNotification' => fn () => new QuoteSentNotification($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001/checkout'),
+        'NewQuoteRequestNotification' => fn () => new NewQuoteRequestNotification($quote, 'https://acme.test/venue/quotes/RFQ-RENDER001'),
+        'QuoteProposalReady' => fn () => new QuoteProposalReady($quote, 'https://miconvener.test/marketplace/quotes/RFQ-RENDER001'),
     ];
 
     $failures = [];

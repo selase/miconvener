@@ -25,7 +25,7 @@ final class EventSections
     public const string OVERVIEW = 'overview';
 
     /**
-     * @var list<array{group: string|null, sections: array<string, array{label: string, permission: string, feature?: string}>}>
+     * @var list<array{group: string|null, sections: array<string, array{label: string, permission: string|list<string>, feature?: string}>}>
      */
     private const array GROUPS = [
         ['group' => null, 'sections' => [
@@ -53,9 +53,9 @@ final class EventSections
             'forum' => ['label' => 'Forum', 'permission' => 'read event'],
         ]],
         ['group' => 'Event day', 'sections' => [
-            // Every check-in endpoint needs "update event": someone who could
-            // open this section but not scan would only ever be refused.
-            'check-in' => ['label' => 'Check-in', 'permission' => 'update event'],
+            // The same permissions every check-in endpoint accepts: someone who
+            // could open this section but not scan would only ever be refused.
+            'check-in' => ['label' => 'Check-in', 'permission' => ['check in attendees', 'update event']],
             'badges' => ['label' => 'Badges', 'permission' => 'read event'],
             'room-headcount' => ['label' => 'Room headcount', 'permission' => 'read event'],
             'help-requests' => ['label' => 'Help requests', 'permission' => 'read event'],
@@ -136,11 +136,12 @@ final class EventSections
     }
 
     /**
-     * @param  array{label: string, permission: string, feature?: string}  $definition
+     * @param  array{label: string, permission: string|list<string>, feature?: string}  $definition
      */
     private function passes(User $user, Tenant $tenant, Event $event, array $definition): bool
     {
-        if (! $user->can($definition['permission'])) {
+        // A list means any one of them will do.
+        if (! $user->canAny((array) $definition['permission'])) {
             return false;
         }
 

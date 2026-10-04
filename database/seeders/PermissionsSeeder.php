@@ -205,6 +205,20 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'stratification',
             ],
+            // Event-day staff work: scanning and answering attendee requests
+            // without the right to edit the event itself.
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'check in attendees',
+                'guard_name' => 'web',
+                'category' => 'event',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'handle service-requests',
+                'guard_name' => 'web',
+                'category' => 'event',
+            ],
             [
                 'uuid' => Str::uuid(),
                 'name' => 'manage notification-settings',

@@ -17,13 +17,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
-use Inertia\Inertia;
-use Inertia\Response;
 use Throwable;
 
 final class EventAbstractController extends Controller
 {
-    public function index(Request $request, string $subdomain, Event $event): Response|JsonResponse
+    public function index(Request $request, string $subdomain, Event $event): JsonResponse|RedirectResponse
     {
         Gate::authorize('read abstract');
 
@@ -147,7 +145,9 @@ final class EventAbstractController extends Controller
             return response()->json($payload);
         }
 
-        return Inertia::render('Tenant/Events/Abstracts', $payload);
+        // The abstracts screen is a section of the event workspace that loads
+        // this data itself; opened directly, send the browser there.
+        return redirect()->route('tenant.events.section', ['event' => $event, 'section' => 'abstracts']);
     }
 
     public function show(Request $request, string $subdomain, Event $event, EventAbstract $abstract): JsonResponse

@@ -8,88 +8,61 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventServiceRequest;
 use App\Models\Tenant;
+use App\Services\Events\ServiceRequestDesk;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 final class EventServiceRequestController extends Controller
 {
     /**
-     * The seat is what sends a steward to the right person: a name alone means
-     * walking the room asking who asked.
-     *
-     * @var list<string>
+     * Answering attendee requests no longer needs the right to edit the event:
+     * event staff hold "handle service-requests" alone. Roles that could answer
+     * before, through "update event", still can.
      */
-    private const array CONSOLE_RELATIONS = [
-        'registration:id,full_name',
-        'registration.seatAssignment:id,registration_id,room_id,seat_label',
-        'registration.seatAssignment.room:id,name',
-        'assignedTo:id,first_name,last_name',
-    ];
+    public const array PERMISSIONS = ['handle service-requests', 'update event'];
+
+    public function __construct(private readonly ServiceRequestDesk $desk) {}
 
     public function index(string $subdomain, string $event): JsonResponse
     {
         $this->authorize('read event');
-        $tenant = $this->getTenant();
-        $eventModel = $this->findEvent($tenant->id, $event);
 
-        $requests = $eventModel->serviceRequests()
-            ->with(self::CONSOLE_RELATIONS)
-            ->get();
-
-        return response()->json($requests->map(fn (EventServiceRequest $r): array => $r->consolePayload()));
+        return response()->json($this->desk->forEvent($this->findEvent($event)));
     }
 
     public function claim(Request $request, string $subdomain, string $event, string $serviceRequest): JsonResponse
     {
-        $this->authorize('update event');
-        $tenant = $this->getTenant();
-        $eventModel = $this->findEvent($tenant->id, $event);
-        $requestModel = $eventModel->serviceRequests()->where('id', $serviceRequest)->firstOrFail();
+        abort_unless(Gate::any(self::PERMISSIONS), 403);
 
-        $requestModel->update([
-            'assigned_to' => $request->user()->id,
-            'status' => $requestModel->status === EventServiceRequest::STATUS_OPEN
-                ? EventServiceRequest::STATUS_ACKNOWLEDGED
-                : $requestModel->status,
-            'acknowledged_at' => $requestModel->acknowledged_at ?? now(),
-        ]);
-
-        return response()->json($requestModel->fresh(self::CONSOLE_RELATIONS)->consolePayload());
+        return response()->json($this->desk->claim($this->findRequest($event, $serviceRequest), $request->user()));
     }
 
     public function updateStatus(Request $request, string $subdomain, string $event, string $serviceRequest): JsonResponse
     {
-        $this->authorize('update event');
-        $tenant = $this->getTenant();
-        $eventModel = $this->findEvent($tenant->id, $event);
-        $requestModel = $eventModel->serviceRequests()->where('id', $serviceRequest)->firstOrFail();
+        abort_unless(Gate::any(self::PERMISSIONS), 403);
 
         $validated = $request->validate([
             'status' => ['required', Rule::in(EventServiceRequest::STATUSES)],
         ]);
 
-        $requestModel->update([
-            'status' => $validated['status'],
-            'resolved_at' => $validated['status'] === EventServiceRequest::STATUS_RESOLVED ? now() : $requestModel->resolved_at,
-        ]);
-
-        return response()->json($requestModel->fresh(self::CONSOLE_RELATIONS)->consolePayload());
+        return response()->json($this->desk->setStatus($this->findRequest($event, $serviceRequest), $validated['status']));
     }
 
-    private function findEvent(string $tenantId, string $eventId): Event
+    private function findRequest(string $eventId, string $requestId): EventServiceRequest
     {
-        return Event::where('tenant_id', $tenantId)->where('id', $eventId)->firstOrFail();
+        return $this->findEvent($eventId)->serviceRequests()->where('id', $requestId)->firstOrFail();
     }
 
-    private function getTenant(): Tenant
+    private function findEvent(string $eventId): Event
     {
         $tenant = app(TenantContext::class)->getTenant();
-        if (! $tenant) {
+        if (! $tenant instanceof Tenant) {
             abort(403, 'Tenant context not resolved.');
         }
 
-        return $tenant;
+        return Event::where('tenant_id', $tenant->id)->where('id', $eventId)->firstOrFail();
     }
 }

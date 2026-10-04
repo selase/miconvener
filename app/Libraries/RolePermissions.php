@@ -20,6 +20,7 @@ final class RolePermissions
             'Superadmin' => self::superadminPermissions(),
             'Org Superadmin' => self::organizationSuperadminPermissions(),
             'Org Admin' => self::organizationAdminPermissions(),
+            'Event Staff' => self::eventStaffPermissions(),
         ];
     }
 
@@ -57,6 +58,22 @@ final class RolePermissions
         }
 
         return $missingRoles;
+    }
+
+    /**
+     * Ushers and floor crew with their own login: they open events, scan
+     * tickets and answer attendee requests, and can change nothing else.
+     *
+     * @return array<int, string>
+     */
+    private static function eventStaffPermissions(): array
+    {
+        return [
+            'access dashboard',
+            'read event',
+            'check in attendees',
+            'handle service-requests',
+        ];
     }
 
     /**
@@ -136,6 +153,8 @@ final class RolePermissions
             'update dynamic-form',
             'delete dynamic-form',
             'manage participant-groups',
+            'check in attendees',
+            'handle service-requests',
             'create notification-rule',
             'read notification-rule',
             'update notification-rule',
@@ -202,6 +221,8 @@ final class RolePermissions
             'update dynamic-form',
             'delete dynamic-form',
             'manage participant-groups',
+            'check in attendees',
+            'handle service-requests',
             'create notification-rule',
             'read notification-rule',
             'update notification-rule',
@@ -264,6 +285,8 @@ final class RolePermissions
             'update dynamic-form',
             'delete dynamic-form',
             'manage participant-groups',
+            'check in attendees',
+            'handle service-requests',
             'create notification-rule',
             'read notification-rule',
             'update notification-rule',

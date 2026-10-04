@@ -78,7 +78,7 @@ final class EventSessionCheckInController extends Controller
      */
     public function scan(Request $request, string $subdomain, string $event, string $session): JsonResponse
     {
-        $this->authorize('update event');
+        abort_unless(\Illuminate\Support\Facades\Gate::any(EventCheckInController::PERMISSIONS), 403);
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 

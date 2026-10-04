@@ -71,6 +71,7 @@ final class EventServiceRequest extends Model
         'event_id',
         'registration_id',
         'assigned_to',
+        'assigned_staff_link_id',
         'type',
         'priority',
         'status',
@@ -107,6 +108,14 @@ final class EventServiceRequest extends Model
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /**
+     * @return BelongsTo<EventStaffLink, $this>
+     */
+    public function assignedStaffLink(): BelongsTo
+    {
+        return $this->belongsTo(EventStaffLink::class, 'assigned_staff_link_id');
     }
 
     public function scopeOpen(Builder $query): Builder
@@ -148,9 +157,11 @@ final class EventServiceRequest extends Model
             'registrant_name' => $this->registration?->full_name,
             'seat_label' => $this->registration?->seatAssignment?->seat_label,
             'room_name' => $this->registration?->seatAssignment?->room?->name,
-            'assignee_name' => $this->assignedTo
-                ? mb_trim($this->assignedTo->first_name.' '.$this->assignedTo->last_name)
-                : null,
+            'assignee_name' => match (true) {
+                $this->assignedTo !== null => mb_trim($this->assignedTo->first_name.' '.$this->assignedTo->last_name),
+                $this->assignedStaffLink !== null => $this->assignedStaffLink->name,
+                default => null,
+            },
             'created_at' => $this->created_at->toIso8601String(),
         ];
     }

@@ -181,6 +181,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::get('events/{event}/checkin/search', [EventCheckInController::class, 'search'])->name('tenant.events.checkin.search');
     Route::post('events/{event}/checkin/scan', [EventCheckInController::class, 'scan'])->name('tenant.events.checkin.scan');
     Route::post('events/{event}/checkin/{registration}', [EventCheckInController::class, 'checkIn'])->name('tenant.events.checkin');
+    Route::get('events/{event}/data/staff-links', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'index'])->name('tenant.events.staff-links.index');
+    Route::post('events/{event}/staff-links', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'store'])->name('tenant.events.staff-links.store');
+    Route::patch('events/{event}/staff-links/{staffLink}', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'update'])->name('tenant.events.staff-links.update');
+    Route::delete('events/{event}/staff-links/{staffLink}', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'destroy'])->name('tenant.events.staff-links.destroy');
 
     Route::post('events/{event}/ticket-types', [EventTicketTypeController::class, 'store'])->name('tenant.events.ticket-types.store');
     Route::put('events/{event}/ticket-types/{ticketType}', [EventTicketTypeController::class, 'update'])->name('tenant.events.ticket-types.update');
@@ -456,6 +460,22 @@ Route::post('/e/{event}/forum', [PublicForumController::class, 'store'])->name('
 Route::post('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'vote'])->name('public.events.forum.vote');
 Route::delete('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'unvote'])->name('public.events.forum.unvote');
 Route::post('/e/{event}/forum/{thread}/report', [PublicForumController::class, 'report'])->name('public.events.forum.report');
+
+// Staff links: ushers and floor crew scan tickets and answer attendee requests
+// from their own phones, reached by the link's token rather than an account.
+// The limit is generous because a whole crew usually shares one venue Wi-Fi
+// address, and every phone polls for requests and the headcount.
+Route::prefix('staff/{token}')->name('public.staff.')->middleware('throttle:900,1')->group(function (): void {
+    Route::get('/', [App\Http\Controllers\Public\StaffLinkController::class, 'show'])->name('show');
+    Route::post('/unlock', [App\Http\Controllers\Public\StaffLinkController::class, 'unlock'])->middleware('throttle:10,1')->name('unlock');
+    Route::get('/counts', [App\Http\Controllers\Public\StaffLinkController::class, 'counts'])->name('counts');
+    Route::get('/checkin/search', [App\Http\Controllers\Public\StaffLinkController::class, 'search'])->name('checkin.search');
+    Route::post('/checkin/scan', [App\Http\Controllers\Public\StaffLinkController::class, 'scan'])->name('checkin.scan');
+    Route::post('/checkin/{registration}', [App\Http\Controllers\Public\StaffLinkController::class, 'checkIn'])->name('checkin');
+    Route::get('/requests', [App\Http\Controllers\Public\StaffLinkController::class, 'requests'])->name('requests');
+    Route::patch('/requests/{serviceRequest}/claim', [App\Http\Controllers\Public\StaffLinkController::class, 'claim'])->name('requests.claim');
+    Route::patch('/requests/{serviceRequest}', [App\Http\Controllers\Public\StaffLinkController::class, 'updateStatus'])->name('requests.status');
+});
 
 // The results screen behind the speaker. Reached by a token, because the
 // machine driving a projector is rarely the organiser's own.

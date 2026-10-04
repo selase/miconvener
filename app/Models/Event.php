@@ -375,6 +375,14 @@ final class Event extends Model
         return $this->hasMany(EventServiceRequest::class)->orderByDesc('created_at');
     }
 
+    /**
+     * @return HasMany<EventStaffLink, $this>
+     */
+    public function staffLinks(): HasMany
+    {
+        return $this->hasMany(EventStaffLink::class);
+    }
+
     public function payouts(): HasMany
     {
         return $this->hasMany(EventPayout::class)->orderByDesc('created_at');

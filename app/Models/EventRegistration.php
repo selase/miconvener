@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Observers\RegistrationWebhookObserver;
 use App\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +19,7 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
+#[ObservedBy(RegistrationWebhookObserver::class)]
 final class EventRegistration extends Model
 {
     use BelongsToTenant;
@@ -94,6 +97,7 @@ final class EventRegistration extends Model
         'checked_in_at',
         'checked_in_by',
         'checked_in_source',
+        'checked_in_by_staff_link_id',
     ];
 
     protected $casts = [

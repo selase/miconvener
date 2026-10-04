@@ -106,6 +106,28 @@ final class WebhookDispatcherService
         ]);
     }
 
+    public function dispatchRegistrationCreated(EventRegistration $registration): int
+    {
+        return $this->dispatchRegistrationEvent($registration, WebhookEndpoint::EVENT_REGISTRATION_CREATED, [
+            'created_at' => $registration->created_at?->toIso8601String() ?? now()->toIso8601String(),
+        ]);
+    }
+
+    public function dispatchRegistrationCancelled(EventRegistration $registration): int
+    {
+        return $this->dispatchRegistrationEvent($registration, WebhookEndpoint::EVENT_REGISTRATION_CANCELLED, [
+            'cancelled_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    public function dispatchOfflinePaymentSubmitted(EventRegistration $registration): int
+    {
+        return $this->dispatchRegistrationEvent($registration, WebhookEndpoint::EVENT_OFFLINE_PAYMENT_SUBMITTED, [
+            'amount_pesewas' => $registration->effectiveChargedAmount(),
+            'submitted_at' => now()->toIso8601String(),
+        ]);
+    }
+
     /**
      * Dispatch ticket checked in event.
      */
@@ -164,6 +186,30 @@ final class WebhookDispatcherService
             'attendee_email' => $registration->email,
             'amount_pesewas' => $registration->effectiveChargedAmount(),
             'approved_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
+    private function dispatchRegistrationEvent(EventRegistration $registration, string $eventName, array $extra): int
+    {
+        $event = $registration->event;
+        if (! $event) {
+            return 0;
+        }
+
+        return $this->dispatch($event->tenant_id, $eventName, [
+            'event_id' => $event->id,
+            'event_name' => $event->name,
+            'registration_id' => $registration->id,
+            'ticket_code' => $registration->ticket_code,
+            'attendee_name' => $registration->full_name,
+            'attendee_email' => $registration->email,
+            'attendee_phone' => $registration->phone,
+            'status' => $registration->status,
+            'ticket_type_id' => $registration->ticket_type_id,
+            ...$extra,
         ]);
     }
 }

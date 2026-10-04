@@ -23,7 +23,7 @@ use Inertia\Response;
 
 final class RoleController extends Controller
 {
-    private const array TENANT_VISIBLE_SYSTEM_ROLES = ['Org Superadmin', 'Org Admin'];
+    private const array TENANT_VISIBLE_SYSTEM_ROLES = ['Org Superadmin', 'Org Admin', 'Event Staff'];
 
     public function index(string $subdomain): Response
     {

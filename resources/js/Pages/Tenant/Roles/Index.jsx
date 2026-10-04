@@ -12,6 +12,8 @@ import RoleFormModal from './RoleFormModal';
 const SYSTEM_ROLE_DESCRIPTIONS = {
     'Org Superadmin': 'Primary organization owner role. Its current permissions are listed below.',
     'Org Admin': 'Organization administrator role. Its current permissions are listed below.',
+    'Event Staff':
+        'Ushers and floor crew with their own login: they can open events, scan tickets and answer attendee requests, and change nothing else.',
 };
 
 function RoleTable({ roles, onSelect, selectedId }) {

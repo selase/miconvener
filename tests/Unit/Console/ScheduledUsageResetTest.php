@@ -32,3 +32,12 @@ test('the schedule dispatches automated event notifications, so organiser remind
     // by hand, so every reminder a tenant configures silently never sends.
     expect($commands->contains(fn (string $c): bool => str_contains($c, 'app:dispatch-automated-notifications')))->toBeTrue();
 });
+
+test('the schedule sends reminders before each occurrence of a recurring event', function () {
+    $schedule = app(Schedule::class);
+    $commands = collect($schedule->events())->map(fn ($event): string => $event->command ?? '')->values();
+
+    // The command existed and was tested, but nothing ran it, so attendees of
+    // weekly services and lecture series never received a reminder.
+    expect($commands->contains(fn (string $c): bool => str_contains($c, 'events:send-occurrence-reminders')))->toBeTrue();
+});

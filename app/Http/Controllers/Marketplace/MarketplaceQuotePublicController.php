@@ -60,7 +60,7 @@ final class MarketplaceQuotePublicController extends Controller
         $quote = $this->vendorService->createRfq($listing, $validated, $plannerTenant);
 
         return redirect()->route('marketplace.quotes.show', ['reference' => $quote->quote_reference])
-            ->with('success', 'Your Request for Quote (RFQ) has been sent to the vendor! They will prepare a customized proposal.');
+            ->with('success', 'Your request has been sent to the vendor. We will email you when their quote is ready; you can also check this page.');
     }
 
     /**
@@ -152,7 +152,7 @@ final class MarketplaceQuotePublicController extends Controller
                 $this->vendorService->confirmPayment($paystackRef, $verified);
 
                 return redirect()->route('marketplace.quotes.show', ['reference' => $quote->quote_reference])
-                    ->with('success', 'Your booking deposit has been confirmed! The vendor has been notified and your date is reserved.');
+                    ->with('success', 'Your deposit is confirmed and the quote is accepted. The vendor sees it in their console.');
             }
 
             return redirect()->route('marketplace.quotes.show', ['reference' => $quote->quote_reference])

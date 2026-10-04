@@ -6,49 +6,46 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\EventRegistration;
+use App\Models\Tenant;
+use App\Services\Events\DoorCheckIn;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 final class EventCheckInController extends Controller
 {
+    /**
+     * Checking people in no longer needs the right to edit the event: event
+     * staff hold "check in attendees" alone. Roles that could scan before,
+     * through "update event", still can.
+     */
+    public const array PERMISSIONS = ['check in attendees', 'update event'];
+
+    public function __construct(private readonly DoorCheckIn $door) {}
+
     /**
      * Manual check-in: search by name, email, or ticket code, then check
      * in the exact registration by id.
      */
     public function search(Request $request, string $subdomain, string $event): JsonResponse
     {
-        $this->authorize('update event');
-        $tenant = $this->getTenant();
-        $eventModel = $this->findEvent($tenant->id, $event);
+        abort_unless(Gate::any(self::PERMISSIONS), 403);
+        $eventModel = $this->findEvent($event);
 
-        $query = (string) $request->query('q', '');
-
-        $registrations = $eventModel->registrations()
-            ->confirmed()
-            ->where(function ($q) use ($query): void {
-                $q->where('full_name', 'like', "%{$query}%")
-                    ->orWhere('email', 'like', "%{$query}%")
-                    ->orWhere('ticket_code', 'like', "%{$query}%");
-            })
-            ->limit(10)
-            ->get(['id', 'full_name', 'email', 'ticket_code', 'status', 'checked_in_at']);
-
-        return response()->json($registrations);
+        return response()->json($this->door->search($eventModel, (string) $request->query('q', '')));
     }
 
     public function checkIn(Request $request, string $subdomain, string $event, string $registration): JsonResponse
     {
-        $this->authorize('update event');
-        $tenant = $this->getTenant();
-        $eventModel = $this->findEvent($tenant->id, $event);
+        abort_unless(Gate::any(self::PERMISSIONS), 403);
+        $eventModel = $this->findEvent($event);
 
         $registrationModel = $eventModel->registrations()
             ->where('id', $registration)
             ->firstOrFail();
 
-        return $this->markCheckedIn($registrationModel, $request);
+        return $this->respond($this->door->checkIn($registrationModel, $request->user()));
     }
 
     /**
@@ -57,80 +54,35 @@ final class EventCheckInController extends Controller
      */
     public function scan(Request $request, string $subdomain, string $event): JsonResponse
     {
-        $this->authorize('update event');
-        $tenant = $this->getTenant();
-        $eventModel = $this->findEvent($tenant->id, $event);
+        abort_unless(Gate::any(self::PERMISSIONS), 403);
+        $eventModel = $this->findEvent($event);
 
         $validated = $request->validate(['token' => ['required', 'string']]);
 
-        $registrationModel = $eventModel->registrations()
-            ->where('qr_token', $validated['token'])
-            ->first();
+        $registrationModel = $this->door->findByQrToken($eventModel, $validated['token']);
 
         if (! $registrationModel) {
             return response()->json(['message' => 'Ticket not recognized.'], 404);
         }
 
-        return $this->markCheckedIn($registrationModel, $request);
-    }
-
-    private function markCheckedIn(EventRegistration $registration, Request $request): JsonResponse
-    {
-        if (! $registration->isConfirmed()) {
-            return response()->json(['message' => 'This registration is not confirmed.'], 422);
-        }
-
-        $registration->loadMissing('seatAssignment.room:id,name');
-
-        if ($registration->status === EventRegistration::STATUS_CHECKED_IN) {
-            return response()->json([
-                'message' => "{$registration->full_name} was already checked in.",
-                'registration' => $this->registrationPayload($registration),
-                'already_checked_in' => true,
-            ]);
-        }
-
-        $registration->update([
-            'status' => EventRegistration::STATUS_CHECKED_IN,
-            'checked_in_at' => now(),
-            'checked_in_by' => $request->user()->id,
-        ]);
-        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCheckedIn(
-            $registration,
-            (string) $registration->checked_in_at?->getTimestamp(),
-        );
-
-        return response()->json([
-            'message' => "{$registration->full_name} checked in.",
-            'registration' => $this->registrationPayload($registration),
-            'already_checked_in' => false,
-        ]);
+        return $this->respond($this->door->checkIn($registrationModel, $request->user()));
     }
 
     /**
-     * @return array<string, mixed>
+     * @param  array{status: int, body: array<string, mixed>}  $result
      */
-    private function registrationPayload(EventRegistration $registration): array
+    private function respond(array $result): JsonResponse
     {
-        return [
-            ...$registration->only(['id', 'full_name', 'ticket_code', 'checked_in_at']),
-            'seat_label' => $registration->seatAssignment?->seat_label,
-            'room_name' => $registration->seatAssignment?->room?->name,
-        ];
+        return response()->json($result['body'], $result['status']);
     }
 
-    private function findEvent(string $tenantId, string $eventId): Event
-    {
-        return Event::where('tenant_id', $tenantId)->where('id', $eventId)->firstOrFail();
-    }
-
-    private function getTenant()
+    private function findEvent(string $eventId): Event
     {
         $tenant = app(TenantContext::class)->getTenant();
-        if (! $tenant) {
+        if (! $tenant instanceof Tenant) {
             abort(403, 'Tenant context not resolved.');
         }
 
-        return $tenant;
+        return Event::where('tenant_id', $tenant->id)->where('id', $eventId)->firstOrFail();
     }
 }

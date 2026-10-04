@@ -69,7 +69,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::group(['prefix' => 'user-management'], function (): void {
         Route::resource('roles', App\Http\Controllers\Admin\RoleController::class);
         Route::resource('features', App\Http\Controllers\Admin\FeatureController::class);
-        Route::resource('packages', App\Http\Controllers\Admin\PackageController::class);
+        Route::resource('packages', App\Http\Controllers\Admin\PackageController::class)->except(['show']);
         Route::post('users/all', [UsersController::class, 'getAllUsers'])->name('users.all');
         Route::put('users/{user}/resend-password', ResendAccountPasswordController::class);
         Route::resource('users', UsersController::class);
@@ -173,6 +173,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     // Enterprise Leads
     Route::resource('admin/leads', App\Http\Controllers\Admin\LeadController::class)
+        ->only(['index', 'show', 'destroy'])
         ->names('admin.leads');
 
     // Superadmin Operations: run the allowlisted maintenance commands

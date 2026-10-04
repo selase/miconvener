@@ -30,6 +30,7 @@ final class Kernel extends ConsoleKernel
 
         // Recurring events — maintain rolling window of upcoming session occurrences
         $schedule->command('events:generate-recurring-sessions')->dailyAt('02:30')->withoutOverlapping();
+        $schedule->command('events:send-occurrence-reminders')->hourly()->withoutOverlapping();
 
         // Usage Metering & Billing
         $schedule->command('tenants:audit-storage')->dailyAt('03:00');

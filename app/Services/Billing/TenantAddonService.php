@@ -24,7 +24,7 @@ final class TenantAddonService
      *
      * An entry marked unavailable stays listed, so the offer is visible, but it
      * cannot be bought until what it sells is delivered: SMS has no sending
-     * gateway yet, and nothing issues a scanner-only pass.
+     * gateway yet.
      */
     public const CATALOG = [
         'team_seat' => [
@@ -40,15 +40,14 @@ final class TenantAddonService
         ],
         'usher_pack' => [
             'key' => 'usher_pack',
-            'name' => 'Event Day Usher / Scanner Pack (5 passes)',
-            'description' => 'Dedicated check-in staff passes for QR ticket scanning and attendance tracking.',
+            'name' => 'Usher Pack (5 staff links)',
+            'description' => 'Five more staff links at a time: ushers and floor crew scan tickets and answer attendee requests from their phones, with no account and no team seat.',
             'addon_type' => TenantAddon::TYPE_USHER_PACK,
             'unit_price' => 6000, // GHS 60.00
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1, // 1 pack = 5 passes
             'category' => 'operations',
-            // Nothing grants a scanner-only pass yet: every door scanner is a full team seat.
-            'available' => false,
+            'available' => true,
         ],
         'live_polling_monthly' => [
             'key' => 'live_polling_monthly',

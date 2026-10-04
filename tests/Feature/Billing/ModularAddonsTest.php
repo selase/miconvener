@@ -400,7 +400,7 @@ final class ModularAddonsTest extends TestCase
     {
         [$tenant, $user, $host] = $this->createTenantOnPackage('starter', 'unavailable-addon-test');
 
-        foreach (['usher_pack', 'sms_500', 'sms_1500', 'sms_5000'] as $key) {
+        foreach (['sms_500', 'sms_1500', 'sms_5000'] as $key) {
             $this->actingAs($user)
                 ->post("http://{$host}/billing/addons/checkout", [
                     'addon_key' => $key,

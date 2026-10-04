@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Jobs\EmbedStoreListingJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -312,5 +313,25 @@ final class StoreListing extends Model
         }
 
         return null;
+    }
+
+    protected static function booted(): void
+    {
+        // Search reads the embedding, so a published listing whose searchable
+        // content changed is re-embedded. Saving the embedding itself changes
+        // none of these fields, so this cannot loop.
+        self::created(function (self $listing): void {
+            if ($listing->status === self::STATUS_PUBLISHED) {
+                EmbedStoreListingJob::dispatch($listing->id);
+            }
+        });
+
+        self::updated(function (self $listing): void {
+            $searchable = ['title', 'description', 'category', 'listing_kind', 'capacity_breakdown', 'service_scope', 'floor_area_sqm', 'ceiling_height_meters', 'rules_and_policies', 'status'];
+
+            if ($listing->status === self::STATUS_PUBLISHED && $listing->wasChanged($searchable)) {
+                EmbedStoreListingJob::dispatch($listing->id);
+            }
+        });
     }
 }

@@ -97,3 +97,21 @@ test('the commission cap each plan advertises is the cap billing applies', funct
         expect((int) $match[1] * 100)->toBe((int) $package->default_platform_fee_cap_amount, "{$plan['slug']} cap");
     }
 });
+
+test('the staff links each plan advertises are the staff links it grants', function (): void {
+    Artisan::call('db:seed', ['--class' => EventPackageSeeder::class]);
+
+    foreach (config('product-page.plans') as $plan) {
+        $advertised = collect($plan['features'])->first(fn (string $line): bool => (bool) preg_match('/^(\d+) staff links?\b/', $line));
+
+        if ($advertised === null) {
+            continue;
+        }
+
+        preg_match('/^(\d+) staff link/', $advertised, $match);
+        $granted = Package::query()->where('slug', $plan['slug'])->firstOrFail()
+            ->features()->where('slug', 'staff_links')->firstOrFail()->pivot->value;
+
+        expect((int) $match[1])->toBe((int) $granted, "{$plan['slug']} staff links");
+    }
+});

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Observers\ContributionWebhookObserver;
 use App\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +38,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Event|null $event
  * @property-read \Illuminate\Database\Eloquent\Collection<int, EventLedgerEntry> $ledgerEntries
  */
+#[ObservedBy(ContributionWebhookObserver::class)]
 final class EventContribution extends Model
 {
     use BelongsToTenant;

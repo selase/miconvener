@@ -156,7 +156,6 @@ final class EventRegistrationController extends Controller
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             app(EventRuleTriggerService::class)->registrationCompleted($registrationModel);
             app(\App\Services\Webhooks\WebhookDispatcherService::class)->dispatchOfflinePaymentApproved($registrationModel);
-            app(\App\Services\Webhooks\WebhookDispatcherService::class)->dispatchRegistrationConfirmed($registrationModel);
 
             Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
 

@@ -515,6 +515,8 @@ final class Tenant extends Model
 
         if ($featureSlug === 'team_seats') {
             $limit += $this->purchasedTeamSeatsCount();
+        } elseif ($featureSlug === 'staff_links') {
+            $limit += $this->purchasedUsherPassesCount();
         } elseif ($featureSlug === 'sms_credits') {
             $limit += (int) $this->addons()->active()->ofType(TenantAddon::TYPE_SMS_PACK)->sum('quantity');
         } elseif ($featureSlug === 'email_credits') {

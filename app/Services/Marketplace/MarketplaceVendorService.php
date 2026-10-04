@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Marketplace;
 
+use App\Mail\Marketplace\NewQuoteRequestNotification;
+use App\Mail\Marketplace\QuoteProposalReady;
 use App\Models\LedgerAccount;
 use App\Models\LedgerEntry;
 use App\Models\MarketplaceQuote;
@@ -14,6 +16,7 @@ use App\Services\Payment\PaystackGateway;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -62,6 +65,8 @@ final class MarketplaceVendorService
             'status' => MarketplaceQuote::STATUS_PENDING_QUOTE,
         ]);
 
+        $this->notifyVendorOfRequest($quote);
+
         return $quote;
     }
 
@@ -105,7 +110,10 @@ final class MarketplaceVendorService
             'status' => MarketplaceQuote::STATUS_QUOTED,
         ]);
 
-        return $quote->fresh();
+        $quote = $quote->fresh();
+        $this->notifyPlannerOfProposal($quote);
+
+        return $quote;
     }
 
     /**
@@ -200,6 +208,37 @@ final class MarketplaceVendorService
 
             return $quote->fresh();
         });
+    }
+
+    private function notifyVendorOfRequest(MarketplaceQuote $quote): void
+    {
+        $shop = $quote->shop;
+        if ($shop === null || blank($shop->email)) {
+            return;
+        }
+
+        try {
+            $subdomain = $shop->tenant?->slug;
+            $inboxUrl = $subdomain !== null
+                ? route('tenant.venue.quotes.show', ['subdomain' => $subdomain, 'quote' => $quote->id])
+                : route('marketplace.quotes.show', ['reference' => $quote->quote_reference]);
+
+            Mail::to($shop->email)->queue(new NewQuoteRequestNotification($quote, $inboxUrl));
+        } catch (Throwable $e) {
+            Log::error('Failed to queue vendor quote request notification', ['quote_id' => $quote->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+    private function notifyPlannerOfProposal(MarketplaceQuote $quote): void
+    {
+        try {
+            Mail::to($quote->planner_email)->queue(new QuoteProposalReady(
+                $quote,
+                route('marketplace.quotes.show', ['reference' => $quote->quote_reference]),
+            ));
+        } catch (Throwable $e) {
+            Log::error('Failed to queue quote proposal notification', ['quote_id' => $quote->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /**
