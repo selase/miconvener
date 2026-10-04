@@ -24,7 +24,9 @@ final class SyncStaffScansRequest extends FormRequest
             'scans.*.client_scan_id' => ['required', 'string', 'max:64'],
             'scans.*.registration_id' => ['required', 'uuid'],
             'scans.*.scanned_at' => ['required', 'date'],
+            'scans.*.qr_hash' => ['nullable', 'string', 'size:64'],
             'since' => ['nullable', 'date'],
+            'sent_at' => ['nullable', 'date'],
         ];
     }
 

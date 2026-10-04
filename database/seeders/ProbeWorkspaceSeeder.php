@@ -291,7 +291,9 @@ final class ProbeWorkspaceSeeder extends Seeder
             ->where('event_id', $event->id)
             ->where('status', EventRegistration::STATUS_CHECKED_IN)
             ->where('id', '!=', $attendee->id)
+            // The crowd repeats names; the id keeps the pick the same on every run.
             ->orderBy('full_name')
+            ->orderBy('id')
             ->limit(3)
             ->get();
         $floor = $links['Floor – Efua'];

@@ -401,9 +401,24 @@ final class Event extends Model
         return $at->copy()->setTimezone($this->timezone ?: 'Africa/Accra')->toDateString();
     }
 
+    /**
+     * More than one door day. An evening event that runs past midnight is
+     * still one night out, so anything shorter than a working day counts as
+     * a single day whatever the calendar says.
+     */
     public function isMultiDay(): bool
     {
-        return $this->dayFor($this->starts_at) !== $this->dayFor($this->ends_at);
+        return $this->dayFor($this->starts_at) !== $this->dayFor($this->ends_at)
+            && $this->starts_at->diffInHours($this->ends_at) >= 20;
+    }
+
+    /**
+     * The day a door admission belongs to: the calendar day for multi-day
+     * events, the event's own day for everything else.
+     */
+    public function doorDayFor(CarbonInterface $at): string
+    {
+        return $this->isMultiDay() ? $this->dayFor($at) : $this->dayFor($this->starts_at);
     }
 
     /**

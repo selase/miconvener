@@ -362,20 +362,36 @@ function Ready({ token, link, event, counts: initialCounts }) {
                 <div
                     role="status"
                     className={`px-4 py-1.5 text-xs ${
-                        doorStatus.closed
+                        doorStatus.closed || doorStatus.locked || doorStatus.syncError
                             ? 'bg-danger-bg text-danger-fg'
                             : doorStatus.online
                               ? 'text-ink-secondary'
                               : 'bg-warning-bg text-warning-fg'
                     }`}
                 >
-                    {doorStatus.closed
-                        ? 'This staff link has been switched off.'
-                        : doorStatus.online
-                          ? doorStatus.guests > 0
-                              ? `Live · ready offline with ${doorStatus.guests.toLocaleString()} guests`
-                              : 'Live'
-                          : `Offline · ${doorStatus.queued} waiting to send · ${doorStatus.guests.toLocaleString()} guests stored`}
+                    {doorStatus.closed ? (
+                        doorStatus.queued > 0 ? (
+                            `This staff link has been switched off. ${doorStatus.queued} scans are still being sent.`
+                        ) : (
+                            'This staff link has been switched off.'
+                        )
+                    ) : doorStatus.locked ? (
+                        <>
+                            Scanning offline: the PIN needs entering again to send{' '}
+                            {doorStatus.queued} scans.{' '}
+                            <a href={route('public.staff.show', { token })} className="underline">
+                                Enter PIN
+                            </a>
+                        </>
+                    ) : doorStatus.online ? (
+                        doorStatus.guests > 0 ? (
+                            `Live · ready offline with ${doorStatus.guests.toLocaleString()} guests`
+                        ) : (
+                            'Live'
+                        )
+                    ) : (
+                        `Offline · ${doorStatus.queued} waiting to send · ${doorStatus.guests.toLocaleString()} guests stored`
+                    )}
                     {stale && (
                         <span>
                             {' '}
@@ -383,11 +399,22 @@ function Ready({ token, link, event, counts: initialCounts }) {
                             connect to refresh
                         </span>
                     )}
-                    {doorStatus.attention.length > 0 && (
-                        <div className="mt-1 text-danger-fg">
-                            Needs attention: {doorStatus.attention.join(' ')}
+                    {doorStatus.syncError && <div className="mt-1">{doorStatus.syncError}</div>}
+                    {doorStatus.attention.map((note) => (
+                        <div
+                            key={note.id}
+                            className="mt-1 flex items-start justify-between gap-2 text-danger-fg"
+                        >
+                            <span>Needs attention: {note.message}</span>
+                            <button
+                                type="button"
+                                onClick={() => door.dismiss(note.id)}
+                                className="shrink-0 underline"
+                            >
+                                OK
+                            </button>
                         </div>
-                    )}
+                    ))}
                 </div>
             )}
 

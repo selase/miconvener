@@ -12,7 +12,9 @@ use App\Models\User;
 use App\Services\Notifications\EventRuleTriggerService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Checking someone in at the door, whoever is holding the phone: a team member
@@ -60,14 +62,83 @@ final class DoorCheckIn
         ?string $clientScanId = null,
         bool $wasOffline = false,
     ): array {
-        if ($clientScanId !== null && ($seen = EventDoorScan::query()->where('client_scan_id', $clientScanId)->first()) !== null) {
+        try {
+            // One scan of a guest at a time: two doors scanning the same ticket
+            // in the same instant must not both admit it.
+            return DB::connection('landlord')->transaction(function () use ($registration, $user, $staffLink, $scannedAt, $clientScanId, $wasOffline): array {
+                EventRegistration::query()->whereKey($registration->getKey())->lockForUpdate()->first();
+                $registration->refresh();
+
+                return $this->decide($registration, $user, $staffLink, $scannedAt, $clientScanId, $wasOffline);
+            });
+        } catch (UniqueConstraintViolationException) {
+            // The same scan, sent twice at once by a phone: the other request stored it.
+            $seen = EventDoorScan::query()->where('event_id', $registration->event_id)->where('client_scan_id', $clientScanId)->firstOrFail();
+
             return $this->replay($registration, $seen);
+        }
+    }
+
+    /**
+     * Today's headcount: anyone admitted at a door today, plus check-ins from
+     * before the door log existed (and self check-ins) that fall on today.
+     *
+     * @return array{checked_in: int, expected: int, day: int, is_multi_day: bool}
+     */
+    public function counts(Event $event): array
+    {
+        $today = $event->doorDayFor(now());
+
+        $scanned = EventDoorScan::query()
+            ->where('event_id', $event->id)
+            ->admittedOn($today)
+            ->distinct()
+            ->pluck('registration_id');
+
+        $unlogged = $event->registrations()
+            ->where('status', EventRegistration::STATUS_CHECKED_IN)
+            ->whereDoesntHave('doorScans', fn ($query) => $query->whereIn('outcome', [EventDoorScan::OUTCOME_ADMITTED, EventDoorScan::OUTCOME_DUPLICATE]));
+
+        // A single-day event's check-ins all belong to its one day, even past midnight.
+        if ($event->isMultiDay()) {
+            $start = Carbon::parse($today, $event->timezone ?: 'Africa/Accra')->startOfDay()->utc();
+            $unlogged->whereBetween('checked_in_at', [$start, $start->copy()->addDay()]);
+        }
+
+        $unlogged = $unlogged->pluck('id');
+
+        return [
+            'checked_in' => $scanned->merge($unlogged)->unique()->count(),
+            'expected' => $event->registrations()
+                ->whereIn('status', [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN])
+                ->count(),
+            'day' => $event->dayNumber($today),
+            'is_multi_day' => $event->isMultiDay(),
+        ];
+    }
+
+    /**
+     * @return array{status: int, body: array<string, mixed>}
+     */
+    private function decide(
+        EventRegistration $registration,
+        ?User $user,
+        ?EventStaffLink $staffLink,
+        ?CarbonInterface $scannedAt,
+        ?string $clientScanId,
+        bool $wasOffline,
+    ): array {
+        if ($clientScanId !== null) {
+            $seen = EventDoorScan::query()->where('event_id', $registration->event_id)->where('client_scan_id', $clientScanId)->first();
+
+            if ($seen !== null) {
+                return $this->replay($registration, $seen);
+            }
         }
 
         $event = $registration->event;
-        // A phone's clock can be wrong; nothing is admitted in the future.
-        $at = $scannedAt !== null && $scannedAt->lessThan(now()) ? Carbon::instance($scannedAt) : now();
-        $day = $event->dayFor($at);
+        $at = $this->plausibleTime($event, $scannedAt);
+        $day = $event->doorDayFor($at);
 
         $log = fn (string $outcome): EventDoorScan => EventDoorScan::query()->create([
             'tenant_id' => $registration->tenant_id,
@@ -86,7 +157,7 @@ final class DoorCheckIn
             $log(EventDoorScan::OUTCOME_REFUSED);
 
             return ['status' => 422, 'body' => [
-                'message' => 'This registration is not confirmed.',
+                'message' => "{$registration->full_name} ({$registration->ticket_code}): this registration is not confirmed.",
                 'outcome' => EventDoorScan::OUTCOME_REFUSED,
                 'refused' => true,
             ]];
@@ -136,39 +207,6 @@ final class DoorCheckIn
     }
 
     /**
-     * Today's headcount: anyone admitted at a door today, plus check-ins from
-     * before the door log existed (and self check-ins) that fall on today.
-     *
-     * @return array{checked_in: int, expected: int, day: int, is_multi_day: bool}
-     */
-    public function counts(Event $event): array
-    {
-        $today = $event->dayFor(now());
-        $start = Carbon::parse($today, $event->timezone ?: 'Africa/Accra')->startOfDay()->utc();
-
-        $scanned = EventDoorScan::query()
-            ->where('event_id', $event->id)
-            ->admittedOn($today)
-            ->distinct()
-            ->pluck('registration_id');
-
-        $unlogged = $event->registrations()
-            ->where('status', EventRegistration::STATUS_CHECKED_IN)
-            ->whereBetween('checked_in_at', [$start, $start->copy()->addDay()])
-            ->whereDoesntHave('doorScans')
-            ->pluck('id');
-
-        return [
-            'checked_in' => $scanned->merge($unlogged)->unique()->count(),
-            'expected' => $event->registrations()
-                ->whereIn('status', [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN])
-                ->count(),
-            'day' => $event->dayNumber($today),
-            'is_multi_day' => $event->isMultiDay(),
-        ];
-    }
-
-    /**
      * The admission already recorded for this guest on that day, if any. A
      * check-in made before the door log existed counts on its own day.
      *
@@ -193,12 +231,27 @@ final class DoorCheckIn
 
         if ($registration->status === EventRegistration::STATUS_CHECKED_IN
             && $arrival !== null
-            && $registration->event->dayFor($arrival) === $day
+            && $registration->event->doorDayFor($arrival) === $day
             && ! $registration->doorScans()->whereIn('outcome', [EventDoorScan::OUTCOME_ADMITTED, EventDoorScan::OUTCOME_DUPLICATE])->exists()) {
             return ['time' => $arrival->copy()->setTimezone($timezone)->format('H:i'), 'by' => 'an earlier check-in'];
         }
 
         return null;
+    }
+
+    /**
+     * A phone's clock can be wrong. Nothing is admitted in the future, and
+     * nothing earlier than half a day before the event opens.
+     */
+    private function plausibleTime(Event $event, ?CarbonInterface $scannedAt): CarbonInterface
+    {
+        if ($scannedAt === null || $scannedAt->greaterThan(now())) {
+            return now();
+        }
+
+        $earliest = $event->starts_at->copy()->subHours(12);
+
+        return $scannedAt->lessThan($earliest) ? $earliest : $scannedAt;
     }
 
     /**

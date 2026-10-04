@@ -38,6 +38,8 @@ export function createIdbStore(name) {
             const request = action(transaction.objectStore('kv'));
             transaction.oncomplete = () => resolve(request?.result);
             transaction.onerror = () => reject(transaction.error);
+            // A full disk aborts the transaction without an error event.
+            transaction.onabort = () => reject(transaction.error ?? new Error('Storage aborted'));
         });
     };
 

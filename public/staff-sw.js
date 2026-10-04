@@ -2,7 +2,7 @@
 // the cached copy when offline) and the built assets (cache first). Nothing
 // else is cached -- the phone's door library decides what to do with scans,
 // searches and requests when the server cannot be reached.
-const CACHE = 'miconvener-staff-v1';
+const CACHE = 'miconvener-staff-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -33,9 +33,11 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request)
                 .then((response) => {
-                    if (response.ok) {
+                    // Only a page ready to scan is kept: never a PIN screen it
+                    // could not unlock offline, nor a closed link.
+                    if (response.ok && response.headers.get('X-Staff-State') === 'ready') {
                         const copy = response.clone();
-                        caches.open(CACHE).then((cache) => cache.put(key, copy));
+                        event.waitUntil(caches.open(CACHE).then((cache) => cache.put(key, copy)));
                     }
                     return response;
                 })

@@ -1,35 +1,48 @@
 import csrfFetch from '@/lib/csrfFetch';
 import { sha256Hex } from './hash';
+import { createMemoryStore } from './store';
 
 class Unreachable extends Error {}
+
+/** The server accepts at most 500 scans per sync; stay well under it. */
+const SYNC_BATCH = 200;
+
+/** A scan must answer fast or the guest waits; a download or upload may take longer. */
+const SLOW_TIMEOUT_MS = 30000;
 
 /**
  * The door as a staff link's phone sees it: the server first, the stored
  * guest list when the server cannot be reached within the timeout. Offline
  * admissions are queued, kept across reloads, and sent when the connection
- * returns. A 410 from the server (link switched off or event over) wipes
- * everything stored.
+ * returns. Nothing is thrown away until the server has received it: a
+ * switched-off link or a finished event drops the guest list, never the queue.
  */
 export function createStaffDoor({
     urls,
-    store,
+    store: preferredStore,
     fetcher = csrfFetch,
     timeoutMs = 3000,
     now = () => new Date(),
     newId = () => crypto.randomUUID(),
 }) {
+    let store = preferredStore;
     let pack = null;
     let queue = [];
     let local = {}; // registration id -> { day, at } this phone admitted them
-    let attention = [];
+    let attention = []; // { id, message } the usher should look at
     let lastSync = null;
     let online = true;
     let closed = false;
+    let locked = false;
+    let syncError = null;
+    let syncing = null;
     const listeners = new Set();
 
     const status = () => ({
         online,
         closed,
+        locked,
+        syncError,
         queued: queue.length,
         guests: pack?.guests?.length ?? 0,
         packUpdatedAt: pack?.version ?? null,
@@ -37,52 +50,70 @@ export function createStaffDoor({
     });
     const emit = () => listeners.forEach((listener) => listener(status()));
 
-    const persist = () =>
-        Promise.all([
-            store.set('queue', queue),
-            store.set('local', local),
-            store.set('attention', attention),
-            store.set('lastSync', lastSync),
-        ]);
+    // A storage failure must never stop the door: fall back to memory.
+    const safely = async (action) => {
+        try {
+            return await action(store);
+        } catch {
+            store = createMemoryStore();
+            return action(store);
+        }
+    };
 
-    const wipe = async () => {
+    const persist = () =>
+        safely((s) =>
+            Promise.all([
+                s.set('queue', queue),
+                s.set('local', local),
+                s.set('attention', attention),
+                s.set('lastSync', lastSync),
+            ])
+        );
+
+    const dropGuestList = async () => {
         pack = null;
-        queue = [];
-        local = {};
-        attention = [];
-        await store.clear();
+        await safely((s) => s.set('pack', undefined));
     };
 
     const ready = (async () => {
-        pack = (await store.get('pack')) ?? null;
-        queue = (await store.get('queue')) ?? [];
-        local = (await store.get('local')) ?? {};
-        attention = (await store.get('attention')) ?? [];
-        lastSync = (await store.get('lastSync')) ?? null;
-        // Nothing about the guests outlives the link itself.
+        await safely(async (s) => {
+            pack = (await s.get('pack')) ?? null;
+            queue = (await s.get('queue')) ?? [];
+            local = (await s.get('local')) ?? {};
+            attention = (await s.get('attention')) ?? [];
+            lastSync = (await s.get('lastSync')) ?? null;
+        });
+        // The guest list does not outlive the link; unsent scans wait to be sent.
         if (pack && new Date(pack.ends_at) < now()) {
-            await wipe();
+            await dropGuestList();
         }
         emit();
     })();
 
-    const request = async (url, options = {}) => {
+    const request = async (url, options = {}, limit = timeoutMs) => {
         let timer;
         const timeout = new Promise((_, reject) => {
-            timer = setTimeout(() => reject(new Unreachable()), timeoutMs);
+            timer = setTimeout(() => reject(new Unreachable()), limit);
         });
         try {
             const response = await Promise.race([fetcher(url, options), timeout]);
             online = true;
             if (response.status === 410) {
                 closed = true;
-                await wipe();
+                await dropGuestList();
                 emit();
                 throw new Unreachable();
             }
+            if (response.status === 403 || response.status === 419) {
+                // The PIN unlock or the session has lapsed: carry on offline until re-unlocked.
+                locked = true;
+                emit();
+                throw new Unreachable();
+            }
+            locked = false;
             return response;
         } catch (error) {
-            if (!closed) {
+            if (!closed && !locked) {
                 online = false;
                 emit();
             }
@@ -93,9 +124,11 @@ export function createStaffDoor({
     };
 
     const dayOf = (date) =>
-        new Intl.DateTimeFormat('en-CA', { timeZone: pack?.timezone ?? 'Africa/Accra' }).format(
-            date
-        );
+        pack && pack.multi_day === false
+            ? pack.day
+            : new Intl.DateTimeFormat('en-CA', {
+                  timeZone: pack?.timezone ?? 'Africa/Accra',
+              }).format(date);
 
     const inToday = (guest) => {
         const today = dayOf(now());
@@ -113,7 +146,7 @@ export function createStaffDoor({
         room_name: guest.room,
     });
 
-    const admitOffline = async (guest) => {
+    const admitOffline = async (guest, scanId, qrHash = null) => {
         const earlier = inToday(guest);
         if (earlier) {
             const time = new Date(earlier).toLocaleTimeString([], {
@@ -130,9 +163,10 @@ export function createStaffDoor({
 
         const at = now();
         queue.push({
-            client_scan_id: newId(),
+            client_scan_id: scanId,
             registration_id: guest.id,
             scanned_at: at.toISOString(),
+            ...(qrHash ? { qr_hash: qrHash } : {}),
         });
         local[guest.id] = { day: dayOf(at), at: at.toISOString() };
         await persist();
@@ -152,31 +186,80 @@ export function createStaffDoor({
         refused: true,
         offline: true,
     };
+    const switchedOff = { message: 'This staff link has been switched off.', refused: true };
+
+    const sendQueue = async () => {
+        while (queue.length > 0) {
+            const batch = queue.slice(0, SYNC_BATCH);
+            const response = await request(
+                urls.sync,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        scans: batch,
+                        since: lastSync,
+                        sent_at: now().toISOString(),
+                    }),
+                },
+                SLOW_TIMEOUT_MS
+            );
+            if (!response.ok) {
+                syncError =
+                    'Scans could not be sent. They are kept on this phone; tell the organizer.';
+                emit();
+                return false;
+            }
+            const body = await response.json();
+            const received = new Set(body.results.map((result) => result.client_scan_id));
+            queue = queue.filter((scan) => !received.has(scan.client_scan_id));
+            attention = [
+                ...attention,
+                ...body.results
+                    .filter((result) => result.outcome === 'refused')
+                    .map((result) => ({ id: result.client_scan_id, message: result.message })),
+            ];
+            lastSync = body.server_time;
+            await persist();
+            emit();
+            if (received.size === 0) break;
+        }
+        return true;
+    };
 
     const door = {
         ready,
         status,
+
+        /** What is waiting to be sent; for display and tests. */
+        queueSnapshot: () => queue.map((scan) => ({ ...scan })),
 
         subscribe(listener) {
             listeners.add(listener);
             return () => listeners.delete(listener);
         },
 
+        async dismiss(id) {
+            attention = attention.filter((note) => note.id !== id);
+            await persist();
+            emit();
+        },
+
         async scan(token) {
             await ready;
+            // One id for this scan, live or queued, so the server counts it once.
+            const scanId = newId();
             try {
                 const response = await request(urls.scan, {
                     method: 'POST',
-                    body: JSON.stringify({ token }),
+                    body: JSON.stringify({ token, client_scan_id: scanId }),
                 });
                 return await response.json();
             } catch {
-                if (closed)
-                    return { message: 'This staff link has been switched off.', refused: true };
+                if (closed) return switchedOff;
                 if (!pack) return noList;
                 const hash = await sha256Hex(token);
                 const guest = pack.guests.find((candidate) => candidate.qr_hash === hash);
-                return guest ? admitOffline(guest) : notOnList;
+                return guest ? admitOffline(guest, scanId, hash) : notOnList;
             }
         },
 
@@ -205,55 +288,53 @@ export function createStaffDoor({
 
         async checkIn(id) {
             await ready;
+            const scanId = newId();
             try {
-                const response = await request(urls.checkIn(id), { method: 'POST' });
+                const response = await request(urls.checkIn(id), {
+                    method: 'POST',
+                    body: JSON.stringify({ client_scan_id: scanId }),
+                });
                 return await response.json();
             } catch {
-                if (closed)
-                    return { message: 'This staff link has been switched off.', refused: true };
+                if (closed) return switchedOff;
                 const guest = pack?.guests.find((candidate) => candidate.id === id);
-                return guest ? admitOffline(guest) : notOnList;
+                return guest ? admitOffline(guest, scanId) : notOnList;
             }
         },
 
         async refreshPack() {
             await ready;
+            if (closed) return;
             try {
-                const response = await request(urls.pack);
+                const response = await request(urls.pack, {}, SLOW_TIMEOUT_MS);
                 if (response.ok) {
                     pack = await response.json();
-                    await store.set('pack', pack);
+                    await safely((s) => s.set('pack', pack));
                     emit();
                 }
             } catch {
-                // Offline: keep the list already stored.
+                // Offline or closed: keep what is stored.
             }
         },
 
-        async sync() {
-            await ready;
-            try {
-                const response = await request(urls.sync, {
-                    method: 'POST',
-                    body: JSON.stringify({ scans: [...queue], since: lastSync }),
-                });
-                if (!response.ok) return;
-                const body = await response.json();
-                const received = new Set(body.results.map((result) => result.client_scan_id));
-                queue = queue.filter((scan) => !received.has(scan.client_scan_id));
-                attention = [
-                    ...attention,
-                    ...body.results
-                        .filter((result) => result.outcome === 'refused')
-                        .map((result) => result.message),
-                ];
-                lastSync = body.server_time;
-                await persist();
-                emit();
-                await door.refreshPack();
-            } catch {
-                // Still offline: the queue waits for the next attempt.
-            }
+        /** Send waiting scans, then refresh the guest list. One at a time. */
+        sync() {
+            if (syncing) return syncing;
+            syncing = (async () => {
+                await ready;
+                try {
+                    if (await sendQueue()) {
+                        syncError = null;
+                        emit();
+                        await door.refreshPack();
+                    }
+                } catch {
+                    // Still offline, or locked: the queue waits for the next attempt.
+                } finally {
+                    syncing = null;
+                }
+            })();
+            return syncing;
         },
     };
 

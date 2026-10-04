@@ -129,10 +129,16 @@ test('sync returns admissions made at other doors since the last sync', function
     expect(collect($response->json('admitted_since'))->pluck('registration_id'))->toContain($guest->id);
 });
 
-test('a switched-off link gets 410 for pack and sync', function (): void {
+test('a switched-off link gets no guest list, but can still hand over its scans', function (): void {
     $this->link->update(['revoked_at' => now()]);
 
     $this->getJson("{$this->base}/offline-pack", ['HTTP_HOST' => $this->host])->assertStatus(410);
+    $this->postJson("{$this->base}/checkin/sync", ['scans' => []], ['HTTP_HOST' => $this->host])->assertOk();
+});
+
+test('sync closes a week after the event', function (): void {
+    $this->travel(8)->days();
+
     $this->postJson("{$this->base}/checkin/sync", ['scans' => []], ['HTTP_HOST' => $this->host])->assertStatus(410);
 });
 

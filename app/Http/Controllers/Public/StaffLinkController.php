@@ -20,7 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * What an usher sees when they open their staff link: the door scanner, the
@@ -34,12 +34,12 @@ final class StaffLinkController extends Controller
         private readonly ServiceRequestDesk $desk,
     ) {}
 
-    public function show(Request $request, string $subdomain, string $token): Response
+    public function show(Request $request, string $subdomain, string $token): SymfonyResponse
     {
         $link = $this->resolve($token);
 
         if (! $link->isUsable()) {
-            return Inertia::render('Public/Staff/Show', [
+            return $this->page($request, [
                 'state' => 'closed',
                 'link' => ['name' => $link->name],
                 'event' => ['name' => $link->event?->name],
@@ -47,7 +47,7 @@ final class StaffLinkController extends Controller
         }
 
         if (! $this->unlocked($request, $link)) {
-            return Inertia::render('Public/Staff/Show', [
+            return $this->page($request, [
                 'state' => 'pin',
                 'token' => $link->token,
                 'link' => ['name' => $link->name],
@@ -57,7 +57,7 @@ final class StaffLinkController extends Controller
 
         $link->forceFill(['last_used_at' => now()])->saveQuietly();
 
-        return Inertia::render('Public/Staff/Show', [
+        return $this->page($request, [
             'state' => 'ready',
             'token' => $link->token,
             'link' => [
@@ -85,7 +85,10 @@ final class StaffLinkController extends Controller
 
         $request->session()->put($this->sessionKey($link), true);
 
-        return redirect()->route('public.staff.show', ['token' => $link->token]);
+        // The unlock outlives the session -- an usher's shift is longer than two
+        // hours -- but not a change of PIN, which the value is tied to.
+        return redirect()->route('public.staff.show', ['token' => $link->token])
+            ->withCookie(cookie($this->cookieName($link), $this->unlockValue($link), minutes: 60 * 24 * 14, path: '/staff/'));
     }
 
     public function counts(Request $request, string $subdomain, string $token): JsonResponse
@@ -105,24 +108,30 @@ final class StaffLinkController extends Controller
     public function scan(Request $request, string $subdomain, string $token): JsonResponse
     {
         $link = $this->authorizeFor($request, $token, 'check_in');
-        $validated = $request->validate(['token' => ['required', 'string']]);
+        $validated = $request->validate([
+            'token' => ['required', 'string'],
+            'client_scan_id' => ['nullable', 'string', 'max:64'],
+        ]);
 
         $registration = $this->door->findByQrToken($link->event, $validated['token']);
 
         if (! $registration) {
-            return response()->json(['message' => 'Ticket not recognized.'], 404);
+            return response()->json(['message' => 'Ticket not recognized.', 'refused' => true], 404);
         }
 
-        return $this->respond($this->door->checkIn($registration, staffLink: $link));
+        // The phone's id for this scan: if the answer is slow to arrive the
+        // phone queues the same scan offline, and the id stops it counting twice.
+        return $this->respond($this->door->checkIn($registration, staffLink: $link, clientScanId: $validated['client_scan_id'] ?? null));
     }
 
     public function checkIn(Request $request, string $subdomain, string $token, string $registration): JsonResponse
     {
         $link = $this->authorizeFor($request, $token, 'check_in');
+        $validated = $request->validate(['client_scan_id' => ['nullable', 'string', 'max:64']]);
 
         $registrationModel = $link->event->registrations()->where('id', $registration)->firstOrFail();
 
-        return $this->respond($this->door->checkIn($registrationModel, staffLink: $link));
+        return $this->respond($this->door->checkIn($registrationModel, staffLink: $link, clientScanId: $validated['client_scan_id'] ?? null));
     }
 
     /**
@@ -135,7 +144,7 @@ final class StaffLinkController extends Controller
     {
         $link = $this->authorizeFor($request, $token, 'check_in');
         $event = $link->event;
-        $today = $event->dayFor(now());
+        $today = $event->doorDayFor(now());
         $timezone = $event->timezone ?: 'Africa/Accra';
 
         $inToday = EventDoorScan::query()
@@ -150,7 +159,7 @@ final class StaffLinkController extends Controller
             ->with(['ticketType:id,name', 'seatAssignment.room:id,name'])
             ->get(['id', 'full_name', 'ticket_code', 'qr_token', 'ticket_type_id', 'status', 'checked_in_at'])
             ->map(function (EventRegistration $registration) use ($inToday, $event, $today, $timezone): array {
-                $arrivedToday = $registration->checked_in_at !== null && $event->dayFor($registration->checked_in_at) === $today
+                $arrivedToday = $registration->checked_in_at !== null && $event->doorDayFor($registration->checked_in_at) === $today
                     ? $registration->checked_in_at
                     : null;
                 $in = $inToday[$registration->id] ?? $arrivedToday;
@@ -170,6 +179,8 @@ final class StaffLinkController extends Controller
         return response()->json([
             'version' => now()->toIso8601String(),
             'day' => $today,
+            // A single-day event is one door day even past midnight; the phone follows suit.
+            'multi_day' => $event->isMultiDay(),
             'timezone' => $timezone,
             'ends_at' => $event->ends_at->copy()->addHours(EventStaffLink::HOURS_AFTER_EVENT)->toIso8601String(),
             'guests' => $guests,
@@ -183,17 +194,29 @@ final class StaffLinkController extends Controller
      */
     public function sync(SyncStaffScansRequest $request, string $subdomain, string $token): JsonResponse
     {
-        $link = $this->authorizeFor($request, $token, 'check_in');
+        $link = $this->authorizeForSync($request, $token);
         $results = [];
+
+        // How far the phone's clock is from ours, so its scan times can be corrected.
+        $sentAt = $request->validated('sent_at');
+        $offset = $sentAt !== null ? (int) Carbon::parse($sentAt)->diffInSeconds(now(), false) : 0;
 
         foreach ($request->validated('scans') as $scan) {
             $registration = $link->event->registrations()->where('id', $scan['registration_id'])->first();
+            $scannedAt = Carbon::parse($scan['scanned_at'])->addSeconds($offset);
+            $refusal = match (true) {
+                $registration === null => 'This ticket is not for this event.',
+                // Transferred while the phone was offline: the old code no longer admits anyone.
+                isset($scan['qr_hash']) && $registration->qr_token !== null && ! hash_equals(hash('sha256', $registration->qr_token), $scan['qr_hash']) => "{$registration->full_name} ({$registration->ticket_code}): this ticket was transferred and the code scanned is no longer valid.",
+                $link->revoked_at !== null && $scannedAt->greaterThan($link->revoked_at) => 'This staff link had been switched off when this scan was made.',
+                default => null,
+            };
 
-            if ($registration === null) {
+            if ($refusal !== null) {
                 $results[] = [
                     'client_scan_id' => $scan['client_scan_id'],
                     'outcome' => EventDoorScan::OUTCOME_REFUSED,
-                    'message' => 'This ticket is not for this event.',
+                    'message' => $refusal,
                 ];
 
                 continue;
@@ -202,7 +225,7 @@ final class StaffLinkController extends Controller
             $result = $this->door->checkIn(
                 $registration,
                 staffLink: $link,
-                scannedAt: Carbon::parse($scan['scanned_at']),
+                scannedAt: $scannedAt,
                 clientScanId: $scan['client_scan_id'],
                 wasOffline: true,
             );
@@ -278,6 +301,49 @@ final class StaffLinkController extends Controller
         return $link;
     }
 
+    /**
+     * Sync is the one thing a switched-off or expired link may still do, for
+     * a week after its event: scans made before it was switched off are real
+     * admissions, and a phone must be able to hand them over.
+     */
+    private function authorizeForSync(Request $request, string $token): EventStaffLink
+    {
+        $link = $this->resolve($token);
+
+        abort_unless($link->event !== null && $link->event->ends_at->copy()->addDays(7)->isFuture(), 410, 'This staff link has closed.');
+        abort_unless($this->unlocked($request, $link), 403, 'Enter the PIN first.');
+        abort_unless($link->can_check_in, 403, 'This staff link does not allow that.');
+
+        $link->forceFill(['last_used_at' => now()])->saveQuietly();
+
+        return $link;
+    }
+
+    /**
+     * Rendered with a header saying which state the page is in: the offline
+     * worker keeps only a ready page, never a PIN screen it could not unlock.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    private function page(Request $request, array $props): SymfonyResponse
+    {
+        $response = Inertia::render('Public/Staff/Show', $props)->toResponse($request);
+        $response->headers->set('X-Staff-State', (string) $props['state']);
+        $response->headers->set('Vary', 'Cookie');
+
+        return $response;
+    }
+
+    private function cookieName(EventStaffLink $link): string
+    {
+        return 'staff_unlock_'.str_replace('-', '', $link->id);
+    }
+
+    private function unlockValue(EventStaffLink $link): string
+    {
+        return hash('sha256', $link->id.'|'.$link->pin_hash);
+    }
+
     private function resolve(string $token): EventStaffLink
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -292,7 +358,14 @@ final class StaffLinkController extends Controller
 
     private function unlocked(Request $request, EventStaffLink $link): bool
     {
-        return ! $link->requiresPin() || $request->session()->get($this->sessionKey($link)) === true;
+        if (! $link->requiresPin()) {
+            return true;
+        }
+
+        $cookie = $request->cookie($this->cookieName($link));
+
+        return $request->session()->get($this->sessionKey($link)) === true
+            || (is_string($cookie) && hash_equals($this->unlockValue($link), $cookie));
     }
 
     private function sessionKey(EventStaffLink $link): string
