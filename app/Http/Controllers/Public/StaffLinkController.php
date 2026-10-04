@@ -9,9 +9,11 @@ use App\Http\Requests\SyncStaffScansRequest;
 use App\Models\EventDoorScan;
 use App\Models\EventRegistration;
 use App\Models\EventServiceRequest;
+use App\Models\EventSession;
 use App\Models\EventStaffLink;
 use App\Models\Tenant;
 use App\Services\Events\DoorCheckIn;
+use App\Services\Events\RoomScan;
 use App\Services\Events\ServiceRequestDesk;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +34,7 @@ final class StaffLinkController extends Controller
     public function __construct(
         private readonly DoorCheckIn $door,
         private readonly ServiceRequestDesk $desk,
+        private readonly RoomScan $rooms,
     ) {}
 
     public function show(Request $request, string $subdomain, string $token): SymfonyResponse
@@ -69,6 +72,17 @@ final class StaffLinkController extends Controller
                 'id' => $link->event->id,
                 'name' => $link->event->name,
                 'is_recurring' => (bool) $link->event->is_recurring,
+                // Any room can be scanned into from any link: ushers are not tied to rooms.
+                'sessions' => $link->can_check_in
+                    ? $link->event->sessions()->orderBy('starts_at')->get()->map(fn (EventSession $session): array => [
+                        'id' => $session->id,
+                        'title' => $session->title,
+                        'location' => $session->location,
+                        'starts_at' => $session->starts_at->toIso8601String(),
+                        'occurrence_date' => $session->occurrence_date?->toDateString(),
+                        'capacity' => $session->capacity,
+                    ])->values()
+                    : [],
             ],
             'counts' => $link->can_check_in ? $this->door->counts($link->event) : null,
         ]);
@@ -255,6 +269,41 @@ final class StaffLinkController extends Controller
                 ->map(fn (EventDoorScan $scan): array => ['registration_id' => $scan->registration_id, 'at' => $scan->scanned_at->toIso8601String()]),
             'server_time' => now()->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Scan a guest into or out of one of the event's rooms. Online only: a
+     * room's capacity cannot be kept across phones without a connection.
+     */
+    public function roomScan(Request $request, string $subdomain, string $token, string $session): JsonResponse
+    {
+        $link = $this->authorizeFor($request, $token, 'check_in');
+        $sessionModel = $link->event->sessions()->where('id', $session)->firstOrFail();
+
+        $validated = $request->validate([
+            'token' => ['nullable', 'string'],
+            'registration_id' => ['nullable', 'uuid'],
+            'action' => ['nullable', 'in:check_in,check_out'],
+            'override_capacity' => ['nullable', 'boolean'],
+        ]);
+
+        $registration = match (true) {
+            filled($validated['token'] ?? null) => $this->door->findByQrToken($link->event, $validated['token']),
+            filled($validated['registration_id'] ?? null) => $link->event->registrations()->where('id', $validated['registration_id'])->first(),
+            default => null,
+        };
+
+        if ($registration === null) {
+            return response()->json(['message' => 'Ticket not recognized.', 'refused' => true], 404);
+        }
+
+        return $this->respond($this->rooms->scan(
+            $sessionModel,
+            $registration,
+            $validated['action'] ?? 'check_in',
+            (bool) ($validated['override_capacity'] ?? false),
+            deviceName: $link->name,
+        ));
     }
 
     public function requests(Request $request, string $subdomain, string $token): JsonResponse

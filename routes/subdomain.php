@@ -476,6 +476,7 @@ Route::prefix('staff/{token}')->name('public.staff.')->middleware('throttle:900,
     Route::get('/offline-pack', [App\Http\Controllers\Public\StaffLinkController::class, 'pack'])->name('pack');
     Route::post('/checkin/sync', [App\Http\Controllers\Public\StaffLinkController::class, 'sync'])->name('sync');
     Route::post('/checkin/{registration}', [App\Http\Controllers\Public\StaffLinkController::class, 'checkIn'])->name('checkin');
+    Route::post('/rooms/{session}/scan', [App\Http\Controllers\Public\StaffLinkController::class, 'roomScan'])->name('rooms.scan');
     Route::get('/requests', [App\Http\Controllers\Public\StaffLinkController::class, 'requests'])->name('requests');
     Route::patch('/requests/{serviceRequest}/claim', [App\Http\Controllers\Public\StaffLinkController::class, 'claim'])->name('requests.claim');
     Route::patch('/requests/{serviceRequest}', [App\Http\Controllers\Public\StaffLinkController::class, 'updateStatus'])->name('requests.status');

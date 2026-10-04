@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
-use App\Events\SessionAttendanceUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventSession;
 use App\Models\EventSessionAttendance;
+use App\Services\Events\RoomScan;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,7 +94,6 @@ final class EventSessionCheckInController extends Controller
             'device_name' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $action = $validated['action'] ?? 'check_in';
         $registrationModel = null;
 
         if (! empty($validated['token'])) {
@@ -111,109 +110,16 @@ final class EventSessionCheckInController extends Controller
             return response()->json(['message' => 'Attendee badge or ticket not recognized.'], 404);
         }
 
-        if (! $registrationModel->isConfirmed()) {
-            return response()->json([
-                'message' => "{$registrationModel->full_name} is not confirmed for this event.",
-            ], 422);
-        }
+        $result = app(RoomScan::class)->scan(
+            $sessionModel,
+            $registrationModel,
+            $validated['action'] ?? 'check_in',
+            (bool) ($validated['override_capacity'] ?? false),
+            $request->user(),
+            $validated['device_name'] ?? null,
+        );
 
-        if ($action === 'check_in') {
-            // Room capacity guard
-            if ($sessionModel->isRoomFull() && ! ($validated['override_capacity'] ?? false)) {
-                return response()->json([
-                    'message' => "Room is at maximum capacity ({$sessionModel->capacity} attendees). Entry denied.",
-                    'is_room_full' => true,
-                    'current_headcount' => $sessionModel->liveHeadcount(),
-                    'capacity' => $sessionModel->capacity,
-                ], 422);
-            }
-
-            // Check if already in the room
-            $existing = EventSessionAttendance::where('session_id', $sessionModel->id)
-                ->where('registration_id', $registrationModel->id)
-                ->whereNull('checked_out_at')
-                ->first();
-
-            if ($existing) {
-                return response()->json([
-                    'message' => "{$registrationModel->full_name} is already checked into {$sessionModel->title}.",
-                    'already_checked_in' => true,
-                    'live_headcount' => $sessionModel->liveHeadcount(),
-                    'attendance' => $existing,
-                    'registration' => [
-                        'id' => $registrationModel->id,
-                        'full_name' => $registrationModel->full_name,
-                        'ticket_code' => $registrationModel->ticket_code,
-                    ],
-                ]);
-            }
-
-            $attendance = EventSessionAttendance::create([
-                'tenant_id' => $tenant->id,
-                'event_id' => $eventModel->id,
-                'session_id' => $sessionModel->id,
-                'registration_id' => $registrationModel->id,
-                'checked_in_at' => now(),
-                'checked_in_by' => $request->user()?->id,
-                'device_name' => $validated['device_name'] ?? null,
-            ]);
-
-            // Broadcast real-time Reverb update
-            broadcast(new SessionAttendanceUpdated($sessionModel, 'check_in', $registrationModel->full_name));
-
-            return response()->json([
-                'message' => "{$registrationModel->full_name} checked in.",
-                'action' => 'check_in',
-                'live_headcount' => $sessionModel->liveHeadcount(),
-                'capacity' => $sessionModel->capacity,
-                'occupancy_percentage' => $sessionModel->occupancyPercentage(),
-                'attendance' => $attendance,
-                'registration' => [
-                    'id' => $registrationModel->id,
-                    'full_name' => $registrationModel->full_name,
-                    'ticket_code' => $registrationModel->ticket_code,
-                    'title' => $registrationModel->title,
-                ],
-            ]);
-        }
-
-        // Action: Check Out
-        $activeAttendance = EventSessionAttendance::where('session_id', $sessionModel->id)
-            ->where('registration_id', $registrationModel->id)
-            ->whereNull('checked_out_at')
-            ->latest('checked_in_at')
-            ->first();
-
-        if (! $activeAttendance) {
-            return response()->json([
-                'message' => "{$registrationModel->full_name} is not currently checked into this room.",
-                'not_checked_in' => true,
-            ], 422);
-        }
-
-        $activeAttendance->update([
-            'checked_out_at' => now(),
-            'checked_out_by' => $request->user()?->id,
-        ]);
-
-        // Broadcast real-time Reverb update
-        broadcast(new SessionAttendanceUpdated($sessionModel, 'check_out', $registrationModel->full_name));
-
-        return response()->json([
-            'message' => "{$registrationModel->full_name} checked out. Dwell time: {$activeAttendance->durationMinutes()} min.",
-            'action' => 'check_out',
-            'live_headcount' => $sessionModel->liveHeadcount(),
-            'capacity' => $sessionModel->capacity,
-            'occupancy_percentage' => $sessionModel->occupancyPercentage(),
-            'duration_minutes' => $activeAttendance->durationMinutes(),
-            'hours_earned' => $activeAttendance->contactHoursEarned(),
-            'attendance' => $activeAttendance,
-            'registration' => [
-                'id' => $registrationModel->id,
-                'full_name' => $registrationModel->full_name,
-                'ticket_code' => $registrationModel->ticket_code,
-            ],
-        ]);
+        return response()->json($result['body'], $result['status']);
     }
 
     /**

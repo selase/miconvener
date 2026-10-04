@@ -457,7 +457,10 @@ function Ready({ token, link, event, counts: initialCounts }) {
                         <CheckInPanel
                             event={event}
                             door={door}
-                            sessions={[]}
+                            sessions={event.sessions ?? []}
+                            sessionScanUrlFor={(sessionId) =>
+                                route('public.staff.rooms.scan', { token, session: sessionId })
+                            }
                             scanUrl={route('public.staff.checkin.scan', { token })}
                             searchUrl={route('public.staff.checkin.search', { token })}
                             checkInUrlFor={(registrationId) =>

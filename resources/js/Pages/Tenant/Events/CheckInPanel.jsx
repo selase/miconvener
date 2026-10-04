@@ -87,7 +87,11 @@ function ScanMode({ scanUrl, payloadExtra = {}, onResult, door = null }) {
                         const json = await response.json();
                         onResult(json);
                     } catch (err) {
-                        onResult({ message: 'Error communicating with server.', error: true });
+                        onResult({
+                            message:
+                                'Could not reach the server. Check the connection and try again.',
+                            refused: true,
+                        });
                     } finally {
                         setTimeout(() => {
                             busyRef.current = false;
@@ -154,8 +158,15 @@ function ManualMode({ searchUrl, checkInUrlFor, onResult, door = null }) {
         if (door) {
             onResult(await door.checkIn(registrationId));
         } else {
-            const response = await csrfFetch(checkInUrlFor(registrationId), { method: 'POST' });
-            onResult(await response.json());
+            try {
+                const response = await csrfFetch(checkInUrlFor(registrationId), { method: 'POST' });
+                onResult(await response.json());
+            } catch {
+                onResult({
+                    message: 'Could not reach the server. Check the connection and try again.',
+                    refused: true,
+                });
+            }
         }
         setQuery('');
         setResults([]);
@@ -200,6 +211,7 @@ export default function CheckInPanel({
     sessions = [],
     preselectedSessionId = null,
     door = null,
+    sessionScanUrlFor = null,
 }) {
     // Find best default session:
     // 1. preselectedSessionId
@@ -240,22 +252,23 @@ export default function CheckInPanel({
     };
 
     // Calculate effective scan URL and payload
+    // A staff link brings its own room address; the console uses its own route.
+    const roomScanUrl = (sessionId) =>
+        sessionScanUrlFor
+            ? sessionScanUrlFor(sessionId)
+            : route('tenant.events.sessions.scan', { event: event.id, session: sessionId });
+
     const effectiveScanUrl = useMemo(() => {
         if (targetMode === 'room' && selectedSessionId && event?.id) {
-            return route('tenant.events.sessions.scan', {
-                event: event.id,
-                session: selectedSessionId,
-            });
+            return roomScanUrl(selectedSessionId);
         }
         return scanUrl;
-    }, [targetMode, selectedSessionId, event?.id, scanUrl]);
+        // roomScanUrl only depends on the props listed.
+    }, [targetMode, selectedSessionId, event?.id, scanUrl, sessionScanUrlFor]);
 
     const effectiveCheckInUrlFor = (registrationId) => {
         if (targetMode === 'room' && selectedSessionId && event?.id) {
-            return `${route('tenant.events.sessions.scan', {
-                event: event.id,
-                session: selectedSessionId,
-            })}?registration_id=${registrationId}&action=${scanAction}&override_capacity=${overrideCapacity ? '1' : '0'}`;
+            return `${roomScanUrl(selectedSessionId)}?registration_id=${registrationId}&action=${scanAction}&override_capacity=${overrideCapacity ? '1' : '0'}`;
         }
         return checkInUrlFor(registrationId);
     };
