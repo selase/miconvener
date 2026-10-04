@@ -117,7 +117,8 @@ test('the delivery job carries tenant context and prevents overlapping attempts'
     $job = new SendEventNotificationDeliveryJob((string) Str::uuid7(), $tenant->id);
 
     expect($job->tenantId)->toBe($tenant->id)
-        ->and($job->tries)->toBe(3)
+        ->and($job->maxExceptions)->toBe(3)
+        ->and(now()->diffInHours($job->retryUntil()))->toBeGreaterThanOrEqual(11.9)
         ->and($job->backoff)->toBe([30, 120, 300])
         ->and($job->middleware()[0])->toBeInstanceOf(TenantAwareJob::class)
         ->and($job->middleware()[1])->toBeInstanceOf(WithoutOverlapping::class);

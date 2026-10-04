@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Notifications;
 
 use App\Contracts\SmsGateway;
+use App\Jobs\Notifications\SendEventNotificationDeliveryJob;
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Models\Event;
 use App\Models\EventNotificationLog;
@@ -48,10 +49,14 @@ final class NotificationGatewayService
     /**
      * Execute one atomically claimed delivery.
      *
-     * @return array{status: string, message: string, cost: int}
+     * @return array{status: string, message: string, cost: int, retry_after?: int}
      */
     public function deliver(EventNotificationLog $delivery): array
     {
+        if ($delivery->channel === EventNotificationLog::CHANNEL_SMS) {
+            return $this->deliverSmsBatch([$delivery])['results'][(string) $delivery->id];
+        }
+
         if (in_array($delivery->status, [
             EventNotificationLog::STATUS_SENT,
             EventNotificationLog::STATUS_STAGED,
@@ -96,10 +101,6 @@ final class NotificationGatewayService
                 "Sending blocked: {$delivery->channel} quota reached or channel disabled in settings.",
                 metadata: ['reason' => 'Quota exceeded or channel disabled in tenant settings.'],
             );
-        }
-
-        if ($delivery->channel === EventNotificationLog::CHANNEL_SMS) {
-            return $this->deliverSms($delivery);
         }
 
         if ($delivery->channel === EventNotificationLog::CHANNEL_WHATSAPP) {
@@ -162,7 +163,7 @@ final class NotificationGatewayService
      * @param  array{name?: ?string, email?: ?string, phone?: ?string}  $recipient
      * @param  array<string>  $channels
      * @param  array{subject: string, body: string, action_url?: ?string, action_label?: ?string}  $payload
-     * @return array<string, array{status: string, message: string, cost: int}>
+     * @return array<string, array{status: string, message: string, cost: int, retry_after?: int}>
      */
     public function dispatch(
         Event $event,
@@ -244,6 +245,11 @@ final class NotificationGatewayService
                     'cost_billed' => 0,
                 ]);
                 $results[$channel] = $this->deliver($delivery);
+
+                if (isset($results[$channel]['retry_after'])) {
+                    SendEventNotificationDeliveryJob::dispatch($delivery->id, $delivery->tenant_id)
+                        ->delay(now()->addSeconds($results[$channel]['retry_after']));
+                }
 
                 continue;
             }
@@ -365,57 +371,134 @@ final class NotificationGatewayService
     }
 
     /**
-     * Hand one SMS to the provider and, only once it is accepted, spend one
-     * of the tenant's SMS credits. The provider queues the message itself, so
-     * "sent" here means accepted for sending.
+     * Hand claimed SMS deliveries to the provider together.
      *
-     * @return array{status: string, message: string, cost: int}
+     * Each is checked as deliver() checks one; those the tenant's credits do
+     * not cover are suppressed. A credit is spent per message the provider
+     * accepts. If the provider turns the request away for volume the messages
+     * stay pending, nothing is spent, and retry_after says how long to wait.
+     *
+     * @param  iterable<EventNotificationLog>  $deliveries
+     * @return array{results: array<string, array{status: string, message: string, cost: int, retry_after?: int}>, retry_after: ?int}
      */
-    private function deliverSms(EventNotificationLog $delivery): array
+    public function deliverSmsBatch(iterable $deliveries): array
     {
-        $tenant = Tenant::query()->find($delivery->tenant_id);
+        $results = [];
+        $sendable = [];
 
-        if (! $tenant instanceof Tenant) {
-            return $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'The organizer account no longer exists.');
-        }
+        foreach ($deliveries as $delivery) {
+            $id = (string) $delivery->id;
 
-        if (! $this->smsAllowance->canSend($tenant)) {
-            return $this->finish(
-                $delivery,
+            if (in_array($delivery->status, [
+                EventNotificationLog::STATUS_SENT,
                 EventNotificationLog::STATUS_SUPPRESSED_QUOTA,
-                'Sending blocked: no SMS credits left. Buy an SMS pack to keep sending.',
-                metadata: ['reason' => 'SMS credits used up.'],
-            );
+                EventNotificationLog::STATUS_SKIPPED,
+                EventNotificationLog::STATUS_UNSUBSCRIBED,
+            ], true)) {
+                $results[$id] = ['status' => $delivery->status, 'message' => 'Delivery is already terminal.', 'cost' => 0];
+
+                continue;
+            }
+
+            $delivery->forceFill(['attempts' => $delivery->attempts + 1, 'last_attempted_at' => now()])->save();
+
+            if (empty($delivery->recipient_phone)) {
+                $results[$id] = $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'No phone number available for recipient.');
+
+                continue;
+            }
+
+            if (! TenantNotificationSetting::forTenant($delivery->tenant_id)->canSend(EventNotificationLog::CHANNEL_SMS)) {
+                $results[$id] = $this->finish(
+                    $delivery,
+                    EventNotificationLog::STATUS_SUPPRESSED_QUOTA,
+                    'Sending blocked: SMS is switched off in settings.',
+                    metadata: ['reason' => 'SMS disabled in tenant settings.'],
+                );
+
+                continue;
+            }
+
+            $sendable[] = $delivery;
         }
 
-        $result = $this->sms->send([
-            new SmsMessage((string) $delivery->recipient_phone, self::smsText((string) $delivery->message), (string) $delivery->id),
-        ])[(string) $delivery->id] ?? SmsResult::refused('The SMS provider returned no result.');
+        $retryAfter = null;
 
-        if (! $result->accepted) {
-            Log::warning('Event SMS was not accepted', [
-                'delivery_id' => $delivery->id,
-                'event_id' => $delivery->event_id,
-                'error' => $result->error,
-            ]);
+        foreach (collect($sendable)->groupBy('tenant_id') as $tenantId => $tenantDeliveries) {
+            $tenant = Tenant::query()->find($tenantId);
 
-            return $this->finish(
-                $delivery,
-                EventNotificationLog::STATUS_FAILED,
-                (string) $result->error,
-                metadata: ['error' => $result->error],
-            );
+            if (! $tenant instanceof Tenant) {
+                foreach ($tenantDeliveries as $delivery) {
+                    $results[(string) $delivery->id] = $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'The organizer account no longer exists.');
+                }
+
+                continue;
+            }
+
+            $remaining = $this->smsAllowance->remaining($tenant);
+            $covered = $remaining === null ? $tenantDeliveries : $tenantDeliveries->take($remaining);
+
+            foreach ($tenantDeliveries->slice($covered->count()) as $delivery) {
+                $results[(string) $delivery->id] = $this->finish(
+                    $delivery,
+                    EventNotificationLog::STATUS_SUPPRESSED_QUOTA,
+                    'Sending blocked: no SMS credits left. Buy an SMS pack to keep sending.',
+                    metadata: ['reason' => 'SMS credits used up.'],
+                );
+            }
+
+            if ($covered->isEmpty()) {
+                continue;
+            }
+
+            $sent = $this->sms->send($covered->map(fn (EventNotificationLog $delivery): SmsMessage => new SmsMessage(
+                (string) $delivery->recipient_phone,
+                self::smsText((string) $delivery->message),
+                (string) $delivery->id,
+            ))->values()->all());
+
+            $accepted = 0;
+
+            foreach ($covered as $delivery) {
+                $id = (string) $delivery->id;
+                $result = $sent[$id] ?? SmsResult::refused('The SMS provider returned no result.');
+
+                if ($result->accepted) {
+                    $accepted++;
+                    $results[$id] = $this->finish(
+                        $delivery,
+                        EventNotificationLog::STATUS_SENT,
+                        'SMS accepted by the provider for sending.',
+                        metadata: ['provider_reference' => $result->providerReference],
+                        sent: true,
+                    );
+                } elseif ($result->isThrottled()) {
+                    $retryAfter = max($retryAfter ?? 0, (int) $result->retryAfter);
+                    $results[$id] = $this->finish(
+                        $delivery,
+                        EventNotificationLog::STATUS_PENDING,
+                        (string) $result->error,
+                        metadata: ['last_error' => $result->error],
+                    ) + ['retry_after' => (int) $result->retryAfter];
+                } else {
+                    Log::warning('Event SMS was not accepted', [
+                        'delivery_id' => $delivery->id,
+                        'event_id' => $delivery->event_id,
+                        'error' => $result->error,
+                    ]);
+                    $results[$id] = $this->finish(
+                        $delivery,
+                        EventNotificationLog::STATUS_FAILED,
+                        (string) $result->error,
+                        metadata: ['error' => $result->error],
+                    );
+                }
+            }
+
+            $this->smsAllowance->consume($tenant, $accepted);
         }
 
-        $this->smsAllowance->consume($tenant, 1);
-
-        return $this->finish(
-            $delivery,
-            EventNotificationLog::STATUS_SENT,
-            'SMS accepted by the provider for sending.',
-            metadata: ['provider_reference' => $result->providerReference],
-            sent: true,
-        );
+        return ['results' => $results, 'retry_after' => $retryAfter];
     }
 
     /**

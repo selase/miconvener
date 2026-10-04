@@ -82,7 +82,7 @@ test('an announcement with SMS is refused when credits do not cover the phones i
     expect($response->json('message'))->toContain('needs 2 SMS credit(s)')->toContain('1 left');
 });
 
-test('the blast texts each attendee with a phone once, and reports it', function (): void {
+test('the blast texts each attendee with a phone once, in one request, and reports it', function (): void {
     Mail::fake();
     Http::fake(['messaging.test/*' => Http::response(['data' => ['campaign_id' => 'camp-b']], 202)]);
     [$tenant, $user, $event, $host] = blastSmsScenario(10);
@@ -96,8 +96,10 @@ test('the blast texts each attendee with a phone once, and reports it', function
     (new SendEventBlastJob($blast))->handle();
 
     expect(EventNotificationLog::query()->where('channel', 'sms')->where('status', 'sent')->count())->toBe(2);
-    Http::assertSentCount(2);
-    Http::assertSent(fn ($request): bool => $request->data()[0]['message'] === 'Room change: Hall B.');
+    // One request for the whole audience: everyone gets the same text.
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request): bool => $request->data()[0]['message'] === 'Room change: Hall B.'
+        && count($request->data()[0]['users']) === 2);
 
     $index = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/blasts", ['HTTP_HOST' => $host]);
     $index->assertJsonPath('blasts.0.sms_sent_count', 2)

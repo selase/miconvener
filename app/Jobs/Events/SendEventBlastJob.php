@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Events;
 
+use App\Jobs\Notifications\SendSmsBatchJob;
 use App\Mail\Events\EventBlastMail;
 use App\Models\EventBlast;
 use App\Models\EventBlastRecipient;
@@ -41,6 +42,8 @@ final class SendEventBlastJob implements ShouldQueue
 
         EventBlast::audienceQuery($event, $this->blast->audience)
             ->chunk(100, function ($registrations) use ($tenant, $metering, $claims, $event): void {
+                $smsDeliveryIds = [];
+
                 foreach ($registrations as $registration) {
                     $recipient = EventBlastRecipient::firstOrCreate(
                         ['blast_id' => $this->blast->id, 'registration_id' => $registration->id],
@@ -57,8 +60,18 @@ final class SendEventBlastJob implements ShouldQueue
                     }
 
                     if ($this->blast->send_sms) {
-                        $this->textRegistration($claims, $event, $registration);
+                        $delivery = $this->claimSms($claims, $event, $registration);
+
+                        if ($delivery instanceof EventNotificationLog) {
+                            $smsDeliveryIds[] = (string) $delivery->id;
+                        }
                     }
+                }
+
+                // Every recipient gets the same text, so a chunk is one
+                // provider request rather than one per attendee.
+                if ($smsDeliveryIds !== []) {
+                    SendSmsBatchJob::dispatch($this->blast->tenant_id, $smsDeliveryIds);
                 }
             });
 
@@ -66,17 +79,17 @@ final class SendEventBlastJob implements ShouldQueue
     }
 
     /**
-     * The SMS copy goes through the queued notification delivery, which
-     * checks the organizer's SMS switch and credits per message. Keyed by
-     * blast and registration, so a retried job never texts anyone twice.
+     * The SMS copy is claimed as a notification delivery, which checks the
+     * organizer's SMS switch and credits per message when it is sent. Keyed
+     * by blast and registration, so a retried job never texts anyone twice.
      */
-    private function textRegistration(NotificationDeliveryClaimService $claims, \App\Models\Event $event, EventRegistration $registration): void
+    private function claimSms(NotificationDeliveryClaimService $claims, \App\Models\Event $event, EventRegistration $registration): ?EventNotificationLog
     {
         if (PhoneNumber::toInternationalDigits($registration->phone) === null) {
-            return;
+            return null;
         }
 
-        $delivery = $claims->claim(
+        return $claims->claim(
             $event,
             null,
             'announcement',
@@ -86,9 +99,5 @@ final class SendEventBlastJob implements ShouldQueue
             ['subject' => $this->blast->subject, 'body' => $this->blast->subject.': '.$this->blast->body],
             $this->blast,
         );
-
-        if ($delivery instanceof EventNotificationLog) {
-            $claims->dispatch($delivery);
-        }
     }
 }

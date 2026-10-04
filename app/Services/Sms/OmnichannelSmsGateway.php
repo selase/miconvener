@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Http;
  *
  * Omnichannel queues every campaign and charges its own credit as it sends,
  * so a 202 here means "queued", not "delivered". Messages with the same text
- * travel as one campaign to save requests; personalised texts go one by one.
+ * travel as one campaign, because the platform allows ten send requests a
+ * minute per account. Different texts are never combined: Omnichannel sends
+ * the first recipient's text to every number in a campaign chunk.
  */
 final class OmnichannelSmsGateway implements SmsGateway
 {
@@ -27,7 +29,7 @@ final class OmnichannelSmsGateway implements SmsGateway
     public static function fromConfig(): self
     {
         return new self(
-            rtrim((string) config('services.omnichannel.url'), '/'),
+            mb_rtrim((string) config('services.omnichannel.url'), '/'),
             (string) config('services.omnichannel.token'),
             (string) config('services.omnichannel.sender_id'),
         );
@@ -89,6 +91,10 @@ final class OmnichannelSmsGateway implements SmsGateway
                 ]]);
         } catch (ConnectionException $e) {
             return SmsResult::refused('Could not reach the SMS provider: '.$e->getMessage());
+        }
+
+        if ($response->status() === 429) {
+            return SmsResult::throttled(max(1, (int) ($response->header('Retry-After') ?: 60)));
         }
 
         if (! $response->successful()) {

@@ -12,29 +12,32 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
-final class SendEventNotificationDeliveryJob implements ShouldQueue
+/**
+ * Sends a group of claimed SMS deliveries in as few provider requests as
+ * possible -- one per distinct text -- so a large announcement stays within
+ * the provider's rate limit. When the provider asks us to slow down, the job
+ * waits as long as it was told and sends whatever is still pending.
+ */
+final class SendSmsBatchJob implements ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
 
-    /**
-     * Unhandled errors give up after three tries. Waiting out the SMS
-     * provider's rate limit is a release, not an error, and may repeat until
-     * retryUntil().
-     */
     public int $maxExceptions = 3;
 
     /** @var array<int> */
     public array $backoff = [30, 120, 300];
 
+    /**
+     * @param  list<string>  $deliveryIds
+     */
     public function __construct(
-        public string $deliveryId,
         public string $tenantId,
+        public array $deliveryIds,
     ) {}
 
     public function retryUntil(): DateTimeInterface
@@ -45,26 +48,24 @@ final class SendEventNotificationDeliveryJob implements ShouldQueue
     /** @return array<int, object> */
     public function middleware(): array
     {
-        return [
-            new TenantAwareJob,
-            (new WithoutOverlapping("event-notification:{$this->tenantId}:{$this->deliveryId}"))
-                ->releaseAfter(30)
-                ->expireAfter(600),
-        ];
+        return [new TenantAwareJob];
     }
 
     public function handle(NotificationGatewayService $gateway): void
     {
-        $delivery = EventNotificationLog::query()->find($this->deliveryId);
+        $deliveries = EventNotificationLog::query()
+            ->whereIn('id', $this->deliveryIds)
+            ->where('channel', EventNotificationLog::CHANNEL_SMS)
+            ->get();
 
-        if (! $delivery instanceof EventNotificationLog) {
+        if ($deliveries->isEmpty()) {
             return;
         }
 
-        $result = $gateway->deliver($delivery);
+        $retryAfter = $gateway->deliverSmsBatch($deliveries)['retry_after'];
 
-        if (isset($result['retry_after'])) {
-            $this->release($result['retry_after']);
+        if ($retryAfter !== null) {
+            $this->release($retryAfter);
         }
     }
 }
