@@ -6,13 +6,22 @@ namespace App\Services\Notifications;
 
 use App\Models\EventMaterial;
 use App\Models\EventRegistration;
+use App\Services\Sms\TicketSms;
 use Illuminate\Support\Facades\DB;
 
 final class EventRuleTriggerService
 {
+    /**
+     * Called wherever a registration is confirmed, next to the ticket email:
+     * runs the organizer's on-registration rules and texts the ticket.
+     */
     public function registrationCompleted(EventRegistration $registration): void
     {
-        $this->afterCommit(fn (AutomatedNotificationDispatcher $dispatcher, EventRegistration $fresh): int => $dispatcher->dispatchRegistrationRules($fresh), $registration);
+        $this->afterCommit(function (AutomatedNotificationDispatcher $dispatcher, EventRegistration $fresh): int {
+            app(TicketSms::class)->send($fresh);
+
+            return $dispatcher->dispatchRegistrationRules($fresh);
+        }, $registration);
     }
 
     public function registrationCheckedIn(EventRegistration $registration, string $occurrenceKey): void

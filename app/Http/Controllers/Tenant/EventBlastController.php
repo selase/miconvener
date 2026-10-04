@@ -8,8 +8,12 @@ use App\Http\Controllers\Controller;
 use App\Jobs\Events\SendEventBlastJob;
 use App\Models\Event;
 use App\Models\EventBlast;
+use App\Models\EventNotificationLog;
+use App\Models\TenantNotificationSetting;
+use App\Services\Sms\SmsAllowance;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
+use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +31,15 @@ final class EventBlastController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $smsSent = EventNotificationLog::query()
+            ->where('source_type', (new EventBlast)->getMorphClass())
+            ->whereIn('source_id', $blasts->where('send_sms', true)->pluck('id'))
+            ->where('channel', EventNotificationLog::CHANNEL_SMS)
+            ->where('status', EventNotificationLog::STATUS_SENT)
+            ->selectRaw('source_id, count(*) as aggregate')
+            ->groupBy('source_id')
+            ->pluck('aggregate', 'source_id');
+
         return response()->json([
             'blasts' => $blasts->map(fn (EventBlast $blast): array => [
                 'id' => $blast->id,
@@ -35,7 +48,9 @@ final class EventBlastController extends Controller
                 'audience' => $blast->audience,
                 'audience_label' => $blast->audience_label,
                 'recipients_count' => $blast->recipients_count,
-                'opened_count' => $blast->opened_count,
+                'opened_count' => (int) $blast->getAttribute('opened_count'),
+                'send_sms' => $blast->send_sms,
+                'sms_sent_count' => $blast->send_sms ? (int) ($smsSent[$blast->id] ?? 0) : null,
                 'status' => $blast->status,
                 'scheduled_at' => $blast->scheduled_at?->toIso8601String(),
                 'sent_at' => $blast->sent_at?->toIso8601String(),
@@ -43,6 +58,10 @@ final class EventBlastController extends Controller
                 'created_at' => $blast->created_at->toIso8601String(),
             ]),
             'audience_options' => EventBlast::audienceOptions($eventModel),
+            'sms' => [
+                'enabled' => (bool) TenantNotificationSetting::forTenant($tenant->id)->sms_enabled,
+                'remaining' => app(SmsAllowance::class)->remaining($tenant),
+            ],
         ]);
     }
 
@@ -57,7 +76,9 @@ final class EventBlastController extends Controller
             'body' => ['required', 'string', 'max:10000'],
             'audience' => ['required', 'string'],
             'scheduled_at' => ['nullable', 'date', 'after:now'],
+            'send_sms' => ['sometimes', 'boolean'],
         ]);
+        $sendSms = (bool) ($validated['send_sms'] ?? false);
 
         $options = collect(EventBlast::audienceOptions($eventModel));
         $option = $options->firstWhere('key', $validated['audience']);
@@ -79,6 +100,24 @@ final class EventBlastController extends Controller
             ], 422);
         }
 
+        if ($sendSms) {
+            if (! TenantNotificationSetting::forTenant($tenant->id)->sms_enabled) {
+                throw ValidationException::withMessages(['send_sms' => 'Turn on SMS in this event\'s notification settings before texting attendees.']);
+            }
+
+            $phoneCount = EventBlast::audienceQuery($eventModel, $validated['audience'])
+                ->pluck('phone')
+                ->filter(fn (?string $phone): bool => PhoneNumber::toInternationalDigits($phone) !== null)
+                ->count();
+            $remaining = app(SmsAllowance::class)->remaining($tenant);
+
+            if ($remaining !== null && $phoneCount > $remaining) {
+                return response()->json([
+                    'message' => "This message needs {$phoneCount} SMS credit(s) and you have {$remaining} left. Buy an SMS pack, or send it by email only.",
+                ], 422);
+            }
+        }
+
         $blast = $eventModel->blasts()->create([
             'tenant_id' => $tenant->id,
             'sent_by' => $request->user()->id,
@@ -86,6 +125,7 @@ final class EventBlastController extends Controller
             'body' => $validated['body'],
             'audience' => $validated['audience'],
             'audience_label' => $option['label'],
+            'send_sms' => $sendSms,
             'recipients_count' => $recipientsCount,
             'status' => EventBlast::STATUS_SCHEDULED,
             'scheduled_at' => $validated['scheduled_at'] ?? null,

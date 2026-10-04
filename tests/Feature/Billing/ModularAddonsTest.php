@@ -247,10 +247,11 @@ final class ModularAddonsTest extends TestCase
         expect(Transaction::where('provider_transaction_id', $ref)->count())->toBe(1);
     }
 
-    public function test_prepaid_sms_pack_increases_effective_tenant_capacity(): void
+    public function test_prepaid_sms_pack_adds_to_what_the_tenant_can_send_without_raising_the_monthly_limit(): void
     {
         [$tenant] = $this->createTenantOnPackage('starter', 'starter-sms-test'); // base sms_credits: 150
         expect($tenant->featureLimitValue('sms_credits'))->toBe(150);
+        $allowance = app(\App\Services\Sms\SmsAllowance::class);
 
         TenantAddon::factory()->create([
             'tenant_id' => $tenant->id,
@@ -262,9 +263,12 @@ final class ModularAddonsTest extends TestCase
             'status' => TenantAddon::STATUS_ACTIVE,
         ]);
 
-        expect($tenant->featureLimitValue('sms_credits'))->toBe(650);
-        expect($tenant->canUse('sms_credits', 600))->toBeTrue();
-        expect($tenant->canUse('sms_credits', 700))->toBeFalse();
+        // A pack is spent once, so it is not part of the monthly limit that
+        // the usage reset refills; it is counted by the SMS allowance.
+        expect($tenant->featureLimitValue('sms_credits'))->toBe(150);
+        expect($allowance->remaining($tenant))->toBe(650);
+        expect($allowance->canSend($tenant, 650))->toBeTrue();
+        expect($allowance->canSend($tenant, 651))->toBeFalse();
     }
 
     public function test_cancelling_an_addon_updates_status(): void
@@ -396,17 +400,25 @@ final class ModularAddonsTest extends TestCase
             ->assertRedirect('https://paystack.com/checkout/real-key');
     }
 
-    public function test_addons_not_yet_delivered_cannot_be_bought(): void
+    public function test_sms_packs_are_on_sale_once_an_sms_provider_is_configured(): void
     {
-        [$tenant, $user, $host] = $this->createTenantOnPackage('starter', 'unavailable-addon-test');
+        config()->set('services.omnichannel.token', 'secret-token');
+
+        $listed = collect(app(TenantAddonService::class)->getCatalog())->keyBy('key');
 
         foreach (['sms_500', 'sms_1500', 'sms_5000'] as $key) {
-            $this->actingAs($user)
-                ->post("http://{$host}/billing/addons/checkout", [
-                    'addon_key' => $key,
-                ], ['HTTP_HOST' => $host])
-                ->assertSessionHasErrors('addon_key');
+            expect($listed[$key]['available'])->toBeTrue();
         }
+    }
+
+    public function test_sms_packs_cannot_be_bought_while_no_sms_provider_is_configured(): void
+    {
+        config()->set('services.omnichannel.token', null);
+        [$tenant, $user, $host] = $this->createTenantOnPackage('starter', 'no-sms-provider-test');
+
+        $this->actingAs($user)
+            ->post("http://{$host}/billing/addons/checkout", ['addon_key' => 'sms_500'], ['HTTP_HOST' => $host])
+            ->assertSessionHasErrors('addon_key');
 
         expect(fn () => app(TenantAddonService::class)->initializeCheckout($tenant, $user, 'sms_500'))
             ->toThrow(InvalidArgumentException::class);

@@ -167,6 +167,10 @@ test('host can view notification dashboard, audiences, and tenant quota', functi
         ->assertJsonPath('recent_logs.0.source_type', EventRegistration::class)
         ->assertJsonPath('recent_logs.0.attempts', 1)
         ->assertJsonPath('recent_logs.0.status', EventNotificationLog::STATUS_SENT);
+
+    $dayBefore = collect($response->json('presets'))->firstWhere('offset_amount', 1);
+    expect($dayBefore['offset_unit'])->toBe('days')
+        ->and($dayBefore['channels'])->toBe(['email', 'sms']);
 });
 
 test('host can create, update, toggle, and delete notification rules', function () {
@@ -300,8 +304,18 @@ test('rule dispatch delivers direct emails with template placeholder interpolati
         ->and($log->channel)->toBe('email');
 });
 
-test('multi-channel notification stages SMS and WhatsApp payloads ready for Omnichannel', function () {
+test('multi-channel notification sends SMS through the provider and stages WhatsApp', function () {
+    config()->set('services.omnichannel', ['url' => 'https://messaging.test', 'token' => 'secret-token', 'sender_id' => 'MiConvener']);
+    \Illuminate\Support\Facades\Http::fake(['messaging.test/*' => \Illuminate\Support\Facades\Http::response(['data' => ['campaign_id' => 'camp-1']], 202)]);
+
     [$tenant, $user] = eventHost('acme');
+    \App\Models\TenantAddon::factory()->create([
+        'tenant_id' => $tenant->id,
+        'addon_type' => \App\Models\TenantAddon::TYPE_SMS_PACK,
+        'quantity' => 10,
+        'billing_interval' => \App\Models\TenantAddon::INTERVAL_ONE_OFF,
+        'status' => \App\Models\TenantAddon::STATUS_ACTIVE,
+    ]);
     $host = eventSubdomainHost('acme');
 
     $event = Event::factory()->published()->create([
@@ -351,16 +365,16 @@ test('multi-channel notification stages SMS and WhatsApp payloads ready for Omni
     $dispatchResponse->assertJsonPath('stats.total_recipients', 1);
 
     expect(EventNotificationLog::where('event_id', $event->id)
-        ->where('status', EventNotificationLog::STATUS_STAGED)->count())->toBe(2);
+        ->where('status', EventNotificationLog::STATUS_STAGED)->count())->toBe(1);
 
     $logs = EventNotificationLog::where('recipient_phone', '+233241234567')->get();
     expect($logs->count())->toBe(2);
 
     $smsLog = $logs->where('channel', 'sms')->first();
-    expect($smsLog->status)->toBe(EventNotificationLog::STATUS_STAGED)
-        ->and($smsLog->metadata['provider'])->toBe('omnichannel')
-        ->and($smsLog->metadata['to'])->toBe('+233241234567')
-        ->and($smsLog->metadata['channel'])->toBe('sms');
+    expect($smsLog->status)->toBe(EventNotificationLog::STATUS_SENT)
+        ->and($smsLog->metadata['provider_reference'])->toBe('camp-1');
+    \Illuminate\Support\Facades\Http::assertSent(fn ($request): bool => str_contains($request->data()[0]['message'], 'your pass is TKT-AKO-12.')
+        && $request->data()[0]['users'][0]['phone_number'] === '233241234567');
 
     $waLog = $logs->where('channel', 'whatsapp')->first();
     expect($waLog->status)->toBe(EventNotificationLog::STATUS_STAGED)

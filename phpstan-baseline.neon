@@ -1453,62 +1453,8 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventBadgeController.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\EventBlast::$opened_count.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$first_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$last_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$scheduled_at.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$status.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventBlastController::getTenant() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: 'Parameter #1 $blast of job class App\Jobs\Events\SendEventBlastJob constructor expects App\Models\EventBlast in App\Jobs\Events\SendEventBlastJob::dispatch(), Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() expects callable(Illuminate\Database\Eloquent\Model, int): array{id: string, subject: string, body: string, audience: string, audience_label: string|null, recipients_count: int, opened_count: mixed, status: string, scheduled_at: string|null, sent_at: string|null, sent_by: non-falsy-string|null, created_at: string}, Closure(App\Models\EventBlast): array{id: string, subject: string, body: string, audience: string, audience_label: string|null, recipients_count: int, opened_count: mixed, status: string, scheduled_at: string|null, sent_at: string|null, sent_by: non-falsy-string|null, created_at: string} given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventBlastController.php
-
-		-
-			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
-			identifier: method.unresolvableReturnType
 			count: 1
 			path: app/Http/Controllers/Tenant/EventBlastController.php
 
@@ -2533,24 +2479,6 @@ parameters:
 			path: app/Http/Resources/UserProfileResource.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$email.
-			identifier: property.notFound
-			count: 1
-			path: app/Jobs/Events/SendEventBlastJob.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$full_name.
-			identifier: property.notFound
-			count: 1
-			path: app/Jobs/Events/SendEventBlastJob.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
-			identifier: property.notFound
-			count: 1
-			path: app/Jobs/Events/SendEventBlastJob.php
-
-		-
 			rawMessage: Instanceof between App\Models\Tenant and App\Models\Tenant will always evaluate to true.
 			identifier: instanceof.alwaysTrue
 			count: 1
@@ -2941,12 +2869,6 @@ parameters:
 			path: app/Models/Event.php
 
 		-
-			rawMessage: 'Method App\Models\Event::blasts() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Event.php
-
-		-
 			rawMessage: 'Method App\Models\Event::certificateTemplates() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -3200,24 +3122,6 @@ parameters:
 
 		-
 			rawMessage: 'Class App\Models\EventBlast uses generic trait Illuminate\Database\Eloquent\Factories\HasFactory but does not specify its types: TFactory'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventBlast.php
-
-		-
-			rawMessage: 'Method App\Models\EventBlast::audienceQuery() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventBlast.php
-
-		-
-			rawMessage: 'Method App\Models\EventBlast::recipients() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventBlast.php
-
-		-
-			rawMessage: 'Method App\Models\EventBlast::sentBy() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventBlast.php

@@ -13,10 +13,9 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
 
 /**
- * The gateway takes payment at the moment it decides to send, not at the moment
- * something is delivered. For SMS and WhatsApp nothing is delivered at all --
- * there is no gateway yet, only a staged log row -- so every one of those was a
- * real charge for a message that never left the system.
+ * Nothing is billed for a message that did not leave the system: a WhatsApp
+ * message is only staged (there is no WhatsApp gateway yet), and an SMS spends
+ * a credit only once the provider has accepted it.
  */
 beforeEach(function () {
     refreshTenantDatabases();
@@ -49,8 +48,15 @@ function gatewayScenario(string $slug): array
     return [$tenant, $event, $settings];
 }
 
-test('a staged sms is not billed', function () {
+test('an sms the provider does not accept is not billed', function () {
     [$tenant, $event] = gatewayScenario('bill-sms');
+    \App\Models\TenantAddon::factory()->create([
+        'tenant_id' => $tenant->id,
+        'addon_type' => \App\Models\TenantAddon::TYPE_SMS_PACK,
+        'quantity' => 5,
+        'billing_interval' => \App\Models\TenantAddon::INTERVAL_ONE_OFF,
+        'status' => \App\Models\TenantAddon::STATUS_ACTIVE,
+    ]);
 
     app(NotificationGatewayService::class)->dispatch(
         $event,
@@ -62,10 +68,11 @@ test('a staged sms is not billed', function () {
 
     $log = EventNotificationLog::where('event_id', $event->id)->firstOrFail();
 
-    expect($log->status)->toBe(EventNotificationLog::STATUS_STAGED);
+    // No provider is configured under test, so nothing was accepted.
+    expect($log->status)->toBe(EventNotificationLog::STATUS_FAILED);
     expect((int) $log->cost_billed)->toBe(0);
-    // The rate survives for when a real gateway is wired in.
-    expect((int) ($log->metadata['would_bill'] ?? -1))->toBe(500);
+    expect($log->sent_at)->toBeNull();
+    expect(app(\App\Services\Sms\SmsAllowance::class)->remaining($tenant))->toBe(5);
 });
 
 test('a staged message does not claim it was sent', function () {
@@ -92,10 +99,10 @@ test('separate staged messages to one recipient are not treated as duplicates', 
     $recipient = ['name' => 'Ama Mensah', 'email' => null, 'phone' => '233200000002'];
     $payload = ['subject' => 'Doors open', 'body' => 'See you at 9.'];
 
-    app(NotificationGatewayService::class)->dispatch($event, null, $recipient, ['sms'], $payload);
-    $second = app(NotificationGatewayService::class)->dispatch($event, null, $recipient, ['sms'], $payload);
+    app(NotificationGatewayService::class)->dispatch($event, null, $recipient, ['whatsapp'], $payload);
+    $second = app(NotificationGatewayService::class)->dispatch($event, null, $recipient, ['whatsapp'], $payload);
 
-    expect($second['sms']['status'])->toBe(EventNotificationLog::STATUS_STAGED);
+    expect($second['whatsapp']['status'])->toBe(EventNotificationLog::STATUS_STAGED);
     expect(EventNotificationLog::where('event_id', $event->id)->count())->toBe(2);
 });
 

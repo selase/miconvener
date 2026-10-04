@@ -373,8 +373,8 @@ export default function NotificationsPanel({ event }) {
                         </span>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-indigo-500" /> Staged for Omnichannel
-                        Gateway
+                        <Sparkles className="w-3 h-3 text-indigo-500" /> SMS uses your SMS credits.
+                        WhatsApp is not sent yet.
                     </p>
                 </div>
 
@@ -968,10 +968,11 @@ export default function NotificationsPanel({ event }) {
                                 <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                                     <div>
                                         <div className="text-xs font-bold text-slate-900 dark:text-white">
-                                            Enable SMS Staging
+                                            Send SMS
                                         </div>
                                         <div className="text-[11px] text-slate-500">
-                                            Dispatch SMS alerts staged for Omnichannel Gateway
+                                            Text tickets, reminders and announcements to attendees
+                                            with a phone number. Each SMS uses one credit.
                                         </div>
                                     </div>
                                     <input

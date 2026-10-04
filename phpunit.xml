@@ -25,6 +25,7 @@
     <env name="SESSION_DOMAIN" value=".miconvener.test"/>
     <env name="TELESCOPE_ENABLED" value="false"/>
     <env name="INERTIA_SSR_ENABLED" value="false"/>
+    <env name="OMNICHANNEL_TOKEN" value=""/>
   </php>
   <source>
     <include>

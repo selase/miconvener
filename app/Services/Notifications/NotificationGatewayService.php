@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\Notifications;
 
+use App\Contracts\SmsGateway;
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Models\Event;
 use App\Models\EventNotificationLog;
 use App\Models\EventNotificationRule;
+use App\Models\Tenant;
 use App\Models\TenantNotificationSetting;
+use App\Services\Sms\SmsAllowance;
+use App\Services\Sms\SmsMessage;
+use App\Services\Sms\SmsResult;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
@@ -16,6 +21,30 @@ use Throwable;
 
 final class NotificationGatewayService
 {
+    /**
+     * Three standard SMS segments. Longer texts are cut rather than sent as a
+     * string of segments the attendee receives out of order.
+     */
+    public const int SMS_MAX_LENGTH = 459;
+
+    public function __construct(
+        private readonly SmsGateway $sms,
+        private readonly SmsAllowance $smsAllowance,
+    ) {}
+
+    /**
+     * Messages are written for email as well; an SMS gets them as plain text,
+     * whitespace folded, and cut to fit.
+     */
+    public static function smsText(string $message): string
+    {
+        $text = mb_trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($message), ENT_QUOTES | ENT_HTML5)));
+
+        return mb_strlen($text) > self::SMS_MAX_LENGTH
+            ? mb_rtrim(mb_substr($text, 0, self::SMS_MAX_LENGTH - 1)).'…'
+            : $text;
+    }
+
     /**
      * Execute one atomically claimed delivery.
      *
@@ -69,7 +98,11 @@ final class NotificationGatewayService
             );
         }
 
-        if (in_array($delivery->channel, [EventNotificationLog::CHANNEL_SMS, EventNotificationLog::CHANNEL_WHATSAPP], true)) {
+        if ($delivery->channel === EventNotificationLog::CHANNEL_SMS) {
+            return $this->deliverSms($delivery);
+        }
+
+        if ($delivery->channel === EventNotificationLog::CHANNEL_WHATSAPP) {
             $cost = $settings->recordSend($delivery->channel);
 
             return $this->finish(
@@ -196,6 +229,25 @@ final class NotificationGatewayService
                 continue;
             }
 
+            if ($channel === EventNotificationLog::CHANNEL_SMS) {
+                $delivery = EventNotificationLog::create([
+                    'tenant_id' => $event->tenant_id,
+                    'event_id' => $event->id,
+                    'rule_id' => $rule?->id,
+                    'recipient_name' => $name,
+                    'recipient_email' => $email,
+                    'recipient_phone' => $phone,
+                    'channel' => EventNotificationLog::CHANNEL_SMS,
+                    'status' => EventNotificationLog::STATUS_PENDING,
+                    'subject' => $payload['subject'],
+                    'message' => $payload['body'],
+                    'cost_billed' => 0,
+                ]);
+                $results[$channel] = $this->deliver($delivery);
+
+                continue;
+            }
+
             // Record send against tenant quota and get calculated cost
             $cost = $settings->recordSend($channel);
 
@@ -268,7 +320,7 @@ final class NotificationGatewayService
                         'cost' => 0,
                     ];
                 }
-            } elseif (in_array($channel, [EventNotificationLog::CHANNEL_SMS, EventNotificationLog::CHANNEL_WHATSAPP], true)) {
+            } elseif ($channel === EventNotificationLog::CHANNEL_WHATSAPP) {
                 // Staged for Omnichannel Gateway integration. Nothing has been
                 // delivered, so nothing is billed and nothing claims to have
                 // been sent -- the rate is kept so the figure survives for when
@@ -310,6 +362,60 @@ final class NotificationGatewayService
         }
 
         return $results;
+    }
+
+    /**
+     * Hand one SMS to the provider and, only once it is accepted, spend one
+     * of the tenant's SMS credits. The provider queues the message itself, so
+     * "sent" here means accepted for sending.
+     *
+     * @return array{status: string, message: string, cost: int}
+     */
+    private function deliverSms(EventNotificationLog $delivery): array
+    {
+        $tenant = Tenant::query()->find($delivery->tenant_id);
+
+        if (! $tenant instanceof Tenant) {
+            return $this->finish($delivery, EventNotificationLog::STATUS_SKIPPED, 'The organizer account no longer exists.');
+        }
+
+        if (! $this->smsAllowance->canSend($tenant)) {
+            return $this->finish(
+                $delivery,
+                EventNotificationLog::STATUS_SUPPRESSED_QUOTA,
+                'Sending blocked: no SMS credits left. Buy an SMS pack to keep sending.',
+                metadata: ['reason' => 'SMS credits used up.'],
+            );
+        }
+
+        $result = $this->sms->send([
+            new SmsMessage((string) $delivery->recipient_phone, self::smsText((string) $delivery->message), (string) $delivery->id),
+        ])[(string) $delivery->id] ?? SmsResult::refused('The SMS provider returned no result.');
+
+        if (! $result->accepted) {
+            Log::warning('Event SMS was not accepted', [
+                'delivery_id' => $delivery->id,
+                'event_id' => $delivery->event_id,
+                'error' => $result->error,
+            ]);
+
+            return $this->finish(
+                $delivery,
+                EventNotificationLog::STATUS_FAILED,
+                (string) $result->error,
+                metadata: ['error' => $result->error],
+            );
+        }
+
+        $this->smsAllowance->consume($tenant, 1);
+
+        return $this->finish(
+            $delivery,
+            EventNotificationLog::STATUS_SENT,
+            'SMS accepted by the provider for sending.',
+            metadata: ['provider_reference' => $result->providerReference],
+            sent: true,
+        );
     }
 
     /**

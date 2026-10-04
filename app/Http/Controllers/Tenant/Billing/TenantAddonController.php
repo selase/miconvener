@@ -71,7 +71,7 @@ final class TenantAddonController extends Controller
                 'total_seats_limit' => $totalSeatLimit,
                 'usher_passes_count' => $tenant->purchasedUsherPassesCount(),
                 'live_polling_enabled' => $tenant->canUseLivePolling(),
-                'sms_balance' => (int) TenantAddon::where('tenant_id', $tenant->id)->active()->ofType(TenantAddon::TYPE_SMS_PACK)->sum('quantity'),
+                'sms_balance' => app(\App\Services\Sms\SmsAllowance::class)->packRemaining($tenant),
                 'email_balance' => (int) TenantAddon::where('tenant_id', $tenant->id)->active()->ofType(TenantAddon::TYPE_EMAIL_PACK)->sum('quantity'),
             ],
             'events' => $events,

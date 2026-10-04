@@ -35,6 +35,7 @@ final class EventBlast extends Model
         'body',
         'audience',
         'audience_label',
+        'send_sms',
         'recipients_count',
         'status',
         'scheduled_at',
@@ -43,6 +44,7 @@ final class EventBlast extends Model
 
     protected $casts = [
         'recipients_count' => 'integer',
+        'send_sms' => 'boolean',
         'scheduled_at' => 'datetime',
         'sent_at' => 'datetime',
     ];
@@ -51,6 +53,8 @@ final class EventBlast extends Model
      * Resolve an audience key to a query of matching registrations. Base
      * keys are fixed; `ticket_type:{id}` and `session:{id}` are dynamic,
      * scoped to this event so a key can't reach across tenants or events.
+     *
+     * @return HasMany<EventRegistration, Event>
      */
     public static function audienceQuery(Event $event, string $audience): HasMany
     {
@@ -98,11 +102,17 @@ final class EventBlast extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function sentBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sent_by');
     }
 
+    /**
+     * @return HasMany<EventBlastRecipient, $this>
+     */
     public function recipients(): HasMany
     {
         return $this->hasMany(EventBlastRecipient::class, 'blast_id');

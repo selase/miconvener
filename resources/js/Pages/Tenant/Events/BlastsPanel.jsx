@@ -3,6 +3,7 @@ import { Send } from 'lucide-react';
 import Select from '@/Components/Console/Select';
 import Input from '@/Components/Console/Input';
 import Button from '@/Components/Console/Button';
+import Checkbox from '@/Components/Console/Checkbox';
 import StatusPill from '@/Components/Console/StatusPill';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { useToast } from '@/Components/Console/Toast';
@@ -27,6 +28,7 @@ export default function BlastsPanel({ event }) {
         audience: 'all',
         when: 'now',
         scheduled_at: '',
+        send_sms: false,
     });
     const [sending, setSending] = useState(false);
     const toast = useToast();
@@ -50,15 +52,23 @@ export default function BlastsPanel({ event }) {
                 body: form.body,
                 audience: form.audience,
                 scheduled_at: form.when === 'later' && form.scheduled_at ? form.scheduled_at : null,
+                send_sms: form.send_sms,
             }),
         });
         const json = await response.json();
 
         setSending(false);
-        toast?.(json.message ?? 'Blast sent.');
+        toast?.(json.message ?? json.errors?.send_sms?.[0] ?? 'Blast sent.');
 
         if (response.ok) {
-            setForm({ subject: '', body: '', audience: 'all', when: 'now', scheduled_at: '' });
+            setForm({
+                subject: '',
+                body: '',
+                audience: 'all',
+                when: 'now',
+                scheduled_at: '',
+                send_sms: false,
+            });
             load();
         }
     };
@@ -159,6 +169,21 @@ export default function BlastsPanel({ event }) {
                         className="w-full border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
                     />
                 </div>
+                <div className="mt-3.5">
+                    <Checkbox
+                        label="Also send by SMS to attendees with a phone number"
+                        checked={form.send_sms}
+                        disabled={!data.sms?.enabled}
+                        onChange={(e) => setForm({ ...form, send_sms: e.target.checked })}
+                    />
+                    <p className="mt-1 text-xs text-ink-secondary">
+                        {!data.sms?.enabled
+                            ? 'Turn on SMS in Notifications to text attendees.'
+                            : data.sms.remaining === null
+                              ? 'Each text uses one SMS credit. Your plan has unlimited SMS.'
+                              : `Each text uses one SMS credit. You have ${data.sms.remaining} left.`}
+                    </p>
+                </div>
                 <Button
                     type="submit"
                     icon={Send}
@@ -193,7 +218,13 @@ export default function BlastsPanel({ event }) {
                         data.blasts.map((blast) => (
                             <Tr key={blast.id}>
                                 <Td>{blast.subject}</Td>
-                                <Td muted>{blast.audience_label ?? blast.audience}</Td>
+                                <Td muted>
+                                    {blast.audience_label ?? blast.audience}
+                                    {blast.send_sms &&
+                                        (blast.status === 'sent'
+                                            ? ` · ${blast.sms_sent_count} by SMS`
+                                            : ' · + SMS')}
+                                </Td>
                                 <Td numeric>
                                     {blast.status === 'sent'
                                         ? `${blast.opened_count} of ${blast.recipients_count}`

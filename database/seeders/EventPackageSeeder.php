@@ -19,7 +19,7 @@ final class EventPackageSeeder extends Seeder
         'team_seats' => ['name' => 'Team Seats', 'type' => 'limit', 'description' => 'Maximum team members for this organization.'],
         'staff_links' => ['name' => 'Staff Links', 'type' => 'limit', 'description' => 'Active staff links (ushers and floor crew without an account) at a time. Each usher pack adds five.'],
         'email_credits' => ['name' => 'Email Credits Per Month', 'type' => 'limit', 'description' => 'Maximum event-related emails sent per month.'],
-        'sms_credits' => ['name' => 'SMS Credits Per Month', 'type' => 'limit', 'description' => 'Maximum SMS messages sent per month. Reserved: SMS sending does not exist yet.'],
+        'sms_credits' => ['name' => 'SMS Credits Per Month', 'type' => 'limit', 'description' => 'SMS messages included each month: ticket confirmations, reminders and announcements by text. SMS packs top this up and do not expire at the month end.'],
         'paid_tickets' => ['name' => 'Paid Ticket Sales', 'type' => 'boolean', 'description' => 'Sell tickets and collect payments. Free events remain available on every plan.'],
         'live_polling' => ['name' => 'Live Polling & Audience Q&A', 'type' => 'boolean', 'description' => 'Real-time interactive presenter deck, audience polling, and moderated Q&A.'],
         'event_materials' => ['name' => 'Speaker Materials', 'type' => 'boolean', 'description' => 'Upload files attendees can download from the event page.'],

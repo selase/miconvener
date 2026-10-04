@@ -55,6 +55,23 @@ return [
         'currency' => env('PAYSTACK_CURRENCY', 'GHS'),
     ],
 
+    /*
+     * Outgoing SMS. The platform sends through one provider today; the driver
+     * is a setting so a different provider -- or, later, a tenant's own
+     * Twilio or mNotify account -- can be added without touching callers.
+     * With no token configured, SMS is switched off rather than broken.
+     */
+    'sms' => [
+        'driver' => env('SMS_DRIVER', 'omnichannel'),
+    ],
+
+    'omnichannel' => [
+        'url' => env('OMNICHANNEL_URL', 'https://messaging.klevelly.com'),
+        'token' => env('OMNICHANNEL_TOKEN'),
+        // A sender name registered and approved on the Omnichannel platform.
+        'sender_id' => env('OMNICHANNEL_SENDER_ID', 'MiConvener'),
+    ],
+
     'payment' => [
         'default' => env('PAYMENT_DRIVER', 'paystack'),
         'dev_bypass' => env('PAYMENT_DEV_BYPASS', false),

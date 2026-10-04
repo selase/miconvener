@@ -46,6 +46,17 @@ final class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(\Stripe\StripeClient::class, fn (): \Stripe\StripeClient => new \Stripe\StripeClient(config('services.stripe.secret') ?? ''));
 
+        $this->app->bind(\App\Services\Sms\OmnichannelSmsGateway::class, fn (): \App\Services\Sms\OmnichannelSmsGateway => \App\Services\Sms\OmnichannelSmsGateway::fromConfig());
+
+        $this->app->bind(\App\Contracts\SmsGateway::class, function ($app): \App\Contracts\SmsGateway {
+            return match (config('services.sms.driver')) {
+                'omnichannel' => filled(config('services.omnichannel.token'))
+                    ? $app->make(\App\Services\Sms\OmnichannelSmsGateway::class)
+                    : new \App\Services\Sms\NullSmsGateway,
+                default => new \App\Services\Sms\NullSmsGateway,
+            };
+        });
+
         $this->app->bind(\App\Contracts\PaymentGateway::class, function ($app) {
             $request = $app->make('request');
             $context = $request->attributes->get('payment_context', 'platform');

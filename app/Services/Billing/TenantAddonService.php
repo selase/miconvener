@@ -23,8 +23,8 @@ final class TenantAddonService
      * @var array<string, array{key: string, name: string, description: string, addon_type: string, unit_price: int, billing_interval: string, quantity: int, category: string, available: bool}>
      *
      * An entry marked unavailable stays listed, so the offer is visible, but it
-     * cannot be bought until what it sells is delivered: SMS has no sending
-     * gateway yet.
+     * cannot be bought until what it sells is delivered. SMS packs are also off
+     * sale while no SMS provider is configured -- see isAvailable().
      */
     public const CATALOG = [
         'team_seat' => [
@@ -80,7 +80,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 500,
             'category' => 'messaging',
-            'available' => false,
+            'available' => true,
         ],
         'sms_1500' => [
             'key' => 'sms_1500',
@@ -91,7 +91,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 1500,
             'category' => 'messaging',
-            'available' => false,
+            'available' => true,
         ],
         'sms_5000' => [
             'key' => 'sms_5000',
@@ -102,7 +102,7 @@ final class TenantAddonService
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 5000,
             'category' => 'messaging',
-            'available' => false,
+            'available' => true,
         ],
         'email_5000' => [
             'key' => 'email_5000',
@@ -137,7 +137,7 @@ final class TenantAddonService
      */
     public function purchasableKeys(): array
     {
-        return array_keys(array_filter(self::CATALOG, fn (array $item): bool => $item['available']));
+        return array_keys(array_filter(self::CATALOG, fn (string $key): bool => $this->isAvailable($key), ARRAY_FILTER_USE_KEY));
     }
 
     /**
@@ -147,6 +147,7 @@ final class TenantAddonService
     {
         return array_values(array_map(function (array $item): array {
             return array_merge($item, [
+                'available' => $this->isAvailable($item['key']),
                 'formatted_price' => number_format($item['unit_price'] / 100, 2),
             ]);
         }, self::CATALOG));
@@ -344,6 +345,17 @@ final class TenantAddonService
         ]);
 
         return true;
+    }
+
+    private function isAvailable(string $key): bool
+    {
+        $item = self::CATALOG[$key];
+
+        if ($item['addon_type'] === TenantAddon::TYPE_SMS_PACK && ! app(\App\Contracts\SmsGateway::class)->isConfigured()) {
+            return false;
+        }
+
+        return $item['available'];
     }
 
     private function getOrCreateCustomerId(User $user, Tenant $tenant): string

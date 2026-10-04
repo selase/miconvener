@@ -254,6 +254,18 @@ final class EventNotificationRuleController extends Controller
                 'body_template' => "Dear {name},\n\nWe are looking forward to welcoming you to {event_name} in one week on {date} at {venue}.\n\nPlease ensure your badge profile is complete and explore the digital programme before arrival.",
             ],
             [
+                'name' => 'Day-Before Reminder (Email + SMS)',
+                'target_role' => 'attendee',
+                'target_audience' => 'confirmed',
+                'trigger_type' => 'scheduled_offset',
+                'offset_direction' => 'before',
+                'offset_amount' => 1,
+                'offset_unit' => 'days',
+                'channels' => ['email', 'sms'],
+                'subject' => "See you tomorrow at {$event->name}",
+                'body_template' => 'Hi {name}, see you tomorrow at {event_name}, {date} at {venue}. Your ticket code is {ticket_code}.',
+            ],
+            [
                 'name' => 'Day-Of Welcome & Digital Pass Passcode',
                 'target_role' => 'attendee',
                 'target_audience' => 'confirmed',

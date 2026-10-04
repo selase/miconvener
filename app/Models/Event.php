@@ -258,6 +258,9 @@ final class Event extends Model
         return $this->hasMany(EventRegistration::class);
     }
 
+    /**
+     * @return HasMany<EventBlast, $this>
+     */
     public function blasts(): HasMany
     {
         return $this->hasMany(EventBlast::class);

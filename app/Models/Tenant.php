@@ -437,11 +437,7 @@ final class Tenant extends Model
         // 2. Is it a metered feature with a limit?
         $limit = $this->featureLimitValue($featureSlug);
         if ($limit === null) {
-            // Negative stored value means unlimited; null means not a limit or not enabled
-            $feature = $this->features()->where('feature_key', $featureSlug)->first();
-            $meta = $feature ? $feature->meta : [];
-
-            return isset($meta['type']) && $meta['type'] === 'limit' && (int) ($meta['value'] ?? 0) < 0;
+            return $this->hasUnlimited($featureSlug);
         }
 
         $usage = $this->usage()
@@ -487,6 +483,19 @@ final class Tenant extends Model
     }
 
     /**
+     * Whether a limit-type feature is set to unlimited (a negative stored
+     * value).
+     */
+    public function hasUnlimited(string $featureSlug): bool
+    {
+        $feature = $this->features()->where('feature_key', $featureSlug)->first();
+        $meta = $feature ? ($feature->meta ?? []) : [];
+
+        return ($meta['type'] ?? null) === 'limit'
+            && (int) ($meta['value'] ?? 0) < 0;
+    }
+
+    /**
      * Get the configured numeric limit for a limit-type feature, or null
      * when the feature is missing, disabled, not a limit type, or set to
      * unlimited (a negative stored value). Unlike canUse()/recordUsage(),
@@ -517,8 +526,6 @@ final class Tenant extends Model
             $limit += $this->purchasedTeamSeatsCount();
         } elseif ($featureSlug === 'staff_links') {
             $limit += $this->purchasedUsherPassesCount();
-        } elseif ($featureSlug === 'sms_credits') {
-            $limit += (int) $this->addons()->active()->ofType(TenantAddon::TYPE_SMS_PACK)->sum('quantity');
         } elseif ($featureSlug === 'email_credits') {
             $limit += (int) $this->addons()->active()->ofType(TenantAddon::TYPE_EMAIL_PACK)->sum('quantity');
         }

@@ -195,8 +195,8 @@ test('claimed delivery truthfully records missing contact quota suppression and 
     expect($gateway->deliver($quota)['status'])->toBe(EventNotificationLog::STATUS_SUPPRESSED_QUOTA)
         ->and($quota->fresh()->cost_billed)->toBe(0);
 
-    TenantNotificationSetting::forTenant($tenant->id)->update(['sms_enabled' => true, 'sms_cost_rate' => 25]);
-    $staged = $claims->claim($event, null, 'reminder', 'staged-sms', ['phone' => '+233 20 000 0000'], 'sms', $payload);
+    TenantNotificationSetting::forTenant($tenant->id)->update(['whatsapp_enabled' => true, 'whatsapp_cost_rate' => 25]);
+    $staged = $claims->claim($event, null, 'reminder', 'staged-whatsapp', ['phone' => '+233 20 000 0000'], 'whatsapp', $payload);
     expect($gateway->deliver($staged)['status'])->toBe(EventNotificationLog::STATUS_STAGED)
         ->and($staged->fresh()->cost_billed)->toBe(0)
         ->and($staged->fresh()->metadata)->toMatchArray(['would_bill' => 25]);
