@@ -531,3 +531,78 @@ describe('staff door, after review', () => {
         expect(bodies[0].sent_at).toBe('2026-11-02T09:00:00.000Z');
     });
 });
+
+describe('staff door, minor gaps', () => {
+    it('sends waiting scans as soon as a live scan succeeds', async () => {
+        const store = createMemoryStore();
+        await store.set(
+            'pack',
+            await packWith([{ id: 'r1', name: 'Ama', ticket_code: 'T1', qr: 'QR-1' }])
+        );
+        await store.set('queue', [
+            { client_scan_id: 'q1', registration_id: 'r1', scanned_at: '2026-11-02T08:59:00Z' },
+        ]);
+        const urlsCalled = [];
+        const fetcher = vi.fn(async (url, options) => {
+            urlsCalled.push(url);
+            if (url === '/sync') {
+                const { scans } = JSON.parse(options.body);
+                return json({
+                    results: scans.map((s) => ({
+                        client_scan_id: s.client_scan_id,
+                        outcome: 'admitted',
+                        message: '',
+                    })),
+                    admitted_since: [],
+                    server_time: '2026-11-02T09:05:00Z',
+                });
+            }
+            if (url === '/pack') return json(await packWith([]));
+            return json({ message: 'Kofi checked in.' });
+        });
+        const door = createStaffDoor({
+            urls,
+            store,
+            fetcher,
+            now: () => new Date('2026-11-02T09:00:00Z'),
+        });
+
+        await door.scan('QR-2');
+        await vi.waitFor(() => expect(door.status().queued).toBe(0));
+
+        expect(urlsCalled).toContain('/sync');
+    });
+
+    it('says the link is finished once its guest list is gone and nothing is waiting', async () => {
+        const store = createMemoryStore();
+        await store.set('pack', { ...(await packWith([])), ends_at: '2020-01-01T00:00:00Z' });
+        const door = createStaffDoor({
+            urls,
+            store,
+            fetcher: offline,
+            now: () => new Date('2026-11-02T09:00:00Z'),
+        });
+
+        await door.ready;
+
+        expect(door.status().finished).toBe(true);
+    });
+
+    it('is not finished while scans are still waiting to be sent', async () => {
+        const store = createMemoryStore();
+        await store.set('pack', { ...(await packWith([])), ends_at: '2020-01-01T00:00:00Z' });
+        await store.set('queue', [
+            { client_scan_id: 'q1', registration_id: 'r1', scanned_at: '2019-12-31T23:00:00Z' },
+        ]);
+        const door = createStaffDoor({
+            urls,
+            store,
+            fetcher: offline,
+            now: () => new Date('2026-11-02T09:00:00Z'),
+        });
+
+        await door.ready;
+
+        expect(door.status().finished).toBe(false);
+    });
+});

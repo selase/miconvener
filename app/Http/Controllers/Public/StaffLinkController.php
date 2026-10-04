@@ -201,8 +201,14 @@ final class StaffLinkController extends Controller
         $sentAt = $request->validated('sent_at');
         $offset = $sentAt !== null ? (int) Carbon::parse($sentAt)->diffInSeconds(now(), false) : 0;
 
-        foreach ($request->validated('scans') as $scan) {
-            $registration = $link->event->registrations()->where('id', $scan['registration_id'])->first();
+        $scans = $request->validated('scans');
+        $registrations = $link->event->registrations()
+            ->whereIn('id', array_column($scans, 'registration_id'))
+            ->get()
+            ->keyBy('id');
+
+        foreach ($scans as $scan) {
+            $registration = $registrations->get($scan['registration_id']);
             $scannedAt = Carbon::parse($scan['scanned_at'])->addSeconds($offset);
             $refusal = match (true) {
                 $registration === null => 'This ticket is not for this event.',

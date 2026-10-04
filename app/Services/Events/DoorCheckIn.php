@@ -66,10 +66,10 @@ final class DoorCheckIn
             // One scan of a guest at a time: two doors scanning the same ticket
             // in the same instant must not both admit it.
             return DB::connection('landlord')->transaction(function () use ($registration, $user, $staffLink, $scannedAt, $clientScanId, $wasOffline): array {
-                EventRegistration::query()->whereKey($registration->getKey())->lockForUpdate()->first();
-                $registration->refresh();
+                $locked = EventRegistration::query()->whereKey($registration->getKey())->lockForUpdate()->first() ?? $registration;
+                $locked->setRelation('event', $registration->event);
 
-                return $this->decide($registration, $user, $staffLink, $scannedAt, $clientScanId, $wasOffline);
+                return $this->decide($locked, $user, $staffLink, $scannedAt, $clientScanId, $wasOffline);
             });
         } catch (UniqueConstraintViolationException) {
             // The same scan, sent twice at once by a phone: the other request stored it.

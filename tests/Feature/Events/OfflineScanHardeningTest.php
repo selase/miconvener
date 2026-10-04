@@ -170,3 +170,32 @@ test('a refused sync says whose ticket it was', function (): void {
 
     expect($message)->toContain('Ama Owusu')->toContain($this->guest->ticket_code);
 });
+
+test('a scan before the first day is labelled day 1, never day 0', function (): void {
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $this->tenant->id,
+        'timezone' => 'Africa/Accra',
+        'starts_at' => Carbon::parse('2026-11-02 08:00', 'Africa/Accra'),
+        'ends_at' => Carbon::parse('2026-11-04 17:00', 'Africa/Accra'),
+    ]);
+
+    expect($event->dayNumber('2026-11-01'))->toBe(1)
+        ->and($event->dayNumber('2026-11-03'))->toBe(2);
+});
+
+test('a sync batch looks its guests up in one query, not one per scan', function (): void {
+    $guests = EventRegistration::factory()->count(20)->create([
+        'tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'status' => 'confirmed',
+    ]);
+    $scans = $guests->map(fn (EventRegistration $guest): array => [
+        'client_scan_id' => (string) Str::uuid(), 'registration_id' => $guest->id, 'scanned_at' => now()->toIso8601String(),
+    ])->all();
+
+    \Illuminate\Support\Facades\DB::connection('landlord')->enableQueryLog();
+    syncScans($this, $scans)->assertOk();
+    $lookups = collect(\Illuminate\Support\Facades\DB::connection('landlord')->getQueryLog())
+        ->filter(fn (array $q): bool => str_contains($q['query'], 'from "event_registrations"') && str_contains($q['query'], '"id" in'))
+        ->count();
+
+    expect($lookups)->toBe(1);
+});

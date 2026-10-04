@@ -5,7 +5,7 @@ import CheckInPanel from '@/Pages/Tenant/Events/CheckInPanel';
 import csrfFetch from '@/lib/csrfFetch';
 import { createStaffDoor } from '@/lib/staffDoor/door';
 import { createIdbStore } from '@/lib/staffDoor/store';
-import { registerStaffWorker } from '@/lib/staffDoor/registerStaffWorker';
+import { forgetOfflinePage, registerStaffWorker } from '@/lib/staffDoor/registerStaffWorker';
 
 const TYPE_LABEL = {
     refreshment: 'Water / refreshments',
@@ -324,6 +324,11 @@ function Ready({ token, link, event, counts: initialCounts }) {
         }, 30000);
         return () => clearInterval(timer);
     }, [link.can_check_in, token]);
+
+    // A finished link (switched off or over, nothing left to send) drops its offline page.
+    useEffect(() => {
+        if (doorStatus.finished) forgetOfflinePage(window.location.origin, token).catch(() => {});
+    }, [doorStatus.finished, token]);
 
     const stale =
         doorStatus.packUpdatedAt &&

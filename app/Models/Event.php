@@ -422,11 +422,12 @@ final class Event extends Model
     }
 
     /**
-     * 1 for the event's first day, 2 for the next, and so on.
+     * 1 for the event's first day, 2 for the next, and so on. Early arrivals
+     * scanned the evening before still count as day 1.
      */
     public function dayNumber(string $day): int
     {
-        return (int) Carbon::parse($this->dayFor($this->starts_at))->diffInDays(Carbon::parse($day)) + 1;
+        return max(1, (int) Carbon::parse($this->dayFor($this->starts_at))->diffInDays(Carbon::parse($day), false) + 1);
     }
 
     public function payouts(): HasMany

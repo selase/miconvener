@@ -34,6 +34,7 @@ export function createStaffDoor({
     let online = true;
     let closed = false;
     let locked = false;
+    let expired = false;
     let syncError = null;
     let syncing = null;
     const listeners = new Set();
@@ -42,6 +43,8 @@ export function createStaffDoor({
         online,
         closed,
         locked,
+        // Nothing more for this phone to do: the page can forget itself.
+        finished: (closed || expired) && queue.length === 0,
         syncError,
         queued: queue.length,
         guests: pack?.guests?.length ?? 0,
@@ -85,6 +88,7 @@ export function createStaffDoor({
         });
         // The guest list does not outlive the link; unsent scans wait to be sent.
         if (pack && new Date(pack.ends_at) < now()) {
+            expired = true;
             await dropGuestList();
         }
         emit();
@@ -226,6 +230,11 @@ export function createStaffDoor({
         return true;
     };
 
+    // The connection is back: hand over anything queued without waiting for the timer.
+    const sendWaitingSoon = () => {
+        if (queue.length > 0) door.sync();
+    };
+
     const door = {
         ready,
         status,
@@ -253,6 +262,7 @@ export function createStaffDoor({
                     method: 'POST',
                     body: JSON.stringify({ token, client_scan_id: scanId }),
                 });
+                sendWaitingSoon();
                 return await response.json();
             } catch {
                 if (closed) return switchedOff;
@@ -294,6 +304,7 @@ export function createStaffDoor({
                     method: 'POST',
                     body: JSON.stringify({ client_scan_id: scanId }),
                 });
+                sendWaitingSoon();
                 return await response.json();
             } catch {
                 if (closed) return switchedOff;
