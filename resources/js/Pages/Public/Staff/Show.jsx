@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { AlertTriangle, Bell, KeyRound, MapPin, ScanLine } from 'lucide-react';
 import CheckInPanel from '@/Pages/Tenant/Events/CheckInPanel';
 import csrfFetch from '@/lib/csrfFetch';
+import { createStaffDoor } from '@/lib/staffDoor/door';
+import { createIdbStore } from '@/lib/staffDoor/store';
+import { registerStaffWorker } from '@/lib/staffDoor/registerStaffWorker';
 
 const TYPE_LABEL = {
     refreshment: 'Water / refreshments',
@@ -108,12 +111,21 @@ function alertNewRequest(isMedical) {
 function Requests({ token, onCount }) {
     const [requests, setRequests] = useState([]);
     const [arrived, setArrived] = useState(null);
+    const [unreachable, setUnreachable] = useState(false);
     const seen = useRef(null);
 
     const load = useCallback(async () => {
-        const response = await csrfFetch(route('public.staff.requests', { token }));
-        if (!response.ok) return;
-        const data = await response.json();
+        let data;
+        try {
+            const response = await csrfFetch(route('public.staff.requests', { token }));
+            if (!response.ok) return;
+            data = await response.json();
+            setUnreachable(false);
+        } catch {
+            // Requests live on the server: without a connection there is nothing to show.
+            setUnreachable(true);
+            return;
+        }
         const openIds = data.filter((r) => r.status === 'open').map((r) => r.id);
 
         // The first load is what was already waiting, not something new.
@@ -177,7 +189,13 @@ function Requests({ token, onCount }) {
                 </div>
             )}
 
-            {active.length === 0 && (
+            {unreachable && (
+                <p className="rounded-md border border-warning-fg/40 bg-warning-bg p-3 text-sm text-warning-fg">
+                    Requests need a connection. They will appear when you are back online.
+                </p>
+            )}
+
+            {!unreachable && active.length === 0 && (
                 <p className="py-10 text-center text-sm text-ink-secondary">
                     No one needs help right now. New requests appear here and your phone will buzz.
                 </p>
@@ -261,14 +279,55 @@ function Ready({ token, link, event, counts: initialCounts }) {
     const [counts, setCounts] = useState(initialCounts);
     const [openRequests, setOpenRequests] = useState(0);
 
+    // The phone's door: the server first, the stored guest list when the
+    // server cannot be reached. One per link, kept in this phone's browser.
+    const door = useMemo(
+        () =>
+            createStaffDoor({
+                urls: {
+                    scan: route('public.staff.checkin.scan', { token }),
+                    search: route('public.staff.checkin.search', { token }),
+                    checkIn: (id) => route('public.staff.checkin', { token, registration: id }),
+                    pack: route('public.staff.pack', { token }),
+                    sync: route('public.staff.sync', { token }),
+                },
+                store: createIdbStore(`miconvener-staff-${token.slice(0, 16)}`),
+            }),
+        [token]
+    );
+    const [doorStatus, setDoorStatus] = useState(door.status());
+
+    useEffect(() => {
+        if (!link.can_check_in) return undefined;
+        registerStaffWorker();
+        const unsubscribe = door.subscribe(setDoorStatus);
+        door.sync();
+        const tick = setInterval(() => door.sync(), 30000);
+        const reconnect = () => door.sync();
+        window.addEventListener('online', reconnect);
+        return () => {
+            unsubscribe();
+            clearInterval(tick);
+            window.removeEventListener('online', reconnect);
+        };
+    }, [door, link.can_check_in]);
+
     useEffect(() => {
         if (!link.can_check_in) return undefined;
         const timer = setInterval(async () => {
-            const response = await csrfFetch(route('public.staff.counts', { token }));
-            if (response.ok) setCounts(await response.json());
+            try {
+                const response = await csrfFetch(route('public.staff.counts', { token }));
+                if (response.ok) setCounts(await response.json());
+            } catch {
+                // Offline: the stored count stands, plus this phone's unsent admissions.
+            }
         }, 30000);
         return () => clearInterval(timer);
     }, [link.can_check_in, token]);
+
+    const stale =
+        doorStatus.packUpdatedAt &&
+        Date.now() - new Date(doorStatus.packUpdatedAt) > 12 * 3600 * 1000;
 
     const percent =
         counts && counts.expected > 0 ? Math.round((counts.checked_in / counts.expected) * 100) : 0;
@@ -289,10 +348,48 @@ function Ready({ token, link, event, counts: initialCounts }) {
                                 / {counts.expected.toLocaleString()}
                             </span>
                         </div>
-                        <div className="num text-[11px] text-ink-secondary">{percent}% in</div>
+                        <div className="num text-[11px] text-ink-secondary">
+                            {percent}% in
+                            {!doorStatus.online &&
+                                doorStatus.queued > 0 &&
+                                ` · +${doorStatus.queued} offline`}
+                        </div>
                     </div>
                 )}
             </header>
+
+            {link.can_check_in && (
+                <div
+                    role="status"
+                    className={`px-4 py-1.5 text-xs ${
+                        doorStatus.closed
+                            ? 'bg-danger-bg text-danger-fg'
+                            : doorStatus.online
+                              ? 'text-ink-secondary'
+                              : 'bg-warning-bg text-warning-fg'
+                    }`}
+                >
+                    {doorStatus.closed
+                        ? 'This staff link has been switched off.'
+                        : doorStatus.online
+                          ? doorStatus.guests > 0
+                              ? `Live · ready offline with ${doorStatus.guests.toLocaleString()} guests`
+                              : 'Live'
+                          : `Offline · ${doorStatus.queued} waiting to send · ${doorStatus.guests.toLocaleString()} guests stored`}
+                    {stale && (
+                        <span>
+                            {' '}
+                            · guest list from {new Date(doorStatus.packUpdatedAt).toLocaleString()},
+                            connect to refresh
+                        </span>
+                    )}
+                    {doorStatus.attention.length > 0 && (
+                        <div className="mt-1 text-danger-fg">
+                            Needs attention: {doorStatus.attention.join(' ')}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {link.can_check_in && link.can_handle_requests && (
                 <nav className="grid grid-cols-2 border-b border-border text-sm">
@@ -327,6 +424,7 @@ function Ready({ token, link, event, counts: initialCounts }) {
                     <div hidden={tab !== 'scan'}>
                         <CheckInPanel
                             event={event}
+                            door={door}
                             sessions={[]}
                             scanUrl={route('public.staff.checkin.scan', { token })}
                             searchUrl={route('public.staff.checkin.search', { token })}

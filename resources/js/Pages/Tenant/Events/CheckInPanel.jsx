@@ -8,19 +8,37 @@ import csrfFetch from '@/lib/csrfFetch';
 
 const SCANNER_ELEMENT_ID = 'event-checkin-qr-reader';
 
+function admitted(result) {
+    return Boolean(
+        result.registration?.full_name &&
+        !result.already_checked_in &&
+        !result.not_checked_in &&
+        !result.refused &&
+        !result.error &&
+        !result.is_room_full
+    );
+}
+
 function CheckInResultBanner({ result }) {
     if (!result) return null;
 
     return (
         <div
             className={`mb-4 rounded-md px-4 py-3 text-sm ${
-                result.is_room_full
+                result.is_room_full || result.refused
                     ? 'bg-danger-bg text-danger-fg border border-danger-fg/40'
                     : result.already_checked_in || result.not_checked_in
                       ? 'bg-warning-bg text-warning-fg border border-warning-fg/40'
                       : 'bg-success-bg text-success-fg border border-success-fg/40'
             }`}
         >
+            {/* The holder's name, large, on an admission: at a busy door the usher
+                checks it against the person in front of them. */}
+            {admitted(result) && (
+                <div data-testid="admitted-name" className="text-2xl font-semibold leading-tight">
+                    {result.registration.full_name}
+                </div>
+            )}
             <div className="font-medium">{result.message}</div>
             {result.registration?.seat_label && (
                 <div className="mt-1 font-mono text-xs opacity-80">
@@ -37,7 +55,7 @@ function CheckInResultBanner({ result }) {
     );
 }
 
-function ScanMode({ scanUrl, payloadExtra = {}, onResult }) {
+function ScanMode({ scanUrl, payloadExtra = {}, onResult, door = null }) {
     const busyRef = useRef(false);
 
     useEffect(() => {
@@ -54,6 +72,11 @@ function ScanMode({ scanUrl, payloadExtra = {}, onResult }) {
                     busyRef.current = true;
 
                     try {
+                        // A staff link's door decides online or offline itself.
+                        if (door) {
+                            onResult(await door.scan(decodedText));
+                            return;
+                        }
                         const response = await csrfFetch(scanUrl, {
                             method: 'POST',
                             body: JSON.stringify({
@@ -92,7 +115,7 @@ function ScanMode({ scanUrl, payloadExtra = {}, onResult }) {
                 scanner.stop().catch(() => {});
             }
         };
-    }, [scanUrl, JSON.stringify(payloadExtra), onResult]);
+    }, [scanUrl, JSON.stringify(payloadExtra), onResult, door]);
 
     return (
         <div className="relative mx-auto aspect-square max-w-sm overflow-hidden border border-border bg-surface-sunken">
@@ -105,7 +128,7 @@ function ScanMode({ scanUrl, payloadExtra = {}, onResult }) {
     );
 }
 
-function ManualMode({ searchUrl, checkInUrlFor, onResult }) {
+function ManualMode({ searchUrl, checkInUrlFor, onResult, door = null }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
 
@@ -116,16 +139,24 @@ function ManualMode({ searchUrl, checkInUrlFor, onResult }) {
         }
 
         const timeout = setTimeout(async () => {
+            if (door) {
+                setResults(await door.search(query));
+                return;
+            }
             const response = await csrfFetch(`${searchUrl}?q=${encodeURIComponent(query)}`);
             setResults(await response.json());
         }, 250);
 
         return () => clearTimeout(timeout);
-    }, [query, searchUrl]);
+    }, [query, searchUrl, door]);
 
     const checkIn = async (registrationId) => {
-        const response = await csrfFetch(checkInUrlFor(registrationId), { method: 'POST' });
-        onResult(await response.json());
+        if (door) {
+            onResult(await door.checkIn(registrationId));
+        } else {
+            const response = await csrfFetch(checkInUrlFor(registrationId), { method: 'POST' });
+            onResult(await response.json());
+        }
         setQuery('');
         setResults([]);
     };
@@ -168,6 +199,7 @@ export default function CheckInPanel({
     checkInUrlFor,
     sessions = [],
     preselectedSessionId = null,
+    door = null,
 }) {
     // Find best default session:
     // 1. preselectedSessionId
@@ -387,12 +419,14 @@ export default function CheckInPanel({
                     scanUrl={effectiveScanUrl}
                     payloadExtra={payloadExtra}
                     onResult={handleResult}
+                    door={targetMode === 'event' ? door : null}
                 />
             ) : (
                 <ManualMode
                     searchUrl={searchUrl}
                     checkInUrlFor={effectiveCheckInUrlFor}
                     onResult={handleResult}
+                    door={targetMode === 'event' ? door : null}
                 />
             )}
         </div>
