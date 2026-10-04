@@ -127,8 +127,8 @@
         </h1>
 
         <p class="hero-sub">
-            Build the page, sell the tickets, scan guests in at the door, and see exactly
-            what you earned — without stitching five tools together.
+            Sell the tickets, run the door with your own crew’s phones, answer guests while
+            the event is on, and see exactly what you earned. One tool instead of five.
         </p>
 
         <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -229,9 +229,9 @@
         <div class="arc mt-10">
             @foreach ([
                 ['Create', 'Build the page', 'Schedule, speakers and ticket types on one link you can share anywhere.'],
-                ['Sell', 'Take payments', 'Cards and mobile money. The ticket arrives the moment payment clears.'],
-                ['Check in', 'Run the door', 'Scan a code or search by name, and print badges as guests arrive.'],
-                ['Settle', 'Get paid', 'One statement per event, then a payout to your account.'],
+                ['Sell', 'Take payments', 'Card and mobile money, with a QR ticket the moment payment clears. Bank transfer and MoMo slips you approve by hand.'],
+                ['Run', 'Run the day', 'Scan guests in, answer their requests, run live polls and Q&A, and keep the forum going.'],
+                ['Settle', 'Get paid', 'One statement per event, then a payout to your bank or mobile money.'],
             ] as $i => [$step, $title, $body])
                 <div class="arc-step">
                     <div class="arc-n mono">{{ str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT) }} · {{ $step }}</div>
@@ -248,16 +248,17 @@
     <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
         <div class="grid items-center gap-12 lg:grid-cols-[0.85fr_1.15fr]">
             <div>
-                <h2 class="h2 display">The door is the hardest part.<br>It takes one scan.</h2>
+                <h2 class="h2 display">Your crew scans<br>from their own phones.</h2>
                 <p class="lede mt-4">
-                    Point a phone at the guest’s entry code, or type it if they left it at home.
-                    Ticket type, capacity and codes already used are all checked before you wave anyone through.
+                    Send each usher a staff link on WhatsApp. It opens the scanner on their phone:
+                    no app, no account, no team seat. It stops working when the event ends.
                 </p>
                 <ul class="mt-6 space-y-3">
                     @foreach ([
-                        'Works on any phone — no scanner hardware to hire',
-                        'Several doors at once, all counting into the same total',
+                        'Works on any phone, so there is no scanner hardware to hire',
+                        'Every door counts into the same live total',
                         'Turns away a code that has already been used, and says why',
+                        'Every scan records who let the guest in',
                     ] as $point)
                         <li class="flex items-start gap-3 text-[15px]" style="color:var(--ink-2)">
                             <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style="background:var(--field)"></span>{{ $point }}
@@ -293,16 +294,16 @@
                     <div class="p-4">
                         <div class="flex items-baseline justify-between">
                             <div class="text-[13px] font-medium">Last scans</div>
-                            <div class="text-[11px]" style="color:var(--muted)">Main entrance, faculty desk, Volta Room</div>
+                            <div class="text-[11px]" style="color:var(--muted)">Three ushers, three doors</div>
                         </div>
                         <div class="mt-1">
                             @foreach ([
-                                ['Abena Owusu','AHIS26-9XR4','Main entrance','09:14:22', true],
-                                ['Selorm Attoh','AHIS26-7VD3','Faculty desk','09:13:58', true],
-                                ['Michael Tetteh','AHIS26-3JW2','Main entrance','09:13:41', true],
-                                ['Ibrahim Sulemana','AHIS26-4TL8','Main entrance','09:13:07', false],
-                                ['Kofi Danso','AHIS26-2M7Q','Main entrance','09:12:50', true],
-                                ['Yaa Serwaa Mensah','AHIS26-8F3K','Volta Room','09:12:11', true],
+                                ['Abena Owusu','AHIS26-9XR4','Gate A · Kwame','09:14:22', true],
+                                ['Selorm Attoh','AHIS26-7VD3','Faculty desk · Efua','09:13:58', true],
+                                ['Michael Tetteh','AHIS26-3JW2','Gate A · Kwame','09:13:41', true],
+                                ['Ibrahim Sulemana','AHIS26-4TL8','Gate A · Kwame','09:13:07', false],
+                                ['Kofi Danso','AHIS26-2M7Q','Gate B · Adjoa','09:12:50', true],
+                                ['Yaa Serwaa Mensah','AHIS26-8F3K','Volta Room · Efua','09:12:11', true],
                             ] as [$name, $code, $gate, $time, $ok])
                                 <div class="row">
                                     <div class="flex items-center gap-3">
@@ -323,6 +324,51 @@
                             One entry turned away: payment outstanding. Take payment at the desk to let them in.
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ══ REQUESTS ══════════════════════════════════════════════════════ --}}
+<section class="border-t" style="border-color:var(--rule)">
+    <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
+        <div class="grid items-center gap-12 lg:grid-cols-[0.85fr_1.15fr]">
+            <div>
+                <h2 class="h2 display">When a guest needs something,<br>someone’s phone buzzes.</h2>
+                <p class="lede mt-4">
+                    Water, a technician, a step-free route or first aid: guests ask from their ticket page.
+                    Your floor crew sees the request with the seat number, taps “I’m on it” and marks it done.
+                    Medical requests jump the queue, and the console shows who is handling each one.
+                </p>
+            </div>
+
+            {{-- Requests, as the floor crew sees them on a staff link. --}}
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <div class="text-[13px] font-medium">Requests</div>
+                        <div class="text-[11px]" style="color:var(--muted)">Floor · Efua</div>
+                    </div>
+                    <div class="rounded-md px-2.5 py-1 text-[11px] font-semibold text-white" style="background:var(--danger)">2 open</div>
+                </div>
+                <div class="px-5 py-2">
+                    @foreach ([
+                        ['Medical / first aid', 'Seat C-14 · Main Hall', '1m', 'Open', true],
+                        ['Water / refreshments', 'Seat F-02 · Volta Room', '3m', 'Kwame is on it', false],
+                        ['Technical issue', 'Seat A-21 · Main Hall', '6m', 'Open', false],
+                    ] as [$type, $where, $age, $state, $urgent])
+                        <div class="row">
+                            <span>
+                                <span class="block text-[13px] font-medium" style="{{ $urgent ? 'color:var(--danger)' : '' }}">{{ $type }}</span>
+                                <span class="block text-[11px]" style="color:var(--muted)">{{ $where }}</span>
+                            </span>
+                            <span class="text-right">
+                                <span class="mono block text-[11px]" style="color:var(--muted)">{{ $age }}</span>
+                                <span class="block text-[11px]" style="color:var(--ink-2)">{{ $state }}</span>
+                            </span>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         </div>

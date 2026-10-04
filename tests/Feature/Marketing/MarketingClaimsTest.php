@@ -33,6 +33,31 @@ test('the homepage does not promise offline scanning, which the scanner does not
         ->assertDontSee('Queued scans', false);
 });
 
+test('the homepage does not promise proration, quiz leaderboards or vendor milestone payments', function (): void {
+    // An upgrade charges the new plan's full price, a quiz shows the answer
+    // but ranks nobody, and a vendor quote takes one deposit.
+    $this->get('/')
+        ->assertOk()
+        ->assertDontSee('prorated', false)
+        ->assertDontSee('leaderboard', false)
+        ->assertDontSee('milestone', false);
+});
+
+test('the staff link FAQ quotes the allowances the plans grant', function (): void {
+    Artisan::call('db:seed', ['--class' => EventPackageSeeder::class]);
+
+    $answer = collect(config('product-page.faqs'))->firstWhere('q', 'Do my ushers need accounts?')['a'];
+
+    foreach (['free' => 'Free', 'starter' => 'Starter', 'growth' => 'Growth'] as $slug => $name) {
+        $granted = Package::query()->where('slug', $slug)->firstOrFail()
+            ->features()->where('slug', 'staff_links')->firstOrFail()->pivot->value;
+
+        expect($answer)->toContain("{$granted} on {$name}");
+    }
+
+    $this->get('/')->assertSee('Your crew scans', false)->assertSee('someone’s phone buzzes', false);
+});
+
 test('no plan advertises single sign-on, which is not built', function (): void {
     $this->get('/')->assertDontSee('Single sign-on', false);
 });
