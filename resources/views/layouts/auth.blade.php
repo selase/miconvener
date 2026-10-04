@@ -45,7 +45,7 @@
         </div>
 
         {{-- Logo --}}
-        <a href="{{ route('product.template') }}" class="relative flex items-center flex-none z-10">
+        <a href="{{ route('home') }}" class="relative flex items-center flex-none z-10">
             <img src="/assets/img/brand/miconvener-light.png"
                  srcset="/assets/img/brand/miconvener-light.png 1x, /assets/img/brand/miconvener-light@2x.png 2x"
                  alt="{{ $brandName }}" class="h-7 w-auto" width="1228" height="229" />

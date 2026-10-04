@@ -69,7 +69,8 @@ final class EventPackageSeeder extends Seeder
             'sort' => 1,
             'is_free' => false,
             'default_fee' => 3.5,
-            'default_cap' => 2500,
+            // GHS 20, as agreed for every plan and as billing charges in production.
+            'default_cap' => 2000,
             'default_bearer' => 'organizer',
             'features' => [
                 'events_in_flight' => 3,

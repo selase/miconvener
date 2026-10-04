@@ -62,7 +62,7 @@
         <div class="mx-auto max-w-7xl px-6">
             <div class="flex h-16 items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <a href="{{ route('product.template') }}" class="flex items-center">
+                    <a href="{{ route('home') }}" class="flex items-center">
                         <img src="{{ config('product-page.brand.wordmark') }}"
                              srcset="{{ config('product-page.brand.wordmark') }} 1x, {{ config('product-page.brand.wordmark_2x') }} 2x"
                              alt="{{ config('product-page.brand.name') }}"

@@ -47,7 +47,9 @@ Route::get('/health/scheduler', App\Http\Controllers\SchedulerHealthController::
 
 Route::get('/', fn (): Factory|View => view('product.landing'))->name('home');
 Route::get('/sample-product', fn (): Factory|View => view('sample-product-page'));
-Route::get('/product-template', fn (): Factory|View => view('product.landing'))->name('product.template');
+// A leftover from the template the homepage was built on. Kept as a permanent
+// redirect so old links and search results land on the real homepage.
+Route::permanentRedirect('/product-template', '/')->name('product.template');
 Route::get('/product-enterprise', fn (): Factory|View => view('product.enterprise'))->name('product.enterprise');
 Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadController::class, 'store'])->name('product.enterprise.lead');
 Route::get('/product-docs/{section?}', function (?string $section = 'start-guide') {

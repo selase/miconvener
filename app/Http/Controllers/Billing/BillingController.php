@@ -94,7 +94,7 @@ final class BillingController extends Controller
         $tenant = $tenantContext->getTenant();
         $packages = Package::where('is_active', true)->with('features')->orderBy('sort_order')->get();
         $planWarnings = app(PlanChangeWarnings::class);
-        $catalogPlans = collect(config('product-page.plans'))->keyBy('slug');
+        $catalogPlans = collect(config()->array('product-page.plans'))->keyBy('slug');
 
         return Inertia::render('Billing/Pricing', [
             'packages' => $packages->map(fn (Package $package): array => [

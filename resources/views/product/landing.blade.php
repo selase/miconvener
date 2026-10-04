@@ -136,7 +136,7 @@
             <a href="#pricing" class="btn-ghost">See pricing</a>
         </div>
 
-        <p class="mt-5 text-sm" style="color:#b7cdf7; font-weight:300">One free event and 50 registrations, no card required.</p>
+        <p class="mt-5 text-sm" style="color:#b7cdf7; font-weight:300">One live event at a time and 50 registrations a month. No card required.</p>
 
         {{-- Event-day overview. Swap for a real capture by replacing this block
              with <img src="/assets/img/marketing/overview.png" alt="…"> once the
@@ -271,7 +271,7 @@
                 <div class="panel-head">
                     <div>
                         <div class="text-[13px] font-medium">Check-in</div>
-                        <div class="text-[11px]" style="color:var(--muted)">Scanning works without a network. Queued scans sync when you reconnect.</div>
+                        <div class="text-[11px]" style="color:var(--muted)">Every door counts into the same live total, scan by scan.</div>
                     </div>
                     <div class="hidden rounded-md border px-2.5 py-1 text-[11px] sm:block" style="border-color:var(--rule); color:var(--ink-2)">Export log</div>
                 </div>

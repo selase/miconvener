@@ -73,7 +73,7 @@ return [
                 '150 SMS credits per month',
                 'Speaker material downloads',
                 'CSV settlement export',
-                '3.5% commission on ticket sales (GHS 25 cap)',
+                '3.5% commission on ticket sales (GHS 20 cap)',
                 'Modular add-ons available (Live Polling, extra seats)',
             ],
             'cta' => [
@@ -119,7 +119,6 @@ return [
                 'Unlimited events, registrations and seats',
                 'Unlimited email and SMS credits',
                 'White label portals',
-                'Single sign-on',
                 'API access',
                 'Negotiated commission',
             ],
@@ -189,22 +188,22 @@ return [
 
     'final_cta' => [
         'title' => 'Ready to run your next event?',
-        'subtitle' => 'Start free with one event and up to 50 registrations. No card required.',
+        'subtitle' => 'One live event at a time and 50 registrations a month. No card required.',
         'cta_primary' => ['label' => 'Start Free', 'href' => '/register'],
-        'cta_secondary' => ['label' => 'Contact Sales', 'href' => '/contact'],
+        // The contact form lives on the enterprise page; there is no /contact.
+        'cta_secondary' => ['label' => 'Talk to us', 'href' => '/product-enterprise'],
     ],
 
     'footer' => [
         'tagline' => 'Create, run and settle events — all in one place.',
         'columns' => [
             'Product' => [
-                ['label' => 'Features', 'href' => '/product-template#features'],
+                ['label' => 'Features', 'href' => '/#features'],
                 ['label' => 'Venue Marketplace', 'href' => '/marketplace'],
-                ['label' => 'Pricing', 'href' => '/product-template#pricing'],
+                ['label' => 'Pricing', 'href' => '/#pricing'],
                 ['label' => 'Enterprise', 'href' => '/product-enterprise'],
             ],
             'Company' => [
-                ['label' => 'About Us', 'href' => '#'],
                 ['label' => 'Terms', 'href' => '/terms'],
                 ['label' => 'Privacy', 'href' => '/privacy'],
             ],

@@ -28,28 +28,30 @@
                     </h1>
 
                     <p class="mt-6 text-[19px] leading-[30px] text-slate-500">
-                        {{ config('product-page.brand.name') }} is purpose-built to help you scale your SaaS with
-                        confidence. We can help if you process billions of events, have specific security requirements,
-                        or need custom enterprise support.
+                        {{ config('product-page.brand.name') }} runs conferences, summits and professional events from
+                        the first ticket to the final payout. If you run many events a year, need your own commission
+                        and limits, or want several teams working in one account, tell us what you need.
                     </p>
 
-                    {{-- Trust signals --}}
+                    {{-- Trust signals. Only what the product verifiably does: no
+                         certification, SLA or compliance claim goes here until it
+                         is held and can be shown to a buyer who asks for it. --}}
                     <div class="mt-10 grid grid-cols-2 gap-4">
                         <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                            <div class="text-2xl font-bold text-slate-900">SOC 2</div>
-                            <div class="mt-0.5 text-sm text-slate-500">Type II certified</div>
+                            <div class="text-2xl font-bold text-slate-900">Paystack</div>
+                            <div class="mt-0.5 text-sm text-slate-500">Cards and mobile money, processed by Paystack</div>
                         </div>
                         <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                            <div class="text-2xl font-bold text-slate-900">99.9%</div>
-                            <div class="mt-0.5 text-sm text-slate-500">Uptime SLA</div>
+                            <div class="text-2xl font-bold text-slate-900">Per event</div>
+                            <div class="mt-0.5 text-sm text-slate-500">Every charge, fee and payout on one statement</div>
                         </div>
                         <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                            <div class="text-2xl font-bold text-slate-900">GDPR</div>
-                            <div class="mt-0.5 text-sm text-slate-500">Fully compliant</div>
+                            <div class="text-2xl font-bold text-slate-900">Separate</div>
+                            <div class="mt-0.5 text-sm text-slate-500">Each organisation's records kept apart</div>
                         </div>
                         <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                            <div class="text-2xl font-bold text-slate-900">24 / 7</div>
-                            <div class="mt-0.5 text-sm text-slate-500">Dedicated support</div>
+                            <div class="text-2xl font-bold text-slate-900">Your terms</div>
+                            <div class="mt-0.5 text-sm text-slate-500">Commission and limits agreed with you</div>
                         </div>
                     </div>
 
