@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Libraries\Helper;
 use App\Traits\BelongsToTenant;
 use App\Traits\SpatieActivityLogs;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 final class Event extends Model
 {
@@ -381,6 +383,35 @@ final class Event extends Model
     public function staffLinks(): HasMany
     {
         return $this->hasMany(EventStaffLink::class);
+    }
+
+    /**
+     * @return HasMany<EventDoorScan, $this>
+     */
+    public function doorScans(): HasMany
+    {
+        return $this->hasMany(EventDoorScan::class);
+    }
+
+    /**
+     * The event's own calendar day for a moment, in the event's timezone.
+     */
+    public function dayFor(CarbonInterface $at): string
+    {
+        return $at->copy()->setTimezone($this->timezone ?: 'Africa/Accra')->toDateString();
+    }
+
+    public function isMultiDay(): bool
+    {
+        return $this->dayFor($this->starts_at) !== $this->dayFor($this->ends_at);
+    }
+
+    /**
+     * 1 for the event's first day, 2 for the next, and so on.
+     */
+    public function dayNumber(string $day): int
+    {
+        return (int) Carbon::parse($this->dayFor($this->starts_at))->diffInDays(Carbon::parse($day)) + 1;
     }
 
     public function payouts(): HasMany

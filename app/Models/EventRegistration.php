@@ -199,6 +199,14 @@ final class EventRegistration extends Model
     }
 
     /**
+     * @return HasMany<EventDoorScan, $this>
+     */
+    public function doorScans(): HasMany
+    {
+        return $this->hasMany(EventDoorScan::class, 'registration_id');
+    }
+
+    /**
      * @return HasOne<EventSeatAssignment, $this>
      */
     public function seatAssignment(): HasOne

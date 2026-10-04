@@ -9,6 +9,7 @@ use App\Libraries\Helper;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
+use App\Services\Events\DoorCheckIn;
 use App\Services\Events\EventSections;
 use App\Services\Events\EventWorkspaceSnapshot;
 use App\Services\Events\RecurrenceService;
@@ -571,12 +572,8 @@ final class EventController extends Controller
 
         return Inertia::render('Tenant/Events/CheckInDoor', [
             'event' => $this->toPayload($eventModel),
-            'counts' => [
-                'checked_in' => $eventModel->registrations()->where('status', EventRegistration::STATUS_CHECKED_IN)->count(),
-                'expected' => $eventModel->registrations()
-                    ->whereIn('status', [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN])
-                    ->count(),
-            ],
+            // Today's entries, so a multi-day event's door starts each day at zero.
+            'counts' => app(DoorCheckIn::class)->counts($eventModel),
         ]);
     }
 
