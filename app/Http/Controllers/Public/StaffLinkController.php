@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SyncStaffScansRequest;
+use App\Models\EventDoorScan;
+use App\Models\EventRegistration;
 use App\Models\EventServiceRequest;
 use App\Models\EventStaffLink;
 use App\Models\Tenant;
@@ -14,6 +17,7 @@ use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -119,6 +123,109 @@ final class StaffLinkController extends Controller
         $registrationModel = $link->event->registrations()->where('id', $registration)->firstOrFail();
 
         return $this->respond($this->door->checkIn($registrationModel, staffLink: $link));
+    }
+
+    /**
+     * Everything the phone needs to keep admitting guests without a
+     * connection. QR tokens leave as SHA-256 hashes only: the phone can
+     * recognise a scanned code but cannot produce one. No emails or phone
+     * numbers.
+     */
+    public function pack(Request $request, string $subdomain, string $token): JsonResponse
+    {
+        $link = $this->authorizeFor($request, $token, 'check_in');
+        $event = $link->event;
+        $today = $event->dayFor(now());
+        $timezone = $event->timezone ?: 'Africa/Accra';
+
+        $inToday = EventDoorScan::query()
+            ->where('event_id', $event->id)
+            ->admittedOn($today)
+            ->selectRaw('registration_id, min(scanned_at) as first_at')
+            ->groupBy('registration_id')
+            ->pluck('first_at', 'registration_id');
+
+        $guests = $event->registrations()
+            ->whereIn('status', [EventRegistration::STATUS_CONFIRMED, EventRegistration::STATUS_CHECKED_IN])
+            ->with(['ticketType:id,name', 'seatAssignment.room:id,name'])
+            ->get(['id', 'full_name', 'ticket_code', 'qr_token', 'ticket_type_id', 'status', 'checked_in_at'])
+            ->map(function (EventRegistration $registration) use ($inToday, $event, $today, $timezone): array {
+                $arrivedToday = $registration->checked_in_at !== null && $event->dayFor($registration->checked_in_at) === $today
+                    ? $registration->checked_in_at
+                    : null;
+                $in = $inToday[$registration->id] ?? $arrivedToday;
+
+                return [
+                    'id' => $registration->id,
+                    'name' => $registration->full_name,
+                    'ticket_type' => $registration->ticketType?->name,
+                    'ticket_code' => $registration->ticket_code,
+                    'seat' => $registration->seatAssignment?->seat_label,
+                    'room' => $registration->seatAssignment?->room?->name,
+                    'qr_hash' => $registration->qr_token !== null ? hash('sha256', $registration->qr_token) : null,
+                    'in_today_at' => $in !== null ? Carbon::parse($in)->setTimezone($timezone)->toIso8601String() : null,
+                ];
+            });
+
+        return response()->json([
+            'version' => now()->toIso8601String(),
+            'day' => $today,
+            'timezone' => $timezone,
+            'ends_at' => $event->ends_at->copy()->addHours(EventStaffLink::HOURS_AFTER_EVENT)->toIso8601String(),
+            'guests' => $guests,
+        ]);
+    }
+
+    /**
+     * Scans made while the phone was offline. Each is applied once (by its
+     * client id), so resending after a dropped answer is harmless. The answer
+     * also carries admissions made at other doors since the last sync.
+     */
+    public function sync(SyncStaffScansRequest $request, string $subdomain, string $token): JsonResponse
+    {
+        $link = $this->authorizeFor($request, $token, 'check_in');
+        $results = [];
+
+        foreach ($request->validated('scans') as $scan) {
+            $registration = $link->event->registrations()->where('id', $scan['registration_id'])->first();
+
+            if ($registration === null) {
+                $results[] = [
+                    'client_scan_id' => $scan['client_scan_id'],
+                    'outcome' => EventDoorScan::OUTCOME_REFUSED,
+                    'message' => 'This ticket is not for this event.',
+                ];
+
+                continue;
+            }
+
+            $result = $this->door->checkIn(
+                $registration,
+                staffLink: $link,
+                scannedAt: Carbon::parse($scan['scanned_at']),
+                clientScanId: $scan['client_scan_id'],
+                wasOffline: true,
+            );
+
+            $results[] = [
+                'client_scan_id' => $scan['client_scan_id'],
+                'outcome' => $result['body']['outcome'],
+                'message' => $result['body']['message'],
+            ];
+        }
+
+        $since = $request->validated('since');
+
+        return response()->json([
+            'results' => $results,
+            'admitted_since' => $since === null ? [] : EventDoorScan::query()
+                ->where('event_id', $link->event_id)
+                ->whereIn('outcome', [EventDoorScan::OUTCOME_ADMITTED, EventDoorScan::OUTCOME_DUPLICATE])
+                ->where('created_at', '>', Carbon::parse($since))
+                ->get(['registration_id', 'scanned_at'])
+                ->map(fn (EventDoorScan $scan): array => ['registration_id' => $scan->registration_id, 'at' => $scan->scanned_at->toIso8601String()]),
+            'server_time' => now()->toIso8601String(),
+        ]);
     }
 
     public function requests(Request $request, string $subdomain, string $token): JsonResponse

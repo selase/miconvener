@@ -471,6 +471,9 @@ Route::prefix('staff/{token}')->name('public.staff.')->middleware('throttle:900,
     Route::get('/counts', [App\Http\Controllers\Public\StaffLinkController::class, 'counts'])->name('counts');
     Route::get('/checkin/search', [App\Http\Controllers\Public\StaffLinkController::class, 'search'])->name('checkin.search');
     Route::post('/checkin/scan', [App\Http\Controllers\Public\StaffLinkController::class, 'scan'])->name('checkin.scan');
+    // Offline support: before the {registration} route, so "sync" is never read as a registration id.
+    Route::get('/offline-pack', [App\Http\Controllers\Public\StaffLinkController::class, 'pack'])->name('pack');
+    Route::post('/checkin/sync', [App\Http\Controllers\Public\StaffLinkController::class, 'sync'])->name('sync');
     Route::post('/checkin/{registration}', [App\Http\Controllers\Public\StaffLinkController::class, 'checkIn'])->name('checkin');
     Route::get('/requests', [App\Http\Controllers\Public\StaffLinkController::class, 'requests'])->name('requests');
     Route::patch('/requests/{serviceRequest}/claim', [App\Http\Controllers\Public\StaffLinkController::class, 'claim'])->name('requests.claim');
