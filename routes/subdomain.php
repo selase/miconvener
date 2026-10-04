@@ -182,6 +182,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('events/{event}/checkin/scan', [EventCheckInController::class, 'scan'])->name('tenant.events.checkin.scan');
     Route::post('events/{event}/checkin/{registration}', [EventCheckInController::class, 'checkIn'])->name('tenant.events.checkin');
     Route::get('events/{event}/data/staff-links', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'index'])->name('tenant.events.staff-links.index');
+    Route::get('events/{event}/data/door-scans', [App\Http\Controllers\Tenant\EventDoorScanController::class, 'index'])->name('tenant.events.door-scans.index');
     Route::post('events/{event}/staff-links', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'store'])->name('tenant.events.staff-links.store');
     Route::patch('events/{event}/staff-links/{staffLink}', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'update'])->name('tenant.events.staff-links.update');
     Route::delete('events/{event}/staff-links/{staffLink}', [App\Http\Controllers\Tenant\EventStaffLinkController::class, 'destroy'])->name('tenant.events.staff-links.destroy');

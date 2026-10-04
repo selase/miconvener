@@ -23,6 +23,7 @@ import BadgesPanel from './panels/BadgesPanel';
 import VenuePanel from './panels/VenuePanel';
 import RequestsPanel from './panels/RequestsPanel';
 import StaffLinksPanel from './panels/StaffLinksPanel';
+import DoorScansPanel from './panels/DoorScansPanel';
 import ForumPanel from './panels/ForumPanel';
 import MaterialsPanel from './panels/MaterialsPanel';
 import ReportsPanel from './panels/ReportsPanel';
@@ -540,6 +541,7 @@ export default function Show({
                 <div className="flex justify-end">
                     <DoorModeLink event={event} />
                 </div>
+                <DoorScansPanel event={event} />
                 <CheckInPanel
                     event={event}
                     sessions={event.sessions || []}

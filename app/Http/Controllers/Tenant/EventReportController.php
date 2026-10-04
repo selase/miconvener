@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\EventDoorScan;
 use App\Models\EventForumThread;
 use App\Models\EventPollResponse;
 use App\Models\EventRegistration;
@@ -133,19 +134,24 @@ final class EventReportController extends Controller
 
         return response()->streamDownload(function () use ($eventModel): void {
             $handle = fopen('php://output', 'wb');
-            fputcsv($handle, ['Name', 'Ticket code', 'Checked in at', 'Checked in by']);
+            fputcsv($handle, ['Name', 'Ticket code', 'Checked in at', 'Checked in by', 'Days attended', 'Used twice on']);
 
             $eventModel->registrations()
                 ->where('status', EventRegistration::STATUS_CHECKED_IN)
-                ->with('checkedInBy:id,first_name,last_name')
+                ->with(['checkedInBy:id,first_name,last_name', 'doorScans' => fn ($query) => $query->whereIn('outcome', [EventDoorScan::OUTCOME_ADMITTED, EventDoorScan::OUTCOME_DUPLICATE])])
                 ->orderBy('checked_in_at')
                 ->chunk(200, function ($registrations) use ($handle): void {
                     foreach ($registrations as $registration) {
+                        $days = $registration->doorScans->groupBy(fn (EventDoorScan $scan): string => $scan->event_day->toDateString());
+
                         fputcsv($handle, [
                             $registration->full_name,
                             $registration->ticket_code,
                             $registration->checked_in_at?->toIso8601String(),
                             $registration->checkedInBy ? mb_trim($registration->checkedInBy->first_name.' '.$registration->checkedInBy->last_name) : null,
+                            // Checked in before the door log existed, or by self check-in: one day.
+                            max(1, $days->count()),
+                            $days->filter(fn ($scans): bool => $scans->count() > 1)->keys()->implode(' '),
                         ]);
                     }
                 });
