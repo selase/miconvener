@@ -143,14 +143,20 @@ return [
 
     'capabilities' => [
         'title' => 'Everything an event needs',
-        'subtitle' => 'One place for the whole operation, from the first invite to the money landing in your account.',
+        'subtitle' => 'One place for the whole operation, from venue booking and vendor sourcing to on-site check-in and financial settlement.',
         'items' => [
-            ['icon' => '🎫', 'title' => 'Event pages', 'body' => 'Description, schedule, speakers and tickets on one shareable link.'],
-            ['icon' => '💳', 'title' => 'Ticketing', 'body' => 'Free, paid or tiered tickets with capacity limits, approvals and waitlists.'],
-            ['icon' => '📲', 'title' => 'Check-in', 'body' => 'Scan a QR code or search by name at the door, and print badges as guests arrive.'],
-            ['icon' => '🗓', 'title' => 'Programme', 'body' => 'Multi-session agendas, speaker portals, venue rooms and seat assignments.'],
-            ['icon' => '💬', 'title' => 'Engagement', 'body' => 'Live polls, quizzes with a leaderboard, a moderated forum and shared materials.'],
-            ['icon' => '📊', 'title' => 'Settlement', 'body' => 'Every payment, fee and refund on one statement, with payouts to your account.'],
+            ['icon' => '🎫', 'title' => 'Event pages', 'body' => 'Description, schedule, speakers, and ticket tiers on one unified shareable link.'],
+            ['icon' => '💳', 'title' => 'Ticketing & Payments', 'body' => 'Free, paid or tiered tickets with instant mobile money and card checkout via Paystack.'],
+            ['icon' => '📲', 'title' => 'Check-in & Badges', 'body' => 'Scan QR codes at the door, coordinate mobile usher teams, and print attendee badges.'],
+            ['icon' => '🗓', 'title' => 'Multi-Track Programme', 'body' => 'Agendas across multiple rooms, session occupancy caps, and downloadable calendar feeds.'],
+            ['icon' => '🎤', 'title' => 'Speaker Portal', 'body' => 'Dedicated self-service portal for speakers to confirm participation, edit bios, and upload slides.'],
+            ['icon' => '💬', 'title' => 'Live Polling & Q&A', 'body' => 'Synchronized presenter decks, audience voting, live leaderboard quizzes, and moderated Q&A.'],
+            ['icon' => '🏛️', 'title' => 'Venue Marketplace', 'body' => 'Discover event venues, inspect seating configurations, request quotes, and lock dates with deposits.'],
+            ['icon' => '📋', 'title' => 'Facility Operations', 'body' => 'Direct host-to-planner messaging, condition inspections, handover checklists, and joint task tracking.'],
+            ['icon' => '🛍️', 'title' => 'Vendor RFQs & Quotes', 'body' => 'Source vetted caterers, AV production, and decorators with itemized proposals and milestone payments.'],
+            ['icon' => '📊', 'title' => 'Settlement & Ledgers', 'body' => 'Charges, refunds, and provider fees on an exportable statement with direct mobile money payouts.'],
+            ['icon' => '⚡', 'title' => 'Webhooks & Integrations', 'body' => 'Real-time cryptographic webhook deliveries for ticket purchases, check-ins, and settlement events.'],
+            ['icon' => '🛡️', 'title' => 'Event Safeguards', 'body' => 'Soft-delete protection with a 6-hour recovery window and safeguards against in-flight payouts.'],
         ],
     ],
 

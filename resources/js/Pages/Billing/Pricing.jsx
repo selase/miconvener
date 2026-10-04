@@ -122,27 +122,6 @@ export default function Pricing({ packages, currentPackageSlug, currency = 'GHS'
                         );
                     })}
                 </div>
-
-                <div className="mt-8 rounded-lg border border-border bg-surface-raised p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <div className="text-xs font-semibold text-accent uppercase tracking-wider">
-                                Modular Add-Ons Available
-                            </div>
-                            <h4 className="text-base font-bold text-ink mt-0.5">
-                                Need more capacity without changing your plan tier?
-                            </h4>
-                            <p className="text-sm text-ink-secondary mt-1">
-                                Purchase extra Team Seats (GHS 75/mo), Usher passes (GHS 60/mo), Live Polling & Q&A passes (GHS 50/event or GHS 85/mo), or Prepaid SMS & Email bundles.
-                            </p>
-                        </div>
-                        <div className="flex-none">
-                            <Button href={route('billing.addons.index')} variant="primary">
-                                Browse Add-Ons
-                            </Button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {confirming && (
