@@ -6,7 +6,7 @@
 export function registerStaffWorker() {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
-    navigator.serviceWorker.register('/staff-sw.js', { scope: '/staff/' }).catch(() => {
+    navigator.serviceWorker.register('/staff-worker.js', { scope: '/staff/' }).catch(() => {
         // Registration failing (private browsing, an old browser) only loses offline reloads.
     });
 }

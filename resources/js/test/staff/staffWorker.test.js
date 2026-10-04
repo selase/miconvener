@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * Runs public/staff-sw.js against fake caches: the worker is a plain script,
+ * Runs resources/js/workers/staff-sw.js against fake caches: the worker is a plain script,
  * so it is evaluated with its own `self` and `caches`.
  */
 function loadWorker(initial) {
@@ -33,7 +33,7 @@ function loadWorker(initial) {
         skipWaiting() {},
         clients: { claim: async () => {} },
     };
-    const source = readFileSync(path.resolve('public/staff-sw.js'), 'utf8');
+    const source = readFileSync(path.resolve('resources/js/workers/staff-sw.js'), 'utf8');
     new Function('self', 'caches', 'fetch', source)(self, caches, globalThis.fetchForWorker);
     return { stores, listeners };
 }

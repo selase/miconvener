@@ -52,6 +52,15 @@ Route::get('/sample-product', fn (): Factory|View => view('sample-product-page')
 Route::permanentRedirect('/product-template', '/')->name('product.template');
 Route::get('/product-enterprise', fn (): Factory|View => view('product.enterprise'))->name('product.enterprise');
 Route::get('/terms', fn (): Factory|View => view('product.terms'))->name('terms');
+
+// The staff links' offline worker. Served by the app rather than as a static
+// file so it is never cached at the edge: a fixed worker must reach ushers'
+// phones on the next page load, not hours later.
+Route::get('/staff-worker.js', fn () => response()->file(resource_path('js/workers/staff-sw.js'), [
+    'Content-Type' => 'application/javascript; charset=utf-8',
+    'Cache-Control' => 'no-cache, no-store, must-revalidate',
+    'Service-Worker-Allowed' => '/staff/',
+]))->name('staff.worker');
 Route::get('/privacy', fn (): Factory|View => view('product.privacy'))->name('privacy');
 Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadController::class, 'store'])->name('product.enterprise.lead');
 Route::get('/product-docs/{section?}', function (?string $section = 'start-guide') {

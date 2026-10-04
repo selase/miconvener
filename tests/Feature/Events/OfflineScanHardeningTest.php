@@ -199,3 +199,12 @@ test('a sync batch looks its guests up in one query, not one per scan', function
 
     expect($lookups)->toBe(1);
 });
+
+test('the offline worker is served uncached, so a deploy reaches phones at once', function (): void {
+    $response = $this->get("http://{$this->host}/staff-worker.js", ['HTTP_HOST' => $this->host])->assertOk();
+
+    expect($response->headers->get('Content-Type'))->toContain('javascript')
+        ->and($response->headers->get('Cache-Control'))->toContain('no-cache')
+        ->and($response->headers->get('Service-Worker-Allowed'))->toBe('/staff/')
+        ->and(file_get_contents($response->baseResponse->getFile()->getPathname()))->toContain('miconvener-staff-v');
+});
