@@ -124,6 +124,16 @@ test('the event-day crew is seeded: staff links that work, credited check-ins an
 
     $statuses = EventServiceRequest::withoutGlobalScopes()->where('event_id', $event->id)->pluck('status')->sort()->values()->all();
     expect($statuses)->toBe(['acknowledged', 'open', 'resolved', 'resolved']);
+
+    // A guest scanned in during a demo goes back to waiting, credited to no one.
+    $absent = $event->registrations()->withoutGlobalScopes()->where('status', 'confirmed')->firstOrFail();
+    $absent->update(['status' => 'checked_in', 'checked_in_at' => now(), 'checked_in_by_staff_link_id' => $links['Floor – Efua']->id]);
+
+    Artisan::call('db:seed', ['--class' => ProbeWorkspaceSeeder::class]);
+
+    $absent->refresh();
+    expect($absent->status)->toBe('confirmed')
+        ->and($absent->checked_in_by_staff_link_id)->toBeNull();
 });
 
 test('running the seeder twice changes nothing and moves the event to the new now', function (): void {

@@ -357,6 +357,8 @@ final class ProbeWorkspaceSeeder extends Seeder
                     'email_verified_at' => now()->subDays(10),
                     'checked_in_at' => $present ? now()->subMinutes(150 - $i) : null,
                     'checked_in_source' => $present ? 'scan' : null,
+                    // Undo a scan made during a demo; staff() re-credits the present.
+                    'checked_in_by_staff_link_id' => null,
                 ]
             );
 
