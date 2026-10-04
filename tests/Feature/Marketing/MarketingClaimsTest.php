@@ -89,7 +89,14 @@ test('every internal link in the homepage navigation, calls to action and footer
 
 test('the Terms and Privacy pages exist, since every form says people agree to them', function (): void {
     $this->get('/terms')->assertOk()->assertSee('Terms of Service')->assertSee('Paystack');
-    $this->get('/privacy')->assertOk()->assertSee('Privacy Policy')->assertSee('Act 843');
+    $this->get('/privacy')->assertOk()->assertSee('Privacy Policy')->assertSee('Act 843')->assertSee('marketplace');
+
+    // What established platforms make explicit: who sells the ticket, who owes
+    // the tax, what a cancellation refunds, and the marketplace's own rules.
+    $this->get('/terms')
+        ->assertSee('is the seller of its tickets', false)
+        ->assertSee('not refunded to the organizer', false)
+        ->assertSee('Marketplace', false);
 
     // The enterprise form's consent line once pointed at '#'.
     $this->get('/product-enterprise')->assertSee(route('privacy'), false);

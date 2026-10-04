@@ -38,7 +38,8 @@
 
         <h2>Who we share it with</h2>
         <ul>
-            <li><strong>The event's organizer</strong>, for the events you register for.</li>
+            <li><strong>The event's organizer</strong>, for the events you register for: your registration details and your activity at the event, such as check-in and requests for help.</li>
+            <li><strong>Venues and suppliers on the marketplace</strong>, when you ask them for a quote or a booking: your name, contact details and what you asked for.</li>
             <li><strong>Paystack</strong>, which processes payments and payouts.</li>
             <li><strong>Our hosting, file storage and email delivery providers</strong>, which store data and send email for us and may process it outside Ghana under safeguards that protect it.</li>
             <li><strong>Authorities</strong>, where the law requires us to.</li>

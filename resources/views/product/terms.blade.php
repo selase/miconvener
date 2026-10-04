@@ -29,9 +29,11 @@
         <h2>Payments, commission and payouts</h2>
         <ul>
             <li>Ticket payments and contributions are processed by Paystack. Card and mobile money details go to Paystack, never to us.</li>
+            <li>We collect payments on the organizer's behalf. The organizer, not {{ $brand }}, is the seller of its tickets and is responsible for any taxes due on its sales.</li>
             <li>We charge a commission on paid tickets at the rate of the organizer's plan, up to the cap per ticket shown on our <a href="{{ route('home') }}#pricing" class="underline hover:text-slate-900">pricing</a>, or at a rate agreed in writing. Payment processing and transfer fees are passed on at cost.</li>
             <li>The organizer chooses for each event whether it or the attendee bears these fees.</li>
             <li>Ticket income, less commission and fees, is paid out to the organizer's account. Refunds to attendees are made from the organizer's funds.</li>
+            <li>If an event is cancelled, our commission and the payment provider's fees on tickets already sold are not refunded to the organizer, unless the law requires it.</li>
         </ul>
 
         <h2>Plans, renewals and add-ons</h2>
@@ -43,8 +45,15 @@
             <li>Payments for plans and add-ons are not refunded for part of a period, unless the law requires it.</li>
         </ul>
 
+        <h2>Marketplace</h2>
+        <ul>
+            <li>Venues and suppliers listed on the {{ $brand }} marketplace are independent businesses. A booking or an accepted quote is an agreement between the planner and that business; {{ $brand }} provides the listing, the quote and the payment of the deposit.</li>
+            <li>We take a commission on marketplace payments at the rate shown when the business joins. A deposit, once paid, is governed by the terms the business set in its quote.</li>
+            <li>Listings must describe what is actually offered. We may remove a listing or a review that is misleading, and verify a business before it can take paid bookings.</li>
+        </ul>
+
         <h2>Acceptable use</h2>
-        <p>You may not use {{ $brand }} to run fraudulent or unlawful events, to send unsolicited messages, to collect data you have no right to, or to interfere with the service or other users. We may suspend an event or account that does, and we may withhold payouts connected to fraud while it is investigated.</p>
+        <p>You may not use {{ $brand }} to run fraudulent or unlawful events, to send unsolicited messages, to collect data you have no right to, or to interfere with the service or other users. Before importing a contact list, you must have the consent of the people on it to be contacted about your events. We may suspend an event or account that does, and we may withhold payouts connected to fraud while it is investigated.</p>
 
         <h2>Your content</h2>
         <p>You keep ownership of what you upload: event descriptions, images, materials and attendee data. You give us permission to store and display it only as needed to run the service for you.</p>
