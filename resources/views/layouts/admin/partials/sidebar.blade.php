@@ -364,24 +364,9 @@
                             </div>
                         </div>
 
+                        {{-- Global LLM Usage (llm-usage.index) is left out of the menu: the
+                             AI API is a placeholder and records no usage (checked 2026-10-05). --}}
                         @if(auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard'))
-                            <div class="menu-item">
-                                <a class="menu-link {{ request()->routeIs('llm-usage.index') ? 'active' : '' }}"
-                                    href="{{ route('llm-usage.index') }}">
-                                    <span class="menu-icon">
-                                        <span class="svg-icon svg-icon-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                                fill="none">
-                                                <path
-                                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
-                                                    fill="currentColor" />
-                                            </svg>
-                                        </span>
-                                    </span>
-                                    <span class="menu-title">Global LLM Usage</span>
-                                </a>
-                            </div>
-
                             <div class="menu-item menu-accordion {{ request()->is('user-management/features*') || request()->is('user-management/packages*') ? 'show' : '' }}"
                                 data-kt-menu-trigger="click">
                                 <span class="menu-link">
@@ -444,22 +429,13 @@
                                     <span class="menu-title">Usage Analytics</span>
                                 </a>
                             </div>
-                            <div class="menu-item">
-                                <a class="menu-link {{ request()->is('admin/billing/invoices*') ? 'active' : '' }}" href="{{ route('admin.billing.invoices.index') }}">
-                                    <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
-                                    <span class="menu-title">Invoices</span>
-                                </a>
-                            </div>
+                            {{-- Usage invoices and Rate Cards & Taxes are left out of the menu:
+                                 MiConvener bills plans and add-ons, not metered usage, and none
+                                 has ever been issued or priced (checked 2026-10-05). --}}
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('packages.*') ? 'active' : '' }}" href="{{ route('packages.index') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
                                     <span class="menu-title">Subscription Plans</span>
-                                </a>
-                            </div>
-                            <div class="menu-item">
-                                <a class="menu-link {{ request()->routeIs('admin.billing.rate-cards.index') ? 'active' : '' }}" href="{{ route('admin.billing.rate-cards.index') }}">
-                                    <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
-                                    <span class="menu-title">Rate Cards & Taxes</span>
                                 </a>
                             </div>
                             <div class="menu-item">

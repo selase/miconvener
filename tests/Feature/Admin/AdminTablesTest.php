@@ -94,3 +94,13 @@ test('the business verification queue is in the menu with its pending count', fu
         ->assertSee(route('admin.marketplace-verifications.index'), false)
         ->assertSee('Business Verifications');
 });
+
+test('the menu leaves out pages for features MiConvener does not run', function (): void {
+    $this->actingAs($this->superadmin)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee(route('admin.billing.analytics.usage'), false)
+        ->assertDontSee(route('llm-usage.index'), false)
+        ->assertDontSee(route('admin.billing.invoices.index').'"', false)
+        ->assertDontSee(route('admin.billing.rate-cards.index'), false);
+});

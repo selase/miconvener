@@ -55,9 +55,21 @@ final class Package extends Model
         'default_platform_fee_cap_amount' => 'integer',
     ];
 
+    /**
+     * A GHS 0 list price means free, except on a negotiated plan, whose price
+     * is set per organisation (see Tenant::agreedPriceFor()).
+     */
     public function isFree(): bool
     {
-        return $this->is_free || (float) $this->price === 0.0;
+        return $this->is_free || ((float) $this->price === 0.0 && ! $this->isNegotiated());
+    }
+
+    /**
+     * Priced per organisation rather than from a list price: Enterprise.
+     */
+    public function isNegotiated(): bool
+    {
+        return $this->slug === 'enterprise';
     }
 
     /**

@@ -70,6 +70,9 @@
                             <span data-bs-toggle="tooltip" data-bs-trigger="hover" title="Send event mail from the organiser's own domain (Enterprise)">
                                 <a href="{{ route('tenants.sending-domain.show', $tenant->uuid) }}" class="btn btn-sm btn-light">Sending domain</a>
                             </span>
+                            <span data-bs-toggle="tooltip" data-bs-trigger="hover" title="The negotiated Enterprise price this organisation pays">
+                                <a href="{{ route('tenants.agreed-price.show', $tenant->uuid) }}" class="btn btn-sm btn-light">Agreed price</a>
+                            </span>
                         </div>
 
                         <div class="separator"></div>
