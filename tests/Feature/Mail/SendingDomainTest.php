@@ -58,7 +58,7 @@ function sendingDomainTenant(string $plan = 'enterprise'): Tenant
     ]);
 }
 
-function platformSuperadmin(): User
+function sendingDomainSuperadmin(): User
 {
     $superadmin = User::factory()->create(['tenant_id' => null]);
     $superadmin->assignRole('Superadmin');
@@ -70,7 +70,7 @@ test('registering a domain stores the three DKIM records the organiser must publ
     $tenant = sendingDomainTenant();
     $this->ses->append(sesIdentity(false));
 
-    $this->actingAs(platformSuperadmin())
+    $this->actingAs(sendingDomainSuperadmin())
         ->post(route('tenants.sending-domain.store', $tenant->uuid), [
             'domain' => ' Events.TechSummit.gh ',
             'from_address' => 'hello@events.techsummit.gh',
@@ -102,7 +102,7 @@ test('a domain already registered with SES is picked up rather than refused', fu
 test('only Enterprise organisations can have a sending domain', function (): void {
     $tenant = sendingDomainTenant('growth');
 
-    $this->actingAs(platformSuperadmin())
+    $this->actingAs(sendingDomainSuperadmin())
         ->post(route('tenants.sending-domain.store', $tenant->uuid), [
             'domain' => 'events.techsummit.gh',
             'from_address' => 'hello@events.techsummit.gh',
@@ -116,7 +116,7 @@ test('only Enterprise organisations can have a sending domain', function (): voi
 test('the from address must be on the domain being registered', function (): void {
     $tenant = sendingDomainTenant();
 
-    $this->actingAs(platformSuperadmin())
+    $this->actingAs(sendingDomainSuperadmin())
         ->post(route('tenants.sending-domain.store', $tenant->uuid), [
             'domain' => 'events.techsummit.gh',
             'from_address' => 'someone@gmail.com',
@@ -185,7 +185,7 @@ test('removing a domain deletes it from SES and sends from the platform again', 
     ]);
     $this->ses->append(new Result([]));
 
-    $this->actingAs(platformSuperadmin())
+    $this->actingAs(sendingDomainSuperadmin())
         ->delete(route('tenants.sending-domain.destroy', $tenant->uuid))
         ->assertSessionHas('success');
 
