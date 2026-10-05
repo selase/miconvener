@@ -98,6 +98,13 @@
                 </div></div>
             </div>
 
+            @if (session('success'))
+                <div class="col-12"><div class="alert alert-success p-5 mb-0">{{ session('success') }}</div></div>
+            @endif
+            @if ($errors->any())
+                <div class="col-12"><div class="alert alert-danger p-5 mb-0">{{ $errors->first() }}</div></div>
+            @endif
+
             <div class="col-12">
                 <div class="card"><div class="card-body">
                     <h3 class="fw-bolder mb-5">Events</h3>
@@ -106,6 +113,52 @@
                         <div><div class="fw-bold text-muted fs-8">Next</div><div>{{ $nextEvent ? $nextEvent->name.' · '.$nextEvent->starts_at?->format('j M Y') : 'None scheduled' }}</div></div>
                         <div><div class="fw-bold text-muted fs-8">Most recent</div><div>{{ $lastEvent ? $lastEvent->name.' · '.$lastEvent->starts_at?->format('j M Y') : 'None yet' }}</div></div>
                     </div>
+                </div></div>
+            </div>
+
+            <div class="col-12">
+                <div class="card"><div class="card-body">
+                    <h3 class="fw-bolder mb-1">Take down abusive content</h3>
+                    <p class="text-muted fs-7 mb-5">Taking down hides an event or listing from the public and stops its owner republishing it. The reason is shown to them. Restoring puts back the status it had.</p>
+                    <table class="table align-middle table-row-dashed fs-7 gy-3">
+                        <thead>
+                            <tr class="text-muted fw-bolder text-uppercase"><th>Item</th><th>Status</th><th class="text-end">Action</th></tr>
+                        </thead>
+                        <tbody class="text-gray-700 fw-bold">
+                            @foreach ([['event', $recentEvents], ['listing', $listings]] as [$type, $items])
+                                @foreach ($items as $item)
+                                    <tr>
+                                        <td>
+                                            <span class="badge badge-light me-2">{{ $type === 'event' ? 'Event' : 'Listing' }}</span>
+                                            {{ $type === 'event' ? $item->name : $item->title }}
+                                            @if ($item->taken_down_at)
+                                                <div class="text-danger fs-8 mt-1">Taken down {{ $item->taken_down_at->format('j M Y') }}: {{ $item->takedown_reason }}</div>
+                                            @endif
+                                        </td>
+                                        <td>{{ str_replace('_', ' ', $item->status) }}</td>
+                                        <td class="text-end">
+                                            @if ($item->taken_down_at)
+                                                <form method="POST" action="{{ route('admin.takedowns.destroy', [$type, $item->id]) }}" onsubmit="return confirm('Restore it to the status it had before?')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-light">Restore</button>
+                                                </form>
+                                            @else
+                                                <form method="POST" action="{{ route('admin.takedowns.store', [$type, $item->id]) }}" class="d-flex gap-2 justify-content-end">
+                                                    @csrf
+                                                    <input type="text" name="reason" class="form-control form-control-sm form-control-solid w-250px" placeholder="Reason (shown to the organiser)" aria-label="Reason for taking down {{ $type === 'event' ? $item->name : $item->title }}">
+                                                    <button type="submit" class="btn btn-sm btn-light-danger">Take down</button>
+                                                </form>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @endforeach
+                            @if ($recentEvents->isEmpty() && $listings->isEmpty())
+                                <tr><td colspan="3" class="text-center text-muted py-8">No events or listings.</td></tr>
+                            @endif
+                        </tbody>
+                    </table>
                 </div></div>
             </div>
         </div>

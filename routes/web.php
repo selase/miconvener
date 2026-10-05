@@ -108,6 +108,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('health.tenants.show');
     Route::get('messages', [App\Http\Controllers\Admin\MessageDeliveryController::class, 'index'])
         ->name('admin.messages.index');
+    Route::post('takedowns/{type}/{id}', [App\Http\Controllers\Admin\TakedownController::class, 'store'])
+        ->whereIn('type', ['event', 'listing'])
+        ->name('admin.takedowns.store');
+    Route::delete('takedowns/{type}/{id}', [App\Http\Controllers\Admin\TakedownController::class, 'destroy'])
+        ->whereIn('type', ['event', 'listing'])
+        ->name('admin.takedowns.destroy');
 
     // profile routes
     Route::get('profile/{user}', [ProfileController::class, 'index'])->name('profile.index');
