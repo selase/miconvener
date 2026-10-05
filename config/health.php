@@ -20,6 +20,16 @@ return [
      */
     'expect_optimized_app' => (bool) env('HEALTH_EXPECT_OPTIMIZED_APP', false),
 
+    /*
+     * Hourly sending ceilings per organisation for MessageVolumeCheck. Set
+     * high on purpose: a large announcement must not raise an alert; a
+     * runaway loop or misuse will.
+     */
+    'message_alerts' => [
+        'sms_per_hour' => (int) env('ALERT_SMS_PER_HOUR', 1000),
+        'email_per_hour' => (int) env('ALERT_EMAIL_PER_HOUR', 5000),
+    ],
+
     'result_stores' => [
         EloquentHealthResultStore::class => [
             'model' => HealthCheckResultHistoryItem::class,

@@ -87,6 +87,10 @@ final class HealthServiceProvider extends ServiceProvider
 
             \App\Checks\PaystackWebhookCheck::new(),
 
+            \App\Checks\MessageVolumeCheck::new(),
+
+            \App\Checks\SmsDeliveryFailuresCheck::new(),
+
             /**
              * Backups are the one system whose failure is silent: nothing stops
              * working, and you find out only when you need one. This polls the
