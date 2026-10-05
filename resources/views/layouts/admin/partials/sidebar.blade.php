@@ -496,7 +496,7 @@
                     
                     @if(auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard'))
                     <div class="menu-item">
-                        <a class="menu-link {{ request()->routeIs('health.tenants') ? 'active' : '' }}" href="{{ route('health.tenants') }}">
+                        <a class="menu-link {{ request()->routeIs('health.tenants*') ? 'active' : '' }}" href="{{ route('health.tenants') }}">
                             <span class="menu-icon">
                                 <span class="svg-icon svg-icon-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -505,7 +505,21 @@
                                     </svg>
                                 </span>
                             </span>
-                            <span class="menu-title">Tenant Health (Drill-down)</span>
+                            <span class="menu-title">Customer health</span>
+                        </a>
+                    </div>
+
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->routeIs('admin.messages.*') ? 'active' : '' }}" href="{{ route('admin.messages.index') }}">
+                            <span class="menu-icon">
+                                <span class="svg-icon svg-icon-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path opacity="0.3" d="M21 18H3C2.4 18 2 17.6 2 17V7C2 6.4 2.4 6 3 6H21C21.6 6 22 6.4 22 7V17C22 17.6 21.6 18 21 18Z" fill="currentColor"></path>
+                                        <path d="M11.4 13.5L3.4 8.1C3 7.8 2.9 7.2 3.2 6.8C3.5 6.4 4.1 6.3 4.5 6.6L12 11.6L19.5 6.6C19.9 6.3 20.5 6.4 20.8 6.8C21.1 7.2 21 7.8 20.6 8.1L12.6 13.5C12.3 13.7 11.7 13.7 11.4 13.5Z" fill="currentColor"></path>
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="menu-title">Message delivery</span>
                         </a>
                     </div>
 
