@@ -14,7 +14,7 @@ import { useToast } from '@/Components/Console/Toast';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import TeamFormModal from './TeamFormModal';
 
-export default function Index({ users, roles, statuses }) {
+export default function Index({ users, roles, statuses, events = [] }) {
     const { flash } = usePage().props;
     const showToast = useToast();
     const [selectedUuid, setSelectedUuid] = useState(null);
@@ -206,6 +206,7 @@ export default function Index({ users, roles, statuses }) {
                     user={modal.user}
                     roles={roles}
                     statuses={statuses}
+                    events={events}
                     onClose={() => setModal(null)}
                 />
             )}

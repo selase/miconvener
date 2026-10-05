@@ -49,7 +49,9 @@
         <h2>Marketplace</h2>
         <ul>
             <li>Venues and suppliers listed on the {{ $brand }} marketplace are independent businesses. A booking or an accepted quote is an agreement between the planner and that business; {{ $brand }} provides the listing, the quote and the payment of the deposit.</li>
-            <li>We take a commission on marketplace payments at the rate shown when the business joins. A deposit, once paid, is governed by the terms the business set in its quote.</li>
+            <li>We take a commission on marketplace payments (venue bookings and quotes) at the rate shown when the business joins. A deposit, once paid, is governed by the terms the business set in its quote.</li>
+            <li>A buyer pays a MiConvener service fee on top of a marketplace payment, shown before they pay. It depends on the buyer's plan, and there is none for organisers on Growth or Enterprise.</li>
+            <li>Businesses may pay to have their page verified, boosted in search or featured. A verified page has been checked by our team; verification is not an endorsement of the business or a guarantee of its work.</li>
             <li>Listings must describe what is actually offered. We may remove a listing or a review that is misleading, and verify a business before it can take paid bookings.</li>
         </ul>
 

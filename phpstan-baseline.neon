@@ -5035,12 +5035,6 @@ parameters:
 			path: app/Services/Api/ApiKeyService.php
 
 		-
-			rawMessage: Match arm comparison between 'event_pass'|'one_off' and 'yearly' is always false.
-			identifier: match.alwaysFalse
-			count: 1
-			path: app/Services/Billing/TenantAddonService.php
-
-		-
 			rawMessage: 'Method App\Services\Billing\TenantAddonService::cancelAddon() never returns false so the return type can be changed to true.'
 			identifier: return.tooWideBool
 			count: 1

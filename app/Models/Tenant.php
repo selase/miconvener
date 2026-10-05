@@ -430,9 +430,24 @@ final class Tenant extends Model
     }
 
     /**
-     * Record usage for a specific feature.
+     * Record usage for a specific feature. Email is spent through its
+     * allowance, so sends beyond the monthly plan come out of email packs.
      */
     public function recordUsage(string $featureSlug, int $quantity = 1): void
+    {
+        if ($featureSlug === \App\Services\Billing\EmailAllowance::FEATURE) {
+            app(\App\Services\Billing\EmailAllowance::class)->consume($this, $quantity);
+
+            return;
+        }
+
+        $this->incrementUsage($featureSlug, $quantity);
+    }
+
+    /**
+     * Add to a feature's running usage counter, with no pack accounting.
+     */
+    public function incrementUsage(string $featureSlug, int $quantity = 1): void
     {
         // Simple increment for "lifetime" usage or current period usage
         // A more robust system would handle period dates here.
@@ -537,6 +552,31 @@ final class Tenant extends Model
      */
     public function featureLimitValue(string $featureSlug): ?int
     {
+        $limit = $this->planLimitValue($featureSlug);
+
+        if ($limit === null) {
+            return null;
+        }
+
+        if ($featureSlug === 'team_seats') {
+            $limit += $this->purchasedTeamSeatsCount();
+        } elseif ($featureSlug === 'staff_links') {
+            $limit += $this->purchasedUsherPassesCount();
+        } elseif ($featureSlug === \App\Services\Billing\EmailAllowance::FEATURE) {
+            // What is left in the packs, not their full size: a pack is
+            // spent once and never refilled by the monthly reset.
+            $limit += app(\App\Services\Billing\EmailAllowance::class)->packRemaining($this);
+        }
+
+        return $limit;
+    }
+
+    /**
+     * The plan's own limit for a limit-type feature, before any add-ons;
+     * null when missing, disabled, not a limit, or unlimited.
+     */
+    public function planLimitValue(string $featureSlug): ?int
+    {
         $feature = $this->features()->where('feature_key', $featureSlug)->first();
 
         if (! $feature || ! $feature->enabled) {
@@ -550,19 +590,7 @@ final class Tenant extends Model
 
         $limit = (int) ($meta['value'] ?? 0);
 
-        if ($limit < 0) {
-            return null;
-        }
-
-        if ($featureSlug === 'team_seats') {
-            $limit += $this->purchasedTeamSeatsCount();
-        } elseif ($featureSlug === 'staff_links') {
-            $limit += $this->purchasedUsherPassesCount();
-        } elseif ($featureSlug === 'email_credits') {
-            $limit += (int) $this->addons()->active()->ofType(TenantAddon::TYPE_EMAIL_PACK)->sum('quantity');
-        }
-
-        return $limit;
+        return $limit < 0 ? null : $limit;
     }
 
     /**

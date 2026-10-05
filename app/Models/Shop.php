@@ -78,6 +78,23 @@ final class Shop extends Model
     ];
 
     /**
+     * SQL that is true while the shop's business holds an active promotion of
+     * this type (TenantAddon::TYPE_SHOP_BOOST or TYPE_SHOP_FEATURED), for
+     * ordering queries that join `shops`. Bind the returned values in order.
+     *
+     * @return array{0: string, 1: list<mixed>}
+     */
+    public static function activePromotionSql(string $type): array
+    {
+        return [
+            'EXISTS (SELECT 1 FROM tenant_addons WHERE tenant_addons.tenant_id = shops.tenant_id'
+                .' AND tenant_addons.addon_type = ? AND tenant_addons.status = ?'
+                .' AND tenant_addons.period_start <= ? AND tenant_addons.period_end > ?)',
+            [$type, TenantAddon::STATUS_ACTIVE, now(), now()],
+        ];
+    }
+
+    /**
      * @return BelongsTo<Tenant, $this>
      */
     public function tenant(): BelongsTo
@@ -156,6 +173,17 @@ final class Shop extends Model
     public function hasVendorCategory(string $category): bool
     {
         return in_array($category, $this->vendor_categories ?? [], true);
+    }
+
+    public function hasActivePromotion(string $type): bool
+    {
+        return TenantAddon::query()
+            ->where('tenant_id', $this->tenant_id)
+            ->where('addon_type', $type)
+            ->where('status', TenantAddon::STATUS_ACTIVE)
+            ->where('period_start', '<=', now())
+            ->where('period_end', '>', now())
+            ->exists();
     }
 
     public function isVerified(): bool

@@ -174,6 +174,12 @@ test('check availability endpoint returns real-time slot availability and pricin
                 'rental_amount_pesewas' => 400000,
             ],
         ]);
+
+    // The buyer sees the service fee before paying (a guest pays 3%).
+    $deposit = $response->json('pricing.deposit_required_pesewas');
+    expect($response->json('pricing.service_fee_percent'))->toEqual(3)
+        ->and($response->json('pricing.service_fee_pesewas'))->toBe((int) round($deposit * 3 / 100))
+        ->and($response->json('pricing.due_now_pesewas'))->toBe($deposit + (int) round($deposit * 3 / 100));
 });
 
 test('booking flow creates pending booking and initiates Paystack deposit checkout', function (): void {
@@ -446,4 +452,61 @@ test('expired pending payment booking releases the slot in calendar availability
 
     // Now slot must be released and available
     expect($service->isSlotAvailable($this->hourlyListing, $startsAt, $endsAt))->toBeTrue();
+});
+
+test('a venue deposit carries the buyer service fee, and the payment books the venue commission', function (): void {
+    $service = app(VenueBookingService::class);
+    $booking = $service->createBooking($this->hourlyListing, [
+        'planner_name' => 'Kofi Planner',
+        'planner_email' => 'kofi@planner.test',
+        'event_type' => 'Board retreat',
+        'guest_count' => 12,
+        'layout_style' => 'boardroom',
+        'starts_at' => Carbon::tomorrow()->setTime(9, 0)->toDateTimeString(),
+        'ends_at' => Carbon::tomorrow()->setTime(17, 0)->toDateTimeString(),
+        'agreed_to_terms' => true,
+    ]);
+    $deposit = $booking->deposit_required_pesewas;
+
+    Http::fake([
+        'https://api.paystack.co/customer*' => Http::response(['data' => ['customer_code' => 'CUS_1']], 200),
+        'https://api.paystack.co/transaction/initialize' => Http::response(['data' => ['authorization_url' => 'https://checkout.test/x', 'reference' => 'r1']], 200),
+    ]);
+    $service->initializeDepositCheckout($booking, 'https://example.test/callback');
+
+    // A guest (no MiConvener plan) pays the Free rate: 3%.
+    $fee = (int) round($deposit * 3 / 100);
+    expect($booking->fresh()->buyer_fee_pesewas)->toBe($fee);
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'transaction/initialize')
+        && (int) $request['amount'] === $deposit + $fee);
+
+    $service->confirmBookingPayment('pstk_fee_1', [
+        'amount' => $deposit + $fee,
+        'fees' => 1000,
+        'metadata' => ['booking_reference' => $booking->booking_reference],
+    ]);
+
+    $transaction = App\Models\LedgerTransaction::where('tenant_id', $this->hostTenant->id)
+        ->where('reference', "MKT-{$booking->booking_reference}-pstk_fee_1")->sole();
+    $amounts = App\Models\LedgerEntry::where('transaction_id', $transaction->id)->get()
+        ->mapWithKeys(fn ($entry) => [$entry->account->code => (int) $entry->amount]);
+    $commission = (int) round($deposit * 10 / 100);
+
+    expect($amounts[App\Models\LedgerAccount::CODE_PLATFORM_REVENUE])->toBe($commission + $fee)
+        ->and($amounts[App\Models\LedgerAccount::CODE_ORGANIZER_PAYABLE])->toBe($deposit - 1000 - $commission)
+        ->and($booking->fresh()->payment_status)->toBe(VenueBooking::PAYMENT_DEPOSIT_PAID);
+});
+
+test('the buyer service fee follows the buyer plan: none on Growth', function (): void {
+    $this->seed(Database\Seeders\EventPackageSeeder::class);
+    $fees = app(App\Services\Marketplace\MarketplaceFees::class);
+    $planTenant = fn (string $slug): Tenant => Tenant::factory()->create([
+        'package_id' => App\Models\Package::where('slug', $slug)->firstOrFail()->id,
+    ]);
+
+    expect($fees->buyerFeePercent(null))->toBe(3.0)
+        ->and($fees->buyerFeePercent($planTenant('free')))->toBe(3.0)
+        ->and($fees->buyerFeePercent($planTenant('starter')))->toBe(2.0)
+        ->and($fees->buyerFeePercent($planTenant('growth')))->toBe(0.0)
+        ->and($fees->buyerFeeOn($planTenant('starter'), 100000))->toBe(2000);
 });

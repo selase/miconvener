@@ -47,7 +47,7 @@ Route::get('/tenant-test', function () {
     return 'Tenant: '.($tenant?->name ?? 'None');
 });
 
-Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function () {
+Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_staff_scope']], function () {
     Route::get('/account', [AccountController::class, 'index'])->name('tenant.account');
     Route::post('/account/two-factor/setup', [AccountController::class, 'setup'])->name('tenant.account.two-factor.setup');
     Route::post('/account/two-factor/confirm', [AccountController::class, 'confirm'])

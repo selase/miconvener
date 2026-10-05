@@ -62,6 +62,22 @@ return [
      * With no token configured, SMS is switched off rather than broken.
      */
     /*
+     * Marketplace money (decided 2026-10-05). Businesses pay a commission on
+     * every venue booking and vendor quote they are paid for; buyers pay a
+     * service fee on top of what they pay, by their plan (none on Growth and
+     * Enterprise; a buyer with no MiConvener plan pays the Free rate).
+     */
+    'marketplace' => [
+        'commission_percent' => (float) env('MARKETPLACE_COMMISSION_PERCENT', 10),
+        'buyer_fee_percent' => [
+            'free' => 3.0,
+            'starter' => 2.0,
+            'growth' => 0.0,
+            'enterprise' => 0.0,
+        ],
+    ],
+
+    /*
      * What MiConvener keeps from a voluntary contribution (donation, offering,
      * tribute). Null charges the event's ticket commission, capped the same
      * way; a number charges that flat percentage instead, with no cap.

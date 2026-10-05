@@ -203,7 +203,8 @@ test('clients can review proposals, initiate Paystack deposit checkout, and veri
                 'id' => 1234567,
                 'status' => 'success',
                 'reference' => 'PAY_QUOTE_REF_777',
-                'amount' => 550000,
+                // Deposit 550000 + the guest buyer's 3% service fee (16500).
+                'amount' => 566500,
                 'fees' => 11000, // 110 GHS Paystack fee (2%)
                 'currency' => 'GHS',
                 'metadata' => [
@@ -237,7 +238,11 @@ test('clients can review proposals, initiate Paystack deposit checkout, and veri
     expect($quote->status)->toBe(MarketplaceQuote::STATUS_ACCEPTED)
         ->and($quote->isPaid())->toBeTrue()
         ->and($quote->paystack_reference)->toBe('PAY_QUOTE_REF_777')
-        ->and($quote->amount_paid_pesewas)->toBe(550000);
+        ->and($quote->amount_paid_pesewas)->toBe(566500)
+        ->and($quote->buyer_fee_pesewas)->toBe(16500);
+
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'transaction/initialize')
+        && (int) $request['amount'] === 566500);
 
     // 4. Verify balanced double-entry ledger transaction
     $ledgerTx = LedgerTransaction::where('tenant_id', $tenant->id)
@@ -253,11 +258,11 @@ test('clients can review proposals, initiate Paystack deposit checkout, and veri
     $debitSum = $entries->where('direction', LedgerEntry::DIRECTION_DEBIT)->sum('amount');
     $creditSum = $entries->where('direction', LedgerEntry::DIRECTION_CREDIT)->sum('amount');
     expect($debitSum)->toBe($creditSum)
-        ->and($debitSum)->toBe(539000); // 550000 - 11000 = 539000 pesewas net cash clearing
+        ->and($debitSum)->toBe(555500); // 566500 - 11000 = 555500 pesewas net cash clearing
 
-    // 10% platform commission on 550000 = 55000 pesewas
+    // 10% commission on the 550000 deposit (55000) plus the 16500 service fee
     $platformRev = $entries->where('account_id', LedgerAccount::where('tenant_id', $tenant->id)->where('code', LedgerAccount::CODE_PLATFORM_REVENUE)->first()->id)->first();
-    expect($platformRev->amount)->toBe(55000);
+    expect($platformRev->amount)->toBe(71500);
 });
 
 test('verified clients can submit 1 to 5 star ratings and reviews which recalculate vendor shop stats', function (): void {

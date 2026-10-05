@@ -78,7 +78,17 @@ test('tenant admin can update venue profile and submit for verification', functi
         ->and((float) $shop->latitude)->toBe(5.565)
         ->and($shop->verification_status)->toBe(Shop::VERIFICATION_UNVERIFIED);
 
-    // Submit for verification
+    // Verification is a paid review: with the add-on bought, submit for it.
+    \App\Models\TenantAddon::factory()->create([
+        'tenant_id' => $tenant->id,
+        'addon_type' => \App\Models\TenantAddon::TYPE_SHOP_VERIFICATION,
+        'quantity' => 1,
+        'billing_interval' => \App\Models\TenantAddon::INTERVAL_YEARLY,
+        'status' => \App\Models\TenantAddon::STATUS_ACTIVE,
+        'period_start' => now()->subMinute(),
+        'period_end' => now()->addYear(),
+    ]);
+
     $verifyResponse = $this->actingAs($user)
         ->post(route('tenant.venue.profile.verify', ['subdomain' => $tenant->slug]));
 

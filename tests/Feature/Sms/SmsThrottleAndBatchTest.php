@@ -107,7 +107,7 @@ test('a batch of identical texts is one provider request', function (): void {
         ->and(app(SmsAllowance::class)->remaining($tenant))->toBe(7);
 });
 
-test('a batch never puts different texts in one request', function (): void {
+test('a batch of personalised texts is one request, each person with their own text', function (): void {
     Http::fake(['messaging.test/*' => Http::response(['data' => ['campaign_id' => 'x']], 202)]);
     [$tenant, $event] = throttleScenario();
     $ids = [
@@ -117,8 +117,9 @@ test('a batch never puts different texts in one request', function (): void {
 
     (new SendSmsBatchJob($tenant->id, $ids))->handle(app(NotificationGatewayService::class));
 
-    Http::assertSentCount(2);
-    Http::assertNotSent(fn ($request): bool => count($request->data()[0]['users']) > 1);
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request): bool => collect($request->data()[0]['users'])
+        ->pluck('placeholder.0.{{1}}')->all() === ['Ticket TKT-1', 'Ticket TKT-2']);
 });
 
 test('a batch larger than the credits left sends what is covered and suppresses the rest', function (): void {

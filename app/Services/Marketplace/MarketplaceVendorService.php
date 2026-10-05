@@ -6,12 +6,9 @@ namespace App\Services\Marketplace;
 
 use App\Mail\Marketplace\NewQuoteRequestNotification;
 use App\Mail\Marketplace\QuoteProposalReady;
-use App\Models\LedgerAccount;
-use App\Models\LedgerEntry;
 use App\Models\MarketplaceQuote;
 use App\Models\StoreListing;
 use App\Models\Tenant;
-use App\Services\Finance\LedgerService;
 use App\Services\Payment\PaystackGateway;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +22,8 @@ use Throwable;
 final class MarketplaceVendorService
 {
     public function __construct(
-        private readonly LedgerService $ledgerService
+        private readonly MarketplaceFees $fees,
+        private readonly MarketplaceLedger $marketplaceLedger,
     ) {}
 
     /**
@@ -132,11 +130,16 @@ final class MarketplaceVendorService
             ? $quote->deposit_required_pesewas
             : $quote->total_amount_pesewas;
 
+        // The buyer's service fee, by their plan, fixed now so the amount
+        // charged and the amount booked to the ledger are the same.
+        $buyerFee = $this->fees->buyerFeeOn($quote->plannerTenant, $amountToPay);
+        $quote->update(['buyer_fee_pesewas' => $buyerFee]);
+
         $customerId = $gateway->createCustomer($quote->planner_email, $quote->planner_name);
 
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(
             $customerId,
-            $amountToPay,
+            $amountToPay + $buyerFee,
             'GHS',
             $callbackUrl,
             [
@@ -204,7 +207,17 @@ final class MarketplaceVendorService
                 'paid_at' => now(),
             ]);
 
-            $this->postQuoteLedger($quote, $reference, $amountPaid, $gatewayFee);
+            if ($quote->tenant !== null) {
+                $this->marketplaceLedger->post(
+                    seller: $quote->tenant,
+                    event: $quote->event,
+                    label: "quote {$quote->quote_reference}",
+                    reference: "MKT-{$quote->quote_reference}-{$reference}",
+                    amountPaid: $amountPaid,
+                    gatewayFee: $gatewayFee,
+                    buyerFee: (int) $quote->buyer_fee_pesewas,
+                );
+            }
 
             return $quote->fresh();
         });
@@ -238,90 +251,6 @@ final class MarketplaceVendorService
             ));
         } catch (Throwable $e) {
             Log::error('Failed to queue quote proposal notification', ['quote_id' => $quote->id, 'error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Book balanced double-entry ledger entries for marketplace vendor booking.
-     */
-    private function postQuoteLedger(
-        MarketplaceQuote $quote,
-        string $reference,
-        int $amountPaid,
-        int $gatewayFee
-    ): void {
-        $tenant = $quote->tenant;
-        if (! $tenant) {
-            return;
-        }
-
-        // Platform commission is 10% on marketplace bookings
-        $commissionRate = (float) config('services.platform.marketplace_commission_percent', 10.0);
-        $netClearing = max(0, $amountPaid - $gatewayFee);
-        $platformFee = min($netClearing, (int) round($amountPaid * $commissionRate / 100));
-        $organizerPayable = max(0, $netClearing - $platformFee);
-
-        $entries = [
-            [
-                'code' => LedgerAccount::CODE_GATEWAY_CLEARING,
-                'direction' => LedgerEntry::DIRECTION_DEBIT,
-                'amount' => $netClearing,
-                'description' => "Cash clearing from Paystack for quote {$quote->quote_reference} (net of gateway fee)",
-            ],
-            [
-                'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
-                'direction' => LedgerEntry::DIRECTION_CREDIT,
-                'amount' => $platformFee,
-                'description' => "Platform commission (10%) on marketplace quote {$quote->quote_reference}",
-            ],
-            [
-                'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
-                'direction' => LedgerEntry::DIRECTION_CREDIT,
-                'amount' => $organizerPayable,
-                'description' => "Vendor payable balance for quote {$quote->quote_reference}",
-            ],
-        ];
-
-        // Filter out any zero amounts so debits and credits stay balanced
-        $validEntries = [];
-        $totalDebits = 0;
-        $totalCredits = 0;
-
-        foreach ($entries as $e) {
-            if ($e['amount'] > 0) {
-                $validEntries[] = $e;
-                if ($e['direction'] === LedgerEntry::DIRECTION_DEBIT) {
-                    $totalDebits += $e['amount'];
-                } else {
-                    $totalCredits += $e['amount'];
-                }
-            }
-        }
-
-        if ($totalDebits === $totalCredits && ! empty($validEntries)) {
-            try {
-                $this->ledgerService->postTransaction(
-                    tenant: $tenant,
-                    event: $quote->event,
-                    transactionType: 'marketplace_booking',
-                    description: "Marketplace quote booking payment: {$quote->quote_reference}",
-                    reference: "MKT-{$quote->quote_reference}-{$reference}",
-                    entries: $validEntries
-                );
-            } catch (Throwable $e) {
-                Log::error('Failed to post marketplace quote to ledger', [
-                    'quote_id' => $quote->id,
-                    'reference' => $reference,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        } elseif ($totalDebits !== $totalCredits) {
-            Log::warning('Imbalanced debits and credits calculated for marketplace quote ledger', [
-                'quote_id' => $quote->id,
-                'reference' => $reference,
-                'debits' => $totalDebits,
-                'credits' => $totalCredits,
-            ]);
         }
     }
 

@@ -13,6 +13,7 @@ use App\Models\EventDynamicForm;
 use App\Models\EventForumReply;
 use App\Models\EventForumThread;
 use App\Models\EventMaterial;
+use App\Models\EventNotificationLog;
 use App\Models\EventNotificationRule;
 use App\Models\EventOperationPillar;
 use App\Models\EventOperationTask;
@@ -538,17 +539,59 @@ final class ProbeWorkspaceSeeder extends Seeder
         ];
 
         foreach ($plan as [$subject, $body, $sentAt]) {
-            EventBlast::query()->updateOrCreate(
+            $blast = EventBlast::query()->updateOrCreate(
                 ['event_id' => $event->id, 'subject' => $subject],
                 [
                     'tenant_id' => $event->tenant_id,
                     'body' => $body,
                     'audience' => 'all',
                     'audience_label' => 'All registrants',
+                    // The room change also went by text, as an urgent update would.
+                    'send_sms' => str_starts_with($subject, 'Programme update'),
                     'recipients_count' => $recipients,
                     'status' => EventBlast::STATUS_SENT,
                     'scheduled_at' => null,
                     'sent_at' => $sentAt,
+                ]
+            );
+
+            if ($blast->send_sms) {
+                $this->smsHistory($event, $blast);
+            }
+        }
+    }
+
+    /**
+     * The texts an SMS announcement sent, as delivery records, so the
+     * Announcements list shows how many went by SMS. Records only: nothing is
+     * sent to the provider, so re-seeding never texts the crowd.
+     */
+    private function smsHistory(Event $event, EventBlast $blast): void
+    {
+        $registrations = EventRegistration::query()
+            ->where('event_id', $event->id)
+            ->whereNotNull('phone')
+            ->get(['id', 'full_name', 'email', 'phone']);
+
+        foreach ($registrations as $registration) {
+            EventNotificationLog::query()->updateOrCreate(
+                ['dedupe_key' => 'demo-blast-sms:'.$blast->id.':'.$registration->id],
+                [
+                    'tenant_id' => $event->tenant_id,
+                    'event_id' => $event->id,
+                    'notification_type' => 'announcement',
+                    'source_type' => $blast->getMorphClass(),
+                    'source_id' => $blast->id,
+                    'recipient_name' => $registration->full_name,
+                    'recipient_email' => $registration->email,
+                    'recipient_phone' => $registration->phone,
+                    'channel' => EventNotificationLog::CHANNEL_SMS,
+                    'status' => EventNotificationLog::STATUS_SENT,
+                    'subject' => $blast->subject,
+                    'message' => $blast->subject.': '.$blast->body,
+                    'cost_billed' => 0,
+                    'attempts' => 1,
+                    'sent_at' => $blast->sent_at,
                 ]
             );
         }
@@ -582,7 +625,8 @@ final class ProbeWorkspaceSeeder extends Seeder
                     'offset_direction' => $direction,
                     'offset_amount' => $amount,
                     'offset_unit' => $unit,
-                    'channels' => ['email'],
+                    // The day-before reminder goes by text too (paused, so it never sends on a re-seed).
+                    'channels' => $name === 'Reminder the day before' ? ['email', 'sms'] : ['email'],
                     'subject' => $subject,
                     'body_template' => $body,
                     'is_active' => $active,

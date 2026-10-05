@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Notifications;
 
+use App\Jobs\Notifications\SendSmsBatchJob;
 use App\Models\Event;
 use App\Models\EventMaterial;
 use App\Models\EventNotificationLog;
@@ -13,6 +14,7 @@ use App\Models\EventRegistration;
 use App\Models\EventSpeaker;
 use App\Models\Speaker;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class AutomatedNotificationDispatcher
@@ -216,6 +218,11 @@ final class AutomatedNotificationDispatcher
             'rate_limited_count' => 0,
         ];
 
+        /** @var list<EventNotificationLog> $claimed */
+        $claimed = [];
+        /** @var list<string> $smsDeliveryIds */
+        $smsDeliveryIds = [];
+
         foreach ($recipients as $recipient) {
             $interpolatedSubject = $this->interpolateTemplate($rule->subject, $recipient, $event);
             $interpolatedBody = $this->interpolateTemplate($rule->body_template, $recipient, $event);
@@ -239,16 +246,35 @@ final class AutomatedNotificationDispatcher
                 }
 
                 $stats['claimed_count']++;
-                $this->claims->dispatch($delivery);
-                $delivery->refresh();
+                $claimed[] = $delivery;
 
-                match ($delivery->status) {
-                    EventNotificationLog::STATUS_SENT => $stats['sent_count']++,
-                    EventNotificationLog::STATUS_STAGED => $stats['staged_count']++,
-                    EventNotificationLog::STATUS_SUPPRESSED_QUOTA => $stats['suppressed_count']++,
-                    default => null,
-                };
+                // SMS go out together (see below); other channels one by one.
+                if ($channel === EventNotificationLog::CHANNEL_SMS) {
+                    $smsDeliveryIds[] = (string) $delivery->id;
+                } else {
+                    $this->claims->dispatch($delivery);
+                }
             }
+        }
+
+        // A personalised reminder to many people is a few provider requests,
+        // not one per person: the SMS provider allows ten requests a minute.
+        foreach (array_chunk($smsDeliveryIds, 100) as $batch) {
+            $tenantId = (string) $event->tenant_id;
+            DB::connection('landlord')->afterCommit(function () use ($tenantId, $batch): void {
+                SendSmsBatchJob::dispatch($tenantId, $batch);
+            });
+        }
+
+        foreach ($claimed as $delivery) {
+            $delivery->refresh();
+
+            match ($delivery->status) {
+                EventNotificationLog::STATUS_SENT => $stats['sent_count']++,
+                EventNotificationLog::STATUS_STAGED => $stats['staged_count']++,
+                EventNotificationLog::STATUS_SUPPRESSED_QUOTA => $stats['suppressed_count']++,
+                default => null,
+            };
         }
 
         return $stats;

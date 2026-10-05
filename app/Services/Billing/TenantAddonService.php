@@ -126,6 +126,41 @@ final class TenantAddonService
             'category' => 'messaging',
             'available' => true,
         ],
+        // Marketplace business add-ons (prices set 2026-10-05). One-off
+        // payments for a fixed period; buying again extends from the end.
+        'shop_verification' => [
+            'key' => 'shop_verification',
+            'name' => 'Verified business (1 year)',
+            'description' => 'Our team checks your business, including past clients and events you have served. Once approved, your page shows a verified tick for a year.',
+            'addon_type' => TenantAddon::TYPE_SHOP_VERIFICATION,
+            'unit_price' => 15000, // GHS 150.00
+            'billing_interval' => TenantAddon::INTERVAL_YEARLY,
+            'quantity' => 1,
+            'category' => 'marketplace',
+            'available' => true,
+        ],
+        'shop_boost' => [
+            'key' => 'shop_boost',
+            'name' => 'Boost in search (1 week)',
+            'description' => 'Your listings appear first in marketplace search results for a week.',
+            'addon_type' => TenantAddon::TYPE_SHOP_BOOST,
+            'unit_price' => 5000, // GHS 50.00
+            'billing_interval' => TenantAddon::INTERVAL_WEEKLY,
+            'quantity' => 1,
+            'category' => 'marketplace',
+            'available' => true,
+        ],
+        'shop_featured' => [
+            'key' => 'shop_featured',
+            'name' => 'Featured on the marketplace (1 month)',
+            'description' => 'Your listings lead the marketplace home page, marked Featured, for a month.',
+            'addon_type' => TenantAddon::TYPE_SHOP_FEATURED,
+            'unit_price' => 20000, // GHS 200.00
+            'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
+            'quantity' => 1,
+            'category' => 'marketplace',
+            'available' => true,
+        ],
     ];
 
     public function __construct(private readonly PaymentGateway $gateway) {}
@@ -263,10 +298,25 @@ final class TenantAddonService
         $totalPrice = (int) ($metadata['total_price'] ?? ($config['unit_price'] * $multiplier));
         $eventId = ! empty($metadata['event_id']) ? (string) $metadata['event_id'] : null;
 
+        // A business buying more of the same promotion extends it: the new
+        // period starts when the current one ends, not alongside it.
         $periodStart = Carbon::now();
+        if (in_array($config['addon_type'], TenantAddon::SHOP_TYPES, true)) {
+            $currentEnd = TenantAddon::query()
+                ->where('tenant_id', $tenant->id)
+                ->active()
+                ->ofType($config['addon_type'])
+                ->max('period_end');
+
+            if ($currentEnd !== null && Carbon::parse($currentEnd)->isFuture()) {
+                $periodStart = Carbon::parse($currentEnd);
+            }
+        }
+
         $periodEnd = match ($config['billing_interval']) {
-            TenantAddon::INTERVAL_MONTHLY => Carbon::now()->addMonth(),
-            TenantAddon::INTERVAL_YEARLY => Carbon::now()->addYear(),
+            TenantAddon::INTERVAL_WEEKLY => $periodStart->copy()->addWeek(),
+            TenantAddon::INTERVAL_MONTHLY => $periodStart->copy()->addMonth(),
+            TenantAddon::INTERVAL_YEARLY => $periodStart->copy()->addYear(),
             TenantAddon::INTERVAL_EVENT_PASS => Carbon::now()->addDays(7),
             default => null, // One-off credit packs stay active indefinitely
         };
@@ -353,6 +403,15 @@ final class TenantAddonService
 
         if ($item['addon_type'] === TenantAddon::TYPE_SMS_PACK && ! app(\App\Contracts\SmsGateway::class)->isConfigured()) {
             return false;
+        }
+
+        // Only a business with a marketplace shop has anything to promote.
+        if (in_array($item['addon_type'], TenantAddon::SHOP_TYPES, true)) {
+            $tenant = app(\App\Services\Tenancy\TenantContext::class)->getTenant();
+
+            if ($tenant === null || $tenant->shop === null) {
+                return false;
+            }
         }
 
         return $item['available'];

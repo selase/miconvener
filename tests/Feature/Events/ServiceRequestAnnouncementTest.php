@@ -126,7 +126,18 @@ test('a medical request is emailed to the organiser as well', function (): void 
     );
 });
 
-test('an organisation with no address on file is simply not mailed', function (): void {
+test('a medical request reaches the owner of an organisation with no address on file', function (): void {
+    [$tenant, , $registration] = helpRequestScenario('announce-owner-only', '');
+    $owner = \App\Models\User::factory()->create(['tenant_id' => $tenant->id, 'email' => 'owner@organiser.test']);
+    setPermissionsTeamId($tenant->id);
+    $owner->assignRole('Org Superadmin');
+
+    raiseRequest($this, $registration, EventServiceRequest::TYPE_MEDICAL)->assertCreated();
+
+    Mail::assertQueued(UrgentServiceRequestRaised::class, fn (UrgentServiceRequestRaised $mail): bool => $mail->hasTo('owner@organiser.test'));
+});
+
+test('an organisation with no address and no admins is simply not mailed', function (): void {
     [, , $registration] = helpRequestScenario('announce-no-address', '');
 
     raiseRequest($this, $registration, EventServiceRequest::TYPE_MEDICAL)->assertCreated();

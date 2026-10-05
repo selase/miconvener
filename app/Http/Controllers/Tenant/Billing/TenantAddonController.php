@@ -72,7 +72,7 @@ final class TenantAddonController extends Controller
                 'usher_passes_count' => $tenant->purchasedUsherPassesCount(),
                 'live_polling_enabled' => $tenant->canUseLivePolling(),
                 'sms_balance' => app(\App\Services\Sms\SmsAllowance::class)->packRemaining($tenant),
-                'email_balance' => (int) TenantAddon::where('tenant_id', $tenant->id)->active()->ofType(TenantAddon::TYPE_EMAIL_PACK)->sum('quantity'),
+                'email_balance' => app(\App\Services\Billing\EmailAllowance::class)->packRemaining($tenant),
             ],
             'events' => $events,
             'currency' => (string) config('services.paystack.currency', 'GHS'),

@@ -663,9 +663,28 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                     <span>Total Booking Value:</span>
                                     <span>{formatCurrency(pricing.total_amount_pesewas)}</span>
                                 </div>
-                                <div className="flex justify-between text-accent font-semibold pt-1">
-                                    <span>Reservation Deposit Due Now:</span>
+                                <div className="flex justify-between pt-1">
+                                    <span>Reservation Deposit:</span>
                                     <span>{formatCurrency(pricing.deposit_required_pesewas)}</span>
+                                </div>
+                                {pricing.service_fee_pesewas > 0 && (
+                                    <div className="flex justify-between">
+                                        <span>
+                                            MiConvener service fee ({pricing.service_fee_percent}%):
+                                            <span className="block text-xs text-ink-tertiary">
+                                                None for organisers on Growth or Enterprise
+                                            </span>
+                                        </span>
+                                        <span>{formatCurrency(pricing.service_fee_pesewas)}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-accent font-semibold pt-1">
+                                    <span>Due Now:</span>
+                                    <span>
+                                        {formatCurrency(
+                                            pricing.due_now_pesewas ?? pricing.deposit_required_pesewas
+                                        )}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -731,7 +750,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 <span>
                                     {submitting
                                         ? 'Processing...'
-                                        : `Pay Reservation Deposit (${formatCurrency(pricing?.deposit_required_pesewas || 0)})`}
+                                        : `Pay Reservation Deposit (${formatCurrency(pricing?.due_now_pesewas ?? pricing?.deposit_required_pesewas ?? 0)})`}
                                 </span>
                             </button>
                         )}

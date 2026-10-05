@@ -222,3 +222,11 @@ test('the leftover template documentation about LLM tokens is not served', funct
     $this->get('/product-docs')->assertNotFound();
     $this->get('/product-docs/start-guide')->assertNotFound();
 });
+
+test('the terms disclose the marketplace service fee and what verification means', function (): void {
+    $this->get('/terms')
+        ->assertOk()
+        ->assertSee('MiConvener service fee')
+        ->assertSee('none for organisers on Growth or Enterprise', false)
+        ->assertSee('not an endorsement', false);
+});

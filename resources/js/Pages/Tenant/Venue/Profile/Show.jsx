@@ -106,11 +106,11 @@ export default function VenueProfileShow({ shop }) {
 
                             <p className="mt-1 text-sm text-ink-secondary">
                                 {shop.verification_status === 'verified' &&
-                                    `Your venue was verified on ${new Date(shop.verified_at).toLocaleDateString()}. Your listings appear with a Blue Tick.`}
+                                    `Your venue was verified on ${new Date(shop.verified_at).toLocaleDateString()}. Your listings appear with a Blue Tick for a year from that date.`}
                                 {shop.verification_status === 'pending' &&
                                     'Your credentials have been submitted. Our compliance team is verifying your business registration and event references.'}
                                 {shop.verification_status === 'unverified' &&
-                                    'Unverified venues appear with an unverified badge. Submit your business registration and Ghana Card to unlock top search placement and verified badges.'}
+                                    'Verification is a paid review: GHS 150 for a year. Buy the Verified business add-on under Billing → Add-ons, then request verification. Verified businesses show a tick and rank above unverified ones.'}
                                 {shop.verification_status === 'rejected' &&
                                     `Verification declined: ${shop.rejection_reason || 'Please contact support with updated documentation.'}`}
                             </p>

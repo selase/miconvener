@@ -162,7 +162,11 @@ final class MarketplaceSearchService
                     $query->leftJoin('shops', 'store_listings.shop_id', '=', 'shops.id');
                 }
 
+                // A paid boost leads, then verified businesses.
+                [$boosted, $bindings] = \App\Models\Shop::activePromotionSql(\App\Models\TenantAddon::TYPE_SHOP_BOOST);
+
                 return $query
+                    ->orderByRaw("CASE WHEN {$boosted} THEN 0 ELSE 1 END", $bindings)
                     ->orderByRaw("CASE WHEN shops.verification_status = 'verified' THEN 0 ELSE 1 END")
                     ->orderBy('store_listings.sort_order')
                     ->orderByDesc('store_listings.created_at');

@@ -126,6 +126,7 @@ final class VenueBooking extends Model
         'security_deposit_pesewas',
         'total_amount_pesewas',
         'deposit_required_pesewas',
+        'buyer_fee_pesewas',
         'amount_paid_pesewas',
         'gateway_fee_pesewas',
         'status',
@@ -276,6 +277,7 @@ final class VenueBooking extends Model
             'security_deposit_pesewas' => 'integer',
             'total_amount_pesewas' => 'integer',
             'deposit_required_pesewas' => 'integer',
+            'buyer_fee_pesewas' => 'integer',
             'amount_paid_pesewas' => 'integer',
             'gateway_fee_pesewas' => 'integer',
         ];

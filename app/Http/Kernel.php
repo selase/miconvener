@@ -112,6 +112,7 @@ final class Kernel extends HttpKernel
         '2fa' => \PragmaRX\Google2FALaravel\Middleware::class,
         '2fa_challenge' => Middleware\TwoFactorChallenge::class,
         'mcp_tier' => Middleware\IdentifyMarketplaceMcpPartner::class,
+        'event_staff_scope' => Middleware\RestrictEventStaffToAssignedEvents::class,
     ];
 
     /**

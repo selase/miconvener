@@ -62,6 +62,23 @@ final class StoreTeamMemberRequest extends FormRequest
             ],
             'status' => ['required', 'string'],
             'photo' => ['nullable', 'image', 'mimes:png,jpg,gif,svg', 'max:2048'],
+            // The events an Event Staff member works; empty means every event.
+            'event_ids' => ['sometimes', 'array'],
+            'event_ids.*' => [
+                'uuid',
+                Rule::exists(\App\Models\Event::class, 'id')->where('tenant_id', app(TenantContext::class)->activeTenantId()),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'event_ids.*.exists' => 'Choose events from this organisation.',
+            'event_ids.*.uuid' => 'Choose events from this organisation.',
         ];
     }
 

@@ -136,6 +136,27 @@ test('the event-day crew is seeded: staff links that work, credited check-ins an
         ->and($absent->checked_in_by_staff_link_id)->toBeNull();
 });
 
+test('the demo shows SMS: the room-change announcement went by text, and the reminder includes SMS', function (): void {
+    \Illuminate\Support\Facades\Http::fake();
+    [$tenant, $event] = seedProbeWorkspace();
+
+    $blast = \App\Models\EventBlast::withoutGlobalScopes()->where('event_id', $event->id)
+        ->where('subject', 'like', 'Programme update%')->firstOrFail();
+    $texts = \App\Models\EventNotificationLog::withoutGlobalScopes()
+        ->where('source_id', $blast->id)->where('channel', 'sms')->where('status', 'sent');
+    $withPhones = $event->registrations()->withoutGlobalScopes()->whereNotNull('phone')->count();
+
+    expect($blast->send_sms)->toBeTrue()
+        ->and($texts->count())->toBe($withPhones)
+        ->and(\App\Models\EventNotificationRule::withoutGlobalScopes()->where('event_id', $event->id)
+            ->where('name', 'Reminder the day before')->value('channels'))->toBe(['email', 'sms']);
+
+    // Records only: re-seeding never texts the crowd, and adds no duplicates.
+    Artisan::call('db:seed', ['--class' => ProbeWorkspaceSeeder::class]);
+    \Illuminate\Support\Facades\Http::assertNothingSent();
+    expect($texts->count())->toBe($withPhones);
+});
+
 test('running the seeder twice changes nothing and moves the event to the new now', function (): void {
     [$tenant, $event] = seedProbeWorkspace();
     $firstStart = $event->starts_at;

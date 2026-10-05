@@ -138,9 +138,14 @@ final class VenueBookingService
         $gateway = $this->getPlatformGateway();
         $customerId = $gateway->createCustomer($booking->planner_email, $booking->planner_name);
 
+        // The buyer's service fee, by their plan, fixed now so the amount
+        // charged and the amount booked to the ledger are the same.
+        $buyerFee = app(MarketplaceFees::class)->buyerFeeOn($booking->plannerTenant, $booking->deposit_required_pesewas);
+        $booking->update(['buyer_fee_pesewas' => $buyerFee]);
+
         return $gateway->createOneTimeCheckoutSession(
             $customerId,
-            $booking->deposit_required_pesewas,
+            $booking->deposit_required_pesewas + $buyerFee,
             'GHS',
             $callbackUrl,
             [
@@ -186,10 +191,12 @@ final class VenueBookingService
             throw new RuntimeException("Venue booking not found for Paystack reference: {$reference}");
         }
 
-        $amountPaid = (int) ($gatewayData['amount'] ?? $booking->deposit_required_pesewas);
+        $buyerFee = (int) $booking->buyer_fee_pesewas;
+        $amountPaid = (int) ($gatewayData['amount'] ?? $booking->deposit_required_pesewas + $buyerFee);
         $gatewayFee = (int) ($gatewayData['fees'] ?? 0);
 
-        $paymentStatus = ($amountPaid >= $booking->total_amount_pesewas)
+        // What was paid toward the venue's price, without the service fee.
+        $paymentStatus = ($amountPaid - $buyerFee >= $booking->total_amount_pesewas)
             ? VenueBooking::PAYMENT_FULLY_PAID
             : VenueBooking::PAYMENT_DEPOSIT_PAID;
 
@@ -202,7 +209,22 @@ final class VenueBookingService
             'gateway_fee_pesewas' => $gatewayFee,
         ]);
 
-        $booking->load(['listing', 'shop']);
+        $booking->load(['listing', 'shop', 'tenant']);
+
+        // The venue's commission and the buyer's service fee, booked to the
+        // venue's ledger with what it is owed. Venue bookings used to record
+        // nothing at all.
+        if ($booking->tenant !== null) {
+            app(MarketplaceLedger::class)->post(
+                seller: $booking->tenant,
+                event: $booking->event,
+                label: "venue booking {$booking->booking_reference}",
+                reference: "MKT-{$booking->booking_reference}-{$reference}",
+                amountPaid: $amountPaid,
+                gatewayFee: $gatewayFee,
+                buyerFee: $buyerFee,
+            );
+        }
 
         // Send confirmation receipt to guest
         try {
