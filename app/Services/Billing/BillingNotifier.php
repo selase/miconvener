@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
+use App\Mail\Billing\AgreedPriceMail;
 use App\Mail\Billing\PaymentFailedMail;
 use App\Mail\Billing\PaymentReceiptMail;
 use App\Mail\Billing\RenewalReminderMail;
@@ -115,6 +116,32 @@ final class BillingNotifier
         );
 
         return $this->sender->send($tenant, BillingEmail::TYPE_PAYMENT_FAILED, "payment_failed:{$reference}", $this->subscriptionRecipients($tenant, $subscription), $mail);
+    }
+
+    /**
+     * We set or changed the organisation's negotiated price. One email per
+     * distinct price, so saving the same figure again sends nothing.
+     */
+    public function agreedPriceSet(Tenant $tenant, Package $package, bool $alreadyPaying): bool
+    {
+        $agreed = $tenant->agreedPriceFor($package);
+
+        if ($agreed === null) {
+            return false;
+        }
+
+        $price = self::money($agreed['amount'], (string) config('services.paystack.currency', 'GHS')).($agreed['interval'] === 'year' ? ' a year' : ' a month');
+        $owner = $tenant->users()->orderBy('tenant_user.created_at')->value('users.email');
+
+        $mail = new AgreedPriceMail(
+            tenant: $tenant,
+            planName: $package->name,
+            price: $price,
+            alreadyPaying: $alreadyPaying,
+            billingUrl: $this->billingUrl($tenant),
+        );
+
+        return $this->sender->send($tenant, BillingEmail::TYPE_AGREED_PRICE, "agreed:{$tenant->id}:{$agreed['amount']}:{$agreed['interval']}", [$owner, $tenant->email], $mail);
     }
 
     /**

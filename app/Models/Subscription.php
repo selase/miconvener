@@ -118,8 +118,19 @@ final class Subscription extends Model
     /**
      * What one period of this subscription costs on the given package now.
      */
+    /**
+     * What the next period of this plan costs, in minor units: the
+     * organisation's agreed price when it has one (Enterprise), otherwise the
+     * plan's list price for this subscription's interval.
+     */
     public function priceMinorFor(Package $package): int
     {
+        $agreed = $this->tenant?->agreedPriceFor($package);
+
+        if ($agreed !== null) {
+            return $agreed['amount'];
+        }
+
         $price = $this->billingInterval() === 'year'
             ? ($package->yearly_price ?? (float) $package->price * 10)
             : $package->price;

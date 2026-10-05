@@ -120,7 +120,7 @@ final class BillingController extends Controller
     /**
      * What the tenant is on and what happens next, for the billing page.
      *
-     * @return array{package_name: string, is_free: bool, complimentary: bool, status: ?string, period_end: ?string, grace_ends_at: ?string, auto_renews: bool, payment_method: ?string, ends_at_period_end: bool, can_pay_now: bool, renew_amount: ?string}
+     * @return array{agreed_price: ?string, first_payment_due: ?string, package_name: string, is_free: bool, complimentary: bool, status: ?string, period_end: ?string, grace_ends_at: ?string, auto_renews: bool, payment_method: ?string, ends_at_period_end: bool, can_pay_now: bool, renew_amount: ?string}
      */
     private function planSummary(Tenant $tenant): array
     {
@@ -138,8 +138,14 @@ final class BillingController extends Controller
         $renewPackage = $renewable ? app(SubscriptionRenewalService::class)->packageToRenew($current) : null;
         $daysLeft = $current?->current_period_end ? now()->startOfDay()->diffInDays($current->current_period_end->copy()->startOfDay(), false) : null;
         $autoRenews = $renewPackage !== null && $current->canBeChargedAutomatically();
+        $currency = (string) config('services.paystack.currency', 'GHS');
+        $agreed = $package && ! $tenant->billing_complimentary ? $tenant->agreedPriceFor($package) : null;
 
         return [
+            'agreed_price' => $agreed ? BillingNotifier::money($agreed['amount'], $currency).($agreed['interval'] === 'year' ? ' a year' : ' a month') : null,
+            // An agreed price set by us, never yet paid: the organisation starts
+            // the plan by paying its first period.
+            'first_payment_due' => $agreed !== null && ! $renewable ? BillingNotifier::money($agreed['amount'], $currency) : null,
             'package_name' => $isFree ? ($package->name ?? 'Free') : $package->name,
             'is_free' => $isFree,
             'complimentary' => (bool) $tenant->billing_complimentary && ! $isFree,
@@ -150,7 +156,7 @@ final class BillingController extends Controller
             'payment_method' => $current?->authorization_label,
             'ends_at_period_end' => $renewable && $renewPackage === null,
             'can_pay_now' => $renewPackage !== null && ($current->isPastDue() || (! $autoRenews && $daysLeft !== null && $daysLeft <= RenewalScheduler::REMINDER_DAYS[0])),
-            'renew_amount' => $renewPackage ? BillingNotifier::money($current->priceMinorFor($renewPackage), (string) config('services.paystack.currency', 'GHS')) : null,
+            'renew_amount' => $renewPackage ? BillingNotifier::money($current->priceMinorFor($renewPackage), $currency) : null,
         ];
     }
 

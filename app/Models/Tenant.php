@@ -75,6 +75,8 @@ final class Tenant extends Model
         'platform_fee_cap_amount',
         'fee_bearer',
         'settlement_mode',
+        'agreed_price_pesewas',
+        'agreed_price_interval',
         'created_at',
         'updated_at',
     ];
@@ -92,6 +94,7 @@ final class Tenant extends Model
         'platform_fee_percentage' => 'float',
         'platform_fee_cap_amount' => 'integer',
         'billing_complimentary' => 'boolean',
+        'agreed_price_pesewas' => 'integer',
     ];
 
     /**
@@ -212,6 +215,21 @@ final class Tenant extends Model
     public function sendingDomain(): HasOne
     {
         return $this->hasOne(TenantSendingDomain::class);
+    }
+
+    /**
+     * The price this organisation agreed for a plan, when one is negotiated.
+     * Only Enterprise is priced this way; every other plan uses its list price.
+     *
+     * @return array{amount: int, interval: string}|null amount in pesewas; interval "month" or "year"
+     */
+    public function agreedPriceFor(Package $package): ?array
+    {
+        if ($package->slug !== 'enterprise' || ! $this->agreed_price_pesewas || ! in_array($this->agreed_price_interval, ['month', 'year'], true)) {
+            return null;
+        }
+
+        return ['amount' => $this->agreed_price_pesewas, 'interval' => $this->agreed_price_interval];
     }
 
     /**

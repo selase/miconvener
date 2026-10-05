@@ -19,7 +19,7 @@ final class ConfirmSubscriptionController extends Controller
 
         $package = Package::where('slug', $slug)->first();
 
-        if (! $package || $package->isFree()) {
+        if (! $package || $package->isFree() || $package->isNegotiated()) {
             return redirect()->route('register');
         }
 

@@ -175,6 +175,20 @@ final class CheckoutController extends Controller
             ? (int) round((float) $newPackage->yearly_price * 100)
             : (int) round((float) $newPackage->price * 100);
 
+        // A negotiated plan (Enterprise) is charged at the organisation's agreed
+        // price and interval; without one there is nothing to charge yet.
+        if ($newPackage->slug === 'enterprise') {
+            $agreed = $tenant->agreedPriceFor($newPackage);
+
+            if ($agreed === null) {
+                return redirect()->route('tenant.pricing', ['subdomain' => $tenant->slug])
+                    ->with('info', 'Enterprise is priced for each organisation. Talk to us and we will set your price.');
+            }
+
+            $amount = $agreed['amount'];
+            $interval = $agreed['interval'];
+        }
+
         $customerId = $this->getOrCreateCustomerId($request, $gateway, $tenant);
 
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(

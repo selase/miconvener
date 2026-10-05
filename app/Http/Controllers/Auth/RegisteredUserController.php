@@ -54,6 +54,12 @@ final class RegisteredUserController extends Controller
         /** @var Package $package */
         $package = Package::where('slug', $request->input('plan'))->firstOrFail();
 
+        // Enterprise is priced per organisation by us, never bought at signup:
+        // the organisation starts on Free until we agree a price.
+        if ($package->isNegotiated()) {
+            $package = Package::query()->where('is_free', true)->orderBy('sort_order')->firstOrFail();
+        }
+
         // Create user
         $user = User::query()->create([
             'first_name' => $request->string('first_name')->toString(),

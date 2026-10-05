@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import StatusPill from '@/Components/Console/StatusPill';
@@ -69,7 +69,7 @@ function planLine(plan) {
     return null;
 }
 
-function CurrentPlan({ plan }) {
+export function CurrentPlan({ plan }) {
     const line = plan ? planLine(plan) : null;
     const overdue = plan?.status === 'past_due';
 
@@ -79,10 +79,29 @@ function CurrentPlan({ plan }) {
         >
             <div className="text-xs font-semibold uppercase text-ink-secondary">Current plan</div>
             <div className="mt-1 text-2xl font-bold text-ink">{plan?.package_name ?? 'Free'}</div>
+            {plan?.agreed_price && (
+                <p className="num mt-1 text-sm font-medium text-ink">
+                    Your agreed price: {plan.agreed_price}
+                </p>
+            )}
+            {plan?.first_payment_due && (
+                <p className="mt-1 text-sm text-ink-secondary">
+                    Pay your first period to start the plan. After that it renews at this price.
+                </p>
+            )}
             {line && (
                 <p className={`mt-1 text-sm ${overdue ? 'text-danger-fg' : 'text-ink-secondary'}`}>
                     {line}
                 </p>
+            )}
+            {plan?.first_payment_due && (
+                <Button
+                    className="mt-3"
+                    variant="primary"
+                    onClick={() => router.post(route('billing.checkout'), { plan: 'enterprise' })}
+                >
+                    Pay {plan.first_payment_due}
+                </Button>
             )}
             {plan?.can_pay_now && (
                 <Button className="mt-3" variant="primary" href={route('billing.renew')}>
