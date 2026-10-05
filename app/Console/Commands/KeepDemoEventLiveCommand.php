@@ -56,8 +56,8 @@ final class KeepDemoEventLiveCommand extends Command
 
             EventSession::query()->where('event_id', $event->id)->get()->each(function (EventSession $session) use ($seconds): void {
                 $session->forceFill([
-                    'starts_at' => $session->starts_at?->addSeconds($seconds),
-                    'ends_at' => $session->ends_at?->addSeconds($seconds),
+                    'starts_at' => $session->starts_at->addSeconds($seconds),
+                    'ends_at' => $session->ends_at->addSeconds($seconds),
                 ])->save();
             });
 
