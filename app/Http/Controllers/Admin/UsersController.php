@@ -137,7 +137,7 @@ final class UsersController extends Controller
 
                 if (Auth::user()->can('impersonate user') && $user->roles->pluck('name')->first() !== 'Superadmin') {
                     $action .= '<a href="'.route('impersonation.impersonate', $user->id).'" class="btn btn-icon btn-active-light-warning w-30px h-30px me-3"
-                                        data-kt-permissions-table-filter="delete_row" data-toggle="tooltip" data-placement="top"  title="Login as '.$user->displayName().'">
+                                        data-kt-permissions-table-filter="delete_row" data-toggle="tooltip" data-placement="top"  title="Login as '.e($user->displayName()).'">
                                         <i class="fas fa-user-tag fs-4"></i>
                                     </a>';
                 }
@@ -153,24 +153,27 @@ final class UsersController extends Controller
                     ? $userPhoto = Storage::url($user->photo)
                     : $userPhoto = $user->gravatar;
 
+                // Names and emails are user-supplied, so they are escaped before
+                // going into the HTML the table renders.
+                $showUrl = e(route('users.show', $user->uuid));
                 $client = '<div class="symbol symbol-circle symbol-50px overflow-hidden me-3">
-                                <a href="javascript:void(0)">
+                                <a href="'.$showUrl.'">
                                     <div class="symbol-label">
-                                        <img src="'.$userPhoto.'"
-                                            alt="'.$user->displayName().'" class="w-100">
+                                        <img src="'.e($userPhoto).'"
+                                            alt="'.e($user->displayName()).'" class="w-100">
                                     </div>
                                 </a>
                             </div>
 
                             <div class="d-flex flex-column">
-                                <a href="javascript:void(0)"
-                                    class="text-gray-800 text-hover-primary mb-1">'.$user->displayName().'</a>
-                                <span>'.$user->email.'</span>
+                                <a href="'.$showUrl.'"
+                                    class="text-gray-800 text-hover-primary mb-1">'.e($user->displayName()).'</a>
+                                <span>'.e($user->email).'</span>
                             </div>';
 
                 $nestedData['uuid'] = $user->uuid;
                 $nestedData['client'] = $client;
-                $nestedData['role'] = $user->roles->map(fn ($role): string => '<span class="badge badge-light-primary fw-bolder">'.ucfirst((string) $role->name).'</span>')->implode(' ');
+                $nestedData['role'] = $user->roles->map(fn ($role): string => '<span class="badge badge-light-primary fw-bolder">'.e(ucfirst((string) $role->name)).'</span>')->implode(' ');
                 $nestedData['last_login_at'] = $user->last_login_at?->diffForHumans();
                 $nestedData['created_at'] = $user->created_at->format('Y-m-d');
                 $nestedData['action'] = $action;

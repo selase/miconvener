@@ -104,7 +104,7 @@ final class TeamController extends Controller
 
                 if (Auth::user()->can('impersonate user') && $user->roles->pluck('name')->first() !== 'Superadmin') {
                     $action .= '<a href="'.route('impersonation.impersonate', $user->id).'" class="btn btn-icon btn-active-light-warning w-30px h-30px me-3"
-                                        data-kt-permissions-table-filter="delete_row" data-toggle="tooltip" data-placement="top"  title="Login as '.$user->displayName().'">
+                                        data-kt-permissions-table-filter="delete_row" data-toggle="tooltip" data-placement="top"  title="Login as '.e($user->displayName()).'">
                                         <i class="fas fa-user-tag fs-4"></i>
                                     </a>';
                 }
@@ -124,20 +124,20 @@ final class TeamController extends Controller
                                 <a href="javascript:void(0)">
                                     <div class="symbol-label">
                                         <img src="'.$userPhoto.'"
-                                            alt="'.$user->displayName().'" class="w-100">
+                                            alt="'.e($user->displayName()).'" class="w-100">
                                     </div>
                                 </a>
                             </div>
 
                             <div class="d-flex flex-column">
                                 <a href="javascript:void(0)"
-                                    class="text-gray-800 text-hover-primary mb-1">'.$user->displayName().'</a>
-                                <span>'.$user->email.'</span>
+                                    class="text-gray-800 text-hover-primary mb-1">'.e($user->displayName()).'</a>
+                                <span>'.e($user->email).'</span>
                             </div>';
 
                 $nestedData['uuid'] = $user->uuid;
                 $nestedData['client'] = $client;
-                $nestedData['role'] = $user->roles->map(fn ($role): string => '<span class="badge badge-light-primary fw-bolder me-1">'.ucfirst((string) $role->name).'</span>')->implode(' ');
+                $nestedData['role'] = $user->roles->map(fn ($role): string => '<span class="badge badge-light-primary fw-bolder me-1">'.e(ucfirst((string) $role->name)).'</span>')->implode(' ');
                 $nestedData['created_at'] = $user->created_at->format('Y-m-d');
                 $nestedData['action'] = $action;
 

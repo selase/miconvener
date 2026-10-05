@@ -99,12 +99,14 @@ final class AuditTrailController extends Controller
 
         if ($activityLogs->isNotEmpty()) {
             foreach ($activityLogs as $log) {
+                // The table renders HTML, and logged values (names, titles,
+                // changed attributes) were typed by users, so all are escaped.
                 $nestedData['id'] = $log->id;
-                $nestedData['location'] = $log->log_name;
-                $nestedData['event'] = $log->description;
-                $nestedData['subject_type'] = $log->subject_type;
-                $nestedData['causer'] = $log->causer?->displayName();
-                $nestedData['properties'] = '<textarea rows="5" disabled>'.$log->properties.'</textarea>';
+                $nestedData['location'] = e((string) $log->log_name);
+                $nestedData['event'] = e((string) $log->description);
+                $nestedData['subject_type'] = e((string) $log->subject_type);
+                $nestedData['causer'] = e((string) $log->causer?->displayName());
+                $nestedData['properties'] = '<textarea rows="5" disabled>'.e((string) $log->properties).'</textarea>';
                 $nestedData['created_at'] = $log->created_at->format('Y-m-d H:i:s');
 
                 $data[] = $nestedData;
@@ -227,24 +229,26 @@ final class AuditTrailController extends Controller
                 $user = '<div class="symbol symbol-circle symbol-50px overflow-hidden me-3">
                                 <a href="javascript:void(0)">
                                     <div class="symbol-label">
-                                        <img src="'.$userPhoto.'"
-                                            alt="'.$login->user->displayName().'" class="w-100">
+                                        <img src="'.e($userPhoto).'"
+                                            alt="'.e($login->user->displayName()).'" class="w-100">
                                     </div>
                                 </a>
                             </div>
 
                             <div class="d-flex flex-column">
                                 <a href="javascript:void(0)"
-                                    class="text-gray-800 text-hover-primary mb-1">'.$login->user->displayName().'</a>
-                                <span>'.$login->user->email.'</span>
+                                    class="text-gray-800 text-hover-primary mb-1">'.e($login->user->displayName()).'</a>
+                                <span>'.e($login->user->email).'</span>
                             </div>';
 
+                // Device, platform and browser come from the visitor's
+                // User-Agent header, which anyone can set; escape everything.
                 $nestedData['id'] = $login->id;
-                $nestedData['location'] = $login->location;
-                $nestedData['client_device'] = $login->client_device;
-                $nestedData['platform'] = $login->platform;
-                $nestedData['ip_address'] = $login->ip_address;
-                $nestedData['browser'] = $login->browser;
+                $nestedData['location'] = e((string) $login->location);
+                $nestedData['client_device'] = e((string) $login->client_device);
+                $nestedData['platform'] = e((string) $login->platform);
+                $nestedData['ip_address'] = e((string) $login->ip_address);
+                $nestedData['browser'] = e((string) $login->browser);
                 $nestedData['login_at'] = $login->login_at->format('Y-m-d H:i:s');
                 $nestedData['logout_at'] = $login->logout_at?->format('Y-m-d H:i:s');
                 $nestedData['user'] = $user;

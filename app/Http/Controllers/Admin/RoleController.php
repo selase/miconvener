@@ -69,7 +69,7 @@ final class RoleController extends Controller
 
                 // Nest data
                 $nestedData['id'] = $role->id;
-                $nestedData['name'] = $role->name;
+                $nestedData['name'] = e($role->name);
                 $nestedData['guard_name'] = '<span class="badge badge-light-primary">'.$role->guard_name.'</span>';
                 $nestedData['created_at'] = $role->created_at->format('Y-m-d H:i:s');
                 $nestedData['action'] = $action;
