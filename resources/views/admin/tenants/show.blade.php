@@ -70,6 +70,9 @@
                             <span data-bs-toggle="tooltip" data-bs-trigger="hover" title="Send event mail from the organiser's own domain (Enterprise)">
                                 <a href="{{ route('tenants.sending-domain.show', $tenant->uuid) }}" class="btn btn-sm btn-light">Sending domain</a>
                             </span>
+                            <span data-bs-toggle="tooltip" data-bs-trigger="hover" title="Plan, billing, messaging and events on one page">
+                                <a href="{{ route('health.tenants.show', $tenant->uuid) }}" class="btn btn-sm btn-light-primary">Customer view</a>
+                            </span>
                             <span data-bs-toggle="tooltip" data-bs-trigger="hover" title="Add-ons this organisation has, and grant credits or features without charge">
                                 <a href="{{ route('tenants.addons.index', $tenant->uuid) }}" class="btn btn-sm btn-light">Add-ons &amp; credits</a>
                             </span>

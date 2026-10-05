@@ -104,6 +104,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     Route::get('health/tenants', [TenantHealthController::class, 'index'])
         ->name('health.tenants');
+    Route::get('health/tenants/{tenant:uuid}', [TenantHealthController::class, 'show'])
+        ->name('health.tenants.show');
+    Route::get('messages', [App\Http\Controllers\Admin\MessageDeliveryController::class, 'index'])
+        ->name('admin.messages.index');
 
     // profile routes
     Route::get('profile/{user}', [ProfileController::class, 'index'])->name('profile.index');
