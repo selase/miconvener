@@ -28,6 +28,20 @@ final class TenantAddon extends Model
 
     public const TYPE_EMAIL_PACK = 'email_pack';
 
+    /** A business pays for a year of verification (checked by our team). */
+    public const TYPE_SHOP_VERIFICATION = 'shop_verification';
+
+    /** A business's listings rank first in marketplace search for a week. */
+    public const TYPE_SHOP_BOOST = 'shop_boost';
+
+    /** A business leads the marketplace home page for a month. */
+    public const TYPE_SHOP_FEATURED = 'shop_featured';
+
+    /** The add-on types that only a business with a marketplace shop can buy. */
+    public const SHOP_TYPES = [self::TYPE_SHOP_VERIFICATION, self::TYPE_SHOP_BOOST, self::TYPE_SHOP_FEATURED];
+
+    public const INTERVAL_WEEKLY = 'weekly';
+
     public const INTERVAL_MONTHLY = 'monthly';
 
     public const INTERVAL_YEARLY = 'yearly';

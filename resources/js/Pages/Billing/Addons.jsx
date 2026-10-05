@@ -246,6 +246,8 @@ export default function Addons({
                             const isSubmitting = submittingKey === item.key;
                             const isEventPass = item.billing_interval === 'event_pass';
                             const isMonthly = item.billing_interval === 'monthly';
+                            const isWeekly = item.billing_interval === 'weekly';
+                            const isYearly = item.billing_interval === 'yearly';
                             const isOneOff = item.billing_interval === 'one_off';
 
                             return (
@@ -261,9 +263,13 @@ export default function Addons({
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 uppercase">
                                                 {isMonthly
                                                     ? 'Monthly'
-                                                    : isEventPass
-                                                      ? 'Event Pass'
-                                                      : 'Prepaid'}
+                                                    : isWeekly
+                                                      ? '1 week'
+                                                      : isYearly
+                                                        ? '1 year'
+                                                        : isEventPass
+                                                          ? 'Event Pass'
+                                                          : 'Prepaid'}
                                             </span>
                                         </div>
 
@@ -276,7 +282,15 @@ export default function Addons({
                                                 {currency} {formatPrice(item.unit_price)}
                                             </span>
                                             <span className="text-xs text-ink-secondary">
-                                                {isMonthly ? '/mo' : isEventPass ? '/event' : ''}
+                                                {isMonthly
+                                                    ? '/mo'
+                                                    : isWeekly
+                                                      ? '/week'
+                                                      : isYearly
+                                                        ? '/year'
+                                                        : isEventPass
+                                                          ? '/event'
+                                                          : ''}
                                             </span>
                                         </div>
                                     </div>

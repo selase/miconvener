@@ -74,6 +74,8 @@ final class Kernel extends ConsoleKernel
         $schedule->command('events:purge-deleted')->hourly()->withoutOverlapping();
         // Keeps the demo event running for whoever opens it (no-op without one).
         $schedule->command('demo:keep-live')->hourly()->withoutOverlapping();
+        // A paid verification lasts a year.
+        $schedule->command('marketplace:expire-verifications')->dailyAt('03:15');
 
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');

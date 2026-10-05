@@ -74,6 +74,12 @@ final class VenueProfileController extends Controller
                 ->with('error', 'Please complete your venue profile before requesting verification.');
         }
 
+        // Verification is a paid review (GHS 150 a year).
+        if (! $shop->hasActivePromotion(\App\Models\TenantAddon::TYPE_SHOP_VERIFICATION)) {
+            return redirect()->route('tenant.venue.profile', ['subdomain' => $subdomain])
+                ->with('error', 'Buy the Verified business add-on (Billing → Add-ons) before asking for verification.');
+        }
+
         $shop->update([
             'verification_status' => Shop::VERIFICATION_PENDING,
         ]);

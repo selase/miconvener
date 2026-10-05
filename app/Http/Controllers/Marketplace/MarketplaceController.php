@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Marketplace;
 use App\Http\Controllers\Controller;
 use App\Models\Shop;
 use App\Models\StoreListing;
+use App\Models\TenantAddon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -15,7 +16,9 @@ final class MarketplaceController extends Controller
 {
     public function index(Request $request): Response
     {
-        // Curated featured venues across major event hubs in Ghana
+        // Paid featured businesses lead, then verified ones.
+        [$featured, $bindings] = Shop::activePromotionSql(TenantAddon::TYPE_SHOP_FEATURED);
+
         $featuredVenues = StoreListing::query()
             ->with(['shop', 'primaryMedia'])
             ->where('listing_kind', StoreListing::KIND_VENUE)
@@ -24,6 +27,7 @@ final class MarketplaceController extends Controller
                 $q->where('is_active', true);
             })
             ->leftJoin('shops', 'store_listings.shop_id', '=', 'shops.id')
+            ->orderByRaw("CASE WHEN {$featured} THEN 0 ELSE 1 END", $bindings)
             ->orderByRaw("CASE WHEN shops.verification_status = 'verified' THEN 0 ELSE 1 END")
             ->select('store_listings.*')
             ->orderBy('store_listings.sort_order')
@@ -45,6 +49,10 @@ final class MarketplaceController extends Controller
         return Inertia::render('Public/Marketplace/Index', [
             'featuredVenues' => $featuredVenues,
             'featuredMerchants' => $featuredMerchants,
+            // Businesses that paid to be featured, so their cards say so.
+            'featuredShopIds' => $featuredVenues->pluck('shop')->filter()
+                ->filter(fn (Shop $shop): bool => $shop->hasActivePromotion(TenantAddon::TYPE_SHOP_FEATURED))
+                ->pluck('id')->unique()->values(),
         ]);
     }
 }

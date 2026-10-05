@@ -15,7 +15,11 @@ import {
     FileText,
 } from 'lucide-react';
 
-export default function MarketplaceIndex({ featuredVenues = [], featuredMerchants = [] }) {
+export default function MarketplaceIndex({
+    featuredVenues = [],
+    featuredMerchants = [],
+    featuredShopIds = [],
+}) {
     const [searchMode, setSearchMode] = useState('keyword'); // 'keyword' | 'ai'
     const [q, setQ] = useState('');
     const [aiPrompt, setAiPrompt] = useState('');
@@ -418,6 +422,12 @@ export default function MarketplaceIndex({ featuredVenues = [], featuredMerchant
                                                 <MapPin className="h-3 w-3" />
                                                 <span>{venue.shop?.city ?? 'Ghana'}</span>
                                             </div>
+
+                                            {featuredShopIds.includes(venue.shop_id) && (
+                                                <div className="absolute top-2.5 right-2.5 rounded bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-ink">
+                                                    Featured
+                                                </div>
+                                            )}
 
                                             {venue.shop?.verification_status === 'verified' && (
                                                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded bg-accent/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-xs">
