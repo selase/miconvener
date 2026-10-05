@@ -206,6 +206,34 @@ final class Tenant extends Model
         return $this->hasOne(Shop::class);
     }
 
+    /**
+     * @return HasOne<TenantSendingDomain, $this>
+     */
+    public function sendingDomain(): HasOne
+    {
+        return $this->hasOne(TenantSendingDomain::class);
+    }
+
+    /**
+     * Sending from the organiser's own domain is an Enterprise feature
+     * (decided 2026-10-05, after Luma's model).
+     */
+    public function canHaveSendingDomain(): bool
+    {
+        return $this->package?->slug === 'enterprise';
+    }
+
+    /**
+     * The organiser's own sending domain, when mail may come from it now: on
+     * Enterprise and verified by SES. Anything else sends from our address.
+     */
+    public function activeSendingDomain(): ?TenantSendingDomain
+    {
+        $sendingDomain = $this->sendingDomain;
+
+        return $sendingDomain?->isVerified() && $this->canHaveSendingDomain() ? $sendingDomain : null;
+    }
+
     public function featureEnabled(string $key): bool
     {
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();

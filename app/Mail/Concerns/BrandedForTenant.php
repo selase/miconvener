@@ -7,6 +7,7 @@ namespace App\Mail\Concerns;
 use App\Models\Event;
 use App\Services\Mail\TenantMailIdentity;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 
 /**
  * Applied to mail an attendee receives about a tenant's event, so it arrives
@@ -23,6 +24,14 @@ trait BrandedForTenant
      * goes on it and the optional address replies should go to.
      */
     abstract protected function brandingEvent(): ?Event;
+
+    /**
+     * See TenantMailIdentity::headers().
+     */
+    public function headers(): Headers
+    {
+        return app(TenantMailIdentity::class)->headers($this->brandingEvent());
+    }
 
     protected function brandedEnvelope(string $subject): Envelope
     {

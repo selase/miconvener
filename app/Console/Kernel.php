@@ -76,6 +76,8 @@ final class Kernel extends ConsoleKernel
         $schedule->command('demo:keep-live')->hourly()->withoutOverlapping();
         // A paid verification lasts a year.
         $schedule->command('marketplace:expire-verifications')->dailyAt('03:15');
+        // Organiser sending domains switch on/off as SES finds their DNS records.
+        $schedule->command('mail:check-sending-domains')->everyFifteenMinutes()->withoutOverlapping();
 
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');

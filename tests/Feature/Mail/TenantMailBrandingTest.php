@@ -11,6 +11,7 @@ use App\Models\EventBlast;
 use App\Models\EventRegistration;
 use App\Models\Package;
 use App\Models\Tenant;
+use App\Models\TenantSendingDomain;
 use Database\Seeders\EventPackageSeeder;
 use Illuminate\Support\Facades\Config;
 
@@ -20,9 +21,8 @@ use Illuminate\Support\Facades\Config;
  * organizer happens to use, and a reply should reach that organizer rather
  * than a noreply mailbox nobody reads.
  *
- * The envelope address itself stays on our own sending domain throughout: it
- * is the only address the mail provider will accept, and changing it is a
- * separate feature that needs the organizer's domain verified.
+ * The envelope address stays on our own sending domain unless the organiser
+ * is on Enterprise and SES has verified their own domain.
  */
 beforeEach(function (): void {
     refreshTenantDatabases();
@@ -140,4 +140,46 @@ test('billing mail keeps our identity, because we are the ones who charged the c
         ->not->toContain(App\Mail\Concerns\BrandedForTenant::class);
 
     expect($tenant->planAllows('white_label'))->toBeTrue();
+});
+
+test('an Enterprise organiser whose own domain SES has verified sends from their own address', function () {
+    $tenant = brandingTenantOnPlan('enterprise');
+    TenantSendingDomain::query()->create([
+        'tenant_id' => $tenant->id,
+        'domain' => 'events.techsummit.gh',
+        'from_address' => 'hello@events.techsummit.gh',
+        'status' => TenantSendingDomain::STATUS_VERIFIED,
+    ]);
+
+    $envelope = new EventTicketLink(brandingRegistrationFor($tenant))->envelope();
+
+    expect($envelope->from->address)->toBe('hello@events.techsummit.gh')
+        ->and($envelope->from->name)->toBe('Tech Summit Ghana')
+        ->and($envelope->replyTo[0]->address)->toBe('organizers@techsummit.gh');
+});
+
+test('an own domain that is not verified, or not on Enterprise, sends from the platform address', function (string $plan, string $status) {
+    $tenant = brandingTenantOnPlan($plan);
+    TenantSendingDomain::query()->create([
+        'tenant_id' => $tenant->id,
+        'domain' => 'events.techsummit.gh',
+        'from_address' => 'hello@events.techsummit.gh',
+        'status' => $status,
+    ]);
+
+    $envelope = new EventTicketLink(brandingRegistrationFor($tenant))->envelope();
+
+    expect($envelope->from->address)->toBe('hello@miconvener.com');
+})->with([
+    'pending on Enterprise' => ['enterprise', TenantSendingDomain::STATUS_PENDING],
+    'failed on Enterprise' => ['enterprise', TenantSendingDomain::STATUS_FAILED],
+    'verified but no longer on Enterprise' => ['growth', TenantSendingDomain::STATUS_VERIFIED],
+]);
+
+test('event mail carries its tenant as an SES message tag', function () {
+    $tenant = brandingTenantOnPlan('starter');
+
+    $headers = new EventTicketLink(brandingRegistrationFor($tenant))->headers();
+
+    expect($headers->text)->toBe(['X-SES-MESSAGE-TAGS' => "tenant={$tenant->id}"]);
 });

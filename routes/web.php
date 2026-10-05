@@ -135,6 +135,14 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         Route::resource('{tenants}/team', TeamController::class);
         Route::get('change/{tenant}', [TenantController::class, 'changeTenant'])
             ->name('change');
+        Route::get('{tenant:uuid}/sending-domain', [App\Http\Controllers\Admin\SendingDomainController::class, 'show'])
+            ->name('sending-domain.show');
+        Route::post('{tenant:uuid}/sending-domain', [App\Http\Controllers\Admin\SendingDomainController::class, 'store'])
+            ->name('sending-domain.store');
+        Route::post('{tenant:uuid}/sending-domain/check', [App\Http\Controllers\Admin\SendingDomainController::class, 'check'])
+            ->name('sending-domain.check');
+        Route::delete('{tenant:uuid}/sending-domain', [App\Http\Controllers\Admin\SendingDomainController::class, 'destroy'])
+            ->name('sending-domain.destroy');
     });
     Route::resource('tenants', TenantController::class);
 

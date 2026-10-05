@@ -38,6 +38,17 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->singleton(\App\Services\Tenancy\TenantStorageManager::class);
         $this->app->singleton(\App\Services\Tenancy\FeatureService::class);
 
+        $this->app->singleton(\Aws\SesV2\SesV2Client::class, function (): \Aws\SesV2\SesV2Client {
+            $ses = (array) config('services.ses');
+            $options = ['version' => 'latest', 'region' => $ses['region'] ?? 'us-east-1'];
+
+            if (filled($ses['key'] ?? null) && filled($ses['secret'] ?? null)) {
+                $options['credentials'] = ['key' => $ses['key'], 'secret' => $ses['secret']];
+            }
+
+            return new \Aws\SesV2\SesV2Client($options);
+        });
+
         // Domain service interfaces
         $this->app->bind(\App\Contracts\InvoicingServiceContract::class, \App\Services\Tenancy\InvoicingService::class);
         $this->app->bind(\App\Contracts\UsageServiceContract::class, \App\Services\Tenancy\UsageService::class);

@@ -7,6 +7,7 @@ namespace App\Services\Mail;
 use App\Models\Event;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 
 /**
  * Who an event's mail appears to come from, and where a reply to it goes.
@@ -16,9 +17,10 @@ use Illuminate\Mail\Mailables\Envelope;
  * attendee actually reads, and the Reply-To that carries their answer back to
  * the organizer rather than into a noreply mailbox.
  *
- * Sending as the organizer's own address is a separate, larger feature: it
- * needs their domain verified as a sending identity, which needs DNS records
- * they may not be able to add.
+ * The exception is an organiser whose own domain SES has verified (Enterprise,
+ * set up by a superadmin): their mail comes from their own address. Until SES
+ * reports the domain verified, and whenever it stops doing so, they get the
+ * platform address like everyone else.
  */
 final class TenantMailIdentity
 {
@@ -38,12 +40,28 @@ final class TenantMailIdentity
 
         // A tenant here implies an event: it was reached through one.
         $replyTo = $event->contact_email ?: $tenant->email;
+        $ownDomain = $tenant->activeSendingDomain();
+
+        $from = $ownDomain !== null
+            ? new Address($ownDomain->from_address, $tenant->name)
+            : new Address((string) config('mail.from.address'), $this->displayName($tenant->name, $tenant->planAllows('white_label')));
 
         return new Envelope(
             subject: $subject,
-            from: new Address((string) config('mail.from.address'), $this->displayName($tenant->name, $tenant->planAllows('white_label'))),
+            from: $from,
             replyTo: $replyTo ? [new Address($replyTo, $tenant->name)] : [],
         );
+    }
+
+    /**
+     * Tags the message with its tenant so SES can report bounces and
+     * complaints per organiser, once a configuration set publishes events.
+     */
+    public function headers(?Event $event): Headers
+    {
+        $tenantId = $event?->tenant_id;
+
+        return new Headers(text: $tenantId ? ['X-SES-MESSAGE-TAGS' => "tenant={$tenantId}"] : []);
     }
 
     /**

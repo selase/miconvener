@@ -67,6 +67,9 @@
                             <span data-bs-toggle="tooltip" data-bs-trigger="hover" title="Edit tenant details">
                                 <a href="{{ route('tenants.edit', $tenant->uuid) }}" class="btn btn-sm btn-light-primary">Edit</a>
                             </span>
+                            <span data-bs-toggle="tooltip" data-bs-trigger="hover" title="Send event mail from the organiser's own domain (Enterprise)">
+                                <a href="{{ route('tenants.sending-domain.show', $tenant->uuid) }}" class="btn btn-sm btn-light">Sending domain</a>
+                            </span>
                         </div>
 
                         <div class="separator"></div>
