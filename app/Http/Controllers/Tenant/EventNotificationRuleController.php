@@ -11,9 +11,12 @@ use App\Models\EventNotificationRule;
 use App\Models\TenantNotificationSetting;
 use App\Services\Notifications\AutomatedNotificationDispatcher;
 use App\Services\Notifications\NotificationGatewayService;
+use App\Support\PhoneNumber;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 final class EventNotificationRuleController extends Controller
 {
@@ -187,20 +190,35 @@ final class EventNotificationRuleController extends Controller
             'channels.*' => ['string', 'in:email,sms,whatsapp'],
             'subject' => ['required', 'string'],
             'body_template' => ['required', 'string'],
+            // User accounts carry no phone number, so an SMS or WhatsApp
+            // test goes to a number the organizer types in.
+            'phone' => [
+                Rule::requiredIf(fn (): bool => array_intersect((array) $request->input('channels'), ['sms', 'whatsapp']) !== []),
+                'nullable',
+                'string',
+                'max:30',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value !== null && PhoneNumber::toInternationalDigits((string) $value) === null) {
+                        $fail('Enter a phone number we can text, for example 0241234567 or +233241234567.');
+                    }
+                },
+            ],
+        ], [
+            'phone.required' => 'Enter the phone number to send the test SMS to.',
         ]);
 
         $user = $request->user();
         $recipient = [
             'name' => mb_trim("{$user->first_name} {$user->last_name}"),
             'email' => $user->email,
-            'phone' => $user->phone ?? null,
+            'phone' => $validated['phone'] ?? null,
         ];
 
         $payload = [
             'subject' => "[TEST] {$validated['subject']}",
             'body' => str_replace(
-                ['{name}', '{event_name}', '{venue}', '{date}'],
-                [$recipient['name'], $event->name, $event->venue_name ?? 'Accra Conference Center', now()->format('F j, Y')],
+                ['{name}', '{event_name}', '{venue}', '{date}', '{ticket_code}'],
+                [$recipient['name'], $event->name, $event->venue_name ?? 'Accra Conference Center', now()->format('F j, Y'), 'TKT-TEST-0001'],
                 $validated['body_template']
             ),
             'action_url' => url("/e/{$event->slug}"),

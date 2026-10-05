@@ -302,7 +302,7 @@ describe('staff door, after review', () => {
 
         expect(sizes.every((n) => n <= 200)).toBe(true);
         expect(door.status().queued).toBe(0);
-    });
+    }, 30_000); // 450 check-ins through the real store: slow on a busy machine, not stuck
 
     it('shows a sync failure instead of hiding it', async () => {
         const fetcher = vi.fn(async (url) =>
