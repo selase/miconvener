@@ -116,6 +116,10 @@ final class EventController extends Controller
 
         $validated = $this->validateEvent($request);
 
+        if ($validated['status'] === Event::STATUS_SUSPENDED) {
+            $validated['status'] = Event::STATUS_DRAFT;
+        }
+
         if (($validated['ticket_price'] ?? 0) > 0 && ! $tenant->planAllows('paid_tickets')) {
             $message = 'Your plan runs free events only. Set the ticket price to 0, or upgrade to sell tickets.';
 
@@ -172,6 +176,15 @@ final class EventController extends Controller
         $eventModel = $this->resolveEvent($tenant, $event, ['ticketTypes']);
 
         $validated = $this->validateEvent($request);
+
+        // A takedown is MiConvener's to lift: while it stands the organiser
+        // can still edit the event, but not republish it. Nor can anyone
+        // choose "suspended" themselves.
+        if ($eventModel->taken_down_at !== null) {
+            $validated['status'] = Event::STATUS_SUSPENDED;
+        } elseif ($validated['status'] === Event::STATUS_SUSPENDED) {
+            $validated['status'] = $eventModel->status;
+        }
 
         // A grandfathered event was already selling when the plan changed, so
         // the organizer can keep editing it; a smaller plan only stops new paid events.
@@ -650,6 +663,8 @@ final class EventController extends Controller
         return Inertia::render('Tenant/Events/Show', [
             'event' => [
                 ...$this->toPayload($eventModel),
+                // Set when MiConvener took the event down; the organiser sees why.
+                'takedown_reason' => $eventModel->taken_down_at !== null ? $eventModel->takedown_reason : null,
                 'platform_fee_percentage' => $eventModel->platform_fee_percentage,
                 'effective_platform_fee_percentage' => $eventModel->effectivePlatformFeePercentage(),
                 'effective_platform_fee_cap_amount' => $eventModel->effectivePlatformFeeCapAmount(),
@@ -775,7 +790,9 @@ final class EventController extends Controller
             'event_category' => ['sometimes', 'string', Rule::in(Event::CATEGORIES)],
             'contribution_title' => ['nullable', 'string', 'max:255'],
             'contribution_description' => ['nullable', 'string', 'max:1000'],
-            'status' => ['required', Rule::in([Event::STATUS_DRAFT, Event::STATUS_PUBLISHED, Event::STATUS_CANCELLED])],
+            // "suspended" is accepted only so a taken-down event's form can be
+            // saved; update() keeps or rejects it (store() never creates one).
+            'status' => ['required', Rule::in([Event::STATUS_DRAFT, Event::STATUS_PUBLISHED, Event::STATUS_CANCELLED, Event::STATUS_SUSPENDED])],
             'visibility' => ['sometimes', Rule::in(Event::VISIBILITIES)],
             'fee_bearer' => ['nullable', Rule::in([
                 \App\Services\Finance\PlatformFeeResolver::BEARER_ORGANIZER,

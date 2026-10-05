@@ -154,6 +154,12 @@ final class VenueListingController extends Controller
         $rentalPriceGhs = (float) $validated['rental_price'];
         $securityDepositGhs = isset($validated['security_deposit']) ? (float) $validated['security_deposit'] : null;
 
+        // A listing MiConvener took down stays down until we restore it,
+        // whatever status the owner picks.
+        if ($listing->taken_down_at !== null) {
+            $validated['status'] = StoreListing::STATUS_SUSPENDED;
+        }
+
         DB::connection('landlord')->transaction(function () use ($listing, $validated, $rentalPriceGhs, $securityDepositGhs): void {
             $listing->update([
                 'listing_kind' => $validated['listing_kind'] ?? $listing->listing_kind,

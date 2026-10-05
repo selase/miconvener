@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventNotificationLog;
 use App\Models\Package;
+use App\Models\StoreListing;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantAddon;
@@ -96,6 +97,8 @@ final class TenantHealthController extends Controller
             'eventCount' => (clone $events)->count(),
             'nextEvent' => (clone $events)->where('starts_at', '>=', now()->startOfDay())->orderBy('starts_at')->first(),
             'lastEvent' => (clone $events)->where('starts_at', '<', now()->startOfDay())->orderByDesc('starts_at')->first(),
+            'recentEvents' => (clone $events)->orderByDesc('starts_at')->limit(20)->get(),
+            'listings' => $tenant->shop ? StoreListing::query()->withoutGlobalScopes()->where('shop_id', $tenant->shop->id)->latest()->limit(20)->get() : collect(),
         ]);
     }
 

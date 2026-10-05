@@ -33,6 +33,9 @@ final class Event extends Model
 
     public const string STATUS_CANCELLED = 'cancelled';
 
+    /** Taken down by a superadmin; see ContentTakedown. */
+    public const string STATUS_SUSPENDED = 'suspended';
+
     public const string LOCATION_IN_PERSON = 'in_person';
 
     public const string LOCATION_VIRTUAL = 'virtual';
@@ -159,6 +162,7 @@ final class Event extends Model
     ];
 
     protected $casts = [
+        'taken_down_at' => 'datetime',
         'starts_at' => 'datetime',
         'grandfathered_at' => 'datetime',
         'terms_locked_at' => 'datetime',

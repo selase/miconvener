@@ -105,6 +105,7 @@ final class StoreListing extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'taken_down_at' => 'datetime',
         'rental_price_pesewas' => 'integer',
         'security_deposit_pesewas' => 'integer',
         'min_order_pesewas' => 'integer',

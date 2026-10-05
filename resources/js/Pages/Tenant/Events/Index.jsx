@@ -13,6 +13,7 @@ const STATUS_VARIANT = {
     draft: 'neutral',
     published: 'success',
     cancelled: 'failed',
+    suspended: 'failed',
 };
 
 function formatDate(iso) {

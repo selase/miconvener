@@ -587,6 +587,21 @@ export default function Show({
                 </Button>
             }
         >
+            {event.status === 'suspended' && (
+                <div
+                    role="alert"
+                    className="mb-6 rounded-lg border border-danger-border bg-danger-surface p-4 text-sm text-danger-fg"
+                >
+                    <p className="font-semibold">MiConvener has taken this event down.</p>
+                    <p className="mt-1">
+                        It is hidden from the public and cannot be published again until we restore
+                        it.
+                        {event.takedown_reason ? ` Reason: ${event.takedown_reason}` : ''} Contact
+                        MiConvener support if you think this is a mistake.
+                    </p>
+                </div>
+            )}
+
             {(panels[current] ?? panels.overview)()}
 
             {editing && (

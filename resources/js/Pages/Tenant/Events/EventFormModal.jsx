@@ -623,9 +623,15 @@ export default function EventFormModal({ mode, event, onClose }) {
                     onChange={(e) => setData('status', e.target.value)}
                     error={errors.status}
                 >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                    <option value="cancelled">Cancelled</option>
+                    {data.status === 'suspended' ? (
+                        <option value="suspended">Taken down by MiConvener</option>
+                    ) : (
+                        <>
+                            <option value="draft">Draft</option>
+                            <option value="published">Published</option>
+                            <option value="cancelled">Cancelled</option>
+                        </>
+                    )}
                 </Select>
 
                 {errorCount > 0 && (

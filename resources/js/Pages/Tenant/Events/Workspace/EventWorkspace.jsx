@@ -37,7 +37,13 @@ export function StatusPill({ event, phase }) {
         );
     }
     const status =
-        phase === 'after' ? 'Ended' : event.status === 'published' ? 'Published' : 'Draft';
+        event.status === 'suspended'
+            ? 'Taken down'
+            : phase === 'after'
+              ? 'Ended'
+              : event.status === 'published'
+                ? 'Published'
+                : 'Draft';
     return (
         <span className="inline-flex w-max items-center rounded-full bg-surface-sunken px-2 py-0.5 text-[11.5px] font-medium text-ink-secondary">
             {status} · {dateRange(event)}
