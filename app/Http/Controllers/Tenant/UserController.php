@@ -9,10 +9,13 @@ use App\Http\Requests\Tenant\StoreTeamMemberRequest;
 use App\Http\Requests\Tenant\UpdateTeamMemberRequest;
 use App\Libraries\Helper;
 use App\Mail\Users\SendAccountDetails;
+use App\Models\Event;
+use App\Models\EventStaffAssignment;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\PermissionCeiling;
+use App\Services\Events\EventStaffScope;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -32,33 +35,52 @@ final class UserController extends Controller
         $users = User::where('tenant_id', $tenant->id)
             ->with(['roles:id,name', 'roles.permissions:id,name'])
             ->orderByDesc('created_at')
-            ->paginate(20)
-            ->through(fn (User $user): array => [
-                'uuid' => $user->uuid,
-                'name' => $user->displayName(),
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
-                'phone_no' => $user->phone_no,
-                'avatar' => $user->photo ? Storage::url($user->photo) : $user->gravatar,
-                'role' => $user->roles->pluck('name')->first(),
-                'role_id' => $user->roles->first()?->id,
-                'status' => $user->status,
-                'last_login_at' => $user->last_login_at?->diffForHumans(),
-                'created_at' => $user->created_at->format('Y-m-d'),
-                'can_edit' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
-                    && $this->withinReach($user),
-                'can_remove' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
-                    && $this->withinReach($user)
-                    && $user->id !== auth()->id(),
-                // Your own role is never yours to change.
-                'can_change_role' => $user->id !== auth()->id(),
-            ]);
+            ->paginate(20);
+
+        $assignments = EventStaffAssignment::query()
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('user_id', $users->getCollection()->pluck('id'))
+            ->get(['user_id', 'event_id'])
+            ->groupBy('user_id');
+
+        $users = $users->through(fn (User $user): array => [
+            'uuid' => $user->uuid,
+            'name' => $user->displayName(),
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'email' => $user->email,
+            'phone_no' => $user->phone_no,
+            'avatar' => $user->photo ? Storage::url($user->photo) : $user->gravatar,
+            'role' => $user->roles->pluck('name')->first(),
+            'role_id' => $user->roles->first()?->id,
+            'status' => $user->status,
+            'last_login_at' => $user->last_login_at?->diffForHumans(),
+            'created_at' => $user->created_at->format('Y-m-d'),
+            'can_edit' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
+                && $this->withinReach($user),
+            'can_remove' => ($actorCanManageOwners || ! $user->roles->contains('name', 'Org Superadmin'))
+                && $this->withinReach($user)
+                && $user->id !== auth()->id(),
+            // Your own role is never yours to change.
+            'can_change_role' => $user->id !== auth()->id(),
+            // Events an Event Staff member works; empty means every event.
+            'event_ids' => ($assignments->get($user->id) ?? collect())->pluck('event_id')->map(fn (mixed $id): string => (string) $id)->values()->all(),
+        ]);
 
         return Inertia::render('Tenant/Team/Index', [
             'users' => $users,
             'roles' => $this->availableRoles(),
             'statuses' => User::STATUSES,
+            'events' => Event::where('tenant_id', $tenant->id)
+                ->orderByDesc('starts_at')
+                ->limit(200)
+                ->get(['id', 'name', 'starts_at'])
+                ->map(fn (Event $event): array => [
+                    'id' => (string) $event->id,
+                    'name' => $event->name,
+                    'starts_at' => $event->starts_at->format('j M Y'),
+                ])
+                ->values(),
         ]);
     }
 
@@ -92,6 +114,10 @@ final class UserController extends Controller
             setPermissionsTeamId($tenant->id);
             $user->assignRole($role);
             $user->tenants()->attach($tenant->id);
+
+            if ($role->name === EventStaffScope::ROLE) {
+                $this->syncEventAssignments($user, (string) $tenant->id, $validated['event_ids'] ?? []);
+            }
 
             $loginUrl = $tenant->url('/login');
 
@@ -135,6 +161,10 @@ final class UserController extends Controller
         setPermissionsTeamId($tenant->id);
         $user->syncRoles([$role]);
 
+        $this->syncEventAssignments($user, (string) $tenant->id, $role->name === EventStaffScope::ROLE
+            ? ($validated['event_ids'] ?? [])
+            : []);
+
         return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
             ->with('success', __('locale.messages.updated', ['name' => 'Team member']));
     }
@@ -169,6 +199,32 @@ final class UserController extends Controller
 
         return redirect()->route('tenant.users.index', ['subdomain' => $subdomain])
             ->with('success', __('locale.messages.deleted', ['name' => 'Team member']));
+    }
+
+    /**
+     * Replace the events a member is assigned to. Called with an empty list
+     * for anyone who isn't Event Staff, so a limit never lingers unseen after
+     * a role change.
+     *
+     * @param  list<string>  $eventIds
+     */
+    private function syncEventAssignments(User $user, string $tenantId, array $eventIds): void
+    {
+        DB::connection('landlord')->transaction(function () use ($user, $tenantId, $eventIds): void {
+            EventStaffAssignment::query()
+                ->where('tenant_id', $tenantId)
+                ->where('user_id', $user->id)
+                ->whereNotIn('event_id', $eventIds)
+                ->delete();
+
+            foreach (array_unique($eventIds) as $eventId) {
+                EventStaffAssignment::query()->firstOrCreate([
+                    'tenant_id' => $tenantId,
+                    'event_id' => $eventId,
+                    'user_id' => $user->id,
+                ]);
+            }
+        });
     }
 
     /**

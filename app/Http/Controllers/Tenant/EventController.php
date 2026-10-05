@@ -45,7 +45,12 @@ final class EventController extends Controller
         $this->authorize('read event');
         $tenant = $this->getTenant();
 
+        $assignedOnly = request()->user() instanceof \App\Models\User
+            ? \App\Services\Events\EventStaffScope::restrictedEventIds(request()->user(), (string) $tenant->id)
+            : null;
+
         $allEvents = Event::where('tenant_id', $tenant->id)
+            ->when($assignedOnly !== null, fn ($query) => $query->whereIn('id', $assignedOnly))
             ->withCount(['registrations as registrations_count' => fn ($query) => $query->confirmed()])
             ->orderByDesc('starts_at')
             ->get();
