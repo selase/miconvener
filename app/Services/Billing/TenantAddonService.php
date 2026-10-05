@@ -298,6 +298,73 @@ final class TenantAddonService
         $totalPrice = (int) ($metadata['total_price'] ?? ($config['unit_price'] * $multiplier));
         $eventId = ! empty($metadata['event_id']) ? (string) $metadata['event_id'] : null;
 
+        try {
+            return $this->activate($tenant, $reference, $config, $quantity, $totalPrice, $eventId, []);
+        } catch (UniqueConstraintViolationException) {
+            return TenantAddon::where('paystack_reference', $reference)->first();
+        }
+    }
+
+    /**
+     * Give an organisation an add-on without charging for it: goodwill
+     * credits, a launch partner's promotion. It works exactly like a bought
+     * one, but no payment is recorded (so it is not counted as earnings), and
+     * who granted it and why are kept on the add-on.
+     */
+    public function grantAddon(Tenant $tenant, string $addonKey, int $packs, User $grantedBy, string $reason): TenantAddon
+    {
+        if (! isset(self::CATALOG[$addonKey])) {
+            throw new InvalidArgumentException("Unknown add-on [{$addonKey}].");
+        }
+
+        $config = self::CATALOG[$addonKey];
+        $packs = max(1, $packs);
+
+        $addon = $this->activate($tenant, 'grant_'.Str::uuid(), $config, $config['quantity'] * $packs, 0, null, [
+            'granted_by' => $grantedBy->id,
+            'granted_by_name' => $grantedBy->displayName(),
+            'grant_reason' => $reason,
+        ]);
+
+        activity()
+            ->causedBy($grantedBy)
+            ->performedOn($tenant)
+            ->withProperties(['addon' => $config['name'], 'quantity' => $addon->quantity, 'reason' => $reason])
+            ->log("Granted {$config['name']} to {$tenant->name}");
+
+        return $addon;
+    }
+
+    public function cancelAddon(Tenant $tenant, TenantAddon $addon): bool
+    {
+        if ($addon->tenant_id !== $tenant->id) {
+            abort(403, 'Unauthorized.');
+        }
+
+        if (! in_array($addon->billing_interval, [TenantAddon::INTERVAL_MONTHLY, TenantAddon::INTERVAL_YEARLY], true)) {
+            abort(422, 'Only recurring add-ons can be cancelled.');
+        }
+
+        if ($addon->status === TenantAddon::STATUS_CANCELLED) {
+            return true;
+        }
+
+        $addon->update([
+            'status' => TenantAddon::STATUS_CANCELLED,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Create the active add-on. A paid one ($totalPrice > 0) also records the
+     * payment to MiConvener; a grant records none.
+     *
+     * @param  array<string, mixed>  $config  a CATALOG entry
+     * @param  array<string, mixed>  $extraMeta
+     */
+    private function activate(Tenant $tenant, string $reference, array $config, int $quantity, int $totalPrice, ?string $eventId, array $extraMeta): TenantAddon
+    {
         // A business buying more of the same promotion extends it: the new
         // period starts when the current one ends, not alongside it.
         $periodStart = Carbon::now();
@@ -321,80 +388,63 @@ final class TenantAddonService
             default => null, // One-off credit packs stay active indefinitely
         };
 
-        try {
-            return DB::connection('landlord')->transaction(function () use (
-                $tenant,
-                $reference,
-                $config,
-                $quantity,
-                $totalPrice,
-                $eventId,
-                $periodStart,
-                $periodEnd
-            ): TenantAddon {
-                $addon = TenantAddon::create([
-                    'tenant_id' => $tenant->id,
-                    'addon_type' => $config['addon_type'],
-                    'name' => $config['name'],
-                    'quantity' => $quantity,
-                    'unit_price' => $config['unit_price'],
-                    'total_price' => $totalPrice,
-                    'billing_interval' => $config['billing_interval'],
-                    'status' => TenantAddon::STATUS_ACTIVE,
-                    'event_id' => $eventId,
-                    'paystack_reference' => $reference,
-                    'period_start' => $periodStart,
-                    'period_end' => $periodEnd,
-                    'meta' => [
-                        'catalog_key' => $config['key'],
-                    ],
-                ]);
+        return DB::connection('landlord')->transaction(function () use (
+            $tenant,
+            $reference,
+            $config,
+            $quantity,
+            $totalPrice,
+            $eventId,
+            $periodStart,
+            $periodEnd,
+            $extraMeta
+        ): TenantAddon {
+            $addon = TenantAddon::create([
+                'tenant_id' => $tenant->id,
+                'addon_type' => $config['addon_type'],
+                'name' => $config['name'],
+                'quantity' => $quantity,
+                'unit_price' => $config['unit_price'],
+                'total_price' => $totalPrice,
+                'billing_interval' => $config['billing_interval'],
+                'status' => TenantAddon::STATUS_ACTIVE,
+                'event_id' => $eventId,
+                'paystack_reference' => $reference,
+                'period_start' => $periodStart,
+                'period_end' => $periodEnd,
+                'meta' => [
+                    'catalog_key' => $config['key'],
+                    ...$extraMeta,
+                ],
+            ]);
 
-                // Record double-entry transaction record
-                Transaction::create([
-                    'tenant_id' => $tenant->id,
-                    'amount' => $totalPrice,
-                    'currency' => mb_strtolower((string) config('services.paystack.currency', 'ghs')),
-                    'status' => 'success',
-                    'type' => 'charge',
-                    'provider' => config('services.payment.default', 'paystack'),
-                    'provider_transaction_id' => $reference,
-                    'meta' => [
-                        'type' => 'tenant_addon',
-                        'addon_id' => $addon->id,
-                        'addon_type' => $addon->addon_type,
-                        'addon_name' => $addon->name,
-                    ],
-                ]);
-
-                Log::info("Provisioned addon [{$addon->name}] for tenant [{$tenant->id}] via reference [{$reference}].");
+            if ($totalPrice <= 0) {
+                Log::info("Granted addon [{$addon->name}] to tenant [{$tenant->id}] via reference [{$reference}].");
 
                 return $addon;
-            });
-        } catch (UniqueConstraintViolationException) {
-            return TenantAddon::where('paystack_reference', $reference)->first();
-        }
-    }
+            }
 
-    public function cancelAddon(Tenant $tenant, TenantAddon $addon): bool
-    {
-        if ($addon->tenant_id !== $tenant->id) {
-            abort(403, 'Unauthorized.');
-        }
+            // Record double-entry transaction record
+            Transaction::create([
+                'tenant_id' => $tenant->id,
+                'amount' => $totalPrice,
+                'currency' => mb_strtolower((string) config('services.paystack.currency', 'ghs')),
+                'status' => 'success',
+                'type' => 'charge',
+                'provider' => config('services.payment.default', 'paystack'),
+                'provider_transaction_id' => $reference,
+                'meta' => [
+                    'type' => 'tenant_addon',
+                    'addon_id' => $addon->id,
+                    'addon_type' => $addon->addon_type,
+                    'addon_name' => $addon->name,
+                ],
+            ]);
 
-        if (! in_array($addon->billing_interval, [TenantAddon::INTERVAL_MONTHLY, TenantAddon::INTERVAL_YEARLY], true)) {
-            abort(422, 'Only recurring add-ons can be cancelled.');
-        }
+            Log::info("Provisioned addon [{$addon->name}] for tenant [{$tenant->id}] via reference [{$reference}].");
 
-        if ($addon->status === TenantAddon::STATUS_CANCELLED) {
-            return true;
-        }
-
-        $addon->update([
-            'status' => TenantAddon::STATUS_CANCELLED,
-        ]);
-
-        return true;
+            return $addon;
+        });
     }
 
     private function isAvailable(string $key): bool
