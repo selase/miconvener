@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string $domain
  * @property string $from_address
  * @property string $status
+ * @property bool $owns_ses_identity
  * @property list<array{name: string, type: string, value: string}>|null $dkim_records
  * @property Carbon|null $verified_at
  * @property Carbon|null $last_checked_at
@@ -39,6 +40,7 @@ final class TenantSendingDomain extends Model
         'domain',
         'from_address',
         'status',
+        'owns_ses_identity',
         'dkim_records',
         'verified_at',
         'last_checked_at',
@@ -64,6 +66,7 @@ final class TenantSendingDomain extends Model
     {
         return [
             'dkim_records' => 'array',
+            'owns_ses_identity' => 'boolean',
             'verified_at' => 'datetime',
             'last_checked_at' => 'datetime',
         ];
