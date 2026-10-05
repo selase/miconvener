@@ -225,6 +225,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::group(['prefix' => 'admin/billing', 'as' => 'admin.billing.'], function (): void {
         Route::get('earnings', [App\Http\Controllers\Admin\EarningsController::class, 'index'])
             ->name('earnings.index');
+        Route::get('payouts', [App\Http\Controllers\Admin\PayoutOversightController::class, 'index'])
+            ->name('payouts.index');
+        Route::post('payouts/{payout}/release', [App\Http\Controllers\Admin\PayoutOversightController::class, 'release'])
+            ->name('payouts.release');
         Route::get('transactions', [App\Http\Controllers\Admin\BillingController::class, 'transactions'])
             ->name('transactions.index');
         Route::get('subscriptions', [App\Http\Controllers\Admin\BillingController::class, 'subscriptions'])

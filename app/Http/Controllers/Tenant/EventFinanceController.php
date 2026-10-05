@@ -247,19 +247,15 @@ final class EventFinanceController extends Controller
     }
 
     /**
-     * Release a payout Paystack is holding for a one-time code.
-     *
-     * The transfer fee is recorded here rather than at initiation: Paystack
-     * charges it when the money actually moves, so a code that is never
-     * entered costs nothing and must not be billed to the organizer.
+     * Release a payout Paystack is holding for a one-time code. See
+     * PayoutRelease, which a superadmin also uses from the console.
      */
     public function finalizePayout(
         Request $request,
         string $subdomain,
         string $event,
         string $payout,
-        SettlementGateway $settlementGateway,
-        \App\Services\Finance\TransferFeeSchedule $transferFeeSchedule
+        \App\Services\Finance\PayoutRelease $payoutRelease
     ): JsonResponse {
         $this->authorize('manage payouts');
         $tenant = $this->getTenant();
@@ -269,61 +265,11 @@ final class EventFinanceController extends Controller
             'otp' => ['required', 'string', 'max:32'],
         ]);
 
-        return DB::transaction(function () use ($eventModel, $payout, $validated, $settlementGateway, $transferFeeSchedule): JsonResponse {
-            // Same lock as sending: two submissions of the same code must not
-            // both release the transfer.
-            $payoutModel = $eventModel->payouts()->where('id', $payout)->lockForUpdate()->firstOrFail();
+        $result = $payoutRelease->release($eventModel->payouts()->where('id', $payout)->firstOrFail(), $validated['otp']);
 
-            if ($payoutModel->status !== EventPayout::STATUS_AWAITING_OTP) {
-                return response()->json(['message' => 'This payout is not waiting for a one-time code.'], 422);
-            }
-
-            if (! $payoutModel->provider_transfer_code) {
-                return response()->json(['message' => 'This payout has no transfer to release. Send it again.'], 422);
-            }
-
-            try {
-                $transfer = $settlementGateway->finalizeTransfer($payoutModel->provider_transfer_code, $validated['otp']);
-            } catch (PaymentFailedException $e) {
-                /*
-                 * A rejected code is not a failed payout — the transfer is
-                 * still parked and the code can be entered again.
-                 */
-                $payoutModel->update(['failure_reason' => 'The one-time code was not accepted: '.$e->getMessage()]);
-
-                return response()->json(['message' => $payoutModel->failure_reason], 422);
-            }
-
-            $transferStatus = (string) ($transfer['status'] ?? '');
-
-            if (! in_array($transferStatus, ['success', 'pending', 'queued'], true)) {
-                $payoutModel->update([
-                    'status' => EventPayout::STATUS_FAILED,
-                    'failure_reason' => "The payment provider did not release the transfer (status: {$transferStatus}).",
-                ]);
-
-                return response()->json(['message' => $payoutModel->failure_reason], 502);
-            }
-
-            $account = $payoutModel->payoutAccount;
-            $transferFee = $transferFeeSchedule->feeFor($account->type);
-
-            /*
-             * net_paid_amount follows the scheduled fee because that is what
-             * the transfer was actually requested for, while transfer_fee_amount
-             * records what the provider says it charged. They normally agree;
-             * when they do not, the provider has changed its pricing and the
-             * gap is worth seeing rather than papering over.
-             */
-            $payoutModel->update([
-                'status' => EventPayout::STATUS_PROCESSING,
-                'failure_reason' => null,
-                'transfer_fee_amount' => $transferFeeSchedule->feeFromProviderResponse($transfer) ?? $transferFee,
-                'net_paid_amount' => $payoutModel->amount - $transferFee,
-            ]);
-
-            return response()->json(['message' => 'Payout released.', 'status' => EventPayout::STATUS_PROCESSING]);
-        });
+        return $result['released']
+            ? response()->json(['message' => $result['message'], 'status' => EventPayout::STATUS_PROCESSING])
+            : response()->json(['message' => $result['message']], $result['http_status']);
     }
 
     public function updatePayoutStatus(Request $request, string $subdomain, string $event, string $payout): JsonResponse

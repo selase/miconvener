@@ -433,6 +433,9 @@ final class Event extends Model
         return max(1, (int) Carbon::parse($this->dayFor($this->starts_at))->diffInDays(Carbon::parse($day), false) + 1);
     }
 
+    /**
+     * @return HasMany<EventPayout, $this>
+     */
     public function payouts(): HasMany
     {
         return $this->hasMany(EventPayout::class)->orderByDesc('created_at');
