@@ -25,11 +25,14 @@ final class SendingDomainService
 
     /**
      * Register the domain with SES, or pick up an identity that already exists
-     * there (a retry after a timeout, or a domain set up by hand).
+     * there (a retry after a timeout, or a domain another product registered).
+     * Only an identity created here is ours to delete later.
      */
     public function start(Tenant $tenant, string $domain, string $fromAddress): TenantSendingDomain
     {
         $domain = mb_strtolower(mb_trim($domain));
+        $existing = $tenant->sendingDomain;
+        $created = true;
 
         try {
             $identity = $this->ses->createEmailIdentity(['EmailIdentity' => $domain])->toArray();
@@ -39,6 +42,7 @@ final class SendingDomainService
             }
 
             $identity = $this->ses->getEmailIdentity(['EmailIdentity' => $domain])->toArray();
+            $created = false;
         }
 
         $sendingDomain = TenantSendingDomain::query()->updateOrCreate(
@@ -47,6 +51,7 @@ final class SendingDomainService
                 'domain' => $domain,
                 'from_address' => mb_strtolower(mb_trim($fromAddress)),
                 'status' => TenantSendingDomain::STATUS_PENDING,
+                'owns_ses_identity' => $created || ($existing?->domain === $domain && $existing->owns_ses_identity),
                 'verified_at' => null,
             ],
         );
@@ -73,15 +78,18 @@ final class SendingDomainService
     }
 
     /**
-     * Stop sending from the domain and remove it from SES.
+     * Stop sending from the domain, and remove it from SES if we created it
+     * there. An identity that already existed belongs to someone else.
      */
     public function remove(TenantSendingDomain $sendingDomain): void
     {
-        try {
-            $this->ses->deleteEmailIdentity(['EmailIdentity' => $sendingDomain->domain]);
-        } catch (SesV2Exception $e) {
-            if ($e->getAwsErrorCode() !== 'NotFoundException') {
-                throw $e;
+        if ($sendingDomain->owns_ses_identity) {
+            try {
+                $this->ses->deleteEmailIdentity(['EmailIdentity' => $sendingDomain->domain]);
+            } catch (SesV2Exception $e) {
+                if ($e->getAwsErrorCode() !== 'NotFoundException') {
+                    throw $e;
+                }
             }
         }
 

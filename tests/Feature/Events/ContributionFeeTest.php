@@ -12,7 +12,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 /**
  * What MiConvener keeps from a voluntary contribution is a setting, and the
  * organizer is told the actual figure before turning contributions on. By
- * default it is the event's ticket commission.
+ * default it is 1%, uncapped (decided 2026-10-05).
  */
 beforeEach(function (): void {
     refreshTenantDatabases();
@@ -32,7 +32,16 @@ function contributionFeeEvent(): Event
     ]);
 }
 
-test('by default a contribution carries the event ticket commission, and says so', function (): void {
+test('by default a contribution carries 1%, without the ticket cap, and says so', function (): void {
+    $event = contributionFeeEvent();
+    $service = app(EventContributionService::class);
+
+    expect($service->platformFeeFor($event, 500000))->toBe(5000)
+        ->and($service->feeNoteFor($event))->toContain('keeps 1% of each contribution');
+});
+
+test('an empty rate falls back to the event ticket commission', function (): void {
+    config()->set('services.contributions.platform_fee_percentage', null);
     $event = contributionFeeEvent();
     $service = app(EventContributionService::class);
 
@@ -66,5 +75,5 @@ test('the organizer sees the contribution commission in the event console', func
     $this->actingAs($user)->get("http://{$host}/events/{$event->id}", ['HTTP_HOST' => $host])
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('event.contribution_fee_note', fn (string $note): bool => str_contains($note, '5%')));
+            ->where('event.contribution_fee_note', fn (string $note): bool => str_contains($note, '1%')));
 });

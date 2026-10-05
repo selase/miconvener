@@ -48,6 +48,12 @@ final class StoreSendingDomainRequest extends FormRequest
                 if ($domain !== '' && ! Str::endsWith((string) $this->input('from_address'), '@'.$domain)) {
                     $validator->errors()->add('from_address', "The from address must be on {$domain}.");
                 }
+
+                $platformDomain = mb_strtolower(Str::after((string) config('mail.from.address'), '@'));
+
+                if ($platformDomain !== '' && ($domain === $platformDomain || Str::endsWith($domain, '.'.$platformDomain))) {
+                    $validator->errors()->add('domain', 'This is MiConvener\'s own sending domain, not an organiser\'s.');
+                }
             },
         ];
     }

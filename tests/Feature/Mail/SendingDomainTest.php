@@ -81,6 +81,7 @@ test('registering a domain stores the three DKIM records the organiser must publ
 
     expect($sendingDomain->domain)->toBe('events.techsummit.gh')
         ->and($sendingDomain->status)->toBe(TenantSendingDomain::STATUS_PENDING)
+        ->and($sendingDomain->owns_ses_identity)->toBeTrue()
         ->and($sendingDomain->dkim_records)->toHaveCount(3)
         ->and($sendingDomain->dkim_records[0])->toBe([
             'name' => 'tok1._domainkey.events.techsummit.gh',
@@ -175,13 +176,40 @@ test('the check carries on past a domain SES cannot answer for', function (): vo
     expect(collect([$first->fresh(), $second->fresh()])->filter->isVerified())->toHaveCount(1);
 });
 
-test('removing a domain deletes it from SES and sends from the platform again', function (): void {
+test('removing a domain registered elsewhere leaves it in SES', function (): void {
+    $tenant = sendingDomainTenant();
+    $this->ses->append(sesError('AlreadyExistsException'), sesIdentity(true, 'SUCCESS'));
+    $service = app(SendingDomainService::class);
+
+    $sendingDomain = $service->start($tenant, 'wearepurpledot.com', 'hello@wearepurpledot.com');
+    $service->remove($sendingDomain);
+
+    expect($tenant->fresh()->sendingDomain)->toBeNull()
+        ->and($this->ses->getLastCommand()->getName())->toBe('GetEmailIdentity');
+});
+
+test('the platform own sending domain cannot be given to an organiser', function (string $domain): void {
+    config()->set('mail.from.address', 'hello@miconvener.com');
+    $tenant = sendingDomainTenant();
+
+    $this->actingAs(sendingDomainSuperadmin())
+        ->post(route('tenants.sending-domain.store', $tenant->uuid), [
+            'domain' => $domain,
+            'from_address' => "events@{$domain}",
+        ])
+        ->assertSessionHasErrors('domain');
+
+    expect($this->ses->count())->toBe(0);
+})->with(['miconvener.com', 'mail.miconvener.com']);
+
+test('removing a domain we registered deletes it from SES and sends from the platform again', function (): void {
     $tenant = sendingDomainTenant();
     TenantSendingDomain::query()->create([
         'tenant_id' => $tenant->id,
         'domain' => 'events.techsummit.gh',
         'from_address' => 'hello@events.techsummit.gh',
         'status' => TenantSendingDomain::STATUS_VERIFIED,
+        'owns_ses_identity' => true,
     ]);
     $this->ses->append(new Result([]));
 

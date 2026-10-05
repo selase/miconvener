@@ -84,11 +84,11 @@ return [
 
     /*
      * What MiConvener keeps from a voluntary contribution (donation, offering,
-     * tribute). Null charges the event's ticket commission, capped the same
-     * way; a number charges that flat percentage instead, with no cap.
+     * tribute): 1%, uncapped (decided 2026-10-05). An empty value charges the
+     * event's ticket commission instead, capped the same way.
      */
     'contributions' => [
-        'platform_fee_percentage' => env('CONTRIBUTION_PLATFORM_FEE_PERCENTAGE'),
+        'platform_fee_percentage' => env('CONTRIBUTION_PLATFORM_FEE_PERCENTAGE', 1),
     ],
 
     'sms' => [
