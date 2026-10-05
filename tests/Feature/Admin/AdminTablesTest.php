@@ -104,3 +104,75 @@ test('the menu leaves out pages for features MiConvener does not run', function 
         ->assertDontSee(route('admin.billing.invoices.index').'"', false)
         ->assertDontSee(route('admin.billing.rate-cards.index'), false);
 });
+
+/*
+ * The DataTables endpoints return HTML the browser renders as-is. Names,
+ * emails and logged values are typed by users (and the browser name comes
+ * from the User-Agent header), so they must arrive escaped.
+ */
+test('the admin tables escape what users typed', function (): void {
+    $script = '<script>alert(1)</script>';
+    $tenant = Tenant::factory()->create(['name' => "Evil {$script}"]);
+    $member = User::factory()->create(['tenant_id' => $tenant->id, 'first_name' => "Mal {$script}"]);
+    $tenant->users()->attach($member->id);
+    App\Models\UserLoginHistory::query()->create([
+        'user_id' => $member->id,
+        'tenant_id' => $tenant->id,
+        'ip_address' => '127.0.0.1',
+        'session_id' => 'sess-1',
+        'login_at' => now(),
+        'browser' => $script,
+        'platform' => $script,
+    ]);
+    activity()->causedBy($member)->withProperties(['title' => "</textarea>{$script}"])->log('Renamed the event');
+
+    $responses = [
+        $this->actingAs($this->superadmin)->post(route('tenants.all'), adminTableRequest('', 1)),
+        $this->actingAs($this->superadmin)->post(route('users.all'), adminTableRequest()),
+        $this->actingAs($this->superadmin)->post(route('tenants.team.all', $tenant->uuid), adminTableRequest()),
+        $this->actingAs($this->superadmin)->post(route('audit-trail.login-history.all'), adminTableRequest('', 0)),
+        $this->actingAs($this->superadmin)->post(route('audit-trail.activity-logs.all'), adminTableRequest('', 0)),
+    ];
+
+    foreach ($responses as $table => $response) {
+        $response->assertOk();
+        $data = (string) json_encode($response->json('data'), JSON_UNESCAPED_SLASHES);
+
+        expect(str_contains($data, '<script>'))->toBeFalse("Table {$table} returned unescaped HTML: ".mb_substr($data, max(0, (int) mb_strpos($data, '<script>') - 120), 200));
+    }
+});
+
+test('an organisation in the list links to its page', function (): void {
+    $tenant = Tenant::factory()->create(['name' => 'Linked Org']);
+
+    $row = collect($this->actingAs($this->superadmin)->post(route('tenants.all'), adminTableRequest('Linked', 1))->json('data'))->first();
+
+    expect($row['name'])->toContain('href="'.route('tenants.show', $tenant->uuid).'"')
+        ->and($row['name'])->not->toContain('javascript:void(0)');
+});
+
+test('the console no longer loads a calendar plugin that does not exist', function (): void {
+    $this->actingAs($this->superadmin)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSee('fullcalendar', false)
+        ->assertSee(now()->year.'©', false);
+});
+
+test('the profile page shows the real account and no sample content', function (): void {
+    $this->actingAs($this->superadmin)
+        ->get(route('profile.index', $this->superadmin->uuid))
+        ->assertOk()
+        ->assertSee($this->superadmin->email)
+        ->assertDontSee('smith@kpmg.com')
+        ->assertDontSee('Assigned Tickets')
+        ->assertDontSee("User's Tasks", false);
+});
+
+test('Enterprise is listed as priced per organisation', function (): void {
+    $this->seed(Database\Seeders\EventPackageSeeder::class);
+
+    $rows = collect($this->actingAs($this->superadmin)->get(route('packages.index'), ['X-Requested-With' => 'XMLHttpRequest'])->json('data'));
+
+    expect($rows->firstWhere('name', 'Enterprise')['price'])->toBe('Agreed per organisation');
+});

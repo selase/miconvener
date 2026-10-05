@@ -70,8 +70,8 @@ final class FeatureController extends Controller
                     default => '<span class="badge badge-light">Unknown</span>',
                 };
 
-                $nestedData['name'] = $feature->name;
-                $nestedData['slug'] = $feature->slug;
+                $nestedData['name'] = e($feature->name);
+                $nestedData['slug'] = e($feature->slug);
                 $nestedData['type'] = $typeBadge;
                 $nestedData['created_at'] = $feature->created_at->format('Y-m-d H:i:s');
                 $nestedData['action'] = $action;

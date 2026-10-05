@@ -139,19 +139,22 @@ final class TenantController extends Controller
                     ? $profile = Storage::url($tenant->logo)
                     : $profile = $tenant->gravatar;
 
+                // Name and email are chosen by whoever signed up, so they are
+                // escaped before going into the HTML the table renders.
+                $showUrl = e(route('tenants.show', $tenant->uuid));
                 $tenantProfile = '<div class="symbol symbol-circle symbol-50px overflow-hidden me-3">
-                                <a href="javascript:void(0)">
+                                <a href="'.$showUrl.'">
                                     <div class="symbol-label">
-                                        <img src="'.$profile.'"
-                                            alt="'.$tenant->name.'" class="w-100">
+                                        <img src="'.e($profile).'"
+                                            alt="'.e($tenant->name).'" class="w-100">
                                     </div>
                                 </a>
                             </div>
 
                             <div class="d-flex flex-column">
-                                <a href="javascript:void(0)"
-                                    class="text-gray-800 text-hover-primary mb-1">'.$tenant->name.'</a>
-                                <span>'.$tenant->email.'</span>
+                                <a href="'.$showUrl.'"
+                                    class="text-gray-800 text-hover-primary mb-1">'.e($tenant->name).'</a>
+                                <span>'.e($tenant->email).'</span>
                             </div>';
 
                 $nestedData['uuid'] = $tenant->uuid;

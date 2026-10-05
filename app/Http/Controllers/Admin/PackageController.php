@@ -67,8 +67,8 @@ final class PackageController extends Controller
                     ? '<span class="badge badge-light-success">Active</span>'
                     : '<span class="badge badge-light-danger">Inactive</span>';
 
-                $nestedData['name'] = $package->name;
-                $nestedData['price'] = number_format((float) $package->price, 2);
+                $nestedData['name'] = e($package->name);
+                $nestedData['price'] = $package->isNegotiated() ? 'Agreed per organisation' : number_format((float) $package->price, 2);
                 $nestedData['interval'] = ucfirst((string) $package->interval);
                 $nestedData['is_active'] = $statusBadge;
                 $nestedData['created_at'] = $package->created_at->format('Y-m-d H:i:s');
