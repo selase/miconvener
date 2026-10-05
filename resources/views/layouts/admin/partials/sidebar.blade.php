@@ -251,6 +251,24 @@
                             <span class="menu-title">Enterprise Leads</span>
                         </a>
                     </div>
+                    @php($pendingVerifications = \App\Models\Shop::query()->where('verification_status', \App\Models\Shop::VERIFICATION_PENDING)->count())
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->routeIs('admin.marketplace-verifications.*') ? 'active' : '' }}"
+                            href="{{ route('admin.marketplace-verifications.index') }}">
+                            <span class="menu-icon">
+                                <span class="svg-icon svg-icon-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path opacity="0.3" d="M20.5543 4.37824L12.1798 2.02473C12.0626 1.99176 11.9376 1.99176 11.8203 2.02473L3.44572 4.37824C3.18118 4.45258 3 4.6807 3 4.93945V13.569C3 14.6914 3.48509 15.8404 4.4417 16.984C5.17231 17.8575 6.18314 18.7345 7.446 19.5909C9.56752 21.0295 11.5866 21.922 11.7779 21.9934C11.849 22.02 11.9243 22.0336 12 22.0336C12.0757 22.0336 12.151 22.02 12.2221 21.9934C12.4134 21.922 14.4325 21.0295 16.554 19.5909C17.8169 18.7345 18.8277 17.8575 19.5583 16.984C20.5149 15.8404 21 14.6914 21 13.569V4.93945C21 4.6807 20.8189 4.45258 20.5543 4.37824Z" fill="currentColor"></path>
+                                        <path d="M10.5606 11.3042L8.23223 8.97583C7.84171 8.58531 7.20854 8.58531 6.81802 8.97583C6.42749 9.36635 6.42749 9.99952 6.81802 10.39L9.85355 13.4255C10.2441 13.8161 10.8772 13.8161 11.2678 13.4255L17.182 7.51132C17.5725 7.12079 17.5725 6.48763 17.182 6.0971C16.7915 5.70658 16.1583 5.70658 15.7678 6.0971L10.5606 11.3042Z" fill="currentColor"></path>
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="menu-title">Business Verifications</span>
+                            @if ($pendingVerifications > 0)
+                                <span class="menu-badge"><span class="badge badge-light-warning">{{ $pendingVerifications }}</span></span>
+                            @endif
+                        </a>
+                    </div>
                 @endif
 
                 {{-- User Management — only in global admin view (no tenant), otherwise in Settings Hub --}}

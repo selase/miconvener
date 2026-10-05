@@ -68,7 +68,8 @@ function sendingDomainSuperadmin(): User
 
 test('registering a domain stores the three DKIM records the organiser must publish', function (): void {
     $tenant = sendingDomainTenant();
-    $this->ses->append(sesIdentity(false));
+    // What SES actually answers straight after CreateEmailIdentity.
+    $this->ses->append(sesIdentity(false, 'NOT_STARTED'));
 
     $this->actingAs(sendingDomainSuperadmin())
         ->post(route('tenants.sending-domain.store', $tenant->uuid), [

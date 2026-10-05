@@ -107,7 +107,7 @@ final class SendingDomainService
 
         $status = match (true) {
             ($identity['VerifiedForSendingStatus'] ?? false) === true => TenantSendingDomain::STATUS_VERIFIED,
-            $identity === [], in_array($dkim['Status'] ?? '', ['FAILED', 'NOT_STARTED'], true) => TenantSendingDomain::STATUS_FAILED,
+            $identity === [], ($dkim['Status'] ?? '') === 'FAILED' => TenantSendingDomain::STATUS_FAILED,
             default => TenantSendingDomain::STATUS_PENDING,
         };
 

@@ -98,16 +98,16 @@ final class UsersController extends Controller
         } else {
             $search = $request->input('search.value');
 
+            $roleUserIds = User::idsWithRoleNameLike((string) $search);
+
             $users = $query->with(['roles:id,name'])
-                ->where(function ($query) use ($search): void {
-                    $query->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('last_login_at', 'like', "%{$search}%")
-                        ->orWhere('created_at', 'like', "%{$search}%");
-                })
-                ->orWhereHas('roles', function ($query) use ($search): void {
-                    $query->where('name', 'like', "%{$search}%"); // Search in role names
+                ->where(function ($query) use ($search, $roleUserIds): void {
+                    $query->where('first_name', 'ilike', "%{$search}%")
+                        ->orWhere('last_name', 'ilike', "%{$search}%")
+                        ->orWhere('email', 'ilike', "%{$search}%")
+                        ->orWhereRaw('CAST(last_login_at AS TEXT) LIKE ?', ["%{$search}%"])
+                        ->orWhereRaw('CAST(created_at AS TEXT) LIKE ?', ["%{$search}%"])
+                        ->orWhereIn('id', $roleUserIds);
                 })
                 ->offset($start)
                 ->limit($limit)

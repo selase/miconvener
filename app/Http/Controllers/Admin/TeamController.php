@@ -73,13 +73,11 @@ final class TeamController extends Controller
                 ->with(['roles:id,name'])
                 ->where('tenant_id', $tenantId)
                 ->where(function ($q) use ($search): void {
-                    $q->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('created_at', 'like', "%{$search}%")
-                        ->orWhereHas('roles', function ($rq) use ($search): void {
-                            $rq->where('name', 'like', "%{$search}%");
-                        });
+                    $q->where('first_name', 'ilike', "%{$search}%")
+                        ->orWhere('last_name', 'ilike', "%{$search}%")
+                        ->orWhere('email', 'ilike', "%{$search}%")
+                        ->orWhereRaw('CAST(created_at AS TEXT) LIKE ?', ["%{$search}%"])
+                        ->orWhereIn('id', User::idsWithRoleNameLike((string) $search));
                 });
 
             $users = $query->clone()
@@ -164,7 +162,7 @@ final class TeamController extends Controller
     {
         $this->authorize('create team');
 
-        $tenant = Tenant::findByUuid($id);
+        $tenant = Tenant::findByUuidOrFail($id);
         $roles = Role::all();
 
         $breadcrumbs = [
@@ -196,7 +194,7 @@ final class TeamController extends Controller
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,svg', 'max:2048'],
         ]);
 
-        $tenant = Tenant::findByUuid($id);
+        $tenant = Tenant::findByUuidOrFail($id);
 
         $user = new User();
         $user->first_name = $validated['first_name'];
