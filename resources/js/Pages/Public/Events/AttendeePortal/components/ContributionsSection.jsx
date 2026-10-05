@@ -36,7 +36,7 @@ export default function ContributionsSection({ contributions = [], onContributio
                 <HeartHandshake className="mx-auto h-8 w-8 text-ink-secondary/60" strokeWidth={1.5} />
                 <h3 className="text-sm font-medium text-ink">No giving history found</h3>
                 <p className="text-xs text-ink-secondary max-w-sm mx-auto">
-                    Voluntary contributions, offerings, and tributes you make across MiConvener events will appear here with official receipts.
+                    Voluntary contributions, offerings, and tributes you make across MiConvener events will appear here, each with a receipt.
                 </p>
             </div>
         );

@@ -32,6 +32,7 @@
             <li>We collect payments on the organizer's behalf. The organizer, not {{ $brand }}, is the seller of its tickets and is responsible for any taxes due on its sales.</li>
             <li>We charge a commission on paid tickets at the rate of the organizer's plan, up to the cap per ticket shown on our <a href="{{ route('home') }}#pricing" class="underline hover:text-slate-900">pricing</a>, or at a rate agreed in writing. Payment processing and transfer fees are passed on at cost.</li>
             <li>The organizer chooses for each event whether it or the attendee bears these fees.</li>
+            <li>Voluntary contributions (donations, offerings and tributes) carry the commission shown in the contribution settings before the organizer turns contributions on. Payment processing fees are passed on at cost.</li>
             <li>Ticket income, less commission and fees, is paid out to the organizer's account. Refunds to attendees are made from the organizer's funds.</li>
             <li>If an event is cancelled, our commission and the payment provider's fees on tickets already sold are not refunded to the organizer, unless the law requires it.</li>
         </ul>

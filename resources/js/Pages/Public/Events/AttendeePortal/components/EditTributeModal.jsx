@@ -107,7 +107,7 @@ export default function EditTributeModal({ open, onClose, contribution, onSucces
                                 Display contribution as Anonymous
                             </span>
                             <span className="block text-[11px] text-ink-secondary">
-                                When checked, your name is hidden from the public tribute wall and donor listings. Your email remains verified on your official receipt.
+                                When checked, your name is hidden from the public tribute wall and donor listings. Your receipt still shows your name.
                             </span>
                         </div>
                     </label>

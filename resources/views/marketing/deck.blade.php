@@ -199,7 +199,7 @@
                             Production Manager Viewpoint
                         </div>
                         <p class="text-sm text-slate-300 font-normal">
-                            Zero gate failure. Offline-first PWA check-in, clash-free agendas, live in-seat water/tech requests, and automated badge printing without 2 AM spreadsheet panics.
+                            Door scanning that keeps working when the network drops, schedule clash warnings, live in-seat water and tech requests, and printable badge sheets.
                         </p>
                     </div>
 
@@ -209,7 +209,7 @@
                             Sales Tech & Commercial Viewpoint
                         </div>
                         <p class="text-sm text-slate-300 font-normal">
-                            Higher ticket conversion with instant Mobile Money + Card checkout, automated settlements on double-entry ledgers, and 65–80% reduction in fragmented SaaS fees.
+                            Mobile Money and card checkout, every charge recorded on a double-entry ledger, and one tool in place of several.
                         </p>
                     </div>
                 </div>
@@ -273,7 +273,7 @@
             <div class="space-y-6 max-w-5xl">
                 <span class="text-brand-400 text-xs font-semibold tracking-wider uppercase">The Core Proposition</span>
                 <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                    One Sovereign Platform. Zero Operational Chaos.
+                    One Platform, From First Invite to Final Payout.
                 </h2>
                 <p class="text-base sm:text-lg text-slate-300 font-light max-w-3xl">
                     MiConvener is an end-to-end, multi-tenant Event Operating System. Your event runs on your own branded subdomain, powered by a single unified database.
@@ -292,7 +292,7 @@
                         <div class="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold text-sm mb-3">02</div>
                         <h3 class="text-base font-bold text-white mb-1.5">Production-Grade Guardrails</h3>
                         <p class="text-xs text-slate-400 leading-relaxed">
-                            Offline-first PWA check-in, sub-second scanning, schedule clash detection, and anti-passback controls keep gates moving smoothly.
+                            Door scanning that works offline, schedule clash warnings, and a ticket that admits only once keep gates moving.
                         </p>
                     </div>
 
@@ -447,7 +447,7 @@
                         </p>
                     </div>
                     <div class="shrink-0 text-xs font-mono px-3 py-1.5 rounded bg-white/5 border border-white/10 text-slate-300">
-                        Zero Ticket Scalping / Zero Duplicate Scans
+                        Each Ticket Admits Once
                     </div>
                 </div>
             </div>
@@ -461,7 +461,7 @@
                     Mobile Money, Global Cards & Double-Entry Settlement
                 </h2>
                 <p class="text-base sm:text-lg text-slate-300 font-light max-w-3xl">
-                    Eliminate payment reconciliation headaches. Collect payments across Africa and the world, backed by an immutable ledger and instant automated settlement.
+                    Fewer reconciliation headaches. Collect card and Mobile Money payments, recorded on a double-entry ledger, with payouts you request to your bank or Mobile Money account.
                 </p>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
@@ -482,7 +482,7 @@
                             <span class="text-brand-400">●</span> Dual Settlement Freedom
                         </div>
                         <p class="text-xs text-slate-400 leading-relaxed mb-3">
-                            <strong>Platform Default:</strong> Zero gateway setup required; start selling in 60 seconds.<br>
+                            <strong>Platform Default:</strong> No gateway setup required to start selling.<br>
                             <strong>Own Gateway (BYO):</strong> Direct your funds straight into your own merchant credentials.
                         </p>
                         <div class="text-[11px] font-mono text-slate-300 bg-white/5 p-2 rounded">
@@ -510,20 +510,20 @@
             <div class="space-y-5 max-w-5xl">
                 <span class="text-brand-400 text-xs font-semibold tracking-wider uppercase">Production-Grade On-Site Operations</span>
                 <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                    Sub-Second Check-In & Live Name Tag Printing
+                    Fast Check-In & Printable Badges
                 </h2>
                 <p class="text-base sm:text-lg text-slate-300 font-light max-w-3xl">
-                    The registration desk is your event's first impression. Deliver a VIP gate experience with zero queues, zero Wi-Fi dependencies, and instant badge printing.
+                    The registration desk is your event's first impression. Scan guests in on any phone, keep scanning when the Wi-Fi drops, and print badge sheets ahead of the day.
                 </p>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div class="glass-panel p-5 rounded-xl">
                         <div class="text-sm font-bold text-white mb-2 flex items-center gap-2">
                             <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            Offline-First PWA Scanner
+                            Scanning That Survives Bad Signal
                         </div>
                         <p class="text-xs text-slate-400 leading-relaxed">
-                            Underground hotel ballrooms and concrete convention centers lose Wi-Fi. Our offline PWA scanner caches the entire guest list, validates scans in <500ms, and auto-syncs when reconnected.
+                            Hotel ballrooms and concrete convention centres lose Wi-Fi. Ushers' phones carry the guest list, keep checking tickets without a connection, and send the scans up when it returns.
                         </p>
                         <div class="mt-3 text-[11px] font-mono text-emerald-300 bg-emerald-950/40 p-2 rounded">
                             Anti-passback: Blocks duplicate entries & screenshot re-use immediately.
@@ -564,13 +564,13 @@
             <div class="space-y-5 max-w-5xl">
                 <span class="text-brand-400 text-xs font-semibold tracking-wider uppercase">During-Event Operations</span>
                 <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                    In-Seat Water & Tech Requests + Live Lunch Tracking
+                    In-Seat Water & Tech Requests
                 </h2>
                 <p class="text-base sm:text-lg text-slate-300 font-light max-w-3xl">
-                    Deliver five-star hospitality inside the conference hall and maintain 100% order during the high-stress lunch rush.
+                    Deliver five-star hospitality inside the conference hall.
                 </p>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                <div class="grid grid-cols-1 gap-5 pt-2 max-w-3xl">
                     <!-- In-Seat Service Requests -->
                     <div class="glass-panel p-6 rounded-xl border-t-2 border-t-brand-500">
                         <div class="flex items-center justify-between mb-3">
@@ -603,35 +603,6 @@
                     </div>
 
                     <!-- During-Event Lunch Management -->
-                    <div class="glass-panel p-6 rounded-xl border-t-2 border-t-emerald-500">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-base font-bold text-white flex items-center gap-2">
-                                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                                During-Event Lunch & Menu Tracking
-                            </h3>
-                            <span class="code-pill text-[10px] text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">No Double Dipping</span>
-                        </div>
-                        <p class="text-xs text-slate-300 leading-relaxed mb-4">
-                            Prevent catering shortages and confusion. Staff scan attendee badges at the food station to instantly verify meal selection and entitlement.
-                        </p>
-                        <div class="space-y-2 text-xs text-slate-400 mb-4">
-                            <div class="bg-white/5 p-2 rounded flex items-center justify-between">
-                                <span>Instant Menu Display:</span>
-                                <span class="text-emerald-400 font-bold">"Vegetarian Curry" or "Grilled Chicken"</span>
-                            </div>
-                            <div class="bg-white/5 p-2 rounded flex items-center justify-between">
-                                <span>Fraud / Re-use Block:</span>
-                                <span class="text-rose-400 font-bold">Flags badge if lunch already claimed</span>
-                            </div>
-                            <div class="bg-white/5 p-2 rounded flex items-center justify-between">
-                                <span>Live Kitchen Telemetry:</span>
-                                <span class="text-sky-400 font-bold">Meals served vs. meals remaining</span>
-                            </div>
-                        </div>
-                        <p class="text-[11px] text-slate-400">
-                            Catering teams avoid costly food over-ordering while ensuring special dietary delegates get their exact meals.
-                        </p>
-                    </div>
                 </div>
             </div>
         </article>
@@ -644,7 +615,7 @@
                     Live Quizzes, Moderated Polls & PowerPoint Sharing
                 </h2>
                 <p class="text-base sm:text-lg text-slate-300 font-light max-w-3xl">
-                    Replace expensive $1,500/year third-party polling software. Built-in interactive tools keep audiences engaged and slide distribution controlled.
+                    Replace a separate polling subscription. Built-in interactive tools keep audiences engaged and slide distribution controlled.
                 </p>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
@@ -653,10 +624,10 @@
                             <span class="text-purple-400">⚡</span> Live Quizzes & Leaderboards
                         </div>
                         <p class="text-xs text-slate-400 leading-relaxed mb-3">
-                            Run high-energy gamified quizzes with timers, point multipliers, and negative marking. Delegates join instantly via QR.
+                            Run quizzes with timers and points. Delegates answer from their event workspace, opened from the QR code on screen.
                         </p>
                         <div class="text-[11px] font-mono text-purple-300 bg-purple-950/40 p-2 rounded">
-                            Presentation mode displays live animated leaderboards on projection screens.
+                            A leaderboard shows in your console and on attendees' event page.
                         </div>
                     </div>
 
@@ -668,7 +639,7 @@
                             Real-time polls, word clouds, and threaded Q&A with upvoting. Organizer moderation queue filters inappropriate questions before they hit the big screen.
                         </p>
                         <div class="text-[11px] font-mono text-sky-300 bg-sky-950/40 p-2 rounded">
-                            Tag official answers, pin key takeaways, and summarize with AI.
+                            Tag official answers and pin key takeaways.
                         </div>
                     </div>
 
@@ -750,7 +721,7 @@
             <div class="space-y-4 max-w-5xl">
                 <span class="text-brand-400 text-xs font-semibold tracking-wider uppercase">Hard Economics</span>
                 <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                    Save 65–80% in Tool Subscriptions & 120+ Staff Hours
+                    Replace Several Tool Subscriptions With One
                 </h2>
                 <p class="text-sm sm:text-base text-slate-300 font-light max-w-3xl">
                     Replace 5 bloated SaaS invoices with one consolidated platform. See the actual financial return on your next event:
@@ -1082,48 +1053,48 @@
             },
             4: {
                 title: "Pre-Event & Speaker Engagement",
-                pm: "Focus on the Speaker Portal: Faculty receive private links, upload PowerPoint files against hard deadlines, and submit COI disclosures. No more frantically chasing slides 5 minutes before stage time.",
-                sales: "Emphasize automated attendee reminders and lunch forms. Capturing menu preferences (e.g. Jollof vs Vegan) during registration prevents caterer over-ordering and saves thousands on food waste."
+                pm: "Focus on the Speaker Portal: Faculty receive private links, confirm, update their bios and upload their slides themselves. No more chasing slides minutes before stage time.",
+                sales: "Emphasize automated attendee reminders and lunch forms. Capturing menu preferences (e.g. Jollof vs Vegan) during registration helps caterers order the right amounts."
             },
             5: {
                 title: "Registration Modes & Ticketing",
                 pm: "Explain that academic, medical, and corporate events cannot use simple e-commerce checkouts. Highlight Mode 2 (Manual vetting) and Mode 4 (Approve first, pay later) for scholarship and abstract presenters.",
-                sales: "Demonstrate anti-scalping: Cryptographic signed QR codes + readable Tag IDs (EVT24-8F3K-221) prevent ticket forgery and duplicate screenshot transfers."
+                sales: "Each ticket admits once: a forwarded screenshot gets one person in, not two. Every ticket also carries a readable code for lookup at the desk."
             },
             6: {
                 title: "Payments & Settlement",
-                pm: "Explain that gate staff never have to handle cash or guess if a mobile money transfer arrived. Payment confirmation is cryptographically locked to registration state.",
+                pm: "Explain that gate staff never have to handle cash or guess if a mobile money transfer arrived. A ticket is only issued once payment is confirmed.",
                 sales: "Huge selling point for African and global events: Dual settlement allows organizers to bring their own Paystack/Stripe accounts or use the platform default. Native MTN MoMo, Telecel, and cards."
             },
             7: {
                 title: "Gate Operations & Name Tags",
-                pm: "The crown jewel: The offline-first PWA check-in scanner operates in underground venues with ZERO internet. Scans validate in <500ms and anti-passback blocks duplicate entries instantly.",
-                sales: "Highlight the in-app canvas badge designer: Print personalized name tags with company, category color bands (VIP/Speaker), and QR codes directly at the desk or batch print sheets."
+                pm: "The crown jewel: ushers' phones keep checking tickets when the venue loses signal, refuse a ticket already used, and send the scans up when the connection returns.",
+                sales: "Highlight the in-app canvas badge designer: Print badge sheets with names, organisation, colour bands (VIP/Speaker) and QR codes."
             },
             8: {
                 title: "Room Management & Lunch Logistics",
-                pm: "Two critical production tools: 1) In-seat service requests let VIPs and attendees discreetly ping staff for water, microphone help, or AC adjustments. 2) Lunch station QR scanning prevents attendees from double-dipping or taking the wrong meal.",
-                sales: "This elevates the perceived prestige of the summit. When attendees can get water delivered to their seat and lunch lines move seamlessly, satisfaction scores (CSAT/NPS) jump dramatically."
+                pm: "Two critical production tools: 1) In-seat service requests let VIPs and attendees discreetly ping staff for water, microphone help, or AC adjustments. 2) Crew answer those requests from their own phones, which buzz when a request comes in.",
+                sales: "This elevates the perceived prestige of the summit. When attendees can get water brought to their seat, the event feels looked after."
             },
             9: {
                 title: "Engagement & PowerPoint Sharing",
-                pm: "Session materials repository: Slide decks and handouts can be scheduled for embargo release (only unlock when session starts) with watermarking and download attempt caps.",
-                sales: "Eliminate $1,200 to $2,000 annual fees for Slido or Mentimeter. Live quizzes with timers and animated leaderboards run right on the projector."
+                pm: "Session materials repository: Slide decks and handouts can be scheduled for embargo release (only unlock when session starts) with download limits per attendee.",
+                sales: "Replace a separate Slido or Mentimeter subscription. Live poll results run on the projector, and quizzes have timers and points."
             },
             10: {
                 title: "Certificates & Enterprise Reports",
-                pm: "Closing an event usually takes two weeks. With MiConvener, attendance and CME/CPD credit certificates are automatically generated from verified check-in data and delivered to attendee portals.",
-                sales: "Showcase the 10 asynchronous formatted Excel & PDF exports: Dietary lists for caterers, session attendance logs for accrediting boards, and deliverable fulfillment sheets for sponsors."
+                pm: "Closing an event usually takes two weeks. With MiConvener, attendance and CME/CPD certificates are issued in one step to everyone who checked in, and appear in their attendee portal.",
+                sales: "Showcase the exports: dietary lists for caterers, session attendance logs for accrediting boards, and deliverable fulfillment sheets for sponsors."
             },
             11: {
                 title: "ROI & Cost Savings",
-                pm: "Highlight team burnout prevention: Over 120 staff hours saved from eliminating manual badge merges, payment cross-referencing, and usher walkie-talkie chaos.",
+                pm: "Highlight less manual work: no badge mail-merges, no payment cross-checking, and no walkie-talkie chaos at the door.",
                 sales: "Have the prospect interact with the live ROI calculator! Slide the attendees and ticket price to show them their exact net dollar or cedi savings."
             },
             12: {
                 title: "Take Command & Next Steps",
                 pm: "Offer a customized technical production dry-run for their specific upcoming conference floor plan.",
-                sales: "Direct close: Propose setting up a live sandbox tenant in 60 seconds so their organizing committee can test the scanner and badge builder directly."
+                sales: "Direct close: offer to set up a trial workspace so their organising committee can test the scanner and badge builder themselves."
             }
         };
 

@@ -315,9 +315,10 @@ final class PublicEventController extends Controller
             // The registrant has just been promised a review. Tell whoever has
             // to do it -- nothing else did, and the console only surfaced
             // pending approvals once the event was running, far too late.
-            if (filled($tenant->email)) {
+            $organizers = $tenant->organizerNotificationEmails();
+            if ($organizers !== []) {
                 app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-                Mail::to($tenant->email)->queue(new EventRegistrationNeedsApproval($registration));
+                Mail::to($organizers)->queue(new EventRegistrationNeedsApproval($registration));
             }
         }
 

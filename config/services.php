@@ -61,6 +61,15 @@ return [
      * Twilio or mNotify account -- can be added without touching callers.
      * With no token configured, SMS is switched off rather than broken.
      */
+    /*
+     * What MiConvener keeps from a voluntary contribution (donation, offering,
+     * tribute). Null charges the event's ticket commission, capped the same
+     * way; a number charges that flat percentage instead, with no cap.
+     */
+    'contributions' => [
+        'platform_fee_percentage' => env('CONTRIBUTION_PLATFORM_FEE_PERCENTAGE'),
+    ],
+
     'sms' => [
         'driver' => env('SMS_DRIVER', 'omnichannel'),
     ],

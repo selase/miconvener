@@ -360,6 +360,9 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             Enable voluntary contributions for this event
                         </span>
                     </label>
+                    {event.contribution_fee_note && (
+                        <p className="-mt-2 text-xs text-ink-secondary">{event.contribution_fee_note}</p>
+                    )}
 
                     <div>
                         <label className="block text-xs font-medium text-ink-secondary mb-1">

@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -156,6 +157,37 @@ final class Tenant extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class);
+    }
+
+    /**
+     * Where to send mail that asks the organization to act (approve a
+     * registration, check a payment slip): its own email if set, plus every
+     * Org Superadmin and Org Admin. Many organizations never set an email,
+     * so the address alone would silently reach nobody.
+     *
+     * @return list<string>
+     */
+    public function organizerNotificationEmails(): array
+    {
+        // model_has_roles.model_id is a string column, so the ids are read
+        // first and compared as integers, as SuperadminNotifiable does.
+        $adminIds = DB::connection('landlord')->table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->whereIn('roles.name', ['Org Superadmin', 'Org Admin'])
+            ->where('model_has_roles.model_type', User::class)
+            ->where('model_has_roles.tenant_id', $this->id)
+            ->pluck('model_has_roles.model_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        return collect([$this->email])
+            ->merge(User::query()->whereIn('id', $adminIds)->pluck('email'))
+            ->filter(fn (mixed $email): bool => is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL) !== false)
+            ->map(fn (string $email): string => mb_strtolower(mb_trim($email)))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

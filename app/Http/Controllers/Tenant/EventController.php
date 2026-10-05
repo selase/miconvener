@@ -955,6 +955,7 @@ final class EventController extends Controller
             'event_category' => $event->event_category ?? Event::CATEGORY_GENERAL,
             'lexicon' => $event->lexicon(),
             'allow_contributions' => (bool) $event->allow_contributions,
+            'contribution_fee_note' => app(\App\Services\Events\EventContributionService::class)->feeNoteFor($event),
             'contribution_title' => $event->contribution_title ?: $event->lexicon()['contributions_title'],
             'contribution_description' => $event->contribution_description,
             'contribution_presets' => $event->effectiveContributionPresets(),

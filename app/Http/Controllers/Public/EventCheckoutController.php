@@ -251,8 +251,9 @@ final class EventCheckoutController extends Controller
 
         Mail::to($registrationModel->email)->queue(new EventRegistrationPendingVerification($registrationModel));
 
-        if (filled($tenant->email)) {
-            Mail::to($tenant->email)->queue(new EventRegistrationOfflineProofSubmitted($registrationModel));
+        $organizers = $tenant->organizerNotificationEmails();
+        if ($organizers !== []) {
+            Mail::to($organizers)->queue(new EventRegistrationOfflineProofSubmitted($registrationModel));
         }
 
         return redirect()->back()->with('success', 'Your proof of payment has been submitted. The organizer will review your payment and email your confirmed ticket.');
@@ -267,6 +268,7 @@ final class EventCheckoutController extends Controller
 
         $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
             ->where('id', $registration)
+            ->whereHas('event', fn ($query) => $query->where('slug', $event))
             ->firstOrFail();
 
         if (! $this->canClaimWorkspace($registrationModel)) {

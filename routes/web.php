@@ -70,9 +70,6 @@ Route::get('/attendee-worker.js', fn () => response()->file(resource_path('js/wo
 ]))->name('attendee.worker');
 Route::get('/privacy', fn (): Factory|View => view('product.privacy'))->name('privacy');
 Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadController::class, 'store'])->name('product.enterprise.lead');
-Route::get('/product-docs/{section?}', function (?string $section = 'start-guide') {
-    return view('product.docs', ['section' => $section]);
-})->name('product.docs');
 Route::get('/deck', App\Http\Controllers\Marketing\PitchDeckController::class)->name('marketing.deck');
 Route::get('/pitch', App\Http\Controllers\Marketing\PitchDeckController::class)->name('marketing.pitch');
 Route::get('/slides', App\Http\Controllers\Marketing\PitchDeckController::class)->name('marketing.slides');

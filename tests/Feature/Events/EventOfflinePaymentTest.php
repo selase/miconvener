@@ -370,3 +370,135 @@ test('cross-tenant user cannot approve or reject another tenants offline payment
 
     $response->assertStatus(404);
 });
+
+/**
+ * The scenarios below were listed as tested when offline payments shipped,
+ * but the tests were never written. The behaviour existed; these pin it.
+ */
+function approvableOfflineRegistration(Tenant $tenant, array $overrides = []): array
+{
+    $event = Event::factory()->published()->create([
+        'tenant_id' => $tenant->id,
+        'allow_offline_payments' => true,
+        'fee_bearer' => 'organizer',
+        'platform_fee_percentage' => '5.00',
+    ]);
+    $ticket = EventTicketType::factory()->create(['event_id' => $event->id, 'price' => 10000]);
+    $registration = EventRegistration::factory()->create(array_merge([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'ticket_type_id' => $ticket->id,
+        'amount' => 10000,
+        'charged_amount' => 10000,
+        'status' => EventRegistration::STATUS_PENDING_PAYMENT,
+        'payment_method' => EventRegistration::PAYMENT_METHOD_OFFLINE_MOMO,
+        'offline_payment_status' => EventRegistration::OFFLINE_STATUS_PENDING_VERIFICATION,
+    ], $overrides));
+
+    return [$event, $registration];
+}
+
+test('cancelling an approved offline ticket gives the commission back to the organizer', function () {
+    Mail::fake();
+    [$tenant, $user] = offlinePaymentHost();
+    $host = offlineSubdomainHost($tenant->slug);
+    [$event, $registration] = approvableOfflineRegistration($tenant);
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/registrations/{$registration->id}/approve-offline")->assertOk();
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/registrations/{$registration->id}/cancel")->assertOk();
+
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED);
+
+    // Booked 5% on approval (-500 to the organizer), then reversed (+500).
+    $net = EventLedgerEntry::where('event_id', $event->id)->pluck('net_amount')->map(fn ($n) => (int) $n);
+    expect($net->sort()->values()->all())->toBe([-500, 500])
+        ->and($net->sum())->toBe(0);
+});
+
+test('commission on an offline ticket is taken on the discounted price actually charged', function () {
+    Mail::fake();
+    [$tenant, $user] = offlinePaymentHost();
+    $host = offlineSubdomainHost($tenant->slug);
+    [$event, $registration] = approvableOfflineRegistration($tenant, ['charged_amount' => 8000]);
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/registrations/{$registration->id}/approve-offline")->assertOk();
+
+    $entry = EventLedgerEntry::where('event_id', $event->id)->sole();
+    expect($entry->commission_amount)->toBe(400); // 5% of 8000, not of 10000
+});
+
+test('a cancelled registration cannot be approved', function () {
+    [$tenant, $user] = offlinePaymentHost();
+    $host = offlineSubdomainHost($tenant->slug);
+    [$event, $registration] = approvableOfflineRegistration($tenant, ['status' => EventRegistration::STATUS_CANCELLED]);
+
+    $this->actingAs($user)->post("http://{$host}/events/{$event->id}/registrations/{$registration->id}/approve-offline")
+        ->assertUnprocessable();
+
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_CANCELLED)
+        ->and(EventLedgerEntry::where('event_id', $event->id)->count())->toBe(0);
+});
+
+test('approving needs a signed-in organizer', function () {
+    [$tenant] = offlinePaymentHost();
+    $host = offlineSubdomainHost($tenant->slug);
+    [$event, $registration] = approvableOfflineRegistration($tenant);
+
+    $this->post("http://{$host}/events/{$event->id}/registrations/{$registration->id}/approve-offline")
+        ->assertRedirect();
+
+    expect($registration->fresh()->status)->toBe(EventRegistration::STATUS_PENDING_PAYMENT);
+});
+
+test('a stranger cannot upload or download a payment slip for someone else', function () {
+    Storage::fake(Event::uploadDisk());
+    [$tenant] = offlinePaymentHost();
+    $host = offlineSubdomainHost($tenant->slug);
+    [$event, $registration] = approvableOfflineRegistration($tenant, [
+        'offline_payment_proof_path' => null,
+    ]);
+    $registration->forceFill(['offline_payment_proof_path' => "events/{$event->id}/proofs/slip.pdf"])->save();
+    Storage::disk(Event::uploadDisk())->put("events/{$event->id}/proofs/slip.pdf", 'PDF');
+
+    $this->post("http://{$host}/e/{$event->slug}/checkout/{$registration->id}/offline-proof", [
+        'proof_file' => UploadedFile::fake()->create('slip.pdf', 100, 'application/pdf'),
+        'payment_method' => EventRegistration::PAYMENT_METHOD_OFFLINE_BANK,
+    ])->assertForbidden();
+
+    $this->get("http://{$host}/e/{$event->slug}/checkout/{$registration->id}/proof")->assertForbidden();
+
+    // The attendee who registered in this browser can.
+    $this->withSession([
+        PlatformAttendeeWorkspaceAuthorizer::REGISTERED_SESSION_KEY => [$registration->id => now()->getTimestamp()],
+    ])->get("http://{$host}/e/{$event->slug}/checkout/{$registration->id}/proof")->assertOk();
+});
+
+test('a slip stored outside the event proofs folder is never served', function () {
+    Storage::fake(Event::uploadDisk());
+    [$tenant, $user] = offlinePaymentHost();
+    $host = offlineSubdomainHost($tenant->slug);
+    [$event, $registration] = approvableOfflineRegistration($tenant);
+    Storage::disk(Event::uploadDisk())->put('secrets/other-tenant.pdf', 'PDF');
+    $registration->forceFill(['offline_payment_proof_path' => "events/{$event->id}/proofs/../../../secrets/other-tenant.pdf"])->save();
+
+    $this->withSession([
+        PlatformAttendeeWorkspaceAuthorizer::REGISTERED_SESSION_KEY => [$registration->id => now()->getTimestamp()],
+    ])->get("http://{$host}/e/{$event->slug}/checkout/{$registration->id}/proof")->assertForbidden();
+
+    $this->actingAs($user)->get("http://{$host}/events/{$event->id}/registrations/{$registration->id}/offline-proof")
+        ->assertForbidden();
+});
+
+test('a slip is only served under the event it belongs to', function () {
+    Storage::fake(Event::uploadDisk());
+    [$tenant] = offlinePaymentHost();
+    $host = offlineSubdomainHost($tenant->slug);
+    [$event, $registration] = approvableOfflineRegistration($tenant);
+    $other = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $registration->forceFill(['offline_payment_proof_path' => "events/{$event->id}/proofs/slip.pdf"])->save();
+    Storage::disk(Event::uploadDisk())->put("events/{$event->id}/proofs/slip.pdf", 'PDF');
+
+    $this->withSession([
+        PlatformAttendeeWorkspaceAuthorizer::REGISTERED_SESSION_KEY => [$registration->id => now()->getTimestamp()],
+    ])->get("http://{$host}/e/{$other->slug}/checkout/{$registration->id}/proof")->assertNotFound();
+});

@@ -147,3 +147,15 @@ test('the staff links each plan advertises are the staff links it grants', funct
         expect((int) $match[1])->toBe((int) $granted, "{$plan['slug']} staff links");
     }
 });
+
+test('the terms disclose the commission on voluntary contributions', function (): void {
+    $this->get('/terms')
+        ->assertOk()
+        ->assertSee('Voluntary contributions')
+        ->assertSee('shown in the contribution settings', false);
+});
+
+test('the leftover template documentation about LLM tokens is not served', function (): void {
+    $this->get('/product-docs')->assertNotFound();
+    $this->get('/product-docs/start-guide')->assertNotFound();
+});

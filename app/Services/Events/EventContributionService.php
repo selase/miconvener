@@ -164,7 +164,7 @@ final class EventContributionService
 
         $grossAmount = isset($gatewayData['amount']) ? (int) $gatewayData['amount'] : (int) $contribution->amount;
         $gatewayFee = isset($gatewayData['fees']) ? (int) $gatewayData['fees'] : 0;
-        $platformFee = $this->feeCalculator->for($event, $grossAmount)->platformFee;
+        $platformFee = $this->platformFeeFor($event, $grossAmount);
         $netAmount = max(0, $grossAmount - $gatewayFee - $platformFee);
 
         DB::connection('landlord')->transaction(function () use (
@@ -208,6 +208,53 @@ final class EventContributionService
             : $this->tenantGateway($tenant);
     }
 
+    /**
+     * What MiConvener keeps from a contribution of this amount, in minor units.
+     */
+    public function platformFeeFor(Event $event, int $grossAmount): int
+    {
+        $percentage = $this->contributionPercentage();
+
+        if ($percentage === null) {
+            return $this->feeCalculator->for($event, $grossAmount)->platformFee;
+        }
+
+        return (int) round($grossAmount * $percentage / 100);
+    }
+
+    /**
+     * The commission in plain words, shown to the organizer before they turn
+     * contributions on, so the rate taken is the rate they were told.
+     */
+    public function feeNoteFor(Event $event): string
+    {
+        $percentage = $this->contributionPercentage();
+
+        if ($percentage === 0.0) {
+            return 'Contributions carry no MiConvener commission. Paystack deducts its own processing fee.';
+        }
+
+        if ($percentage !== null) {
+            return sprintf('MiConvener keeps %s%% of each contribution. Paystack also deducts its processing fee.', self::percent($percentage));
+        }
+
+        $cap = $event->effectivePlatformFeeCapAmount();
+        $capText = $cap !== null
+            ? sprintf(', up to %s %s per contribution', $event->currency ?: 'GHS', number_format($cap / 100, 2))
+            : '';
+
+        return sprintf(
+            'MiConvener keeps %s%% of each contribution%s, the same as your ticket commission. Paystack also deducts its processing fee.',
+            self::percent($event->effectivePlatformFeePercentage()),
+            $capText,
+        );
+    }
+
+    private static function percent(float $percentage): string
+    {
+        return mb_rtrim(mb_rtrim(number_format($percentage, 2, '.', ''), '0'), '.');
+    }
+
     private function tenantGateway(Tenant $tenant): ?PaystackGateway
     {
         $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
@@ -223,5 +270,12 @@ final class EventContributionService
         $secret = config('services.settlement.paystack.secret_key');
 
         return $secret ? new PaystackGateway(['secret_key' => $secret]) : null;
+    }
+
+    private function contributionPercentage(): ?float
+    {
+        $configured = config('services.contributions.platform_fee_percentage');
+
+        return $configured === null || $configured === '' ? null : max(0.0, (float) $configured);
     }
 }

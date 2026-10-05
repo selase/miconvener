@@ -210,11 +210,11 @@
                     @if ($tenant?->email)
                         {{ $tenant->email }}<br>
                     @endif
-                    Verified Event Beneficiary &amp; Organizer
+                    Event organiser
                 </div>
             </td>
             <td class="receipt-badge">
-                <div class="receipt-title">Official Receipt</div>
+                <div class="receipt-title">Receipt</div>
                 <div class="receipt-number">RCP-{{ $contribution->payment_reference }}</div>
                 <div class="receipt-date">
                     Issued: {{ ($contribution->paid_at ?? $contribution->created_at)?->format('j M Y, g:i A') }}
@@ -232,10 +232,9 @@
                 <div class="info-item">
                     <div class="k">Donor Name</div>
                     <div class="v">
+                        {{ $contribution->contributor_name ?: 'Supporter' }}
                         @if ($contribution->is_anonymous)
-                            Anonymous Donor <span style="font-size: 11px; font-weight: normal; color: #6b7280;">(Record Verified)</span>
-                        @else
-                            {{ $contribution->contributor_name ?: 'Supporter' }}
+                            <span style="font-size: 11px; font-weight: normal; color: #6b7280;">(shown as anonymous on the event page)</span>
                         @endif
                     </div>
                 </div>
@@ -253,7 +252,7 @@
                 @endif
             </td>
             <td style="padding-left: 20px;">
-                <div class="section-label">Event &amp; Beneficiary</div>
+                <div class="section-label">Event</div>
                 <div class="info-item">
                     <div class="k">Event Title</div>
                     <div class="v">{{ $event?->name ?? 'Event Contribution' }}</div>
@@ -311,16 +310,8 @@
 
     <div class="total-box clearfix">
         <table class="total-table">
-            <tr>
-                <td style="color: #6b7280;">Subtotal</td>
-                <td class="text-right" style="font-weight: 600;">{{ $contribution->formattedAmount() }}</td>
-            </tr>
-            <tr>
-                <td style="color: #6b7280;">Processing / Taxes</td>
-                <td class="text-right" style="font-weight: 600;">{{ $contribution->currency }} 0.00</td>
-            </tr>
             <tr class="grand-total">
-                <td>Total Received</td>
+                <td>Amount paid</td>
                 <td class="text-right" style="color: #4f46e5;">{{ $contribution->formattedAmount() }}</td>
             </tr>
         </table>
@@ -337,13 +328,13 @@
 
     <div class="footer">
         <div>
-            This official electronic receipt is issued by {{ config('app.name') }} on behalf of <strong>{{ $tenant?->name }}</strong> for donor records, charitable gift tracking, and accounting verification. No commercial goods or services were provided in exchange for this voluntary contribution.
+            This receipt records a voluntary contribution to <strong>{{ $event?->name ?? 'this event' }}</strong>, collected by {{ config('app.name') }} on behalf of <strong>{{ $tenant?->name }}</strong>. It is a record of payment for your own files; it is not a tax receipt.
         </div>
 
         <table class="issuer-table">
             <tr>
                 <td style="font-size: 10px; color: #9ca3af;">
-                    Secured by {{ config('app.name') }} Payments &middot; Paystack Settlement Ref: {{ $contribution->paystack_reference ?? $contribution->payment_reference }}
+                    Paid through Paystack &middot; Reference: {{ $contribution->paystack_reference ?? $contribution->payment_reference }}
                 </td>
                 @if ($brandDataUri)
                     <td class="text-right issuer-logo">
