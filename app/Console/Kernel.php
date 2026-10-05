@@ -72,6 +72,8 @@ final class Kernel extends ConsoleKernel
 
         // Event Deletion Safeguard — permanently purge events whose 6-hour recovery window has elapsed
         $schedule->command('events:purge-deleted')->hourly()->withoutOverlapping();
+        // Keeps the demo event running for whoever opens it (no-op without one).
+        $schedule->command('demo:keep-live')->hourly()->withoutOverlapping();
 
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
