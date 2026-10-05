@@ -62,6 +62,9 @@ final class EventPayout extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /**
+     * @return BelongsTo<TenantPayoutAccount, $this>
+     */
     public function payoutAccount(): BelongsTo
     {
         return $this->belongsTo(TenantPayoutAccount::class, 'payout_account_id');

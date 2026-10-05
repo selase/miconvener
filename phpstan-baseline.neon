@@ -1597,12 +1597,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventDynamicFormController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$amount.
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$auto_payout_enabled.
 			identifier: property.notFound
 			count: 1
@@ -1633,12 +1627,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$failure_reason.
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$gateway_fee_amount.
 			identifier: property.notFound
 			count: 1
@@ -1665,12 +1653,6 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
 			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$label.
-			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
@@ -1693,12 +1675,6 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$payoutAccount.
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$preferred_account_id.
 			identifier: property.notFound
 			count: 1
@@ -1711,25 +1687,7 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$provider_transfer_code.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$schedule_type.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$status.
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$transfer_fee_amount.
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
@@ -1741,26 +1699,8 @@ parameters:
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::ledgerEntries().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::maskedAccountNumber().'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\EventFinanceController::getTenant() has no return type specified.'
 			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: 'Offset ''status'' on array{status: string, fee: int|null} on left side of ?? always exists and is not nullable.'
-			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
@@ -1774,36 +1714,6 @@ parameters:
 			rawMessage: 'Offset ''transfer_code'' on array{transfer_code: string, status: string, fee: int|null} on left side of ?? always exists and is not nullable.'
 			identifier: nullCoalesce.offset
 			count: 2
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: 'Parameter #1 $callback of method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() expects callable(Illuminate\Database\Eloquent\Model, int): array{id: string, amount: int, status: string, scheduled_at: string|null, paid_at: string|null, note: string|null, failure_reason: string|null, transfer_fee_amount: int, net_paid_amount: int|null, payout_account_label: mixed, payout_account_masked_number: mixed}, Closure(App\Models\EventPayout): array{id: string, amount: int, status: string, scheduled_at: string|null, paid_at: string|null, note: string|null, failure_reason: string|null, transfer_fee_amount: int, net_paid_amount: int|null, payout_account_label: mixed, payout_account_masked_number: mixed} given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: 'Parameter #4 $payout of method App\Services\Finance\LedgerService::recordPayout() expects App\Models\EventPayout|null, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: 'Return type of call to method Illuminate\Database\Eloquent\Collection<int,Illuminate\Database\Eloquent\Model>::map() contains unresolvable type.'
-			identifier: method.unresolvableReturnType
-			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
-
-		-
-			rawMessage: 'Return type of call to method Illuminate\Support\Collection<int,array<string, mixed>>::values() contains unresolvable type.'
-			identifier: method.unresolvableReturnType
-			count: 1
 			path: app/Http/Controllers/Tenant/EventFinanceController.php
 
 		-
@@ -2941,12 +2851,6 @@ parameters:
 			path: app/Models/Event.php
 
 		-
-			rawMessage: 'Method App\Models\Event::payouts() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Event.php
-
-		-
 			rawMessage: 'Method App\Models\Event::promoCodes() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
@@ -3554,12 +3458,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventPayout::ledgerEntries() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventPayout.php
-
-		-
-			rawMessage: 'Method App\Models\EventPayout::payoutAccount() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventPayout.php

@@ -429,6 +429,16 @@
                                     <span class="menu-title">Earnings</span>
                                 </a>
                             </div>
+                            @php($payoutsWaiting = \App\Models\EventPayout::query()->withoutGlobalScopes()->whereIn('status', [\App\Models\EventPayout::STATUS_AWAITING_OTP, \App\Models\EventPayout::STATUS_FAILED])->count())
+                            <div class="menu-item">
+                                <a class="menu-link {{ request()->routeIs('admin.billing.payouts.*') ? 'active' : '' }}" href="{{ route('admin.billing.payouts.index') }}">
+                                    <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                    <span class="menu-title">Payouts &amp; refunds</span>
+                                    @if ($payoutsWaiting > 0)
+                                        <span class="menu-badge"><span class="badge badge-light-danger">{{ $payoutsWaiting }}</span></span>
+                                    @endif
+                                </a>
+                            </div>
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.analytics.usage') ? 'active' : '' }}" href="{{ route('admin.billing.analytics.usage') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
