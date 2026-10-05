@@ -62,7 +62,7 @@ final class TicketSms
             'registration' => $registration->id,
         ]);
 
-        return trim(sprintf(
+        return mb_trim(sprintf(
             "You're confirmed for %s on %s. Ticket %s. Show your QR code at the door: %s",
             $event->name,
             $when,
