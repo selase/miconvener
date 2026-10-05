@@ -143,6 +143,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('sending-domain.check');
         Route::delete('{tenant:uuid}/sending-domain', [App\Http\Controllers\Admin\SendingDomainController::class, 'destroy'])
             ->name('sending-domain.destroy');
+        Route::get('{tenant:uuid}/addons', [App\Http\Controllers\Admin\AddonGrantController::class, 'index'])
+            ->name('addons.index');
+        Route::post('{tenant:uuid}/addons', [App\Http\Controllers\Admin\AddonGrantController::class, 'store'])
+            ->name('addons.store');
+        Route::delete('{tenant:uuid}/addons/{addon}', [App\Http\Controllers\Admin\AddonGrantController::class, 'destroy'])
+            ->name('addons.destroy');
         Route::get('{tenant:uuid}/agreed-price', [App\Http\Controllers\Admin\AgreedPriceController::class, 'show'])
             ->name('agreed-price.show');
         Route::put('{tenant:uuid}/agreed-price', [App\Http\Controllers\Admin\AgreedPriceController::class, 'update'])
