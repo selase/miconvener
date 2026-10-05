@@ -16,7 +16,6 @@ return [
     'nav' => [
         'links' => [
             ['label' => 'Features', 'href' => '/#features'],
-            ['label' => 'Marketplace', 'href' => '/marketplace'],
             ['label' => 'Pricing', 'href' => '/#pricing'],
             ['label' => 'Enterprise', 'href' => '/product-enterprise'],
         ],
@@ -26,7 +25,7 @@ return [
 
     'hero' => [
         'title' => "Run the whole event\nfrom one place",
-        'subtitle' => 'Sell the tickets, run the door with your own crew’s phones, answer guests while the event is on, and see exactly what you earned. One tool instead of five.',
+        'subtitle' => 'Sell tickets, run the door from your crew’s own phones, poll the room from the stage, and see exactly what you earned. Built for conferences, and for the churches, memorials and fundraisers that gather around them.',
         'cta_primary' => ['label' => 'Start Free', 'href' => '/register'],
         'cta_secondary' => ['label' => 'See pricing', 'href' => '/#pricing'],
     ],
@@ -52,6 +51,7 @@ return [
                 '1 team seat',
                 '1 staff link for door and floor crew',
                 '200 email credits per month',
+                'SMS available as credit packs',
             ],
             'cta' => [
                 'label' => 'Get Started Free',
@@ -72,6 +72,7 @@ return [
                 '3 team seats',
                 '2 staff links for door and floor crew',
                 '3,000 email credits per month',
+                '150 SMS credits per month',
                 'Speaker material downloads',
                 'CSV settlement export',
                 '3.5% commission on ticket sales (GHS 25 cap)',
@@ -96,6 +97,7 @@ return [
                 '6 team seats',
                 '5 staff links for door and floor crew',
                 '15,000 email credits per month',
+                '500 SMS credits per month',
                 'Live Polling & Audience Q&A included',
                 'Your own domain',
                 'No platform branding & white label',
@@ -118,7 +120,7 @@ return [
             'features' => [
                 'Everything in Growth',
                 'Unlimited events, registrations, seats and staff links',
-                'Unlimited email credits',
+                'Unlimited email and SMS credits',
                 'White label portals',
                 'Negotiated commission',
             ],
@@ -136,26 +138,44 @@ return [
         'cards' => [
             ['kicker' => 'Create', 'title' => 'Build your event page', 'body' => 'Add the schedule, speakers and ticket types, then publish to a link you can share anywhere.'],
             ['kicker' => 'Sell', 'title' => 'Take payments', 'body' => 'Cards and mobile money. Guests get a ticket with a QR code the moment payment clears.'],
-            ['kicker' => 'Run', 'title' => 'Run the day', 'body' => 'Scan guests in, print badges, run live polls, and answer questions in the event forum.'],
+            ['kicker' => 'Run', 'title' => 'Run the day', 'body' => 'Scan guests in, even without signal, print badges, run live polls, and answer guests’ requests as they come.'],
         ],
     ],
 
     'capabilities' => [
         'title' => 'Everything an event needs',
-        'subtitle' => 'One place for the whole operation, from venue booking and vendor sourcing to on-site check-in and financial settlement.',
+        'subtitle' => 'One place for the whole operation, from the first ticket sold to the final settlement statement.',
         'items' => [
             ['icon' => '🎫', 'title' => 'Event pages', 'body' => 'Description, schedule, speakers and ticket tiers on one shareable link.'],
             ['icon' => '💳', 'title' => 'Tickets & payments', 'body' => 'Free, paid or tiered tickets. Card and mobile money through Paystack, plus offline payments you approve.'],
-            ['icon' => '📲', 'title' => 'Door & floor crew', 'body' => 'Staff links for ushers, an Event Staff role for permanent staff, and printed badges.'],
+            ['icon' => '📲', 'title' => 'Door scanning that works offline', 'body' => 'Ushers scan from their own phones with a staff link: no app, no account. The guest list is saved on the phone, so scanning carries on without signal and syncs when it returns. One link covers every day of a multi-day event.'],
+            ['icon' => '👥', 'title' => 'Door & floor crew', 'body' => 'An Event Staff role for permanent staff, and printed badges.'],
+            ['icon' => '💬', 'title' => 'SMS to your guests', 'body' => 'Ticket confirmations, reminders and announcements by text. Plans include SMS credits, and packs top them up.'],
+            ['icon' => '🪪', 'title' => 'Attendee portal', 'body' => 'Guests sign in at miconvener.com/my to find their tickets, certificates and receipts across every organizer, with tickets saved for offline use.'],
             ['icon' => '🙋', 'title' => 'Attendee requests', 'body' => 'Guests ask for help from their ticket, and your crew answers from their phones.'],
             ['icon' => '🗓', 'title' => 'Programme', 'body' => 'Several rooms, session capacity, live room headcounts and calendar feeds.'],
             ['icon' => '🎤', 'title' => 'Speaker portal', 'body' => 'Speakers confirm, edit their bios and upload their slides themselves.'],
-            ['icon' => '💬', 'title' => 'Live polling & Q&A', 'body' => 'Presenter decks, eight question types including quizzes, word clouds and ratings, and moderated Q&A. Included on Growth, or as an add-on.'],
-            ['icon' => '🏛️', 'title' => 'Venue marketplace', 'body' => 'Find venues, compare layouts, request quotes and pay a deposit to hold the date.'],
-            ['icon' => '🛍️', 'title' => 'Vendor quotes', 'body' => 'Ask caterers, sound and decor suppliers for itemized quotes, and accept with a deposit.'],
+            ['icon' => '💬', 'title' => 'Live polling & Q&A', 'body' => 'A live presenter screen, ten question types including quizzes, word clouds, rankings and ratings, and moderated Q&A. Included on Growth, or as an add-on.'],
+            ['icon' => '🕊️', 'title' => 'Giving, tributes and recurring gatherings', 'body' => 'Collect donations, offerings and tributes, and run weekly services or lecture series. Wording adapts to churches, memorials, academic events and fundraisers. Contributions carry a platform fee, disclosed in the Terms.'],
             ['icon' => '📊', 'title' => 'Settlement', 'body' => 'Charges, refunds and fees on an exportable statement, with payouts to bank or mobile money.'],
             ['icon' => '⚡', 'title' => 'Webhooks', 'body' => 'Signed notifications to your own systems for registrations, check-ins, payments and contributions.'],
             ['icon' => '🛡️', 'title' => 'Safeguards', 'body' => 'A deleted event can be restored for 6 hours, and nothing is deleted while a payout is in progress.'],
+        ],
+    ],
+
+    /*
+     * Each card quotes the EventLexicon wording for its event category, so a
+     * change there is a change to be made here too (MarketingClaimsTest pins it).
+     */
+    'communities' => [
+        'eyebrow' => 'Beyond conferences',
+        'title' => 'The same tools, in the words your community uses',
+        'body' => 'Choose the type of event and the page speaks accordingly. Giving, a message wall and recurring gatherings are built in.',
+        'cards' => [
+            ['title' => 'Churches', 'body' => 'Tithes & Offerings, a Blessings & Prayer Wall, and services that repeat every week.'],
+            ['title' => 'Funerals and memorials', 'body' => 'Funeral Donations & Support, and a Tribute & Condolence Wall for those who cannot attend.'],
+            ['title' => 'Academic events', 'body' => 'Lectures and seminars on a schedule, a Department & Class Fund, and a Student & Alumni Message Board.'],
+            ['title' => 'Fundraisers', 'body' => 'Donations & Pledges, and a Donor Wall & Solidarity Messages.'],
         ],
     ],
 
@@ -185,6 +205,9 @@ return [
         ['q' => 'Do my ushers need accounts?', 'a' => 'No. Each usher gets a staff link that works on their own phone. Your plan includes some (1 on Free, 2 on Starter, 5 on Growth), and an usher pack adds five more.'],
         ['q' => 'How and when do I get paid?', 'a' => 'Ticket revenue is tracked on a settlement statement for each event, showing what was collected, what the payment provider took, and what settles to you. Request a payout and track it through to completion.'],
         ['q' => 'Is there a fee on ticket sales?', 'a' => 'Yes. Paid tickets carry a commission, and the rate falls as you move up plans. Each plan shows its rate in the pricing table above.'],
+        ['q' => 'Does door scanning work without signal?', 'a' => 'Yes. When an usher opens their staff link, the guest list is saved on their phone. Scans carry on offline, refuse a ticket already used on that phone, and sync when the connection returns. Two phones offline at once can both admit the same ticket; the second is flagged as a duplicate when they sync.'],
+        ['q' => 'Can I text my guests?', 'a' => 'Yes. Ticket confirmations, reminders and announcements can go out by SMS as well as email. Starter includes 150 SMS credits a month and Growth 500; Free has none, and prepaid packs top up any plan. Each text uses one credit, and a message is sent only to guests who gave a phone number.'],
+        ['q' => 'Can I use it for a church service, funeral or fundraiser?', 'a' => 'Yes. Choose the type when you create the event and the wording follows: tithes and offerings, a tribute wall, or donations. Weekly services and lecture series repeat on a schedule. Contributions carry a platform fee, shown in the contribution settings and in the Terms.'],
         ['q' => 'Do you offer annual billing?', 'a' => 'Yes. Annual billing saves 17% on every paid plan.'],
     ],
 
@@ -201,7 +224,6 @@ return [
         'columns' => [
             'Product' => [
                 ['label' => 'Features', 'href' => '/#features'],
-                ['label' => 'Venue Marketplace', 'href' => '/marketplace'],
                 ['label' => 'Pricing', 'href' => '/#pricing'],
                 ['label' => 'Enterprise', 'href' => '/product-enterprise'],
             ],

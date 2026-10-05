@@ -231,7 +231,7 @@
                     <div class="glass-panel p-5 rounded-xl border-t-2 border-t-rose-500/60">
                         <div class="text-rose-400 text-2xl font-bold mb-2">6 Disconnected Apps</div>
                         <p class="text-xs text-slate-400 leading-relaxed">
-                            Ticketing on Eventbrite, badges designed in Canva, lunch choices on Google Forms, polling on Slido, speaker slides chased via email, and usher requests on scattered chat threads.
+                            Ticketing on Eventbrite, badges designed in Canva, lunch choices on Google Forms, polling in a separate app, speaker slides chased via email, and usher requests on scattered chat threads.
                         </p>
                         <div class="mt-3 text-[11px] font-mono text-rose-300/80 bg-rose-950/30 p-2 rounded">
                             Result: 120+ hours wasted on manual copy-pasting and de-duplication.
@@ -339,7 +339,7 @@
                             </li>
                             <li class="flex items-start gap-1.5">
                                 <span class="text-brand-400 font-bold">•</span>
-                                <span><strong>Countdown Alerts:</strong> Automated reminders sent N days/hours prior to kickoff.</span>
+                                <span><strong>Countdown Alerts:</strong> Reminders before the event, by email and by SMS where you switch it on. SMS uses plan credits or prepaid packs.</span>
                             </li>
                             <li class="flex items-start gap-1.5">
                                 <span class="text-brand-400 font-bold">•</span>
@@ -364,7 +364,7 @@
                             </li>
                             <li class="flex items-start gap-1.5">
                                 <span class="text-emerald-400 font-bold">•</span>
-                                <span><strong>Accreditation Disclosures:</strong> Conflict-of-interest forms submitted for CME/CPD compliance.</span>
+                                <span><strong>Abstract Submissions:</strong> Authors submit abstracts with a conflict-of-interest statement for your reviewers.</span>
                             </li>
                         </ul>
                     </div>
@@ -716,96 +716,36 @@
             </div>
         </article>
 
-        <!-- SLIDE 11: THE ECONOMICS: ROI & COST CALCULATOR -->
-        <article class="slide w-full flex-col justify-center min-h-[580px]" data-slide="11" data-title="ROI & Cost Savings">
+        <!-- SLIDE 11: WHAT TICKETING COSTS -->
+        <article class="slide w-full flex-col justify-center min-h-[580px]" data-slide="11" data-title="What Ticketing Costs">
             <div class="space-y-4 max-w-5xl">
-                <span class="text-brand-400 text-xs font-semibold tracking-wider uppercase">Hard Economics</span>
+                <span class="text-brand-400 text-xs font-semibold tracking-wider uppercase">Transparent Pricing</span>
                 <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                    Replace Several Tool Subscriptions With One
+                    One Commission, Shown Before You Sell
                 </h2>
                 <p class="text-sm sm:text-base text-slate-300 font-light max-w-3xl">
-                    Replace 5 bloated SaaS invoices with one consolidated platform. See the actual financial return on your next event:
+                    Each paid ticket carries a commission that falls as you move up the plans, with a cap per ticket. Move the sliders to see it for your event. Payment-provider charges are separate and are shown on every settlement statement.
                 </p>
 
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-1">
-                    <!-- Comparison Table (7 cols) -->
-                    <div class="lg:col-span-7 glass-panel p-5 rounded-xl space-y-3">
-                        <div class="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 pb-2 flex justify-between">
-                            <span>Traditional Multi-Vendor Stack</span>
-                            <span>Est. Annual / Per-Event Cost</span>
+                <div class="glass-panel p-5 rounded-xl space-y-4 max-w-2xl">
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">Paid tickets sold:</span>
+                            <span id="calc-attendees-val" class="font-bold text-white font-mono">500</span>
                         </div>
-                        <div class="space-y-2 text-xs text-slate-300">
-                            <div class="flex justify-between items-center py-1 border-b border-white/5">
-                                <span>Ticketing Fees (3.5% + $1.50 per ticket on $100k sales)</span>
-                                <span class="font-mono text-rose-400 font-semibold">$5,000</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1 border-b border-white/5">
-                                <span>Live Audience Q&A / Polling (Slido / Mentimeter)</span>
-                                <span class="font-mono text-rose-400 font-semibold">$1,200</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1 border-b border-white/5">
-                                <span>Event App & Community (Whova / Hopin)</span>
-                                <span class="font-mono text-rose-400 font-semibold">$3,500</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1 border-b border-white/5">
-                                <span>Badge & Tag Printing Software License</span>
-                                <span class="font-mono text-rose-400 font-semibold">$800</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1 border-b border-white/5">
-                                <span>Certificate of Attendance Generator Tool</span>
-                                <span class="font-mono text-rose-400 font-semibold">$600</span>
-                            </div>
-                            <div class="flex justify-between items-center pt-2 font-bold text-sm text-white">
-                                <span>Total Disconnected Stack Cost</span>
-                                <span class="font-mono text-rose-400 text-base">$11,100 + 120 hrs</span>
-                            </div>
-                        </div>
-                        <div class="mt-2 p-2.5 rounded bg-brand-950/40 border border-brand-500/30 text-xs text-brand-300">
-                            <strong>With MiConvener:</strong> All included in one unified subscription + low transparent transaction fees. 
-                        </div>
+                        <input id="calc-attendees" type="range" min="100" max="3000" step="50" value="500" oninput="updateFeeCalc()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
                     </div>
-
-                    <!-- Interactive ROI Calculator Widget (5 cols) -->
-                    <div class="lg:col-span-5 glass-panel p-5 rounded-xl space-y-4 bg-gradient-to-b from-brand-950/40 to-obsidian-900 border-brand-500/40">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-white uppercase tracking-wider">Interactive ROI Calculator</span>
-                            <span class="text-[10px] text-brand-400 font-mono">Live Simulation</span>
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">Ticket price ({{ $currency }}):</span>
+                            <span id="calc-price-val" class="font-bold text-white font-mono">{{ $currency }} 250</span>
                         </div>
-
-                        <!-- Attendees Slider -->
-                        <div class="space-y-1.5">
-                            <div class="flex justify-between text-xs">
-                                <span class="text-slate-400">Expected Delegates:</span>
-                                <span id="calc-attendees-val" class="font-bold text-white font-mono">500</span>
-                            </div>
-                            <input id="calc-attendees" type="range" min="100" max="3000" step="50" value="500" oninput="updateRoiCalc()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
-                        </div>
-
-                        <!-- Ticket Price Slider -->
-                        <div class="space-y-1.5">
-                            <div class="flex justify-between text-xs">
-                                <span class="text-slate-400">Avg. Ticket Price ({{ $currency }}):</span>
-                                <span id="calc-price-val" class="font-bold text-white font-mono">{{ $currency }} 250</span>
-                            </div>
-                            <input id="calc-price" type="range" min="0" max="1500" step="25" value="250" oninput="updateRoiCalc()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
-                        </div>
-
-                        <!-- Dynamic Output Cards -->
-                        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-white/10">
-                            <div class="bg-white/5 p-2.5 rounded text-center">
-                                <div class="text-[10px] uppercase text-slate-400">Estimated Savings</div>
-                                <div id="calc-savings" class="text-base font-extrabold text-emerald-400 font-mono mt-0.5">{{ $currency }} 18,500</div>
-                            </div>
-                            <div class="bg-white/5 p-2.5 rounded text-center">
-                                <div class="text-[10px] uppercase text-slate-400">Staff Hours Saved</div>
-                                <div id="calc-hours" class="text-base font-extrabold text-brand-400 font-mono mt-0.5">85 hrs</div>
-                            </div>
-                        </div>
-
-                        <p class="text-[11px] text-slate-400 text-center italic">
-                            Based on tool consolidation, elimination of manual data reconciliations, and reduced ticketing fees.
-                        </p>
+                        <input id="calc-price" type="range" min="25" max="1500" step="25" value="250" oninput="updateFeeCalc()" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
                     </div>
+                    <div id="calc-results" class="grid grid-cols-2 gap-2 pt-2 border-t border-white/10"></div>
+                    <p class="text-[11px] text-slate-400 italic">
+                        Commission only. Plan subscription, payment-provider charges and any enterprise terms are not included.
+                    </p>
                 </div>
             </div>
         </article>
@@ -835,12 +775,12 @@
 
                     <div class="glass-panel p-4 rounded-xl">
                         <div class="text-brand-400 font-bold text-xs uppercase mb-1">For Speakers</div>
-                        <p class="text-xs text-slate-300">A friction-free private portal to submit bios, conflict disclosures, and PowerPoint decks without email chains.</p>
+                        <p class="text-xs text-slate-300">A friction-free private portal to confirm, update their bios and upload their PowerPoint decks without email chains.</p>
                     </div>
 
                     <div class="glass-panel p-4 rounded-xl">
                         <div class="text-sky-400 font-bold text-xs uppercase mb-1">For Executives</div>
-                        <p class="text-xs text-slate-300">Immediate double-entry settlement, mobile money revenues in bank, and comprehensive sponsor ROI reports.</p>
+                        <p class="text-xs text-slate-300">A settlement statement for every event showing charges, refunds and fees, with payouts to a bank or mobile money account.</p>
                     </div>
                 </div>
 
@@ -947,7 +887,7 @@
                     Sales Tech & Commercial Script
                 </div>
                 <p id="notes-sales" class="text-xs text-slate-300 leading-relaxed">
-                    Quantify the cost of chaos. Explain that paying $1,200 for Slido, $3,500 for Whova, 3.5% ticketing cuts, and separate badge printing fees burns over $10,000 per conference. MiConvener cuts software overhead by 70% while improving attendee checkout conversion with native Mobile Money.
+                    Explain the cost of juggling separate tools: ticketing, polling, badges and certificates each bill and reconcile on their own. MiConvener puts them in one place, with one commission shown up front, and guests can pay with Mobile Money.
                 </p>
             </div>
         </div>
@@ -1079,7 +1019,7 @@
             9: {
                 title: "Engagement & PowerPoint Sharing",
                 pm: "Session materials repository: Slide decks and handouts can be scheduled for embargo release (only unlock when session starts) with download limits per attendee.",
-                sales: "Replace a separate Slido or Mentimeter subscription. Live poll results run on the projector, and quizzes have timers and points."
+                sales: "Replace a separate polling subscription. Live poll results run on the projector, and quizzes have timers and points."
             },
             10: {
                 title: "Certificates & Enterprise Reports",
@@ -1087,9 +1027,9 @@
                 sales: "Showcase the exports: dietary lists for caterers, session attendance logs for accrediting boards, and deliverable fulfillment sheets for sponsors."
             },
             11: {
-                title: "ROI & Cost Savings",
-                pm: "Highlight less manual work: no badge mail-merges, no payment cross-checking, and no walkie-talkie chaos at the door.",
-                sales: "Have the prospect interact with the live ROI calculator! Slide the attendees and ticket price to show them their exact net dollar or cedi savings."
+                title: "What Ticketing Costs",
+                pm: "Be plain about the cost: one commission per paid ticket, capped, and shown before the first sale.",
+                sales: "Let the prospect move the sliders to see the commission on their own event, on each plan."
             },
             12: {
                 title: "Take Command & Next Steps",
@@ -1330,8 +1270,10 @@
             }, 2500);
         }
 
-        // Interactive ROI Calculator Logic
-        function updateRoiCalc() {
+        // Commission calculator: rates come from the seeded plans.
+        const commissionPlans = @json($commissionPlans);
+
+        function updateFeeCalc() {
             const attendees = parseInt(document.getElementById('calc-attendees').value, 10);
             const price = parseInt(document.getElementById('calc-price').value, 10);
             const currency = "{{ $currency }}";
@@ -1339,30 +1281,19 @@
             document.getElementById('calc-attendees-val').innerText = attendees.toLocaleString();
             document.getElementById('calc-price-val').innerText = currency + ' ' + price.toLocaleString();
 
-            const grossRevenue = attendees * price;
+            const perTicket = (plan) => Math.min(price * plan.percentage / 100, plan.cap);
 
-            // Estimated costs of legacy disconnected tools:
-            // Ticketing fees: 3.5% + $1.50 per ticket
-            const ticketingFee = (grossRevenue * 0.035) + (attendees * 1.5);
-            // Third-party add-ons: Slido ($1,200) + App ($3,500) + Badge ($800) + Certs ($600)
-            const addOnsCost = 6100;
-            const totalLegacy = ticketingFee + addOnsCost;
-
-            // MiConvener estimate: unified platform fee + minimal 1.5% processing
-            const miconvenerCost = Math.min(2500, grossRevenue * 0.02 + 800);
-            const netSavings = Math.max(1500, Math.round(totalLegacy - miconvenerCost));
-
-            // Staff hours saved: 0.15 hours per attendee + 30 baseline hours
-            const hoursSaved = Math.round(30 + (attendees * 0.12));
-
-            document.getElementById('calc-savings').innerText = currency + ' ' + netSavings.toLocaleString();
-            document.getElementById('calc-hours').innerText = hoursSaved + ' hrs';
+            document.getElementById('calc-results').innerHTML = commissionPlans.map((plan) => `
+                <div class="bg-white/5 p-2.5 rounded text-center">
+                    <div class="text-[10px] uppercase text-slate-400">${plan.name} · ${plan.percentage}%, ${currency} ${plan.cap} cap</div>
+                    <div class="text-base font-extrabold text-emerald-400 font-mono mt-0.5">${currency} ${Math.round(perTicket(plan) * attendees).toLocaleString()}</div>
+                </div>`).join('');
         }
 
         // Initialize on Load
         document.addEventListener('DOMContentLoaded', () => {
             initSlideFromHash();
-            updateRoiCalc();
+            updateFeeCalc();
         });
     </script>
 </body>

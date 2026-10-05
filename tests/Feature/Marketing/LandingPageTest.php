@@ -35,10 +35,9 @@ test('the enterprise page renders', function (): void {
     $this->get('/product-enterprise')->assertOk();
 });
 
-test('the landing page renders direct links to the marketplace in navigation and footer', function (): void {
+test('the landing page leaves the marketplace out of navigation and footer until real venues take bookings', function (): void {
     $response = $this->get('/');
 
     $response->assertOk();
-    $response->assertSee('/marketplace', false);
-    $response->assertSee('Marketplace', false);
+    $response->assertDontSee('/marketplace', false);
 });

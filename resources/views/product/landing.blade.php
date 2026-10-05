@@ -256,6 +256,7 @@
                 <ul class="mt-6 space-y-3">
                     @foreach ([
                         'Works on any phone, so there is no scanner hardware to hire',
+                        'The guest list is saved on the phone, so scanning carries on without signal and syncs when it returns',
                         'Every door counts into the same live total',
                         'Turns away a code that has already been used, and says why',
                         'Every scan records who let the guest in',
@@ -428,6 +429,22 @@
                 <div>
                     <h3>{{ $item['title'] }}</h3>
                     <p>{{ $item['body'] }}</p>
+                </div>
+            @endforeach
+        </div>
+    </div>
+</section>
+
+{{-- ══ COMMUNITIES ═══════════════════════════════════════════════════ --}}
+<section class="border-t" style="border-color:var(--rule)">
+    <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
+        <h2 class="h2 display">{{ config('product-page.communities.title') }}</h2>
+        <p class="lede mt-3">{{ config('product-page.communities.body') }}</p>
+        <div class="cap mt-10">
+            @foreach (config('product-page.communities.cards') as $card)
+                <div>
+                    <h3>{{ $card['title'] }}</h3>
+                    <p>{{ $card['body'] }}</p>
                 </div>
             @endforeach
         </div>

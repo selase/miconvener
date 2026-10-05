@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Marketing;
 
+use App\Models\Event;
+use App\Models\EventPoll;
 use App\Models\Package;
+use App\Services\Events\EventLexicon;
 use Database\Seeders\EventPackageSeeder;
 use Illuminate\Support\Facades\Artisan;
 
@@ -26,11 +29,77 @@ test('the enterprise page makes no certification, uptime or compliance claim', f
     $page->assertSee('Paystack', false);
 });
 
-test('the homepage does not promise offline scanning, which the scanner does not do', function (): void {
+test('the homepage promises offline scanning, which staff links do', function (): void {
     $this->get('/')
         ->assertOk()
-        ->assertDontSee('without a network', false)
-        ->assertDontSee('Queued scans', false);
+        ->assertSee('without signal', false)
+        ->assertSee('Door scanning that works offline', false);
+
+    // The page's promises are the ones StaffLinkOfflineTest holds the code to.
+    expect(file_exists(base_path('resources/js/lib/staffDoor/store.js')))->toBeTrue()
+        ->and(file_exists(base_path('tests/Feature/Events/StaffLinkOfflineTest.php')))->toBeTrue();
+});
+
+test('the public pages do not sell the venue marketplace until real venues take bookings', function (): void {
+    foreach (['/', '/deck'] as $path) {
+        $this->get($path)
+            ->assertOk()
+            ->assertDontSee('hold the date', false)
+            ->assertDontSee('Venue marketplace', false)
+            ->assertDontSee('Vendor quotes', false);
+    }
+
+    $config = json_encode(config('product-page'));
+    expect($config)->not->toContain('/marketplace');
+});
+
+test('the homepage names no customer', function (): void {
+    $this->get('/')->assertOk()->assertDontSee('UGMC', false)->assertDontSee('Nkabom', false);
+    $this->get('/deck')->assertOk()->assertDontSee('UGMC', false)->assertDontSee('Nkabom', false);
+});
+
+test('the homepage poll claim matches the question types the code offers', function (): void {
+    $count = count(EventPoll::TYPES);
+    $words = [8 => 'eight', 9 => 'nine', 10 => 'ten', 11 => 'eleven', 12 => 'twelve'];
+
+    $polling = collect(config('product-page.capabilities.items'))->firstWhere('title', 'Live polling & Q&A');
+
+    expect($polling['body'])->toContain($words[$count].' question types');
+});
+
+test('the communities cards use the wording the event types really show', function (): void {
+    $cards = collect(config('product-page.communities.cards'))->pluck('body')->implode(' ');
+
+    foreach ([Event::CATEGORY_FAITH, Event::CATEGORY_MEMORIAL, Event::CATEGORY_ACADEMIC, Event::CATEGORY_FUNDRAISER] as $category) {
+        $lexicon = EventLexicon::forCategory($category);
+
+        expect($cards)->toContain($lexicon['contributions_title'])
+            ->and($cards)->toContain($lexicon['wall_title']);
+    }
+
+    $this->get('/')->assertSee('Tribute &amp; Condolence Wall', false);
+});
+
+test('the SMS allowance each plan advertises is the one it grants', function (): void {
+    Artisan::call('db:seed', ['--class' => EventPackageSeeder::class]);
+
+    foreach (['starter', 'growth'] as $slug) {
+        $plan = collect(config('product-page.plans'))->firstWhere('slug', $slug);
+        $granted = Package::query()->where('slug', $slug)->firstOrFail()
+            ->features()->where('slug', 'sms_credits')->firstOrFail()->pivot->value;
+
+        expect($plan['features'])->toContain("{$granted} SMS credits per month");
+    }
+
+    $free = Package::query()->where('slug', 'free')->firstOrFail()->features()->where('slug', 'sms_credits')->firstOrFail()->pivot->value;
+    expect((int) $free)->toBe(0)
+        ->and(collect(config('product-page.plans'))->firstWhere('slug', 'free')['features'])->not->toContain('0 SMS credits per month');
+});
+
+test('no plan advertises API access, which is not delivered yet', function (): void {
+    $features = collect(config('product-page.plans'))->pluck('features')->flatten();
+
+    expect($features->filter(fn (string $line): bool => str_contains($line, 'API')))->toBeEmpty();
 });
 
 test('the homepage does not promise proration, quiz leaderboards or vendor milestone payments', function (): void {
@@ -100,12 +169,6 @@ test('the Terms and Privacy pages exist, since every form says people agree to t
 
     // The enterprise form's consent line once pointed at '#'.
     $this->get('/product-enterprise')->assertSee(route('privacy'), false);
-});
-
-test('no plan advertises SMS or API access, neither of which is delivered yet', function (): void {
-    $features = collect(config('product-page.plans'))->pluck('features')->flatten();
-
-    expect($features->filter(fn (string $line): bool => str_contains($line, 'SMS') || str_contains($line, 'API')))->toBeEmpty();
 });
 
 test('the template-era address sends people to the real homepage', function (): void {
