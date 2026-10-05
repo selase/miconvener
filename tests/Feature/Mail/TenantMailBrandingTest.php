@@ -176,10 +176,14 @@ test('an own domain that is not verified, or not on Enterprise, sends from the p
     'verified but no longer on Enterprise' => ['growth', TenantSendingDomain::STATUS_VERIFIED],
 ]);
 
-test('event mail carries its tenant as an SES message tag', function () {
+test('event mail carries its tenant as an SES message tag, and its event', function () {
     $tenant = brandingTenantOnPlan('starter');
+    $registration = brandingRegistrationFor($tenant);
 
-    $headers = new EventTicketLink(brandingRegistrationFor($tenant))->headers();
+    $headers = new EventTicketLink($registration)->headers();
 
-    expect($headers->text)->toBe(['X-SES-MESSAGE-TAGS' => "tenant={$tenant->id}"]);
+    expect($headers->text)->toBe([
+        'X-SES-MESSAGE-TAGS' => "tenant={$tenant->id}",
+        'X-MiConvener-Event' => (string) $registration->event_id,
+    ]);
 });

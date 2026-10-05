@@ -135,3 +135,33 @@ test('a takedown needs a reason, and only superadmins can do it', function (): v
 
     expect($event->fresh()->status)->toBe(Event::STATUS_PUBLISHED);
 });
+
+test('the organisation is emailed with the reason when its event is taken down, and again when restored', function (): void {
+    Illuminate\Support\Facades\Mail::fake();
+    [$tenant] = eventHost('mail-org');
+    $tenant->update(['email' => 'team@mail-org.test']);
+    $event = Event::factory()->create(['tenant_id' => $tenant->id, 'status' => Event::STATUS_PUBLISHED, 'name' => 'Free iPhones']);
+
+    $this->actingAs($this->superadmin)->post(route('admin.takedowns.store', ['event', $event->id]), ['reason' => 'Fraudulent giveaway reported by attendees']);
+
+    Illuminate\Support\Facades\Mail::assertQueued(App\Mail\Moderation\TakedownNoticeMail::class, fn ($mail): bool => $mail->hasTo('team@mail-org.test')
+        && ! $mail->restored
+        && $mail->itemName === 'Free iPhones'
+        && $mail->reason === 'Fraudulent giveaway reported by attendees');
+
+    $this->actingAs($this->superadmin)->delete(route('admin.takedowns.destroy', ['event', $event->id]));
+
+    Illuminate\Support\Facades\Mail::assertQueued(App\Mail\Moderation\TakedownNoticeMail::class, fn ($mail): bool => $mail->restored && $mail->hasTo('team@mail-org.test'));
+});
+
+test('a taken-down listing emails its business as well as the organisation', function (): void {
+    Illuminate\Support\Facades\Mail::fake();
+    $shop = Shop::factory()->create(['email' => 'bookings@venue.test']);
+    $listing = StoreListing::factory()->published()->create(['shop_id' => $shop->id, 'title' => 'Grand Hall']);
+
+    $this->actingAs($this->superadmin)->post(route('admin.takedowns.store', ['listing', $listing->id]), ['reason' => 'Photos copied from another venue']);
+
+    Illuminate\Support\Facades\Mail::assertQueued(App\Mail\Moderation\TakedownNoticeMail::class, fn ($mail): bool => $mail->hasTo('bookings@venue.test')
+        && $mail->kind === 'listing'
+        && $mail->itemName === 'Grand Hall');
+});

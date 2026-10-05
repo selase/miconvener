@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Moderation;
 
+use App\Mail\Moderation\TakedownNoticeMail;
 use App\Models\Event;
 use App\Models\StoreListing;
+use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Take down an abusive event or marketplace listing, and restore it.
@@ -16,7 +19,7 @@ use App\Models\User;
  * it had so restoring puts that back. While it is down the owner's edits
  * cannot republish it (see EventController and VenueListingController).
  * The takedown columns are not mass-assignable, so no owner request can set
- * or clear them.
+ * or clear them. The organisation is emailed either way, with the reason.
  */
 final class ContentTakedown
 {
@@ -39,6 +42,8 @@ final class ContentTakedown
             ->performedOn($item)
             ->withProperties(['reason' => $reason])
             ->log('Took down '.$this->describe($item));
+
+        $this->notify($item, restored: false, reason: $reason);
     }
 
     public function restore(Event|StoreListing $item, User $by): void
@@ -59,6 +64,36 @@ final class ContentTakedown
             ->causedBy($by)
             ->performedOn($item)
             ->log('Restored '.$this->describe($item));
+
+        $this->notify($item, restored: true, reason: null);
+    }
+
+    /**
+     * Email the organisation's address and its admins (and, for a listing,
+     * the business's own address).
+     */
+    private function notify(Event|StoreListing $item, bool $restored, ?string $reason): void
+    {
+        $tenant = $item instanceof Event
+            ? Tenant::query()->find($item->tenant_id)
+            : $item->shop?->tenant;
+
+        $recipients = array_values(array_unique(array_filter([
+            ...($tenant?->organizerNotificationEmails() ?? []),
+            $item instanceof StoreListing ? $item->shop?->email : null,
+        ])));
+
+        if ($recipients === []) {
+            return;
+        }
+
+        Mail::to($recipients)->queue(new TakedownNoticeMail(
+            organisationName: (string) ($tenant->name ?? $item->shop->name ?? 'your organisation'),
+            kind: $item instanceof Event ? 'event' : 'listing',
+            itemName: $item instanceof Event ? (string) $item->name : (string) $item->title,
+            restored: $restored,
+            reason: $reason,
+        ));
     }
 
     private function describe(Event|StoreListing $item): string
