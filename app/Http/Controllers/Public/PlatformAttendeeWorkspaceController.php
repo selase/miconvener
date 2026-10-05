@@ -1202,9 +1202,9 @@ final class PlatformAttendeeWorkspaceController extends Controller
         }
 
         $tenant = $registration->tenant;
-        $to = $tenant?->email;
+        $to = $tenant?->organizerNotificationEmails() ?? [];
 
-        if ($tenant === null || blank($to)) {
+        if ($tenant === null || $to === []) {
             return;
         }
 
