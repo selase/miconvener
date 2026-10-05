@@ -424,6 +424,12 @@
                         </span>
                         <div class="menu-sub menu-sub-accordion">
                             <div class="menu-item">
+                                <a class="menu-link {{ request()->routeIs('admin.billing.earnings.*') ? 'active' : '' }}" href="{{ route('admin.billing.earnings.index') }}">
+                                    <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                    <span class="menu-title">Earnings</span>
+                                </a>
+                            </div>
+                            <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.analytics.usage') ? 'active' : '' }}" href="{{ route('admin.billing.analytics.usage') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
                                     <span class="menu-title">Usage Analytics</span>

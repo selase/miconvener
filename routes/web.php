@@ -213,6 +213,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     // Superadmin Global Billing & Analytics
     Route::group(['prefix' => 'admin/billing', 'as' => 'admin.billing.'], function (): void {
+        Route::get('earnings', [App\Http\Controllers\Admin\EarningsController::class, 'index'])
+            ->name('earnings.index');
         Route::get('transactions', [App\Http\Controllers\Admin\BillingController::class, 'transactions'])
             ->name('transactions.index');
         Route::get('subscriptions', [App\Http\Controllers\Admin\BillingController::class, 'subscriptions'])
