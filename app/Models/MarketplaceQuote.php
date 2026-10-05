@@ -90,6 +90,7 @@ final class MarketplaceQuote extends Model
         'tax_pesewas',
         'total_amount_pesewas',
         'deposit_required_pesewas',
+        'buyer_fee_pesewas',
         'amount_paid_pesewas',
         'valid_until',
         'vendor_notes',
@@ -113,6 +114,7 @@ final class MarketplaceQuote extends Model
         'tax_pesewas' => 'integer',
         'total_amount_pesewas' => 'integer',
         'deposit_required_pesewas' => 'integer',
+        'buyer_fee_pesewas' => 'integer',
         'amount_paid_pesewas' => 'integer',
     ];
 
@@ -189,6 +191,27 @@ final class MarketplaceQuote extends Model
     }
 
     /**
+     * The buyer's service fee as they will pay it: the figure fixed at
+     * checkout once there is one, otherwise what their plan would charge on
+     * the amount due now.
+     *
+     * @return array{service_fee_pesewas: int, service_fee_percent: float, formatted_service_fee: string, formatted_due_now: string}
+     */
+    public function serviceFeePayload(): array
+    {
+        $fees = app(\App\Services\Marketplace\MarketplaceFees::class);
+        $dueNow = $this->deposit_required_pesewas > 0 ? $this->deposit_required_pesewas : $this->total_amount_pesewas;
+        $fee = $this->buyer_fee_pesewas > 0 ? (int) $this->buyer_fee_pesewas : $fees->buyerFeeOn($this->plannerTenant, (int) $dueNow);
+
+        return [
+            'service_fee_pesewas' => $fee,
+            'service_fee_percent' => $fees->buyerFeePercent($this->plannerTenant),
+            'formatted_service_fee' => number_format($fee / 100, 2).' GHS',
+            'formatted_due_now' => number_format(((int) $dueNow + $fee) / 100, 2).' GHS',
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toPayload(): array
@@ -211,6 +234,7 @@ final class MarketplaceQuote extends Model
             'tax_pesewas' => $this->tax_pesewas,
             'total_amount_pesewas' => $this->total_amount_pesewas,
             'deposit_required_pesewas' => $this->deposit_required_pesewas,
+            'buyer_fee_pesewas' => $this->buyer_fee_pesewas,
             'amount_paid_pesewas' => $this->amount_paid_pesewas,
             'deposit_percentage' => $this->total_amount_pesewas > 0
                 ? (int) round(($this->deposit_required_pesewas / $this->total_amount_pesewas) * 100)
@@ -220,6 +244,7 @@ final class MarketplaceQuote extends Model
             'formatted_tax' => number_format($this->tax_pesewas / 100, 2).' GHS',
             'formatted_total' => number_format($this->total_amount_pesewas / 100, 2).' GHS',
             'formatted_deposit' => number_format($this->deposit_required_pesewas / 100, 2).' GHS',
+            ...$this->serviceFeePayload(),
             'formatted_balance_due' => number_format(max(0, $this->total_amount_pesewas - $this->deposit_required_pesewas) / 100, 2).' GHS',
             'formatted_amount_paid' => number_format($this->amount_paid_pesewas / 100, 2).' GHS',
             'valid_until' => $this->valid_until?->toIso8601String(),

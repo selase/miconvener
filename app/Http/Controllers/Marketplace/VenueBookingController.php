@@ -74,6 +74,19 @@ final class VenueBookingController extends Controller
             );
         }
 
+        // The buyer's service fee on the deposit, shown before they pay, by
+        // the same rule the booking will charge (see MarketplaceFees).
+        if (is_array($pricing)) {
+            $fees = app(\App\Services\Marketplace\MarketplaceFees::class);
+            $buyer = $request->attributes->get('tenant');
+            $buyer = $buyer instanceof \App\Models\Tenant ? $buyer : null;
+            $deposit = $pricing['deposit_required_pesewas'];
+
+            $pricing['service_fee_percent'] = $fees->buyerFeePercent($buyer);
+            $pricing['service_fee_pesewas'] = $fees->buyerFeeOn($buyer, $deposit);
+            $pricing['due_now_pesewas'] = $deposit + $pricing['service_fee_pesewas'];
+        }
+
         return response()->json([
             'available' => $isAvailable,
             'pricing' => $pricing,

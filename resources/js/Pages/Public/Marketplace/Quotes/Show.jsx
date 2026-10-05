@@ -224,6 +224,17 @@ export default function QuoteShow({ quote, existingReview }) {
                                     <dt>Deposit to confirm</dt>
                                     <dd>{quote.formatted_deposit}</dd>
                                 </div>
+                                {quote.service_fee_pesewas > 0 && (
+                                    <div className="flex justify-between text-ink-secondary">
+                                        <dt>
+                                            MiConvener service fee ({quote.service_fee_percent}%)
+                                            <span className="block text-xs text-ink-tertiary">
+                                                None for organisers on Growth or Enterprise
+                                            </span>
+                                        </dt>
+                                        <dd>{quote.formatted_service_fee}</dd>
+                                    </div>
+                                )}
                                 {quote.amount_paid_pesewas > 0 && (
                                     <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                                         <dt>Paid</dt>
@@ -257,7 +268,7 @@ export default function QuoteShow({ quote, existingReview }) {
                         >
                             {paying
                                 ? 'Opening payment…'
-                                : `Accept and pay ${quote.formatted_deposit} deposit`}
+                                : `Accept and pay ${quote.formatted_due_now}`}
                         </button>
                     )}
 
