@@ -63,21 +63,39 @@ test('the omnichannel driver queues a campaign on the v1 API', function (): void
     });
 });
 
-test('messages with the same text share one campaign; different texts do not', function (): void {
-    Http::fake(['messaging.test/*' => Http::sequence()
-        ->push(['data' => ['campaign_id' => 'same']], 202)
-        ->push(['data' => ['campaign_id' => 'other']], 202)]);
+test('identical texts go as one plain bulk campaign', function (): void {
+    Http::fake(['messaging.test/*' => Http::response(['data' => ['campaign_id' => 'same']], 202)]);
+
+    app(OmnichannelSmsGateway::class)->send([
+        new SmsMessage('0241111111', 'Doors open at 8', 'a'),
+        new SmsMessage('0242222222', 'Doors open at 8', 'b'),
+    ]);
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => $request->data()[0]['message'] === 'Doors open at 8'
+        && ! array_key_exists('placeholder', $request->data()[0]['users'][0]));
+});
+
+test('different texts go in one request, each recipient carrying their own text', function (): void {
+    Http::fake(['messaging.test/*' => Http::response(['data' => ['campaign_id' => 'mixed']], 202)]);
 
     $results = app(OmnichannelSmsGateway::class)->send([
         new SmsMessage('0241111111', 'Doors open at 8', 'a'),
-        new SmsMessage('0242222222', 'Doors open at 8', 'b'),
-        new SmsMessage('0243333333', 'Your seat is C-14', 'c'),
+        new SmsMessage('0242222222', 'Your seat is C-14', 'b'),
     ]);
 
-    Http::assertSentCount(2);
-    expect($results['a']->providerReference)->toBe('same')
-        ->and($results['b']->providerReference)->toBe('same')
-        ->and($results['c']->providerReference)->toBe('other');
+    Http::assertSentCount(1);
+    Http::assertSent(function (Request $request): bool {
+        $body = $request->data()[0];
+
+        return $body['message'] === '{{1}}'
+            && $body['users'] === [
+                ['phone_number' => '233241111111', 'intended_delivery_channel' => 'sms', 'placeholder' => [['{{1}}' => 'Doors open at 8']]],
+                ['phone_number' => '233242222222', 'intended_delivery_channel' => 'sms', 'placeholder' => [['{{1}}' => 'Your seat is C-14']]],
+            ];
+    });
+    expect($results['a']->providerReference)->toBe('mixed')
+        ->and($results['b']->providerReference)->toBe('mixed');
 });
 
 test('an unusable number is refused without calling the provider', function (): void {

@@ -13,13 +13,19 @@ use Illuminate\Support\Facades\Http;
  * Sends through the Omnichannel messaging platform's v1 campaign API.
  *
  * Omnichannel queues every campaign and charges its own credit as it sends,
- * so a 202 here means "queued", not "delivered". Messages with the same text
- * travel as one campaign, because the platform allows ten send requests a
- * minute per account. Different texts are never combined: Omnichannel sends
- * the first recipient's text to every number in a campaign chunk.
+ * so a 202 here means "queued", not "delivered". It allows ten send requests
+ * a minute per account, so a batch always goes as one request: identical
+ * texts as a plain bulk message, different texts as the template "{{1}}"
+ * with each recipient's own text as their placeholder. Omnichannel renders
+ * each recipient's text and sends each distinct text separately to mNotify
+ * (fixed in Omnichannel PR #206; before that it sent the first recipient's
+ * text to everyone, so do not point this at an older Omnichannel).
  */
 final class OmnichannelSmsGateway implements SmsGateway
 {
+    /** The placeholder that carries each recipient's own text. */
+    public const string TEXT_PLACEHOLDER = '{{1}}';
+
     public function __construct(
         private readonly string $url,
         private readonly string $token,
@@ -43,8 +49,8 @@ final class OmnichannelSmsGateway implements SmsGateway
     public function send(array $messages): array
     {
         $results = [];
-        /** @var array<string, list<array{reference: string, phone: string}>> $byText */
-        $byText = [];
+        /** @var list<array{reference: string, phone: string, text: string}> $recipients */
+        $recipients = [];
 
         foreach ($messages as $message) {
             $phone = PhoneNumber::toInternationalDigits($message->to);
@@ -55,30 +61,41 @@ final class OmnichannelSmsGateway implements SmsGateway
                 continue;
             }
 
-            $byText[$message->text][] = ['reference' => $message->reference, 'phone' => $phone];
+            $recipients[] = ['reference' => $message->reference, 'phone' => $phone, 'text' => $message->text];
         }
 
-        foreach ($byText as $text => $recipients) {
-            $result = $this->sendCampaign((string) $text, array_column($recipients, 'phone'));
+        if ($recipients === []) {
+            return $results;
+        }
 
-            foreach ($recipients as $recipient) {
-                $results[$recipient['reference']] = $result;
-            }
+        $texts = array_values(array_unique(array_column($recipients, 'text')));
+
+        $result = count($texts) === 1
+            ? $this->sendCampaign($texts[0], array_map(
+                fn (string $phone): array => ['phone_number' => $phone, 'intended_delivery_channel' => 'sms'],
+                array_values(array_unique(array_column($recipients, 'phone'))),
+            ))
+            : $this->sendCampaign(self::TEXT_PLACEHOLDER, array_map(
+                fn (array $recipient): array => [
+                    'phone_number' => $recipient['phone'],
+                    'intended_delivery_channel' => 'sms',
+                    'placeholder' => [[self::TEXT_PLACEHOLDER => $recipient['text']]],
+                ],
+                $recipients,
+            ));
+
+        foreach ($recipients as $recipient) {
+            $results[$recipient['reference']] = $result;
         }
 
         return $results;
     }
 
     /**
-     * @param  list<string>  $phones
+     * @param  list<array<string, mixed>>  $users
      */
-    private function sendCampaign(string $text, array $phones): SmsResult
+    private function sendCampaign(string $text, array $users): SmsResult
     {
-        $users = array_map(
-            fn (string $phone): array => ['phone_number' => $phone, 'intended_delivery_channel' => 'sms'],
-            array_values(array_unique($phones)),
-        );
-
         try {
             $response = Http::withToken($this->token)
                 ->acceptJson()
