@@ -29,4 +29,13 @@ trait HasUuid
     {
         return static::where('uuid', $uuid)->first();
     }
+
+    /**
+     * As findByUuid(), but a missing record is a 404 rather than a null that
+     * fails later with a 500.
+     */
+    public static function findByUuidOrFail(string $uuid): self
+    {
+        return static::where('uuid', $uuid)->firstOrFail();
+    }
 }

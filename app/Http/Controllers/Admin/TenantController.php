@@ -260,7 +260,7 @@ final class TenantController extends Controller
     {
         $this->authorize('read tenant');
 
-        $tenant = Tenant::findByUuid($id);
+        $tenant = Tenant::findByUuidOrFail($id);
 
         $days = $request->integer('days', 7);
         $startDateParam = $request->input('start_date');
@@ -356,7 +356,7 @@ final class TenantController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $tenant = Tenant::findByUuid($id);
+        $tenant = Tenant::findByUuidOrFail($id);
 
         $request->validate([
             'name' => 'required',
@@ -422,7 +422,7 @@ final class TenantController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $tenant = Tenant::findByUuid($id);
+        $tenant = Tenant::findByUuidOrFail($id);
 
         if ($tenant->logo) {
             config('app.env') === 'production'

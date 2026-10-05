@@ -116,6 +116,38 @@ final class User extends Authenticatable
     }
 
     /**
+     * Ids of users holding a role whose name contains the search text, for the
+     * admin tables' search box.
+     *
+     * A whereHas('roles') cannot be used there: model_has_roles.model_id is a
+     * string column and users.id an integer, and PostgreSQL refuses to compare
+     * the two in a join.
+     *
+     * @return list<int>
+     */
+    public static function idsWithRoleNameLike(string $search): array
+    {
+        $roleIds = \Spatie\Permission\Models\Role::query()->where('name', 'ilike', "%{$search}%")->pluck('id');
+
+        if ($roleIds->isEmpty()) {
+            return [];
+        }
+
+        $user = new self;
+
+        return DB::connection($user->getConnectionName())
+            ->table((string) config('permission.table_names.model_has_roles'))
+            ->where('model_type', $user->getMorphClass())
+            ->whereIn('role_id', $roleIds)
+            ->pluck('model_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Issue a fresh set, replacing any that already exist.
      *
      * @return array<int, string> the plaintext codes, shown to the user once

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
+use App\Models\User;
 use App\Models\UserLoginHistory;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\JsonResponse;
@@ -40,9 +41,9 @@ final class AuditTrailController extends Controller
             1 => 'log_name',
             2 => 'description',
             3 => 'subject_type',
-            4 => 'causer',
+            4 => 'causer_id',
             5 => 'created_at',
-            6 => 'properties',
+            6 => 'created_at',
         ];
 
         $totalData = Activity::query()->count();
@@ -62,44 +63,36 @@ final class AuditTrailController extends Controller
                 ->orderBy($order, $dir)
                 ->get();
         } else {
-            $search = $request->input('search.value');
+            $search = (string) $request->input('search.value');
+
+            /*
+             * activity_log.causer_id is a string and users.id an integer, so a
+             * whereHas('causer') join fails on PostgreSQL; match the users first.
+             */
+            $causerIds = User::query()
+                ->where(fn ($query) => $query->where('first_name', 'ilike', "%{$search}%")->orWhere('last_name', 'ilike', "%{$search}%"))
+                ->pluck('id')
+                ->map(fn (int $id): string => (string) $id)
+                ->all();
+
+            $filter = function ($query) use ($search, $causerIds): void {
+                $query->where('log_name', 'ilike', "%{$search}%")
+                    ->orWhereRaw('CAST(id AS TEXT) LIKE ?', ["%{$search}%"])
+                    ->orWhere('description', 'ilike', "%{$search}%")
+                    ->orWhereRaw('CAST(properties AS TEXT) ILIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('CAST(created_at AS TEXT) LIKE ?', ["%{$search}%"])
+                    ->orWhere(fn ($causer) => $causer->where('causer_type', (new User)->getMorphClass())->whereIn('causer_id', $causerIds));
+            };
 
             $activityLogs = Activity::query()
                 ->with(['causer'])
-                ->where(function ($query) use ($search): void {
-                    $query->where('log_name', 'like', "%{$search}%")
-                        ->orWhere('id', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhere('properties', 'like', "%{$search}%")
-                        ->orWhere('created_at', 'like', "%{$search}%");
-                })
-                ->orWhereHas('causer', function ($query) use ($search): void {
-                    $query->where(function ($builder) use ($search): void {
-                        $builder->where('first_name', 'like', "%{$search}%")
-                            ->orWhere('last_name', 'like', "%{$search}%");
-                    });
-                })
+                ->where($filter)
                 ->offset($start)
                 ->limit($limit)
                 ->orderBy($order, $dir)
                 ->get();
 
-            $totalFiltered = Activity::query()
-                ->with(['causer'])
-                ->where(function ($query) use ($search): void {
-                    $query->where('log_name', 'like', "%{$search}%")
-                        ->orWhere('id', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhere('properties', 'like', "%{$search}%")
-                        ->orWhere('created_at', 'like', "%{$search}%");
-                })
-                ->orWhereHas('causer', function ($query) use ($search): void {
-                    $query->where(function ($builder) use ($search): void {
-                        $builder->where('first_name', 'like', "%{$search}%")
-                            ->orWhere('last_name', 'like', "%{$search}%");
-                    });
-                })
-                ->count();
+            $totalFiltered = Activity::query()->where($filter)->count();
         }
 
         $data = [];
