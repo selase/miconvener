@@ -17,5 +17,6 @@ final class PreventRequestForgery extends Middleware
         'webhooks/*',
         'webhooks/merchant/*',
         'mcp/*',
+        'e/*/speaker-portal/*',
     ];
 }
