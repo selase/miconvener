@@ -27,10 +27,15 @@ return [
         'token' => env('POSTMARK_TOKEN'),
     ],
 
+    /*
+     * SES API access, used to register organiser sending domains. Its own keys,
+     * because on Laravel Cloud the AWS_* variables belong to the object storage
+     * bucket (region "auto"), not to AWS. Mail itself goes out over SES SMTP.
+     */
     'ses' => [
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+        'key' => env('SES_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
+        'secret' => env('SES_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
+        'region' => env('SES_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
     ],
 
     'stripe' => [
