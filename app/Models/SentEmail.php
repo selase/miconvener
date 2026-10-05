@@ -26,6 +26,7 @@ final class SentEmail extends Model
 {
     /** @use HasFactory<\Database\Factories\SentEmailFactory> */
     use HasFactory;
+
     use HasUuids;
 
     protected $connection = 'landlord';
