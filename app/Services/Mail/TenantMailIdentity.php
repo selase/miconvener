@@ -55,13 +55,19 @@ final class TenantMailIdentity
 
     /**
      * Tags the message with its tenant so SES can report bounces and
-     * complaints per organiser, once a configuration set publishes events.
+     * complaints per organiser, once a configuration set publishes events,
+     * and with its event so RecordSentEventEmail can file it.
      */
     public function headers(?Event $event): Headers
     {
-        $tenantId = $event?->tenant_id;
+        if ($event === null || ! $event->tenant_id) {
+            return new Headers;
+        }
 
-        return new Headers(text: $tenantId ? ['X-SES-MESSAGE-TAGS' => "tenant={$tenantId}"] : []);
+        return new Headers(text: [
+            'X-SES-MESSAGE-TAGS' => "tenant={$event->tenant_id}",
+            'X-MiConvener-Event' => (string) $event->id,
+        ]);
     }
 
     /**

@@ -9,7 +9,7 @@
             <div class="card-header border-0 pt-6">
                 <div class="card-title flex-column">
                     <h3 class="fw-bolder mb-1">Did they get our message?</h3>
-                    <div class="text-muted fs-7">Search one person by email address or phone number, across every organisation: event emails and texts, announcements and billing emails.</div>
+                    <div class="text-muted fs-7">Search one person by email address or phone number, across every organisation: tickets and other event emails, texts, announcements and billing emails. Event emails are recorded from 5 October 2026.</div>
                 </div>
             </div>
             <div class="card-body py-4">

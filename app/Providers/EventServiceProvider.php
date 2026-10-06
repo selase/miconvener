@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Listeners\LoginLogs;
 use App\Listeners\LogoutLogs;
+use App\Listeners\RecordSentEventEmail;
 use App\Listeners\SendWelcomeEmail;
 use App\Listeners\SetTenantIdInSession;
 use App\Listeners\UpdateLastLoginIp;
@@ -14,6 +15,7 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Mail\Events\MessageSent;
 
 final class EventServiceProvider extends ServiceProvider
 {
@@ -36,6 +38,10 @@ final class EventServiceProvider extends ServiceProvider
 
         Logout::class => [
             LogoutLogs::class,
+        ],
+
+        MessageSent::class => [
+            RecordSentEventEmail::class,
         ],
     ];
 

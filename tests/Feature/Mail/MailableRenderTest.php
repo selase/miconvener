@@ -35,6 +35,7 @@ use App\Mail\Marketplace\NewQuoteRequestNotification;
 use App\Mail\Marketplace\NewVenueBookingNotification;
 use App\Mail\Marketplace\QuoteProposalReady;
 use App\Mail\Marketplace\QuoteSentNotification;
+use App\Mail\Moderation\TakedownNoticeMail;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
@@ -253,6 +254,7 @@ test('every mailable renders', function (): void {
         'EventRegistrationWaitlisted' => fn () => new EventRegistrationWaitlisted($registration),
         'OccurrenceReminderMail' => fn () => new OccurrenceReminderMail($event, $session, $registration),
         'SpeakerPortalInvitationMail' => fn () => new SpeakerPortalInvitationMail($event, $speaker, $eventSpeaker),
+        'TakedownNoticeMail' => fn () => new TakedownNoticeMail('Acme Events', 'event', 'Free iPhones', false, 'Fraudulent giveaway'),
         'EventTicketLink' => fn () => new EventTicketLink($registration),
         'EventTicketTransferCode' => fn () => new EventTicketTransferCode($transfer, '123456'),
         'EventTicketTransferred' => fn () => new EventTicketTransferred($registration, 'Ama Serwaa', 'Kofi Mensah', 'kofi@stem.org'),

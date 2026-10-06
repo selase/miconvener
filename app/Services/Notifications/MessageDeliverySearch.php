@@ -8,12 +8,14 @@ use App\Models\BillingEmail;
 use App\Models\EventBlastRecipient;
 use App\Models\EventNotificationLog;
 use App\Models\EventRegistration;
+use App\Models\SentEmail;
 use App\Models\Tenant;
 
 /**
  * Answers support's commonest question, "did this person get our message?",
  * across every organisation: event notifications and texts (with the
- * provider's error when one failed), announcement emails, and billing emails.
+ * provider's error when one failed), announcement emails, event emails sent
+ * straight to attendees (tickets, invites...), and billing emails.
  */
 final class MessageDeliverySearch
 {
@@ -42,6 +44,7 @@ final class MessageDeliverySearch
         $rows = collect([
             ...$this->notifications($term, $isEmail, $phoneTail),
             ...($isEmail ? $this->announcements($term) : []),
+            ...($isEmail ? $this->directEmails($term) : []),
             ...($isEmail ? $this->billingEmails($term) : []),
         ]);
 
@@ -119,6 +122,34 @@ final class MessageDeliverySearch
                 'to' => (string) $registrations[$recipient->registration_id],
                 'subject' => (string) ($recipient->blast->subject ?? 'Announcement'),
                 'status' => $recipient->opened_at ? 'sent, opened '.$recipient->opened_at->format('j M H:i') : 'sent',
+                'error' => null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Event emails sent straight to an attendee: tickets, payment invites,
+     * approvals. Recorded by RecordSentEventEmail when they leave.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function directEmails(string $email): array
+    {
+        return SentEmail::query()
+            ->where('recipient_email', mb_strtolower($email))
+            ->latest('sent_at')
+            ->limit(self::LIMIT)
+            ->get()
+            ->map(fn (SentEmail $sent): array => [
+                'tenant_id' => $sent->tenant_id,
+                'at' => $sent->sent_at->format('j M Y H:i'),
+                'sort' => (int) $sent->sent_at->timestamp,
+                'kind' => mb_strtolower((string) preg_replace('/(?<!^)[A-Z]/', ' $0', $sent->mailable)),
+                'channel' => 'EMAIL',
+                'to' => $sent->recipient_email,
+                'subject' => (string) $sent->subject,
+                'status' => 'sent',
                 'error' => null,
             ])
             ->values()
