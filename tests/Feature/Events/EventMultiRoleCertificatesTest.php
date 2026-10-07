@@ -6,14 +6,122 @@ namespace Tests\Feature\Events;
 
 use App\Models\Event;
 use App\Models\EventCertificate;
+use App\Models\EventCertificateTemplate;
 use App\Models\EventRegistration;
+use App\Models\EventStaffAssignment;
 use App\Models\Speaker;
+use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 
 beforeEach(function () {
     refreshTenantDatabases();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+});
+
+test('certificate actions enforce event and access boundaries', function (string $action, string $access): void {
+    [$tenant, $owner] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $certificateTenant = $access === 'foreign tenant'
+        ? Tenant::factory()->create(['isolation_mode' => 'shared'])
+        : $tenant;
+    $otherEvent = Event::factory()->published()->create(['tenant_id' => $certificateTenant->id]);
+    $certificate = EventCertificate::create([
+        'tenant_id' => $certificateTenant->id,
+        'event_id' => $otherEvent->id,
+        'recipient_name' => 'Boundary Recipient',
+        'recipient_email' => 'boundary@example.test',
+        'role' => 'delegate',
+        'download_count' => 3,
+    ]);
+
+    if ($access === 'denied permission' || $access === 'assigned staff') {
+        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        $tenant->users()->attach($user->id);
+        setPermissionsTeamId($tenant->id);
+        if ($access === 'assigned staff') {
+            $user->assignRole('Event Staff');
+            $user->givePermissionTo(['read certificate', 'delete certificate']);
+            EventStaffAssignment::create([
+                'tenant_id' => $tenant->id,
+                'event_id' => $event->id,
+                'user_id' => $user->id,
+            ]);
+            expect(\App\Services\Events\EventStaffScope::canAccessEvent($user, $event))->toBeTrue()
+                ->and(\App\Services\Events\EventStaffScope::canAccessEvent($user, $otherEvent))->toBeFalse();
+        }
+        $this->actingAs($user);
+    } elseif ($access !== 'anonymous') {
+        $this->actingAs($owner);
+    }
+
+    $url = "http://{$host}/events/{$event->id}/certificates/{$certificate->id}";
+    $response = $action === 'download'
+        ? $this->getJson($url.'/download', ['HTTP_HOST' => $host])
+        : $this->deleteJson($url, [], ['HTTP_HOST' => $host]);
+
+    if ($access === 'anonymous') {
+        $response->assertUnauthorized();
+    } elseif ($access === 'denied permission') {
+        $response->assertForbidden();
+    } else {
+        $response->assertNotFound();
+    }
+
+    $unchanged = EventCertificate::withoutGlobalScopes()->findOrFail($certificate->id);
+    expect($unchanged->download_count)->toBe(3);
+})->with(['download', 'revoke'])->with([
+    'same tenant', 'foreign tenant', 'anonymous', 'denied permission', 'assigned staff',
+]);
+
+test('certificate issuance explicitly rejects another events template', function (bool $foreignTenant): void {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $otherTenant = $foreignTenant ? Tenant::factory()->create(['isolation_mode' => 'shared']) : $tenant;
+    $otherEvent = Event::factory()->published()->create(['tenant_id' => $otherTenant->id]);
+    $template = EventCertificateTemplate::create([
+        'tenant_id' => $otherTenant->id,
+        'event_id' => $otherEvent->id,
+        'role' => 'delegate',
+        'title' => 'Foreign template',
+        'body_template' => 'Awarded to {name}',
+    ]);
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/certificates/issue", [
+        'target_group' => 'custom',
+        'template_id' => $template->id,
+        'custom_recipients' => [['name' => 'Ada Mensah', 'email' => 'ada@example.test']],
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('template_id');
+
+    expect(EventCertificate::withoutGlobalScopes()->count())->toBe(0);
+})->with(['same tenant' => false, 'foreign tenant' => true]);
+
+test('organizer can select an events own template and revoke its certificate', function (): void {
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $template = EventCertificateTemplate::create([
+        'tenant_id' => $tenant->id,
+        'event_id' => $event->id,
+        'role' => 'delegate',
+        'title' => 'Selected template',
+        'body_template' => 'Awarded to {name}',
+    ]);
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/certificates/issue", [
+        'target_group' => 'custom',
+        'template_id' => $template->id,
+        'custom_recipients' => [['name' => 'Ada Mensah', 'email' => 'ada@example.test']],
+    ], ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('issued_count', 1);
+
+    $certificate = $event->certificates()->sole();
+    expect($certificate->template_id)->toBe($template->id);
+    $this->deleteJson("http://{$host}/events/{$event->id}/certificates/{$certificate->id}", [], ['HTTP_HOST' => $host])
+        ->assertOk();
+    expect(EventCertificate::withoutGlobalScopes()->find($certificate->id))->toBeNull();
 });
 
 test('host can view certificate management dashboard with auto-seeded templates', function () {

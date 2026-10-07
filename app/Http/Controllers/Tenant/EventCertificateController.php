@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -158,7 +159,7 @@ final class EventCertificateController extends Controller
 
         $validated = $request->validate([
             'target_group' => ['required', 'string', 'in:checked_in_delegates,all_delegates,speakers,presenters,custom'],
-            'template_id' => ['nullable', 'uuid', 'exists:landlord.event_certificate_templates,id'],
+            'template_id' => ['nullable', 'uuid', Rule::exists('landlord.event_certificate_templates', 'id')->where('event_id', $event->id)],
             'role' => ['nullable', 'string', 'in:delegate,speaker,presenter,volunteer,custom'],
             'cpd_hours' => ['nullable', 'numeric', 'min:0'],
             'custom_recipients' => ['nullable', 'array'],
@@ -313,6 +314,7 @@ final class EventCertificateController extends Controller
     public function download(Request $request, string $subdomain, Event $event, EventCertificate $certificate): Response
     {
         Gate::authorize('read certificate');
+        abort_unless($certificate->event_id === $event->id, 404);
 
         $domPdf = $this->pdfs->generatePdf($certificate);
         $certificate->increment('download_count');
@@ -323,6 +325,7 @@ final class EventCertificateController extends Controller
     public function destroy(Request $request, string $subdomain, Event $event, EventCertificate $certificate): JsonResponse
     {
         Gate::authorize('delete certificate');
+        abort_unless($certificate->event_id === $event->id, 404);
 
         $certificate->delete();
 
