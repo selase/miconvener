@@ -26,6 +26,48 @@ final class ArtifactLayoutValidator
     /** @var list<string> */
     private const array ALIGNS = ['left', 'center', 'right'];
 
+    /** @return array<string, array<string, bool|float|int|string>> */
+    public function certificateDefaults(): array
+    {
+        $boxes = [
+            'title' => [0.15, 0.15, 0.70, 0.10, 28, 700],
+            'recipient_name' => [0.15, 0.34, 0.70, 0.10, 32, 700],
+            'body' => [0.15, 0.48, 0.70, 0.16, 16, 400],
+            'event_name' => [0.15, 0.27, 0.70, 0.05, 14, 400],
+            'issuer' => [0.10, 0.89, 0.50, 0.06, 11, 400],
+            'signature' => [0.10, 0.79, 0.22, 0.08, 11, 400],
+            'qr' => [0.82, 0.74, 0.10, 0.14, 11, 400],
+            'verification_code' => [0.68, 0.90, 0.25, 0.04, 9, 700],
+            'cpd_hours' => [0.15, 0.68, 0.60, 0.06, 11, 400],
+        ];
+        $layout = [];
+        foreach ($boxes as $element => [$x, $y, $width, $height, $size, $weight]) {
+            $layout[$element] = [
+                'x' => $x, 'y' => $y, 'width' => $width, 'height' => $height,
+                'align' => in_array($element, ['issuer', 'signature'], true) ? 'left' : ($element === 'verification_code' ? 'right' : 'center'),
+                'font_family' => 'DejaVu Sans', 'font_size' => $size, 'font_weight' => $weight,
+                'color' => '#111827', 'visible' => $element !== 'event_name',
+            ];
+        }
+
+        return $this->validate($layout, 'certificate');
+    }
+
+    /**
+     * Resolve editable designs only. Historical snapshots intentionally stay partial.
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, array<string, bool|float|int|string>>
+     */
+    public function resolveCertificate(array $overrides = []): array
+    {
+        $layout = $this->validate(array_replace_recursive($this->certificateDefaults(), $overrides), 'certificate');
+        $layout['recipient_name']['visible'] = true;
+        $layout['verification_code']['visible'] = true;
+
+        return $layout;
+    }
+
     /**
      * @param  array<string, mixed>  $layout
      * @return array<string, array<string, bool|float|int|string>>

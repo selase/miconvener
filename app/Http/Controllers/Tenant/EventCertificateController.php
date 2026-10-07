@@ -22,6 +22,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -77,6 +79,7 @@ final class EventCertificateController extends Controller
 
         return response()->json([
             'templates' => $templates,
+            'layout_defaults' => $this->layouts->certificateDefaults(),
             'certificates' => $certificates,
             'stats' => $stats,
             'eligible' => $eligible,
@@ -185,6 +188,10 @@ final class EventCertificateController extends Controller
             $template = null;
         }
 
+        if ($template?->design_mode === 'custom_background') {
+            $this->requireBackground($template);
+        }
+
         $cpdHours = isset($validated['cpd_hours']) && $validated['cpd_hours'] > 0
             ? (float) $validated['cpd_hours']
             : ($template?->default_cpd_hours ?? 0.0);
@@ -266,6 +273,9 @@ final class EventCertificateController extends Controller
             function () use ($event, $recipients, $role, $template, $cpdHours): array {
                 $issuedCount = 0;
                 $skippedCount = 0;
+                if ($template?->design_mode === 'custom_background') {
+                    $template->update(['layout' => $this->layouts->resolveCertificate($template->layout ?? [])]);
+                }
                 $designVersion = $template !== null
                     ? $this->designVersions->snapshot($template)
                     : null;
@@ -363,6 +373,21 @@ final class EventCertificateController extends Controller
         }
     }
 
+    private function requireBackground(EventCertificateTemplate $template): void
+    {
+        try {
+            if (! is_string($template->background_disk) || ! is_string($template->background_path)) {
+                throw new RuntimeException('Missing background.');
+            }
+            $this->artwork->dataUri($template->background_disk, $template->background_path);
+            if (@getimagesizefromstring($this->artwork->contents($template->background_disk, $template->background_path)) === false) {
+                throw new RuntimeException('Invalid background.');
+            }
+        } catch (RuntimeException) {
+            throw ValidationException::withMessages(['background' => 'Upload usable background artwork before issuing custom certificates.']);
+        }
+    }
+
     /** @param array<string, mixed> $validated */
     private function persistTemplate(
         StoreCertificateTemplateRequest|UpdateCertificateTemplateRequest $request,
@@ -398,7 +423,7 @@ final class EventCertificateController extends Controller
             unset($validated['background'], $validated['signature'], $validated['remove_background'], $validated['remove_signature']);
             $validated['tenant_id'] = $event->tenant_id;
             $validated['event_id'] = $event->id;
-            $validated['layout'] = $this->layouts->validate($validated['layout'] ?? [], 'certificate');
+            $validated['layout'] = $this->layouts->resolveCertificate($validated['layout'] ?? $template->layout ?? []);
 
             DB::connection('landlord')->transaction(function () use ($template, $validated): void {
                 $template->fill($validated)->save();

@@ -13,10 +13,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
-function customCertificateFixture(array $templateOverrides = [], array $certificateOverrides = []): array
+function customCertificateFixture(array $templateOverrides = [], array $certificateOverrides = [], ?App\Models\Tenant $tenant = null): array
 {
     Storage::fake('public');
-    $tenant = setActiveTenantForTest();
+    $tenant ??= setActiveTenantForTest();
     $event = Event::factory()->create([
         'tenant_id' => $tenant->id,
         'name' => 'Clinical Research Congress',
@@ -236,4 +236,111 @@ test('organizer can download a representative certificate preview without issuin
 
     $response->assertOk()->assertHeader('content-type', 'application/pdf');
     expect($event->certificates()->count())->toBe(0);
+});
+
+test('editing a legacy certificate resolves full defaults before new issuance without backfilling snapshots', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template, $oldVersion, $oldCertificate] = customCertificateFixture(['layout' => null, 'design_mode' => 'miconvener'], tenant: $tenant);
+    $host = eventSubdomainHost('acme');
+    $before = app(CertificatePdfService::class)->renderHtml($oldCertificate);
+    $this->actingAs($user)->putJson("http://{$host}/events/{$template->event_id}/certificates/templates/{$template->id}", [
+        'title' => $template->title,
+        'design_mode' => 'custom_background',
+    ], ['HTTP_HOST' => $host])->assertOk();
+    $template->refresh();
+    expect(array_keys($template->layout))->toContain('title', 'recipient_name', 'body', 'issuer', 'verification_code');
+    $newCertificate = $oldCertificate->replicate(['id', 'uuid', 'verification_code', 'design_version_id']);
+    $newCertificate->design_version_id = app(CertificateDesignVersionService::class)->snapshot($template)->id;
+    $newCertificate->save();
+    $html = app(CertificatePdfService::class)->renderHtml($newCertificate->fresh());
+    expect($html)->toContain($template->title, 'Akosua Élise Mensah attended', 'Dr. Esi Owusu', $newCertificate->verification_code)
+        ->and($oldVersion->fresh()->layout)->toBeNull()
+        ->and(app(CertificatePdfService::class)->renderHtml($oldCertificate->fresh()))->toBe($before);
+});
+
+test('custom certificate requires usable background when saving and issuing', function (): void {
+    prepareCertificateDesignerHost();
+    Storage::fake('public');
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/certificates/templates", [
+        'role' => 'delegate', 'title' => 'Certificate', 'design_mode' => 'custom_background',
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('background');
+    $template = $event->certificateTemplates()->create([
+        'tenant_id' => $tenant->id, 'role' => 'delegate', 'title' => 'Certificate',
+        'design_mode' => 'custom_background', 'background_disk' => 'public', 'background_path' => 'missing.png',
+    ]);
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/certificates/issue", [
+        'target_group' => 'custom', 'role' => 'delegate', 'template_id' => $template->id,
+        'custom_recipients' => [['name' => 'Ama', 'email' => 'ama@example.test']],
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('background');
+    expect($event->certificates()->count())->toBe(0);
+});
+
+test('certificate index exposes server defaults and mandatory fields resolve visible', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/certificates", ['HTTP_HOST' => $host])->assertOk();
+    $defaults = app(ArtifactLayoutValidator::class)->certificateDefaults();
+    expect($response->json('layout_defaults'))->toEqual($defaults)
+        ->and($defaults['recipient_name']['font_family'])->toBe('DejaVu Sans');
+    $resolved = app(ArtifactLayoutValidator::class)->resolveCertificate([
+        'recipient_name' => ['visible' => false], 'verification_code' => ['visible' => false], 'title' => ['visible' => false],
+    ]);
+    expect($resolved['recipient_name']['visible'])->toBeTrue()
+        ->and($resolved['verification_code']['visible'])->toBeTrue()
+        ->and($resolved['title']['visible'])->toBeFalse();
+});
+
+test('background removal in custom mode fails without replacement and replacement preserves issued artwork', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template, $version, $certificate] = customCertificateFixture(tenant: $tenant);
+    $host = eventSubdomainHost('acme');
+    $url = "http://{$host}/events/{$template->event_id}/certificates/templates/{$template->id}";
+    $this->actingAs($user)->putJson($url, [
+        'title' => $template->title, 'design_mode' => 'custom_background', 'remove_background' => true,
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('background');
+    $oldPath = $template->background_path;
+    expect($template->fresh()->background_path)->toBe($oldPath);
+    $this->actingAs($user)->post($url, [
+        '_method' => 'PUT', 'title' => $template->title, 'design_mode' => 'custom_background',
+        'remove_background' => '1', 'background' => UploadedFile::fake()->image('replacement.jpg', 1120, 800),
+    ], ['HTTP_HOST' => $host])->assertOk();
+    expect($template->fresh()->background_path)->not->toBe($oldPath)
+        ->and($version->fresh()->background_path)->toBe($oldPath);
+    Storage::disk('public')->assertExists($oldPath);
+    expect(app(CertificatePdfService::class)->renderHtml($certificate))->toContain('Akosua Élise Mensah');
+});
+
+test('invalid edited layout leaves the current template and artwork intact', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template] = customCertificateFixture(tenant: $tenant);
+    $host = eventSubdomainHost('acme');
+    $original = $template->layout;
+    $this->actingAs($user)->putJson("http://{$host}/events/{$template->event_id}/certificates/templates/{$template->id}", [
+        'title' => $template->title, 'layout' => ['recipient_name' => ['x' => 0.9, 'width' => 0.5]],
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('layout');
+    expect($template->fresh()->layout)->toBe($original);
+    Storage::disk('public')->assertExists($template->background_path);
+});
+
+test('new issuance resolves legacy custom layout without rewriting an earlier partial snapshot', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template, $oldVersion] = customCertificateFixture(['layout' => null], tenant: $tenant);
+    $host = eventSubdomainHost('acme');
+    $this->actingAs($user)->postJson("http://{$host}/events/{$template->event_id}/certificates/issue", [
+        'target_group' => 'custom', 'role' => 'delegate', 'template_id' => $template->id,
+        'custom_recipients' => [['name' => 'Ama Élise', 'email' => 'new@example.test']],
+    ], ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('issued_count', 1);
+    $new = $template->event->certificates()->where('recipient_email', 'new@example.test')->firstOrFail();
+    $html = app(CertificatePdfService::class)->renderHtml($new);
+    expect($html)->toContain('artifact-title', 'artifact-recipient_name', 'artifact-body', 'artifact-issuer', 'artifact-verification_code')
+        ->and($oldVersion->fresh()->layout)->toBeNull();
 });

@@ -90,7 +90,9 @@ final class CertificatePdfService
                 ]);
             }
 
-            $layout = $this->layouts->validate($design->layout ?? [], 'certificate');
+            $layout = $certificate->designVersion !== null
+                ? $this->layouts->validate($design->layout ?? [], 'certificate')
+                : $this->layouts->resolveCertificate($design->layout ?? []);
             $layout['verification_code'] = ($layout['verification_code'] ?? [
                 'x' => 0.68,
                 'y' => 0.9,

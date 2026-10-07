@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, RotateCcw } from 'lucide-react';
 import Button from '@/Components/Console/Button';
 import Checkbox from '@/Components/Console/Checkbox';
 import Input from '@/Components/Console/Input';
 import ArtworkUpload from './ArtworkUpload';
 import ArtifactLayoutPreview from './ArtifactLayoutPreview';
+import ArtifactLayoutControls from './ArtifactLayoutControls';
 
 export default function CertificateDesignEditor({
     form,
+    layoutDefaults = {},
     setForm,
     template,
     eventId,
@@ -16,9 +18,8 @@ export default function CertificateDesignEditor({
     onCancel,
 }) {
     const [backgroundUrl, setBackgroundUrl] = useState(null);
-    const initialLayout = useRef(form.layout);
     const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-    const resetLayout = () => update('layout', structuredClone(initialLayout.current));
+    const resetLayout = () => update('layout', structuredClone(layoutDefaults));
     useEffect(() => {
         if (!form.background) {
             setBackgroundUrl(null);
@@ -126,21 +127,38 @@ export default function CertificateDesignEditor({
                         />
                     </label>
                 </div>
+                <Input
+                    label="Default CPD/CME hours"
+                    aria-label="Default CPD/CME hours"
+                    type="number"
+                    min={0}
+                    max={1000}
+                    step={0.1}
+                    value={form.default_cpd_hours}
+                    onChange={(event) => update('default_cpd_hours', event.target.value)}
+                />
+                {form.design_mode === 'custom_background' && (
+                    <ArtifactLayoutControls
+                        layout={form.layout || {}}
+                        onChange={(layout) => update('layout', layout)}
+                        requiredFields={['recipient_name', 'verification_code']}
+                    />
+                )}
                 <div className="flex flex-wrap gap-5">
-                    <label className="flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-xs">
                         <Checkbox
+                            label="Verification QR"
                             checked={form.show_qr}
-                            onChange={(checked) => update('show_qr', checked)}
+                            onChange={(event) => update('show_qr', event.target.checked)}
                         />
-                        Verification QR
-                    </label>
-                    <label className="flex items-center gap-2 text-xs">
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
                         <Checkbox
+                            label="CPD/CME hours"
                             checked={form.show_cpd_hours}
-                            onChange={(checked) => update('show_cpd_hours', checked)}
+                            onChange={(event) => update('show_cpd_hours', event.target.checked)}
                         />
-                        CPD/CME hours
-                    </label>
+                    </div>
                 </div>
             </div>
             <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">

@@ -72,6 +72,7 @@ export default function CertificatesPanel({ event }) {
     const [templateModalOpen, setTemplateModalOpen] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [savingTemplate, setSavingTemplate] = useState(false);
+    const [layoutDefaults, setLayoutDefaults] = useState({});
     const [templateForm, setTemplateForm] = useState({
         role: 'delegate',
         title: '',
@@ -121,6 +122,7 @@ export default function CertificatesPanel({ event }) {
             if (res.ok) {
                 const data = await res.json();
                 setTemplates(data.templates || []);
+                setLayoutDefaults(data.layout_defaults || {});
                 setCertificates(data.certificates?.data || []);
                 setStats(data.stats || null);
                 setEligible(data.eligible || null);
@@ -157,7 +159,20 @@ export default function CertificatesPanel({ event }) {
             design_mode: tmpl.design_mode || 'miconvener',
             orientation: 'landscape',
             page_size: 'a4',
-            layout: tmpl.layout || {},
+            layout: Object.fromEntries(
+                Object.entries({ ...layoutDefaults, ...(tmpl.layout || {}) }).map(
+                    ([key, value]) => [
+                        key,
+                        {
+                            ...layoutDefaults[key],
+                            ...value,
+                            ...(['recipient_name', 'verification_code'].includes(key)
+                                ? { visible: true }
+                                : {}),
+                        },
+                    ]
+                )
+            ),
             background: null,
             signature: null,
             remove_background: false,
@@ -594,6 +609,7 @@ export default function CertificatesPanel({ event }) {
                 title={`Customize ${templateForm.role.toUpperCase()} Certificate Template`}
             >
                 <CertificateDesignEditor
+                    layoutDefaults={layoutDefaults}
                     form={templateForm}
                     setForm={setTemplateForm}
                     template={selectedTemplate}
