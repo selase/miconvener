@@ -6,7 +6,6 @@ namespace App\Services\Certificates;
 
 use App\Models\EventCertificateDesignVersion;
 use App\Models\EventCertificateTemplate;
-use App\Services\Design\ArtifactArtworkService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -30,8 +29,6 @@ final class CertificateDesignVersionService
         'default_cpd_hours',
         'layout',
     ];
-
-    public function __construct(private readonly ArtifactArtworkService $artwork) {}
 
     public function snapshot(EventCertificateTemplate $template): EventCertificateDesignVersion
     {
@@ -64,37 +61,15 @@ final class CertificateDesignVersionService
 
     public function deleteIfUnreferenced(EventCertificateDesignVersion $version): bool
     {
-        $assets = DB::connection('landlord')->transaction(function () use ($version): array|false {
+        return DB::connection('landlord')->transaction(function () use ($version): bool {
             $locked = EventCertificateDesignVersion::query()->lockForUpdate()->find($version->getKey());
-
             if (! $locked instanceof EventCertificateDesignVersion || $locked->certificates()->exists()) {
                 return false;
             }
-
-            $assets = [
-                [$locked->background_disk, $locked->background_path, 'background'],
-                [$locked->signature_disk, $locked->signature_path, 'signature'],
-            ];
-
             $locked->delete();
 
-            return array_values(array_filter(
-                $assets,
-                fn (array $asset): bool => is_string($asset[0])
-                    && is_string($asset[1])
-                    && ! $this->assetIsReferenced($asset[0], $asset[1], $asset[2]),
-            ));
+            return true;
         });
-
-        if ($assets === false) {
-            return false;
-        }
-
-        foreach ($assets as [$disk, $path]) {
-            $this->artwork->delete($disk, $path);
-        }
-
-        return true;
     }
 
     /**
@@ -114,20 +89,5 @@ final class CertificateDesignVersionService
         }
 
         return $value;
-    }
-
-    private function assetIsReferenced(string $disk, string $path, string $type): bool
-    {
-        $diskColumn = "{$type}_disk";
-        $pathColumn = "{$type}_path";
-
-        return EventCertificateTemplate::withoutGlobalScopes()
-            ->where($diskColumn, $disk)
-            ->where($pathColumn, $path)
-            ->exists()
-            || EventCertificateDesignVersion::withoutGlobalScopes()
-                ->where($diskColumn, $disk)
-                ->where($pathColumn, $path)
-                ->exists();
     }
 }

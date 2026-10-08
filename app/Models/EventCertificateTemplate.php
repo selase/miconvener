@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Design\ArtifactArtworkCleanup;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -99,6 +100,13 @@ final class EventCertificateTemplate extends Model
 
     protected static function booted(): void
     {
+        self::deleting(function (self $template): void {
+            $template->designVersions()->whereDoesntHave('certificates')->get()->each->delete();
+        });
+        self::deleted(function (self $design): void {
+            app(ArtifactArtworkCleanup::class)->afterDeletionCommit($design, app(ArtifactArtworkCleanup::class)->assets($design));
+        });
+
         self::updating(function (self $template): void {
             $renderingFields = [
                 'design_mode', 'orientation', 'page_size', 'layout', 'title', 'body_template',

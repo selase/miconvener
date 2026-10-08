@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Design;
 
+use Dompdf\Dompdf;
+use Dompdf\FontMetrics;
 use Illuminate\Validation\ValidationException;
 
 final class ArtifactLayoutValidator
@@ -25,6 +27,57 @@ final class ArtifactLayoutValidator
 
     /** @var list<string> */
     private const array ALIGNS = ['left', 'center', 'right'];
+
+    private ?FontMetrics $fontMetrics = null;
+
+    /**
+     * @param  array<string, bool|float|int|string>  $settings
+     * @return array<string, bool|float|int|string>
+     */
+    public function fitText(string $text, array $settings, float $widthMm, float $heightMm, string $field, float $lineHeight = 1.15): array
+    {
+        if ($text === '' || ($settings['visible'] ?? true) === false) {
+            return $settings;
+        }
+        $metrics = $this->fontMetrics ??= (new Dompdf)->getFontMetrics();
+        $font = $metrics->getFont((string) $settings['font_family'], (int) $settings['font_weight'] >= 600 ? 'bold' : 'normal')
+            ?? $metrics->getFont('DejaVu Sans', 'normal');
+        $width = $widthMm * 72 / 25.4;
+        $height = $heightMm * 72 / 25.4;
+        $original = (float) $settings['font_size'];
+        $minimum = max(6.0, $original * 0.7);
+        $size = $original;
+        while (true) {
+            $lines = 0;
+            $fits = true;
+            foreach (explode("\n", str_replace("\r", '', $text)) as $paragraph) {
+                $lines++;
+                $line = '';
+                foreach (preg_split('/\s+/u', mb_trim($paragraph), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+                    if ($metrics->getTextWidth($word, $font, $size) > $width) {
+                        $fits = false;
+                        break 2;
+                    }
+                    $candidate = $line === '' ? $word : $line.' '.$word;
+                    if ($line !== '' && $metrics->getTextWidth($candidate, $font, $size) > $width) {
+                        $lines++;
+                        $line = $word;
+                    } else {
+                        $line = $candidate;
+                    }
+                }
+            }
+            if ($fits && $lines * $size * $lineHeight <= $height) {
+                $settings['font_size'] = $size;
+
+                return $settings;
+            }
+            if ($size <= $minimum) {
+                throw ValidationException::withMessages([$field => 'Text does not fit this field. Enlarge its box, reduce its font size, or shorten the text. Automatic reduction is limited to 30%.']);
+            }
+            $size = max($minimum, $size - 0.5);
+        }
+    }
 
     /** @return array<string, array<string, bool|float|int|string>> */
     public function certificateDefaults(): array

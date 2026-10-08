@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventBadgeTemplate;
 use App\Models\EventRegistration;
 use App\Services\Design\ArtifactArtworkService;
+use App\Services\Design\ArtifactLayoutValidator;
 use App\Services\Events\QrCodeGenerator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPDF;
@@ -20,6 +21,7 @@ final class BadgePdfService
     public function __construct(
         private readonly ArtifactArtworkService $artwork,
         private readonly BadgeTemplateService $templates,
+        private readonly ArtifactLayoutValidator $layouts,
     ) {}
 
     /** @param Collection<int, EventRegistration> $registrations */
@@ -40,6 +42,9 @@ final class BadgePdfService
         $paper = $settings['paper'] === 'letter' ? [215.9, 279.4] : [210.0, 297.0];
         $margin = $settings['margin_mm'];
         $gap = $settings['gap_mm'];
+        if ($settings['crop_marks'] && $gap < 3) {
+            throw ValidationException::withMessages(['sheet_settings.gap_mm' => 'Crop marks require at least 3 mm between badges. Increase the gap or turn crop marks off.']);
+        }
         $columns = (int) floor(($paper[0] - (2 * $margin) + $gap) / ($template->width_mm + $gap));
         $rows = (int) floor(($paper[1] - (2 * $margin) + $gap) / ($template->height_mm + $gap));
 
@@ -63,15 +68,24 @@ final class BadgePdfService
 
             $tier = $registration->ticketType->badge_tier ?? 'general';
 
+            $values = [
+                'event_name' => $event->name,
+                'attendee_name' => $registration->full_name,
+                'ticket_type' => $registration->ticketType->name ?? '',
+                'tier_label' => mb_strtoupper($tier),
+                'ticket_code' => $registration->ticket_code ?? '',
+                'seat_label' => $registration->seatAssignment->seat_label ?? '',
+            ];
+            $layout = $template->layoutSettings();
+            foreach ($values as $key => $value) {
+                if (isset($layout[$key])) {
+                    $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * $template->width_mm, $layout[$key]['height'] * $template->height_mm, 'layout.'.$key);
+                }
+            }
+
             return [
-                'values' => [
-                    'event_name' => $event->name,
-                    'attendee_name' => $registration->full_name,
-                    'ticket_type' => $registration->ticketType->name ?? '',
-                    'tier_label' => mb_strtoupper($tier),
-                    'ticket_code' => $registration->ticket_code ?? '',
-                    'seat_label' => $registration->seatAssignment->seat_label ?? '',
-                ],
+                'values' => $values,
+                'layout' => $layout,
                 'qr' => $registration->qr_token ? QrCodeGenerator::svgDataUri($registration->qr_token, 240) : null,
                 'tier_style' => $template->tierStyleSettings()[$tier] ?? [],
             ];
@@ -86,6 +100,8 @@ final class BadgePdfService
             'margin' => $margin,
             'gap' => $gap,
             'columns' => $columns,
+            'paperWidth' => $paper[0],
+            'paperHeight' => $paper[1],
             'cropMarks' => $settings['crop_marks'],
         ])->render();
     }

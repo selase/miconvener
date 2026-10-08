@@ -32,6 +32,9 @@ trait ValidatesCertificateBackground
                 if ($this->boolean('remove_background') || ! $template instanceof EventCertificateTemplate || ! is_string($template->background_disk) || ! is_string($template->background_path)) {
                     throw new RuntimeException('Missing background.');
                 }
+                if ($this->routeIs('tenant.events.certificates.templates.draft-preview')) {
+                    return;
+                }
                 $artwork = app(ArtifactArtworkService::class);
                 $artwork->dataUri($template->background_disk, $template->background_path);
                 if (@getimagesizefromstring($artwork->contents($template->background_disk, $template->background_path)) === false) {

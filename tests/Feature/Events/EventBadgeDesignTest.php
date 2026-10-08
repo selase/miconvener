@@ -147,6 +147,19 @@ test('invalid badge layout does not leak uploaded artwork', function (): void {
     expect(Storage::disk('public')->allFiles())->toBe([]);
 });
 
+test('crop marks require a clear gap between badges', function (): void {
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $payload = validBadgeDesign();
+    $payload['sheet_settings']['gap_mm'] = 0;
+    $url = "http://{$host}/events/{$event->id}/badges/template";
+    $this->actingAs($user)->postJson($url, $payload, ['HTTP_HOST' => $host])
+        ->assertUnprocessable()->assertJsonValidationErrors('sheet_settings.gap_mm');
+    $payload['sheet_settings']['crop_marks'] = false;
+    $this->postJson($url, $payload, ['HTTP_HOST' => $host])->assertOk();
+});
+
 test('badge sheet fit follows selected paper and dimensions determine orientation', function (): void {
     [$tenant, $user] = badgeDesignerHost();
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);

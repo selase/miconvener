@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -138,7 +139,7 @@ final class EventCertificateController extends Controller
         $certificate->setRelation('designVersion', null);
         $certificate->setRelation('registration', null);
 
-        return $this->pdfs->generatePdf($certificate)->stream('certificate-preview.pdf');
+        return $this->previewResponse($certificate);
     }
 
     public function draftPreview(StoreCertificateTemplateRequest $request, string $subdomain, Event $event): Response
@@ -170,7 +171,7 @@ final class EventCertificateController extends Controller
         $certificate->setRelation('designVersion', null);
         $certificate->setRelation('registration', null);
 
-        return $this->pdfs->generatePdf($certificate, $assets)->stream('certificate-preview.pdf');
+        return $this->previewResponse($certificate, $assets);
     }
 
     public function artwork(string $subdomain, Event $event, EventCertificateTemplate $template, string $type): Response
@@ -324,7 +325,8 @@ final class EventCertificateController extends Controller
                         continue;
                     }
 
-                    $event->certificates()->create([
+                    $certificate = new EventCertificate([
+                        'event_id' => $event->id,
                         'tenant_id' => $event->tenant_id,
                         'registration_id' => $item['registration_id'],
                         'user_id' => $item['user_id'],
@@ -335,7 +337,15 @@ final class EventCertificateController extends Controller
                         'role' => $role,
                         'cpd_hours' => $cpdHours,
                         'issued_at' => now(),
+                        'uuid' => (string) Str::uuid(),
+                        'verification_code' => 'MC-'.mb_strtoupper(Str::random(8)),
                     ]);
+                    $certificate->setRelation('event', $event);
+                    $certificate->setRelation('template', $template);
+                    $certificate->setRelation('designVersion', $designVersion);
+                    $certificate->setRelation('registration', null);
+                    $this->pdfs->renderHtml($certificate);
+                    $certificate->save();
 
                     $issuedCount++;
                 }
@@ -359,9 +369,10 @@ final class EventCertificateController extends Controller
         abort_unless($certificate->event_id === $event->id, 404);
 
         $domPdf = $this->pdfs->generatePdf($certificate);
+        $response = $domPdf->download("certificate-{$certificate->verification_code}.pdf");
         $certificate->increment('download_count');
 
-        return $domPdf->download("certificate-{$certificate->verification_code}.pdf");
+        return $response;
     }
 
     public function destroy(Request $request, string $subdomain, Event $event, EventCertificate $certificate): JsonResponse
@@ -374,6 +385,45 @@ final class EventCertificateController extends Controller
         return response()->json([
             'message' => 'Certificate removed successfully.',
         ]);
+    }
+
+    /** @param array<string, string|null> $assets */
+    private function previewResponse(EventCertificate $certificate, array $assets = []): Response
+    {
+        $template = clone $certificate->template;
+        $warnings = [];
+        foreach (['background', 'signature'] as $type) {
+            if (array_key_exists($type, $assets) || ($type === 'background' && $template->design_mode !== 'custom_background')) {
+                continue;
+            }
+            $disk = $template->getAttribute("{$type}_disk");
+            $path = $template->getAttribute("{$type}_path");
+            if ($type === 'signature' && (! is_string($disk) || ! is_string($path))) {
+                continue;
+            }
+            try {
+                if (! is_string($disk) || ! is_string($path)) {
+                    throw new RuntimeException('Missing artwork.');
+                }
+                $assets[$type] = $this->artwork->dataUri($disk, $path);
+            } catch (RuntimeException) {
+                $assets[$type] = null;
+                if ($type === 'background') {
+                    $template->design_mode = 'miconvener';
+                    $warnings[] = 'Background artwork is unavailable. This preview uses the MiConvener design.';
+                } else {
+                    $warnings[] = 'Signature artwork is unavailable and is omitted from this preview.';
+                }
+            }
+        }
+        $certificate->setRelation('template', $template);
+        $assets['warning'] = $warnings === [] ? null : implode(' ', $warnings);
+        $response = $this->pdfs->generatePdf($certificate, $assets)->stream('certificate-preview.pdf');
+        if ($assets['warning'] !== null) {
+            $response->headers->set('X-Certificate-Preview-Warning', $assets['warning']);
+        }
+
+        return $response;
     }
 
     private function ensureDefaultTemplates(Event $event): void

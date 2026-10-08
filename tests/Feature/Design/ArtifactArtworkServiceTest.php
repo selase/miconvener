@@ -167,3 +167,12 @@ test('in memory upload encoding preserves transparent png pixels and stores no f
     expect(imagecolorsforindex($decoded, imagecolorat($decoded, 0, 0))['alpha'])->toBe(127)
         ->and(Storage::disk('public')->allFiles())->toBe([]);
 });
+
+test('stored artwork with a recognizable but truncated image header is rejected', function (string $disk): void {
+    Storage::fake($disk);
+    $source = UploadedFile::fake()->image('background.png', 100, 100);
+    $bytes = (string) file_get_contents($source->getRealPath());
+    Storage::disk($disk)->put('truncated.png', mb_substr($bytes, 0, 40));
+    expect(fn () => app(ArtifactArtworkService::class)->dataUri($disk, 'truncated.png'))
+        ->toThrow(RuntimeException::class, 'Stored artwork is not a supported image.');
+})->with(['public', 's3']);

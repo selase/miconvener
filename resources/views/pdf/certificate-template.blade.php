@@ -9,44 +9,48 @@
             margin: 0;
         }
         body {
-            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-family: 'DejaVu Sans', sans-serif;
             color: #1e293b;
             margin: 0;
-            padding: 24px;
+            padding: 0;
             background-color: #ffffff;
             -webkit-print-color-adjust: exact;
         }
         .outer-border {
+            position: fixed;
+            top: 6mm; left: 6mm; width: 282.8mm; height: 195.8mm;
             border: 4px solid #1e3a8a;
-            padding: 6px;
-            height: 94%;
+            padding: 0;
             box-sizing: border-box;
             background: #ffffff;
         }
         .middle-border {
+            position: absolute;
+            top: 2mm; left: 2mm; width: 278.5mm; height: 191.5mm;
             border: 1px solid #d97706;
-            padding: 6px;
-            height: 100%;
+            padding: 0;
             box-sizing: border-box;
         }
         .inner-content {
+            position: absolute;
+            top: 2mm; left: 2mm; width: 273.7mm; height: 186.7mm;
             border: 1px solid #e2e8f0;
-            padding: 30px 48px;
-            height: 100%;
+            padding: 0;
             box-sizing: border-box;
             text-align: center;
-            position: relative;
             background: radial-gradient(circle at center, #ffffff 0%, #f8fafc 100%);
         }
         .header-logo {
+            position: absolute; top: 10mm; left: 12mm; right: 12mm;
             font-size: 14px;
-            font-weight: 800;
+            font-weight: 700;
             letter-spacing: 3px;
             text-transform: uppercase;
             color: #1e3a8a;
             margin-bottom: 8px;
         }
         .certificate-category {
+            position: absolute; top: 20mm; left: 12mm; right: 12mm;
             font-size: 11px;
             font-weight: 700;
             letter-spacing: 4px;
@@ -55,22 +59,25 @@
             margin-bottom: 6px;
         }
         .title {
-            font-size: 28px;
-            font-weight: 800;
+            position: absolute; top: 27mm; left: 12mm; right: 12mm; height: 24mm;
+            font-size: {{ $defaultTextSizes['title'] }}pt;
+            font-weight: 700;
             color: #0f172a;
             margin: 0 0 16px 0;
             line-height: 1.2;
             letter-spacing: -0.5px;
         }
         .presented-to {
+            position: absolute; top: 57mm; left: 12mm; right: 12mm;
             font-size: 13px;
             font-style: italic;
             color: #64748b;
             margin-bottom: 12px;
         }
         .recipient-name {
-            font-size: 32px;
-            font-weight: 800;
+            position: absolute; top: 65mm; left: 12mm; right: 12mm; height: 22mm;
+            font-size: {{ $defaultTextSizes['recipient_name'] }}pt;
+            font-weight: 700;
             color: #1e3a8a;
             margin-bottom: 14px;
             padding-bottom: 6px;
@@ -79,13 +86,15 @@
             min-width: 380px;
         }
         .body-text {
-            font-size: 14px;
+            position: absolute; top: 94mm; left: 12mm; right: 12mm; height: 36mm;
+            font-size: {{ $defaultTextSizes['body'] }}pt;
             line-height: 1.65;
             color: #334155;
-            max-width: 680px;
+            width: 180mm;
             margin: 0 auto 20px auto;
         }
         .cpd-badge {
+            position: absolute; top: 134mm; left: 12mm; right: 12mm;
             display: inline-block;
             background-color: #fef3c7;
             border: 1px solid #f59e0b;
@@ -99,8 +108,8 @@
             letter-spacing: 1px;
         }
         .bottom-section {
-            margin-top: 24px;
-            width: 100%;
+            position: absolute;
+            left: 12mm; right: 12mm; bottom: 10mm;
         }
         .bottom-table {
             width: 100%;
@@ -120,12 +129,12 @@
             margin-bottom: 6px;
         }
         .issuer-name {
-            font-size: 13px;
+            font-size: {{ $defaultTextSizes['issuer'] }}pt;
             font-weight: 700;
             color: #0f172a;
         }
         .issuer-title {
-            font-size: 11px;
+            font-size: {{ $defaultTextSizes['issuer'] }}pt;
             color: #64748b;
         }
         .signature-image {
@@ -162,7 +171,7 @@
             border: 2px dashed #d97706;
             border-radius: 50%;
             margin: 0 auto;
-            line-height: 56px;
+            position: relative;
             font-size: 9px;
             font-weight: 700;
             color: #d97706;
@@ -172,6 +181,9 @@
     </style>
 </head>
 <body>
+    @if(!empty($previewWarning))
+        <div style="position: fixed; top: 0; left: 0; right: 0; padding: 2mm; background: #fef3c7; color: #92400e; font: 9pt 'DejaVu Sans'; z-index: 10;">{{ $previewWarning }}</div>
+    @endif
     <div class="outer-border">
         <div class="middle-border">
             <div class="inner-content">
@@ -204,7 +216,7 @@
                                 <div class="issuer-title">{{ $template?->issuer_title ?? 'Organizing Committee Chair' }}</div>
                             </td>
                             <td class="center-seal">
-                                <div class="seal-circle">VERIFIED</div>
+                                <div class="seal-circle"><span style="position: absolute; left: 0; right: 0; top: 24px; line-height: 12px;">VERIFIED</span></div>
                             </td>
                             <td class="qr-area">
                                 @if(!empty($qrDataUri))

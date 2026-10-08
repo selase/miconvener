@@ -63,12 +63,63 @@ test('badge renderer honours optional fields tier overrides and qr images', func
 
     expect($html)->toContain('Ési Mensah', 'VIP Access', '#7C3AED', 'Seat A14', 'data:image/svg+xml;base64,')
         ->and($html)->not->toContain('>SEAT PLACEHOLDER<');
+    $pdf = app(BadgePdfService::class)->generate($event, $template->fresh(), collect([$registration]));
+    $fonts = [];
+    $pdf->getDomPDF()->setCallbacks([['event' => 'end_frame', 'f' => function (\Dompdf\Frame $frame) use (&$fonts): void {
+        if ($frame->is_text_node() && in_array(mb_trim($frame->get_node()->textContent), ['VIP Access', 'Seat A14'], true)) {
+            $fonts[mb_trim($frame->get_node()->textContent)] = $frame->get_style()->font_family;
+        }
+    }]]);
+    $output = $pdf->output();
+    expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe(1);
+    expect($fonts)->toHaveKeys(['VIP Access', 'Seat A14']);
+    foreach ($fonts as $font) {
+        expect($font)->toContain('DejaVuSans');
+    }
+    $directory = getenv('ARTIFACT_QA_DIRECTORY');
+    if (is_string($directory) && is_dir($directory)) {
+        file_put_contents($directory.'/badges-vip.pdf', $output);
+    }
     $layout = $template->layout;
     $layout['qr']['visible'] = false;
     $layout['seat_label']['visible'] = false;
     $template->update(['layout' => $layout]);
     $hidden = app(BadgePdfService::class)->renderHtml($event, $template, collect([$registration]));
     expect($hidden)->not->toContain('Seat A14', 'alt="QR"');
+});
+
+test('badge PDFs use corner crop marks and square QR geometry', function (): void {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $template = app(BadgeTemplateService::class)->forEvent($event);
+    $layout = $template->layout;
+    $layout['qr']['width'] = 0.3;
+    $layout['qr']['height'] = 0.2;
+    $template->update(['layout' => $layout]);
+
+    $html = app(BadgePdfService::class)->renderHtml($event, $template, collect([badgePdfRegistration($event)]));
+    expect($html)->toContain('class="crop-mark', 'width:14mm;height:14mm')
+        ->not->toContain('dashed', 'object-fit');
+    $template->update(['sheet_settings' => ['paper' => 'a4', 'margin_mm' => 8, 'gap_mm' => 3, 'crop_marks' => false]]);
+    expect(app(BadgePdfService::class)->renderHtml($event, $template, collect([badgePdfRegistration($event)])))
+        ->not->toContain('class="crop-mark');
+});
+
+test('badge event text overflow fails before producing a silently clipped badge', function (): void {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id, 'name' => str_repeat('W', 200)]);
+    $template = app(BadgeTemplateService::class)->forEvent($event);
+    expect(fn () => app(BadgePdfService::class)->renderHtml($event, $template, collect([badgePdfRegistration($event)])))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+test('legacy badge sheets with insufficient crop clearance return an actionable error', function (): void {
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $template = app(BadgeTemplateService::class)->forEvent($event);
+    $template->update(['sheet_settings' => ['paper' => 'a4', 'margin_mm' => 8, 'gap_mm' => 0, 'crop_marks' => true]]);
+    expect(fn () => app(BadgePdfService::class)->renderHtml($event, $template, collect([badgePdfRegistration($event)])))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
 });
 
 test('sheet endpoint validates event ownership and records print history only after successful output', function (): void {
@@ -131,12 +182,17 @@ test('actual badge pdf page counts match one partial full and multiple sheets', 
     $template->update(['width_mm' => $width, 'height_mm' => $height, 'sheet_settings' => ['paper' => $paper, 'margin_mm' => 8, 'gap_mm' => 3, 'crop_marks' => true]]);
     $registrations = collect(range(1, $count))->map(fn (int $index) => badgePdfRegistration($event, ['full_name' => "Attendee {$index}"]));
     $pdf = app(BadgePdfService::class)->generate($event, $template, $registrations);
-    $pdf->output();
+    $output = $pdf->output();
     expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe($pages);
+    $directory = getenv('ARTIFACT_QA_DIRECTORY');
+    if (is_string($directory) && is_dir($directory)) {
+        file_put_contents($directory.'/badges-'.$paper.'-'.$count.'-'.$width.'x'.$height.'.pdf', $output);
+    }
 })->with([
     ['a4', 1, 1], ['a4', 2, 1], ['a4', 3, 1], ['a4', 7, 3],
     ['letter', 1, 1], ['letter', 2, 1], ['letter', 3, 1], ['letter', 7, 3],
     ['a4', 8, 1, 90, 55], ['a4', 9, 2, 90, 55], ['letter', 8, 1, 90, 55], ['letter', 9, 2, 90, 55],
+    ['a4', 1, 1, 194, 281], ['letter', 1, 1, 199, 263],
 ]);
 
 test('badges embed trusted tenant storage logos with no remote access', function (string $disk, string $environment): void {

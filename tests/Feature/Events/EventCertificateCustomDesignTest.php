@@ -75,6 +75,114 @@ function prepareCertificateDesignerHost(): void
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
 }
 
+test('representative certificate PDFs stay on one physical A4 page', function (string $mode, bool $signature): void {
+    [$template, $version, $certificate] = customCertificateFixture([
+        'design_mode' => $mode,
+        'layout' => app(ArtifactLayoutValidator::class)->certificateDefaults(),
+        'show_qr' => true,
+        'show_cpd_hours' => true,
+        'signature_disk' => $signature ? 'public' : null,
+        'signature_path' => $signature ? 'certificates/signature.png' : null,
+    ], ['recipient_name' => 'Dr. Ési Akosua Mensah-Boateng']);
+    $image = imagecreatetruecolor(1120, 800);
+    imagefill($image, 0, 0, imagecolorallocate($image, 245, 248, 255));
+    imagerectangle($image, 15, 15, 1104, 784, imagecolorallocate($image, 30, 58, 138));
+    ob_start();
+    imagepng($image);
+    $background = ob_get_clean();
+    imagedestroy($image);
+    Storage::disk('public')->put($version->background_path, $background);
+    if ($signature) {
+        $ink = imagecreatetruecolor(300, 100);
+        imagealphablending($ink, false);
+        imagesavealpha($ink, true);
+        imagefill($ink, 0, 0, imagecolorallocatealpha($ink, 255, 255, 255, 127));
+        imagesetthickness($ink, 3);
+        $color = imagecolorallocate($ink, 30, 58, 138);
+        foreach ([[10, 70, 40, 15], [40, 15, 30, 80], [30, 80, 90, 45], [90, 45, 110, 65], [110, 65, 180, 45], [180, 45, 210, 60], [60, 85, 270, 75]] as [$x1, $y1, $x2, $y2]) {
+            imageline($ink, $x1, $y1, $x2, $y2, $color);
+        }
+        ob_start();
+        imagepng($ink);
+        Storage::disk('public')->put($version->signature_path, ob_get_clean());
+        imagedestroy($ink);
+    }
+    $pdf = app(CertificatePdfService::class)->generatePdf($certificate);
+    $boxes = [];
+    $pdf->getDomPDF()->setCallbacks([['event' => 'end_frame', 'f' => function (Dompdf\Frame $frame) use (&$boxes): void {
+        $node = $frame->get_node();
+        if ($node instanceof DOMElement && in_array($node->getAttribute('class'), ['outer-border', 'issuer-title', 'verify-text', 'qr-image', 'bottom-section'], true)) {
+            $boxes[$node->getAttribute('class')] = $frame->get_border_box();
+        }
+    }]]);
+    $output = $pdf->output();
+
+    $directory = getenv('ARTIFACT_QA_DIRECTORY');
+    if (is_string($directory) && is_dir($directory)) {
+        file_put_contents($directory.'/certificate-'.$mode.'-'.($signature ? 'signature' : 'no-signature').'.pdf', $output);
+    }
+    expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe(1)
+        ->and($output)->toContain('/MediaBox [0.000 0.000 841.890 595.280]');
+    if ($mode === 'miconvener') {
+        expect($boxes)->toHaveKeys(['outer-border', 'issuer-title', 'verify-text', 'qr-image', 'bottom-section']);
+        $outer = $boxes['outer-border'];
+        foreach (['issuer-title', 'verify-text', 'qr-image', 'bottom-section'] as $key) {
+            $box = $boxes[$key];
+            expect($box['y'] + $box['h'])->toBeLessThan($outer['y'] + $outer['h'] - 5)
+                ->and($box['x'])->toBeGreaterThan($outer['x']);
+        }
+    }
+})->with([['miconvener', false], ['custom_background', false], ['custom_background', true]]);
+
+test('every visible certificate text overlay reports overflow instead of clipping', function (string $field): void {
+    $layout = app(ArtifactLayoutValidator::class)->certificateDefaults();
+    $layout[$field]['width'] = 0.01;
+    $layout[$field]['height'] = 0.01;
+    $layout[$field]['visible'] = true;
+    [, , $certificate] = customCertificateFixture(['layout' => $layout, 'show_cpd_hours' => true]);
+
+    expect(fn () => app(CertificatePdfService::class)->renderHtml($certificate))->toThrow(ValidationException::class);
+})->with(['title', 'body', 'event_name', 'issuer', 'verification_code', 'cpd_hours']);
+
+test('Unicode text fitting reduces fonts within a readable bounded range', function (): void {
+    $settings = app(ArtifactLayoutValidator::class)->fitText('Akosua Ési Mensah', [
+        'font_family' => 'DejaVu Sans', 'font_weight' => 700, 'font_size' => 16,
+    ], 40, 10, 'recipient_name');
+    expect($settings['font_size'])->toBeLessThan(16)->toBeGreaterThanOrEqual(11.2);
+});
+
+test('heavy custom certificate fonts keep the selected family in the actual PDF', function (): void {
+    $layout = app(ArtifactLayoutValidator::class)->certificateDefaults();
+    $layout['title']['font_weight'] = 800;
+    [, , $certificate] = customCertificateFixture(['title' => 'Award', 'layout' => $layout]);
+    $pdf = app(CertificatePdfService::class)->generatePdf($certificate);
+    $font = null;
+    $pdf->getDomPDF()->setCallbacks([['event' => 'end_frame', 'f' => function (Dompdf\Frame $frame) use (&$font): void {
+        if ($frame->is_text_node() && mb_trim($frame->get_node()->textContent) === 'Award') {
+            $font = $frame->get_style()->font_family;
+        }
+    }]]);
+    $pdf->output();
+    expect($font)->toContain('DejaVuSans');
+});
+
+test('certificate issuance rejects overflow and rolls back the entire recipient batch', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template] = customCertificateFixture(['layout' => app(ArtifactLayoutValidator::class)->certificateDefaults()], [], $tenant);
+    $host = eventSubdomainHost('acme');
+    $before = EventCertificate::query()->count();
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$template->event_id}/certificates/issue", [
+        'target_group' => 'custom', 'template_id' => $template->id, 'role' => 'delegate',
+        'custom_recipients' => [
+            ['name' => 'Ama Mensah', 'email' => 'first@example.test'],
+            ['name' => str_repeat('W', 81), 'email' => 'second@example.test'],
+        ],
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors('recipient_name');
+    expect(EventCertificate::query()->count())->toBe($before);
+});
+
 test('certificate layouts accept only canonical allowlisted elements and styles', function (): void {
     $validator = app(ArtifactLayoutValidator::class);
     $layout = $validator->validate([

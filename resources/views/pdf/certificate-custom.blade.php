@@ -21,11 +21,13 @@
             line-height: 1.15;
         }
         .artifact-element img { max-width: 100%; max-height: 100%; }
-        .signature-image { display: block; width: 100%; height: 100%; object-fit: contain; }
-        .qr-image { width: 100%; height: 100%; object-fit: contain; }
+        .signature-image { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; }
     </style>
 </head>
 <body>
+@if(!empty($previewWarning))
+    <div style="position: fixed; top: 0; left: 0; right: 0; padding: 2mm; background: #fef3c7; color: #92400e; font: 9pt 'DejaVu Sans'; z-index: 10;">{{ $previewWarning }}</div>
+@endif
 <div class="certificate-page">
     @foreach($layout as $element => $settings)
         @php
@@ -37,10 +39,11 @@
         @if($isVisible)
             <div
                 class="artifact-element artifact-{{ $element }}"
-                style="left: {{ $settings['x'] * 100 }}%; top: {{ $settings['y'] * 100 }}%; width: {{ $settings['width'] * 100 }}%; height: {{ $settings['height'] * 100 }}%; text-align: {{ $settings['align'] }}; font-family: '{{ $settings['font_family'] }}'; font-size: {{ $settings['font_size'] }}pt; font-weight: {{ $settings['font_weight'] }}; color: {{ $settings['color'] }};"
+                style="left: {{ $settings['x'] * 100 }}%; top: {{ $settings['y'] * 100 }}%; width: {{ $settings['width'] * 100 }}%; height: {{ $settings['height'] * 100 }}%; text-align: {{ $settings['align'] }}; font-family: '{{ $settings['font_family'] }}'; font-size: {{ $settings['font_size'] }}pt; font-weight: {{ $settings['font_weight'] >= 600 ? 700 : 400 }}; color: {{ $settings['color'] }};"
             >
                 @if($element === 'qr')
-                    <img src="{{ $qrDataUri }}" class="qr-image" alt="Verification QR">
+                    @php($qrSize = min($settings['width'] * 297, $settings['height'] * 210))
+                    <img src="{{ $qrDataUri }}" style="width:{{ $qrSize }}mm;height:{{ $qrSize }}mm" alt="Verification QR">
                 @elseif($element === 'signature')
                     <img src="{{ $signatureDataUri }}" class="signature-image" alt="Issuer signature">
                 @else

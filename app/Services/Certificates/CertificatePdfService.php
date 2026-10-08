@@ -14,6 +14,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPDF;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class CertificatePdfService
 {
@@ -124,7 +125,24 @@ final class CertificatePdfService
             $view = 'pdf.certificate-custom';
         }
 
+        $elementValues = $this->elementValues($certificate, $design, $bodyText);
+        $defaultTextSizes = [];
+        if ($view === 'pdf.certificate-custom') {
+            foreach ($elementValues as $key => $value) {
+                if (! isset($layout[$key]) || ($key === 'cpd_hours' && (! $design->show_cpd_hours || $certificate->cpd_hours <= 0))) {
+                    continue;
+                }
+                $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * 297, $layout[$key]['height'] * 210, 'layout.'.$key);
+            }
+        } else {
+            foreach (['title' => [28, 700, 235, 24], 'recipient_name' => [32, 700, 235, 22], 'body' => [14, 400, 180, 36], 'issuer' => [11, 400, 85, 15]] as $key => [$size, $weight, $width, $height]) {
+                $settings = $this->layouts->fitText($elementValues[$key], ['font_family' => 'DejaVu Sans', 'font_weight' => $weight, 'font_size' => $size], $width, $height, $key, $key === 'body' ? 1.65 : 1.2);
+                $defaultTextSizes[$key] = $settings['font_size'];
+            }
+        }
+
         return view($view, [
+            'previewWarning' => $previewAssets['warning'] ?? null,
             'certificate' => $certificate,
             'event' => $event,
             'template' => $design,
@@ -134,7 +152,8 @@ final class CertificatePdfService
             'signatureDataUri' => $signatureDataUri,
             'backgroundDataUri' => $backgroundDataUri,
             'layout' => $layout,
-            'elementValues' => $this->elementValues($certificate, $design, $bodyText),
+            'elementValues' => $elementValues,
+            'defaultTextSizes' => $defaultTextSizes,
         ])->render();
     }
 
@@ -154,7 +173,7 @@ final class CertificatePdfService
 
         if (! is_string($disk) || ! is_string($path)) {
             if ($required && $certificate->designVersion !== null) {
-                throw new RuntimeException('Issued certificate artwork is unavailable.');
+                throw new HttpException(503, 'Issued certificate artwork is unavailable. Contact the organizer to restore the original artwork.');
             }
 
             return null;
@@ -164,7 +183,7 @@ final class CertificatePdfService
             return $this->artwork->dataUri($disk, $path);
         } catch (RuntimeException $exception) {
             if ($certificate->designVersion !== null) {
-                throw new RuntimeException('Issued certificate artwork is unavailable.', previous: $exception);
+                throw new HttpException(503, 'Issued certificate artwork is unavailable. Contact the organizer to restore the original artwork.', $exception);
             }
 
             return null;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Design\ArtifactArtworkCleanup;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -55,6 +56,13 @@ final class EventBadgeTemplate extends Model
             'gap_mm' => is_array($settings) && is_numeric($settings['gap_mm'] ?? null) ? (float) $settings['gap_mm'] : 3.0,
             'crop_marks' => is_array($settings) && is_bool($settings['crop_marks'] ?? null) ? $settings['crop_marks'] : true,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        self::deleted(function (self $design): void {
+            app(ArtifactArtworkCleanup::class)->afterDeletionCommit($design, app(ArtifactArtworkCleanup::class)->assets($design));
+        });
     }
 
     /** @return array<string, string> */

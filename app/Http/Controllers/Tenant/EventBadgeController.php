@@ -18,10 +18,8 @@ use App\Services\Events\QrCodeGenerator;
 use App\Services\Tenancy\TenantContext;
 use finfo;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -141,32 +139,6 @@ final class EventBadgeController extends Controller
         abort_unless(is_string($mime) && in_array($mime, ['image/png', 'image/jpeg'], true), 404);
 
         return response($bytes, 200, ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=300']);
-    }
-
-    public function logPrint(Request $request, string $subdomain, string $event): JsonResponse
-    {
-        $this->authorize('update event');
-        $tenant = $this->getTenant();
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
-
-        $validated = $request->validate([
-            'registration_ids' => ['required', 'array', 'min:1'],
-            'registration_ids.*' => [Rule::exists('event_registrations', 'id')->where('event_id', $eventModel->id)],
-        ]);
-
-        $rows = array_map(fn (string $registrationId): array => [
-            'id' => (string) Str::uuid(),
-            'tenant_id' => $tenant->id,
-            'event_id' => $eventModel->id,
-            'registration_id' => $registrationId,
-            'printed_by' => $request->user()->id,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ], $validated['registration_ids']);
-
-        EventBadgePrint::insert($rows);
-
-        return response()->json(['message' => 'Print logged.']);
     }
 
     public function sheet(GenerateBadgeSheetRequest $request, string $subdomain, string $event): Response

@@ -29,7 +29,7 @@ final class UpdateEventBadgeTemplateRequest extends FormRequest
             'sheet_settings' => ['required', 'array'],
             'sheet_settings.paper' => ['required', Rule::in(['a4', 'letter'])],
             'sheet_settings.margin_mm' => ['required', 'numeric', 'min:3', 'max:30'],
-            'sheet_settings.gap_mm' => ['required', 'numeric', 'min:0', 'max:20'],
+            'sheet_settings.gap_mm' => ['required', 'numeric', $this->boolean('sheet_settings.crop_marks') ? 'min:3' : 'min:0', 'max:20'],
             'sheet_settings.crop_marks' => ['required', 'boolean'],
             'background' => ['nullable', 'file', 'max:10240', 'mimetypes:image/png,image/jpeg', 'dimensions:max_width=8000,max_height=8000'],
             'remove_background' => ['sometimes', 'boolean'],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Design\ArtifactArtworkCleanup;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -62,6 +63,13 @@ final class EventCertificateDesignVersion extends Model
     public function certificates(): HasMany
     {
         return $this->hasMany(EventCertificate::class, 'design_version_id');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleted(function (self $design): void {
+            app(ArtifactArtworkCleanup::class)->afterDeletionCommit($design, app(ArtifactArtworkCleanup::class)->assets($design));
+        });
     }
 
     /** @return array<string, string> */

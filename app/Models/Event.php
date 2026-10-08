@@ -191,6 +191,9 @@ final class Event extends Model
         'allow_offline_payments' => 'boolean',
     ];
 
+    /** @var list<array{string, string}> */
+    protected array $artifactAssetsForDeletion = [];
+
     /**
      * The disk event uploads live on, matching the convention used at every
      * upload site.
@@ -817,9 +820,19 @@ final class Event extends Model
         // When soft-deleting with a 6-hour recovery window, files must be
         // preserved in case the event is restored. Files are only cleaned
         // up when force-deleting permanently.
+        self::forceDeleted(function (self $event): void {
+            app(\App\Services\Design\ArtifactArtworkCleanup::class)->afterDeletionCommit($event, $event->artifactAssetsForDeletion);
+        });
         self::deleting(function (self $event): void {
             if (! $event->isForceDeleting()) {
                 return;
+            }
+
+            $cleanup = app(\App\Services\Design\ArtifactArtworkCleanup::class);
+            foreach ([EventCertificateTemplate::class, EventCertificateDesignVersion::class, EventBadgeTemplate::class] as $model) {
+                foreach ($model::withoutGlobalScopes()->where('event_id', $event->id)->get() as $design) {
+                    array_push($event->artifactAssetsForDeletion, ...$cleanup->assets($design));
+                }
             }
 
             $disk = self::uploadDisk();

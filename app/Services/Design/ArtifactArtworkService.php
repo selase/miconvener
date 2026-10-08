@@ -88,9 +88,15 @@ final class ArtifactArtworkService
         $bytes = $this->contents($disk, $path);
         $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
 
-        if (! is_string($mime) || ! isset(self::EXTENSIONS[$mime])) {
+        $details = @getimagesizefromstring($bytes);
+        if (! is_string($mime) || ! isset(self::EXTENSIONS[$mime]) || $details === false || mb_strlen($bytes) > self::MAX_FILE_BYTES || $details[0] > self::MAX_DIMENSION || $details[1] > self::MAX_DIMENSION || $details[0] * $details[1] > self::MAX_PIXELS) {
             throw new RuntimeException('Stored artwork is not a supported image.');
         }
+        $image = @imagecreatefromstring($bytes);
+        if (! $image instanceof GdImage) {
+            throw new RuntimeException('Stored artwork is not a supported image.');
+        }
+        imagedestroy($image);
 
         return sprintf('data:%s;base64,%s', $mime, base64_encode($bytes));
     }

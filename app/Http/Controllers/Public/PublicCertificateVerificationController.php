@@ -20,7 +20,7 @@ final class PublicCertificateVerificationController extends Controller
 
         $certificate = EventCertificate::withoutGlobalScope(\App\Scopes\TenantScope::class)
             ->where('uuid', $uuid)
-            ->with(['event.tenant', 'template'])
+            ->with(['event.tenant', 'template', 'designVersion'])
             ->first();
 
         if (! $certificate) {
@@ -30,6 +30,8 @@ final class PublicCertificateVerificationController extends Controller
                 'event' => null,
             ]);
         }
+
+        $design = $certificate->designVersion ?? $certificate->template;
 
         return Inertia::render('Public/Certificates/Verify', [
             'isValid' => true,
@@ -41,9 +43,9 @@ final class PublicCertificateVerificationController extends Controller
                 'role' => $certificate->role,
                 'cpd_hours' => (float) $certificate->cpd_hours,
                 'issued_at' => $certificate->issued_at?->format('F j, Y'),
-                'title' => $certificate->template?->title ?? 'Certificate of Attendance',
-                'issuer_name' => $certificate->template?->issuer_name ?? 'Organizing Committee',
-                'issuer_title' => $certificate->template?->issuer_title ?? 'Convener',
+                'title' => $design?->title ?? 'Certificate of Attendance',
+                'issuer_name' => $design?->issuer_name ?? 'Organizing Committee',
+                'issuer_title' => $design?->issuer_title ?? 'Convener',
             ],
             'event' => [
                 'id' => $certificate->event->id,
@@ -64,12 +66,12 @@ final class PublicCertificateVerificationController extends Controller
             ->with(['event.tenant', 'template'])
             ->firstOrFail();
 
-        $certificate->increment('download_count');
-
         $pdfService = app(CertificatePdfService::class);
         $domPdf = $pdfService->generatePdf($certificate);
+        $response = $domPdf->download("verified-certificate-{$certificate->verification_code}.pdf");
+        $certificate->increment('download_count');
 
-        return $domPdf->download("verified-certificate-{$certificate->verification_code}.pdf");
+        return $response;
     }
 
     private function maskEmail(string $email): string

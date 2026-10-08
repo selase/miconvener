@@ -114,12 +114,11 @@ test('printing badges logs an audit entry per registration and increments the pr
     $baseDomain = mb_ltrim((string) config('session.domain'), '.');
     $host = "acme.{$baseDomain}";
 
-    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/print-log", [
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/sheet", [
         'registration_ids' => [$first->id, $second->id],
     ], ['HTTP_HOST' => $host])->assertOk();
 
-    // Reprinting just one of them.
-    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/print-log", [
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/sheet", [
         'registration_ids' => [$first->id],
     ], ['HTTP_HOST' => $host])->assertOk();
 
@@ -133,6 +132,18 @@ test('printing badges logs an audit entry per registration and increments the pr
 
     expect($response->json('recent_prints'))->toHaveCount(3);
     expect($response->json('recent_prints.0.printed_by'))->not->toBe('Unknown');
+});
+
+test('the retired print log cannot record history without generating a PDF', function (): void {
+    [$tenant, $user] = badgeHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $registration = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+    $host = 'acme.'.mb_ltrim((string) config('session.domain'), '.');
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/print-log", [
+        'registration_ids' => [$registration->id],
+    ], ['HTTP_HOST' => $host])->assertNotFound();
+    expect(EventBadgePrint::query()->count())->toBe(0);
 });
 
 test('a host without read event permission cannot view badges', function () {
