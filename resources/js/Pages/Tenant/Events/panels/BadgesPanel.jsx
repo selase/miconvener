@@ -1,13 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '@/Components/Console/Button';
 import SearchInput from '@/Components/Console/SearchInput';
+import Select from '@/Components/Console/Select';
 import Modal from '@/Components/Console/Modal';
 import BadgeLayoutPreview from '@/Pages/Tenant/Events/Badges/BadgeLayoutPreview';
 import BadgeDesignEditor from '@/Pages/Tenant/Events/Badges/BadgeDesignEditor';
 import { Download, History, Palette, Printer } from 'lucide-react';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 
+const exportReference = () => {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
 export default function BadgesPanel({ event }) {
+    const [batch, setBatch] = useState(0);
+    const [layoutDefaults, setLayoutDefaults] = useState({});
+    const [tenantLogo, setTenantLogo] = useState(null);
+    const exportAttempt = useRef(null);
+    const downloadPending = useRef(false);
+    const [retryAvailable, setRetryAvailable] = useState(false);
     const [badges, setBadges] = useState(null);
     const [recentPrints, setRecentPrints] = useState([]);
     const [query, setQuery] = useState('');
@@ -23,6 +39,8 @@ export default function BadgesPanel({ event }) {
             .then((r) => r.json())
             .then((data) => {
                 setBadges(data.badges);
+                setLayoutDefaults(data.layout_defaults || data.template?.layout || {});
+                setTenantLogo(data.tenant_logo || null);
                 setRecentPrints(data.recent_prints);
                 setTemplate(data.template);
             });
@@ -43,7 +61,23 @@ export default function BadgesPanel({ event }) {
         );
     }, [badges, query]);
 
+    const resultIds = filtered.map((badge) => badge.id).join(',');
+    useEffect(() => {
+        setBatch(0);
+        setRetryAvailable(false);
+    }, [query, resultIds]);
+    const batchCount = Math.ceil(filtered.length / 100);
+    const selectedBadges = filtered.slice(batch * 100, (batch + 1) * 100);
+
     const downloadPdf = async () => {
+        if (downloadPending.current || selectedBadges.length === 0) return;
+        downloadPending.current = true;
+        const ids = selectedBadges.map((badge) => badge.id);
+        const selection = JSON.stringify([event.id, template?.design_version, ids]);
+        if (exportAttempt.current?.selection !== selection) {
+            exportAttempt.current = { selection, reference: exportReference() };
+        }
+        const reference = exportAttempt.current.reference;
         setPrinting(true);
         setError(null);
         try {
@@ -51,7 +85,7 @@ export default function BadgesPanel({ event }) {
                 route('tenant.events.badges.sheet', { event: event.id }),
                 {
                     method: 'POST',
-                    body: JSON.stringify({ registration_ids: filtered.map((badge) => badge.id) }),
+                    body: JSON.stringify({ registration_ids: ids, export_reference: reference }),
                 }
             );
             if (!response.ok) {
@@ -64,10 +98,14 @@ export default function BadgesPanel({ event }) {
             link.download = `${event.name || 'event'}-badges.pdf`;
             link.click();
             URL.revokeObjectURL(url);
+            if (exportAttempt.current?.reference === reference) exportAttempt.current = null;
+            setRetryAvailable(false);
             load();
         } catch (reason) {
             setError(reason.message);
+            setRetryAvailable(true);
         } finally {
+            downloadPending.current = false;
             setPrinting(false);
         }
     };
@@ -134,14 +172,14 @@ export default function BadgesPanel({ event }) {
 
     return (
         <div>
-            <div className="no-print mb-5 flex items-center justify-between gap-3">
+            <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p className="text-sm text-ink-secondary">
                         Design once, print for everyone, reprint at the desk.
                     </p>
                     <p className="mt-1 text-xs text-ink-tertiary">
                         Search for a name to reprint just one badge, or leave it blank and print the
-                        whole batch.
+                        selected batch (up to 100 badges).
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -152,11 +190,11 @@ export default function BadgesPanel({ event }) {
                         icon={Download}
                         variant="primary"
                         onClick={downloadPdf}
-                        disabled={filtered.length === 0 || printing}
+                        disabled={selectedBadges.length === 0 || printing}
                     >
                         {printing
                             ? 'Generating…'
-                            : `Download ${filtered.length || ''} badge${filtered.length === 1 ? '' : 's'} PDF`}
+                            : `${retryAvailable ? 'Retry download' : 'Download'} ${selectedBadges.length || ''} badge${selectedBadges.length === 1 ? '' : 's'} PDF`}
                     </Button>
                 </div>
             </div>
@@ -167,7 +205,31 @@ export default function BadgesPanel({ event }) {
                 </div>
             )}
 
-            <div className="no-print mb-5">
+            <div className="no-print mb-5 flex flex-wrap items-end gap-4">
+                <div>
+                    <p className="mb-2 text-xs text-ink-secondary">
+                        {filtered.length} matching badges · {batchCount} batch
+                        {batchCount === 1 ? '' : 'es'}
+                    </p>
+                    {batchCount > 1 && (
+                        <Select
+                            label="Badge batch"
+                            aria-label="Badge batch"
+                            value={batch}
+                            onChange={(e) => {
+                                setBatch(Number(e.target.value));
+                                setRetryAvailable(false);
+                            }}
+                        >
+                            {Array.from({ length: batchCount }, (_, index) => (
+                                <option key={index} value={index}>
+                                    Batch {index + 1} · {index * 100 + 1}–
+                                    {Math.min((index + 1) * 100, filtered.length)}
+                                </option>
+                            ))}
+                        </Select>
+                    )}
+                </div>
                 <SearchInput
                     placeholder="Search by name or entry code"
                     value={query}
@@ -204,12 +266,13 @@ export default function BadgesPanel({ event }) {
 
             {filtered.length > 0 && (
                 <div className="print-area grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-2">
-                    {filtered.map((b) => (
+                    {selectedBadges.map((b) => (
                         <BadgeLayoutPreview
                             key={b.id}
                             event={event}
                             badge={b}
                             template={template || {}}
+                            tenantLogo={tenantLogo}
                             backgroundUrl={
                                 template?.background_path
                                     ? route('tenant.events.badges.template.artwork', {
@@ -252,6 +315,8 @@ export default function BadgesPanel({ event }) {
                 {designForm && (
                     <BadgeDesignEditor
                         form={designForm}
+                        layoutDefaults={layoutDefaults}
+                        tenantLogo={tenantLogo}
                         setForm={setDesignForm}
                         existingBackground={template?.background_path}
                         existingBackgroundUrl={

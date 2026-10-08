@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ImagePlus, RotateCcw } from 'lucide-react';
 import Button from '@/Components/Console/Button';
-import Checkbox from '@/Components/Console/Checkbox';
+import ArtifactLayoutControls from '../Certificates/ArtifactLayoutControls';
 import Input from '@/Components/Console/Input';
 import BadgeLayoutPreview from './BadgeLayoutPreview';
 import BadgeSheetSettings from './BadgeSheetSettings';
@@ -14,6 +14,8 @@ const PRESETS = [
 
 export default function BadgeDesignEditor({
     form,
+    layoutDefaults,
+    tenantLogo,
     setForm,
     existingBackground,
     existingBackgroundUrl,
@@ -22,8 +24,14 @@ export default function BadgeDesignEditor({
     onCancel,
 }) {
     const [backgroundUrl, setBackgroundUrl] = useState(null);
-    const initialLayout = useRef(form.layout);
-    const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+
+    const update = (key, value) =>
+        setForm((current) => {
+            const next = { ...current, [key]: value };
+            if (['width_mm', 'height_mm'].includes(key))
+                next.orientation = next.width_mm > next.height_mm ? 'landscape' : 'portrait';
+            return next;
+        });
     useEffect(() => {
         if (!form.background) {
             setBackgroundUrl(null);
@@ -70,6 +78,7 @@ export default function BadgeDesignEditor({
                         Width (mm)
                         <Input
                             type="number"
+                            step="any"
                             min="40"
                             max="210"
                             value={form.width_mm}
@@ -80,6 +89,7 @@ export default function BadgeDesignEditor({
                         Height (mm)
                         <Input
                             type="number"
+                            step="any"
                             min="40"
                             max="210"
                             value={form.height_mm}
@@ -124,60 +134,10 @@ export default function BadgeDesignEditor({
                         </button>
                     )}
                 </div>
-                <div>
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Dynamic fields
-                    </p>
-                    <div className="mt-2 space-y-2">
-                        {Object.entries(form.layout || {}).map(([key, item]) => (
-                            <div
-                                key={key}
-                                className="grid grid-cols-[1fr_72px_72px] items-center gap-2 rounded-md border border-slate-200 p-2 dark:border-slate-700"
-                            >
-                                <label className="flex items-center gap-2 text-xs capitalize">
-                                    <Checkbox
-                                        checked={item.visible !== false}
-                                        onChange={(checked) =>
-                                            update('layout', {
-                                                ...form.layout,
-                                                [key]: { ...item, visible: checked },
-                                            })
-                                        }
-                                    />
-                                    {key.replaceAll('_', ' ')}
-                                </label>
-                                <Input
-                                    aria-label={`${key} horizontal position`}
-                                    type="number"
-                                    min="0"
-                                    max="1"
-                                    step="0.01"
-                                    value={item.x}
-                                    onChange={(event) =>
-                                        update('layout', {
-                                            ...form.layout,
-                                            [key]: { ...item, x: Number(event.target.value) },
-                                        })
-                                    }
-                                />
-                                <Input
-                                    aria-label={`${key} vertical position`}
-                                    type="number"
-                                    min="0"
-                                    max="1"
-                                    step="0.01"
-                                    value={item.y}
-                                    onChange={(event) =>
-                                        update('layout', {
-                                            ...form.layout,
-                                            [key]: { ...item, y: Number(event.target.value) },
-                                        })
-                                    }
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <ArtifactLayoutControls
+                    layout={{ ...layoutDefaults, ...form.layout }}
+                    onChange={(layout) => update('layout', layout)}
+                />
                 <BadgeSheetSettings
                     value={form.sheet_settings}
                     onChange={(value) => update('sheet_settings', value)}
@@ -214,7 +174,8 @@ export default function BadgeDesignEditor({
             </div>
             <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
                 <BadgeLayoutPreview
-                    template={form}
+                    template={{ ...form, layout: { ...layoutDefaults, ...form.layout } }}
+                    tenantLogo={tenantLogo}
                     backgroundUrl={
                         backgroundUrl || (!form.remove_background ? existingBackgroundUrl : null)
                     }
@@ -222,7 +183,7 @@ export default function BadgeDesignEditor({
                 <div className="flex justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
                     <Button
                         type="button"
-                        onClick={() => update('layout', structuredClone(initialLayout.current))}
+                        onClick={() => update('layout', structuredClone(layoutDefaults))}
                     >
                         <RotateCcw className="mr-1.5 h-4 w-4" />
                         Reset fields

@@ -54,7 +54,7 @@ test('badge index creates and returns the compatible default template', function
 
     $response = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/data/badges", ['HTTP_HOST' => $host]);
 
-    $response->assertOk()->assertJsonPath('template.width_mm', 100)->assertJsonPath('template.height_mm', 70)->assertJsonPath('template.layout.attendee_name.visible', true);
+    $response->assertOk()->assertJsonPath('template.design_version', 1)->assertJsonPath('template.width_mm', 100)->assertJsonPath('template.height_mm', 70)->assertJsonPath('template.layout.attendee_name.visible', true);
     expect(EventBadgeTemplate::query()->where('event_id', $event->id)->count())->toBe(1);
 });
 
@@ -105,4 +105,42 @@ test('badge console uses the server pdf instead of browser printing', function (
 
     expect($panel)->toContain('tenant.events.badges.sheet')
         ->not->toContain('window.print');
+});
+
+test('badge save rejects sheet overflow before storing uploaded artwork', function (): void {
+    Storage::fake('public');
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $payload = validBadgeDesign(['width_mm' => 210, 'background' => UploadedFile::fake()->image('badge.png', 1000, 700)]);
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/template", $payload, ['HTTP_HOST' => $host])
+        ->assertUnprocessable()->assertJsonValidationErrors('sheet_settings');
+    expect(Storage::disk('public')->allFiles())->toBe([]);
+});
+
+test('invalid badge layout does not leak uploaded artwork', function (): void {
+    Storage::fake('public');
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $payload = validBadgeDesign(['layout' => ['unsafe' => []], 'background' => UploadedFile::fake()->image('badge.png', 1000, 700)]);
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/template", $payload, ['HTTP_HOST' => $host])
+        ->assertUnprocessable()->assertJsonValidationErrors('layout');
+    expect(Storage::disk('public')->allFiles())->toBe([]);
+});
+
+test('badge sheet fit follows selected paper and dimensions determine orientation', function (): void {
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $url = "http://{$host}/events/{$event->id}/badges/template";
+    $payload = validBadgeDesign(['width_mm' => 195, 'height_mm' => 70]);
+    $this->actingAs($user)->postJson($url, $payload, ['HTTP_HOST' => $host])
+        ->assertUnprocessable()->assertJsonValidationErrors('sheet_settings');
+    $payload['sheet_settings']['paper'] = 'letter';
+    $payload['sheet_settings']['crop_marks'] = false;
+    $this->postJson($url, $payload, ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('template.sheet_settings.crop_marks', false);
+    $payload['width_mm'] = 70;
+    $payload['height_mm'] = 100;
+    $this->postJson($url, $payload, ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('template.orientation', 'portrait');
 });

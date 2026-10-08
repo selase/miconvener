@@ -20,6 +20,8 @@ body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
         @continue(($item['visible'] ?? true) === false)
         @if ($key === 'qr')
             @if ($badge['qr'])<div class="element qr" style="left:{{ $item['x'] * 100 }}%;top:{{ $item['y'] * 100 }}%;width:{{ $item['width'] * 100 }}%;height:{{ $item['height'] * 100 }}%"><img src="{{ $badge['qr'] }}" alt="QR"></div>@endif
+        @elseif ($key === 'tenant_logo')
+            @if ($tenantLogoDataUri)<div class="element qr" style="left:{{ $item['x'] * 100 }}%;top:{{ $item['y'] * 100 }}%;width:{{ $item['width'] * 100 }}%;height:{{ $item['height'] * 100 }}%"><img src="{{ $tenantLogoDataUri }}" alt="Tenant logo"></div>@endif
         @else
             <div class="element" style="left:{{ $item['x'] * 100 }}%;top:{{ $item['y'] * 100 }}%;width:{{ $item['width'] * 100 }}%;height:{{ $item['height'] * 100 }}%;text-align:{{ $item['align'] }};font-family:'{{ $item['font_family'] }}';font-size:{{ $item['font_size'] }}pt;font-weight:{{ $item['font_weight'] }};color:{{ $badge['tier_style']['text_color'] ?? $item['color'] }}">{{ $badge['values'][$key] ?? '' }}</div>
         @endif

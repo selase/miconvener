@@ -61,6 +61,8 @@ final class EventBadgeController extends Controller
 
         return response()->json([
             'template' => $this->templates->forEvent($eventModel),
+            'layout_defaults' => $this->templates->defaults($eventModel)['layout'],
+            'tenant_logo' => $this->templates->tenantLogo($eventModel),
             'badges' => $registrations->map(fn (EventRegistration $r): array => [
                 'id' => $r->id,
                 'full_name' => $r->full_name,
@@ -86,6 +88,8 @@ final class EventBadgeController extends Controller
         $eventModel = Event::query()->where('tenant_id', $tenant->id)->whereKey($event)->firstOrFail();
         $template = $this->templates->forEvent($eventModel);
         $validated = $request->validated();
+        $validated['layout'] = $this->layouts->validate($validated['layout'], 'badge');
+        $validated['orientation'] = $validated['width_mm'] > $validated['height_mm'] ? 'landscape' : 'portrait';
         $oldDisk = $template->background_disk;
         $oldPath = $template->background_path;
         $newArtwork = null;
@@ -100,7 +104,6 @@ final class EventBadgeController extends Controller
         }
 
         unset($validated['background'], $validated['remove_background']);
-        $validated['layout'] = $this->layouts->validate($validated['layout'], 'badge');
         $nextDesignVersion = max(1, (int) $template->design_version) + 1;
 
         try {
@@ -183,6 +186,9 @@ final class EventBadgeController extends Controller
         $template = $this->templates->forEvent($eventModel);
         $output = $this->pdfs->generate($eventModel, $template, $registrations)->output();
 
+        $reference = $request->validated('export_reference') ?? (string) Str::uuid();
+        $sortedIds = $registrations->pluck('id')->sort()->values()->all();
+        $fingerprint = hash('sha256', json_encode([$request->user()->id, $template->design_version, $sortedIds], JSON_THROW_ON_ERROR));
         $now = now();
         $rows = $registrations->map(fn (EventRegistration $registration): array => [
             'id' => (string) Str::uuid(),
@@ -190,10 +196,25 @@ final class EventBadgeController extends Controller
             'event_id' => $eventModel->id,
             'registration_id' => $registration->id,
             'printed_by' => $request->user()->id,
+            'export_reference' => $reference,
+            'export_fingerprint' => $fingerprint,
             'created_at' => $now,
             'updated_at' => $now,
         ])->all();
-        DB::connection('landlord')->transaction(fn () => EventBadgePrint::query()->insert($rows), 3);
+        DB::connection('landlord')->transaction(function () use ($eventModel, $reference, $fingerprint, $rows): void {
+            Event::query()->whereKey($eventModel->id)->lockForUpdate()->firstOrFail();
+            $previous = $eventModel->badgePrints()->where('export_reference', $reference)->first();
+            if ($previous !== null) {
+                if ($previous->getAttribute('export_fingerprint') !== $fingerprint) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'export_reference' => 'This export reference belongs to a different selection or design. Start a new download.',
+                    ]);
+                }
+
+                return;
+            }
+            EventBadgePrint::query()->insert($rows);
+        }, 3);
 
         return response($output, 200, [
             'Content-Type' => 'application/pdf',

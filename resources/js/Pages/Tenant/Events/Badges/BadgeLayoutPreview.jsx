@@ -7,7 +7,7 @@ const SAMPLE = {
     seat_label: 'Seat A14',
 };
 
-export default function BadgeLayoutPreview({ template, backgroundUrl, badge, event }) {
+export default function BadgeLayoutPreview({ template, backgroundUrl, badge, event, tenantLogo }) {
     const ratio = `${template.width_mm || 100}/${template.height_mm || 70}`;
     const values = badge
         ? {
@@ -19,7 +19,7 @@ export default function BadgeLayoutPreview({ template, backgroundUrl, badge, eve
               seat_label: badge.seat_label || '',
           }
         : SAMPLE;
-    const tierStyle = template.tier_styles?.[badge?.badge_tier] || {};
+    const tierStyle = template.tier_styles?.[badge?.badge_tier || 'vip'] || {};
     const longName = values.attendee_name.length > 28;
 
     return (
@@ -38,6 +38,22 @@ export default function BadgeLayoutPreview({ template, backgroundUrl, badge, eve
             >
                 {Object.entries(template.layout || {}).map(([key, item]) => {
                     if (item.visible === false) return null;
+                    if (key === 'tenant_logo') {
+                        return tenantLogo ? (
+                            <img
+                                key={key}
+                                src={tenantLogo}
+                                alt="Tenant logo"
+                                className="absolute object-contain"
+                                style={{
+                                    left: `${item.x * 100}%`,
+                                    top: `${item.y * 100}%`,
+                                    width: `${item.width * 100}%`,
+                                    height: `${item.height * 100}%`,
+                                }}
+                            />
+                        ) : null;
+                    }
                     if (key === 'qr' && badge && !badge.qr_image) return null;
                     if (key === 'qr')
                         return (
@@ -88,6 +104,12 @@ export default function BadgeLayoutPreview({ template, backgroundUrl, badge, eve
                     );
                 })}
             </div>
+            {template.layout?.tenant_logo?.visible && !tenantLogo && (
+                <p className="mt-2 text-xs text-ink-secondary">
+                    Upload a PNG or JPEG organization logo in organization settings to show it on
+                    badges.
+                </p>
+            )}
             {longName && (
                 <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
                     Check long names in the PDF before printing. Names over 80 characters are

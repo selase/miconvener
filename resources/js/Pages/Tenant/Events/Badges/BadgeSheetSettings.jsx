@@ -20,6 +20,7 @@ export default function BadgeSheetSettings({ value, onChange }) {
                 Margin (mm)
                 <Input
                     type="number"
+                    step="any"
                     min="3"
                     max="30"
                     value={value.margin_mm}
@@ -30,6 +31,7 @@ export default function BadgeSheetSettings({ value, onChange }) {
                 Gap (mm)
                 <Input
                     type="number"
+                    step="any"
                     min="0"
                     max="20"
                     value={value.gap_mm}
@@ -39,7 +41,7 @@ export default function BadgeSheetSettings({ value, onChange }) {
             <label className="flex items-center gap-2 self-end pb-2 text-xs">
                 <Checkbox
                     checked={value.crop_marks}
-                    onChange={(checked) => update('crop_marks', checked)}
+                    onChange={(event) => update('crop_marks', event.target.checked)}
                 />
                 Crop marks
             </label>

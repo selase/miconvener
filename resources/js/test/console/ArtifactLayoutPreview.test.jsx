@@ -144,3 +144,29 @@ it.each([0, '0.0', null, undefined, ''])(
         );
     }
 );
+
+it('badge preview shows the tenant logo and studio tier colors and hides optional elements', () => {
+    const template = {
+        width_mm: 100,
+        height_mm: 70,
+        layout: { tenant_logo: field, seat_label: { ...field, visible: false } },
+        tier_styles: { vip: { background_color: '#112233' } },
+    };
+    const { container, rerender } = render(
+        <BadgeLayoutPreview template={template} tenantLogo="data:image/png;base64,logo" />
+    );
+    expect(screen.getByAltText('Tenant logo').getAttribute('src')).toBe(
+        'data:image/png;base64,logo'
+    );
+    expect(
+        container.querySelector('[aria-label="Badge design preview"]').style.backgroundColor
+    ).toBe('rgb(17, 34, 51)');
+    expect(screen.queryByText('Seat A14')).toBeNull();
+    rerender(
+        <BadgeLayoutPreview
+            template={{ ...template, layout: { tenant_logo: { ...field, visible: false } } }}
+            tenantLogo="logo"
+        />
+    );
+    expect(screen.queryByAltText('Tenant logo')).toBeNull();
+});

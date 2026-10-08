@@ -17,7 +17,10 @@ use RuntimeException;
 
 final class BadgePdfService
 {
-    public function __construct(private readonly ArtifactArtworkService $artwork) {}
+    public function __construct(
+        private readonly ArtifactArtworkService $artwork,
+        private readonly BadgeTemplateService $templates,
+    ) {}
 
     /** @param Collection<int, EventRegistration> $registrations */
     public function generate(Event $event, EventBadgeTemplate $template, Collection $registrations): DomPDF
@@ -79,6 +82,7 @@ final class BadgePdfService
             'layout' => $template->layoutSettings(),
             'pages' => $badges->chunk($columns * $rows),
             'backgroundDataUri' => $background,
+            'tenantLogoDataUri' => $this->templates->tenantLogo($event),
             'margin' => $margin,
             'gap' => $gap,
             'columns' => $columns,
