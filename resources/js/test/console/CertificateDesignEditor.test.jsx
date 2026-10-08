@@ -155,3 +155,108 @@ describe('certificate layout editor', () => {
         expect(save.mock.calls[0][0].layout).toEqual(smallLayout);
     });
 });
+
+it('posts unsaved multipart design and shows PDF failures within the editor', async () => {
+    vi.stubGlobal('route', (name) => name);
+    vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+            ok: false,
+            json: async () => ({ errors: { background: ['Artwork is corrupt.'] } }),
+        })
+    );
+    render(<Editor onSave={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Certificate title'), {
+        target: { value: 'Unsaved draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Test PDF' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Artwork is corrupt.');
+    expect(fetch.mock.calls[0][0]).toBe('tenant.events.certificates.templates.draft-preview');
+    expect(fetch.mock.calls[0][1].body.get('title')).toBe('Unsaved draft');
+    expect(fetch.mock.calls[0][1].body.get('layout')).toBe(JSON.stringify(defaults));
+    vi.unstubAllGlobals();
+});
+
+it('retains a generated PDF link and releases its blob when the editor closes', async () => {
+    vi.stubGlobal('route', (name) => name);
+    vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['%PDF']) })
+    );
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pdf');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { unmount } = render(<Editor onSave={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Test PDF' }));
+    expect(
+        (await screen.findByRole('link', { name: 'Open generated test PDF' })).getAttribute('href')
+    ).toBe('blob:pdf');
+    expect(open).toHaveBeenCalledWith('blob:pdf', '_blank', 'noopener,noreferrer');
+    expect(revoke).not.toHaveBeenCalled();
+    unmount();
+    expect(revoke).toHaveBeenCalledWith('blob:pdf');
+    create.mockRestore();
+    revoke.mockRestore();
+    open.mockRestore();
+    vi.unstubAllGlobals();
+});
+
+it('shows a pending PDF state and releases uploaded artwork URLs on removal', async () => {
+    vi.stubGlobal('route', (name) => name);
+    let resolve;
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(
+            () =>
+                new Promise((done) => {
+                    resolve = done;
+                })
+        )
+    );
+    const create = vi
+        .spyOn(URL, 'createObjectURL')
+        .mockImplementation((file) => `blob:${file.name}`);
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const form = {
+        role: 'delegate',
+        design_mode: 'custom_background',
+        title: 'Draft',
+        layout: { ...defaults, signature: element },
+        background: new File(['png'], 'background.png'),
+        signature: new File(['png'], 'signature.png'),
+    };
+    const { rerender, unmount } = render(
+        <CertificateDesignEditor
+            form={form}
+            setForm={vi.fn()}
+            layoutDefaults={defaults}
+            eventId="event"
+        />
+    );
+    expect(screen.getByAltText('Signature').getAttribute('src')).toBe('blob:signature.png');
+    fireEvent.click(screen.getByRole('button', { name: 'Test PDF' }));
+    expect(screen.getByRole('button', { name: 'Generating…' }).disabled).toBe(true);
+    rerender(
+        <CertificateDesignEditor
+            form={{
+                ...form,
+                background: null,
+                signature: null,
+                remove_background: true,
+                remove_signature: true,
+            }}
+            setForm={vi.fn()}
+            layoutDefaults={defaults}
+            eventId="event"
+        />
+    );
+    expect(revoke).toHaveBeenCalledWith('blob:background.png');
+    expect(revoke).toHaveBeenCalledWith('blob:signature.png');
+    expect(screen.queryByAltText('Signature')).toBeNull();
+    resolve({ ok: false, json: async () => ({ message: 'Failed PDF' }) });
+    expect((await screen.findByRole('alert')).textContent).toBe('Failed PDF');
+    unmount();
+    create.mockRestore();
+    revoke.mockRestore();
+    vi.unstubAllGlobals();
+});

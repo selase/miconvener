@@ -141,6 +141,38 @@ final class EventCertificateController extends Controller
         return $this->pdfs->generatePdf($certificate)->stream('certificate-preview.pdf');
     }
 
+    public function draftPreview(StoreCertificateTemplateRequest $request, string $subdomain, Event $event): Response
+    {
+        $validated = $request->validated();
+        $saved = $event->certificateTemplates()->where('role', $validated['role'])->first();
+        Gate::authorize($saved ? 'update certificate' : 'create certificate');
+        $template = $saved instanceof EventCertificateTemplate ? clone $saved : new EventCertificateTemplate;
+        $validated = $this->designFields($event, $template, $validated);
+        $template->fill($validated);
+        $assets = [];
+        foreach (['background', 'signature'] as $type) {
+            $file = $request->file($type);
+            if ($file !== null) {
+                $assets[$type] = $this->artwork->uploadDataUri($file);
+            } elseif ($request->boolean("remove_{$type}")) {
+                $assets[$type] = null;
+            }
+        }
+        $certificate = new EventCertificate([
+            'recipient_name' => 'Akosua Élise Mensah',
+            'recipient_email' => 'preview@example.test',
+            'role' => $template->role,
+            'cpd_hours' => $template->default_cpd_hours,
+            'verification_code' => 'MC-PREVIEW-2026',
+        ]);
+        $certificate->setRelation('event', $event);
+        $certificate->setRelation('template', $template);
+        $certificate->setRelation('designVersion', null);
+        $certificate->setRelation('registration', null);
+
+        return $this->pdfs->generatePdf($certificate, $assets)->stream('certificate-preview.pdf');
+    }
+
     public function artwork(string $subdomain, Event $event, EventCertificateTemplate $template, string $type): Response
     {
         Gate::authorize('read certificate');
@@ -388,6 +420,20 @@ final class EventCertificateController extends Controller
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function designFields(Event $event, EventCertificateTemplate $template, array $validated): array
+    {
+        unset($validated['background'], $validated['signature'], $validated['remove_background'], $validated['remove_signature']);
+        $validated['tenant_id'] = $event->tenant_id;
+        $validated['event_id'] = $event->id;
+        $validated['layout'] = $this->layouts->resolveCertificate($validated['layout'] ?? $template->layout ?? []);
+
+        return $validated;
+    }
+
     /** @param array<string, mixed> $validated */
     private function persistTemplate(
         StoreCertificateTemplateRequest|UpdateCertificateTemplateRequest $request,
@@ -420,10 +466,7 @@ final class EventCertificateController extends Controller
                 }
             }
 
-            unset($validated['background'], $validated['signature'], $validated['remove_background'], $validated['remove_signature']);
-            $validated['tenant_id'] = $event->tenant_id;
-            $validated['event_id'] = $event->id;
-            $validated['layout'] = $this->layouts->resolveCertificate($validated['layout'] ?? $template->layout ?? []);
+            $validated = $this->designFields($event, $template, $validated);
 
             DB::connection('landlord')->transaction(function () use ($template, $validated): void {
                 $template->fill($validated)->save();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, RotateCcw } from 'lucide-react';
 import Button from '@/Components/Console/Button';
 import Checkbox from '@/Components/Console/Checkbox';
@@ -6,6 +6,7 @@ import Input from '@/Components/Console/Input';
 import ArtworkUpload from './ArtworkUpload';
 import ArtifactLayoutPreview from './ArtifactLayoutPreview';
 import ArtifactLayoutControls from './ArtifactLayoutControls';
+import { csrfFetchFormData } from '@/lib/csrfFetch';
 
 export default function CertificateDesignEditor({
     form,
@@ -17,7 +18,95 @@ export default function CertificateDesignEditor({
     onSave,
     onCancel,
 }) {
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
     const [backgroundUrl, setBackgroundUrl] = useState(null);
+    const [signatureUrl, setSignatureUrl] = useState(null);
+    const [pdfPending, setPdfPending] = useState(false);
+    const [pdfError, setPdfError] = useState(null);
+    const [pdfUrl, setPdfUrl] = useState(null);
+    useEffect(() => {
+        if (!form.signature) {
+            setSignatureUrl(null);
+            return undefined;
+        }
+        const url = URL.createObjectURL(form.signature);
+        setSignatureUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [form.signature]);
+    useEffect(
+        () => () => {
+            if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        },
+        [pdfUrl]
+    );
+    const testPdf = async () => {
+        setPdfPending(true);
+        setPdfError(null);
+        const payload = new FormData();
+        for (const key of [
+            'role',
+            'design_mode',
+            'orientation',
+            'page_size',
+            'title',
+            'body_template',
+            'issuer_name',
+            'issuer_title',
+            'default_cpd_hours',
+            'show_qr',
+            'show_cpd_hours',
+            'layout',
+            'background',
+            'signature',
+            'remove_background',
+            'remove_signature',
+        ]) {
+            const value = form[key];
+            if (value === null || value === undefined) continue;
+            payload.append(
+                key,
+                key === 'layout'
+                    ? JSON.stringify(value)
+                    : typeof value === 'boolean'
+                      ? value
+                          ? '1'
+                          : '0'
+                      : value
+            );
+        }
+        try {
+            const response = await csrfFetchFormData(
+                route('tenant.events.certificates.templates.draft-preview', { event: eventId }),
+                payload
+            );
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(
+                    Object.values(data.errors || {})
+                        .flat()
+                        .join(' ') ||
+                        data.message ||
+                        'The test PDF could not be generated.'
+                );
+            }
+            const blob = await response.blob();
+            if (!mounted.current) return;
+            const url = URL.createObjectURL(blob);
+            setPdfUrl(url);
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (reason) {
+            if (mounted.current)
+                setPdfError(reason.message || 'The test PDF could not be generated.');
+        } finally {
+            if (mounted.current) setPdfPending(false);
+        }
+    };
     const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
     const resetLayout = () => update('layout', structuredClone(layoutDefaults));
     useEffect(() => {
@@ -164,6 +253,17 @@ export default function CertificateDesignEditor({
             <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
                 <ArtifactLayoutPreview
                     form={form}
+                    layoutDefaults={layoutDefaults}
+                    signatureUrl={
+                        signatureUrl ||
+                        (!form.remove_signature && template?.signature_path
+                            ? route('tenant.events.certificates.templates.artwork', {
+                                  event: eventId,
+                                  template: template.id,
+                                  type: 'signature',
+                              })
+                            : null)
+                    }
                     backgroundUrl={
                         backgroundUrl ||
                         (!form.remove_background && template?.background_path
@@ -183,21 +283,26 @@ export default function CertificateDesignEditor({
                         <RotateCcw className="mr-1.5 h-4 w-4" />
                         Reset layout
                     </Button>
-                    {template?.id && (
-                        <a
-                            href={route('tenant.events.certificates.templates.preview', {
-                                event: eventId,
-                                template: template.id,
-                            })}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:text-slate-200"
-                        >
-                            <Download className="mr-1.5 h-4 w-4" />
-                            Test PDF
-                        </a>
-                    )}
+                    <Button type="button" onClick={testPdf} disabled={pdfPending}>
+                        <Download className="mr-1.5 h-4 w-4" />
+                        {pdfPending ? 'Generating…' : 'Test PDF'}
+                    </Button>
                 </div>
+                {pdfError && (
+                    <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">
+                        {pdfError}
+                    </p>
+                )}
+                {pdfUrl && (
+                    <a
+                        href={pdfUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-indigo-700 dark:text-indigo-300"
+                    >
+                        Open generated test PDF
+                    </a>
+                )}
                 <div className="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
                     <Button type="button" onClick={onCancel}>
                         Cancel

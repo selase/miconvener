@@ -7,9 +7,20 @@ const SAMPLE = {
     seat_label: 'Seat A14',
 };
 
-export default function BadgeLayoutPreview({ template, backgroundUrl }) {
+export default function BadgeLayoutPreview({ template, backgroundUrl, badge, event }) {
     const ratio = `${template.width_mm || 100}/${template.height_mm || 70}`;
-    const longName = SAMPLE.attendee_name.length > 28;
+    const values = badge
+        ? {
+              event_name: event?.name || '',
+              attendee_name: badge.full_name || '',
+              ticket_type: badge.ticket_type_name || '',
+              tier_label: (badge.badge_tier || 'general').toUpperCase(),
+              ticket_code: badge.ticket_code || '',
+              seat_label: badge.seat_label || '',
+          }
+        : SAMPLE;
+    const tierStyle = template.tier_styles?.[badge?.badge_tier] || {};
+    const longName = values.attendee_name.length > 28;
 
     return (
         <div>
@@ -18,13 +29,16 @@ export default function BadgeLayoutPreview({ template, backgroundUrl }) {
                 style={{
                     aspectRatio: ratio,
                     backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
-                    backgroundSize: 'cover',
+                    backgroundSize: '100% 100%',
+                    backgroundColor: tierStyle.background_color || '#FFFFFF',
+                    containerType: 'inline-size',
                     backgroundPosition: 'center',
                 }}
                 aria-label="Badge design preview"
             >
                 {Object.entries(template.layout || {}).map(([key, item]) => {
                     if (item.visible === false) return null;
+                    if (key === 'qr' && badge && !badge.qr_image) return null;
                     if (key === 'qr')
                         return (
                             <div
@@ -37,7 +51,15 @@ export default function BadgeLayoutPreview({ template, backgroundUrl }) {
                                     height: `${item.height * 100}%`,
                                 }}
                             >
-                                QR
+                                {badge?.qr_image ? (
+                                    <img
+                                        src={badge.qr_image}
+                                        alt="Attendee QR"
+                                        className="h-full w-full object-contain"
+                                    />
+                                ) : (
+                                    'Illustrative QR'
+                                )}
                             </div>
                         );
                     return (
@@ -50,12 +72,18 @@ export default function BadgeLayoutPreview({ template, backgroundUrl }) {
                                 width: `${item.width * 100}%`,
                                 height: `${item.height * 100}%`,
                                 textAlign: item.align || 'center',
-                                color: item.color || '#111827',
+                                color: tierStyle.text_color || item.color || '#111827',
+                                fontFamily: {
+                                    Helvetica: 'Arial, sans-serif',
+                                    Times: '"Times New Roman", serif',
+                                    Courier: '"Courier New", monospace',
+                                    'DejaVu Sans': '"DejaVu Sans", sans-serif',
+                                }[item.font_family],
                                 fontWeight: item.font_weight || 400,
-                                fontSize: `${Math.max(8, Math.min(24, (item.font_size || 12) * 0.75))}px`,
+                                fontSize: `${((item.font_size || 12) / (((template.width_mm || 100) * 72) / 25.4)) * 100}cqw`,
                             }}
                         >
-                            {SAMPLE[key] || ''}
+                            {values[key] || ''}
                         </div>
                     );
                 })}
@@ -67,7 +95,8 @@ export default function BadgeLayoutPreview({ template, backgroundUrl }) {
                 </p>
             )}
             <p className="mt-1 text-[11px] text-slate-500">
-                Keep the QR area high contrast and at least 20 mm wide.
+                Advisory preview; the generated PDF is authoritative. Keep the QR area high contrast
+                and at least 20 mm wide.
             </p>
         </div>
     );

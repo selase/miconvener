@@ -148,3 +148,22 @@ test('it throws and attempts cleanup when storage cannot persist re-encoded artw
         'certificate-background',
     ))->toThrow(RuntimeException::class, 'Artwork could not be stored.');
 });
+
+test('in memory upload encoding preserves transparent png pixels and stores no files', function (): void {
+    $image = imagecreatetruecolor(20, 20);
+    imagealphablending($image, false);
+    imagesavealpha($image, true);
+    imagefill($image, 0, 0, imagecolorallocatealpha($image, 255, 255, 255, 127));
+    ob_start();
+    imagepng($image);
+    $bytes = ob_get_clean();
+    $file = UploadedFile::fake()->createWithContent('signature.png', $bytes);
+    $uri = app(ArtifactArtworkService::class)->uploadDataUri($file);
+    $stored = app(ArtifactArtworkService::class)->store($file, 'tenant-alpha', 'event-alpha', 'certificate-signature');
+    $savedImage = imagecreatefromstring(Storage::disk('public')->get($stored->path));
+    expect(imagecolorsforindex($savedImage, imagecolorat($savedImage, 0, 0))['alpha'])->toBe(127);
+    Storage::disk('public')->delete($stored->path);
+    $decoded = imagecreatefromstring(base64_decode(explode(',', $uri)[1]));
+    expect(imagecolorsforindex($decoded, imagecolorat($decoded, 0, 0))['alpha'])->toBe(127)
+        ->and(Storage::disk('public')->allFiles())->toBe([]);
+});

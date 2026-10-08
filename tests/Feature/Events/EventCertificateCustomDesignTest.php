@@ -344,3 +344,89 @@ test('new issuance resolves legacy custom layout without rewriting an earlier pa
     expect($html)->toContain('artifact-title', 'artifact-recipient_name', 'artifact-body', 'artifact-issuer', 'artifact-verification_code')
         ->and($oldVersion->fresh()->layout)->toBeNull();
 });
+
+test('draft certificate pdf uses unsaved design without changing templates versions certificates or files', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template] = customCertificateFixture(tenant: $tenant);
+    $host = eventSubdomainHost('acme');
+    $before = $template->fresh()->getAttributes();
+    $files = Storage::disk('public')->allFiles();
+    $versions = App\Models\EventCertificateDesignVersion::query()->count();
+    $certificates = EventCertificate::query()->count();
+    $pdf = Mockery::mock(Barryvdh\DomPDF\PDF::class);
+    $pdf->shouldReceive('setPaper')->with('a4', 'landscape')->andReturnSelf();
+    $pdf->shouldReceive('setOption')->andReturnSelf();
+    $pdf->shouldReceive('stream')->with('certificate-preview.pdf')->andReturn(response('%PDF-draft', 200, ['Content-Type' => 'application/pdf']));
+    Barryvdh\DomPDF\Facade\Pdf::shouldReceive('loadHTML')->once()->withArgs(function (string $html): bool {
+        expect($html)->toContain('Unsaved title', 'Unsaved Akosua Élise Mensah', 'left: 20%', 'data:image/png;base64,');
+
+        return true;
+    })->andReturn($pdf);
+    $this->actingAs($user)->post("http://{$host}/events/{$template->event_id}/certificates/templates/preview", [
+        'role' => 'delegate', 'design_mode' => 'custom_background', 'title' => 'Unsaved title',
+        'body_template' => 'Unsaved {name}', 'show_qr' => '0', 'show_cpd_hours' => '0',
+        'layout' => json_encode(['recipient_name' => ['x' => 0.2]]),
+        'background' => UploadedFile::fake()->image('draft.png', 1120, 800),
+        'signature' => UploadedFile::fake()->image('signature.png', 300, 100),
+    ], ['HTTP_HOST' => $host, 'Accept' => 'application/json'])->assertOk()->assertHeader('content-type', 'application/pdf');
+    expect($template->fresh()->getAttributes())->toEqual($before)
+        ->and(App\Models\EventCertificateDesignVersion::query()->count())->toBe($versions)
+        ->and(EventCertificate::query()->count())->toBe($certificates)
+        ->and(Storage::disk('public')->allFiles())->toBe($files);
+});
+
+test('draft preview retains event owned stored assets and can remove the signature without persisting', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template] = customCertificateFixture(tenant: $tenant);
+    $host = eventSubdomainHost('acme');
+    $files = Storage::disk('public')->allFiles();
+    foreach ([false, true] as $removed) {
+        $pdf = Mockery::mock(Barryvdh\DomPDF\PDF::class);
+        $pdf->shouldReceive('setPaper')->andReturnSelf();
+        $pdf->shouldReceive('setOption')->andReturnSelf();
+        $pdf->shouldReceive('stream')->andReturn(response('%PDF-preview', 200, ['Content-Type' => 'application/pdf']));
+        Barryvdh\DomPDF\Facade\Pdf::shouldReceive('loadHTML')->once()->withArgs(function (string $html) use ($removed): bool {
+            expect($html)->toContain("background: #fff url('data:image/png;base64,");
+            expect(str_contains($html, 'class="signature-image"'))->toBe(! $removed);
+
+            return true;
+        })->andReturn($pdf);
+        $this->actingAs($user)->postJson("http://{$host}/events/{$template->event_id}/certificates/templates/preview", [
+            'role' => 'delegate', 'title' => 'Draft', 'design_mode' => 'custom_background', 'remove_signature' => $removed,
+        ], ['HTTP_HOST' => $host])->assertOk();
+    }
+    expect($template->fresh()->signature_path)->not->toBeNull()
+        ->and(Storage::disk('public')->allFiles())->toBe($files);
+});
+
+test('draft preview rejects corrupt uploads and client artwork paths without creating records', function (): void {
+    prepareCertificateDesignerHost();
+    Storage::fake('public');
+    [$tenant, $user] = eventHost('acme');
+    $host = eventSubdomainHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $url = "http://{$host}/events/{$event->id}/certificates/templates/preview";
+    $this->actingAs($user)->post($url, [
+        'role' => 'delegate', 'title' => 'Draft', 'background' => UploadedFile::fake()->createWithContent('corrupt.png', "\x89PNG\r\nnot-image"),
+    ], ['HTTP_HOST' => $host, 'Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('background');
+    $this->actingAs($user)->postJson($url, [
+        'role' => 'delegate', 'title' => 'Draft', 'background_disk' => 'public', 'background_path' => '/etc/passwd',
+    ], ['HTTP_HOST' => $host])->assertUnprocessable()->assertJsonValidationErrors(['background_disk', 'background_path']);
+    expect($event->certificateTemplates()->count())->toBe(0)
+        ->and($event->certificates()->count())->toBe(0)
+        ->and(Storage::disk('public')->allFiles())->toBe([]);
+});
+
+test('draft preview requires template editing permission', function (): void {
+    prepareCertificateDesignerHost();
+    [$tenant, $user] = eventHost('acme');
+    [$template] = customCertificateFixture(tenant: $tenant);
+    $host = eventSubdomainHost('acme');
+    $user->syncRoles([]);
+    $user->unsetRelation('roles')->unsetRelation('permissions');
+    $this->actingAs($user)->postJson("http://{$host}/events/{$template->event_id}/certificates/templates/preview", [
+        'role' => 'delegate', 'title' => 'Draft', 'design_mode' => 'miconvener',
+    ], ['HTTP_HOST' => $host])->assertForbidden();
+});

@@ -41,43 +41,11 @@ final class ArtifactArtworkService
     {
         $this->validateNamespace($tenantId, $eventId, $kind);
 
-        $fileSize = $file->getSize();
-
-        if ($fileSize === false || $fileSize > self::MAX_FILE_BYTES) {
-            $this->invalid('Artwork must not exceed 10 MB.');
-        }
-
-        $bytes = file_get_contents($file->getRealPath());
-
-        if (! is_string($bytes) || $bytes === '' || mb_strlen($bytes) > self::MAX_FILE_BYTES) {
-            $this->invalid('Artwork could not be read or exceeds 10 MB.');
-        }
-
-        $details = @getimagesizefromstring($bytes);
-
-        if ($details === false || ! isset(self::EXTENSIONS[$details['mime']])) {
-            $this->invalid('Artwork must be a valid PNG or JPEG image.');
-        }
-
-        $mime = $details['mime'];
-        $width = $details[0];
-        $height = $details[1];
-
-        if ($width < 1 || $height < 1 || $width > self::MAX_DIMENSION || $height > self::MAX_DIMENSION || ($width * $height) > self::MAX_PIXELS) {
-            $this->invalid('Artwork dimensions are too large.');
-        }
-
-        $image = @imagecreatefromstring($bytes);
-
-        if (! $image instanceof GdImage) {
-            $this->invalid('Artwork could not be decoded safely.');
-        }
-
-        try {
-            $encoded = $this->encode($image, $mime);
-        } finally {
-            imagedestroy($image);
-        }
+        $upload = $this->encodeUpload($file);
+        $encoded = $upload['bytes'];
+        $mime = $upload['mime'];
+        $width = $upload['width'];
+        $height = $upload['height'];
 
         $disk = config('app.env') === 'production' ? 's3' : 'public';
         $extension = self::EXTENSIONS[$mime];
@@ -106,6 +74,13 @@ final class ArtifactArtworkService
         }
 
         return new StoredArtwork($disk, $path, $mime, $width, $height);
+    }
+
+    public function uploadDataUri(UploadedFile $file): string
+    {
+        $upload = $this->encodeUpload($file);
+
+        return sprintf('data:%s;base64,%s', $upload['mime'], base64_encode($upload['bytes']));
     }
 
     public function dataUri(string $disk, string $path): string
@@ -144,6 +119,50 @@ final class ArtifactArtworkService
         $this->filesystems->disk($disk)->delete($path);
     }
 
+    /** @return array{bytes: string, mime: string, width: int, height: int} */
+    private function encodeUpload(UploadedFile $file): array
+    {
+        $fileSize = $file->getSize();
+
+        if ($fileSize === false || $fileSize > self::MAX_FILE_BYTES) {
+            $this->invalid('Artwork must not exceed 10 MB.');
+        }
+
+        $bytes = file_get_contents($file->getRealPath());
+
+        if (! is_string($bytes) || $bytes === '' || mb_strlen($bytes) > self::MAX_FILE_BYTES) {
+            $this->invalid('Artwork could not be read or exceeds 10 MB.');
+        }
+
+        $details = @getimagesizefromstring($bytes);
+
+        if ($details === false || ! isset(self::EXTENSIONS[$details['mime']])) {
+            $this->invalid('Artwork must be a valid PNG or JPEG image.');
+        }
+
+        $mime = $details['mime'];
+        $width = $details[0];
+        $height = $details[1];
+
+        if ($width < 1 || $height < 1 || $width > self::MAX_DIMENSION || $height > self::MAX_DIMENSION || ($width * $height) > self::MAX_PIXELS) {
+            $this->invalid('Artwork dimensions are too large.');
+        }
+
+        $image = @imagecreatefromstring($bytes);
+
+        if (! $image instanceof GdImage) {
+            $this->invalid('Artwork could not be decoded safely.');
+        }
+
+        try {
+            $encoded = $this->encode($image, $mime);
+        } finally {
+            imagedestroy($image);
+        }
+
+        return ['bytes' => $encoded, 'mime' => $mime, 'width' => $width, 'height' => $height];
+    }
+
     private function validateNamespace(string $tenantId, string $eventId, string $kind): void
     {
         $safeSegment = '/\A[A-Za-z0-9][A-Za-z0-9_-]{0,127}\z/';
@@ -155,6 +174,11 @@ final class ArtifactArtworkService
 
     private function encode(GdImage $image, string $mime): string
     {
+        if ($mime === 'image/png') {
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+        }
+
         ob_start();
 
         $encoded = $mime === 'image/png'

@@ -52,15 +52,17 @@ final class CertificatePdfService
         return str_replace(array_keys($replacements), array_values($replacements), $rawTemplate);
     }
 
-    public function generatePdf(EventCertificate $certificate): DomPDF
+    /** @param array<string, string|null> $previewAssets */
+    public function generatePdf(EventCertificate $certificate, array $previewAssets = []): DomPDF
     {
-        return Pdf::loadHTML($this->renderHtml($certificate))
+        return Pdf::loadHTML($this->renderHtml($certificate, $previewAssets))
             ->setPaper('a4', 'landscape')
             ->setOption('isHtml5ParserEnabled', true)
             ->setOption('isRemoteEnabled', false);
     }
 
-    public function renderHtml(EventCertificate $certificate): string
+    /** @param array<string, string|null> $previewAssets */
+    public function renderHtml(EventCertificate $certificate, array $previewAssets = []): string
     {
         $certificate->loadMissing(['event.tenant', 'template', 'designVersion', 'registration']);
 
@@ -78,7 +80,7 @@ final class CertificatePdfService
                 : QrCodeGenerator::svgDataUri($verificationUrl, 240);
         }
 
-        $signatureDataUri = $this->assetDataUri($certificate, $design, 'signature');
+        $signatureDataUri = array_key_exists('signature', $previewAssets) ? $previewAssets['signature'] : $this->assetDataUri($certificate, $design, 'signature');
         $view = 'pdf.certificate-template';
         $layout = [];
         $backgroundDataUri = null;
@@ -118,7 +120,7 @@ final class CertificatePdfService
                 $layout['cpd_hours'] = $this->defaultElement(0.25, 0.68, 0.50, 0.05, 'center');
             }
 
-            $backgroundDataUri = $this->assetDataUri($certificate, $design, 'background', true);
+            $backgroundDataUri = array_key_exists('background', $previewAssets) ? $previewAssets['background'] : $this->assetDataUri($certificate, $design, 'background', true);
             $view = 'pdf.certificate-custom';
         }
 

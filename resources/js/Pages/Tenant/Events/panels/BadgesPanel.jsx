@@ -2,55 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import Button from '@/Components/Console/Button';
 import SearchInput from '@/Components/Console/SearchInput';
 import Modal from '@/Components/Console/Modal';
+import BadgeLayoutPreview from '@/Pages/Tenant/Events/Badges/BadgeLayoutPreview';
 import BadgeDesignEditor from '@/Pages/Tenant/Events/Badges/BadgeDesignEditor';
 import { Download, History, Palette, Printer } from 'lucide-react';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
-
-const TIER_STYLE = {
-    general: { band: 'bg-accent', label: null },
-    speaker: { band: 'bg-[#5B4FE0]', label: 'SPEAKER', labelClass: 'text-[#5B4FE0]' },
-    vip: { band: 'bg-[#B8860B]', label: 'VIP', labelClass: 'text-[#B8860B]' },
-    staff: { band: 'bg-[#4A5560]', label: 'STAFF', labelClass: 'text-[#4A5560]' },
-};
-
-function Badge({ event, badge }) {
-    const tier = TIER_STYLE[badge.badge_tier] ?? TIER_STYLE.general;
-
-    return (
-        <div className="flex aspect-[10/7] w-full max-w-[420px] border border-border bg-white text-[#111618] break-inside-avoid">
-            <div className={`w-2 shrink-0 ${tier.band}`} />
-            <div className="flex flex-1 flex-col p-5">
-                <div className="flex items-center justify-between">
-                    <div className="text-[10px] uppercase tracking-wide text-[#5A656A]">
-                        {event.name}
-                    </div>
-                    {tier.label && (
-                        <div className={`text-[10px] font-bold tracking-wide ${tier.labelClass}`}>
-                            {tier.label}
-                        </div>
-                    )}
-                </div>
-                <div className="mt-auto text-2xl leading-tight tracking-tight">
-                    {badge.full_name}
-                </div>
-                <div className="mt-1.5 text-xs text-[#5A656A]">
-                    {badge.ticket_type_name ?? 'General admission'}
-                </div>
-                <div className="mt-4 flex items-end justify-between gap-3">
-                    {badge.qr_image && (
-                        <img src={badge.qr_image} alt="" className="h-14 w-14 shrink-0" />
-                    )}
-                    <div className="flex flex-col items-end gap-0.5 text-right text-[11px] text-[#5A656A]">
-                        <span className="font-mono">{badge.ticket_code}</span>
-                        {badge.seat_label && (
-                            <span className="font-mono">Seat {badge.seat_label}</span>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 export default function BadgesPanel({ event }) {
     const [badges, setBadges] = useState(null);
@@ -250,7 +205,19 @@ export default function BadgesPanel({ event }) {
             {filtered.length > 0 && (
                 <div className="print-area grid grid-cols-1 gap-4 sm:grid-cols-2 print:grid-cols-2">
                     {filtered.map((b) => (
-                        <Badge key={b.id} event={event} badge={b} />
+                        <BadgeLayoutPreview
+                            key={b.id}
+                            event={event}
+                            badge={b}
+                            template={template || {}}
+                            backgroundUrl={
+                                template?.background_path
+                                    ? route('tenant.events.badges.template.artwork', {
+                                          event: event.id,
+                                      })
+                                    : null
+                            }
+                        />
                     ))}
                 </div>
             )}

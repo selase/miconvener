@@ -1,0 +1,99 @@
+import { expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import ArtifactLayoutPreview from '@/Pages/Tenant/Events/Certificates/ArtifactLayoutPreview';
+import BadgeLayoutPreview from '@/Pages/Tenant/Events/Badges/BadgeLayoutPreview';
+const field = {
+    x: 0.1,
+    y: 0.1,
+    width: 0.7,
+    height: 0.1,
+    visible: true,
+    font_family: 'Courier',
+    font_size: 14,
+    font_weight: 700,
+    color: '#123456',
+    align: 'left',
+};
+const layout = Object.fromEntries(
+    [
+        'title',
+        'recipient_name',
+        'body',
+        'issuer',
+        'signature',
+        'cpd_hours',
+        'qr',
+        'verification_code',
+    ].map((key) => [key, field])
+);
+it('certificate preview replaces every supported placeholder and renders optional fields and fonts', () => {
+    const form = {
+        title: 'Draft',
+        design_mode: 'custom_background',
+        layout,
+        body_template: '{name} {name} {event_name} {date} {role} {hours}',
+        issuer_name: 'Dr Ama',
+        issuer_title: 'Chair',
+        default_cpd_hours: 8.5,
+        show_qr: true,
+        show_cpd_hours: true,
+    };
+    const { container, rerender } = render(
+        <ArtifactLayoutPreview
+            form={form}
+            layoutDefaults={layout}
+            backgroundUrl="stored"
+            signatureUrl="signature"
+        />
+    );
+    expect(screen.getByText(/Akosua Élise Mensah Akosua/).textContent).toContain(
+        'Your event October 8, 2026 Delegate 8.5'
+    );
+    expect(screen.getByText('Dr Ama · Chair')).toBeTruthy();
+    expect(screen.getByAltText('Signature').getAttribute('src')).toBe('signature');
+    expect(screen.getByText('Illustrative QR')).toBeTruthy();
+    expect(container.querySelector('[data-field="title"]').style.fontFamily).toBe(
+        '"Courier New", monospace'
+    );
+    expect(container.querySelector('[style*="background-image"]').style.backgroundSize).toBe(
+        '100% 100%'
+    );
+    rerender(
+        <ArtifactLayoutPreview
+            form={{ ...form, design_mode: 'miconvener', show_qr: false, show_cpd_hours: false }}
+            layoutDefaults={layout}
+            backgroundUrl="stored"
+        />
+    );
+    expect(screen.queryByText('Illustrative QR')).toBeNull();
+    expect(screen.queryByText(/Continuing Education/)).toBeNull();
+    expect(screen.queryByAltText('Signature')).toBeNull();
+    expect(container.querySelector('[style*="background-image"]')).toBeNull();
+});
+it('badges use actual attendee data and saved tier styles while honoring hidden fields', () => {
+    const template = {
+        width_mm: 100,
+        height_mm: 70,
+        layout: { attendee_name: field, ticket_code: { ...field, visible: false }, qr: field },
+        tier_styles: { vip: { background_color: '#112233', text_color: '#abcdef' } },
+    };
+    const { container } = render(
+        <BadgeLayoutPreview
+            template={template}
+            event={{ name: 'Conference' }}
+            badge={{
+                full_name: 'Real attendee',
+                badge_tier: 'vip',
+                ticket_code: 'HIDDEN',
+                qr_image: 'real-qr',
+            }}
+        />
+    );
+    expect(screen.getByText('Real attendee').style.color).toBe('rgb(171, 205, 239)');
+    expect(screen.queryByText('HIDDEN')).toBeNull();
+    expect(screen.getByAltText('Attendee QR').getAttribute('src')).toBe('real-qr');
+    expect(
+        container.querySelector('[aria-label="Badge design preview"]').style.backgroundColor
+    ).toBe('rgb(17, 34, 51)');
+    expect(screen.getByText(/Advisory preview/)).toBeTruthy();
+});

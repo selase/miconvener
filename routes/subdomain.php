@@ -377,6 +377,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::get('events/{event}/data/certificates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'index'])->name('tenant.events.certificates.index');
     Route::post('events/{event}/certificates/templates', [App\Http\Controllers\Tenant\EventCertificateController::class, 'storeTemplate'])->name('tenant.events.certificates.templates.store');
     Route::put('events/{event}/certificates/templates/{template}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'updateTemplate'])->name('tenant.events.certificates.templates.update');
+    Route::post('events/{event}/certificates/templates/preview', [App\Http\Controllers\Tenant\EventCertificateController::class, 'draftPreview'])->name('tenant.events.certificates.templates.draft-preview');
     Route::get('events/{event}/certificates/templates/{template}/preview', [App\Http\Controllers\Tenant\EventCertificateController::class, 'preview'])->name('tenant.events.certificates.templates.preview');
     Route::get('events/{event}/certificates/templates/{template}/artwork/{type}', [App\Http\Controllers\Tenant\EventCertificateController::class, 'artwork'])->name('tenant.events.certificates.templates.artwork');
     Route::post('events/{event}/certificates/issue', [App\Http\Controllers\Tenant\EventCertificateController::class, 'issue'])->name('tenant.events.certificates.issue');

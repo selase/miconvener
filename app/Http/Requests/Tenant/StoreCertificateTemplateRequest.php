@@ -21,6 +21,10 @@ final class StoreCertificateTemplateRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'background_disk' => ['prohibited'],
+            'background_path' => ['prohibited'],
+            'signature_disk' => ['prohibited'],
+            'signature_path' => ['prohibited'],
             'role' => ['required', Rule::in(EventCertificateTemplate::ROLES)],
             'design_mode' => ['required', Rule::in(['miconvener', 'custom_background'])],
             'orientation' => ['required', Rule::in(['landscape'])],
