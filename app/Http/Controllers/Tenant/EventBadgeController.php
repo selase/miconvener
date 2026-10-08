@@ -90,8 +90,8 @@ final class EventBadgeController extends Controller
         $validated = $request->validated();
         $validated['layout'] = $this->layouts->validate($validated['layout'], 'badge');
         $validated['orientation'] = $validated['width_mm'] > $validated['height_mm'] ? 'landscape' : 'portrait';
-        $oldDisk = $template->background_disk;
-        $oldPath = $template->background_path;
+        $oldDisk = null;
+        $oldPath = null;
         $newArtwork = null;
 
         if ($request->file('background') !== null) {
@@ -104,12 +104,17 @@ final class EventBadgeController extends Controller
         }
 
         unset($validated['background'], $validated['remove_background']);
-        $nextDesignVersion = max(1, (int) $template->design_version) + 1;
-
         try {
-            $template->fill($validated);
-            $template->design_version = $nextDesignVersion;
-            $template->save();
+            $template = $template->getConnection()->transaction(function () use ($template, $validated, &$oldDisk, &$oldPath) {
+                $current = $template->newQuery()->whereKey($template->id)->lockForUpdate()->firstOrFail();
+                $oldDisk = $current->background_disk;
+                $oldPath = $current->background_path;
+                $current->fill($validated);
+                $current->design_version = max(1, (int) $current->design_version) + 1;
+                $current->save();
+
+                return $current;
+            }, 3);
         } catch (Throwable $exception) {
             if ($newArtwork !== null) {
                 $this->artwork->delete($newArtwork->disk, $newArtwork->path);

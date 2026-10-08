@@ -100,6 +100,24 @@ test('badge template endpoint remains constrained to the tenant event', function
         ->assertNotFound();
 });
 
+test('badge saves advance the latest design version when another save follows the initial read', function (): void {
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $template = app(\App\Services\Badges\BadgeTemplateService::class)->forEvent($event);
+    $interleaved = false;
+    EventBadgeTemplate::retrieved(function (EventBadgeTemplate $retrieved) use ($template, &$interleaved): void {
+        if ($retrieved->id === $template->id && ! $interleaved) {
+            $interleaved = true;
+            EventBadgeTemplate::query()->whereKey($template->id)->update(['design_version' => 2]);
+        }
+    });
+    $host = eventSubdomainHost('acme');
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/template", validBadgeDesign(), ['HTTP_HOST' => $host])
+        ->assertOk()->assertJsonPath('template.design_version', 3);
+    expect($interleaved)->toBeTrue();
+});
+
 test('badge console uses the server pdf instead of browser printing', function (): void {
     $panel = file_get_contents(resource_path('js/Pages/Tenant/Events/panels/BadgesPanel.jsx'));
 
