@@ -20,7 +20,7 @@ const defaults = {
     title: { ...element, y: 0.15 },
     verification_code: { ...element, y: 0.8 },
 };
-function Editor({ onSave, layout = defaults }) {
+function Editor({ onSave, layout = defaults, cpdHours = 0 }) {
     const [form, setForm] = useState({
         design_mode: 'custom_background',
         title: 'Certificate',
@@ -29,7 +29,7 @@ function Editor({ onSave, layout = defaults }) {
         issuer_title: '',
         show_qr: true,
         show_cpd_hours: false,
-        default_cpd_hours: 0,
+        default_cpd_hours: cpdHours,
         layout,
     });
     return (
@@ -109,5 +109,49 @@ describe('certificate layout editor', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save design' }));
         expect(save.mock.calls[0][0].show_qr).toBe(false);
         expect(save.mock.calls[0][0].show_cpd_hours).toBe(true);
+    });
+    it('keeps server-valid fractional values valid when saving unrelated edits', () => {
+        const save = vi.fn();
+        const fractionalLayout = {
+            ...defaults,
+            recipient_name: {
+                ...element,
+                x: 0.125,
+                y: 0.335,
+                width: 0.675,
+                height: 0.105,
+                font_size: 12.5,
+            },
+        };
+        render(<Editor onSave={save} layout={fractionalLayout} cpdHours={6.25} />);
+        for (const label of [
+            'Recipient name X',
+            'Recipient name Y',
+            'Recipient name Width',
+            'Recipient name Height',
+            'Recipient name Font size',
+            'Default CPD/CME hours',
+        ]) {
+            expect(screen.getByLabelText(label).checkValidity(), label).toBe(true);
+        }
+        fireEvent.change(screen.getByLabelText('Certificate title'), {
+            target: { value: 'Updated wording' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Save design' }));
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(save.mock.calls[0][0].layout).toEqual(fractionalLayout);
+        expect(save.mock.calls[0][0].default_cpd_hours).toBe(6.25);
+    });
+    it('accepts positive dimensions below a hundredth without losing the saved values', () => {
+        const save = vi.fn();
+        const smallLayout = {
+            ...defaults,
+            recipient_name: { ...element, width: 0.005, height: 0.005 },
+        };
+        render(<Editor onSave={save} layout={smallLayout} />);
+        expect(screen.getByLabelText('Recipient name Width').checkValidity()).toBe(true);
+        expect(screen.getByLabelText('Recipient name Height').checkValidity()).toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: 'Save design' }));
+        expect(save.mock.calls[0][0].layout).toEqual(smallLayout);
     });
 });

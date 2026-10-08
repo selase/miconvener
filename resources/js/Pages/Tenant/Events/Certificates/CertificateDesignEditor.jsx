@@ -133,7 +133,7 @@ export default function CertificateDesignEditor({
                     type="number"
                     min={0}
                     max={1000}
-                    step={0.1}
+                    step="any"
                     value={form.default_cpd_hours}
                     onChange={(event) => update('default_cpd_hours', event.target.value)}
                 />

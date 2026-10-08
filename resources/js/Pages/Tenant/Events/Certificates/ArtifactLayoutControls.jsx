@@ -42,9 +42,9 @@ export default function ArtifactLayoutControls({ layout, onChange, requiredField
                         label={labelFor(key)}
                         aria-label={`${label} ${labelFor(key)}`}
                         type="number"
-                        min={key === 'width' || key === 'height' ? 0.01 : 0}
+                        min={0}
                         max={1}
-                        step={0.01}
+                        step="any"
                         required
                         value={field[key]}
                         onChange={(event) => update(key, Number(event.target.value))}
@@ -68,6 +68,7 @@ export default function ArtifactLayoutControls({ layout, onChange, requiredField
                     type="number"
                     min={6}
                     max={96}
+                    step="any"
                     required
                     value={field.font_size}
                     onChange={(event) => update('font_size', Number(event.target.value))}
