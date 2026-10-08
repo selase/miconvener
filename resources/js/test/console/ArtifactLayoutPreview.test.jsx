@@ -28,9 +28,10 @@ const layout = Object.fromEntries(
 );
 it('certificate preview replaces every supported placeholder and renders optional fields and fonts', () => {
     const form = {
+        role: 'delegate',
         title: 'Draft',
         design_mode: 'custom_background',
-        layout,
+        layout: { ...layout, recipient_name: { ...field, x: 0.2 } },
         body_template: '{name} {name} {event_name} {date} {role} {hours}',
         issuer_name: 'Dr Ama',
         issuer_title: 'Chair',
@@ -58,17 +59,20 @@ it('certificate preview replaces every supported placeholder and renders optiona
     expect(container.querySelector('[style*="background-image"]').style.backgroundSize).toBe(
         '100% 100%'
     );
+    expect(container.querySelector('[data-field="recipient_name"]').style.left).toBe('20%');
     rerender(
         <ArtifactLayoutPreview
             form={{ ...form, design_mode: 'miconvener', show_qr: false, show_cpd_hours: false }}
             layoutDefaults={layout}
             backgroundUrl="stored"
+            signatureUrl="signature"
         />
     );
     expect(screen.queryByText('Illustrative QR')).toBeNull();
     expect(screen.queryByText(/Continuing Education/)).toBeNull();
-    expect(screen.queryByAltText('Signature')).toBeNull();
+    expect(screen.getByAltText('Signature').getAttribute('src')).toBe('signature');
     expect(container.querySelector('[style*="background-image"]')).toBeNull();
+    expect(container.querySelector('[data-field="recipient_name"]').style.left).toBe('10%');
 });
 it('badges use actual attendee data and saved tier styles while honoring hidden fields', () => {
     const template = {
@@ -97,3 +101,46 @@ it('badges use actual attendee data and saved tier styles while honoring hidden 
     ).toBe('rgb(17, 34, 51)');
     expect(screen.getByText(/Advisory preview/)).toBeTruthy();
 });
+
+it.each(['speaker', 'presenter', 'volunteer', 'special_guest'])(
+    'uses the selected %s role in every body placeholder',
+    (role) => {
+        const expected = role.replaceAll('_', ' ');
+        const label = expected[0].toUpperCase() + expected.slice(1);
+        const { container } = render(
+            <ArtifactLayoutPreview
+                form={{
+                    role,
+                    design_mode: 'custom_background',
+                    layout,
+                    body_template: '{role}/{role}',
+                }}
+                layoutDefaults={layout}
+            />
+        );
+        expect(container.querySelector('[data-field="body"]').textContent).toBe(
+            `${label}/${label}`
+        );
+    }
+);
+
+it.each([0, '0.0', null, undefined, ''])(
+    'leaves hours placeholders empty for zero or absent hours (%s)',
+    (hours) => {
+        const { container } = render(
+            <ArtifactLayoutPreview
+                form={{
+                    role: 'delegate',
+                    design_mode: 'custom_background',
+                    layout,
+                    default_cpd_hours: hours,
+                    body_template: 'Before{hours}Middle{hours}After',
+                }}
+                layoutDefaults={layout}
+            />
+        );
+        expect(container.querySelector('[data-field="body"]').textContent).toBe(
+            'BeforeMiddleAfter'
+        );
+    }
+);

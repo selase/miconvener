@@ -11,12 +11,14 @@ export default function ArtifactLayoutPreview({
     backgroundUrl,
     signatureUrl,
 }) {
+    const role = (form.role || 'delegate').replaceAll('_', ' ');
+    const hours = Number(form.default_cpd_hours || 0);
     const replacements = {
         name: 'Akosua Élise Mensah',
         event_name: 'Your event',
         date: 'October 8, 2026',
-        role: 'Delegate',
-        hours: Number(form.default_cpd_hours || 0).toFixed(1),
+        role: role.charAt(0).toUpperCase() + role.slice(1),
+        hours: hours > 0 ? hours.toFixed(1) : '',
     };
     const values = {
         title: form.title || 'Certificate of Participation',
@@ -28,7 +30,7 @@ export default function ArtifactLayoutPreview({
         event_name: replacements.event_name,
         issuer: [form.issuer_name, form.issuer_title].filter(Boolean).join(' · '),
         verification_code: 'MC-PREVIEW-2026',
-        cpd_hours: `${replacements.hours} Continuing Education (CPD/CME) Contact Hours`,
+        cpd_hours: `${hours.toFixed(1)} Continuing Education (CPD/CME) Contact Hours`,
         signature: signatureUrl,
         qr: 'Illustrative QR',
     };
