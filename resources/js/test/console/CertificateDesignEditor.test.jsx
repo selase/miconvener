@@ -181,7 +181,7 @@ it('retains a generated PDF link and releases its blob when the editor closes', 
     vi.stubGlobal('route', (name) => name);
     vi.stubGlobal(
         'fetch',
-        vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['%PDF']) })
+        vi.fn().mockResolvedValue({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['%PDF']) })
     );
     const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pdf');
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
@@ -259,4 +259,71 @@ it('shows a pending PDF state and releases uploaded artwork URLs on removal', as
     create.mockRestore();
     revoke.mockRestore();
     vi.unstubAllGlobals();
+});
+
+it.each([
+    ['403', { ok: false, status: 403, json: async () => ({}) }],
+    ['500', { ok: false, status: 500, json: async () => ({}) }],
+    [
+        'non-JSON',
+        {
+            ok: false,
+            status: 500,
+            json: async () => {
+                throw new Error('HTML');
+            },
+        },
+    ],
+    [
+        'unexpected successful HTML',
+        { ok: true, headers: { get: () => 'text/html' }, blob: async () => new Blob(['HTML']) },
+    ],
+    ['network', null],
+])('keeps an edited draft and reports %s test-PDF errors', async (_, response) => {
+    vi.stubGlobal(
+        'fetch',
+        response
+            ? vi.fn().mockResolvedValue(response)
+            : vi.fn().mockRejectedValue(new Error('Connection lost'))
+    );
+    try {
+        render(<Editor onSave={vi.fn()} />);
+        fireEvent.change(screen.getByLabelText('Certificate title'), {
+            target: { value: 'Keep this draft' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Test PDF' }));
+        await screen.findByRole('alert');
+        expect(screen.getByLabelText('Certificate title').value).toBe('Keep this draft');
+        expect(screen.getByRole('button', { name: 'Test PDF' }).disabled).toBe(false);
+    } finally {
+        vi.unstubAllGlobals();
+    }
+});
+
+it('announces a fallback warning when preview artwork is unavailable', async () => {
+    vi.stubGlobal(
+        'fetch',
+        vi
+            .fn()
+            .mockResolvedValue({
+                ok: true,
+                headers: {
+                    get: (name) =>
+                        name === 'X-Certificate-Preview-Warning'
+                            ? 'Background unavailable; the default design is shown.'
+                            : 'application/pdf',
+                },
+                blob: async () => new Blob(['%PDF']),
+            })
+    );
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    URL.createObjectURL = vi.fn(() => 'blob:preview');
+    URL.revokeObjectURL = vi.fn();
+    try {
+        render(<Editor onSave={vi.fn()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Test PDF' }));
+        expect((await screen.findByRole('status')).textContent).toContain('Background unavailable');
+    } finally {
+        vi.unstubAllGlobals();
+    }
 });

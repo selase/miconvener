@@ -6,6 +6,8 @@ import Input from '@/Components/Console/Input';
 import ArtworkUpload from './ArtworkUpload';
 import ArtifactLayoutPreview from './ArtifactLayoutPreview';
 import ArtifactLayoutControls from './ArtifactLayoutControls';
+import { artifactPdf } from '@/lib/artifactResponse';
+import ArtifactErrors from './ArtifactErrors';
 import { csrfFetchFormData } from '@/lib/csrfFetch';
 
 export default function CertificateDesignEditor({
@@ -17,6 +19,7 @@ export default function CertificateDesignEditor({
     saving,
     onSave,
     onCancel,
+    fieldErrors = {},
 }) {
     const mounted = useRef(true);
     useEffect(() => {
@@ -29,6 +32,7 @@ export default function CertificateDesignEditor({
     const [signatureUrl, setSignatureUrl] = useState(null);
     const [pdfPending, setPdfPending] = useState(false);
     const [pdfError, setPdfError] = useState(null);
+    const [pdfWarning, setPdfWarning] = useState(null);
     const [pdfUrl, setPdfUrl] = useState(null);
     useEffect(() => {
         if (!form.signature) {
@@ -48,6 +52,7 @@ export default function CertificateDesignEditor({
     const testPdf = async () => {
         setPdfPending(true);
         setPdfError(null);
+        setPdfWarning(null);
         const payload = new FormData();
         for (const key of [
             'role',
@@ -85,24 +90,17 @@ export default function CertificateDesignEditor({
                 route('tenant.events.certificates.templates.draft-preview', { event: eventId }),
                 payload
             );
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(
-                    Object.values(data.errors || {})
-                        .flat()
-                        .join(' ') ||
-                        data.message ||
-                        'The test PDF could not be generated.'
-                );
-            }
-            const blob = await response.blob();
+            const blob = await artifactPdf(
+                response,
+                'The test PDF could not be generated. Please try again.'
+            );
             if (!mounted.current) return;
+            setPdfWarning(response.headers?.get('X-Certificate-Preview-Warning') || null);
             const url = URL.createObjectURL(blob);
             setPdfUrl(url);
             window.open(url, '_blank', 'noopener,noreferrer');
         } catch (reason) {
-            if (mounted.current)
-                setPdfError(reason.message || 'The test PDF could not be generated.');
+            if (mounted.current) setPdfError(reason);
         } finally {
             if (mounted.current) setPdfPending(false);
         }
@@ -187,6 +185,8 @@ export default function CertificateDesignEditor({
                     Certificate title
                     <Input
                         required
+                        aria-label="Certificate title"
+                        error={fieldErrors.title?.join(' ')}
                         value={form.title}
                         onChange={(event) => update('title', event.target.value)}
                     />
@@ -204,6 +204,7 @@ export default function CertificateDesignEditor({
                     <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                         Issuer name
                         <Input
+                            error={fieldErrors.issuer_name?.join(' ')}
                             value={form.issuer_name}
                             onChange={(event) => update('issuer_name', event.target.value)}
                         />
@@ -211,6 +212,7 @@ export default function CertificateDesignEditor({
                     <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                         Issuer title
                         <Input
+                            error={fieldErrors.issuer_title?.join(' ')}
                             value={form.issuer_title}
                             onChange={(event) => update('issuer_title', event.target.value)}
                         />
@@ -223,6 +225,7 @@ export default function CertificateDesignEditor({
                     min={0}
                     max={1000}
                     step="any"
+                    error={fieldErrors.default_cpd_hours?.join(' ')}
                     value={form.default_cpd_hours}
                     onChange={(event) => update('default_cpd_hours', event.target.value)}
                 />
@@ -288,9 +291,13 @@ export default function CertificateDesignEditor({
                         {pdfPending ? 'Generating…' : 'Test PDF'}
                     </Button>
                 </div>
-                {pdfError && (
-                    <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">
-                        {pdfError}
+                <ArtifactErrors error={pdfError} />
+                {pdfWarning && (
+                    <p
+                        role="status"
+                        className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+                    >
+                        {pdfWarning}
                     </p>
                 )}
                 {pdfUrl && (

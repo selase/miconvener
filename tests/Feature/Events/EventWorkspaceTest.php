@@ -75,7 +75,7 @@ test('someone who can only read events sees only what they can open', function (
             $slugs = menuSlugs($menu->all());
 
             // Each of these needs more than "read event".
-            foreach (['check-in', 'abstracts', 'automations', 'surveys', 'planning', 'finance', 'certificates', 'attendee-groups'] as $gated) {
+            foreach (['check-in', 'abstracts', 'automations', 'surveys', 'planning', 'finance', 'certificates', 'badges', 'attendee-groups'] as $gated) {
                 if (in_array($gated, $slugs, true)) {
                     return false;
                 }
@@ -226,4 +226,28 @@ test('an event workspace can be opened using either its UUID or its slug', funct
             ->component('Tenant/Events/Show')
             ->where('event.id', $event->id)
         );
+});
+
+test('badge sections and artifact capabilities follow their own permissions', function () {
+    [, $reader, $event, $host] = workspaceSetup(['read event', 'read certificate', 'read badge-template']);
+
+    $this->actingAs($reader)
+        ->get("http://{$host}/events/{$event->id}/badges", ['HTTP_HOST' => $host])
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('auth.can.read_certificate', true)
+            ->where('auth.can.read_badge_template', true)
+            ->where('auth.can.create_certificate', false)
+            ->where('auth.can.issue_certificates', false)
+            ->where('auth.can.update_certificate', false)
+            ->where('auth.can.delete_certificate', false)
+            ->where('auth.can.update_badge_template', false));
+});
+
+test('reading events alone does not allow opening the badge workspace', function () {
+    [, $reader, $event, $host] = workspaceSetup(['read event']);
+
+    $this->actingAs($reader)
+        ->get("http://{$host}/events/{$event->id}/badges", ['HTTP_HOST' => $host])
+        ->assertForbidden();
 });

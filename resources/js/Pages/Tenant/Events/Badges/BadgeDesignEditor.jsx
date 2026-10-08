@@ -22,6 +22,7 @@ export default function BadgeDesignEditor({
     saving,
     onSave,
     onCancel,
+    fieldErrors = {},
 }) {
     const [backgroundUrl, setBackgroundUrl] = useState(null);
 
@@ -78,9 +79,11 @@ export default function BadgeDesignEditor({
                         Width (mm)
                         <Input
                             type="number"
+                            aria-label="Width (mm)"
                             step="any"
                             min="40"
                             max="210"
+                            error={fieldErrors.width_mm?.join(' ')}
                             value={form.width_mm}
                             onChange={(event) => update('width_mm', Number(event.target.value))}
                         />
@@ -89,9 +92,11 @@ export default function BadgeDesignEditor({
                         Height (mm)
                         <Input
                             type="number"
+                            aria-label="Height (mm)"
                             step="any"
                             min="40"
                             max="210"
+                            error={fieldErrors.height_mm?.join(' ')}
                             value={form.height_mm}
                             onChange={(event) => update('height_mm', Number(event.target.value))}
                         />
@@ -180,7 +185,7 @@ export default function BadgeDesignEditor({
                         backgroundUrl || (!form.remove_background ? existingBackgroundUrl : null)
                     }
                 />
-                <div className="flex justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
+                <div className="flex flex-wrap gap-3 justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
                     <Button
                         type="button"
                         onClick={() => update('layout', structuredClone(layoutDefaults))}

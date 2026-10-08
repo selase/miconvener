@@ -1,7 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BadgesPanel from '@/Pages/Tenant/Events/panels/BadgesPanel';
-import csrfFetch from '@/lib/csrfFetch';
+import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
+const permissions = vi.hoisted(() => ({ current: {} }));
+vi.mock('@inertiajs/react', () => ({
+    usePage: () => ({ props: { auth: { can: permissions.current } } }),
+}));
 vi.mock('@/lib/csrfFetch', () => ({ default: vi.fn(), csrfFetchFormData: vi.fn() }));
 const field = {
     x: 0.1,
@@ -33,6 +37,11 @@ const dataFor = (count) => ({
     recent_prints: [],
 });
 beforeEach(() => {
+    permissions.current = {
+        read_badge_template: true,
+        update_badge_template: true,
+        update_event: true,
+    };
     URL.createObjectURL = vi.fn(() => 'blob:pdf');
     URL.revokeObjectURL = vi.fn();
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -41,7 +50,7 @@ it.each([100, 101, 250])('downloads only the selected batch for %i matches', asy
     const data = dataFor(count);
     csrfFetch.mockImplementation((url, options) =>
         options
-            ? Promise.resolve({ ok: true, blob: async () => new Blob(['pdf']) })
+            ? Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
             : Promise.resolve(response(data))
     );
     render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
@@ -64,7 +73,7 @@ it('uses saved design and actual attendee fields, resets changed filters, and pr
     const data = dataFor(250);
     let loads = 0;
     csrfFetch.mockImplementation((url, options) => {
-        if (options) return Promise.resolve({ ok: true, blob: async () => new Blob(['pdf']) });
+        if (options) return Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) });
         const refreshed = {
             ...data,
             badges: data.badges.map((badge) => ({ ...badge, print_count: loads > 0 ? 1 : 0 })),
@@ -110,7 +119,7 @@ it('retries a lost response with the same reference and blocks concurrent downlo
                     rejectRequest = reject;
                 })
         )
-        .mockResolvedValueOnce({ ok: true, blob: async () => new Blob(['pdf']) })
+        .mockResolvedValueOnce({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
         .mockResolvedValue(response(dataFor(1)));
     render(<BadgesPanel event={{ id: 'event' }} />);
     await screen.findByText('Person 0');
@@ -129,7 +138,7 @@ it('retries a lost response with the same reference and blocks concurrent downlo
 it('starts a new reference for an intentional reprint after success', async () => {
     csrfFetch.mockImplementation((url, options) =>
         options
-            ? Promise.resolve({ ok: true, blob: async () => new Blob(['pdf']) })
+            ? Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
             : Promise.resolve(response(dataFor(1)))
     );
     render(<BadgesPanel event={{ id: 'event' }} />);
@@ -150,6 +159,7 @@ it('retries a failed PDF body with its stable reference and resets batches for c
         options
             ? Promise.resolve({
                   ok: true,
+                  headers: { get: () => 'application/pdf' },
                   blob: async () => {
                       throw new Error('Body failed');
                   },
@@ -180,7 +190,7 @@ it('supports UUID references on HTTP browsers without crypto.randomUUID', async 
     try {
         csrfFetch.mockImplementation((url, options) =>
             options
-                ? Promise.resolve({ ok: true, blob: async () => new Blob(['pdf']) })
+                ? Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
                 : Promise.resolve(response(dataFor(1)))
         );
         render(<BadgesPanel event={{ id: 'event' }} />);
@@ -194,4 +204,73 @@ it('supports UUID references on HTTP browsers without crypto.randomUUID', async 
     } finally {
         Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: uuid });
     }
+});
+
+const failures = [
+    ['403', () => Promise.resolve({ ok: false, status: 403, json: async () => ({}) })],
+    [
+        '422',
+        () =>
+            Promise.resolve({
+                ok: false,
+                status: 422,
+                json: async () => ({ errors: { width_mm: ['Width does not fit on the sheet.'] } }),
+            }),
+    ],
+    ['500', () => Promise.resolve({ ok: false, status: 500, json: async () => ({}) })],
+    [
+        'non-JSON',
+        () =>
+            Promise.resolve({
+                ok: false,
+                status: 500,
+                json: async () => {
+                    throw new Error('HTML');
+                },
+            }),
+    ],
+    ['network', () => Promise.reject(new Error('Connection lost'))],
+];
+it.each(failures)('reports %s load failures and clears them after retry', async (_, failure) => {
+    csrfFetch.mockReset();
+    csrfFetch.mockImplementationOnce(failure).mockResolvedValue(response(dataFor(1)));
+    render(<BadgesPanel event={{ id: 'event' }} />);
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading badges' }));
+    await screen.findByText('Person 0');
+    expect(screen.queryByRole('alert')).toBeNull();
+});
+it.each(failures)(
+    'keeps badge design draft and shows %s save failures in the dialog',
+    async (_, failure) => {
+        csrfFetch.mockReset();
+        csrfFetch.mockResolvedValue(response(dataFor(1)));
+        csrfFetchFormData.mockImplementationOnce(failure);
+        render(<BadgesPanel event={{ id: 'event' }} />);
+        await screen.findByText('Person 0');
+        fireEvent.click(screen.getByRole('button', { name: 'Design badges' }));
+        fireEvent.change(screen.getByLabelText('Width (mm)'), { target: { value: '90' } });
+        fireEvent.submit(screen.getByLabelText('Width (mm)').closest('form'));
+        const { within } = await import('@testing-library/react');
+        await within(screen.getByRole('dialog')).findByRole('alert');
+        expect(screen.getByLabelText('Width (mm)').value).toBe('90');
+    }
+);
+it.each(failures)('reports %s PDF failure without recording client success', async (_, failure) => {
+    csrfFetch.mockReset();
+    csrfFetch.mockResolvedValueOnce(response(dataFor(1))).mockImplementationOnce(failure);
+    render(<BadgesPanel event={{ id: 'event' }} />);
+    await screen.findByText('Person 0');
+    fireEvent.click(screen.getByRole('button', { name: /Download 1 badge PDF/ }));
+    await screen.findByRole('alert');
+    expect(csrfFetch).toHaveBeenCalledTimes(2);
+});
+it('gates design and download using explicit capabilities', async () => {
+    permissions.current = {};
+    csrfFetch.mockReset();
+    csrfFetch.mockResolvedValue(response(dataFor(1)));
+    render(<BadgesPanel event={{ id: 'event' }} />);
+    await screen.findByText('Person 0');
+    expect(screen.queryByRole('button', { name: 'Design badges' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Download .*PDF/ })).toBeNull();
 });

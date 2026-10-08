@@ -47,6 +47,13 @@ final class HandleInertiaRequests extends Middleware
                 // Hides owner-only navigation and actions; every route still
                 // checks the permission itself.
                 'can' => [
+                    'read_certificate' => fn (): bool => (bool) $request->user()?->can('read certificate'),
+                    'issue_certificates' => fn (): bool => (bool) $request->user()?->can('issue certificates'),
+                    'create_certificate' => fn (): bool => (bool) $request->user()?->can('create certificate'),
+                    'update_certificate' => fn (): bool => (bool) $request->user()?->can('update certificate'),
+                    'delete_certificate' => fn (): bool => (bool) $request->user()?->can('delete certificate'),
+                    'read_badge_template' => fn (): bool => (bool) $request->user()?->can('read badge-template'),
+                    'update_badge_template' => fn (): bool => (bool) $request->user()?->can('update badge-template'),
                     'manage_billing' => fn (): bool => (bool) $request->user()?->can('manage billing'),
                     'read_finance' => fn (): bool => (bool) $request->user()?->can('read finance'),
                     'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),

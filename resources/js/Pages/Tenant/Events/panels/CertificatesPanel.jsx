@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { usePage } from '@inertiajs/react';
+import ArtifactErrors from '../Certificates/ArtifactErrors';
+import { artifactJson, artifactPdf, downloadArtifact } from '@/lib/artifactResponse';
 import Button from '@/Components/Console/Button';
-import StatusBanner from '@/Components/Console/StatusBanner';
 import Modal from '@/Components/Console/Modal';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
-import ConfirmModal from '@/Components/Console/ConfirmModal';
 import CertificateDesignEditor from '@/Pages/Tenant/Events/Certificates/CertificateDesignEditor';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import {
@@ -22,9 +23,7 @@ import {
     Trash2,
     ExternalLink,
     Send,
-    Plus,
     Clock,
-    AlertCircle,
 } from 'lucide-react';
 
 const ROLE_ICONS = {
@@ -59,6 +58,17 @@ const ROLE_BADGES = {
 };
 
 export default function CertificatesPanel({ event }) {
+    const can = usePage().props.auth?.can || {};
+    const requestSequence = useRef(0);
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState(null);
+    const [appliedSearch, setAppliedSearch] = useState('');
+    const [templateError, setTemplateError] = useState(null);
+    const [issueError, setIssueError] = useState(null);
+    const [revokeError, setRevokeError] = useState(null);
+    const [downloadError, setDownloadError] = useState(null);
+    const [revoking, setRevoking] = useState(false);
+    const [downloading, setDownloading] = useState(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [templates, setTemplates] = useState([]);
@@ -109,43 +119,48 @@ export default function CertificatesPanel({ event }) {
     const [deleteCertTarget, setDeleteCertTarget] = useState(null);
 
     const loadData = async () => {
+        const sequence = ++requestSequence.current;
         setLoading(true);
         setLoadError(null);
         try {
-            let url = route('tenant.events.certificates.index', { event: event.id });
-            const params = new URLSearchParams();
+            const params = new URLSearchParams({ page: String(page) });
             if (roleFilter !== 'all') params.append('role', roleFilter);
-            if (search.trim()) params.append('search', search.trim());
-            if (params.toString()) url += `?${params.toString()}`;
-
-            const res = await csrfFetch(url);
-            if (res.ok) {
-                const data = await res.json();
-                setTemplates(data.templates || []);
-                setLayoutDefaults(data.layout_defaults || {});
-                setCertificates(data.certificates?.data || []);
-                setStats(data.stats || null);
-                setEligible(data.eligible || null);
-            } else {
-                setLoadError(
-                    res.status === 403
-                        ? 'You do not have permission to view certificates for this event.'
-                        : 'The certificates for this event could not be loaded. Refresh to try again.'
-                );
-            }
-        } catch (err) {
-            console.error('Failed to load certificates data:', err);
+            if (appliedSearch.trim()) params.append('search', appliedSearch.trim());
+            const url = route('tenant.events.certificates.index', { event: event.id });
+            const data = await artifactJson(
+                await csrfFetch(`${url}${url.includes('?') ? '&' : '?'}${params}`),
+                'The certificates could not be loaded. Please try again.'
+            );
+            if (sequence !== requestSequence.current) return;
+            setTemplates(data.templates || []);
+            setLayoutDefaults(data.layout_defaults || {});
+            setCertificates(data.certificates?.data || []);
+            setPagination(data.certificates || null);
+            setStats(data.stats || null);
+            setEligible(data.eligible || null);
+        } catch (error) {
+            if (sequence === requestSequence.current) setLoadError(error);
         } finally {
-            setLoading(false);
+            if (sequence === requestSequence.current) setLoading(false);
         }
     };
 
     useEffect(() => {
         loadData();
-    }, [event.id, roleFilter]);
+        return () => {
+            requestSequence.current += 1;
+        };
+    }, [event.id, roleFilter, appliedSearch, page]);
+
+    const applySearch = () => {
+        setPage(1);
+        setAppliedSearch(search);
+        if (page === 1 && appliedSearch === search) loadData();
+    };
 
     // Open Template Editor
     const openEditTemplate = (tmpl) => {
+        setTemplateError(null);
         setSelectedTemplate(tmpl);
         setTemplateForm({
             role: tmpl.role,
@@ -185,6 +200,7 @@ export default function CertificatesPanel({ event }) {
     const handleSaveTemplate = async (e) => {
         e.preventDefault();
         setSavingTemplate(true);
+        setTemplateError(null);
         try {
             const url = selectedTemplate
                 ? route('tenant.events.certificates.templates.update', {
@@ -203,13 +219,14 @@ export default function CertificatesPanel({ event }) {
 
             const res = await csrfFetchFormData(url, payload);
 
+            await artifactJson(res, 'The certificate design could not be saved. Please try again.');
             if (res.ok) {
                 setTemplateModalOpen(false);
                 setSelectedTemplate(null);
                 await loadData();
             }
         } catch (err) {
-            console.error('Failed to save certificate template:', err);
+            setTemplateError(err);
         } finally {
             setSavingTemplate(false);
         }
@@ -220,6 +237,7 @@ export default function CertificatesPanel({ event }) {
         e.preventDefault();
         setIssuing(true);
         setIssueResult(null);
+        setIssueError(null);
         try {
             const payload = {
                 target_group: issueForm.target_group,
@@ -242,17 +260,16 @@ export default function CertificatesPanel({ event }) {
                 }
             );
 
+            const data = await artifactJson(
+                res,
+                'Certificates could not be issued. Please try again.'
+            );
             if (res.ok) {
-                const data = await res.json();
-                setIssueResult(data.message);
-                setTimeout(() => {
-                    setIssueModalOpen(false);
-                    setIssueResult(null);
-                }, 1500);
+                setIssueResult(data.message || 'Certificates issued.');
                 await loadData();
             }
         } catch (err) {
-            console.error('Failed to issue certificates:', err);
+            setIssueError(err);
         } finally {
             setIssuing(false);
         }
@@ -260,7 +277,9 @@ export default function CertificatesPanel({ event }) {
 
     // Delete Certificate
     const handleDeleteCertificate = async () => {
-        if (!deleteCertTarget) return;
+        if (!deleteCertTarget || revoking) return;
+        setRevoking(true);
+        setRevokeError(null);
         try {
             const res = await csrfFetch(
                 route('tenant.events.certificates.destroy', {
@@ -271,20 +290,52 @@ export default function CertificatesPanel({ event }) {
                     method: 'DELETE',
                 }
             );
+            await artifactJson(res, 'The certificate could not be revoked. Please try again.');
             if (res.ok) {
                 setDeleteCertTarget(null);
-                await loadData();
+                if (page > 1 && certificates.length === 1) setPage(page - 1);
+                else await loadData();
             }
         } catch (err) {
-            console.error('Failed to delete certificate:', err);
+            setRevokeError(err);
+        } finally {
+            setRevoking(false);
+        }
+    };
+
+    const downloadCertificate = async (certificate) => {
+        setDownloadError(null);
+        setDownloading(certificate.id);
+        try {
+            const response = await csrfFetch(
+                route('tenant.events.certificates.download', {
+                    event: event.id,
+                    certificate: certificate.id,
+                })
+            );
+            downloadArtifact(
+                await artifactPdf(
+                    response,
+                    'The certificate PDF could not be downloaded. Please try again.'
+                ),
+                `${certificate.verification_code}.pdf`
+            );
+        } catch (error) {
+            setDownloadError(error);
+        } finally {
+            setDownloading(null);
         }
     };
 
     return (
         <div className="space-y-6">
             {loadError && (
-                <StatusBanner status="failed" title="Could not load" description={loadError} />
+                <div>
+                    <ArtifactErrors error={loadError} />
+                    <Button onClick={loadData}>Retry loading certificates</Button>
+                </div>
             )}
+            <ArtifactErrors error={downloadError} />
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -298,16 +349,19 @@ export default function CertificatesPanel({ event }) {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="primary"
-                        onClick={() => {
-                            setIssueResult(null);
-                            setIssueModalOpen(true);
-                        }}
-                    >
-                        <Send className="w-4 h-4 mr-1.5" />
-                        Issue Certificates
-                    </Button>
+                    {can.issue_certificates && (
+                        <Button
+                            variant="primary"
+                            onClick={() => {
+                                setIssueResult(null);
+                                setIssueError(null);
+                                setIssueModalOpen(true);
+                            }}
+                        >
+                            <Send className="w-4 h-4 mr-1.5" />
+                            Issue Certificates
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -424,13 +478,15 @@ export default function CertificatesPanel({ event }) {
                                     <span className="text-slate-400 truncate max-w-[120px]">
                                         {tmpl.issuer_name || 'Convener'}
                                     </span>
-                                    <button
-                                        onClick={() => openEditTemplate(tmpl)}
-                                        className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                                    >
-                                        <Edit3 className="w-3 h-3" />
-                                        Customize
-                                    </button>
+                                    {can.update_certificate && (
+                                        <button
+                                            onClick={() => openEditTemplate(tmpl)}
+                                            className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                                        >
+                                            <Edit3 className="w-3 h-3" />
+                                            Customize
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -444,7 +500,10 @@ export default function CertificatesPanel({ event }) {
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
                         <button
-                            onClick={() => setRoleFilter('all')}
+                            onClick={() => {
+                                setPage(1);
+                                setRoleFilter('all');
+                            }}
                             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
                                 roleFilter === 'all'
                                     ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
@@ -456,7 +515,10 @@ export default function CertificatesPanel({ event }) {
                         {['delegate', 'speaker', 'presenter', 'volunteer'].map((r) => (
                             <button
                                 key={r}
-                                onClick={() => setRoleFilter(r)}
+                                onClick={() => {
+                                    setPage(1);
+                                    setRoleFilter(r);
+                                }}
                                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition ${
                                     roleFilter === r
                                         ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
@@ -476,12 +538,13 @@ export default function CertificatesPanel({ event }) {
                                 placeholder="Search recipient or code..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && loadData()}
+                                onKeyDown={(e) => e.key === 'Enter' && applySearch()}
                                 className="text-xs pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                             />
                         </div>
                         <button
-                            onClick={loadData}
+                            onClick={applySearch}
+                            aria-label="Refresh certificates"
                             className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-white"
                             title="Refresh"
                         >
@@ -502,102 +565,137 @@ export default function CertificatesPanel({ event }) {
                             No Certificates Issued Yet
                         </p>
                         <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                            Click "Issue Certificates" above to generate accredited credentials for
-                            your delegates, speakers, or presenters.
+                            {can.issue_certificates
+                                ? 'Use Issue Certificates to create credentials for your delegates, speakers, or presenters.'
+                                : 'Issued credentials will appear here when an organizer creates them.'}
                         </p>
                     </div>
                 ) : (
-                    <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
-                            <tr>
-                                <th className="p-3.5">Recipient</th>
-                                <th className="p-3.5">Role</th>
-                                <th className="p-3.5">Credential ID</th>
-                                <th className="p-3.5">CPD Hours</th>
-                                <th className="p-3.5">Issued Date</th>
-                                <th className="p-3.5 text-center">Downloads</th>
-                                <th className="p-3.5 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                            {certificates.map((cert) => {
-                                const badge = ROLE_BADGES[cert.role] || ROLE_BADGES.custom;
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[720px] text-left text-xs">
+                            <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider">
+                                <tr>
+                                    <th className="p-3.5">Recipient</th>
+                                    <th className="p-3.5">Role</th>
+                                    <th className="p-3.5">Credential ID</th>
+                                    <th className="p-3.5">CPD Hours</th>
+                                    <th className="p-3.5">Issued Date</th>
+                                    <th className="p-3.5 text-center">Downloads</th>
+                                    <th className="p-3.5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                                {certificates.map((cert) => {
+                                    const badge = ROLE_BADGES[cert.role] || ROLE_BADGES.custom;
 
-                                return (
-                                    <tr
-                                        key={cert.id}
-                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
-                                    >
-                                        <td className="p-3.5">
-                                            <div className="font-bold text-slate-900 dark:text-white">
-                                                {cert.recipient_name}
-                                            </div>
-                                            <div className="text-[11px] text-slate-500">
-                                                {cert.recipient_email}
-                                            </div>
-                                        </td>
-                                        <td className="p-3.5">
-                                            <span
-                                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.bg}`}
-                                            >
-                                                {badge.label}
-                                            </span>
-                                        </td>
-                                        <td className="p-3.5 font-mono text-[11px] text-slate-800 dark:text-slate-200">
-                                            {cert.verification_code}
-                                        </td>
-                                        <td className="p-3.5">
-                                            {cert.cpd_hours > 0 ? (
-                                                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                                                    {Number(cert.cpd_hours).toFixed(1)} hrs
+                                    return (
+                                        <tr
+                                            key={cert.id}
+                                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
+                                        >
+                                            <td className="p-3.5">
+                                                <div className="font-bold text-slate-900 dark:text-white">
+                                                    {cert.recipient_name}
+                                                </div>
+                                                <div className="text-[11px] text-slate-500">
+                                                    {cert.recipient_email}
+                                                </div>
+                                            </td>
+                                            <td className="p-3.5">
+                                                <span
+                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.bg}`}
+                                                >
+                                                    {badge.label}
                                                 </span>
-                                            ) : (
-                                                <span className="text-slate-400">—</span>
-                                            )}
-                                        </td>
-                                        <td className="p-3.5 text-slate-500">
-                                            {cert.issued_at ? cert.issued_at.split('T')[0] : '—'}
-                                        </td>
-                                        <td className="p-3.5 text-center">
-                                            <span className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-semibold">
-                                                {cert.download_count}
-                                            </span>
-                                        </td>
-                                        <td className="p-3.5 text-right space-x-2">
-                                            <a
-                                                href={route('tenant.events.certificates.download', {
-                                                    event: event.id,
-                                                    certificate: cert.id,
-                                                })}
-                                                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
-                                                title="Download PDF"
-                                            >
-                                                <Download className="w-3.5 h-3.5" />
-                                                PDF
-                                            </a>
-                                            <a
-                                                href={`/verify/cert/${cert.uuid}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400"
-                                                title="Open Public Verification Badge"
-                                            >
-                                                <ExternalLink className="w-3.5 h-3.5" />
-                                                Verify
-                                            </a>
-                                            <button
-                                                onClick={() => setDeleteCertTarget(cert)}
-                                                className="p-1 text-slate-400 hover:text-rose-600"
-                                                title="Revoke Certificate"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                            </td>
+                                            <td className="p-3.5 font-mono text-[11px] text-slate-800 dark:text-slate-200">
+                                                {cert.verification_code}
+                                            </td>
+                                            <td className="p-3.5">
+                                                {cert.cpd_hours > 0 ? (
+                                                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                                                        {Number(cert.cpd_hours).toFixed(1)} hrs
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400">—</span>
+                                                )}
+                                            </td>
+                                            <td className="p-3.5 text-slate-500">
+                                                {cert.issued_at
+                                                    ? cert.issued_at.split('T')[0]
+                                                    : '—'}
+                                            </td>
+                                            <td className="p-3.5 text-center">
+                                                <span className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-semibold">
+                                                    {cert.download_count}
+                                                </span>
+                                            </td>
+                                            <td className="p-3.5 text-right space-x-2">
+                                                {can.read_certificate && (
+                                                    <button
+                                                        onClick={() => downloadCertificate(cert)}
+                                                        disabled={downloading !== null}
+                                                        aria-label={`Download PDF for ${cert.recipient_name}`}
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 disabled:opacity-50"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" />
+                                                        {downloading === cert.id
+                                                            ? 'Downloading…'
+                                                            : 'PDF'}
+                                                    </button>
+                                                )}
+                                                <a
+                                                    href={`/verify/cert/${cert.uuid}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400"
+                                                    title="Open Public Verification Badge"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                    Verify
+                                                </a>
+                                                {can.delete_certificate && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setRevokeError(null);
+                                                            setDeleteCertTarget(cert);
+                                                        }}
+                                                        aria-label="Revoke Certificate"
+                                                        className="p-1 text-slate-400 hover:text-rose-600"
+                                                        title="Revoke Certificate"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                {pagination && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4 text-xs dark:border-slate-800">
+                        <span>
+                            {pagination.from || 0}–{pagination.to || 0} of {pagination.total || 0}{' '}
+                            certificates
+                        </span>
+                        <div className="flex gap-2">
+                            <Button
+                                disabled={loading || page <= 1}
+                                onClick={() => setPage(page - 1)}
+                            >
+                                Previous
+                            </Button>
+                            <Button
+                                disabled={loading || page >= (pagination.last_page || 1)}
+                                onClick={() => setPage(page + 1)}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -608,7 +706,9 @@ export default function CertificatesPanel({ event }) {
                 onClose={() => setTemplateModalOpen(false)}
                 title={`Customize ${templateForm.role.toUpperCase()} Certificate Template`}
             >
+                <ArtifactErrors error={templateError} />
                 <CertificateDesignEditor
+                    fieldErrors={templateError?.fields}
                     layoutDefaults={layoutDefaults}
                     form={templateForm}
                     setForm={setTemplateForm}
@@ -628,6 +728,7 @@ export default function CertificatesPanel({ event }) {
                 title="Issue Accredited Certificates"
             >
                 <form onSubmit={handleIssueCertificates} className="space-y-4">
+                    <ArtifactErrors error={issueError} />
                     {issueResult && (
                         <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
@@ -636,10 +737,15 @@ export default function CertificatesPanel({ event }) {
                     )}
 
                     <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        <label
+                            htmlFor="cohort"
+                            className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                        >
                             Target Recipient Cohort *
                         </label>
                         <Select
+                            error={issueError?.fields?.['target_group']?.join(' ')}
+                            id="cohort"
                             value={issueForm.target_group}
                             onChange={(e) => {
                                 const tg = e.target.value;
@@ -675,15 +781,22 @@ export default function CertificatesPanel({ event }) {
                     </div>
 
                     {issueForm.target_group === 'custom' && (
-                        <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <label
+                                    htmlFor="recipient-name"
+                                    className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                                >
                                     Recipient Name *
                                 </label>
                                 <Input
                                     type="text"
                                     required
                                     placeholder="Full Name"
+                                    error={issueError?.fields?.['custom_recipients.0.name']?.join(
+                                        ' '
+                                    )}
+                                    id="recipient-name"
                                     value={issueForm.custom_name}
                                     onChange={(e) =>
                                         setIssueForm({ ...issueForm, custom_name: e.target.value })
@@ -691,13 +804,20 @@ export default function CertificatesPanel({ event }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                <label
+                                    htmlFor="recipient-email"
+                                    className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                                >
                                     Recipient Email *
                                 </label>
                                 <Input
                                     type="email"
                                     required
                                     placeholder="email@example.com"
+                                    error={issueError?.fields?.['custom_recipients.0.email']?.join(
+                                        ' '
+                                    )}
+                                    id="recipient-email"
                                     value={issueForm.custom_email}
                                     onChange={(e) =>
                                         setIssueForm({ ...issueForm, custom_email: e.target.value })
@@ -707,12 +827,17 @@ export default function CertificatesPanel({ event }) {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            <label
+                                htmlFor="certificate-role"
+                                className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                            >
                                 Certificate Role *
                             </label>
                             <Select
+                                error={issueError?.fields?.['role']?.join(' ')}
+                                id="certificate-role"
                                 value={issueForm.role}
                                 onChange={(e) =>
                                     setIssueForm({ ...issueForm, role: e.target.value })
@@ -726,12 +851,19 @@ export default function CertificatesPanel({ event }) {
                             </Select>
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            <label
+                                htmlFor="cpd-hours"
+                                className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                            >
                                 CPD Hours
                             </label>
                             <Input
                                 type="number"
-                                step="0.5"
+                                step="any"
+                                min="0"
+                                max="1000"
+                                error={issueError?.fields?.['cpd_hours']?.join(' ')}
+                                id="cpd-hours"
                                 value={issueForm.cpd_hours}
                                 onChange={(e) =>
                                     setIssueForm({ ...issueForm, cpd_hours: e.target.value })
@@ -752,15 +884,32 @@ export default function CertificatesPanel({ event }) {
             </Modal>
 
             {/* Confirm Revoke Modal */}
-            <ConfirmModal
+            <Modal
                 open={!!deleteCertTarget}
                 title="Revoke Certificate?"
-                description={`Are you sure you want to revoke the certificate for ${deleteCertTarget?.recipient_name} (${deleteCertTarget?.verification_code})? The QR code and verification link will no longer be valid.`}
-                confirmLabel="Revoke Certificate"
-                danger
-                onConfirm={handleDeleteCertificate}
-                onClose={() => setDeleteCertTarget(null)}
-            />
+                onClose={() => {
+                    if (!revoking) setDeleteCertTarget(null);
+                }}
+            >
+                <ArtifactErrors error={revokeError} />
+                <p className="text-sm text-ink-secondary">
+                    Revoke the certificate for {deleteCertTarget?.recipient_name} (
+                    {deleteCertTarget?.verification_code})? Its verification link will no longer be
+                    valid.
+                </p>
+                <div className="mt-6 flex justify-end gap-3">
+                    <Button onClick={() => setDeleteCertTarget(null)} disabled={revoking}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteCertificate}
+                        disabled={revoking}
+                        className="text-danger-fg"
+                    >
+                        {revoking ? 'Revoking…' : 'Revoke Certificate'}
+                    </Button>
+                </div>
+            </Modal>
         </div>
     );
 }

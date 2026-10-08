@@ -56,7 +56,7 @@ final class EventSections
             // The same permissions every check-in endpoint accepts: someone who
             // could open this section but not scan would only ever be refused.
             'check-in' => ['label' => 'Check-in', 'permission' => ['check in attendees', 'update event']],
-            'badges' => ['label' => 'Badges', 'permission' => 'read event'],
+            'badges' => ['label' => 'Badges', 'permission' => 'read badge-template'],
             'room-headcount' => ['label' => 'Room headcount', 'permission' => 'read event'],
             'help-requests' => ['label' => 'Help requests', 'permission' => 'read event'],
         ]],

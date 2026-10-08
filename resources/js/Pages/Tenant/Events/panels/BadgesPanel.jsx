@@ -1,3 +1,6 @@
+import { usePage } from '@inertiajs/react';
+import ArtifactErrors from '../Certificates/ArtifactErrors';
+import { artifactJson, artifactPdf, downloadArtifact } from '@/lib/artifactResponse';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '@/Components/Console/Button';
 import SearchInput from '@/Components/Console/SearchInput';
@@ -18,6 +21,11 @@ const exportReference = () => {
 };
 
 export default function BadgesPanel({ event }) {
+    const can = usePage().props.auth?.can || {};
+    const [loadError, setLoadError] = useState(null);
+    const [designError, setDesignError] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const loadSequence = useRef(0);
     const [batch, setBatch] = useState(0);
     const [layoutDefaults, setLayoutDefaults] = useState({});
     const [tenantLogo, setTenantLogo] = useState(null);
@@ -34,19 +42,34 @@ export default function BadgesPanel({ event }) {
     const [error, setError] = useState(null);
     const [designForm, setDesignForm] = useState(null);
 
-    const load = () => {
-        csrfFetch(route('tenant.events.badges.index', { event: event.id }))
-            .then((r) => r.json())
-            .then((data) => {
-                setBadges(data.badges);
-                setLayoutDefaults(data.layout_defaults || data.template?.layout || {});
-                setTenantLogo(data.tenant_logo || null);
-                setRecentPrints(data.recent_prints);
-                setTemplate(data.template);
-            });
+    const load = async () => {
+        const sequence = ++loadSequence.current;
+        setLoading(true);
+        setLoadError(null);
+        try {
+            const data = await artifactJson(
+                await csrfFetch(route('tenant.events.badges.index', { event: event.id })),
+                'Badges could not be loaded. Please try again.'
+            );
+            if (sequence !== loadSequence.current) return;
+            setBadges(data.badges || []);
+            setLayoutDefaults(data.layout_defaults || data.template?.layout || {});
+            setTenantLogo(data.tenant_logo || null);
+            setRecentPrints(data.recent_prints || []);
+            setTemplate(data.template || null);
+        } catch (reason) {
+            if (sequence === loadSequence.current) setLoadError(reason);
+        } finally {
+            if (sequence === loadSequence.current) setLoading(false);
+        }
     };
 
-    useEffect(load, [event.id]);
+    useEffect(() => {
+        load();
+        return () => {
+            loadSequence.current += 1;
+        };
+    }, [event.id]);
 
     const filtered = useMemo(() => {
         if (!badges) {
@@ -88,21 +111,18 @@ export default function BadgesPanel({ event }) {
                     body: JSON.stringify({ registration_ids: ids, export_reference: reference }),
                 }
             );
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'The badge PDF could not be generated.');
-            }
-            const url = URL.createObjectURL(await response.blob());
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${event.name || 'event'}-badges.pdf`;
-            link.click();
-            URL.revokeObjectURL(url);
+            downloadArtifact(
+                await artifactPdf(
+                    response,
+                    'The badge PDF could not be generated. Please try again.'
+                ),
+                `${event.name || 'event'}-badges.pdf`
+            );
             if (exportAttempt.current?.reference === reference) exportAttempt.current = null;
             setRetryAvailable(false);
             load();
         } catch (reason) {
-            setError(reason.message);
+            setError(reason);
             setRetryAvailable(true);
         } finally {
             downloadPending.current = false;
@@ -111,6 +131,7 @@ export default function BadgesPanel({ event }) {
     };
 
     const openDesigner = () => {
+        setDesignError(null);
         setDesignForm({
             ...template,
             background: null,
@@ -130,7 +151,7 @@ export default function BadgesPanel({ event }) {
     const saveDesign = async (eventObject) => {
         eventObject.preventDefault();
         setSavingDesign(true);
-        setError(null);
+        setDesignError(null);
         const payload = new FormData();
         Object.entries(designForm).forEach(([key, value]) => {
             if (
@@ -158,13 +179,14 @@ export default function BadgesPanel({ event }) {
                 route('tenant.events.badges.template.update', { event: event.id }),
                 payload
             );
-            const data = await response.json();
-            if (!response.ok)
-                throw new Error(data.message || 'The badge design could not be saved.');
+            const data = await artifactJson(
+                response,
+                'The badge design could not be saved. Please try again.'
+            );
             setTemplate(data.template);
             setDesignerOpen(false);
         } catch (reason) {
-            setError(reason.message);
+            setDesignError(reason);
         } finally {
             setSavingDesign(false);
         }
@@ -183,25 +205,31 @@ export default function BadgesPanel({ event }) {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button icon={Palette} onClick={openDesigner} disabled={!template}>
-                        Design badges
-                    </Button>
-                    <Button
-                        icon={Download}
-                        variant="primary"
-                        onClick={downloadPdf}
-                        disabled={selectedBadges.length === 0 || printing}
-                    >
-                        {printing
-                            ? 'Generating…'
-                            : `${retryAvailable ? 'Retry download' : 'Download'} ${selectedBadges.length || ''} badge${selectedBadges.length === 1 ? '' : 's'} PDF`}
-                    </Button>
+                    {can.update_badge_template && (
+                        <Button icon={Palette} onClick={openDesigner} disabled={!template}>
+                            Design badges
+                        </Button>
+                    )}
+                    {can.update_event && (
+                        <Button
+                            icon={Download}
+                            variant="primary"
+                            onClick={downloadPdf}
+                            disabled={selectedBadges.length === 0 || printing}
+                        >
+                            {printing
+                                ? 'Generating…'
+                                : `${retryAvailable ? 'Retry download' : 'Download'} ${selectedBadges.length || ''} badge${selectedBadges.length === 1 ? '' : 's'} PDF`}
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            {error && (
-                <div className="no-print mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-                    {error}
+            <ArtifactErrors error={error} />
+            {loadError && (
+                <div className="mb-4">
+                    <ArtifactErrors error={loadError} />
+                    <Button onClick={load}>Retry loading badges</Button>
                 </div>
             )}
 
@@ -238,7 +266,9 @@ export default function BadgesPanel({ event }) {
                 />
             </div>
 
-            {badges === null && <p className="text-sm text-ink-secondary">Loading badges…</p>}
+            {loading && badges === null && (
+                <p className="text-sm text-ink-secondary">Loading badges…</p>
+            )}
 
             {badges !== null && badges.length === 0 && (
                 <p className="text-sm text-ink-secondary">
@@ -312,8 +342,10 @@ export default function BadgesPanel({ event }) {
                 title="Badge print studio"
                 className="max-w-6xl"
             >
+                <ArtifactErrors error={designError} />
                 {designForm && (
                     <BadgeDesignEditor
+                        fieldErrors={designError?.fields}
                         form={designForm}
                         layoutDefaults={layoutDefaults}
                         tenantLogo={tenantLogo}
