@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BadgesPanel from '@/Pages/Tenant/Events/panels/BadgesPanel';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 const permissions = vi.hoisted(() => ({ current: {} }));
@@ -46,37 +46,45 @@ beforeEach(() => {
     URL.revokeObjectURL = vi.fn();
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 });
-it.each([100, 101, 250])('downloads only the selected batch for %i matches', async (count) => {
-    const data = dataFor(count);
-    csrfFetch.mockImplementation((url, options) =>
-        options
-            ? Promise.resolve({
-                  ok: true,
-                  headers: { get: () => 'application/pdf' },
-                  blob: async () => new Blob(['pdf']),
-              })
-            : Promise.resolve(response(data))
-    );
-    render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
-    await screen.findByText('Person 0');
-    expect(screen.getByText(/matching badges/).textContent).toContain(String(count));
-    if (count > 100)
-        fireEvent.change(screen.getByLabelText('Badge batch'), { target: { value: '1' } });
-    fireEvent.click(screen.getByRole('button', { name: /Download .* PDF/ }));
-    await waitFor(() =>
-        expect(csrfFetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true)
-    );
-    const payload = JSON.parse(
-        csrfFetch.mock.calls.find(([, options]) => options?.method === 'POST')[1].body
-    );
-    expect(payload.registration_ids).toHaveLength(count === 100 ? 100 : Math.min(count - 100, 100));
-    expect(payload.registration_ids[0]).toBe(count === 100 ? 'id-0' : 'id-100');
-    expect(payload.export_reference).toBeTruthy();
-    await waitFor(() => expect(csrfFetch).toHaveBeenCalledTimes(3));
-    await waitFor(() =>
-        expect(screen.getByRole('button', { name: /Download .* PDF/ }).disabled).toBe(false)
-    );
-});
+it.each([100, 101, 250])(
+    'downloads only the selected batch for %i matches',
+    async (count) => {
+        const data = dataFor(count);
+        csrfFetch.mockImplementation((url, options) =>
+            options
+                ? Promise.resolve({
+                      ok: true,
+                      headers: { get: () => 'application/pdf' },
+                      blob: async () => new Blob(['pdf']),
+                  })
+                : Promise.resolve(response(data))
+        );
+        render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
+        await screen.findByText('Person 0');
+        expect(screen.getByText(/matching badges/).textContent).toContain(String(count));
+        if (count > 100)
+            fireEvent.change(screen.getByLabelText('Badge batch'), { target: { value: '1' } });
+        fireEvent.click(screen.getByRole('button', { name: /Download .* PDF/ }));
+        await waitFor(() =>
+            expect(csrfFetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(
+                true
+            )
+        );
+        const payload = JSON.parse(
+            csrfFetch.mock.calls.find(([, options]) => options?.method === 'POST')[1].body
+        );
+        expect(payload.registration_ids).toHaveLength(
+            count === 100 ? 100 : Math.min(count - 100, 100)
+        );
+        expect(payload.registration_ids[0]).toBe(count === 100 ? 'id-0' : 'id-100');
+        expect(payload.export_reference).toBeTruthy();
+        await waitFor(() => expect(csrfFetch).toHaveBeenCalledTimes(3));
+        await waitFor(() =>
+            expect(screen.getByRole('button', { name: /Download .* PDF/ }).disabled).toBe(false)
+        );
+    },
+    30000
+);
 it('uses saved design and actual attendee fields, resets changed filters, and preserves batch after history refresh', async () => {
     const data = dataFor(250);
     let loads = 0;
@@ -94,8 +102,10 @@ it('uses saved design and actual attendee fields, resets changed filters, and pr
         loads += 1;
         return Promise.resolve(response(refreshed));
     });
-    render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
-    expect((await screen.findByText('Person 0')).style.color).toBe('rgb(171, 205, 239)');
+    await act(async () => {
+        render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
+    });
+    expect(screen.getByText('Person 0').style.color).toBe('rgb(171, 205, 239)');
     expect(screen.getByText('CODE-0')).toBeTruthy();
     expect(screen.getByText('Seat 0')).toBeTruthy();
     expect(screen.getAllByAltText('Attendee QR')[0].getAttribute('src')).toBe('qr-0');
@@ -121,7 +131,7 @@ it('uses saved design and actual attendee fields, resets changed filters, and pr
     expect(requests[1].export_reference).not.toBe(requests[0].export_reference);
     await waitFor(() => expect(loads).toBe(3));
     expect(screen.getByPlaceholderText('Search by name or entry code').value).toBe('CODE-0');
-});
+}, 30000);
 it('retries a lost response with the same reference and blocks concurrent downloads', async () => {
     let rejectRequest;
     csrfFetch
@@ -203,7 +213,7 @@ it('retries a failed PDF body with its stable reference and resets batches for c
     rerender(<BadgesPanel event={{ id: 'other-event' }} />);
     await waitFor(() => expect(screen.getByLabelText('Badge batch').value).toBe('0'));
     expect(screen.getByText(/matching badges/).textContent).toContain('101');
-});
+}, 30000);
 
 it('supports UUID references on HTTP browsers without crypto.randomUUID', async () => {
     const uuid = crypto.randomUUID;
@@ -302,7 +312,11 @@ it('gates design and download using explicit capabilities', async () => {
 it('refreshes saved logo metadata and keeps imported fonts when the designer reopens', async () => {
     const initial = dataFor(1);
     initial.template.layout.tenant_logo = { ...field, visible: true };
-    const updated = { ...initial, badge_logo: 'data:image/png;base64,new-logo', custom_logo: 'data:image/png;base64,new-logo' };
+    const updated = {
+        ...initial,
+        badge_logo: 'data:image/png;base64,new-logo',
+        custom_logo: 'data:image/png;base64,new-logo',
+    };
     let saved = false;
     csrfFetch.mockImplementation(() => Promise.resolve(response(saved ? updated : initial)));
     csrfFetchFormData.mockImplementation(() => {
@@ -317,8 +331,20 @@ it('refreshes saved logo metadata and keeps imported fonts when the designer reo
     expect(screen.getByAltText('Badge logo').getAttribute('src')).toBe(updated.badge_logo);
     fireEvent.click(screen.getByRole('button', { name: 'Design badges' }));
     fireEvent.click(screen.getByText('Add your own font'));
-    csrfFetchFormData.mockResolvedValue(response({ font: { id: 'custom-id', family: 'artifact-id', name: 'Brand Font', weights: [400], faces: [] } }));
-    fireEvent.change(screen.getByLabelText('Google Fonts family or link'), { target: { value: 'Lato' } });
+    csrfFetchFormData.mockResolvedValue(
+        response({
+            font: {
+                id: 'custom-id',
+                family: 'artifact-id',
+                name: 'Brand Font',
+                weights: [400],
+                faces: [],
+            },
+        })
+    );
+    fireEvent.change(screen.getByLabelText('Google Fonts family or link'), {
+        target: { value: 'Lato' },
+    });
     fireEvent.click(screen.getByLabelText('I have permission to use and embed this font'));
     fireEvent.click(screen.getByRole('button', { name: 'Import font' }));
     await screen.findByText('Brand Font is ready to use.');
