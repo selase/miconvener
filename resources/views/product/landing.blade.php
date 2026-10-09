@@ -113,6 +113,38 @@
     .cap p { color: var(--ink-2); font-size: .92rem; margin-top: .3rem; }
 
     a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--ice); outline-offset: 2px; }
+    [data-hero-showcase] [hidden] { display:none!important; }
+    [data-hero-showcase] .mc-reference-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:22px; border-top:1px solid #ffffff35; border-bottom:1px solid #ffffff35; text-align:left; }
+    [data-hero-showcase] .mc-reference-tab { position:relative; padding:20px 24px; font:500 15px 'Public Sans',sans-serif; color:#d7e5ff; background:transparent; border:0; border-left:1px solid #ffffff35; min-height:64px; text-align:left; }
+    [data-hero-showcase] .mc-reference-tab:first-child { border-left:0; }
+    [data-hero-showcase] .mc-reference-tab::after { content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:#ffffff55; }
+    [data-hero-showcase] .mc-reference-tab[aria-selected="true"] { color:#fff; background:#ffffff0a; }
+    [data-hero-showcase] .mc-reference-tab[aria-selected="true"]::after { background:#fff; }
+    [data-hero-showcase] .mc-reference-tab:focus-visible { outline:3px solid #cbf2fb; outline-offset:-3px; }
+    [data-hero-showcase] .shot-body { display:grid; }
+    [data-hero-showcase] .mc-product-slide { grid-area:1 / 1; min-width:0; min-height:430px; }
+    [data-hero-showcase] .mc-product-slide[hidden] { display:block!important; visibility:hidden; pointer-events:none; }
+    [data-hero-showcase] .mc-slide-title { font-size:19px; font-weight:500; margin:0; }
+    [data-hero-showcase] .mc-slide-sub { font-size:13px; line-height:1.6; color:#45505e; margin:4px 0 20px; }
+    [data-hero-showcase] .mc-showcase-columns { display:grid; grid-template-columns:1.05fr 1fr; gap:22px; }
+    [data-hero-showcase] .mc-demo-pane { border:1px solid #e3e8ee; border-radius:8px; padding:18px; background:#fff; }
+    [data-hero-showcase] .mc-demo-pane h3 { font-size:14px; font-weight:500; margin:0 0 14px; }
+    [data-hero-showcase] .mc-demo-row { padding:12px 0; border-top:1px solid #e3e8ee; display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:13px; }
+    [data-hero-showcase] .mc-demo-row small { display:block; font-size:11px; color:#78838f; margin-top:4px; }
+    [data-hero-showcase] .mc-demo-state { font-size:11px; color:#155dfc; background:#eef3ff; padding:4px 6px; border-radius:4px; white-space:nowrap; }
+    [data-hero-showcase] .mc-artifact-pair { display:grid; grid-template-columns:.8fr 1.2fr; gap:14px; align-items:center; }
+    [data-hero-showcase] .mc-demo-badge { border:1px solid #e3e8ee; border-radius:7px; overflow:hidden; text-align:center; background:#f6f8fa; }
+    [data-hero-showcase] .mc-demo-badge header { padding:16px 10px; color:#fff; background:#155dfc; font-size:11px; }
+    [data-hero-showcase] .mc-demo-badge strong { display:block; margin:18px 8px 4px; font-size:16px; font-weight:500; }
+    [data-hero-showcase] .mc-demo-badge p { color:#78838f; font-size:11px; margin-bottom:14px; }
+    [data-hero-showcase] .mc-demo-badge svg { width:48px!important; height:48px!important; margin:0 auto 18px; color:#12161c; }
+    [data-hero-showcase] .mc-demo-certificate { border:1px solid #e3e8ee; padding:28px 12px; text-align:center; background:#fff; }
+    [data-hero-showcase] .mc-demo-certificate small { font-size:10px; color:#78838f; }
+    [data-hero-showcase] .mc-demo-certificate h3 { font-size:15px; font-weight:500; margin:20px 0 14px; }
+    [data-hero-showcase] .mc-demo-certificate strong { font-size:15px; font-weight:500; }
+    [data-hero-showcase] .mc-demo-certificate p { font-size:11px; color:#78838f; margin:10px 0; }
+    @media(max-width:640px) { [data-hero-showcase] .mc-reference-tab { padding:16px 12px; font-size:13px; min-height:58px; } [data-hero-showcase] .mc-showcase-columns { grid-template-columns:1fr; gap:16px; } [data-hero-showcase] .mc-product-slide { min-height:610px; } [data-hero-showcase] .mc-demo-pane { padding:14px; } }
+
 </style>
 @endpush
 
@@ -138,20 +170,74 @@
 
         <p class="mt-5 text-sm" style="color:#b7cdf7; font-weight:300">One live event at a time and 50 registrations a month. No card required.</p>
 
-        {{-- Event-day overview. Swap for a real capture by replacing this block
-             with <img src="/assets/img/marketing/overview.png" alt="…"> once the
-             screenshot is in the repo. --}}
-        <div class="mx-auto mt-14 max-w-5xl">
+        <div class="mx-auto mt-14 max-w-5xl" data-hero-showcase>
+            <div class="mc-reference-tabs" role="tablist" aria-label="Event feature showcase" hidden>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-plan" aria-controls="hero-panel-plan" aria-selected="false" tabindex="-1">Plan your event</button>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-run" aria-controls="hero-panel-run" aria-selected="true" tabindex="0">Run the day</button>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-finish" aria-controls="hero-panel-finish" aria-selected="false" tabindex="-1">Follow through</button>
+            </div>
             <div class="shot">
                 <div class="shot-head">
                     <i></i><i></i><i></i>
                     <span class="addr mono">accra-tech-week.miconvener.com/events/summit</span>
                 </div>
                 <div class="shot-body">
+                    <div class="mc-product-slide" id="hero-panel-plan" role="tabpanel" aria-labelledby="hero-tab-plan" tabindex="0" hidden>
+                        <h2 class="mc-slide-title">Prepare the whole event</h2>
+                        <p class="mc-slide-sub">Event pages, registration, payments, programme, speakers and your event team.</p>
+                        <div class="mc-showcase-columns">
+                            <div class="mc-demo-pane">
+                                <h3>Programme · Demo summit</h3>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Opening keynote
+                                        <small>09:00 · Main hall · Speaker confirmed</small>
+                                    </div>
+                                    <span class="mc-demo-state">Ready</span>
+                                </div>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Research presentations
+                                        <small>10:30 · Breakout room · Abstracts reviewed</small>
+                                    </div>
+                                    <span class="mc-demo-state">Ready</span>
+                                </div>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Practical workshop
+                                        <small>13:00 · Studio · Materials available</small>
+                                    </div>
+                                    <span class="mc-demo-state">Ready</span>
+                                </div>
+                            </div>
+                            <div class="mc-demo-pane">
+                                <h3>Everything around the programme</h3>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Registration & tickets
+                                        <small>Forms, groups, ticket tiers and promo codes</small>
+                                    </div>
+                                </div>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Venue & seating
+                                        <small>Rooms, facilities and seating plans</small>
+                                    </div>
+                                </div>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Team & sponsors
+                                        <small>Crew responsibilities and event partners</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mc-product-slide" id="hero-panel-run" role="tabpanel" aria-labelledby="hero-tab-run" tabindex="0">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <div class="display text-[19px]">Overview</div>
-                            <div class="text-[13px]" style="color:var(--muted)">Everything happening at the summit right now.</div>
+                            <div class="text-[13px]" style="color:var(--muted)">Check-in, live polls, Q&amp;A, discussions and guest assistance in one workspace.</div>
                         </div>
                         <div class="hidden rounded-md border px-3 py-1.5 text-[12px] sm:block" style="border-color:var(--rule); color:var(--ink-2)">Export day report</div>
                     </div>
@@ -210,6 +296,53 @@
                                         <span class="chip shrink-0" style="color:{{ $tone }}">{{ $state }}</span>
                                     </div>
                                 @endforeach
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="mc-product-slide" id="hero-panel-finish" role="tabpanel" aria-labelledby="hero-tab-finish" tabindex="0" hidden>
+                        <h2 class="mc-slide-title">Give people something to take away</h2>
+                        <p class="mc-slide-sub">Your badge and certificate designs, attendee records, feedback and event finances.</p>
+                        <div class="mc-showcase-columns">
+                            <div class="mc-artifact-pair">
+                                <div class="mc-demo-badge">
+                                    <header>Accra Tech Week</header>
+                                    <strong>Ama Mensah</strong>
+                                    <p>Speaker · Main hall</p>
+                                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                                        <path
+                                            d="M4 4h14v14H4zM30 4h14v14H30zM4 30h14v14H4zM10 10h2v2h-2zM36 10h2v2h-2zM10 36h2v2h-2zM24 4v8M24 18v12h8v-6h12M24 36v8h8M38 32h6v12h-6M32 36v-4"
+                                        />
+                                    </svg>
+                                </div>
+                                <div class="mc-demo-certificate">
+                                    <small>Accra Tech Week</small>
+                                    <h3>Certificate of participation</h3>
+                                    <p>Presented to</p>
+                                    <strong>Ama Mensah</strong>
+                                    <p>A record of your participation</p>
+                                </div>
+                            </div>
+                            <div class="mc-demo-pane">
+                                <h3>Close the loop</h3>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Badges & certificates
+                                        <small>Your fonts, artwork, logo and QR placement</small>
+                                    </div>
+                                </div>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Attendee portal & feedback
+                                        <small>Tickets, certificates, receipts and surveys</small>
+                                    </div>
+                                </div>
+                                <div class="mc-demo-row">
+                                    <div>
+                                        Reports & settlement
+                                        <small>Contributions, refunds, statements and payouts</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -487,3 +620,39 @@
 </section>
 
 @endsection
+
+@push('scripts')
+<script data-hero-showcase-script>
+(() => {
+    const root = document.querySelector('[data-hero-showcase]');
+    if (!root) return;
+    const tabs = [...root.querySelectorAll('[role="tab"]')];
+    const panels = tabs.map(tab => document.getElementById(tab.getAttribute('aria-controls')));
+    const select = (index, focus = false) => {
+        tabs.forEach((tab, position) => {
+            const selected = position === index;
+            tab.setAttribute('aria-selected', String(selected));
+            tab.tabIndex = selected ? 0 : -1;
+            panels[position].hidden = !selected;
+        });
+        if (focus) tabs[index].focus();
+    };
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => select(index));
+        tab.addEventListener('keydown', event => {
+            const destinations = {
+                ArrowRight: (index + 1) % tabs.length,
+                ArrowLeft: (index + tabs.length - 1) % tabs.length,
+                Home: 0,
+                End: tabs.length - 1,
+            };
+            if (!(event.key in destinations)) return;
+            event.preventDefault();
+            select(destinations[event.key], true);
+        });
+    });
+    select(1);
+    root.querySelector('[role="tablist"]').hidden = false;
+})();
+</script>
+@endpush

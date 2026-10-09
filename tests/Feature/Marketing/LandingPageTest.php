@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Marketing;
 
+use DOMDocument;
+use DOMXPath;
+
 /**
  * The landing page is the first thing every visitor and every shared link
  * reaches, and it is assembled from config plus a Livewire pricing component --
@@ -40,4 +43,23 @@ test('the landing page leaves the marketplace out of navigation and footer until
 
     $response->assertOk();
     $response->assertDontSee('/marketplace', false);
+});
+
+test('the hero renders three labelled panels and preserves the event-day fallback', function (): void {
+    $response = $this->get('/')->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $tabs = $xpath->query('//*[@data-hero-showcase]//*[@role="tab"]');
+
+    expect($tabs->length)->toBe(3);
+    foreach ($tabs as $tab) {
+        $panel = $document->getElementById($tab->getAttribute('aria-controls'));
+        expect($panel)->not->toBeNull()
+            ->and($panel->getAttribute('aria-labelledby'))->toBe($tab->getAttribute('id'))
+            ->and($panel->hasAttribute('hidden'))->toBe($tab->getAttribute('aria-selected') !== 'true');
+    }
+
+    expect($document->getElementById('hero-panel-run')->textContent)->toContain('Overview');
+    $response->assertSee('Plan your event')->assertSee('Follow through');
 });
