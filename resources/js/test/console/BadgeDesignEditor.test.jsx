@@ -18,7 +18,7 @@ function Editor() {
     const [form, setForm] = useState({
         width_mm: 100,
         height_mm: 70,
-        layout: { attendee_name: { ...field, x: 0.2, width: 0.6 } },
+        layout: { attendee_name: { ...field, x: 0.2, width: 0.6 }, event_name: field },
         sheet_settings: { paper: 'a4', margin_mm: 8, gap_mm: 3, crop_marks: true },
     });
     return (
@@ -81,4 +81,42 @@ it.each([
     const input = screen.getByLabelText(label);
     fireEvent.change(input, { target: { value } });
     expect(input.checkValidity()).toBe(true);
+});
+
+it('selects canvas fields and edits their underline without submitting the form', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Select Event name' }));
+    expect(screen.getByLabelText('Field to position').value).toBe('event_name');
+    fireEvent.click(screen.getByLabelText('Underline Event name'));
+    expect(
+        JSON.parse(screen.getByLabelText('Design values').textContent).layout.event_name.underline
+    ).toBe(true);
+    expect(screen.getByRole('button', { name: 'Select Event name' }).style.textDecoration).toBe(
+        'underline'
+    );
+    fireEvent.change(screen.getByLabelText('Field to position'), {
+        target: { value: 'attendee_name' },
+    });
+    expect(
+        screen.getByRole('button', { name: 'Select Attendee name' }).getAttribute('aria-pressed')
+    ).toBe('true');
+});
+
+it('changes background fit and positioning and provides mobile workspace views', () => {
+    render(<Editor />);
+    fireEvent.change(screen.getByLabelText('Background fit'), { target: { value: 'contain' } });
+    fireEvent.change(screen.getByLabelText('Background position'), {
+        target: { value: 'bottom-right' },
+    });
+    expect(
+        JSON.parse(screen.getByLabelText('Design values').textContent).background_settings
+    ).toMatchObject({ fit: 'contain', position: 'bottom-right' });
+    fireEvent.click(screen.getByRole('button', { name: 'Canvas', exact: true }));
+    expect(
+        screen.getByRole('button', { name: 'Canvas', exact: true }).getAttribute('aria-pressed')
+    ).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Select Event name' }));
+    expect(
+        screen.getByRole('button', { name: 'Properties', exact: true }).getAttribute('aria-pressed')
+    ).toBe('true');
 });

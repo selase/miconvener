@@ -7,7 +7,15 @@ const SAMPLE = {
     seat_label: 'Seat A14',
 };
 
-export default function BadgeLayoutPreview({ template, backgroundUrl, badge, event, tenantLogo }) {
+export default function BadgeLayoutPreview({
+    template,
+    backgroundUrl,
+    badge,
+    event,
+    tenantLogo,
+    selectedField,
+    onSelectField,
+}) {
     const ratio = `${template.width_mm || 100}/${template.height_mm || 70}`;
     const values = badge
         ? {
@@ -23,16 +31,33 @@ export default function BadgeLayoutPreview({ template, backgroundUrl, badge, eve
     const longName = values.attendee_name.length > 28;
 
     return (
-        <div>
+        <div
+            style={
+                onSelectField
+                    ? {
+                          maxWidth: `${((template.width_mm || 100) / (template.height_mm || 70)) * 60}dvh`,
+                          marginInline: 'auto',
+                      }
+                    : undefined
+            }
+        >
             <div
                 className="relative w-full overflow-hidden border border-slate-300 bg-white shadow-sm dark:border-slate-700"
                 style={{
                     aspectRatio: ratio,
                     backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
-                    backgroundSize: '100% 100%',
+                    backgroundSize:
+                        template.background_settings?.fit === 'contain'
+                            ? 'contain'
+                            : template.background_settings?.fit === 'cover'
+                              ? 'cover'
+                              : '100% 100%',
+                    backgroundRepeat: 'no-repeat',
                     backgroundColor: tierStyle.background_color || '#FFFFFF',
                     containerType: 'inline-size',
-                    backgroundPosition: 'center',
+                    backgroundPosition: (
+                        template.background_settings?.position || 'center'
+                    ).replaceAll('-', ' '),
                 }}
                 aria-label="Badge design preview"
             >
@@ -78,15 +103,36 @@ export default function BadgeLayoutPreview({ template, backgroundUrl, badge, eve
                                 )}
                             </div>
                         );
+                    const Element = onSelectField ? 'button' : 'div';
                     return (
-                        <div
+                        <Element
                             key={key}
-                            className="absolute overflow-hidden leading-tight"
+                            type={onSelectField ? 'button' : undefined}
+                            aria-label={
+                                onSelectField
+                                    ? `Select ${key.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase())}`
+                                    : undefined
+                            }
+                            aria-pressed={onSelectField ? selectedField === key : undefined}
+                            onClick={onSelectField ? () => onSelectField(key) : undefined}
+                            className="absolute overflow-hidden leading-tight focus-visible:outline-2 focus-visible:outline-indigo-600"
                             style={{
                                 left: `${item.x * 100}%`,
                                 top: `${item.y * 100}%`,
                                 width: `${item.width * 100}%`,
                                 height: `${item.height * 100}%`,
+                                display: 'block',
+                                alignContent: 'start',
+                                margin: 0,
+                                padding: 0,
+                                border: 0,
+                                background: 'transparent',
+                                outline:
+                                    onSelectField && selectedField === key
+                                        ? '2px solid #6366f1'
+                                        : undefined,
+                                outlineOffset: '-2px',
+                                textDecoration: item.underline ? 'underline' : 'none',
                                 textAlign: item.align || 'center',
                                 color: tierStyle.text_color || item.color || '#111827',
                                 fontFamily: {
@@ -100,7 +146,7 @@ export default function BadgeLayoutPreview({ template, backgroundUrl, badge, eve
                             }}
                         >
                             {values[key] || ''}
-                        </div>
+                        </Element>
                     );
                 })}
             </div>

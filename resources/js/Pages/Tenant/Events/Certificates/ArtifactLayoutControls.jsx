@@ -6,10 +6,18 @@ import Checkbox from '@/Components/Console/Checkbox';
 const labelFor = (key) =>
     key.replaceAll('_', ' ').replace(/^./, (character) => character.toUpperCase());
 
-export default function ArtifactLayoutControls({ layout, onChange, requiredFields = [] }) {
-    const [selected, setSelected] = useState(
+export default function ArtifactLayoutControls({
+    layout,
+    onChange,
+    requiredFields = [],
+    selectedField,
+    onSelectField,
+    allowUnderline = false,
+}) {
+    const [internalSelected, setSelected] = useState(
         'recipient_name' in layout ? 'recipient_name' : Object.keys(layout)[0]
     );
+    const selected = selectedField ?? internalSelected;
     const field = layout[selected];
     if (!field) return null;
     const label = labelFor(selected);
@@ -27,7 +35,11 @@ export default function ArtifactLayoutControls({ layout, onChange, requiredField
                 label="Field to position"
                 aria-label="Field to position"
                 value={selected}
-                onChange={(event) => setSelected(event.target.value)}
+                onChange={(event) =>
+                    onSelectField
+                        ? onSelectField(event.target.value)
+                        : setSelected(event.target.value)
+                }
             >
                 {Object.keys(layout).map((key) => (
                     <option key={key} value={key}>
@@ -105,6 +117,13 @@ export default function ArtifactLayoutControls({ layout, onChange, requiredField
                 value={field.color}
                 onChange={(event) => update('color', event.target.value)}
             />
+            {allowUnderline && !['qr', 'tenant_logo'].includes(selected) && (
+                <Checkbox
+                    label={`Underline ${label}`}
+                    checked={field.underline === true}
+                    onChange={(event) => update('underline', event.target.checked)}
+                />
+            )}
             {requiredFields.includes(selected) ? (
                 <p className="text-xs text-ink-secondary">
                     This identity field always remains visible.

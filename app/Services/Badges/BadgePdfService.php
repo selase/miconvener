@@ -96,6 +96,7 @@ final class BadgePdfService
             'layout' => $template->layoutSettings(),
             'pages' => $badges->chunk($columns * $rows),
             'backgroundDataUri' => $background,
+            'backgroundBox' => $this->backgroundBox($template, $background),
             'tenantLogoDataUri' => $this->templates->tenantLogo($event),
             'margin' => $margin,
             'gap' => $gap,
@@ -104,5 +105,25 @@ final class BadgePdfService
             'paperHeight' => $paper[1],
             'cropMarks' => $settings['crop_marks'],
         ])->render();
+    }
+
+    /** @return array{x: float, y: float, width: float, height: float} */
+    private function backgroundBox(EventBadgeTemplate $template, ?string $background): array
+    {
+        $width = (float) $template->width_mm;
+        $height = (float) $template->height_mm;
+        $settings = $template->backgroundSettings();
+        $image = $background ? getimagesizefromstring(base64_decode(explode(',', $background, 2)[1], true) ?: '') : false;
+        if ($settings['fit'] === 'stretch' || $image === false) {
+            return ['x' => 0.0, 'y' => 0.0, 'width' => $width, 'height' => $height];
+        }
+        $scale = $settings['fit'] === 'contain' ? min($width / $image[0], $height / $image[1]) : max($width / $image[0], $height / $image[1]);
+        $fittedWidth = $image[0] * $scale;
+        $fittedHeight = $image[1] * $scale;
+        $position = $settings['position'];
+        $horizontal = str_contains($position, 'left') ? 0.0 : (str_contains($position, 'right') ? 1.0 : 0.5);
+        $vertical = str_contains($position, 'top') ? 0.0 : (str_contains($position, 'bottom') ? 1.0 : 0.5);
+
+        return ['x' => ($width - $fittedWidth) * $horizontal, 'y' => ($height - $fittedHeight) * $vertical, 'width' => $fittedWidth, 'height' => $fittedHeight];
     }
 }

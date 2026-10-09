@@ -33,3 +33,21 @@ it('labels the dialog, traps keyboard focus, and restores its trigger without re
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
 });
+
+it('offers an opt-in mobile workspace and skips the hidden mobile pane when trapping focus', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    const { unmount } = render(
+        <Modal open fullScreenOnMobile title="Badge workspace" onClose={() => {}}>
+            <button>Visible action</button>
+            <div data-mobile-hidden="true">
+                <button>Hidden action</button>
+            </div>
+        </Modal>
+    );
+    expect(screen.getByRole('dialog').className).toContain('h-dvh');
+    screen.getByRole('button', { name: 'Visible action' }).focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }));
+    unmount();
+    vi.unstubAllGlobals();
+});

@@ -10,6 +10,7 @@ use App\Models\EventRegistration;
 use App\Models\EventTicketType;
 use App\Services\Badges\BadgePdfService;
 use App\Services\Badges\BadgeTemplateService;
+use DOMElement;
 use Illuminate\Support\Facades\Artisan;
 use Mockery;
 use RuntimeException;
@@ -229,3 +230,43 @@ test('badge renderer failures never record print history', function (): void {
     $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/sheet", ['registration_ids' => [$registration->id]], ['HTTP_HOST' => $host])->assertServerError();
     expect(EventBadgePrint::query()->count())->toBe(0);
 });
+
+test('background fitting uses exact printable image dimensions', function (?string $fit, string $position, float $width, float $height, float $left, float $top): void {
+    \Illuminate\Support\Facades\Storage::fake('public');
+    [$tenant] = eventHost('acme');
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $template = app(BadgeTemplateService::class)->forEvent($event);
+    $image = \Illuminate\Http\UploadedFile::fake()->image('wide.png', 1000, 200);
+    $path = 'events/'.$event->id.'/badges/wide.png';
+    \Illuminate\Support\Facades\Storage::disk('public')->put($path, file_get_contents($image->getRealPath()));
+    $layout = $template->layout;
+    $layout['attendee_name']['underline'] = true;
+    $template->update(['background_disk' => 'public', 'background_path' => $path, 'layout' => $layout,
+        'background_settings' => $fit === null ? null : ['fit' => $fit, 'position' => $position]]);
+    $pdf = app(BadgePdfService::class)->generate($event, $template, collect([badgePdfRegistration($event, ['full_name' => 'Ama Mensah'])]));
+    $box = null;
+    $underlined = false;
+    $pdf->getDomPDF()->setCallbacks([['event' => 'end_frame', 'f' => function (\Dompdf\Frame $frame) use (&$box, &$underlined): void {
+        if ($frame->get_node() instanceof DOMElement && $frame->get_node()->getAttribute('class') === 'background') {
+            $box = $frame->get_border_box();
+        }
+        if ($frame->get_node() instanceof DOMElement && $frame->get_node()->getAttribute('class') === 'element' && mb_trim($frame->get_node()->textContent) === 'Ama Mensah') {
+            $underlined = $frame->get_style()->text_decoration === 'underline';
+        }
+    }]]);
+    $pdf->output();
+    expect($box)->not->toBeNull();
+    foreach ([$width, $height, $left + 8, $top + 8] as $index => $millimetres) {
+        $actual = $box[[2, 3, 0, 1][$index]];
+        expect(abs($actual - $millimetres * 72 / 25.4))->toBeLessThan(0.1);
+    }
+    expect($underlined)->toBeTrue()
+        ->and($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe(1);
+})->with([
+    [null, 'center', 100.0, 70.0, 0.0, 0.0],
+    ['stretch', 'center', 100.0, 70.0, 0.0, 0.0],
+    ['contain', 'center', 100.0, 20.0, 0.0, 25.0],
+    ['contain', 'bottom-right', 100.0, 20.0, 0.0, 50.0],
+    ['cover', 'center', 350.0, 70.0, -125.0, 0.0],
+    ['cover', 'right', 350.0, 70.0, -250.0, 0.0],
+]);

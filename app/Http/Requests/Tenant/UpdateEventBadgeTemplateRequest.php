@@ -31,6 +31,9 @@ final class UpdateEventBadgeTemplateRequest extends FormRequest
             'sheet_settings.margin_mm' => ['required', 'numeric', 'min:3', 'max:30'],
             'sheet_settings.gap_mm' => ['required', 'numeric', $this->boolean('sheet_settings.crop_marks') ? 'min:3' : 'min:0', 'max:20'],
             'sheet_settings.crop_marks' => ['required', 'boolean'],
+            'background_settings' => ['sometimes', 'array:fit,position'],
+            'background_settings.fit' => ['required_with:background_settings', Rule::in(['stretch', 'contain', 'cover'])],
+            'background_settings.position' => ['required_with:background_settings', Rule::in(['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'])],
             'background' => ['nullable', 'file', 'max:10240', 'mimetypes:image/png,image/jpeg', 'dimensions:max_width=8000,max_height=8000'],
             'remove_background' => ['sometimes', 'boolean'],
         ];
@@ -54,7 +57,7 @@ final class UpdateEventBadgeTemplateRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        foreach (['layout', 'tier_styles', 'sheet_settings'] as $key) {
+        foreach (['layout', 'tier_styles', 'sheet_settings', 'background_settings'] as $key) {
             if (is_string($this->input($key))) {
                 $this->merge([$key => json_decode((string) $this->input($key), true)]);
             }

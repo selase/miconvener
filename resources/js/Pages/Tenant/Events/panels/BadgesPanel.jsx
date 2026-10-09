@@ -137,6 +137,10 @@ export default function BadgesPanel({ event }) {
             background: null,
             remove_background: false,
             layout: template?.layout || {},
+            background_settings: template?.background_settings || {
+                fit: 'stretch',
+                position: 'center',
+            },
             tier_styles: template?.tier_styles || {},
             sheet_settings: template?.sheet_settings || {
                 paper: 'a4',
@@ -169,7 +173,7 @@ export default function BadgesPanel({ event }) {
                 ].includes(key)
             )
                 return;
-            if (['layout', 'tier_styles', 'sheet_settings'].includes(key))
+            if (['layout', 'tier_styles', 'sheet_settings', 'background_settings'].includes(key))
                 payload.append(key, JSON.stringify(value));
             else if (typeof value === 'boolean') payload.append(key, value ? '1' : '0');
             else payload.append(key, value);
@@ -340,7 +344,8 @@ export default function BadgesPanel({ event }) {
                 open={designerOpen}
                 onClose={() => setDesignerOpen(false)}
                 title="Badge print studio"
-                className="max-w-6xl"
+                className="max-w-[1600px]"
+                fullScreenOnMobile
             >
                 <ArtifactErrors error={designError} />
                 {designForm && (

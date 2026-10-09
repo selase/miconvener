@@ -1,7 +1,14 @@
 import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 
-export default function Modal({ open, onClose, title, children, className = 'max-w-md' }) {
+export default function Modal({
+    open,
+    onClose,
+    title,
+    children,
+    className = 'max-w-md',
+    fullScreenOnMobile = false,
+}) {
     const dialog = useRef(null);
     const closeHandler = useRef(onClose);
     closeHandler.current = onClose;
@@ -17,6 +24,12 @@ export default function Modal({ open, onClose, title, children, className = 'max
                 dialog.current?.querySelectorAll(
                     'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]'
                 ) || []
+            ).filter(
+                (element) =>
+                    !(
+                        window.matchMedia?.('(max-width: 1023px)').matches &&
+                        element.closest('[data-mobile-hidden="true"]')
+                    )
             );
         focusable()[0]?.focus();
         const onKeyDown = (event) => {
@@ -58,7 +71,9 @@ export default function Modal({ open, onClose, title, children, className = 'max
     }
 
     return (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div
+            className={`fixed inset-0 z-40 flex items-center justify-center ${fullScreenOnMobile ? 'p-0 sm:p-4' : 'p-4'}`}
+        >
             <div className="fixed inset-0 bg-black/30" onClick={onClose} />
 
             <div
@@ -67,7 +82,7 @@ export default function Modal({ open, onClose, title, children, className = 'max
                 aria-modal="true"
                 aria-labelledby={title ? titleId : undefined}
                 aria-label={title ? undefined : 'Dialog'}
-                className={`relative max-h-[85vh] w-full overflow-y-auto rounded-lg border border-border bg-surface p-4 sm:p-6 shadow-float ${className}`}
+                className={`relative ${fullScreenOnMobile ? 'h-dvh max-h-dvh rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-lg' : 'max-h-[85vh] rounded-lg'} w-full overflow-y-auto border border-border bg-surface p-4 sm:p-6 shadow-float ${className}`}
             >
                 <button
                     type="button"

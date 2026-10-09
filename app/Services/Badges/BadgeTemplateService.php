@@ -43,6 +43,7 @@ final class BadgeTemplateService
                 'qr' => $this->element(0.68, 0.58, 0.24, 0.34, 8, 400),
             ],
             'tier_styles' => [],
+            'background_settings' => ['fit' => 'stretch', 'position' => 'center'],
             'sheet_settings' => [
                 'paper' => 'a4', 'margin_mm' => 8, 'gap_mm' => 3, 'crop_marks' => true,
             ],

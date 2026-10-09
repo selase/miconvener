@@ -175,3 +175,29 @@ test('badge sheet fit follows selected paper and dimensions determine orientatio
     $payload['height_mm'] = 100;
     $this->postJson($url, $payload, ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('template.orientation', 'portrait');
 });
+
+test('badge saves fitting position and underline settings', function (): void {
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $payload = validBadgeDesign(['background_settings' => json_encode(['fit' => 'contain', 'position' => 'bottom-right'])]);
+    $payload['layout']['attendee_name']['underline'] = true;
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/template", $payload, ['HTTP_HOST' => $host])
+        ->assertOk()->assertJsonPath('template.background_settings.fit', 'contain')
+        ->assertJsonPath('template.background_settings.position', 'bottom-right')
+        ->assertJsonPath('template.layout.attendee_name.underline', true);
+});
+
+test('badge rejects unsupported fitting and non boolean underline', function (array $settings, mixed $underline, string $field): void {
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $payload = validBadgeDesign(['background_settings' => $settings]);
+    $payload['layout']['attendee_name']['underline'] = $underline;
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/template", $payload, ['HTTP_HOST' => $host])
+        ->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    [['fit' => 'arbitrary', 'position' => 'center'], false, 'background_settings.fit'],
+    [['fit' => 'cover', 'position' => 'arbitrary'], false, 'background_settings.position'],
+    [['fit' => 'cover', 'position' => 'center'], 'false', 'layout'],
+]);

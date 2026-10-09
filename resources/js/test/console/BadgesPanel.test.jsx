@@ -50,7 +50,11 @@ it.each([100, 101, 250])('downloads only the selected batch for %i matches', asy
     const data = dataFor(count);
     csrfFetch.mockImplementation((url, options) =>
         options
-            ? Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
+            ? Promise.resolve({
+                  ok: true,
+                  headers: { get: () => 'application/pdf' },
+                  blob: async () => new Blob(['pdf']),
+              })
             : Promise.resolve(response(data))
     );
     render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
@@ -68,12 +72,21 @@ it.each([100, 101, 250])('downloads only the selected batch for %i matches', asy
     expect(payload.registration_ids).toHaveLength(count === 100 ? 100 : Math.min(count - 100, 100));
     expect(payload.registration_ids[0]).toBe(count === 100 ? 'id-0' : 'id-100');
     expect(payload.export_reference).toBeTruthy();
+    await waitFor(() => expect(csrfFetch).toHaveBeenCalledTimes(3));
+    await waitFor(() =>
+        expect(screen.getByRole('button', { name: /Download .* PDF/ }).disabled).toBe(false)
+    );
 });
 it('uses saved design and actual attendee fields, resets changed filters, and preserves batch after history refresh', async () => {
     const data = dataFor(250);
     let loads = 0;
     csrfFetch.mockImplementation((url, options) => {
-        if (options) return Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) });
+        if (options)
+            return Promise.resolve({
+                ok: true,
+                headers: { get: () => 'application/pdf' },
+                blob: async () => new Blob(['pdf']),
+            });
         const refreshed = {
             ...data,
             badges: data.badges.map((badge) => ({ ...badge, print_count: loads > 0 ? 1 : 0 })),
@@ -119,7 +132,11 @@ it('retries a lost response with the same reference and blocks concurrent downlo
                     rejectRequest = reject;
                 })
         )
-        .mockResolvedValueOnce({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
+        .mockResolvedValueOnce({
+            ok: true,
+            headers: { get: () => 'application/pdf' },
+            blob: async () => new Blob(['pdf']),
+        })
         .mockResolvedValue(response(dataFor(1)));
     render(<BadgesPanel event={{ id: 'event' }} />);
     await screen.findByText('Person 0');
@@ -138,7 +155,11 @@ it('retries a lost response with the same reference and blocks concurrent downlo
 it('starts a new reference for an intentional reprint after success', async () => {
     csrfFetch.mockImplementation((url, options) =>
         options
-            ? Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
+            ? Promise.resolve({
+                  ok: true,
+                  headers: { get: () => 'application/pdf' },
+                  blob: async () => new Blob(['pdf']),
+              })
             : Promise.resolve(response(dataFor(1)))
     );
     render(<BadgesPanel event={{ id: 'event' }} />);
@@ -190,7 +211,11 @@ it('supports UUID references on HTTP browsers without crypto.randomUUID', async 
     try {
         csrfFetch.mockImplementation((url, options) =>
             options
-                ? Promise.resolve({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['pdf']) })
+                ? Promise.resolve({
+                      ok: true,
+                      headers: { get: () => 'application/pdf' },
+                      blob: async () => new Blob(['pdf']),
+                  })
                 : Promise.resolve(response(dataFor(1)))
         );
         render(<BadgesPanel event={{ id: 'event' }} />);

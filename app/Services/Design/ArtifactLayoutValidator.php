@@ -142,7 +142,7 @@ final class ArtifactLayoutValidator
 
             $unknown = array_diff(array_keys($settings), [
                 'x', 'y', 'width', 'height', 'align', 'font_family', 'font_size',
-                'font_weight', 'color', 'visible',
+                'font_weight', 'color', 'visible', ...($artifact === 'badge' ? ['underline'] : []),
             ]);
 
             if ($unknown !== []) {
@@ -184,6 +184,10 @@ final class ArtifactLayoutValidator
                 $this->invalid("The {$element} color must be a six-digit hex color.");
             }
 
+            if ($artifact === 'badge' && array_key_exists('underline', $settings) && ! is_bool($settings['underline'])) {
+                $this->invalid("The {$element} underline setting must be a boolean.");
+            }
+
             $canonical[$element] = [
                 'x' => $x,
                 'y' => $y,
@@ -195,6 +199,7 @@ final class ArtifactLayoutValidator
                 'font_weight' => (int) $fontWeight,
                 'color' => $color,
                 'visible' => (bool) ($settings['visible'] ?? true),
+                ...($artifact === 'badge' ? ['underline' => $settings['underline'] ?? false] : []),
             ];
         }
 

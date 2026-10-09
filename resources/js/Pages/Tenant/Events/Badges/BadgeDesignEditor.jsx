@@ -3,6 +3,7 @@ import { ImagePlus, RotateCcw } from 'lucide-react';
 import Button from '@/Components/Console/Button';
 import ArtifactLayoutControls from '../Certificates/ArtifactLayoutControls';
 import Input from '@/Components/Console/Input';
+import Select from '@/Components/Console/Select';
 import BadgeLayoutPreview from './BadgeLayoutPreview';
 import BadgeSheetSettings from './BadgeSheetSettings';
 
@@ -25,6 +26,15 @@ export default function BadgeDesignEditor({
     fieldErrors = {},
 }) {
     const [backgroundUrl, setBackgroundUrl] = useState(null);
+    const [selectedField, setSelectedField] = useState(
+        'attendee_name' in layoutDefaults ? 'attendee_name' : Object.keys(layoutDefaults)[0]
+    );
+    const [mobileView, setMobileView] = useState('properties');
+    const selectField = (key) => {
+        setSelectedField(key);
+        setMobileView('properties');
+    };
+    const backgroundSettings = form.background_settings || { fit: 'stretch', position: 'center' };
 
     const update = (key, value) =>
         setForm((current) => {
@@ -44,11 +54,23 @@ export default function BadgeDesignEditor({
     }, [form.background]);
 
     return (
-        <form
-            onSubmit={onSave}
-            className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]"
-        >
-            <div className="space-y-4">
+        <form onSubmit={onSave} className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+            <div className="flex gap-2 lg:hidden col-span-full">
+                {['properties', 'canvas'].map((view) => (
+                    <Button
+                        key={view}
+                        type="button"
+                        aria-pressed={mobileView === view}
+                        onClick={() => setMobileView(view)}
+                    >
+                        {view === 'canvas' ? 'Canvas' : 'Properties'}
+                    </Button>
+                ))}
+            </div>
+            <div
+                data-mobile-hidden={mobileView !== 'properties'}
+                className={`${mobileView === 'properties' ? 'block' : 'hidden'} space-y-4 lg:block lg:max-h-[65vh] lg:overflow-y-auto lg:pr-2`}
+            >
                 <div>
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                         Badge size
@@ -139,7 +161,58 @@ export default function BadgeDesignEditor({
                         </button>
                     )}
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <Select
+                        label="Background fit"
+                        aria-label="Background fit"
+                        value={backgroundSettings.fit}
+                        onChange={(event) =>
+                            update('background_settings', {
+                                ...backgroundSettings,
+                                fit: event.target.value,
+                            })
+                        }
+                    >
+                        <option value="stretch">Stretch</option>
+                        <option value="contain">Contain</option>
+                        <option value="cover">Cover</option>
+                    </Select>
+                    <Select
+                        label="Background position"
+                        aria-label="Background position"
+                        value={backgroundSettings.position}
+                        onChange={(event) =>
+                            update('background_settings', {
+                                ...backgroundSettings,
+                                position: event.target.value,
+                            })
+                        }
+                    >
+                        {[
+                            'top-left',
+                            'top',
+                            'top-right',
+                            'left',
+                            'center',
+                            'right',
+                            'bottom-left',
+                            'bottom',
+                            'bottom-right',
+                        ].map((position) => (
+                            <option key={position} value={position}>
+                                {position.replaceAll('-', ' ')}
+                            </option>
+                        ))}
+                    </Select>
+                </div>
+                <p className="text-xs text-ink-secondary">
+                    Contain shows the whole image. Cover fills the badge and crops its edges.
+                    Stretch fills it without preserving proportions.
+                </p>
                 <ArtifactLayoutControls
+                    selectedField={selectedField}
+                    onSelectField={selectField}
+                    allowUnderline
                     layout={{ ...layoutDefaults, ...form.layout }}
                     onChange={(layout) => update('layout', layout)}
                 />
@@ -177,32 +250,37 @@ export default function BadgeDesignEditor({
                     </div>
                 </div>
             </div>
-            <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
+            <aside
+                data-mobile-hidden={mobileView !== 'canvas'}
+                className={`${mobileView === 'canvas' ? 'block' : 'hidden'} space-y-3 lg:block lg:self-start`}
+            >
                 <BadgeLayoutPreview
+                    selectedField={selectedField}
+                    onSelectField={selectField}
                     template={{ ...form, layout: { ...layoutDefaults, ...form.layout } }}
                     tenantLogo={tenantLogo}
                     backgroundUrl={
                         backgroundUrl || (!form.remove_background ? existingBackgroundUrl : null)
                     }
                 />
-                <div className="flex flex-wrap gap-3 justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
-                    <Button
-                        type="button"
-                        onClick={() => update('layout', structuredClone(layoutDefaults))}
-                    >
-                        <RotateCcw className="mr-1.5 h-4 w-4" />
-                        Reset fields
-                    </Button>
-                    <div className="flex gap-2">
-                        <Button type="button" onClick={onCancel}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" type="submit" disabled={saving}>
-                            {saving ? 'Saving…' : 'Save design'}
-                        </Button>
-                    </div>
-                </div>
             </aside>
+            <div className="sticky bottom-0 col-span-full flex flex-wrap gap-3 justify-between border-t border-slate-200 bg-surface py-3 dark:border-slate-700">
+                <Button
+                    type="button"
+                    onClick={() => update('layout', structuredClone(layoutDefaults))}
+                >
+                    <RotateCcw className="mr-1.5 h-4 w-4" />
+                    Reset fields
+                </Button>
+                <div className="flex gap-2">
+                    <Button type="button" onClick={onCancel}>
+                        Cancel
+                    </Button>
+                    <Button variant="primary" type="submit" disabled={saving}>
+                        {saving ? 'Saving…' : 'Save design'}
+                    </Button>
+                </div>
+            </div>
         </form>
     );
 }
