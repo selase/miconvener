@@ -1,3 +1,5 @@
+import BadgeCanvasElement from './BadgeCanvasElement';
+import { artifactFontFamily } from '../Certificates/ArtifactFonts';
 const SAMPLE = {
     event_name: 'Your event',
     attendee_name: 'Akosua Élise Mensah',
@@ -15,6 +17,8 @@ export default function BadgeLayoutPreview({
     tenantLogo,
     selectedField,
     onSelectField,
+    onActivateField,
+    onChangeElement,
 }) {
     const ratio = `${template.width_mm || 100}/${template.height_mm || 70}`;
     const values = badge
@@ -45,7 +49,10 @@ export default function BadgeLayoutPreview({
                 className="relative w-full overflow-hidden border border-slate-300 bg-white shadow-sm dark:border-slate-700"
                 style={{
                     aspectRatio: ratio,
-                    backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
+                    backgroundImage:
+                        backgroundUrl && template.background_settings?.visible !== false && !template.background_settings?.removed
+                            ? `url(${backgroundUrl})`
+                            : undefined,
                     backgroundSize:
                         template.background_settings?.fit === 'contain'
                             ? 'contain'
@@ -60,102 +67,90 @@ export default function BadgeLayoutPreview({
                     ).replaceAll('-', ' '),
                 }}
                 aria-label="Badge design preview"
+                data-badge-canvas
             >
                 {Object.entries(template.layout || {}).map(([key, item]) => {
-                    if (item.visible === false) return null;
+                    if (item.visible === false || item.removed === true) return null;
+                    const props = {
+                        elementKey: key,
+                        item,
+                        template,
+                        selected: selectedField === key,
+                        onSelect: onSelectField,
+                        onActivate: onActivateField,
+                        onChange: onChangeElement,
+                    };
                     if (key === 'tenant_logo') {
                         return tenantLogo ? (
-                            <img
-                                key={key}
-                                src={tenantLogo}
-                                alt="Tenant logo"
-                                className="absolute object-contain"
-                                style={{
-                                    left: `${item.x * 100}%`,
-                                    top: `${item.y * 100}%`,
-                                    width: `${item.width * 100}%`,
-                                    height: `${item.height * 100}%`,
-                                }}
-                            />
+                            <BadgeCanvasElement key={key} {...props}>
+                                <img
+                                    src={tenantLogo}
+                                    alt="Badge logo"
+                                    className="h-full w-full object-contain"
+                                    draggable={false}
+                                />
+                            </BadgeCanvasElement>
                         ) : null;
                     }
                     if (key === 'qr' && badge && !badge.qr_image) return null;
                     if (key === 'qr')
                         return (
-                            <div
+                            <BadgeCanvasElement
                                 key={key}
-                                className="absolute grid place-items-center border-2 border-slate-900 bg-white text-[9px] font-bold text-slate-900"
-                                style={{
-                                    left: `${item.x * 100}%`,
-                                    top: `${item.y * 100}%`,
-                                    width: `${item.width * 100}%`,
-                                    height: `${item.height * 100}%`,
-                                }}
+                                {...props}
+                                style={{ background: '#FFFFFF' }}
                             >
                                 {badge?.qr_image ? (
                                     <img
                                         src={badge.qr_image}
                                         alt="Attendee QR"
                                         className="h-full w-full object-contain"
+                                        draggable={false}
                                     />
                                 ) : (
-                                    'Illustrative QR'
+                                    <div className="grid h-full w-full place-items-center border-2 border-slate-900 text-[9px] font-bold text-slate-900">
+                                        Illustrative QR
+                                    </div>
                                 )}
-                            </div>
+                            </BadgeCanvasElement>
                         );
-                    const Element = onSelectField ? 'button' : 'div';
                     return (
-                        <Element
+                        <BadgeCanvasElement
                             key={key}
-                            type={onSelectField ? 'button' : undefined}
-                            aria-label={
-                                onSelectField
-                                    ? `Select ${key.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase())}`
-                                    : undefined
-                            }
-                            aria-pressed={onSelectField ? selectedField === key : undefined}
-                            onClick={onSelectField ? () => onSelectField(key) : undefined}
-                            className="absolute overflow-hidden leading-tight focus-visible:outline-2 focus-visible:outline-indigo-600"
+                            {...props}
                             style={{
-                                left: `${item.x * 100}%`,
-                                top: `${item.y * 100}%`,
-                                width: `${item.width * 100}%`,
-                                height: `${item.height * 100}%`,
-                                display: 'block',
-                                alignContent: 'start',
-                                margin: 0,
-                                padding: 0,
-                                border: 0,
-                                background: 'transparent',
-                                outline:
-                                    onSelectField && selectedField === key
-                                        ? '2px solid #6366f1'
-                                        : undefined,
-                                outlineOffset: '-2px',
                                 textDecoration: item.underline ? 'underline' : 'none',
                                 textAlign: item.align || 'center',
                                 color: tierStyle.text_color || item.color || '#111827',
-                                fontFamily: {
-                                    Helvetica: 'Arial, sans-serif',
-                                    Times: '"Times New Roman", serif',
-                                    Courier: '"Courier New", monospace',
-                                    'DejaVu Sans': '"DejaVu Sans", sans-serif',
-                                }[item.font_family],
+                                fontFamily: artifactFontFamily(item.font_family),
                                 fontWeight: item.font_weight || 400,
                                 fontSize: `${((item.font_size || 12) / (((template.width_mm || 100) * 72) / 25.4)) * 100}cqw`,
                             }}
                         >
                             {values[key] || ''}
-                        </Element>
+                        </BadgeCanvasElement>
                     );
                 })}
             </div>
-            {template.layout?.tenant_logo?.visible && !tenantLogo && (
-                <p className="mt-2 text-xs text-ink-secondary">
-                    Upload a PNG or JPEG organization logo in organization settings to show it on
-                    badges.
-                </p>
-            )}
+            {template.layout?.tenant_logo?.visible &&
+                !template.layout?.tenant_logo?.removed &&
+                !tenantLogo && (
+                    <p className="mt-2 text-xs text-ink-secondary">
+                        Add a PNG or JPEG logo in the badge designer, or use your organization logo.
+                    </p>
+                )}
+            {onSelectField &&
+                template.layout?.qr?.visible !== false &&
+                !template.layout?.qr?.removed &&
+                Math.min(
+                    (template.layout?.qr?.width || 0) * template.width_mm,
+                    (template.layout?.qr?.height || 0) * template.height_mm
+                ) < 20 && (
+                    <p className="mt-2 text-xs text-amber-700">
+                        The QR is smaller than 20 mm. Increase its size and test a printed badge
+                        before use.
+                    </p>
+                )}
             {longName && (
                 <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
                     Check long names in the PDF before printing. Names over 80 characters are

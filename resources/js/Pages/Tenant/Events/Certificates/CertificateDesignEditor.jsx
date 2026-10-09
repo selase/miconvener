@@ -6,6 +6,7 @@ import Input from '@/Components/Console/Input';
 import ArtworkUpload from './ArtworkUpload';
 import ArtifactLayoutPreview from './ArtifactLayoutPreview';
 import ArtifactLayoutControls from './ArtifactLayoutControls';
+import ArtifactFontLibrary, { ArtifactFontStyles, useArtifactFonts } from './ArtifactFonts';
 import { artifactPdf } from '@/lib/artifactResponse';
 import ArtifactErrors from './ArtifactErrors';
 import { csrfFetchFormData } from '@/lib/csrfFetch';
@@ -21,6 +22,7 @@ export default function CertificateDesignEditor({
     onCancel,
     fieldErrors = {},
 }) {
+    const { fonts, setFonts, error: fontError } = useArtifactFonts(eventId);
     const mounted = useRef(true);
     useEffect(() => {
         mounted.current = true;
@@ -230,11 +232,21 @@ export default function CertificateDesignEditor({
                     onChange={(event) => update('default_cpd_hours', event.target.value)}
                 />
                 {form.design_mode === 'custom_background' && (
-                    <ArtifactLayoutControls
-                        layout={form.layout || {}}
-                        onChange={(layout) => update('layout', layout)}
-                        requiredFields={['recipient_name', 'verification_code']}
-                    />
+                    <>
+                        <ArtifactFontStyles fonts={fonts} />
+                        {fontError && (
+                            <p role="alert" className="text-xs text-rose-600">
+                                {fontError}
+                            </p>
+                        )}
+                        <ArtifactFontLibrary eventId={eventId} fonts={fonts} setFonts={setFonts} />
+                        <ArtifactLayoutControls
+                            fonts={fonts}
+                            layout={form.layout || {}}
+                            onChange={(layout) => update('layout', layout)}
+                            requiredFields={['recipient_name', 'verification_code']}
+                        />
+                    </>
                 )}
                 <div className="flex flex-wrap gap-5">
                     <div className="flex items-center gap-2 text-xs">

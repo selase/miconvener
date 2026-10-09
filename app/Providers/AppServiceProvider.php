@@ -33,6 +33,7 @@ final class AppServiceProvider extends ServiceProvider
             };
         });
 
+        $this->app->scoped(\App\Services\Design\ArtifactFontRegistry::class);
         $this->app->singleton(\App\Services\Tenancy\TenantContext::class);
         $this->app->singleton(\App\Services\Tenancy\TenantDatabaseManager::class);
         $this->app->singleton(\App\Services\Tenancy\TenantStorageManager::class);

@@ -299,3 +299,30 @@ it('gates design and download using explicit capabilities', async () => {
     expect(screen.queryByRole('button', { name: 'Design badges' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Download .*PDF/ })).toBeNull();
 });
+it('refreshes saved logo metadata and keeps imported fonts when the designer reopens', async () => {
+    const initial = dataFor(1);
+    initial.template.layout.tenant_logo = { ...field, visible: true };
+    const updated = { ...initial, badge_logo: 'data:image/png;base64,new-logo', custom_logo: 'data:image/png;base64,new-logo' };
+    let saved = false;
+    csrfFetch.mockImplementation(() => Promise.resolve(response(saved ? updated : initial)));
+    csrfFetchFormData.mockImplementation(() => {
+        saved = true;
+        return Promise.resolve(response({ template: updated.template }));
+    });
+    render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
+    await screen.findByText('Person 0');
+    fireEvent.click(screen.getByRole('button', { name: 'Design badges' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save design' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByAltText('Badge logo').getAttribute('src')).toBe(updated.badge_logo);
+    fireEvent.click(screen.getByRole('button', { name: 'Design badges' }));
+    fireEvent.click(screen.getByText('Add your own font'));
+    csrfFetchFormData.mockResolvedValue(response({ font: { id: 'custom-id', family: 'artifact-id', name: 'Brand Font', weights: [400], faces: [] } }));
+    fireEvent.change(screen.getByLabelText('Google Fonts family or link'), { target: { value: 'Lato' } });
+    fireEvent.click(screen.getByLabelText('I have permission to use and embed this font'));
+    fireEvent.click(screen.getByRole('button', { name: 'Import font' }));
+    await screen.findByText('Brand Font is ready to use.');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Design badges' }));
+    expect(screen.getByRole('option', { name: 'Brand Font' })).toBeTruthy();
+});

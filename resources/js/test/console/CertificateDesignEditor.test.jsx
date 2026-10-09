@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import csrfFetch from '@/lib/csrfFetch';
 import CertificateDesignEditor from '@/Pages/Tenant/Events/Certificates/CertificateDesignEditor';
+
+vi.mock('@/lib/csrfFetch', async (importOriginal) => ({ ...(await importOriginal()), default: vi.fn() }));
+
+beforeEach(() => { csrfFetch.mockResolvedValue({ ok: true, json: async () => ({ fonts: undefined }) }); });
 
 const element = {
     x: 0.15,

@@ -31,6 +31,7 @@ final class ArtifactArtworkService
     /** @var list<string> */
     private const array KINDS = [
         'badge-background',
+        'badge-logo',
         'certificate-background',
         'certificate-signature',
     ];

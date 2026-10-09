@@ -37,3 +37,6 @@ GEMINI.md
 
 # Subagent-driven-development scratch (ledgers, briefs, review packages)
 .superpowers
+
+# Generated PDF font metrics and immutable font download cache
+/storage/fonts/

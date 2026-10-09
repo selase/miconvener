@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventBadgeTemplate;
 use App\Models\EventRegistration;
 use App\Services\Design\ArtifactArtworkService;
+use App\Services\Design\ArtifactFontRegistry;
 use App\Services\Design\ArtifactLayoutValidator;
 use App\Services\Events\QrCodeGenerator;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -29,7 +30,7 @@ final class BadgePdfService
     {
         $paper = $template->sheetSettings()['paper'] === 'letter' ? 'letter' : 'a4';
 
-        return Pdf::loadHTML($this->renderHtml($event, $template, $registrations))
+        return app(ArtifactFontRegistry::class)->preparePdf(Pdf::loadHTML($this->renderHtml($event, $template, $registrations)), $template->layoutSettings(), (string) $event->tenant_id)
             ->setPaper($paper, 'portrait')
             ->setOption('isHtml5ParserEnabled', true)
             ->setOption('isRemoteEnabled', false);
@@ -53,7 +54,7 @@ final class BadgePdfService
         }
 
         $background = null;
-        if (is_string($template->background_disk) && is_string($template->background_path)) {
+        if ($template->backgroundSettings()['visible'] && is_string($template->background_disk) && is_string($template->background_path)) {
             try {
                 $background = $this->artwork->dataUri($template->background_disk, $template->background_path);
             } catch (RuntimeException) {
@@ -79,7 +80,7 @@ final class BadgePdfService
             $layout = $template->layoutSettings();
             foreach ($values as $key => $value) {
                 if (isset($layout[$key])) {
-                    $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * $template->width_mm, $layout[$key]['height'] * $template->height_mm, 'layout.'.$key);
+                    $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * $template->width_mm, $layout[$key]['height'] * $template->height_mm, 'layout.'.$key, tenantId: (string) $event->tenant_id);
                 }
             }
 
@@ -97,7 +98,7 @@ final class BadgePdfService
             'pages' => $badges->chunk($columns * $rows),
             'backgroundDataUri' => $background,
             'backgroundBox' => $this->backgroundBox($template, $background),
-            'tenantLogoDataUri' => $this->templates->tenantLogo($event),
+            'tenantLogoDataUri' => $this->templates->badgeLogo($event, $template),
             'margin' => $margin,
             'gap' => $gap,
             'columns' => $columns,

@@ -50,6 +50,32 @@ final class BadgeTemplateService
         ];
     }
 
+    public function badgeLogo(Event $event, EventBadgeTemplate $template): ?string
+    {
+        if ($template->logo_source === 'none') {
+            return null;
+        }
+        if ($template->logo_source !== 'custom') {
+            return $this->tenantLogo($event);
+        }
+
+        return $this->storedLogo($template);
+    }
+
+    public function storedLogo(EventBadgeTemplate $template): ?string
+    {
+        if (! is_string($template->logo_disk) || ! is_string($template->logo_path)) {
+            return null;
+        }
+        try {
+            return $this->artwork->dataUri($template->logo_disk, $template->logo_path);
+        } catch (RuntimeException) {
+            report('Badge logo is unavailable. Upload the original logo again.');
+
+            return null;
+        }
+    }
+
     public function tenantLogo(Event $event): ?string
     {
         $path = $event->tenant?->logo;

@@ -6,6 +6,11 @@ import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
 import BadgeLayoutPreview from './BadgeLayoutPreview';
 import BadgeSheetSettings from './BadgeSheetSettings';
+import { badgeElementLabel } from './BadgeCanvasElement';
+import ArtifactFontLibrary, {
+    ArtifactFontStyles,
+    useArtifactFonts,
+} from '../Certificates/ArtifactFonts';
 
 const PRESETS = [
     { label: 'Standard landscape', width: 100, height: 70 },
@@ -24,11 +29,21 @@ export default function BadgeDesignEditor({
     onSave,
     onCancel,
     fieldErrors = {},
+    eventId,
+    existingLogo,
+    initialFonts,
+    onFontsChange,
 }) {
     const [backgroundUrl, setBackgroundUrl] = useState(null);
+    const {
+        fonts,
+        setFonts,
+        error: fontError,
+    } = useArtifactFonts(eventId, initialFonts, onFontsChange);
     const [selectedField, setSelectedField] = useState(
         'attendee_name' in layoutDefaults ? 'attendee_name' : Object.keys(layoutDefaults)[0]
     );
+    const [logoUrl, setLogoUrl] = useState(null);
     const [mobileView, setMobileView] = useState('properties');
     const selectField = (key) => {
         setSelectedField(key);
@@ -36,6 +51,34 @@ export default function BadgeDesignEditor({
     };
     const backgroundSettings = form.background_settings || { fit: 'stretch', position: 'center' };
 
+    const layout = { ...layoutDefaults, ...form.layout };
+    const changeElement = (key, changes) =>
+        setForm((current) => ({
+            ...current,
+            layout: {
+                ...layoutDefaults,
+                ...current.layout,
+                [key]: { ...(current.layout?.[key] || layoutDefaults[key]), ...changes },
+            },
+        }));
+    useEffect(() => {
+        if (!form.logo) {
+            setLogoUrl(null);
+            return undefined;
+        }
+        const url = URL.createObjectURL(form.logo);
+        setLogoUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [form.logo]);
+    const effectiveLogo =
+        logoUrl ||
+        (form.logo_source === 'none'
+            ? null
+            : form.logo_source === 'custom'
+              ? !form.remove_logo
+                  ? existingLogo
+                  : null
+              : tenantLogo);
     const update = (key, value) =>
         setForm((current) => {
             const next = { ...current, [key]: value };
@@ -55,6 +98,7 @@ export default function BadgeDesignEditor({
 
     return (
         <form onSubmit={onSave} className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+            <ArtifactFontStyles fonts={fonts} />
             <div className="flex gap-2 lg:hidden col-span-full">
                 {['properties', 'canvas'].map((view) => (
                     <Button
@@ -209,12 +253,231 @@ export default function BadgeDesignEditor({
                     Contain shows the whole image. Cover fills the badge and crops its edges.
                     Stretch fills it without preserving proportions.
                 </p>
+                <section
+                    className="rounded-xl border border-border p-3 space-y-2"
+                    aria-label="Badge elements"
+                >
+                    <h3 className="text-sm font-semibold">Elements</h3>
+                    <p className="text-xs text-ink-secondary">
+                        Select an element to edit it. Drag it on the canvas or use arrow keys to
+                        move it; Shift moves 5 mm.
+                    </p>
+                    {Object.entries(layout).map(([key, item]) => (
+                        <div key={key} className="flex flex-wrap items-center gap-2 text-xs">
+                            <button
+                                type="button"
+                                className="mr-auto font-semibold hover:text-accent"
+                                onClick={() => selectField(key)}
+                                disabled={item.removed}
+                                aria-label={`Edit ${badgeElementLabel(key)}`}
+                            >
+                                {badgeElementLabel(key)}
+                            </button>
+                            {item.removed ? (
+                                <button
+                                    type="button"
+                                    className="font-semibold text-accent"
+                                    aria-label={`Restore ${badgeElementLabel(key)}`}
+                                    onClick={() => {
+                                        changeElement(key, { removed: false, visible: true });
+                                        selectField(key);
+                                    }}
+                                >
+                                    Restore
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        className="font-semibold text-ink-secondary"
+                                        aria-label={`${item.visible === false ? 'Show' : 'Hide'} ${badgeElementLabel(key)}`}
+                                        onClick={() =>
+                                            changeElement(key, { visible: item.visible === false })
+                                        }
+                                    >
+                                        {item.visible === false ? 'Show' : 'Hide'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="font-semibold text-rose-600"
+                                        aria-label={`Remove ${badgeElementLabel(key)}`}
+                                        onClick={() => {
+                                            changeElement(key, { removed: true, visible: false });
+                                            if (selectedField === key)
+                                                setSelectedField(
+                                                    Object.keys(layout).find(
+                                                        (other) =>
+                                                            other !== key && !layout[other].removed
+                                                    )
+                                                );
+                                        }}
+                                    >
+                                        Remove
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                    {(form.background || existingBackground) && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="mr-auto font-semibold">Background artwork</span>
+                            {backgroundSettings.removed ? (
+                                <button
+                                    type="button"
+                                    className="font-semibold"
+                                    onClick={() =>
+                                        update('background_settings', {
+                                            ...backgroundSettings,
+                                            removed: false,
+                                            visible: true,
+                                        })
+                                    }
+                                >
+                                    Restore background
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        className="font-semibold"
+                                        onClick={() =>
+                                            update('background_settings', {
+                                                ...backgroundSettings,
+                                                visible: backgroundSettings.visible === false,
+                                            })
+                                        }
+                                    >
+                                        {backgroundSettings.visible === false
+                                            ? 'Show background'
+                                            : 'Hide background'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="font-semibold text-rose-600"
+                                        onClick={() =>
+                                            update('background_settings', {
+                                                ...backgroundSettings,
+                                                removed: true,
+                                                visible: false,
+                                            })
+                                        }
+                                    >
+                                        Remove background
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </section>
+                <section className="rounded-xl border border-border p-3 space-y-3">
+                    <h3 className="text-sm font-semibold">Logo</h3>
+                    <Select
+                        label="Logo source"
+                        aria-label="Logo source"
+                        value={form.logo_source || 'organization'}
+                        onChange={(event) =>
+                            setForm((current) => ({
+                                ...current,
+                                logo_source: event.target.value,
+                                logo: null,
+                            }))
+                        }
+                    >
+                        <option value="organization">Organization logo</option>
+                        <option value="custom">Badge logo</option>
+                        <option value="none">No logo</option>
+                    </Select>
+                    {!tenantLogo && (form.logo_source || 'organization') === 'organization' && (
+                        <p className="text-xs text-ink-secondary">
+                            No organization logo is available. Upload one here for this badge.
+                        </p>
+                    )}
+                    <Input
+                        label="Upload badge logo"
+                        aria-label="Upload badge logo"
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        error={fieldErrors.logo?.join(' ')}
+                        onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) return;
+                            setForm((current) => ({
+                                ...current,
+                                logo: file,
+                                logo_source: 'custom',
+                                remove_logo: false,
+                                layout: {
+                                    ...layoutDefaults,
+                                    ...current.layout,
+                                    tenant_logo: {
+                                        ...(current.layout?.tenant_logo ||
+                                            layoutDefaults.tenant_logo || {
+                                                x: 0.8,
+                                                y: 0.08,
+                                                width: 0.12,
+                                                height: 0.16,
+                                                font_family: 'DejaVu Sans',
+                                                font_size: 8,
+                                                font_weight: 400,
+                                                color: '#111827',
+                                                align: 'center',
+                                            }),
+                                        visible: true,
+                                        removed: false,
+                                    },
+                                },
+                            }));
+                            selectField('tenant_logo');
+                        }}
+                    />
+                    {(form.logo ||
+                        (existingLogo && form.logo_source === 'custom' && !form.remove_logo)) && (
+                        <button
+                            type="button"
+                            className="text-xs font-semibold text-rose-600"
+                            onClick={() =>
+                                setForm((current) => ({
+                                    ...current,
+                                    logo: null,
+                                    remove_logo: true,
+                                    logo_source: 'none',
+                                }))
+                            }
+                        >
+                            Remove uploaded logo
+                        </button>
+                    )}
+                </section>
                 <ArtifactLayoutControls
                     selectedField={selectedField}
                     onSelectField={selectField}
                     allowUnderline
+                    fonts={fonts}
+                    pageSize={{ width: form.width_mm, height: form.height_mm }}
                     layout={{ ...layoutDefaults, ...form.layout }}
                     onChange={(layout) => update('layout', layout)}
+                />
+                {fontError && (
+                    <p role="alert" className="text-xs text-rose-600">
+                        {fontError}
+                    </p>
+                )}
+                <ArtifactFontLibrary
+                    eventId={eventId}
+                    fonts={fonts}
+                    setFonts={setFonts}
+                    onSelect={(font) =>
+                        selectedField &&
+                        !['qr', 'tenant_logo'].includes(selectedField) &&
+                        update('layout', {
+                            ...form.layout,
+                            [selectedField]: {
+                                ...(form.layout[selectedField] || layoutDefaults[selectedField]),
+                                font_family: font.family,
+                                font_weight: font.weights[0],
+                            },
+                        })
+                    }
                 />
                 <BadgeSheetSettings
                     value={form.sheet_settings}
@@ -257,8 +520,10 @@ export default function BadgeDesignEditor({
                 <BadgeLayoutPreview
                     selectedField={selectedField}
                     onSelectField={selectField}
+                    onActivateField={setSelectedField}
+                    onChangeElement={changeElement}
                     template={{ ...form, layout: { ...layoutDefaults, ...form.layout } }}
-                    tenantLogo={tenantLogo}
+                    tenantLogo={effectiveLogo}
                     backgroundUrl={
                         backgroundUrl || (!form.remove_background ? existingBackgroundUrl : null)
                     }

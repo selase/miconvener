@@ -1,9 +1,4 @@
-const FONT_FAMILIES = {
-    Helvetica: 'Arial, sans-serif',
-    Times: '"Times New Roman", serif',
-    Courier: '"Courier New", monospace',
-    'DejaVu Sans': '"DejaVu Sans", sans-serif',
-};
+import { artifactFontFamily } from './ArtifactFonts';
 
 export default function ArtifactLayoutPreview({
     form,
@@ -74,7 +69,7 @@ export default function ArtifactLayoutPreview({
                                 height: `${item.height * 100}%`,
                                 textAlign: item.align,
                                 color: item.color,
-                                fontFamily: FONT_FAMILIES[item.font_family],
+                                fontFamily: artifactFontFamily(item.font_family),
                                 fontWeight: item.font_weight,
                                 fontSize: `${(item.font_size / 841.89) * 100}cqw`,
                             }}

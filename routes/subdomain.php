@@ -271,6 +271,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/decks/{deck}/close', [EventPollDeckController::class, 'close'])->whereUuid('deck')->name('tenant.events.decks.close');
     Route::post('events/{event}/decks/{deck}/end', [EventPollDeckController::class, 'end'])->whereUuid('deck')->name('tenant.events.decks.end');
 
+    Route::get('events/{event}/artifact-fonts', [App\Http\Controllers\Tenant\ArtifactFontController::class, 'index'])->name('tenant.events.artifact-fonts.index');
+    Route::post('events/{event}/artifact-fonts', [App\Http\Controllers\Tenant\ArtifactFontController::class, 'store'])->middleware('throttle:10,1')->name('tenant.events.artifact-fonts.store');
+    Route::get('events/{event}/artifact-fonts/{family}/{weight}', [App\Http\Controllers\Tenant\ArtifactFontController::class, 'face'])->whereNumber('weight')->name('tenant.events.artifact-fonts.face');
+    Route::delete('events/{event}/artifact-fonts/{font}', [App\Http\Controllers\Tenant\ArtifactFontController::class, 'destroy'])->name('tenant.events.artifact-fonts.destroy');
+
     Route::get('events/{event}/data/badges', [EventBadgeController::class, 'index'])->name('tenant.events.badges.index');
     Route::post('events/{event}/badges/template', [EventBadgeController::class, 'updateTemplate'])->name('tenant.events.badges.template.update');
     Route::get('events/{event}/badges/template/artwork', [EventBadgeController::class, 'artwork'])->name('tenant.events.badges.template.artwork');

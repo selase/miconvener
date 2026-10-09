@@ -17,7 +17,7 @@ final class ArtifactArtworkCleanup
     public function assets(Model $design): array
     {
         $assets = [];
-        foreach ($design instanceof EventBadgeTemplate ? ['background'] : ['background', 'signature'] as $type) {
+        foreach ($design instanceof EventBadgeTemplate ? ['background', 'logo'] : ['background', 'signature'] as $type) {
             $disk = $design->getAttribute("{$type}_disk");
             $path = $design->getAttribute("{$type}_path");
             if (is_string($disk) && is_string($path)) {
@@ -40,7 +40,7 @@ final class ArtifactArtworkCleanup
         foreach ($assets as [$disk, $path]) {
             $referenced = false;
             foreach ([EventCertificateTemplate::class, EventCertificateDesignVersion::class, EventBadgeTemplate::class] as $model) {
-                foreach ($model === EventBadgeTemplate::class ? ['background'] : ['background', 'signature'] as $type) {
+                foreach ($model === EventBadgeTemplate::class ? ['background', 'logo'] : ['background', 'signature'] as $type) {
                     if ($model::withoutGlobalScopes()->where("{$type}_disk", $disk)->where("{$type}_path", $path)->exists()) {
                         $referenced = true;
                         break 2;

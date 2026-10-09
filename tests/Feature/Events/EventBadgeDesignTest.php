@@ -201,3 +201,40 @@ test('badge rejects unsupported fitting and non boolean underline', function (ar
     [['fit' => 'cover', 'position' => 'arbitrary'], false, 'background_settings.position'],
     [['fit' => 'cover', 'position' => 'center'], 'false', 'layout'],
 ]);
+
+test('badge designer stores its own logo and removed elements independently from organization branding', function (): void {
+    Storage::fake('public');
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $payload = validBadgeDesign(['logo' => UploadedFile::fake()->image('badge-logo.png', 180, 90), 'logo_source' => 'custom']);
+    $payload['layout']['qr'] = ['x' => 0.01, 'y' => 0.02, 'width' => 0.2, 'height' => 0.3, 'removed' => true, 'visible' => false];
+    $payload['layout']['tenant_logo'] = ['x' => 0.5, 'y' => 0.8, 'width' => 0.4, 'height' => 0.15];
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/badges/template", $payload, ['HTTP_HOST' => $host])
+        ->assertOk()->assertJsonPath('template.logo_source', 'custom')->assertJsonPath('template.layout.qr.removed', true);
+    $template = EventBadgeTemplate::query()->where('event_id', $event->id)->firstOrFail();
+    Storage::disk('public')->assertExists($template->logo_path);
+    expect($tenant->fresh()->logo)->toBeNull();
+    $this->getJson("http://{$host}/events/{$event->id}/data/badges", ['HTTP_HOST' => $host])
+        ->assertOk()->assertJsonPath('badge_logo', fn ($value) => str_starts_with($value, 'data:image/png;base64,'));
+    $path = $template->logo_path;
+    $payload = validBadgeDesign(['remove_logo' => true, 'logo_source' => 'none']);
+    $this->postJson("http://{$host}/events/{$event->id}/badges/template", $payload, ['HTTP_HOST' => $host])->assertOk();
+    Storage::disk('public')->assertMissing($path);
+});
+
+test('removed backgrounds survive save and reopen and can be restored', function (): void {
+    Storage::fake('public');
+    [$tenant, $user] = badgeDesignerHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $host = eventSubdomainHost('acme');
+    $url = "http://{$host}/events/{$event->id}/badges/template";
+    $this->actingAs($user)->postJson($url, validBadgeDesign(['background' => UploadedFile::fake()->image('badge.png')]), ['HTTP_HOST' => $host])->assertOk();
+    $template = EventBadgeTemplate::query()->where('event_id', $event->id)->firstOrFail();
+    $path = $template->background_path;
+    $this->postJson($url, validBadgeDesign(['background_settings' => ['fit' => 'contain', 'position' => 'center', 'removed' => true, 'visible' => false]]), ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('template.background_path', $path)->assertJsonPath('template.background_settings.removed', true);
+    Storage::disk('public')->assertExists($path);
+    expect($template->fresh()->backgroundSettings()['visible'])->toBeFalse();
+    $this->postJson($url, validBadgeDesign(['background_settings' => ['fit' => 'contain', 'position' => 'center', 'removed' => false, 'visible' => true]]), ['HTTP_HOST' => $host])->assertOk();
+    expect($template->fresh()->backgroundSettings()['visible'])->toBeTrue();
+});

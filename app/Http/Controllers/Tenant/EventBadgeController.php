@@ -13,6 +13,7 @@ use App\Models\EventRegistration;
 use App\Services\Badges\BadgePdfService;
 use App\Services\Badges\BadgeTemplateService;
 use App\Services\Design\ArtifactArtworkService;
+use App\Services\Design\ArtifactFontRegistry;
 use App\Services\Design\ArtifactLayoutValidator;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Tenancy\TenantContext;
@@ -57,8 +58,13 @@ final class EventBadgeController extends Controller
             ->limit(20)
             ->get();
 
+        $template = $this->templates->forEvent($eventModel);
+
         return response()->json([
-            'template' => $this->templates->forEvent($eventModel),
+            'template' => $template,
+            'fonts' => app(ArtifactFontRegistry::class)->catalog((string) $tenant->id, (string) $eventModel->id),
+            'badge_logo' => $this->templates->badgeLogo($eventModel, $template),
+            'custom_logo' => $this->templates->storedLogo($template),
             'layout_defaults' => $this->templates->defaults($eventModel)['layout'],
             'tenant_logo' => $this->templates->tenantLogo($eventModel),
             'badges' => $registrations->map(fn (EventRegistration $r): array => [
@@ -91,6 +97,9 @@ final class EventBadgeController extends Controller
         $oldDisk = null;
         $oldPath = null;
         $newArtwork = null;
+        $newLogo = null;
+        $oldLogoDisk = null;
+        $oldLogoPath = null;
 
         if ($request->file('background') !== null) {
             $newArtwork = $this->artwork->store($request->file('background'), (string) $tenant->id, (string) $eventModel->id, 'badge-background');
@@ -101,12 +110,30 @@ final class EventBadgeController extends Controller
             $validated['background_path'] = null;
         }
 
-        unset($validated['background'], $validated['remove_background']);
         try {
-            $template = $template->getConnection()->transaction(function () use ($template, $validated, &$oldDisk, &$oldPath) {
+            if ($request->file('logo') !== null) {
+                $newLogo = $this->artwork->store($request->file('logo'), (string) $tenant->id, (string) $eventModel->id, 'badge-logo');
+                $validated['logo_disk'] = $newLogo->disk;
+                $validated['logo_path'] = $newLogo->path;
+                $validated['logo_source'] = 'custom';
+            } elseif ($request->boolean('remove_logo')) {
+                $validated['logo_disk'] = null;
+                $validated['logo_path'] = null;
+            }
+        } catch (Throwable $exception) {
+            if ($newArtwork !== null) {
+                $this->artwork->delete($newArtwork->disk, $newArtwork->path);
+            }
+            throw $exception;
+        }
+        unset($validated['background'], $validated['remove_background'], $validated['logo'], $validated['remove_logo']);
+        try {
+            $template = $template->getConnection()->transaction(function () use ($template, $validated, &$oldDisk, &$oldPath, &$oldLogoDisk, &$oldLogoPath) {
                 $current = $template->newQuery()->whereKey($template->id)->lockForUpdate()->firstOrFail();
                 $oldDisk = $current->background_disk;
                 $oldPath = $current->background_path;
+                $oldLogoDisk = $current->logo_disk;
+                $oldLogoPath = $current->logo_path;
                 $current->fill($validated);
                 $current->design_version = max(1, (int) $current->design_version) + 1;
                 $current->save();
@@ -117,9 +144,15 @@ final class EventBadgeController extends Controller
             if ($newArtwork !== null) {
                 $this->artwork->delete($newArtwork->disk, $newArtwork->path);
             }
+            if ($newLogo !== null) {
+                $this->artwork->delete($newLogo->disk, $newLogo->path);
+            }
             throw $exception;
         }
 
+        if (is_string($oldLogoDisk) && is_string($oldLogoPath) && $oldLogoPath !== $template->logo_path) {
+            $this->artwork->delete($oldLogoDisk, $oldLogoPath);
+        }
         if (is_string($oldDisk) && is_string($oldPath) && $oldPath !== $template->background_path) {
             $this->artwork->delete($oldDisk, $oldPath);
         }

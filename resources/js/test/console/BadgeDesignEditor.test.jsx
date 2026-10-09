@@ -120,3 +120,82 @@ it('changes background fit and positioning and provides mobile workspace views',
         screen.getByRole('button', { name: 'Properties', exact: true }).getAttribute('aria-pressed')
     ).toBe('true');
 });
+
+it('selects moves hides removes and restores the QR and logo without losing their settings', () => {
+    function ElementsEditor() {
+        const [form, setForm] = useState({
+            width_mm: 100,
+            height_mm: 70,
+            layout: {
+                attendee_name: field,
+                qr: { ...field, x: 0.6, y: 0.5, width: 0.2, height: 2 / 7 },
+                tenant_logo: { ...field, x: 0.05, y: 0.05, width: 0.2, height: 0.2 },
+            },
+            sheet_settings: { paper: 'a4', margin_mm: 8, gap_mm: 3, crop_marks: true },
+        });
+        return (
+            <>
+                <BadgeDesignEditor
+                    form={form}
+                    setForm={setForm}
+                    layoutDefaults={form.layout}
+                    tenantLogo="logo.png"
+                    onSave={vi.fn()}
+                />
+                <output aria-label="Elements values">{JSON.stringify(form)}</output>
+            </>
+        );
+    }
+    render(<ElementsEditor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Select QR', exact: true }));
+    expect(screen.getByLabelText('Field to position').value).toBe('qr');
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Select QR', exact: true }), {
+        key: 'ArrowLeft',
+    });
+    expect(
+        JSON.parse(screen.getByLabelText('Elements values').textContent).layout.qr.x
+    ).toBeCloseTo(0.59);
+    fireEvent.click(screen.getByRole('button', { name: 'Hide QR', exact: true }));
+    expect(screen.queryByRole('button', { name: 'Select QR', exact: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show QR', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Logo', exact: true }));
+    expect(
+        JSON.parse(screen.getByLabelText('Elements values').textContent).layout.tenant_logo.removed
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Logo', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select Logo', exact: true }));
+    expect(screen.getByLabelText('Field to position').value).toBe('tenant_logo');
+});
+
+it('provides an expanded searchable font list', () => {
+    render(<Editor />);
+    fireEvent.change(screen.getByLabelText('Search fonts'), { target: { value: 'Lato' } });
+    expect(screen.getByRole('option', { name: 'Lato', exact: true })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Attendee name Font'), { target: { value: 'Lato' } });
+    expect(
+        JSON.parse(screen.getByLabelText('Design values').textContent).layout.attendee_name
+            .font_family
+    ).toBe('Lato');
+});
+it('removes and restores background artwork without deleting its saved file', () => {
+    function BackgroundEditor() {
+        const [form, setForm] = useState({ width_mm: 100, height_mm: 70, layout: { attendee_name: field }, sheet_settings: { paper: 'a4', margin_mm: 8, gap_mm: 3, crop_marks: true }, background_settings: { fit: 'contain', position: 'center' } });
+        return <><BadgeDesignEditor form={form} setForm={setForm} layoutDefaults={{ attendee_name: field }} existingBackground="saved.png" existingBackgroundUrl="/saved.png" /><output aria-label="Background values">{JSON.stringify(form)}</output></>;
+    }
+    render(<BackgroundEditor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove background', exact: true }));
+    expect(JSON.parse(screen.getByLabelText('Background values').textContent).background_settings.removed).toBe(true);
+    expect(JSON.parse(screen.getByLabelText('Background values').textContent).remove_background).not.toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore background', exact: true }));
+    expect(JSON.parse(screen.getByLabelText('Background values').textContent).background_settings).toMatchObject({ removed: false, fit: 'contain', position: 'center' });
+});
+it('uploads a badge logo without organization branding and selects its properties', () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:logo');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    render(<Editor />);
+    fireEvent.change(screen.getByLabelText('Upload badge logo'), { target: { files: [new File(['logo'], 'logo.png', { type: 'image/png' })] } });
+    expect(screen.getByLabelText('Logo source').value).toBe('custom');
+    expect(screen.getByRole('button', { name: 'Select Logo' })).toBeTruthy();
+    expect(screen.getByLabelText('Field to position').value).toBe('tenant_logo');
+    expect(JSON.parse(screen.getByLabelText('Design values').textContent).layout.tenant_logo).toMatchObject({ visible: true, removed: false });
+});

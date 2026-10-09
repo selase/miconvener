@@ -8,6 +8,7 @@ import Select from '@/Components/Console/Select';
 import Modal from '@/Components/Console/Modal';
 import BadgeLayoutPreview from '@/Pages/Tenant/Events/Badges/BadgeLayoutPreview';
 import BadgeDesignEditor from '@/Pages/Tenant/Events/Badges/BadgeDesignEditor';
+import { ArtifactFontStyles, DEFAULT_ARTIFACT_FONTS } from '../Certificates/ArtifactFonts';
 import { Download, History, Palette, Printer } from 'lucide-react';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 
@@ -29,6 +30,9 @@ export default function BadgesPanel({ event }) {
     const [batch, setBatch] = useState(0);
     const [layoutDefaults, setLayoutDefaults] = useState({});
     const [tenantLogo, setTenantLogo] = useState(null);
+    const [customLogo, setCustomLogo] = useState(null);
+    const [badgeLogo, setBadgeLogo] = useState(null);
+    const [fonts, setFonts] = useState(DEFAULT_ARTIFACT_FONTS);
     const exportAttempt = useRef(null);
     const downloadPending = useRef(false);
     const [retryAvailable, setRetryAvailable] = useState(false);
@@ -55,6 +59,9 @@ export default function BadgesPanel({ event }) {
             setBadges(data.badges || []);
             setLayoutDefaults(data.layout_defaults || data.template?.layout || {});
             setTenantLogo(data.tenant_logo || null);
+            setBadgeLogo(Object.hasOwn(data, 'badge_logo') ? data.badge_logo : data.tenant_logo || null);
+            setCustomLogo(data.custom_logo || null);
+            setFonts(data.fonts || DEFAULT_ARTIFACT_FONTS);
             setRecentPrints(data.recent_prints || []);
             setTemplate(data.template || null);
         } catch (reason) {
@@ -135,6 +142,8 @@ export default function BadgesPanel({ event }) {
         setDesignForm({
             ...template,
             background: null,
+            logo: null,
+            remove_logo: false,
             remove_background: false,
             layout: template?.layout || {},
             background_settings: template?.background_settings || {
@@ -169,6 +178,8 @@ export default function BadgesPanel({ event }) {
                     'updated_at',
                     'background_path',
                     'background_disk',
+                    'logo_disk',
+                    'logo_path',
                     'design_version',
                 ].includes(key)
             )
@@ -188,6 +199,7 @@ export default function BadgesPanel({ event }) {
                 'The badge design could not be saved. Please try again.'
             );
             setTemplate(data.template);
+            await load();
             setDesignerOpen(false);
         } catch (reason) {
             setDesignError(reason);
@@ -198,6 +210,7 @@ export default function BadgesPanel({ event }) {
 
     return (
         <div>
+            <ArtifactFontStyles fonts={fonts} />
             <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p className="text-sm text-ink-secondary">
@@ -306,7 +319,7 @@ export default function BadgesPanel({ event }) {
                             event={event}
                             badge={b}
                             template={template || {}}
-                            tenantLogo={tenantLogo}
+                            tenantLogo={badgeLogo}
                             backgroundUrl={
                                 template?.background_path
                                     ? route('tenant.events.badges.template.artwork', {
@@ -352,6 +365,10 @@ export default function BadgesPanel({ event }) {
                     <BadgeDesignEditor
                         fieldErrors={designError?.fields}
                         form={designForm}
+                        eventId={event.id}
+                        initialFonts={fonts}
+                        onFontsChange={setFonts}
+                        existingLogo={customLogo}
                         layoutDefaults={layoutDefaults}
                         tenantLogo={tenantLogo}
                         setForm={setDesignForm}

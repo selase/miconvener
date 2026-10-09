@@ -20,7 +20,7 @@ final class EventBadgeTemplate extends Model
     protected $fillable = [
         'tenant_id', 'event_id', 'width_mm', 'height_mm', 'orientation',
         'background_disk', 'background_path', 'layout', 'tier_styles',
-        'sheet_settings', 'background_settings', 'design_version',
+        'sheet_settings', 'background_settings', 'design_version', 'logo_disk', 'logo_path', 'logo_source',
     ];
 
     /** @return BelongsTo<Event, $this> */
@@ -58,13 +58,14 @@ final class EventBadgeTemplate extends Model
         ];
     }
 
-    /** @return array{fit: string, position: string} */
+    /** @return array{fit: string, position: string, visible: bool} */
     public function backgroundSettings(): array
     {
         $settings = $this->getAttribute('background_settings');
 
         return [
             'fit' => is_array($settings) && in_array($settings['fit'] ?? null, ['stretch', 'contain', 'cover'], true) ? $settings['fit'] : 'stretch',
+            'visible' => ! is_array($settings) || (bool) ($settings['visible'] ?? true) && ! (bool) ($settings['removed'] ?? false),
             'position' => is_array($settings) && in_array($settings['position'] ?? null, ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'], true) ? $settings['position'] : 'center',
         ];
     }

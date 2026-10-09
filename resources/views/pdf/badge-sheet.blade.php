@@ -19,7 +19,7 @@ body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
 <div class="badge" style="background-color: {{ $badge['tier_style']['background_color'] ?? '#FFFFFF' }}; color: {{ $badge['tier_style']['text_color'] ?? '#111827' }}">
     @if ($backgroundDataUri)<img class="background" style="left:{{ $backgroundBox['x'] }}mm;top:{{ $backgroundBox['y'] }}mm;width:{{ $backgroundBox['width'] }}mm;height:{{ $backgroundBox['height'] }}mm" src="{{ $backgroundDataUri }}" alt="">@endif
     @foreach ($badge['layout'] as $key => $item)
-        @continue(($item['visible'] ?? true) === false)
+        @continue(($item['visible'] ?? true) === false || ($item['removed'] ?? false) === true)
         @if ($key === 'qr')
             @php($qrSize = min($item['width'] * $template->width_mm, $item['height'] * $template->height_mm))
             @if ($badge['qr'])<div class="element qr" style="left:{{ $item['x'] * 100 }}%;top:{{ $item['y'] * 100 }}%;width:{{ $item['width'] * 100 }}%;height:{{ $item['height'] * 100 }}%;text-align:{{ $item['align'] }}"><img src="{{ $badge['qr'] }}" style="width:{{ $qrSize }}mm;height:{{ $qrSize }}mm" alt="QR"></div>@endif

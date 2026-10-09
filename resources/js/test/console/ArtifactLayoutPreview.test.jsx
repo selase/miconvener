@@ -155,7 +155,7 @@ it('badge preview shows the tenant logo and studio tier colors and hides optiona
     const { container, rerender } = render(
         <BadgeLayoutPreview template={template} tenantLogo="data:image/png;base64,logo" />
     );
-    expect(screen.getByAltText('Tenant logo').getAttribute('src')).toBe(
+    expect(screen.getByAltText('Badge logo').getAttribute('src')).toBe(
         'data:image/png;base64,logo'
     );
     expect(
@@ -168,5 +168,5 @@ it('badge preview shows the tenant logo and studio tier colors and hides optiona
             tenantLogo="logo"
         />
     );
-    expect(screen.queryByAltText('Tenant logo')).toBeNull();
+    expect(screen.queryByAltText('Badge logo')).toBeNull();
 });

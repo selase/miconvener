@@ -8,6 +8,7 @@ use App\Models\EventCertificate;
 use App\Models\EventCertificateDesignVersion;
 use App\Models\EventCertificateTemplate;
 use App\Services\Design\ArtifactArtworkService;
+use App\Services\Design\ArtifactFontRegistry;
 use App\Services\Design\ArtifactLayoutValidator;
 use App\Services\Events\QrCodeGenerator;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -56,7 +57,10 @@ final class CertificatePdfService
     /** @param array<string, string|null> $previewAssets */
     public function generatePdf(EventCertificate $certificate, array $previewAssets = []): DomPDF
     {
-        return Pdf::loadHTML($this->renderHtml($certificate, $previewAssets))
+        $html = $this->renderHtml($certificate, $previewAssets);
+        $design = $certificate->designVersion ?? $certificate->template;
+
+        return app(ArtifactFontRegistry::class)->preparePdf(Pdf::loadHTML($html), $design->layout ?? [], (string) $certificate->event->tenant_id)
             ->setPaper('a4', 'landscape')
             ->setOption('isHtml5ParserEnabled', true)
             ->setOption('isRemoteEnabled', false);
@@ -94,8 +98,8 @@ final class CertificatePdfService
             }
 
             $layout = $certificate->designVersion !== null
-                ? $this->layouts->validate($design->layout ?? [], 'certificate')
-                : $this->layouts->resolveCertificate($design->layout ?? []);
+                ? $this->layouts->validate($design->layout ?? [], 'certificate', (string) $event->tenant_id)
+                : $this->layouts->resolveCertificate($design->layout ?? [], (string) $event->tenant_id);
             $layout['verification_code'] = ($layout['verification_code'] ?? [
                 'x' => 0.68,
                 'y' => 0.9,
@@ -132,7 +136,7 @@ final class CertificatePdfService
                 if (! isset($layout[$key]) || ($key === 'cpd_hours' && (! $design->show_cpd_hours || $certificate->cpd_hours <= 0))) {
                     continue;
                 }
-                $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * 297, $layout[$key]['height'] * 210, 'layout.'.$key);
+                $layout[$key] = $this->layouts->fitText($value, $layout[$key], $layout[$key]['width'] * 297, $layout[$key]['height'] * 210, 'layout.'.$key, tenantId: (string) $event->tenant_id);
             }
         } else {
             foreach (['title' => [28, 700, 235, 24], 'recipient_name' => [32, 700, 235, 22], 'body' => [14, 400, 180, 36], 'issuer' => [11, 400, 85, 15]] as $key => [$size, $weight, $width, $height]) {

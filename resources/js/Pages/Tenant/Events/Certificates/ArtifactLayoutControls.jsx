@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
 import Checkbox from '@/Components/Console/Checkbox';
+import { DEFAULT_ARTIFACT_FONTS, artifactFontFamily } from './ArtifactFonts';
 
 const labelFor = (key) =>
     key.replaceAll('_', ' ').replace(/^./, (character) => character.toUpperCase());
@@ -13,15 +14,28 @@ export default function ArtifactLayoutControls({
     selectedField,
     onSelectField,
     allowUnderline = false,
+    fonts = DEFAULT_ARTIFACT_FONTS,
+    pageSize,
 }) {
     const [internalSelected, setSelected] = useState(
         'recipient_name' in layout ? 'recipient_name' : Object.keys(layout)[0]
     );
     const selected = selectedField ?? internalSelected;
+    const [fontSearch, setFontSearch] = useState('');
     const field = layout[selected];
-    if (!field) return null;
+    if (!field || field.removed) return null;
     const label = labelFor(selected);
-    const update = (key, value) => onChange({ ...layout, [selected]: { ...field, [key]: value } });
+    const graphic = ['qr', 'tenant_logo'].includes(selected);
+    const update = (key, value) => {
+        const changes = { [key]: value };
+        if (selected === 'qr' && pageSize && ['width', 'height'].includes(key)) {
+            changes.width = key === 'width' ? value : (value * pageSize.height) / pageSize.width;
+            changes.height = (changes.width * pageSize.width) / pageSize.height;
+            changes.x = Math.max(0, Math.min(field.x, 1 - changes.width));
+            changes.y = Math.max(0, Math.min(field.y, 1 - changes.height));
+        }
+        onChange({ ...layout, [selected]: { ...field, ...changes } });
+    };
 
     return (
         <section className="space-y-4 rounded-xl border border-border bg-surface p-4">
@@ -41,11 +55,13 @@ export default function ArtifactLayoutControls({
                         : setSelected(event.target.value)
                 }
             >
-                {Object.keys(layout).map((key) => (
-                    <option key={key} value={key}>
-                        {labelFor(key)}
-                    </option>
-                ))}
+                {Object.keys(layout)
+                    .filter((key) => !layout[key].removed)
+                    .map((key) => (
+                        <option key={key} value={key}>
+                            {labelFor(key)}
+                        </option>
+                    ))}
             </Select>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {['x', 'y', 'width', 'height'].map((key) => (
@@ -63,60 +79,110 @@ export default function ArtifactLayoutControls({
                     />
                 ))}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-                <Select
-                    label="Font"
-                    aria-label={`${label} Font`}
-                    value={field.font_family}
-                    onChange={(event) => update('font_family', event.target.value)}
-                >
-                    {['Helvetica', 'Times', 'Courier', 'DejaVu Sans'].map((font) => (
-                        <option key={font}>{font}</option>
-                    ))}
-                </Select>
-                <Input
-                    label="Font size (pt)"
-                    aria-label={`${label} Font size`}
-                    type="number"
-                    min={6}
-                    max={96}
-                    step="any"
-                    required
-                    value={field.font_size}
-                    onChange={(event) => update('font_size', Number(event.target.value))}
-                />
-                <Select
-                    label="Weight"
-                    aria-label={`${label} Weight`}
-                    value={field.font_weight}
-                    onChange={(event) => update('font_weight', Number(event.target.value))}
-                >
-                    {[400, 500, 600, 700, 800].map((weight) => (
-                        <option key={weight} value={weight}>
-                            {weight}
-                        </option>
-                    ))}
-                </Select>
-                <Select
-                    label="Alignment"
-                    aria-label={`${label} Alignment`}
-                    value={field.align}
-                    onChange={(event) => update('align', event.target.value)}
-                >
-                    {['left', 'center', 'right'].map((align) => (
-                        <option key={align} value={align}>
-                            {labelFor(align)}
-                        </option>
-                    ))}
-                </Select>
-            </div>
-            <Input
-                label="Text color"
-                aria-label={`${label} Color`}
-                type="color"
-                value={field.color}
-                onChange={(event) => update('color', event.target.value)}
-            />
+            {!graphic && (
+                <>
+                    <Input
+                        label="Search fonts"
+                        aria-label="Search fonts"
+                        value={fontSearch}
+                        onChange={(event) => setFontSearch(event.target.value)}
+                        placeholder="Find a font…"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                        <Select
+                            label="Font"
+                            aria-label={`${label} Font`}
+                            value={field.font_family}
+                            onChange={(event) => {
+                                const family = event.target.value;
+                                const font = fonts.find((item) => item.family === family);
+                                onChange({
+                                    ...layout,
+                                    [selected]: {
+                                        ...field,
+                                        font_family: family,
+                                        font_weight: font?.weights.includes(field.font_weight)
+                                            ? field.font_weight
+                                            : font?.weights[0] || 400,
+                                    },
+                                });
+                            }}
+                        >
+                            {!fonts.some((font) => font.family === field.font_family) && (
+                                <option value={field.font_family}>Saved font</option>
+                            )}
+                            {fonts
+                                .filter(
+                                    (font) =>
+                                        (!font.archived || font.family === field.font_family) &&
+                                        (font.family === field.font_family ||
+                                            font.name
+                                                .toLowerCase()
+                                                .includes(fontSearch.toLowerCase()))
+                                )
+                                .map((font) => (
+                                    <option
+                                        key={font.family}
+                                        value={font.family}
+                                        style={{ fontFamily: artifactFontFamily(font.family) }}
+                                    >
+                                        {font.name}
+                                    </option>
+                                ))}
+                        </Select>
+                        <Input
+                            label="Font size (pt)"
+                            aria-label={`${label} Font size`}
+                            type="number"
+                            min={6}
+                            max={96}
+                            step="any"
+                            required
+                            value={field.font_size}
+                            onChange={(event) => update('font_size', Number(event.target.value))}
+                        />
+                        <Select
+                            label="Weight"
+                            aria-label={`${label} Weight`}
+                            value={field.font_weight}
+                            onChange={(event) => update('font_weight', Number(event.target.value))}
+                        >
+                            {Array.from(
+                                new Set([
+                                    ...(fonts.find((font) => font.family === field.font_family)
+                                        ?.weights || [400, 700]),
+                                    field.font_weight || 400,
+                                ])
+                            )
+                                .sort()
+                                .map((weight) => (
+                                    <option key={weight} value={weight}>
+                                        {weight}
+                                    </option>
+                                ))}
+                        </Select>
+                        <Select
+                            label="Alignment"
+                            aria-label={`${label} Alignment`}
+                            value={field.align}
+                            onChange={(event) => update('align', event.target.value)}
+                        >
+                            {['left', 'center', 'right'].map((align) => (
+                                <option key={align} value={align}>
+                                    {labelFor(align)}
+                                </option>
+                            ))}
+                        </Select>
+                    </div>
+                    <Input
+                        label="Text color"
+                        aria-label={`${label} Color`}
+                        type="color"
+                        value={field.color}
+                        onChange={(event) => update('color', event.target.value)}
+                    />
+                </>
+            )}
             {allowUnderline && !['qr', 'tenant_logo'].includes(selected) && (
                 <Checkbox
                     label={`Underline ${label}`}

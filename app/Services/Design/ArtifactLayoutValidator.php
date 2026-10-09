@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Design;
 
-use Dompdf\Dompdf;
-use Dompdf\FontMetrics;
 use Illuminate\Validation\ValidationException;
 
 final class ArtifactLayoutValidator
@@ -23,23 +21,18 @@ final class ArtifactLayoutValidator
     ];
 
     /** @var list<string> */
-    private const array FONTS = ['Helvetica', 'Times', 'Courier', 'DejaVu Sans'];
-
-    /** @var list<string> */
     private const array ALIGNS = ['left', 'center', 'right'];
-
-    private ?FontMetrics $fontMetrics = null;
 
     /**
      * @param  array<string, bool|float|int|string>  $settings
      * @return array<string, bool|float|int|string>
      */
-    public function fitText(string $text, array $settings, float $widthMm, float $heightMm, string $field, float $lineHeight = 1.15): array
+    public function fitText(string $text, array $settings, float $widthMm, float $heightMm, string $field, float $lineHeight = 1.15, ?string $tenantId = null): array
     {
-        if ($text === '' || ($settings['visible'] ?? true) === false) {
+        if ($text === '' || ($settings['visible'] ?? true) === false || ($settings['removed'] ?? false) === true) {
             return $settings;
         }
-        $metrics = $this->fontMetrics ??= (new Dompdf)->getFontMetrics();
+        $metrics = app(ArtifactFontRegistry::class)->metrics((string) $settings['font_family'], $tenantId);
         $font = $metrics->getFont((string) $settings['font_family'], (int) $settings['font_weight'] >= 600 ? 'bold' : 'normal')
             ?? $metrics->getFont('DejaVu Sans', 'normal');
         $width = $widthMm * 72 / 25.4;
@@ -112,9 +105,9 @@ final class ArtifactLayoutValidator
      * @param  array<string, mixed>  $overrides
      * @return array<string, array<string, bool|float|int|string>>
      */
-    public function resolveCertificate(array $overrides = []): array
+    public function resolveCertificate(array $overrides = [], ?string $tenantId = null): array
     {
-        $layout = $this->validate(array_replace_recursive($this->certificateDefaults(), $overrides), 'certificate');
+        $layout = $this->validate(array_replace_recursive($this->certificateDefaults(), $overrides), 'certificate', $tenantId);
         $layout['recipient_name']['visible'] = true;
         $layout['verification_code']['visible'] = true;
 
@@ -125,7 +118,7 @@ final class ArtifactLayoutValidator
      * @param  array<string, mixed>  $layout
      * @return array<string, array<string, bool|float|int|string>>
      */
-    public function validate(array $layout, string $artifact): array
+    public function validate(array $layout, string $artifact, ?string $tenantId = null): array
     {
         $allowedElements = self::ELEMENTS[$artifact] ?? null;
 
@@ -142,7 +135,7 @@ final class ArtifactLayoutValidator
 
             $unknown = array_diff(array_keys($settings), [
                 'x', 'y', 'width', 'height', 'align', 'font_family', 'font_size',
-                'font_weight', 'color', 'visible', ...($artifact === 'badge' ? ['underline'] : []),
+                'font_weight', 'color', 'visible', ...($artifact === 'badge' ? ['underline', 'removed'] : []),
             ]);
 
             if ($unknown !== []) {
@@ -164,7 +157,7 @@ final class ArtifactLayoutValidator
             $fontWeight = $settings['font_weight'] ?? 400;
             $color = mb_strtoupper((string) ($settings['color'] ?? '#111827'));
 
-            if (! is_string($font) || ! in_array($font, self::FONTS, true)) {
+            if (! is_string($font) || ! app(ArtifactFontRegistry::class)->allows($font, $tenantId)) {
                 $this->invalid("The {$element} font is not supported.");
             }
 
@@ -176,12 +169,16 @@ final class ArtifactLayoutValidator
                 $this->invalid("The {$element} font size must be between 6 and 96 points.");
             }
 
-            if (! in_array((int) $fontWeight, [400, 500, 600, 700, 800], true)) {
+            if (! app(ArtifactFontRegistry::class)->allowsWeight($font, (int) $fontWeight, $tenantId)) {
                 $this->invalid("The {$element} font weight is not supported.");
             }
 
             if (preg_match('/\A#[0-9A-F]{6}\z/', $color) !== 1) {
                 $this->invalid("The {$element} color must be a six-digit hex color.");
+            }
+
+            if ($artifact === 'badge' && array_key_exists('removed', $settings) && ! is_bool($settings['removed'])) {
+                $this->invalid("The {$element} removed setting must be a boolean.");
             }
 
             if ($artifact === 'badge' && array_key_exists('underline', $settings) && ! is_bool($settings['underline'])) {
@@ -199,7 +196,7 @@ final class ArtifactLayoutValidator
                 'font_weight' => (int) $fontWeight,
                 'color' => $color,
                 'visible' => (bool) ($settings['visible'] ?? true),
-                ...($artifact === 'badge' ? ['underline' => $settings['underline'] ?? false] : []),
+                ...($artifact === 'badge' ? ['underline' => $settings['underline'] ?? false, 'removed' => $settings['removed'] ?? false] : []),
             ];
         }
 
