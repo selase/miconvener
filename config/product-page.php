@@ -18,6 +18,7 @@ return [
             ['label' => 'Features', 'href' => '/#features'],
             ['label' => 'Pricing', 'href' => '/#pricing'],
             ['label' => 'Enterprise', 'href' => '/product-enterprise'],
+            ['label' => 'Marketplace', 'href' => '/marketplace', 'route' => 'marketplace.index', 'target' => '_blank'],
         ],
         'cta_secondary' => ['label' => 'Sign in', 'href' => '/login'],
         'cta_primary' => ['label' => 'Start for free', 'href' => '/register'],
@@ -242,6 +243,7 @@ return [
                 ['label' => 'Features', 'href' => '/#features'],
                 ['label' => 'Pricing', 'href' => '/#pricing'],
                 ['label' => 'Enterprise', 'href' => '/product-enterprise'],
+                ['label' => 'Marketplace', 'href' => '/marketplace', 'route' => 'marketplace.index', 'target' => '_blank'],
             ],
             'Company' => [
                 ['label' => 'Terms', 'href' => '/terms'],

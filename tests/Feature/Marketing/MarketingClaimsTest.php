@@ -40,7 +40,7 @@ test('the homepage promises offline scanning, which staff links do', function ()
         ->and(file_exists(base_path('tests/Feature/Events/StaffLinkOfflineTest.php')))->toBeTrue();
 });
 
-test('the public pages do not sell the venue marketplace until real venues take bookings', function (): void {
+test('the public pages allow marketplace browsing without promising venue bookings', function (): void {
     foreach (['/', '/deck'] as $path) {
         $this->get($path)
             ->assertOk()
@@ -49,8 +49,8 @@ test('the public pages do not sell the venue marketplace until real venues take 
             ->assertDontSee('Vendor quotes', false);
     }
 
-    $config = json_encode(config('product-page'));
-    expect($config)->not->toContain('/marketplace');
+    $links = collect(config('product-page.nav.links'));
+    expect($links->firstWhere('label', 'Marketplace')['target'])->toBe('_blank');
 });
 
 test('the homepage names no customer', function (): void {

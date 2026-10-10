@@ -77,9 +77,13 @@
                             $isActive = request()->url() == $l['href']
                                 || (str_starts_with($l['href'], '/') && !str_starts_with($l['href'], '/#') && $path !== '' && request()->is($path.'*'));
                         @endphp
-                        <a href="{{ $l['href'] }}"
+                        <a href="{{ isset($l['route']) ? route($l['route']) : $l['href'] }}"
+                            @if (($l['target'] ?? null) === '_blank') target="_blank" rel="noopener noreferrer" @endif
                             class="text-sm {{ $isActive ? 'text-slate-900 font-semibold' : 'text-slate-500 hover:text-slate-900' }} transition">
                             {{ $l['label'] }}
+                            @if (($l['target'] ?? null) === '_blank')
+                                <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span>
+                            @endif
                         </a>
                     @endforeach
                 </nav>
@@ -124,8 +128,13 @@
                         <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ $colTitle }}</div>
                         <div class="mt-4 space-y-2">
                             @foreach ($links as $l)
-                                <a href="{{ $l['href'] }}" class="block text-sm text-slate-500 hover:text-slate-900 transition">
+                                <a href="{{ isset($l['route']) ? route($l['route']) : $l['href'] }}"
+                                    @if (($l['target'] ?? null) === '_blank') target="_blank" rel="noopener noreferrer" @endif
+                                    class="block text-sm text-slate-500 hover:text-slate-900 transition">
                                     {{ $l['label'] }}
+                                    @if (($l['target'] ?? null) === '_blank')
+                                        <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span>
+                                    @endif
                                 </a>
                             @endforeach
                         </div>

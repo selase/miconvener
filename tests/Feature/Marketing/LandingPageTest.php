@@ -64,11 +64,21 @@ test('the enterprise page renders', function (): void {
     $this->get('/product-enterprise')->assertOk();
 });
 
-test('the landing page leaves the marketplace out of navigation and footer until real venues take bookings', function (): void {
+test('the homepage links to the browsing marketplace in a new tab from navigation and footer', function (): void {
     $response = $this->get('/');
-
     $response->assertOk();
-    $response->assertDontSee('/marketplace', false);
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    foreach (['header', 'footer'] as $area) {
+        $links = $xpath->query('//'.$area.'//a[contains(@href, "/marketplace")]');
+        expect($links->length)->toBe(1);
+        $link = $links->item(0);
+        expect($link->getAttribute('href'))->toBe(route('marketplace.index'))
+            ->and($link->getAttribute('target'))->toBe('_blank')
+            ->and($link->getAttribute('rel'))->toContain('noopener')
+            ->and($link->textContent)->toContain('opens in a new tab');
+    }
 });
 
 test('the hero renders five labelled panels and preserves the event-day fallback', function (): void {
