@@ -121,6 +121,10 @@ final class MarketplaceVendorService
      */
     public function initializeCheckout(MarketplaceQuote $quote, string $callbackUrl): array
     {
+        if ($quote->venuePaymentsPaused()) {
+            throw new RuntimeException('Online payments are paused for this venue.');
+        }
+
         if ($quote->isExpired()) {
             throw new RuntimeException('This quotation proposal has expired.');
         }

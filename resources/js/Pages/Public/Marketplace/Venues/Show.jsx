@@ -486,11 +486,14 @@ export default function VenueShow({ venue, otherSpaces = [] }) {
                                 <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                                     <ShieldCheck className="h-4 w-4 shrink-0" />
                                     <span>
-                                        Approval-First: No upfront charges until dates confirmed
+                                        {venue.is_bookable === false
+                                            ? 'Enquiries welcome. Online reservations and payments are paused.'
+                                            : 'Approval-First: No upfront charges until dates confirmed'}
                                     </span>
                                 </div>
 
-                                {venue.listing_kind === 'equipment' || venue.listing_kind === 'service' ? (
+                                {venue.listing_kind === 'equipment' ||
+                                venue.listing_kind === 'service' ? (
                                     <button
                                         type="button"
                                         onClick={() => setRfqModalOpen(true)}
@@ -510,7 +513,8 @@ export default function VenueShow({ venue, otherSpaces = [] }) {
                                             Request Custom Quote (RFQ)
                                         </button>
                                         <p className="text-[11px] text-center text-ink-secondary leading-relaxed">
-                                            Instant online holds are paused. Submit a quote request or contact the host directly.
+                                            Send an enquiry or contact the host directly. Online
+                                            reservations and payments remain paused.
                                         </p>
                                     </div>
                                 ) : (

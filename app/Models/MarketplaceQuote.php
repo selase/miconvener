@@ -190,6 +190,15 @@ final class MarketplaceQuote extends Model
         return $this->valid_until !== null && $this->valid_until->isPast();
     }
 
+    public function venuePaymentsPaused(): bool
+    {
+        $listing = $this->listing;
+
+        return $listing !== null
+            && $listing->listing_kind === StoreListing::KIND_VENUE
+            && ! $listing->isBookable();
+    }
+
     /**
      * The buyer's service fee as they will pay it: the figure fixed at
      * checkout once there is one, otherwise what their plan would charge on
@@ -254,6 +263,7 @@ final class MarketplaceQuote extends Model
             'paystack_reference' => $this->paystack_reference,
             'paid_at' => $this->paid_at?->toIso8601String(),
             'is_expired' => $this->isExpired(),
+            'venue_payments_paused' => $this->venuePaymentsPaused(),
             'is_deposit_paid' => $this->isDepositPaid(),
             'created_at' => $this->created_at?->toIso8601String(),
             'shop' => $this->relationLoaded('shop') && $this->shop ? [
