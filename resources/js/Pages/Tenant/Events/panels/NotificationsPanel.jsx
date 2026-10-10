@@ -23,6 +23,29 @@ import {
     Zap,
 } from 'lucide-react';
 
+/**
+ * What to tell the organiser about one message. For a text the provider
+ * accepted, "sent" would overstate it: show whether it was delivered once the
+ * provider has said (metadata.delivery, filled in by the delivery sync).
+ */
+export function deliveryLabel(log) {
+    if (log.status === 'staged_omnichannel') {
+        return 'Staged — not sent or billed';
+    }
+    if (log.channel === 'sms' && log.status === 'sent') {
+        if (log.metadata?.delivery === 'delivered') {
+            return 'delivered';
+        }
+        if (log.metadata?.delivery === 'undelivered') {
+            return log.metadata.delivery_detail
+                ? `not delivered (${log.metadata.delivery_detail})`
+                : 'not delivered';
+        }
+        return 'sent, awaiting delivery';
+    }
+    return log.status.replaceAll('_', ' ');
+}
+
 export default function NotificationsPanel({ event }) {
     const [rules, setRules] = useState([]);
     const [audiences, setAudiences] = useState([]);
@@ -454,9 +477,7 @@ export default function NotificationsPanel({ event }) {
                                     </div>
                                 </div>
                                 <span className="shrink-0 rounded border border-slate-200 dark:border-slate-700 px-2 py-1 font-semibold text-slate-600 dark:text-slate-300">
-                                    {log.status === 'staged_omnichannel'
-                                        ? 'Staged — not sent or billed'
-                                        : log.status.replaceAll('_', ' ')}
+                                    {deliveryLabel(log)}
                                 </span>
                             </div>
                         ))}
