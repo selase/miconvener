@@ -17,6 +17,19 @@ test('the landing page renders', function (): void {
     $this->get('/')->assertOk();
 });
 
+test('the hero uses the configured platform overview', function (): void {
+    config(['product-page.hero.subtitle' => 'Bring programmes & places together.']);
+
+    $this->get('/')->assertOk()->assertSee('Bring programmes &amp; places together.', false);
+});
+
+test('venue and engagement copy covers the supported workflows', function (): void {
+    $this->get('/')->assertOk()
+        ->assertSee('Create facility tasks')
+        ->assertDontSee('Assign facility tasks')
+        ->assertSee('Discussions &amp; forums', false);
+});
+
 test('the landing page describes the event product, not the one this codebase replaced', function (): void {
     $response = $this->get('/');
 

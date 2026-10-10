@@ -162,6 +162,7 @@ return [
             ['icon' => '🙋', 'group' => 'Engagement & communication', 'title' => 'Attendee requests', 'body' => 'Guests ask for help from their ticket, and your crew answers from their phones.'],
             ['icon' => '💬', 'group' => 'Engagement & communication', 'title' => 'Live polling & Q&A', 'body' => 'A live presenter screen, ten question types including quizzes, word clouds, rankings and ratings, and moderated Q&A. Included on Growth, or as an add-on.'],
             ['group' => 'Engagement & communication', 'title' => 'Email announcements', 'body' => 'Send event announcements and reminders, with email credits governed by your plan.'],
+            ['group' => 'Engagement & communication', 'title' => 'Discussions & forums', 'body' => 'Give participants a place to exchange ideas and continue the conversation around your event.'],
             ['group' => 'Recognition & academic events', 'title' => 'Badges & certificates', 'body' => 'Design branded badges and certificates with your fonts, artwork, logo and QR placement.'],
             ['group' => 'Recognition & academic events', 'title' => 'Certificate verification', 'body' => 'Give recipients a certificate with a public verification page.'],
             ['group' => 'Recognition & academic events', 'title' => 'Academic submissions & peer review', 'body' => 'Receive abstracts, assign reviewers, record decisions and export an abstract book.'],

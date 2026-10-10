@@ -249,8 +249,7 @@
         </h1>
 
         <p class="hero-sub">
-            Sell the tickets, run the door with your own crew’s phones, answer guests while
-            the event is on, and see exactly what you earned. One tool instead of five.
+            {{ config('product-page.hero.subtitle') }}
         </p>
 
         <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -666,7 +665,7 @@
                 <ul class="venue-points mt-7">
                     @foreach ([
                         ['A calendar for every space', 'Follow event dates, availability and blocked days.'],
-                        ['A shared view of readiness', 'Assign facility tasks, follow completion and exchange organiser messages.'],
+                        ['A shared view of readiness', 'Create facility tasks, follow completion and exchange organiser messages.'],
                         ['A clear handover', 'Record check-in and check-out inspections alongside the booking.'],
                     ] as [$title, $body])
                         <li><strong>{{ $title }}</strong><span>{{ $body }}</span></li>
