@@ -25,7 +25,7 @@ return [
 
     'hero' => [
         'title' => "Run the whole event\nfrom one place",
-        'subtitle' => 'Sell tickets, run the door from your crew’s own phones, poll the room from the stage, and see exactly what you earned. Built for conferences, and for the churches, memorials and fundraisers that gather around them.',
+        'subtitle' => 'Bring programmes, people, payments and places together. Plan the event, equip your crew, engage your guests and keep the venue ready—from the first registration to the final settlement.',
         'cta_primary' => ['label' => 'Start Free', 'href' => '/register'],
         'cta_secondary' => ['label' => 'See pricing', 'href' => '/#pricing'],
     ],
@@ -132,13 +132,14 @@ return [
     ],
 
     'intro' => [
-        'eyebrow' => 'How it works',
-        'title' => 'From first invite to final payout',
-        'body' => 'Set up an event in minutes, share a single link, and run the day from the same place you built it.',
+        'eyebrow' => 'Who it serves',
+        'title' => 'Built for everyone behind the gathering',
+        'body' => 'Bring the people organising, hosting, running and attending your event into connected workspaces.',
         'cards' => [
-            ['kicker' => 'Create', 'title' => 'Build your event page', 'body' => 'Add the schedule, speakers and ticket types, then publish to a link you can share anywhere.'],
-            ['kicker' => 'Sell', 'title' => 'Take payments', 'body' => 'Cards and mobile money. Guests get a ticket with a QR code the moment payment clears.'],
-            ['kicker' => 'Run', 'title' => 'Run the day', 'body' => 'Scan guests in, even without signal, print badges, run live polls, and answer guests’ requests as they come.'],
+            ['kicker' => 'Organisers', 'title' => 'Event organisers', 'body' => 'Coordinate programmes, speakers, registrations, team tasks and sponsor commitments.'],
+            ['kicker' => 'Crew', 'title' => 'Door & floor teams', 'body' => 'Check guests in, track session arrivals and respond to requests from their own phones.'],
+            ['kicker' => 'Venues', 'title' => 'Venue operators', 'body' => 'Manage spaces, inquiries, quotations and facility preparations, with a shared view of the event.'],
+            ['kicker' => 'Attendees', 'title' => 'Attendees & participants', 'body' => 'Find tickets, available materials, receipts and certificates, and take part in the event from one personal portal.'],
         ],
     ],
 

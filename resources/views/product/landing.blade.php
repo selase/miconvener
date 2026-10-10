@@ -95,7 +95,8 @@
     .lede { color: var(--ink-2); font-size: 1.02rem; line-height: 1.6; font-weight: 300; max-width: 40rem; }
 
     .arc { display: grid; grid-template-columns: repeat(4, 1fr); }
-    @media (max-width: 880px) { .arc { grid-template-columns: 1fr; } }
+    @media (max-width: 1000px) { .arc { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap:28px; } }
+    @media (max-width: 580px) { .arc { grid-template-columns: 1fr; row-gap:24px; } }
     .arc-step { padding: 1.5rem 1.35rem; border-left: 2px solid var(--rule); }
     .arc-step:first-child { border-left-color: var(--field); }
     .arc-n { font-size: .74rem; color: var(--field); font-weight: 500; }
@@ -180,6 +181,10 @@
         [data-hero-showcase] .mc-demo-certificate h3 { font-size:13px; }
     }
 
+    .audience-icon { width:32px; height:32px; color:var(--field); margin-bottom:20px; }
+    .arc-t { font-size:19px; line-height:1.35; }
+    .arc-b { font-size:14px; line-height:1.75; margin-top:10px; }
+    .arc-step { padding-top:8px; padding-bottom:8px; }
 </style>
 @endpush
 
@@ -443,16 +448,25 @@
         <h2 class="h2 display">{{ config('product-page.intro.title') }}</h2>
         <p class="lede mt-3">{{ config('product-page.intro.body') }}</p>
         <div class="arc mt-10">
-            @foreach ([
-                ['Create', 'Build the page', 'Schedule, speakers and ticket types on one link you can share anywhere.'],
-                ['Sell', 'Take payments', 'Card and mobile money, with a QR ticket the moment payment clears. Bank transfer and MoMo slips you approve by hand.'],
-                ['Run', 'Run the day', 'Scan guests in, answer their requests, run live polls and Q&A, and keep the forum going.'],
-                ['Settle', 'Get paid', 'One statement per event, then a payout to your bank or mobile money.'],
-            ] as $i => [$step, $title, $body])
+            @foreach (config('product-page.intro.cards') as $card)
                 <div class="arc-step">
-                    <div class="arc-n mono">{{ str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT) }} · {{ $step }}</div>
-                    <div class="arc-t">{{ $title }}</div>
-                    <div class="arc-b">{{ $body }}</div>
+                    <svg class="audience-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        @switch($loop->index)
+                            @case(0)
+                                <rect x="5" y="6" width="22" height="22" rx="3"/><path d="M10 4v5M22 4v5M5 13h22M10 18h5M10 23h11"/>
+                                @break
+                            @case(1)
+                                <rect x="8" y="3" width="16" height="26" rx="3"/><path d="M12 15l3 3 6-7M14 25h4"/>
+                                @break
+                            @case(2)
+                                <path d="M3 12l13-8 13 8M6 12v16h20V12M12 28v-9h8v9M10 13h2M20 13h2"/>
+                                @break
+                            @default
+                                <circle cx="16" cy="10" r="5"/><path d="M6 27v-3a10 10 0 0 1 20 0v3M12 25h8"/>
+                        @endswitch
+                    </svg>
+                    <div class="arc-t">{{ $card['title'] }}</div>
+                    <div class="arc-b">{{ $card['body'] }}</div>
                 </div>
             @endforeach
         </div>

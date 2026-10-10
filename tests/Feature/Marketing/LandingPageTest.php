@@ -64,3 +64,13 @@ test('the hero renders five labelled panels and preserves the event-day fallback
     $response->assertSee('Plan &amp; sell', false)->assertSee('Venues &amp; services', false);
     expect($document->getElementById('hero-panel-venues')->textContent)->toContain('Keep every space ready');
 });
+
+test('the homepage introduces the four audiences it serves', function (): void {
+    $this->get('/')->assertOk()
+        ->assertSee('Built for everyone behind the gathering')
+        ->assertSee('Event organisers')
+        ->assertSee('Door &amp; floor teams', false)
+        ->assertSee('Venue operators')
+        ->assertSee('Attendees &amp; participants', false)
+        ->assertDontSee('From first invite to final payout');
+});
