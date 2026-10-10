@@ -78,6 +78,10 @@ final class Kernel extends ConsoleKernel
         $schedule->command('marketplace:expire-verifications')->dailyAt('03:15');
         // Organiser sending domains switch on/off as SES finds their DNS records.
         $schedule->command('mail:check-sending-domains')->everyFifteenMinutes()->withoutOverlapping();
+        // The SMS provider has no delivery webhook, so delivery is asked for.
+        // On the shared fifteen-minute wake: a per-minute task would hold the
+        // hibernating app awake.
+        $schedule->command('sms:sync-delivery')->everyFifteenMinutes()->withoutOverlapping();
 
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
