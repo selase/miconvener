@@ -45,14 +45,14 @@ test('the landing page leaves the marketplace out of navigation and footer until
     $response->assertDontSee('/marketplace', false);
 });
 
-test('the hero renders three labelled panels and preserves the event-day fallback', function (): void {
+test('the hero renders five labelled panels and preserves the event-day fallback', function (): void {
     $response = $this->get('/')->assertOk();
     $document = new DOMDocument;
     @$document->loadHTML($response->getContent());
     $xpath = new DOMXPath($document);
     $tabs = $xpath->query('//*[@data-hero-showcase]//*[@role="tab"]');
 
-    expect($tabs->length)->toBe(3);
+    expect($tabs->length)->toBe(5);
     foreach ($tabs as $tab) {
         $panel = $document->getElementById($tab->getAttribute('aria-controls'));
         expect($panel)->not->toBeNull()
@@ -61,5 +61,6 @@ test('the hero renders three labelled panels and preserves the event-day fallbac
     }
 
     expect($document->getElementById('hero-panel-run')->textContent)->toContain('Overview');
-    $response->assertSee('Plan your event')->assertSee('Follow through');
+    $response->assertSee('Plan &amp; sell', false)->assertSee('Venues &amp; services', false);
+    expect($document->getElementById('hero-panel-venues')->textContent)->toContain('Keep every space ready');
 });

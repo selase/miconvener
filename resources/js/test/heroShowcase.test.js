@@ -10,7 +10,7 @@ beforeEach(() => {
 
 test('the event-day overview is selected initially and clicks reveal only the corresponding panel', () => {
     const tabs = [...document.querySelectorAll('[data-hero-showcase] [role="tab"]')];
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(5);
     expect(tabs[1].getAttribute('aria-selected')).toBe('true');
     for (const tab of tabs) {
         tab.click();
@@ -26,7 +26,7 @@ test('the event-day overview is selected initially and clicks reveal only the co
 
 test('arrow, home and end keys select and focus tabs with a single tab stop', () => {
     const tabs = [...document.querySelectorAll('[data-hero-showcase] [role="tab"]')];
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(5);
     const press = (index, key, expected) => {
         tabs[index].dispatchEvent(
             new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
@@ -36,8 +36,8 @@ test('arrow, home and end keys select and focus tabs with a single tab stop', ()
         expect(tabs[expected].getAttribute('aria-selected')).toBe('true');
     };
     press(1, 'ArrowRight', 2);
-    press(2, 'ArrowRight', 0);
-    press(0, 'ArrowLeft', 2);
-    press(2, 'Home', 0);
-    press(0, 'End', 2);
+    press(4, 'ArrowRight', 0);
+    press(0, 'ArrowLeft', 4);
+    press(4, 'Home', 0);
+    press(0, 'End', 4);
 });

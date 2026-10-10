@@ -114,7 +114,7 @@
 
     a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--ice); outline-offset: 2px; }
     [data-hero-showcase] [hidden] { display:none!important; }
-    [data-hero-showcase] .mc-reference-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:22px; border-top:1px solid #ffffff35; border-bottom:1px solid #ffffff35; text-align:left; }
+    [data-hero-showcase] .mc-reference-tabs { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); margin-bottom:22px; border-top:1px solid #ffffff35; border-bottom:1px solid #ffffff35; text-align:left; }
     [data-hero-showcase] .mc-reference-tab { position:relative; padding:20px 24px; font:500 15px 'Public Sans',sans-serif; color:#d7e5ff; background:transparent; border:0; border-left:1px solid #ffffff35; min-height:64px; text-align:left; }
     [data-hero-showcase] .mc-reference-tab:first-child { border-left:0; }
     [data-hero-showcase] .mc-reference-tab::after { content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:#ffffff55; }
@@ -145,6 +145,41 @@
     [data-hero-showcase] .mc-demo-certificate p { font-size:11px; color:#78838f; margin:10px 0; }
     @media(max-width:640px) { [data-hero-showcase] .mc-reference-tab { padding:16px 12px; font-size:13px; min-height:58px; } [data-hero-showcase] .mc-showcase-columns { grid-template-columns:1fr; gap:16px; } [data-hero-showcase] .mc-product-slide { min-height:610px; } [data-hero-showcase] .mc-demo-pane { padding:14px; } }
 
+
+    [data-hero-showcase] .mc-slide-title { font-size:22px; line-height:1.35; letter-spacing:-.025em; text-wrap:balance; }
+    [data-hero-showcase] .mc-reference-tab { padding:20px 18px; font-size:14px; }
+    [data-hero-showcase] .mc-demo-row small { color:#596575; }
+    [data-hero-showcase] .mc-demo-state { color:#174bbb; background:#edf3ff; }
+    .mc-illustration-note { margin-top:16px; font-size:11px; line-height:1.6; color:var(--muted); }
+    .mc-net { color:var(--field-deep); background:#edf3ff; padding:16px 10px!important; margin:10px -10px 0; border:0!important; border-radius:5px; }
+    .mc-calendar { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px; text-align:center; font-size:12px; }
+    .mc-calendar > span { padding:10px 0; border-radius:5px; }
+    .mc-calendar .mc-calendar-day { color:var(--muted); font-size:11px; padding:4px 0 10px; }
+    .mc-calendar .mc-calendar-booked { background:var(--field); color:#fff; }
+    .mc-calendar .mc-calendar-blocked { background:#f1f3f6; color:#657080; }
+    .mc-calendar-legend { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; color:#596575; margin-top:18px; }
+    .mc-calendar-legend span { display:flex; align-items:center; gap:6px; }
+    .mc-calendar-legend i { display:block; width:8px; height:8px; border-radius:2px; background:var(--field); }
+    .mc-calendar-legend i.blocked { background:#c6ced8; }
+    @media(max-width:640px) {
+        [data-hero-showcase] .mc-reference-tabs { display:flex; overflow-x:auto; scrollbar-width:thin; scrollbar-color:#ffffff65 transparent; }
+        [data-hero-showcase] .mc-reference-tab { flex:0 0 auto; white-space:nowrap; padding:18px 16px; font-size:13px; }
+        [data-hero-showcase] .shot-body { padding:20px 16px; }
+        [data-hero-showcase] .mc-slide-title { font-size:19px; }
+        [data-hero-showcase] .mc-product-slide { min-height:0; }
+        [data-hero-showcase] .mc-slide-sub { margin-bottom:16px; }
+        [data-hero-showcase] .mc-demo-pane { padding:12px; }
+        [data-hero-showcase] .mc-demo-row { padding:10px 0; }
+        [data-hero-showcase] .mc-demo-pane:not(.mc-finance-preview) .mc-demo-row:nth-of-type(n+3) { display:none; }
+        [data-hero-showcase] .tile-v { font-size:19px; }
+        [data-hero-showcase] .tiles > div { padding:12px; }
+        [data-hero-showcase] .mc-run-detail > div:first-child { display:none; }
+        [data-hero-showcase] .mc-run-detail .row:last-child { display:none; }
+        [data-hero-showcase] .mc-artifact-pair { gap:10px; }
+        [data-hero-showcase] .mc-demo-certificate { padding:22px 8px; }
+        [data-hero-showcase] .mc-demo-certificate h3 { font-size:13px; }
+    }
+
 </style>
 @endpush
 
@@ -172,19 +207,21 @@
 
         <div class="mx-auto mt-14 max-w-5xl" data-hero-showcase>
             <div class="mc-reference-tabs" role="tablist" aria-label="Event feature showcase" hidden>
-                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-plan" aria-controls="hero-panel-plan" aria-selected="false" tabindex="-1">Plan your event</button>
-                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-run" aria-controls="hero-panel-run" aria-selected="true" tabindex="0">Run the day</button>
-                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-finish" aria-controls="hero-panel-finish" aria-selected="false" tabindex="-1">Follow through</button>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-plan" aria-controls="hero-panel-plan" aria-selected="false" tabindex="-1">Plan &amp; sell</button>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-run" aria-controls="hero-panel-run" aria-selected="true" tabindex="0">Run &amp; engage</button>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-design" aria-controls="hero-panel-design" aria-selected="false" tabindex="-1">Design &amp; recognise</button>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-finance" aria-controls="hero-panel-finance" aria-selected="false" tabindex="-1">Collect &amp; settle</button>
+                <button type="button" class="mc-reference-tab" role="tab" id="hero-tab-venues" aria-controls="hero-panel-venues" aria-selected="false" tabindex="-1">Venues &amp; services</button>
             </div>
             <div class="shot">
                 <div class="shot-head">
                     <i></i><i></i><i></i>
-                    <span class="addr mono">accra-tech-week.miconvener.com/events/summit</span>
+                    <span class="addr mono">Example event workspace</span>
                 </div>
                 <div class="shot-body">
                     <div class="mc-product-slide" id="hero-panel-plan" role="tabpanel" aria-labelledby="hero-tab-plan" tabindex="0" hidden>
-                        <h2 class="mc-slide-title">Prepare the whole event</h2>
-                        <p class="mc-slide-sub">Event pages, registration, payments, programme, speakers and your event team.</p>
+                        <h2 class="mc-slide-title">Bring your programme, people and ticket sales together.</h2>
+                        <p class="mc-slide-sub">Publish your event, organise sessions and speakers, register guests and take card or mobile money payments.</p>
                         <div class="mc-showcase-columns">
                             <div class="mc-demo-pane">
                                 <h3>Programme · Demo summit</h3>
@@ -236,8 +273,9 @@
                     <div class="mc-product-slide" id="hero-panel-run" role="tabpanel" aria-labelledby="hero-tab-run" tabindex="0">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <div class="display text-[19px]">Overview</div>
-                            <div class="text-[13px]" style="color:var(--muted)">Check-in, live polls, Q&amp;A, discussions and guest assistance in one workspace.</div>
+                            <h2 class="mc-slide-title">Keep the door moving and the room connected.</h2>
+                            <p class="mc-slide-sub">Check guests in from your crew’s phones, respond to requests and bring the audience into the conversation.</p>
+                            <div class="text-[13px]" style="color:var(--muted)">Overview · Demo summit</div>
                         </div>
                         <div class="hidden rounded-md border px-3 py-1.5 text-[12px] sm:block" style="border-color:var(--rule); color:var(--ink-2)">Export day report</div>
                     </div>
@@ -258,7 +296,7 @@
                         @endforeach
                     </div>
 
-                    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                    <div class="mc-run-detail mt-4 grid gap-4 lg:grid-cols-2">
                         <div class="rounded-lg border p-4" style="border-color:var(--rule)">
                             <div class="flex items-baseline justify-between">
                                 <div class="text-[13px] font-medium">Arrivals through the gates</div>
@@ -300,9 +338,9 @@
                         </div>
                     </div>
                     </div>
-                    <div class="mc-product-slide" id="hero-panel-finish" role="tabpanel" aria-labelledby="hero-tab-finish" tabindex="0" hidden>
-                        <h2 class="mc-slide-title">Give people something to take away</h2>
-                        <p class="mc-slide-sub">Your badge and certificate designs, attendee records, feedback and event finances.</p>
+                    <div class="mc-product-slide" id="hero-panel-design" role="tabpanel" aria-labelledby="hero-tab-design" tabindex="0" hidden>
+                        <h2 class="mc-slide-title">Make every badge and certificate unmistakably yours.</h2>
+                        <p class="mc-slide-sub">Create branded badges and verifiable certificates, with your artwork, fonts, logo and QR placement.</p>
                         <div class="mc-showcase-columns">
                             <div class="mc-artifact-pair">
                                 <div class="mc-demo-badge">
@@ -324,7 +362,7 @@
                                 </div>
                             </div>
                             <div class="mc-demo-pane">
-                                <h3>Close the loop</h3>
+                                <h3>Recognition that stays with them</h3>
                                 <div class="mc-demo-row">
                                     <div>
                                         Badges & certificates
@@ -333,19 +371,64 @@
                                 </div>
                                 <div class="mc-demo-row">
                                     <div>
-                                        Attendee portal & feedback
-                                        <small>Tickets, certificates, receipts and surveys</small>
+                                        Public verification
+                                        <small>A verification page for each issued certificate</small>
                                     </div>
                                 </div>
                                 <div class="mc-demo-row">
                                     <div>
-                                        Reports & settlement
-                                        <small>Contributions, refunds, statements and payouts</small>
+                                        One attendee home
+                                        <small>Tickets, available materials, receipts and certificates</small>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <div class="mc-product-slide" id="hero-panel-finance" role="tabpanel" aria-labelledby="hero-tab-finance" tabindex="0" hidden>
+                        <h2 class="mc-slide-title">See what came in, what went out and what you receive.</h2>
+                        <p class="mc-slide-sub">Track ticket payments, donations, contributions and refunds, then see the fees and payout on your settlement statement.</p>
+                        <div class="mc-showcase-columns">
+                            <div class="mc-demo-pane mc-finance-preview">
+                                <h3>Settlement statement</h3>
+                                <div class="mc-demo-row"><span>Tickets &amp; contributions</span><strong class="mono">GHS 14,400</strong></div>
+                                <div class="mc-demo-row"><span>Refunds</span><span class="mono">− GHS 400</span></div>
+                                <div class="mc-demo-row"><span>Provider &amp; platform fees</span><span class="mono">− GHS 520</span></div>
+                                <div class="mc-demo-row mc-net"><span>Net settlement</span><strong class="mono">GHS 13,480</strong></div>
+                                <p class="mc-illustration-note">Illustrative figures. Fees depend on your event and plan.</p>
+                            </div>
+                            <div class="mc-demo-pane">
+                                <h3>A clear record, from payment to payout</h3>
+                                <div class="mc-demo-row"><div>Card &amp; mobile money<small>Ticket payments and voluntary contributions</small></div><span class="mc-demo-state">Recorded</span></div>
+                                <div class="mc-demo-row"><div>Refunds &amp; statements<small>Follow the money against the event</small></div></div>
+                                <div class="mc-demo-row"><div>Bank &amp; mobile money payouts<small>Request a payout and track its progress</small></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mc-product-slide" id="hero-panel-venues" role="tabpanel" aria-labelledby="hero-tab-venues" tabindex="0" hidden>
+                        <h2 class="mc-slide-title">Keep every space ready for the event.</h2>
+                        <p class="mc-slide-sub">Coordinate your spaces, booking calendar, inquiries, facility tasks and organiser handovers.</p>
+                        <div class="mc-showcase-columns">
+                            <div class="mc-demo-pane">
+                                <h3>Main hall · October</h3>
+                                <div class="mc-calendar mc-calendar-compact" aria-label="Illustrative venue calendar">
+                                    @foreach (['M', 'T', 'W', 'T', 'F', 'S', 'S'] as $day)
+                                        <span class="mc-calendar-day">{{ $day }}</span>
+                                    @endforeach
+                                    @foreach (range(5, 18) as $date)
+                                        <span class="{{ in_array($date, [9, 10, 11]) ? 'mc-calendar-booked' : ($date === 14 ? 'mc-calendar-blocked' : '') }}">{{ $date }}</span>
+                                    @endforeach
+                                </div>
+                                <div class="mc-calendar-legend"><span><i></i>Event dates</span><span><i class="blocked"></i>Blocked date</span></div>
+                            </div>
+                            <div class="mc-demo-pane">
+                                <h3>Ready for the organiser</h3>
+                                <div class="mc-demo-row"><div>Room layout<small>Theatre seating · Main hall</small></div><span class="mc-demo-state">Done</span></div>
+                                <div class="mc-demo-row"><div>Sound &amp; projection<small>Facility team · Equipment check</small></div><span class="mc-demo-state">In progress</span></div>
+                                <div class="mc-demo-row"><div>Inspection &amp; handover<small>Record the condition of the space</small></div><span class="mc-demo-state">Scheduled</span></div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -635,7 +718,15 @@
             tab.tabIndex = selected ? 0 : -1;
             panels[position].hidden = !selected;
         });
-        if (focus) tabs[index].focus();
+        if (focus) tabs[index].focus({ preventScroll: true });
+        const strip = root.querySelector('[role="tablist"]');
+        if (strip.scrollWidth > strip.clientWidth) {
+            const tab = tabs[index];
+            const stripBounds = strip.getBoundingClientRect();
+            const tabBounds = tab.getBoundingClientRect();
+            if (tabBounds.left < stripBounds.left) strip.scrollLeft -= stripBounds.left - tabBounds.left;
+            if (tabBounds.right > stripBounds.right) strip.scrollLeft += tabBounds.right - stripBounds.right;
+        }
     };
     tabs.forEach((tab, index) => {
         tab.addEventListener('click', () => select(index));
