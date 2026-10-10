@@ -124,7 +124,7 @@ test('the staff link FAQ quotes the allowances the plans grant', function (): vo
         expect($answer)->toContain("{$granted} on {$name}");
     }
 
-    $this->get('/')->assertSee('Your crew scans', false)->assertSee('someone’s phone buzzes', false);
+    $this->get('/')->assertSee('Your crew scans', false)->assertSee('your crew sees the request', false)->assertDontSee('phone buzzes', false);
 });
 
 test('no plan advertises single sign-on, which is not built', function (): void {

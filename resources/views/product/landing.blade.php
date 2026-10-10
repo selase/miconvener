@@ -185,6 +185,56 @@
     .arc-t { font-size:19px; line-height:1.35; }
     .arc-b { font-size:14px; line-height:1.75; margin-top:10px; }
     .arc-step { padding-top:8px; padding-bottom:8px; }
+
+    [data-hero-showcase] .shot { --muted:#596575; }
+    [data-hero-showcase] .mc-demo-badge p, [data-hero-showcase] .mc-demo-certificate small, [data-hero-showcase] .mc-demo-certificate p { color:#596575; }
+    .venue-points { display:grid; gap:22px; }
+    .venue-points li { padding-left:18px; border-left:2px solid var(--field); }
+    .venue-points strong { display:block; font-size:15px; font-weight:500; }
+    .venue-points span { display:block; margin-top:5px; color:var(--ink-2); font-size:14px; line-height:1.65; }
+    .venue-operations-preview { --muted:#596575; }
+    .venue-preview-grid { display:grid; grid-template-columns:1fr 1fr; }
+    .venue-calendar-pane, .venue-readiness-pane { padding:24px 20px; min-width:0; }
+    .venue-readiness-pane { border-left:1px solid var(--rule); background:#fafbfd; }
+    .venue-preview-title { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:18px; }
+    .venue-preview-title h3 { font-size:13px; font-weight:500; }
+    .venue-preview-title > span { font-size:11px; color:var(--muted); }
+    .venue-progress { height:5px; background:#e6edf8; border-radius:5px; margin-bottom:10px; overflow:hidden; }
+    .venue-progress span { display:block; width:66.666%; height:100%; background:var(--field); }
+    .venue-task { display:flex; gap:10px; align-items:start; padding:12px 0; border-bottom:1px solid var(--rule); }
+    .venue-task strong { display:block; font-size:12px; font-weight:500; }
+    .venue-task small { display:block; font-size:11px; color:var(--muted); margin-top:3px; }
+    .venue-task-mark { color:#596575; font-size:15px; line-height:20px; }
+    .venue-task-mark.complete { color:var(--go); }
+    .venue-message { padding:12px; margin-top:20px; background:#edf3ff; border-radius:6px; }
+    .venue-message span { font-size:10px; color:var(--field-deep); font-weight:500; }
+    .venue-message p { font-size:11px; line-height:1.6; margin-top:5px; color:var(--ink-2); }
+    .venue-ready { font-size:10px; color:var(--field-deep); background:#edf3ff; padding:5px 8px; border-radius:4px; }
+    .venue-preview-footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; padding:12px 20px; border-top:1px solid var(--rule); font-size:10px; color:var(--muted); }
+    .feature-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:36px 32px; }
+    .feature-group { min-width:0; }
+    .feature-group > h3 { font-size:18px; }
+    .feature-group .cap { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .feature-group .cap > div { padding:20px; }
+    .feature-group .cap h4 { font-size:14px; font-weight:500; line-height:1.5; }
+    .feature-group .cap p { font-size:13px; line-height:1.7; }
+    .feature-group .feature-wide { grid-column:1 / -1; }
+    @media(max-width:900px) { .feature-groups { grid-template-columns:1fr; } }
+    @media(max-width:580px) {
+        .venue-preview-grid { grid-template-columns:1fr; }
+        .venue-readiness-pane { border-left:0; border-top:1px solid var(--rule); }
+        .venue-calendar-pane, .venue-readiness-pane { padding:20px; }
+        .venue-ready { max-width:110px; text-align:center; }
+        .feature-group .cap { grid-template-columns:1fr; }
+    }
+
+    .community-cards { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    @media(max-width:1000px) { .community-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:580px) { .community-cards { grid-template-columns:1fr; } }
+    @media(min-width:641px) { [data-hero-showcase] .mc-run-detail { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:640px) {
+        #hero-panel-finance .mc-demo-pane:last-child, #hero-panel-design .mc-demo-pane { display:none; }
+    }
 </style>
 @endpush
 
@@ -363,7 +413,7 @@
                                     <h3>Certificate of participation</h3>
                                     <p>Presented to</p>
                                     <strong>Ama Mensah</strong>
-                                    <p>A record of your participation</p>
+                                    <p>Public verification available</p>
                                 </div>
                             </div>
                             <div class="mc-demo-pane">
@@ -451,14 +501,14 @@
             @foreach (config('product-page.intro.cards') as $card)
                 <div class="arc-step">
                     <svg class="audience-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        @switch($loop->index)
-                            @case(0)
+                        @switch($card['kicker'])
+                            @case('Organisers')
                                 <rect x="5" y="6" width="22" height="22" rx="3"/><path d="M10 4v5M22 4v5M5 13h22M10 18h5M10 23h11"/>
                                 @break
-                            @case(1)
+                            @case('Crew')
                                 <rect x="8" y="3" width="16" height="26" rx="3"/><path d="M12 15l3 3 6-7M14 25h4"/>
                                 @break
-                            @case(2)
+                            @case('Venues')
                                 <path d="M3 12l13-8 13 8M6 12v16h20V12M12 28v-9h8v9M10 13h2M20 13h2"/>
                                 @break
                             @default
@@ -487,8 +537,8 @@
                     @foreach ([
                         'Works on any phone, so there is no scanner hardware to hire',
                         'The guest list is saved on the phone, so scanning carries on without signal and syncs when it returns',
-                        'Every door counts into the same live total',
-                        'Turns away a code that has already been used, and says why',
+                        'Scans feed the shared total when connected',
+                        'Flags repeat scans on the same phone offline, and checks the shared record when connected',
                         'Every scan records who let the guest in',
                     ] as $point)
                         <li class="flex items-start gap-3 text-[15px]" style="color:var(--ink-2)">
@@ -503,7 +553,7 @@
                 <div class="panel-head">
                     <div>
                         <div class="text-[13px] font-medium">Check-in</div>
-                        <div class="text-[11px]" style="color:var(--muted)">Every door counts into the same live total, scan by scan.</div>
+                        <div class="text-[11px]" style="color:var(--muted)">Scans feed the shared total when connected, scan by scan.</div>
                     </div>
                     <div class="hidden rounded-md border px-2.5 py-1 text-[11px] sm:block" style="border-color:var(--rule); color:var(--ink-2)">Export log</div>
                 </div>
@@ -566,7 +616,7 @@
     <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
         <div class="grid items-center gap-12 lg:grid-cols-[0.85fr_1.15fr]">
             <div>
-                <h2 class="h2 display">When a guest needs something,<br>someone’s phone buzzes.</h2>
+                <h2 class="h2 display">When a guest needs something,<br>your crew sees the request.</h2>
                 <p class="lede mt-4">
                     Water, a technician, a step-free route or first aid: guests ask from their ticket page.
                     Your floor crew sees the request with the seat number, taps “I’m on it” and marks it done.
@@ -606,6 +656,57 @@
     </div>
 </section>
 
+{{-- ══ VENUE OPERATIONS ═════════════════════════════════════════════ --}}
+<section class="border-t" style="border-color:var(--rule)" id="venue-operations">
+    <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
+        <div class="grid items-center gap-12 lg:grid-cols-[0.85fr_1.15fr]">
+            <div>
+                <h2 class="h2 display">Keep every space ready for the next gathering.</h2>
+                <p class="lede mt-4">See your bookings, organise facility tasks and coordinate inspections and handovers with the event organiser.</p>
+                <ul class="venue-points mt-7">
+                    @foreach ([
+                        ['A calendar for every space', 'Follow event dates, availability and blocked days.'],
+                        ['A shared view of readiness', 'Assign facility tasks, follow completion and exchange organiser messages.'],
+                        ['A clear handover', 'Record check-in and check-out inspections alongside the booking.'],
+                    ] as [$title, $body])
+                        <li><strong>{{ $title }}</strong><span>{{ $body }}</span></li>
+                    @endforeach
+                </ul>
+            </div>
+            <div class="panel venue-operations-preview">
+                <div class="panel-head">
+                    <div><div class="text-[13px] font-medium">Facility operations</div><div class="text-[11px]" style="color:var(--muted)">Example venue workspace</div></div>
+                    <span class="venue-ready">Preparations in progress</span>
+                </div>
+                <div class="venue-preview-grid">
+                    <div class="venue-calendar-pane">
+                        <div class="venue-preview-title"><h3>Main hall</h3><span>October</span></div>
+                        <div class="mc-calendar" aria-label="Illustrative venue calendar for October">
+                            @foreach (['M', 'T', 'W', 'T', 'F', 'S', 'S'] as $day)
+                                <span class="mc-calendar-day">{{ $day }}</span>
+                            @endforeach
+                            @foreach (range(1, 35) as $cell)
+                                @php($date = $cell - 3)
+                                <span class="{{ in_array($date, [9, 10, 11]) ? 'mc-calendar-booked' : ($date === 14 ? 'mc-calendar-blocked' : '') }}">{{ $date > 0 && $date <= 31 ? $date : '' }}</span>
+                            @endforeach
+                        </div>
+                        <div class="mc-calendar-legend"><span><i></i>Event dates</span><span><i class="blocked"></i>Blocked date</span></div>
+                    </div>
+                    <div class="venue-readiness-pane">
+                        <div class="venue-preview-title"><h3>Event readiness</h3><span>2 of 3 tasks done</span></div>
+                        <div class="venue-progress" role="img" aria-label="Two of three illustrative preparation tasks complete"><span></span></div>
+                        @foreach ([['Room layout', 'Seating arranged', true], ['Sound & projection', 'Equipment checked', true], ['Inspection & handover', 'Organiser walkthrough', false]] as [$title, $detail, $done])
+                            <div class="venue-task"><span class="venue-task-mark {{ $done ? 'complete' : '' }}">{{ $done ? '✓' : '○' }}</span><div><strong>{{ $title }}</strong><small>{{ $detail }}</small></div></div>
+                        @endforeach
+                        <div class="venue-message"><span>Organiser message</span><p>Could we confirm the room setup before the walkthrough?</p></div>
+                    </div>
+                </div>
+                <div class="venue-preview-footer"><span>Main hall · Demo summit</span><span>Tasks, messages and inspections in one place</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
 {{-- ══ SETTLEMENT ════════════════════════════════════════════════════ --}}
 <section class="paper border-y" style="border-color:var(--rule)">
     <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
@@ -629,7 +730,7 @@
                     @endforeach
                 </div>
                 <div class="border-t px-5 py-3 text-[11px]" style="border-color:var(--rule); color:var(--muted)">
-                    Every charge, refund and payout, per event — exportable whenever you need it.
+                    Illustrative figures. Every charge, refund and payout, per event — exportable whenever you need it.
                 </div>
             </div>
 
@@ -654,11 +755,18 @@
     <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
         <h2 class="h2 display">{{ config('product-page.capabilities.title') }}</h2>
         <p class="lede mt-3">{{ config('product-page.capabilities.subtitle') }}</p>
-        <div class="cap mt-10">
-            @foreach (config('product-page.capabilities.items') as $item)
-                <div>
-                    <h3>{{ $item['title'] }}</h3>
-                    <p>{{ $item['body'] }}</p>
+        <div class="feature-groups mt-10">
+            @foreach (collect(config('product-page.capabilities.items'))->groupBy('group') as $group => $items)
+                <div class="feature-group">
+                    <h3 class="display">{{ $group }}</h3>
+                    <div class="cap mt-4">
+                        @foreach ($items as $item)
+                            <div class="{{ $loop->last && $items->count() % 2 !== 0 ? 'feature-wide' : '' }}">
+                                <h4>{{ $item['title'] }}</h4>
+                                <p>{{ $item['body'] }}</p>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             @endforeach
         </div>
@@ -670,7 +778,7 @@
     <div class="mx-auto max-w-7xl px-6 py-16 md:py-24">
         <h2 class="h2 display">{{ config('product-page.communities.title') }}</h2>
         <p class="lede mt-3">{{ config('product-page.communities.body') }}</p>
-        <div class="cap mt-10">
+        <div class="cap community-cards mt-10">
             @foreach (config('product-page.communities.cards') as $card)
                 <div>
                     <h3>{{ $card['title'] }}</h3>

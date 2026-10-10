@@ -74,3 +74,28 @@ test('the homepage introduces the four audiences it serves', function (): void {
         ->assertSee('Attendees &amp; participants', false)
         ->assertDontSee('From first invite to final payout');
 });
+
+test('the homepage explains facilities recognition and academic coordination', function (): void {
+    $page = $this->get('/')->assertOk();
+    foreach ([
+        'Keep every space ready for the next gathering.',
+        'Academic submissions &amp; peer review',
+        'Receive abstracts, assign reviewers, record decisions and export an abstract book.',
+        'Sponsor commitments',
+        'Certificate verification',
+        'miconvener.com/my',
+        'Know what came in—and what you receive.',
+    ] as $copy) {
+        expect(str_contains($page->getContent(), $copy))->toBeTrue("Missing homepage coverage: {$copy}");
+    }
+});
+
+test('homepage feature groups are labelled and each capability has one home', function (): void {
+    $items = collect(config('product-page.capabilities.items'));
+    expect($items->pluck('group')->unique()->count())->toBe(6)
+        ->and($items->pluck('title')->unique()->count())->toBe($items->count());
+    $page = $this->get('/')->assertOk();
+    foreach ($items->pluck('group')->unique() as $group) {
+        expect(str_contains($page->getContent(), e($group)))->toBeTrue();
+    }
+});
