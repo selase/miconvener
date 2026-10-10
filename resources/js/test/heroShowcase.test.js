@@ -1,11 +1,66 @@
 import { readFileSync } from 'node:fs';
-import { beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const view = readFileSync('resources/views/product/landing.blade.php', 'utf8');
 beforeEach(() => {
     document.body.innerHTML = view;
     const script = document.querySelector('script[data-hero-showcase-script]');
     if (script) new Function(script.textContent)();
+});
+
+afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+});
+
+const startHeadline = (reduced = false) => {
+    vi.useFakeTimers();
+    const preference = { matches: reduced, addEventListener: vi.fn() };
+    vi.stubGlobal('matchMedia', () => preference);
+    const script = document.querySelector('script[data-hero-headline-script]');
+    expect(script).not.toBeNull();
+    new Function(script.textContent)();
+    return preference;
+};
+
+test('headline cycles use cases and can be paused and resumed without changing the showcase', () => {
+    startHeadline();
+    const active = () =>
+        document.querySelector('[data-headline-phrase].is-active').textContent.trim();
+    const pause = document.querySelector('[data-headline-pause]');
+    expect(active()).toBe('Run the whole event');
+    vi.advanceTimersByTime(5000);
+    expect(active()).toBe('Run your conference');
+    pause.click();
+    vi.advanceTimersByTime(20000);
+    expect(active()).toBe('Run your conference');
+    expect(pause.textContent).toBe('Resume animation');
+    pause.click();
+    vi.advanceTimersByTime(5000);
+    expect(active()).toBe('Run academic events');
+    expect(document.querySelector('#hero-tab-run').getAttribute('aria-selected')).toBe('true');
+});
+
+test('reduced motion keeps the headline static including a preference change while running', () => {
+    const preference = startHeadline(true);
+    vi.advanceTimersByTime(30000);
+    expect(document.querySelector('[data-headline-pause]').hidden).toBe(true);
+    expect(document.querySelector('[data-headline-phrase].is-active').textContent.trim()).toBe(
+        'Run the whole event'
+    );
+    preference.matches = false;
+    preference.addEventListener.mock.calls[0][1]();
+    vi.advanceTimersByTime(5000);
+    expect(document.querySelector('[data-headline-phrase].is-active').textContent.trim()).toBe(
+        'Run your conference'
+    );
+    preference.matches = true;
+    preference.addEventListener.mock.calls[0][1]();
+    vi.advanceTimersByTime(30000);
+    expect(document.querySelector('[data-headline-phrase].is-active').textContent.trim()).toBe(
+        'Run the whole event'
+    );
 });
 
 test('the event-day overview is selected initially and clicks reveal only the corresponding panel', () => {

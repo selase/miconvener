@@ -23,6 +23,19 @@ test('the hero uses the configured platform overview', function (): void {
     $this->get('/')->assertOk()->assertSee('Bring programmes &amp; places together.', false);
 });
 
+test('hero use cases replace the plan limits line without removing pricing details', function (): void {
+    $response = $this->get('/')->assertOk();
+    foreach (['Run academic events', 'Bring people together', 'Run your service', 'Honour a life together', 'Pause animation'] as $copy) {
+        expect(str_contains($response->getContent(), $copy))->toBeTrue();
+    }
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $hero = $xpath->query('//section[@data-homepage-hero]')->item(0);
+    expect($hero->textContent)->not->toContain('One live event at a time and 50 registrations a month. No card required.');
+    $response->assertSee('50 registrations per month');
+});
+
 test('venue and engagement copy covers the supported workflows', function (): void {
     $this->get('/')->assertOk()
         ->assertSee('Create facility tasks')

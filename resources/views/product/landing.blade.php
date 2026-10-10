@@ -31,6 +31,21 @@
         color: #fff; text-wrap: balance; margin: 0;
     }
     .hero-title em { font-style: normal; color: var(--ice); }
+    .hero-headline-phrases { display: grid; }
+    .hero-headline-phrases > span {
+        grid-area: 1 / 1; opacity: 0; transform: translateY(.12em);
+        transition: opacity .4s ease, transform .4s ease;
+    }
+    .hero-headline-phrases > .is-active { opacity: 1; transform: translateY(0); }
+    .hero-animation-control {
+        margin-top: .8rem; padding: .35rem .7rem; border-radius: 999px;
+        color: #fff; font-size: .75rem; border: 1px solid rgba(255,255,255,.35);
+    }
+    .hero-animation-control:hover { background: rgba(255,255,255,.12); }
+    .hero-animation-control:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+    @media (prefers-reduced-motion: reduce) {
+        .hero-headline-phrases > span { transition: none; transform: none; }
+    }
     .hero-sub {
         margin: 1.6rem auto 0; max-width: 38rem;
         color: #fff; font-size: 16px; line-height: 24px; font-weight: 300;
@@ -241,12 +256,22 @@
 @section('content')
 
 {{-- ══ HERO ══════════════════════════════════════════════════════════ --}}
-<section class="field">
+<section class="field" data-homepage-hero>
     <div class="mx-auto max-w-7xl px-6 pt-24 text-center md:pt-32">
 
-        <h1 class="hero-title display">
-            Run the whole event<br><em>from one place</em>
+        <h1 class="hero-title display" data-hero-headline>
+            <span class="sr-only">Run conferences, academic events, social gatherings, services and memorials from one place.</span>
+            <span class="hero-headline-phrases" aria-hidden="true">
+                <span data-headline-phrase class="is-active">Run the whole event</span>
+                <span data-headline-phrase>Run your conference</span>
+                <span data-headline-phrase>Run academic events</span>
+                <span data-headline-phrase>Bring people together</span>
+                <span data-headline-phrase>Run your service</span>
+                <span data-headline-phrase>Honour a life together</span>
+            </span>
+            <em aria-hidden="true">from one place</em>
         </h1>
+        <button type="button" class="hero-animation-control" data-headline-pause hidden>Pause animation</button>
 
         <p class="hero-sub">
             {{ config('product-page.hero.subtitle') }}
@@ -256,8 +281,6 @@
             <a href="{{ route('register', ['plan' => 'free']) }}" class="btn-solid">Start free</a>
             <a href="#pricing" class="btn-ghost">See pricing</a>
         </div>
-
-        <p class="mt-5 text-sm" style="color:#b7cdf7; font-weight:300">One live event at a time and 50 registrations a month. No card required.</p>
 
         <div class="mx-auto mt-14 max-w-5xl" data-hero-showcase>
             <div class="mc-reference-tabs" role="tablist" aria-label="Event feature showcase" hidden>
@@ -865,6 +888,41 @@
     });
     select(1);
     root.querySelector('[role="tablist"]').hidden = false;
+})();
+</script>
+<script data-hero-headline-script>
+(() => {
+    const root = document.querySelector('[data-hero-headline]');
+    if (!root || !window.matchMedia) return;
+    const phrases = [...root.querySelectorAll('[data-headline-phrase]')];
+    const control = document.querySelector('[data-headline-pause]');
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let index = 0;
+    let paused = false;
+    let timer;
+    const show = next => {
+        index = next;
+        phrases.forEach((phrase, position) => phrase.classList.toggle('is-active', position === index));
+    };
+    const sync = () => {
+        window.clearInterval(timer);
+        control.hidden = motion.matches;
+        control.textContent = paused ? 'Resume animation' : 'Pause animation';
+        if (motion.matches) {
+            show(0);
+            return;
+        }
+        if (!paused && !document.hidden) {
+            timer = window.setInterval(() => show((index + 1) % phrases.length), 5000);
+        }
+    };
+    control.addEventListener('click', () => {
+        paused = !paused;
+        sync();
+    });
+    motion.addEventListener('change', sync);
+    document.addEventListener('visibilitychange', sync);
+    sync();
 })();
 </script>
 @endpush
