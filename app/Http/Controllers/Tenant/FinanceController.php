@@ -11,7 +11,6 @@ use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Services\Payment\PaystackGateway;
-use App\Services\Payment\StripeGateway;
 use App\Services\Tenancy\TenantContext;
 use Exception;
 use Illuminate\Http\Request;
@@ -235,6 +234,10 @@ final class FinanceController extends Controller
             return null;
         }
 
+        if ($transaction->provider === 'stripe') {
+            return app(\App\Services\Payment\StripeConnect::class)->gatewayFor($gateway);
+        }
+
         $config = [
             'secret_key' => $gateway->api_key_encrypted,
             'public_key' => $gateway->public_key_encrypted,
@@ -242,7 +245,6 @@ final class FinanceController extends Controller
 
         return match ($transaction->provider) {
             'paystack' => new PaystackGateway($config),
-            'stripe' => new StripeGateway(app(\Stripe\StripeClient::class), $config),
             default => null,
         };
     }

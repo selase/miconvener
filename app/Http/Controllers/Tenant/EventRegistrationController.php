@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Contracts\PaymentGateway;
 use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdateEventRegistrationRequest;
@@ -23,6 +24,7 @@ use App\Services\Finance\FeeCalculator;
 use App\Services\Finance\LedgerService;
 use App\Services\Notifications\EventRuleTriggerService;
 use App\Services\Payment\PaystackGateway;
+use App\Services\Payment\StripeConnect;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -353,9 +355,7 @@ final class EventRegistrationController extends Controller
      */
     private function refundPaidRegistration(Tenant $tenant, EventRegistration $registrationModel): ?JsonResponse
     {
-        $paystack = $tenant->isPlatformDefaultSettlement()
-            ? $this->platformRefundGateway()
-            : $this->tenantRefundGateway($tenant);
+        $paystack = $this->refundGatewayFor($tenant, $registrationModel);
 
         if (! $paystack) {
             $message = $tenant->isPlatformDefaultSettlement()
@@ -392,6 +392,23 @@ final class EventRegistrationController extends Controller
         $this->recordRefundInLedger($tenant, $registrationModel, $refundId);
 
         return null;
+    }
+
+    /**
+     * A Stripe charge is refunded on the tenant's connected account; anything
+     * else was taken through Paystack.
+     */
+    private function refundGatewayFor(Tenant $tenant, EventRegistration $registration): ?PaymentGateway
+    {
+        if (str_starts_with((string) $registration->payment_reference, 'pi_')) {
+            $row = app(StripeConnect::class)->connectedGateway($tenant);
+
+            return $row ? app(StripeConnect::class)->gatewayFor($row) : null;
+        }
+
+        return $tenant->isPlatformDefaultSettlement()
+            ? $this->platformRefundGateway()
+            : $this->tenantRefundGateway($tenant);
     }
 
     private function tenantRefundGateway(Tenant $tenant): ?PaystackGateway
@@ -460,7 +477,11 @@ final class EventRegistrationController extends Controller
         if ($chargeEntry) {
             $ref = $this->hasNoProviderRefundId($refundId) ? 'REF_'.$chargeEntry->provider_reference : $refundId;
 
-            app(LedgerService::class)->recordRefund(
+            // The organizer's own gateway paid this refund out of their own
+            // balance, so only the platform's commission is left to reverse.
+            $reverse = $tenant->isPlatformDefaultSettlement() ? 'recordRefund' : 'recordOwnGatewayRefund';
+
+            $arguments = [
                 $registrationModel->event,
                 $registrationModel,
                 $chargeEntry->gross_amount,
@@ -468,7 +489,14 @@ final class EventRegistrationController extends Controller
                 $ref,
                 (int) $chargeEntry->gateway_fee_amount,
                 (string) $chargeEntry->provider,
-            );
+            ];
+
+            if ($reverse === 'recordOwnGatewayRefund') {
+                $cancelled = $registrationModel->event->status === Event::STATUS_CANCELLED;
+                $arguments = [...$arguments, null, ! $cancelled || config('services.commission_split.return_on_cancelled_event')];
+            }
+
+            app(LedgerService::class)->{$reverse}(...$arguments);
         }
     }
 

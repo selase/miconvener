@@ -406,6 +406,17 @@
                     </div>
                 @endcan
 
+                @if(! (auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard')))
+                    @can('manage commission credits')
+                        <div class="menu-item">
+                            <a class="menu-link {{ request()->routeIs('admin.billing.commission-credits.*') ? 'active' : '' }}" href="{{ route('admin.billing.commission-credits.index') }}">
+                                <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                <span class="menu-title">Commission credits</span>
+                            </a>
+                        </div>
+                    @endcan
+                @endif
+
                 @if(auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard'))
                      <!-- Billing & Finance Section -->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion {{ request()->is('admin/billing*') ? 'show' : '' }}">
@@ -439,6 +450,14 @@
                                     @endif
                                 </a>
                             </div>
+                            @can('manage commission credits')
+                            <div class="menu-item">
+                                <a class="menu-link {{ request()->routeIs('admin.billing.commission-credits.*') ? 'active' : '' }}" href="{{ route('admin.billing.commission-credits.index') }}">
+                                    <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                    <span class="menu-title">Commission credits</span>
+                                </a>
+                            </div>
+                            @endcan
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.analytics.usage') ? 'active' : '' }}" href="{{ route('admin.billing.analytics.usage') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>

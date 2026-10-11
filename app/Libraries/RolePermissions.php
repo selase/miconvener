@@ -18,6 +18,7 @@ final class RolePermissions
     {
         return [
             'Superadmin' => self::superadminPermissions(),
+            'Platform Finance' => ['manage commission credits'],
             'Org Superadmin' => self::organizationSuperadminPermissions(),
             'Org Admin' => self::organizationAdminPermissions(),
             'Event Staff' => self::eventStaffPermissions(),
@@ -84,6 +85,7 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
+            'manage commission credits',
             'create setting',
             'read setting',
             'update setting',

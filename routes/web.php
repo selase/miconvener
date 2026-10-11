@@ -235,6 +235,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('payouts.index');
         Route::post('payouts/{payout}/release', [App\Http\Controllers\Admin\PayoutOversightController::class, 'release'])
             ->name('payouts.release');
+        Route::get('commission-credits', [App\Http\Controllers\Admin\CommissionCreditController::class, 'index'])
+            ->name('commission-credits.index');
+        Route::post('commission-credits/{tenant:uuid}/settle', [App\Http\Controllers\Admin\CommissionCreditController::class, 'settle'])
+            ->name('commission-credits.settle');
         Route::get('transactions', [App\Http\Controllers\Admin\BillingController::class, 'transactions'])
             ->name('transactions.index');
         Route::get('subscriptions', [App\Http\Controllers\Admin\BillingController::class, 'subscriptions'])
@@ -281,7 +285,8 @@ Route::post('/webhooks/stripe', [App\Http\Controllers\Billing\WebhookController:
 Route::post('/webhooks/paystack', [App\Http\Controllers\Public\SettlementWebhookController::class, 'handle'])->middleware('throttle:webhooks')->name('webhooks.paystack');
 
 // Merchant Webhooks (Public)
-Route::post('/webhooks/merchant/stripe/{tenant}', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handleStripe'])->middleware('throttle:webhooks')->name('webhooks.merchant.stripe');
+Route::post('/webhooks/stripe/connect', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handleStripeConnect'])->middleware('throttle:webhooks')->name('webhooks.stripe.connect');
+Route::get('/stripe/connect/callback', App\Http\Controllers\Tenant\StripeConnectCallbackController::class)->name('stripe.connect.callback');
 Route::post('/webhooks/merchant/paystack/{tenant}', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handlePaystack'])->middleware('throttle:webhooks')->name('webhooks.merchant.paystack');
 Route::post('/webhooks/settlement/paystack', [App\Http\Controllers\Public\SettlementWebhookController::class, 'handle'])->middleware('throttle:settlement-webhooks')->name('webhooks.settlement.paystack');
 

@@ -34,6 +34,7 @@ final class PlatformEarnings
         LedgerTransaction::TYPE_TICKET_SALE => 'Ticket commission',
         LedgerTransaction::TYPE_OFFLINE_TICKET_SALE => 'Ticket commission (paid at the door)',
         LedgerTransaction::TYPE_CONTRIBUTION => 'Contribution fees',
+        LedgerTransaction::TYPE_COMMISSION_RECEIVABLE => 'Commission not yet collected (own gateway)',
         'marketplace_booking' => 'Marketplace commission and buyer fees',
         LedgerTransaction::TYPE_REFUND => 'Refunded commission',
         LedgerTransaction::TYPE_ADJUSTMENT => 'Adjustments',

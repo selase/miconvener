@@ -14,8 +14,82 @@ final class StripeGateway implements PaymentGateway
         private \Stripe\StripeClient $stripe,
         private ?array $config = null
     ) {
-        if ($this->config) {
+        if (isset($this->config['secret_key'])) {
             $this->stripe = new \Stripe\StripeClient($this->config['secret_key']);
+        }
+    }
+
+    /**
+     * Creates a hosted Checkout session on the tenant's connected account as a
+     * direct charge, with the platform's commission taken as an application
+     * fee. The money settles in the tenant's Stripe balance; only the fee
+     * comes to the platform.
+     *
+     * @param  array<string, string>  $metadata
+     */
+    public function createConnectedCheckoutSession(
+        string $email,
+        int $amount,
+        string $currency,
+        string $description,
+        string $successUrl,
+        string $cancelUrl,
+        array $metadata,
+        int $applicationFee,
+    ): string {
+        $paymentIntentData = ['metadata' => $metadata];
+
+        if ($applicationFee > 0) {
+            $paymentIntentData['application_fee_amount'] = $applicationFee;
+        }
+
+        try {
+            $session = $this->stripe->checkout->sessions->create([
+                'mode' => 'payment',
+                'customer_email' => $email,
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => mb_strtolower($currency),
+                        'product_data' => ['name' => $description],
+                        'unit_amount' => $amount,
+                    ],
+                    'quantity' => 1,
+                ]],
+                'metadata' => $metadata,
+                'payment_intent_data' => $paymentIntentData,
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
+            ], $this->accountOptions());
+
+            return $session->url ?? '';
+        } catch (Throwable $e) {
+            throw PaymentFailedException::fromProvider('stripe', $e->getMessage(), previous: $e);
+        }
+    }
+
+    /**
+     * What Stripe charged the tenant to process a payment, in the charge's own
+     * currency, or 0 when it settled in a different currency or can't be read.
+     * The fee is bookkeeping, so failing to read it never blocks a payment.
+     */
+    public function processingFeeFor(string $paymentIntentId, string $currency): int
+    {
+        try {
+            $intent = $this->stripe->paymentIntents->retrieve(
+                $paymentIntentId,
+                ['expand' => ['latest_charge.balance_transaction']],
+                $this->accountOptions(),
+            );
+
+            $transaction = $intent->latest_charge->balance_transaction ?? null;
+
+            if (! is_object($transaction) || mb_strtolower((string) $transaction->currency) !== mb_strtolower($currency)) {
+                return 0;
+            }
+
+            return max(0, (int) $transaction->fee);
+        } catch (Throwable) {
+            return 0;
         }
     }
 
@@ -123,7 +197,12 @@ final class StripeGateway implements PaymentGateway
             if ($amount) {
                 $params['amount'] = $amount;
             }
-            $refund = $this->stripe->refunds->create($params);
+            $options = $this->accountOptions();
+            if ($options !== []) {
+                // A refunded ticket gives the platform's commission back too.
+                $params['refund_application_fee'] = true;
+            }
+            $refund = $this->stripe->refunds->create($params, $options);
 
             return $refund->id;
         } catch (Throwable $e) {
@@ -156,5 +235,19 @@ final class StripeGateway implements PaymentGateway
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('stripe', $e->getMessage(), previous: $e);
         }
+    }
+
+    /**
+     * Request options that aim a call at the tenant's connected account. The
+     * platform's own key signs every call; the account header says whose
+     * account it acts on.
+     *
+     * @return array{stripe_account?: string}
+     */
+    private function accountOptions(): array
+    {
+        $account = $this->config['stripe_account'] ?? null;
+
+        return filled($account) ? ['stripe_account' => $account] : [];
     }
 }

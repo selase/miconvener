@@ -108,6 +108,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         ->name('tenant.settings.payments.update');
     Route::post('/settings/payments/settlement-mode', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'updateSettlementMode'])
         ->name('tenant.settings.payments.settlement-mode');
+    Route::post('/settings/payments/paystack/verify-split', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'verifyCommissionSplit'])
+        ->name('tenant.settings.payments.verify-split');
+    Route::get('/settings/payments/stripe/connect', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'connectStripe'])
+        ->name('tenant.settings.payments.stripe.connect');
+    Route::delete('/settings/payments/stripe', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'disconnectStripe'])
+        ->name('tenant.settings.payments.stripe.disconnect');
     Route::post('/settings/payments/platform-fee', [App\Http\Controllers\Tenant\PaymentSettingsController::class, 'updatePlatformFee'])
         ->name('tenant.settings.payments.platform-fee');
 
@@ -436,6 +442,7 @@ Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContribut
 Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
 Route::post('/e/{event}/checkout/{registration}/paystack', [EventCheckoutController::class, 'payWithPaystack'])->name('public.events.checkout.paystack');
+Route::post('/e/{event}/checkout/{registration}/stripe', [EventCheckoutController::class, 'payWithStripe'])->name('public.events.checkout.stripe');
 Route::post('/e/{event}/checkout/{registration}/offline-proof', [EventCheckoutController::class, 'submitOfflineProof'])->middleware('throttle:public-registration')->name('public.events.checkout.offline-proof');
 Route::get('/e/{event}/checkout/{registration}/proof', [EventCheckoutController::class, 'downloadProof'])->name('public.events.checkout.proof');
 Route::post('/e/{event}/find-ticket', [App\Http\Controllers\Public\TicketRecoveryController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.find-ticket');

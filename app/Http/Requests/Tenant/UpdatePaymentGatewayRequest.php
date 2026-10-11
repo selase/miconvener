@@ -19,17 +19,19 @@ final class UpdatePaymentGatewayRequest extends FormRequest
     /**
      * The secret fields are never sent back to the browser, so a blank one
      * means "keep what is saved". A secret key is only required the first
-     * time a provider is connected.
+     * time a provider is connected. Stripe has no key: it is linked through
+     * Stripe Connect instead.
      *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
-            'provider' => ['required', 'string', 'in:stripe,paystack'],
+            'provider' => ['required', 'string', 'in:paystack'],
             'api_key' => [Rule::requiredIf(fn (): bool => $this->existingGateway() === null), 'nullable', 'string'],
             'public_key' => ['nullable', 'string'],
             'webhook_secret' => ['nullable', 'string'],
+            'commission_subaccount_code' => ['nullable', 'string', 'regex:/^ACCT_[A-Za-z0-9]+$/'],
             'is_active' => ['nullable', 'boolean'],
         ];
     }
@@ -41,6 +43,8 @@ final class UpdatePaymentGatewayRequest extends FormRequest
     {
         return [
             'api_key.required' => 'Enter the secret key to connect this provider.',
+            'provider.in' => 'Stripe is connected through your Stripe account, not with a key.',
+            'commission_subaccount_code.regex' => 'A Paystack subaccount code looks like ACCT_xxxxxxxxxxxx.',
         ];
     }
 

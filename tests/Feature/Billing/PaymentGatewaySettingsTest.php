@@ -35,84 +35,84 @@ function saveGateway(array $fields): TestResponse
     );
 }
 
-function stripeGateway(): ?TenantPaymentGateway
+function paystackGateway(): ?TenantPaymentGateway
 {
     return TenantPaymentGateway::query()
         ->where('tenant_id', test()->tenant->id)
-        ->where('provider', 'stripe')
+        ->where('provider', 'paystack')
         ->first();
 }
 
 test('connecting a provider for the first time requires its secret key', function () {
-    saveGateway(['provider' => 'stripe', 'api_key' => '', 'public_key' => 'pk_test_1'])
+    saveGateway(['provider' => 'paystack', 'api_key' => '', 'public_key' => 'pk_test_1'])
         ->assertSessionHasErrors(['api_key' => 'Enter the secret key to connect this provider.']);
 
-    expect(stripeGateway())->toBeNull();
+    expect(paystackGateway())->toBeNull();
 });
 
 test('a connected provider is saved and confirmed with a success flash', function () {
     saveGateway([
-        'provider' => 'stripe',
+        'provider' => 'paystack',
         'api_key' => 'sk_test_original',
         'public_key' => 'pk_test_1',
-        'webhook_secret' => 'whsec_original',
         'is_active' => true,
-    ])->assertRedirect()->assertSessionHas('success', 'Stripe settings saved.');
+    ])->assertRedirect()->assertSessionHas('success', 'Paystack settings saved.');
 
-    $gateway = stripeGateway();
+    $gateway = paystackGateway();
     expect($gateway->api_key_encrypted)->toBe('sk_test_original')
-        ->and($gateway->webhook_secret_encrypted)->toBe('whsec_original')
         ->and($gateway->public_key_encrypted)->toBe('pk_test_1')
         ->and($gateway->is_active)->toBeTrue();
 });
 
-test('saving with the secret fields left blank keeps the saved secrets', function () {
+test('saving with the secret field left blank keeps the saved secret', function () {
     /*
-     * The old page pre-filled both secret fields with a literal "********".
-     * Changing only the publishable key or the active switch and saving wrote
-     * those asterisks over the real keys and broke the tenant's checkout.
+     * The old page pre-filled the secret field with a literal "********".
+     * Changing only the public key or the active switch and saving wrote
+     * those asterisks over the real key and broke the tenant's checkout.
      */
-    saveGateway(['provider' => 'stripe', 'api_key' => 'sk_test_original', 'webhook_secret' => 'whsec_original']);
+    saveGateway(['provider' => 'paystack', 'api_key' => 'sk_test_original']);
 
     saveGateway([
-        'provider' => 'stripe',
+        'provider' => 'paystack',
         'api_key' => '',
         'public_key' => 'pk_test_changed',
-        'webhook_secret' => '',
         'is_active' => false,
     ])->assertSessionHasNoErrors();
 
-    $gateway = stripeGateway();
+    $gateway = paystackGateway();
     expect($gateway->api_key_encrypted)->toBe('sk_test_original')
-        ->and($gateway->webhook_secret_encrypted)->toBe('whsec_original')
         ->and($gateway->public_key_encrypted)->toBe('pk_test_changed')
         ->and($gateway->is_active)->toBeFalse();
 });
 
 test('a new secret key replaces the saved one', function () {
-    saveGateway(['provider' => 'stripe', 'api_key' => 'sk_test_original']);
-    saveGateway(['provider' => 'stripe', 'api_key' => 'sk_test_rotated']);
+    saveGateway(['provider' => 'paystack', 'api_key' => 'sk_test_original']);
+    saveGateway(['provider' => 'paystack', 'api_key' => 'sk_test_rotated']);
 
-    expect(stripeGateway()->api_key_encrypted)->toBe('sk_test_rotated');
+    expect(paystackGateway()->api_key_encrypted)->toBe('sk_test_rotated');
+});
+
+test('a Stripe key cannot be pasted in because Stripe is linked through Connect', function () {
+    saveGateway(['provider' => 'stripe', 'api_key' => 'sk_test_x'])
+        ->assertSessionHasErrors(['provider' => 'Stripe is connected through your Stripe account, not with a key.']);
+
+    expect(TenantPaymentGateway::query()->where('tenant_id', $this->tenant->id)->count())->toBe(0);
 });
 
 test('the page shows which providers are connected but never their secrets', function () {
-    saveGateway(['provider' => 'stripe', 'api_key' => 'sk_test_secret_value', 'public_key' => 'pk_test_1', 'webhook_secret' => 'whsec_secret_value']);
+    saveGateway(['provider' => 'paystack', 'api_key' => 'sk_test_secret_value', 'public_key' => 'pk_test_1']);
 
     $response = $this->actingAs($this->user)
         ->get("http://{$this->host}/settings/payments", ['HTTP_HOST' => $this->host])
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Tenant/Settings/Payments')
-            ->where('gateways.stripe.connected', true)
-            ->where('gateways.stripe.has_webhook_secret', true)
-            ->where('gateways.stripe.public_key', 'pk_test_1')
-            ->where('gateways.stripe.webhook_url', route('webhooks.merchant.stripe', ['tenant' => $this->tenant->id]))
-            ->where('gateways.paystack.connected', false));
+            ->where('gateways.paystack.connected', true)
+            ->where('gateways.paystack.public_key', 'pk_test_1')
+            ->where('gateways.paystack.webhook_url', route('webhooks.merchant.paystack', ['tenant' => $this->tenant->id]))
+            ->where('stripe.connected', false));
 
-    expect($response->getContent())
-        ->not->toContain('sk_test_secret_value')
-        ->not->toContain('whsec_secret_value');
+    expect($response->getContent())->not->toContain('sk_test_secret_value');
 });
 
 test('an org admin without payment settings permission cannot save a gateway', function () {
@@ -122,8 +122,8 @@ test('an org admin without payment settings permission cannot save a gateway', f
     $this->tenant->users()->attach($admin->id);
 
     $this->actingAs($admin)
-        ->post("http://{$this->host}/settings/payments", ['provider' => 'stripe', 'api_key' => 'sk_test_x'], ['HTTP_HOST' => $this->host])
+        ->post("http://{$this->host}/settings/payments", ['provider' => 'paystack', 'api_key' => 'sk_test_x'], ['HTTP_HOST' => $this->host])
         ->assertForbidden();
 
-    expect(stripeGateway())->toBeNull();
+    expect(paystackGateway())->toBeNull();
 });
