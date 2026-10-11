@@ -39,6 +39,7 @@ final class ReconcilePayoutSchedulesCommand extends Command
                 continue;
             }
 
+            /** @var Event $event */
             // An own-gateway tenant is paid by their own gateway at the time of
             // sale, so the platform holds nothing to pay out on their behalf.
             if ($event->tenant?->isPlatformDefaultSettlement() === false) {

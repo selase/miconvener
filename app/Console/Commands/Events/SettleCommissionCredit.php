@@ -23,7 +23,7 @@ final class SettleCommissionCredit extends Command
             $rows = TenantCommissionCredit::query()->where('amount', '>', 0)->orderByDesc('amount')->get();
 
             $this->table(['Organizer', 'Currency', 'Credit (minor units)'], $rows->map(fn (TenantCommissionCredit $credit): array => [
-                Tenant::find($credit->tenant_id)?->slug ?? $credit->tenant_id,
+                Tenant::find($credit->tenant_id)->slug ?? $credit->tenant_id,
                 $credit->currency,
                 $credit->amount,
             ])->all());

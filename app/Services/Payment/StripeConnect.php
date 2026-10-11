@@ -117,12 +117,12 @@ final class StripeConnect
         return TenantPaymentGateway::updateOrCreate(
             ['tenant_id' => $tenant->id, 'provider' => 'stripe'],
             [
-                'provider_account_id' => $token->stripe_user_id,
+                'provider_account_id' => $token['stripe_user_id'],
                 'api_key_encrypted' => null,
                 'public_key_encrypted' => null,
                 'webhook_secret_encrypted' => null,
                 'is_active' => true,
-                'meta' => ['livemode' => (bool) $token->livemode],
+                'meta' => ['livemode' => (bool) $token['livemode']],
             ],
         );
     }

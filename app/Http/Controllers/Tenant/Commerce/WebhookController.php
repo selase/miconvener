@@ -10,6 +10,7 @@ use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -48,7 +49,7 @@ final class WebhookController extends Controller
      * endpoint serves every tenant: the `account` on each event says whose
      * account it came from.
      */
-    public function handleStripeConnect(Request $request)
+    public function handleStripeConnect(Request $request): JsonResponse
     {
         try {
             $event = \Stripe\Webhook::constructEvent(

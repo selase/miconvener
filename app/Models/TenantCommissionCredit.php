@@ -13,7 +13,10 @@ use Illuminate\Database\Eloquent\Model;
 final class TenantCommissionCredit extends Model
 {
     use BelongsToTenant;
+
+    /** @use HasFactory<\Database\Factories\TenantCommissionCreditFactory> */
     use HasFactory;
+
     use HasUuid;
     use HasUuids;
 
