@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\Events;
 
+use App\Http\Controllers\Tenant\Commerce\WebhookController;
 use App\Models\Event;
 use App\Models\EventContribution;
 use App\Models\Tenant;
-use App\Models\TenantPaymentGateway;
+use App\Services\Finance\CommissionCredit;
 use App\Services\Finance\FeeCalculator;
 use App\Services\Finance\LedgerService;
 use App\Services\Payment\PaystackGateway;
+use App\Services\Payment\StripeConnect;
+use App\Services\Payment\TenantPaystackResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +27,9 @@ final class EventContributionService
     public function __construct(
         private readonly LedgerService $ledgerService,
         private readonly FeeCalculator $feeCalculator,
+        private readonly TenantPaystackResolver $paystackResolver,
+        private readonly StripeConnect $stripeConnect,
+        private readonly CommissionCredit $credit,
     ) {}
 
     /**
@@ -38,7 +44,7 @@ final class EventContributionService
      *     is_anonymous?: bool|null
      * }  $data
      */
-    public function initiateContribution(Event $event, array $data, string $callbackUrl): string
+    public function initiateContribution(Event $event, array $data, string $callbackUrl, string $provider = 'paystack'): string
     {
         $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
         if (! $tenant) {
@@ -57,12 +63,22 @@ final class EventContributionService
             throw new InvalidArgumentException("Minimum contribution amount is {$event->currency} {$formattedMin}.");
         }
 
-        $paystack = $tenant->isPlatformDefaultSettlement()
-            ? $this->platformGateway()
-            : $this->tenantGateway($tenant);
+        $platformFee = $this->platformFeeFor($event, $amountPesewas);
+        $stripeRow = null;
+        $paystack = null;
 
-        if (! $paystack) {
-            throw new RuntimeException('Online payments are not currently configured for this organizer.');
+        if ($provider === 'stripe') {
+            $stripeRow = $this->stripeConnect->isAvailableFor($tenant) ? $this->stripeConnect->connectedGateway($tenant) : null;
+
+            if (! $stripeRow) {
+                throw new RuntimeException('Card payments by Stripe are not available for this organizer.');
+            }
+        } else {
+            $paystack = $this->paystackResolver->gatewayFor($tenant, $platformFee, $event->currency ?: 'GHS');
+
+            if (! $paystack) {
+                throw new RuntimeException('Online payments are not currently configured for this organizer.');
+            }
         }
 
         $paymentReference = 'CONTRIB-'.mb_strtoupper(Str::random(16));
@@ -86,6 +102,30 @@ final class EventContributionService
         });
 
         try {
+            if ($stripeRow) {
+                $creditApplied = min($this->credit->balance($tenant, $contribution->currency), $platformFee);
+
+                return $this->stripeConnect->gatewayFor($stripeRow)->createConnectedCheckoutSession(
+                    $contribution->contributor_email ?: 'contributor+'.mb_strtolower(Str::random(8)).'@miconvener.com',
+                    $contribution->amount,
+                    $contribution->currency,
+                    $event->name,
+                    // Stripe confirms through its webhook, so both ends of the
+                    // round trip return to the event page.
+                    route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $event->slug]),
+                    route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $event->slug]),
+                    [
+                        'type' => 'event_contribution',
+                        'event_contribution_id' => (string) $contribution->id,
+                        'tenant_id' => (string) $tenant->id,
+                        'event_id' => (string) $event->id,
+                        'commission_collected' => (string) ($platformFee - $creditApplied),
+                        'commission_credit_applied' => (string) $creditApplied,
+                    ],
+                    $platformFee - $creditApplied,
+                );
+            }
+
             $customerEmail = $contribution->contributor_email ?: 'contributor+'.mb_strtolower(Str::random(8)).'@miconvener.com';
             $customerId = $paystack->createCustomer($customerEmail, $contribution->displayName());
 
@@ -104,6 +144,8 @@ final class EventContributionService
                     'tenant_id' => $tenant->id,
                     'event_id' => $event->id,
                     'source' => config('services.paystack.metadata_source'),
+                    'commission_split' => $paystack->splitSubaccount(),
+                    'commission_credit_applied' => $paystack->commissionCreditApplied(),
                 ]
             );
         } catch (Throwable $e) {
@@ -167,6 +209,12 @@ final class EventContributionService
         $platformFee = $this->platformFeeFor($event, $grossAmount);
         $netAmount = max(0, $grossAmount - $gatewayFee - $platformFee);
 
+        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
+        $provider = (string) ($gatewayData['provider'] ?? 'paystack');
+        $settlement = $tenant->isPlatformDefaultSettlement()
+            ? ['received' => 0, 'credit' => 0]
+            : WebhookController::commissionSettlement($tenant, (string) ($event->currency ?: 'GHS'), $provider, (array) ($gatewayData['metadata'] ?? []), $platformFee);
+
         DB::connection('landlord')->transaction(function () use (
             $contribution,
             $event,
@@ -174,7 +222,10 @@ final class EventContributionService
             $grossAmount,
             $gatewayFee,
             $platformFee,
-            $netAmount
+            $netAmount,
+            $tenant,
+            $provider,
+            $settlement
         ): void {
             $contribution->update([
                 'status' => EventContribution::STATUS_COMPLETED,
@@ -186,26 +237,44 @@ final class EventContributionService
                 'paid_at' => now(),
             ]);
 
-            $this->ledgerService->recordContribution(
+            if ($tenant->isPlatformDefaultSettlement()) {
+                $this->ledgerService->recordContribution(
+                    $event,
+                    $contribution,
+                    $grossAmount,
+                    $platformFee,
+                    $reference,
+                    $gatewayFee,
+                    'paystack',
+                    $reference
+                );
+
+                return;
+            }
+
+            $this->ledgerService->recordOwnGatewayContribution(
                 $event,
                 $contribution,
                 $grossAmount,
                 $platformFee,
                 $reference,
                 $gatewayFee,
-                'paystack',
-                $reference
+                $provider,
+                $settlement['received'],
+                $settlement['credit'],
             );
         });
 
         return $contribution->fresh();
     }
 
+    /**
+     * The tenant's gateway for looking up a payment that already happened, so
+     * it carries no split.
+     */
     public function resolveGateway(Tenant $tenant): ?PaystackGateway
     {
-        return $tenant->isPlatformDefaultSettlement()
-            ? $this->platformGateway()
-            : $this->tenantGateway($tenant);
+        return $this->paystackResolver->gatewayFor($tenant, 0);
     }
 
     /**
@@ -253,23 +322,6 @@ final class EventContributionService
     private static function percent(float $percentage): string
     {
         return mb_rtrim(mb_rtrim(number_format($percentage, 2, '.', ''), '0'), '.');
-    }
-
-    private function tenantGateway(Tenant $tenant): ?PaystackGateway
-    {
-        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
-            ->where('provider', 'paystack')
-            ->where('is_active', true)
-            ->first();
-
-        return $gateway ? new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]) : null;
-    }
-
-    private function platformGateway(): ?PaystackGateway
-    {
-        $secret = config('services.settlement.paystack.secret_key');
-
-        return $secret ? new PaystackGateway(['secret_key' => $secret]) : null;
     }
 
     private function contributionPercentage(): ?float

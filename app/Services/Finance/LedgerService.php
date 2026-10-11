@@ -600,6 +600,159 @@ final class LedgerService
     }
 
     /**
+     * Record a ticket sold on the organizer's own gateway. The organizer
+     * holds the money, so the platform's books carry only its commission, which
+     * is Credit Platform Revenue and is met in up to three ways:
+     *  - $commissionReceived reached the platform with the payment (a split or
+     *    an application fee): Debit Gateway Clearing.
+     *  - $creditUsed was netted against commission the platform owed the
+     *    organizer from refunds: Debit Organizer Payable, settling that debt.
+     *  - the rest was not collected and the organizer owes it, as with an
+     *    offline sale: Debit Organizer Payable.
+     * Nothing is ever payable to the organizer from a sale like this.
+     */
+    public function recordOwnGatewayTicketSale(
+        Event $event,
+        EventRegistration $registration,
+        int $grossAmount,
+        int $platformFee,
+        string $reference,
+        int $gatewayFee = 0,
+        string $provider = 'paystack',
+        int $commissionReceived = 0,
+        int $creditUsed = 0,
+        ?string $providerReference = null
+    ): ?LedgerTransaction {
+        return $this->recordOwnGatewaySale(
+            $event,
+            "Ticket Sale (own gateway): {$event->name} - {$registration->full_name}",
+            $reference,
+            $grossAmount,
+            $platformFee,
+            $gatewayFee,
+            $provider,
+            $commissionReceived,
+            $creditUsed,
+            ['registration_id' => $registration->id],
+            $providerReference,
+        );
+    }
+
+    /**
+     * The same as a ticket sale, for a voluntary contribution paid on the
+     * organizer's own gateway.
+     */
+    public function recordOwnGatewayContribution(
+        Event $event,
+        EventContribution $contribution,
+        int $grossAmount,
+        int $platformFee,
+        string $reference,
+        int $gatewayFee = 0,
+        string $provider = 'paystack',
+        int $commissionReceived = 0,
+        int $creditUsed = 0,
+        ?string $providerReference = null
+    ): ?LedgerTransaction {
+        return $this->recordOwnGatewaySale(
+            $event,
+            "Contribution (own gateway): {$event->name} - {$contribution->displayName()}",
+            $reference,
+            $grossAmount,
+            $platformFee,
+            $gatewayFee,
+            $provider,
+            $commissionReceived,
+            $creditUsed,
+            ['contribution_id' => $contribution->id],
+            $providerReference,
+            LedgerTransaction::TYPE_CONTRIBUTION,
+        );
+    }
+
+    /**
+     * Reverse the commission on a refunded own-gateway sale. Stripe returns
+     * the application fee with the refund, so cash leaves the platform's
+     * balance. A Paystack refund is paid from the organizer's balance and
+     * does not claw back the platform's share, so the platform now owes the
+     * organizer its commission back: Credit Organizer Payable, and the same
+     * amount becomes credit that their later sales net against.
+     * With $commissionReturned false (a policy for cancelled events) the
+     * platform keeps the commission and nothing is reversed.
+     */
+    public function recordOwnGatewayRefund(
+        Event $event,
+        EventRegistration $registration,
+        int $grossAmount,
+        int $platformFee,
+        string $reference,
+        int $gatewayFee = 0,
+        string $provider = 'paystack',
+        ?string $providerReference = null,
+        bool $commissionReturned = true
+    ): ?LedgerTransaction {
+        if ($grossAmount <= 0) {
+            return null;
+        }
+
+        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
+        $transaction = null;
+
+        if ($platformFee > 0 && $commissionReturned) {
+            $returnedWithRefund = $provider === 'stripe';
+
+            $transaction = $this->postTransaction(
+                $tenant,
+                $event,
+                LedgerTransaction::TYPE_REFUND,
+                "Refund (own gateway): {$event->name} - {$registration->full_name}",
+                $reference,
+                [
+                    [
+                        'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
+                        'direction' => LedgerEntry::DIRECTION_DEBIT,
+                        'amount' => $platformFee,
+                        'description' => 'Platform fee reversal on refund',
+                    ],
+                    [
+                        'code' => $returnedWithRefund ? LedgerAccount::CODE_GATEWAY_CLEARING : LedgerAccount::CODE_ORGANIZER_PAYABLE,
+                        'direction' => LedgerEntry::DIRECTION_CREDIT,
+                        'amount' => $platformFee,
+                        'description' => $returnedWithRefund
+                            ? 'Application fee returned with the refund'
+                            : 'Commission owed back to the organizer: their gateway refunded the full amount',
+                    ],
+                ],
+                null,
+                $event->currency ?: 'GHS'
+            );
+
+            // A redelivered refund returns the transaction already posted,
+            // and must not grant the credit twice.
+            if (! $returnedWithRefund && $transaction->wasRecentlyCreated) {
+                app(CommissionCredit::class)->grant($tenant, $event->currency ?: 'GHS', $platformFee);
+            }
+        }
+
+        EventLedgerEntry::firstOrCreate([
+            'tenant_id' => $tenant->id,
+            'type' => EventLedgerEntry::TYPE_REFUND,
+            'provider_reference' => $providerReference ?? $reference,
+        ], [
+            'event_id' => $event->id,
+            'registration_id' => $registration->id,
+            'gross_amount' => $grossAmount,
+            'gateway_fee_amount' => $gatewayFee,
+            'commission_amount' => $commissionReturned ? $platformFee : 0,
+            'net_amount' => -($grossAmount - $gatewayFee - ($commissionReturned ? $platformFee : 0)),
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => $provider,
+        ]);
+
+        return $transaction;
+    }
+
+    /**
      * Record holdback reserve retention:
      * Debit:  Organizer Payable (reduces available balance)
      * Credit: Holdback Reserve (held in escrow)
@@ -799,6 +952,105 @@ final class LedgerService
             'total_credits' => $totalCredits,
             'accounts' => $rows,
         ];
+    }
+
+    /**
+     * @param  array<string, string>  $subject  The registration_id or contribution_id the entry belongs to.
+     */
+    private function recordOwnGatewaySale(
+        Event $event,
+        string $description,
+        string $reference,
+        int $grossAmount,
+        int $platformFee,
+        int $gatewayFee,
+        string $provider,
+        int $commissionReceived,
+        int $creditUsed,
+        array $subject,
+        ?string $providerReference,
+        string $transactionType = LedgerTransaction::TYPE_TICKET_SALE,
+    ): ?LedgerTransaction {
+        $received = min(max($commissionReceived, 0), $platformFee);
+        $credited = min(max($creditUsed, 0), $platformFee - $received);
+        $receivable = $platformFee - $received - $credited;
+
+        // Commission we're owed but did not receive is not earnings in hand,
+        // so it reports under its own type rather than alongside collected fees.
+        if ($receivable > 0) {
+            $transactionType = LedgerTransaction::TYPE_COMMISSION_RECEIVABLE;
+        }
+
+        if ($grossAmount <= 0) {
+            return null;
+        }
+
+        if ($gatewayFee < 0 || $gatewayFee >= $grossAmount) {
+            throw new InvalidArgumentException(
+                "Gateway fee ({$gatewayFee}) must be non-negative and smaller than the gross amount ({$grossAmount})."
+            );
+        }
+
+        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
+        $transaction = null;
+
+        if ($platformFee > 0) {
+            $entries = [];
+
+            if ($received > 0) {
+                $entries[] = [
+                    'code' => LedgerAccount::CODE_GATEWAY_CLEARING,
+                    'direction' => LedgerEntry::DIRECTION_DEBIT,
+                    'amount' => $received,
+                    'description' => 'Commission received with the payment',
+                ];
+            }
+
+            if ($credited + $receivable > 0) {
+                $entries[] = [
+                    'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
+                    'direction' => LedgerEntry::DIRECTION_DEBIT,
+                    'amount' => $credited + $receivable,
+                    'description' => $receivable > 0
+                        ? 'Commission owed by the organizer, not collected at payment'.($credited > 0 ? " (after {$credited} netted against credit)" : '')
+                        : 'Commission netted against credit owed to the organizer',
+                ];
+            }
+
+            $entries[] = [
+                'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
+                'direction' => LedgerEntry::DIRECTION_CREDIT,
+                'amount' => $platformFee,
+                'description' => 'Platform commission fee ('.$event->effectivePlatformFeePercentage().'%)',
+            ];
+
+            $transaction = $this->postTransaction(
+                $tenant,
+                $event,
+                $transactionType,
+                $description,
+                $reference,
+                $entries,
+                null,
+                $event->currency ?: 'GHS'
+            );
+        }
+
+        EventLedgerEntry::firstOrCreate([
+            'tenant_id' => $tenant->id,
+            'type' => EventLedgerEntry::TYPE_CHARGE,
+            'provider_reference' => $providerReference ?? $reference,
+        ], $subject + [
+            'event_id' => $event->id,
+            'gross_amount' => $grossAmount,
+            'gateway_fee_amount' => $gatewayFee,
+            'commission_amount' => $platformFee,
+            'net_amount' => $grossAmount - $gatewayFee - $platformFee,
+            'currency' => $event->currency ?: 'GHS',
+            'provider' => $provider,
+        ]);
+
+        return $transaction;
     }
 
     /**

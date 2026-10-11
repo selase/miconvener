@@ -375,21 +375,20 @@ final class EventFinanceController extends Controller
         $this->authorize('read finance');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
-        $ownGateway = ! $tenant->isPlatformDefaultSettlement();
 
         $filename = "{$eventModel->slug}-settlement-statement.csv";
 
-        return response()->streamDownload(function () use ($eventModel, $ownGateway): void {
+        return response()->streamDownload(function () use ($eventModel): void {
             $handle = fopen('php://output', 'wb');
             fputcsv($handle, ['Type', 'Registration/Reference', 'Gross', 'Gateway fee', 'Commission', 'Net', 'Currency', 'Date']);
 
-            $eventModel->ledgerEntries()->orderBy('created_at')->chunk(200, function ($entries) use ($handle, $ownGateway): void {
+            $eventModel->ledgerEntries()->orderBy('created_at')->chunk(200, function ($entries) use ($handle): void {
                 foreach ($entries as $entry) {
                     fputcsv($handle, [
                         $entry->type,
                         $entry->registration?->full_name ?? $entry->provider_reference,
                         $entry->gross_amount,
-                        $ownGateway ? 'not tracked' : $entry->gateway_fee_amount,
+                        $entry->gateway_fee_amount,
                         $entry->commission_amount,
                         $entry->net_amount,
                         $entry->currency,

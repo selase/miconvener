@@ -52,17 +52,17 @@ test('checkout shows a generic message when no payment gateway is configured at 
     $response->assertSessionHas('error', 'This event is not currently accepting payments.');
 });
 
-test('checkout shows a Paystack-specific message when only a non-Paystack gateway is configured', function () {
+test('a Stripe link the platform has not enabled does not make the event payable', function () {
     [$tenant] = gatewayMessageHost('acme');
     $host = gatewayMessageSubdomain('acme');
 
-    // Explicit own_gateway: this tenant has configured its own (non-Paystack) gateway,
-    // which pre-existing tenants (Task 1's column default) would not have set otherwise.
     $tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
 
     TenantPaymentGateway::factory()->create([
         'tenant_id' => $tenant->id,
         'provider' => 'stripe',
+        'provider_account_id' => 'acct_123',
+        'api_key_encrypted' => null,
         'is_active' => true,
     ]);
 
@@ -73,11 +73,7 @@ test('checkout shows a Paystack-specific message when only a non-Paystack gatewa
         'amount' => 5000,
     ]);
 
-    $response = $this->get("http://{$host}/e/{$event->slug}/checkout/{$registration->id}", ['HTTP_HOST' => $host]);
-
-    $response->assertRedirect();
-    $response->assertSessionHas(
-        'error',
-        'This event currently only accepts payments via Paystack, which is not configured for this organizer.'
-    );
+    $this->get("http://{$host}/e/{$event->slug}/checkout/{$registration->id}", ['HTTP_HOST' => $host])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'This event is not currently accepting payments.');
 });

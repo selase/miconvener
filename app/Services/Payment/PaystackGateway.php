@@ -16,9 +16,80 @@ final class PaystackGateway implements PaymentGateway
 
     private readonly string $secret;
 
+    /**
+     * @var array{subaccount: string, platform_share: int}|null
+     */
+    private ?array $split = null;
+
+    private int $creditApplied = 0;
+
     public function __construct(?array $config = null)
     {
         $this->secret = $config['secret_key'] ?? config('services.paystack.secret_key') ?? '';
+    }
+
+    /**
+     * A copy of this gateway whose one-time checkouts are split with a
+     * subaccount. Paystack's transaction_charge is the flat amount that stays
+     * with the main account (here the tenant), so the platform's share is
+     * what is left for the subaccount. Fees come out of the main account's
+     * portion (bearer "account"), leaving the platform's commission intact.
+     */
+    public function withSplit(string $subaccountCode, int $platformShare): self
+    {
+        $clone = clone $this;
+        $clone->split = ['subaccount' => $subaccountCode, 'platform_share' => $platformShare];
+
+        return $clone;
+    }
+
+    /**
+     * A copy of this gateway recording that part of the platform's commission
+     * on this charge is netted against credit it owes the organizer, so only
+     * the remainder is routed to the platform.
+     */
+    public function withCreditApplied(int $amount): self
+    {
+        $clone = clone $this;
+        $clone->creditApplied = $amount;
+
+        return $clone;
+    }
+
+    public function commissionCreditApplied(): int
+    {
+        return $this->creditApplied;
+    }
+
+    /**
+     * The subaccount this gateway's checkouts are split with, if any.
+     */
+    public function splitSubaccount(): ?string
+    {
+        return $this->split['subaccount'] ?? null;
+    }
+
+    /**
+     * The subaccount's details, or null when this account has no such
+     * subaccount.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function subaccount(string $code): ?array
+    {
+        try {
+            $response = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/subaccount/".rawurlencode($code));
+
+            if ($response->status() === 404) {
+                return null;
+            }
+
+            $response->throw();
+        } catch (Throwable $e) {
+            throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
+        }
+
+        return $response->json('status') === true ? (array) $response->json('data') : null;
     }
 
     public function createCustomer(string $email, string $name): string
@@ -59,13 +130,21 @@ final class PaystackGateway implements PaymentGateway
             $customerResponse = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
             $email = $customerResponse->json('data.email');
 
-            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/transaction/initialize", [
+            $payload = [
                 'email' => $email,
                 'amount' => $amount,
                 'currency' => $currency,
                 'callback_url' => $redirectUrl,
                 'metadata' => $metadata,
-            ])->throw();
+            ];
+
+            if ($this->split !== null) {
+                $payload['subaccount'] = $this->split['subaccount'];
+                $payload['transaction_charge'] = $amount - $this->split['platform_share'];
+                $payload['bearer'] = 'account';
+            }
+
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/transaction/initialize", $payload)->throw();
 
             return $response->json('data.authorization_url');
         } catch (Throwable $e) {

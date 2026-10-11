@@ -593,6 +593,22 @@ final class PublicEventController extends Controller
      *                               are withheld until they hold a confirmed
      *                               registration.
      */
+    /**
+     * The ways a visitor can pay a contribution for this event, so the form
+     * only offers what will work.
+     *
+     * @return list<string>
+     */
+    private function contributionProviders(Event $event): array
+    {
+        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
+
+        return array_values(array_filter([
+            app(\App\Services\Payment\TenantPaystackResolver::class)->isAvailableFor($tenant) ? 'paystack' : null,
+            app(\App\Services\Payment\StripeConnect::class)->isAvailableFor($tenant) ? 'stripe' : null,
+        ]));
+    }
+
     private function toPublicPayload(Event $event, bool $revealDetails = true): array
     {
         $withhold = $event->isPrivate() && ! $revealDetails;
@@ -737,6 +753,7 @@ final class PublicEventController extends Controller
             'event_category' => $event->event_category ?? Event::CATEGORY_GENERAL,
             'lexicon' => $event->lexicon(),
             'allow_contributions' => (bool) $event->allow_contributions,
+            'contribution_providers' => $event->allow_contributions ? $this->contributionProviders($event) : [],
             'contribution_title' => $event->contribution_title ?: $event->lexicon()['contributions_title'],
             'contribution_description' => $event->contribution_description,
             'contribution_presets' => $event->effectiveContributionPresets(),

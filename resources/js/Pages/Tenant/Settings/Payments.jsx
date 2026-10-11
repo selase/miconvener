@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
@@ -6,7 +6,7 @@ import Input from '@/Components/Console/Input';
 import Checkbox from '@/Components/Console/Checkbox';
 import StatusPill from '@/Components/Console/StatusPill';
 import { useToast } from '@/Components/Console/Toast';
-import { Copy } from 'lucide-react';
+import { Copy, Link2, Unlink } from 'lucide-react';
 
 const SETTLEMENT_OPTIONS = [
     {
@@ -19,31 +19,9 @@ const SETTLEMENT_OPTIONS = [
         value: 'own_gateway',
         title: 'Own gateway',
         description:
-            'Payments go straight into your own Stripe or Paystack account, configured below.',
+            "Payments go straight into your own Paystack or Stripe account, configured below. MiConvener's commission is taken at the time of payment.",
     },
 ];
-
-const PROVIDERS = {
-    stripe: {
-        name: 'Stripe',
-        secretPlaceholder: 'sk_live_…',
-        publicLabel: 'Publishable key',
-        publicPlaceholder: 'pk_live_…',
-        publicHint: 'Used for client-side checkout.',
-        hasWebhookSecret: true,
-        webhookHint: 'Add this URL in your Stripe Dashboard under Developers › Webhooks.',
-    },
-    paystack: {
-        name: 'Paystack',
-        secretPlaceholder: 'sk_live_…',
-        publicLabel: 'Public key',
-        publicPlaceholder: 'pk_live_…',
-        publicHint: 'Used for inline or popup checkout.',
-        hasWebhookSecret: false,
-        webhookHint:
-            'Add this URL in your Paystack Dashboard under Settings › API Keys & Webhooks.',
-    },
-};
 
 function Card({ title, description, aside, children }) {
     return (
@@ -213,13 +191,83 @@ function PlatformFeeForm({ platformFee }) {
     );
 }
 
-function GatewayForm({ provider, gateway }) {
-    const config = PROVIDERS[provider];
+function CommissionSplit({ gateway, destination, data, setData, errors }) {
+    const verifying = useForm({});
+    const hasCode = Boolean(gateway.commission_subaccount_code);
+
+    const verify = () =>
+        verifying.post(route('tenant.settings.payments.verify-split'), { preserveScroll: true });
+
+    return (
+        <div className="space-y-4 border-t border-border pt-5">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h3 className="text-sm font-semibold text-ink">Commission split</h3>
+                    <p className="mt-1 text-sm text-ink-secondary">
+                        MiConvener&apos;s commission is routed to us when a ticket is paid. Create a
+                        subaccount in your Paystack dashboard (Settings › Subaccounts) with the
+                        details below, then enter its code.
+                    </p>
+                </div>
+                {hasCode &&
+                    (gateway.commission_verified ? (
+                        <StatusPill status="success">Verified</StatusPill>
+                    ) : (
+                        <StatusPill status="failed">Needs attention</StatusPill>
+                    ))}
+            </div>
+
+            <dl className="grid gap-x-6 gap-y-1 rounded-lg border border-border bg-surface-sunken p-3 text-sm sm:grid-cols-[auto_1fr]">
+                <dt className="text-ink-secondary">Business name</dt>
+                <dd className="font-medium text-ink">{destination.business_name}</dd>
+                {destination.settlement_bank && (
+                    <>
+                        <dt className="text-ink-secondary">Settlement bank</dt>
+                        <dd className="font-medium text-ink">{destination.settlement_bank}</dd>
+                    </>
+                )}
+                <dt className="text-ink-secondary">Account number</dt>
+                <dd className="num font-medium text-ink">{destination.account_number}</dd>
+            </dl>
+
+            <div>
+                <Input
+                    label="Subaccount code"
+                    type="text"
+                    autoComplete="off"
+                    value={data.commission_subaccount_code}
+                    placeholder="ACCT_xxxxxxxxxxxx"
+                    onChange={(event) =>
+                        setData('commission_subaccount_code', event.target.value.trim())
+                    }
+                    error={errors.commission_subaccount_code}
+                />
+                {!errors.commission_subaccount_code && gateway.commission_problem && (
+                    <p className="mt-1 text-xs text-danger-fg">{gateway.commission_problem}</p>
+                )}
+                <p className="mt-1 text-xs text-ink-secondary">
+                    We check it with Paystack when you save, before every payment, and nightly.
+                    Online Paystack payments stay off until it passes.
+                </p>
+            </div>
+
+            {hasCode && (
+                <div>
+                    <Button type="button" onClick={verify} disabled={verifying.processing}>
+                        Check again
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function PaystackForm({ gateway, commissionSplit, commissionCredit }) {
     const { data, setData, post, processing, errors } = useForm({
-        provider,
+        provider: 'paystack',
         api_key: '',
         public_key: gateway.public_key ?? '',
-        webhook_secret: '',
+        commission_subaccount_code: gateway.commission_subaccount_code ?? '',
         is_active: gateway.connected ? gateway.is_active : true,
     });
 
@@ -227,16 +275,13 @@ function GatewayForm({ provider, gateway }) {
         event.preventDefault();
         post(route('tenant.settings.payments.update'), {
             preserveScroll: true,
-            onSuccess: () =>
-                setData((current) => ({ ...current, api_key: '', webhook_secret: '' })),
+            onSuccess: () => setData((current) => ({ ...current, api_key: '' })),
         });
     };
 
-    const savedPlaceholder = 'Saved. Leave blank to keep it.';
-
     return (
         <Card
-            title={config.name}
+            title="Paystack"
             aside={
                 gateway.connected ? (
                     <StatusPill status={gateway.is_active ? 'success' : 'neutral'}>
@@ -253,53 +298,145 @@ function GatewayForm({ provider, gateway }) {
                     type="password"
                     autoComplete="off"
                     value={data.api_key}
-                    placeholder={gateway.connected ? savedPlaceholder : config.secretPlaceholder}
+                    placeholder={gateway.connected ? 'Saved. Leave blank to keep it.' : 'sk_live_…'}
                     onChange={(event) => setData('api_key', event.target.value)}
                     error={errors.api_key}
                 />
                 <div>
                     <Input
-                        label={config.publicLabel}
+                        label="Public key"
                         type="text"
                         value={data.public_key}
-                        placeholder={config.publicPlaceholder}
+                        placeholder="pk_live_…"
                         onChange={(event) => setData('public_key', event.target.value)}
                         error={errors.public_key}
                     />
-                    <p className="mt-1 text-xs text-ink-secondary">{config.publicHint}</p>
+                    <p className="mt-1 text-xs text-ink-secondary">
+                        Used for inline or popup checkout.
+                    </p>
                 </div>
-                {config.hasWebhookSecret && (
-                    <div>
-                        <Input
-                            label="Webhook signing secret"
-                            type="password"
-                            autoComplete="off"
-                            value={data.webhook_secret}
-                            placeholder={gateway.has_webhook_secret ? savedPlaceholder : 'whsec_…'}
-                            onChange={(event) => setData('webhook_secret', event.target.value)}
-                            error={errors.webhook_secret}
-                        />
-                        <p className="mt-1 text-xs text-ink-secondary">
-                            Verifies that webhook events really come from Stripe.
-                        </p>
-                    </div>
-                )}
                 <Checkbox
-                    label={`Accept payments through ${config.name}`}
+                    label="Accept payments through Paystack"
                     checked={data.is_active}
                     onChange={(event) => setData('is_active', event.target.checked)}
                 />
 
+                {commissionCredit.length > 0 && (
+                    <p className="rounded-lg border border-border bg-surface-sunken p-3 text-sm text-ink-secondary">
+                        Commission credit:{' '}
+                        <span className="num font-medium text-ink">
+                            {commissionCredit
+                                .map(
+                                    (credit) =>
+                                        `${credit.currency} ${(credit.amount / 100).toFixed(2)}`
+                                )
+                                .join(', ')}
+                        </span>
+                        . MiConvener returned commission on refunded tickets as credit, and it is
+                        taken off the commission on your next sales automatically.
+                    </p>
+                )}
+
+                {commissionSplit.enforced && (
+                    <CommissionSplit
+                        gateway={gateway}
+                        destination={commissionSplit.destination}
+                        data={data}
+                        setData={setData}
+                        errors={errors}
+                    />
+                )}
+
                 <div className="border-t border-border pt-5">
-                    <WebhookUrl url={gateway.webhook_url} hint={config.webhookHint} />
+                    <WebhookUrl
+                        url={gateway.webhook_url}
+                        hint="Add this URL in your Paystack Dashboard under Settings › API Keys & Webhooks."
+                    />
                 </div>
 
                 <div className="flex justify-end">
                     <Button type="submit" variant="primary" disabled={processing}>
-                        Save {config.name}
+                        Save Paystack
                     </Button>
                 </div>
             </form>
+        </Card>
+    );
+}
+
+const STRIPE_NOTICES = {
+    connected: { tone: 'success', text: 'Stripe connected.' },
+    declined: { tone: 'neutral', text: 'The Stripe connection was cancelled.' },
+    failed: { tone: 'danger', text: 'Stripe could not be connected. Please try again.' },
+};
+
+function StripeCard({ stripe }) {
+    const notice = STRIPE_NOTICES[stripe.status];
+
+    const disconnect = () => {
+        if (
+            window.confirm(
+                'Disconnect Stripe? Attendees will no longer be able to pay by Stripe for your events.'
+            )
+        ) {
+            router.delete(route('tenant.settings.payments.stripe.disconnect'), {
+                preserveScroll: true,
+            });
+        }
+    };
+
+    return (
+        <Card
+            title="Stripe"
+            description="Take card payments, including in USD from attendees abroad, in your own Stripe account."
+            aside={
+                stripe.connected ? (
+                    <StatusPill status="success">Connected</StatusPill>
+                ) : (
+                    <StatusPill>Not connected</StatusPill>
+                )
+            }
+        >
+            <div className="space-y-5">
+                {notice && <p className="text-sm text-ink-secondary">{notice.text}</p>}
+
+                {stripe.connected ? (
+                    <>
+                        <p className="text-sm text-ink-secondary">
+                            Linked to account{' '}
+                            <code className="num text-ink">{stripe.account_id}</code>. Payments go
+                            straight to that account; MiConvener&apos;s commission is taken as an
+                            application fee on each ticket.
+                        </p>
+                        <div className="flex justify-end">
+                            <Button type="button" icon={Unlink} onClick={disconnect}>
+                                Disconnect Stripe
+                            </Button>
+                        </div>
+                    </>
+                ) : stripe.configured ? (
+                    <>
+                        <p className="text-sm text-ink-secondary">
+                            You will sign in to Stripe and approve the connection. We never see or
+                            store your Stripe keys, and you can disconnect at any time from here or
+                            from your Stripe dashboard.
+                        </p>
+                        <div className="flex justify-end">
+                            <Button
+                                variant="primary"
+                                icon={Link2}
+                                href={route('tenant.settings.payments.stripe.connect')}
+                            >
+                                Connect with Stripe
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <p className="text-sm text-ink-secondary">
+                        Not available yet: the platform has not finished setting up Stripe.
+                    </p>
+                )}
+            </div>
         </Card>
     );
 }
@@ -308,6 +445,9 @@ export default function Payments({
     settlementMode,
     platformSettlementAvailable,
     gateways,
+    stripe,
+    commissionSplit,
+    commissionCredit,
     canSetPlatformFee,
     platformFee,
 }) {
@@ -332,8 +472,12 @@ export default function Payments({
                     </p>
                 </div>
                 <div className="grid gap-6 xl:grid-cols-2">
-                    <GatewayForm provider="stripe" gateway={gateways.stripe} />
-                    <GatewayForm provider="paystack" gateway={gateways.paystack} />
+                    <PaystackForm
+                        gateway={gateways.paystack}
+                        commissionSplit={commissionSplit}
+                        commissionCredit={commissionCredit}
+                    />
+                    <StripeCard stripe={stripe} />
                 </div>
             </div>
         </ConsoleLayout>

@@ -87,7 +87,7 @@ final class AppServiceProvider extends ServiceProvider
 
                     return match ($gatewayConfig->provider) {
                         'paystack' => new \App\Services\Payment\PaystackGateway($config),
-                        'stripe' => new \App\Services\Payment\StripeGateway($app->make(\Stripe\StripeClient::class), $config),
+                        'stripe' => $app->make(\App\Services\Payment\StripeConnect::class)->gatewayFor($gatewayConfig),
                         default => $app->make(\App\Services\Payment\PaystackGateway::class),
                     };
                 }
