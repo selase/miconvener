@@ -411,7 +411,7 @@ test('the payments page tells the organizer what to enter and whether it checks 
         ->get("http://{$this->host}/settings/payments", ['HTTP_HOST' => $this->host])
         ->assertInertia(fn ($page) => $page
             ->where('commissionSplit.enforced', true)
-            ->where('commissionSplit.destination.account_number', COMMISSION_ACCOUNT)
+            ->where('commissionSplit.destinations.0.account_number', COMMISSION_ACCOUNT)
             ->where('gateways.paystack.commission_subaccount_code', 'ACCT_abc123')
             ->where('gateways.paystack.commission_verified', true)
             ->where('gateways.paystack.commission_problem', null));
@@ -446,4 +446,41 @@ test('the public event page offers only the payment methods that will work', fun
 
     $this->get("http://{$this->host}/e/{$event->slug}", ['HTTP_HOST' => $this->host])
         ->assertInertia(fn ($page) => $page->where('event.contribution_providers', []));
+});
+
+test('the amount the subaccount really received is what is booked as received', function () {
+    Log::spy();
+    splitGateway();
+    $registration = pendingTicket();
+
+    paystackSuccessWebhook($registration, ['fees_split' => ['paystack' => 195, 'integration' => 9_305, 'subaccount' => 500]])->assertOk();
+
+    $ledger = ledgerByAccount($registration->event);
+    expect($ledger[LedgerAccount::CODE_GATEWAY_CLEARING]['debits'])->toBe(500)
+        ->and($ledger[LedgerAccount::CODE_ORGANIZER_PAYABLE]['debits'])->toBe(0);
+    Log::shouldNotHaveReceived('warning', fn (string $message): bool => str_contains($message, 'received a different amount'));
+});
+
+test('a split that paid the platform less than asked leaves the difference owed and is logged', function () {
+    Log::spy();
+    splitGateway();
+    $registration = pendingTicket();
+
+    paystackSuccessWebhook($registration, ['fees_split' => ['paystack' => 195, 'integration' => 9_505, 'subaccount' => 300]])->assertOk();
+
+    $ledger = ledgerByAccount($registration->event);
+    expect($ledger[LedgerAccount::CODE_GATEWAY_CLEARING]['debits'])->toBe(300)
+        ->and($ledger[LedgerAccount::CODE_ORGANIZER_PAYABLE]['debits'])->toBe(200)
+        ->and($ledger[LedgerAccount::CODE_PLATFORM_REVENUE]['credits'])->toBe(500)
+        ->and(LedgerTransaction::where('event_id', $registration->event_id)->value('transaction_type'))->toBe(LedgerTransaction::TYPE_COMMISSION_RECEIVABLE);
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message): bool => str_contains($message, 'received a different amount'))->once();
+});
+
+test('a charge that reports no split breakdown is booked from what checkout asked for', function () {
+    splitGateway();
+    $registration = pendingTicket();
+
+    paystackSuccessWebhook($registration)->assertOk();
+
+    expect(ledgerByAccount($registration->event)[LedgerAccount::CODE_GATEWAY_CLEARING]['debits'])->toBe(500);
 });

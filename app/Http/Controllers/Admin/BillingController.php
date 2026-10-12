@@ -23,7 +23,7 @@ final class BillingController extends Controller
      */
     public function transactions(Request $request): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         $query = Transaction::with('tenant')
             ->latest();
@@ -58,7 +58,7 @@ final class BillingController extends Controller
      */
     public function subscriptions(Request $request): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         $query = Tenant::query()
             ->orderBy('name');

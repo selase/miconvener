@@ -18,7 +18,7 @@ final class InvoiceController extends Controller
 {
     public function index(Request $request): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         $query = Invoice::with('tenant')->latest();
 
@@ -47,7 +47,7 @@ final class InvoiceController extends Controller
 
     public function show(string $id): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         $invoice = Invoice::with(['tenant', 'items'])->findOrFail($id);
 
@@ -63,14 +63,14 @@ final class InvoiceController extends Controller
 
     public function download(Invoice $invoice, PdfInvoiceService $pdfService)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         return $pdfService->download($invoice);
     }
 
     public function issue(Invoice $invoice)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         if ($invoice->status !== Invoice::STATUS_DRAFT) {
             return back()->with('error', 'Only draft invoices can be issued.');
@@ -86,7 +86,7 @@ final class InvoiceController extends Controller
 
     public function bulkIssue(Request $request)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $ids = $request->input('ids', []);
 
@@ -105,7 +105,7 @@ final class InvoiceController extends Controller
 
     public function resend(Invoice $invoice)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         if ($invoice->status === Invoice::STATUS_DRAFT) {
             return back()->with('error', 'Draft invoices cannot be resent. Please issue them first.');
@@ -118,7 +118,7 @@ final class InvoiceController extends Controller
 
     public function addAdjustment(Request $request, Invoice $invoice)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         if ($invoice->status !== Invoice::STATUS_DRAFT) {
             return back()->with('error', 'Adjustments can only be added to draft invoices.');
@@ -145,7 +145,7 @@ final class InvoiceController extends Controller
 
     public function removeAdjustment(InvoiceItem $item)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $invoice = $item->invoice;
 
@@ -162,7 +162,7 @@ final class InvoiceController extends Controller
 
     public function create(): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $tenants = \App\Models\Tenant::orderBy('name')->get(['id', 'name', 'slug']);
 
@@ -178,7 +178,7 @@ final class InvoiceController extends Controller
 
     public function store(Request $request)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $validated = $request->validate([
             'tenant_id' => 'required|exists:tenants,id',

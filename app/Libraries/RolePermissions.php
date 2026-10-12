@@ -18,7 +18,7 @@ final class RolePermissions
     {
         return [
             'Superadmin' => self::superadminPermissions(),
-            'Platform Finance' => ['manage commission credits'],
+            'Platform Finance' => self::platformFinancePermissions(),
             'Org Superadmin' => self::organizationSuperadminPermissions(),
             'Org Admin' => self::organizationAdminPermissions(),
             'Event Staff' => self::eventStaffPermissions(),
@@ -78,6 +78,25 @@ final class RolePermissions
     }
 
     /**
+     * What MiConvener's own finance staff can do across the platform: read the
+     * money, release payouts, bill organisations, and manage the commission
+     * accounts and credits. Changing what an organisation owes (commission
+     * rates, plans, agreed prices) stays with the superadmin.
+     *
+     * @return array<int, string>
+     */
+    private static function platformFinancePermissions(): array
+    {
+        return [
+            'view platform finance',
+            'release payouts',
+            'manage invoices',
+            'manage commission credits',
+            'manage commission destinations',
+        ];
+    }
+
+    /**
      * Default permissions for the built-in Superadmin role.
      *
      * @return array<int, string>
@@ -85,7 +104,7 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
-            'manage commission credits',
+            ...self::platformFinancePermissions(),
             'create setting',
             'read setting',
             'update setting',

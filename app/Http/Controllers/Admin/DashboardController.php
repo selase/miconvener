@@ -9,12 +9,20 @@ use App\Libraries\Helper;
 use App\Models\User;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
 
 final class DashboardController extends Controller
 {
-    public function __invoke(\Illuminate\Http\Request $request, \App\Services\TenantStatsService $tenantStatsService): Factory|View
+    public function __invoke(\Illuminate\Http\Request $request, \App\Services\TenantStatsService $tenantStatsService): Factory|View|RedirectResponse
     {
+        // Platform finance staff are not superadmins, so this page is not
+        // theirs; their landing page is the finance overview.
+        if (! Gate::allows('access-superadmin-dashboard') && $request->user()?->can('view platform finance')) {
+            return redirect()->route('admin.finance.overview');
+        }
+
         // This view reports cross-tenant figures (platform revenue, active
         // subscriptions, other tenants' names and user counts), so it needs the
         // same gate every sibling Admin\* controller uses -- not 'access

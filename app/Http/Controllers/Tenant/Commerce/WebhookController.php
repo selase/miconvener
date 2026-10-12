@@ -26,16 +26,33 @@ final class WebhookController extends Controller
      * down here, once the payment is real; if another sale spent it first, the
      * shortfall simply falls to commission still owed.
      *
+     * Paystack reports what the platform subaccount actually received
+     * ($reportedReceived); when it does, that is what is booked as received,
+     * not what checkout asked for, so a short split shows up as money owed.
+     *
      * @param  array<string, mixed>  $metadata
      * @return array{received: int, credit: int}
      */
-    public static function commissionSettlement(Tenant $tenant, string $currency, string $provider, array $metadata, int $commission): array
+    public static function commissionSettlement(Tenant $tenant, string $currency, string $provider, array $metadata, int $commission, ?int $reportedReceived = null): array
     {
         $creditRequested = max(0, (int) ($metadata['commission_credit_applied'] ?? 0));
 
-        $received = $provider === 'stripe'
-            ? (int) ($metadata['commission_collected'] ?? 0)
-            : (filled($metadata['commission_split'] ?? null) ? max(0, $commission - $creditRequested) : 0);
+        if ($provider === 'stripe') {
+            $received = (int) ($metadata['commission_collected'] ?? 0);
+        } elseif (filled($metadata['commission_split'] ?? null)) {
+            $expected = max(0, $commission - $creditRequested);
+            $received = $reportedReceived !== null ? min(max(0, $reportedReceived), $commission) : $expected;
+
+            if ($reportedReceived !== null && $reportedReceived !== $expected) {
+                Log::warning('The commission subaccount received a different amount than the split asked for', [
+                    'tenant' => $tenant->id,
+                    'expected' => $expected,
+                    'received' => $reportedReceived,
+                ]);
+            }
+        } else {
+            $received = 0;
+        }
 
         $credit = $creditRequested > 0
             ? app(\App\Services\Finance\CommissionCredit::class)->consume($tenant, $currency, $creditRequested)
@@ -133,7 +150,7 @@ final class WebhookController extends Controller
             if ($event === 'charge.success') {
                 $this->recordTransaction($tenant, 'paystack', (object) $data);
                 $this->flagMissingCommissionSplit($tenant, (array) $data);
-                $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')), 'paystack');
+                $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')), 'paystack', is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : null);
             } elseif ($event === 'charge.failed') {
                 $reference = $data['reference'] ?? null;
 
@@ -251,7 +268,7 @@ final class WebhookController extends Controller
      *
      * @param  array<string, mixed>  $metadata
      */
-    private function confirmEventRegistrationIfApplicable(Tenant $tenant, array $metadata, ?string $reference, int $amount, int $gatewayFeeAmount, string $currency, string $provider): void
+    private function confirmEventRegistrationIfApplicable(Tenant $tenant, array $metadata, ?string $reference, int $amount, int $gatewayFeeAmount, string $currency, string $provider, ?int $splitReceived = null): void
     {
         $registrationId = $metadata['event_registration_id'] ?? null;
         if (! $registrationId) {
@@ -299,7 +316,7 @@ final class WebhookController extends Controller
         // what reached us with the payment, what was netted against credit we
         // owed them, and any remainder they owe. Checkout recorded the first
         // two in the metadata it sent to the gateway.
-        $settlement = self::commissionSettlement($tenant, $currency, $provider, $metadata, $commissionAmount);
+        $settlement = self::commissionSettlement($tenant, $currency, $provider, $metadata, $commissionAmount, $splitReceived);
 
         app(\App\Services\Finance\LedgerService::class)->recordOwnGatewayTicketSale(
             $eventModel,

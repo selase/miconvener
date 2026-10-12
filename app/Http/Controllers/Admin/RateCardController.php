@@ -15,7 +15,7 @@ final class RateCardController extends Controller
 {
     public function index(): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         $globalPrices = UsagePrice::whereNull('target_type')->get();
         $metrics = UsageMetric::cases();
@@ -34,7 +34,7 @@ final class RateCardController extends Controller
 
     public function updatePrices(Request $request)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $request->validate([
             'usage_prices' => 'nullable|array',
@@ -64,7 +64,7 @@ final class RateCardController extends Controller
 
     public function storeTax(Request $request)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -86,7 +86,7 @@ final class RateCardController extends Controller
 
     public function updateTax(Request $request, Tax $tax)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -109,7 +109,7 @@ final class RateCardController extends Controller
 
     public function destroyTax(Tax $tax)
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('manage invoices');
 
         $tax->delete();
 

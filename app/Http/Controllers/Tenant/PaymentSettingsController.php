@@ -63,7 +63,7 @@ final class PaymentSettingsController extends Controller
                 ->values(),
             'commissionSplit' => [
                 'enforced' => $this->splitVerifier->isEnforced(),
-                'destination' => $this->splitVerifier->destination(),
+                'destinations' => $this->splitVerifier->destinations(),
             ],
             'canSetPlatformFee' => $canSetPlatformFee,
             'platformFee' => $canSetPlatformFee ? [
