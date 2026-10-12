@@ -77,6 +77,14 @@ final class RoleSeeder extends Seeder
                 'slug' => str()->slug('Platform Finance', '_'),
                 'guard_name' => 'web',
             ],
+
+            // MiConvener's own marketing staff: see signups and follow up.
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'Platform Marketing',
+                'slug' => str()->slug('Platform Marketing', '_'),
+                'guard_name' => 'web',
+            ],
         ];
     }
 }

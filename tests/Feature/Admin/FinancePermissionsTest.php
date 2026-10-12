@@ -111,7 +111,7 @@ test('the overview shows what is waiting and what is owed', function (): void {
         ->assertSee('Earned this month');
 });
 
-test('the platform finance role holds exactly the finance permissions', function (): void {
+test('the platform finance role holds the finance permissions and may read signups', function (): void {
     $role = Role::query()->where('name', 'Platform Finance')->whereNull('tenant_id')->firstOrFail();
 
     expect($role->permissions->pluck('name')->sort()->values()->all())->toBe([
@@ -120,5 +120,6 @@ test('the platform finance role holds exactly the finance permissions', function
         'manage invoices',
         'release payouts',
         'view platform finance',
+        'view signups',
     ]);
 });

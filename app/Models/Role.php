@@ -28,6 +28,7 @@ final class Role extends SpatieRole
         'Org Admin',
         'Event Staff',
         'Platform Finance',
+        'Platform Marketing',
     ];
 
     protected $connection = 'landlord';

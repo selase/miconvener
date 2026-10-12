@@ -92,6 +92,8 @@ final class RegisteredUserController extends Controller
         // Provision tenant database and run migrations
         $this->provisioner->provision($tenant);
 
+        app(\App\Services\Platform\SignupAlerts::class)->signedUp($tenant);
+
         // Attach user to tenant and set primary tenant
         $user->tenant_id = $tenant->id;
         $user->save();

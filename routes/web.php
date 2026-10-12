@@ -227,6 +227,13 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('show');
     });
 
+    Route::get('admin/signups', [App\Http\Controllers\Admin\SignupController::class, 'index'])
+        ->name('admin.signups.index');
+    Route::get('admin/signups/{tenant:uuid}', [App\Http\Controllers\Admin\SignupController::class, 'show'])
+        ->name('admin.signups.show');
+    Route::post('admin/signups/{tenant:uuid}/follow-up', [App\Http\Controllers\Admin\SignupController::class, 'followUp'])
+        ->name('admin.signups.follow-up');
+
     Route::get('admin/finance', App\Http\Controllers\Admin\FinanceOverviewController::class)
         ->name('admin.finance.overview');
 

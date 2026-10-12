@@ -17,10 +17,10 @@ final class DashboardController extends Controller
 {
     public function __invoke(\Illuminate\Http\Request $request, \App\Services\TenantStatsService $tenantStatsService): Factory|View|RedirectResponse
     {
-        // Platform finance staff are not superadmins, so this page is not
-        // theirs; their landing page is the finance overview.
-        if (! Gate::allows('access-superadmin-dashboard') && $request->user()?->can('view platform finance')) {
-            return redirect()->route('admin.finance.overview');
+        // Platform staff who are not superadmins (finance, marketing) have a
+        // page of their own instead of this one.
+        if (! Gate::allows('access-superadmin-dashboard') && $landing = app(\App\Services\Platform\PlatformStaff::class)->landingRouteFor($request->user())) {
+            return redirect()->route($landing);
         }
 
         // This view reports cross-tenant figures (platform revenue, active

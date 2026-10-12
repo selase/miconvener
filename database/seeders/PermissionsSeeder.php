@@ -147,6 +147,18 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'view signups',
+                'guard_name' => 'web',
+                'category' => 'tenant',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'follow up signups',
+                'guard_name' => 'web',
+                'category' => 'tenant',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'view platform finance',
                 'guard_name' => 'web',
                 'category' => 'finance',
