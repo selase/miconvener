@@ -197,3 +197,18 @@ test('organisers are shown only the current accounts on their payments page', fu
             ->has('commissionSplit.destinations', 1)
             ->where('commissionSplit.destinations.0.account_number', '0551234987'));
 });
+
+test('the add form tells the admin to enter the bank the way Paystack reports it', function () {
+    $this->actingAs(destinationAdmin('Superadmin'))
+        ->get(route('admin.billing.commission-destinations.index'))
+        ->assertOk()
+        ->assertSee('as Paystack names it')
+        ->assertSee('Ecobank Ghana Limited');
+});
+
+test('a bank account is matched by the bank name Paystack reports', function () {
+    CommissionDestination::factory()->create(['settlement_bank' => 'Ecobank Ghana Limited', 'account_number' => '1441002056357']);
+
+    expect($this->destinations->accepts(subaccountShape(['settlement_bank' => 'Ecobank Ghana Limited', 'account_number' => '1441002056357'])))->toBeTrue()
+        ->and($this->destinations->accepts(subaccountShape(['settlement_bank' => 'MTN', 'account_number' => '1441002056357'])))->toBeFalse();
+});
