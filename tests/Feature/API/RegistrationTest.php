@@ -8,6 +8,12 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
+    // Migrate on the tenant connection's own handle first. Once it shares the
+    // landlord handle below it sits inside the test's open transaction, where
+    // a pending migration cannot start its own, which is exactly the state of
+    // a freshly created (for instance parallel-testing) database.
+    refreshTenantDatabases();
+
     Config::set('database.connections.tenant', Config::get('database.connections.landlord'));
     DB::connection('tenant')->setPdo(DB::connection('landlord')->getPdo());
 

@@ -67,6 +67,24 @@ final class RoleSeeder extends Seeder
                 'slug' => str()->slug('Event Staff', '_'),
                 'guard_name' => 'web',
             ],
+
+            // MiConvener's own finance staff: platform-wide, not an
+            // organisation's. Named apart from "Finance" because organisations
+            // create their own roles and the seeder matches roles by name.
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'Platform Finance',
+                'slug' => str()->slug('Platform Finance', '_'),
+                'guard_name' => 'web',
+            ],
+
+            // MiConvener's own marketing staff: see signups and follow up.
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'Platform Marketing',
+                'slug' => str()->slug('Platform Marketing', '_'),
+                'guard_name' => 'web',
+            ],
         ];
     }
 }

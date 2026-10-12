@@ -80,7 +80,9 @@ test('an own_gateway charge.success webhook writes a charge ledger entry with th
     // The single-row EventLedgerEntry above is a summary; the double-entry
     // LedgerTransaction is the record that actually moves the organizer
     // payable and platform revenue accounts.
-    expect(LedgerTransaction::where('event_id', $event->id)->where('transaction_type', LedgerTransaction::TYPE_TICKET_SALE)->count())->toBe(1);
+    // No commission split came with this charge, so the commission is owed
+    // by the organizer rather than received, and is reported as such.
+    expect(LedgerTransaction::where('event_id', $event->id)->where('transaction_type', LedgerTransaction::TYPE_COMMISSION_RECEIVABLE)->count())->toBe(1);
 });
 
 test('a platform_default charge.success confirms the registration via tenant_id in metadata and writes a charge ledger entry', function () {

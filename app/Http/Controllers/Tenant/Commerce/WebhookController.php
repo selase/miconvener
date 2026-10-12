@@ -10,7 +10,7 @@ use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
-use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -19,47 +19,97 @@ use Throwable;
 final class WebhookController extends Controller
 {
     /**
-     * Handle Stripe Webhooks for Merchant accounts.
+     * How the platform's commission on this payment was met, from what
+     * checkout recorded in the metadata the gateway returns: the cash taken as
+     * a Paystack split or Stripe application fee, and the credit the platform
+     * owed the organizer that checkout netted against it. The credit is drawn
+     * down here, once the payment is real; if another sale spent it first, the
+     * shortfall simply falls to commission still owed.
+     *
+     * Paystack reports what the platform subaccount actually received
+     * ($reportedReceived); when it does, that is what is booked as received,
+     * not what checkout asked for, so a short split shows up as money owed.
+     *
+     * @param  array<string, mixed>  $metadata
+     * @return array{received: int, credit: int}
      */
-    public function handleStripe(Request $request, Tenant $tenant)
+    public static function commissionSettlement(Tenant $tenant, string $currency, string $provider, array $metadata, int $commission, ?int $reportedReceived = null): array
     {
-        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
-            ->where('provider', 'stripe')
-            ->where('is_active', true)
-            ->first();
+        $creditRequested = max(0, (int) ($metadata['commission_credit_applied'] ?? 0));
 
-        if (! $gateway) {
-            return response()->json(['error' => 'Gateway not configured'], 404);
+        if ($provider === 'stripe') {
+            $received = (int) ($metadata['commission_collected'] ?? 0);
+        } elseif (filled($metadata['commission_split'] ?? null)) {
+            $expected = max(0, $commission - $creditRequested);
+            $received = $reportedReceived !== null ? min(max(0, $reportedReceived), $commission) : $expected;
+
+            if ($reportedReceived !== null && $reportedReceived !== $expected) {
+                Log::warning('The commission subaccount received a different amount than the split asked for', [
+                    'tenant' => $tenant->id,
+                    'expected' => $expected,
+                    'received' => $reportedReceived,
+                ]);
+            }
+        } else {
+            $received = 0;
         }
 
-        $payload = $request->getContent();
-        $sigHeader = $request->header('Stripe-Signature');
-        $webhookSecret = $gateway->webhook_secret_encrypted;
+        $credit = $creditRequested > 0
+            ? app(\App\Services\Finance\CommissionCredit::class)->consume($tenant, $currency, $creditRequested)
+            : 0;
 
+        return ['received' => $received, 'credit' => $credit];
+    }
+
+    /**
+     * Handle Stripe Connect events from tenants' connected accounts. One
+     * endpoint serves every tenant: the `account` on each event says whose
+     * account it came from.
+     */
+    public function handleStripeConnect(Request $request): JsonResponse
+    {
         try {
             $event = \Stripe\Webhook::constructEvent(
-                $payload, $sigHeader, $webhookSecret
+                $request->getContent(),
+                (string) $request->header('Stripe-Signature'),
+                (string) config('services.stripe.connect.webhook_secret'),
             );
-        } catch (Exception $e) {
-            Log::error('Merchant Stripe webhook verification failed', ['tenant' => $tenant->id, 'error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            Log::warning('Stripe Connect webhook verification failed', ['error' => $e->getMessage()]);
 
             return response()->json(['error' => 'Invalid signature'], 400);
         }
 
+        $accountId = $event->account ?? null;
+        $gateway = $accountId
+            ? TenantPaymentGateway::where('provider', 'stripe')->where('provider_account_id', $accountId)->first()
+            : null;
+
+        if (! $gateway) {
+            // Not one of ours (or already disconnected): acknowledge so Stripe stops retrying.
+            return response()->json(['status' => 'ignored']);
+        }
+
+        $tenant = Tenant::find($gateway->tenant_id);
+
         try {
             switch ($event->type) {
                 case 'checkout.session.completed':
+                case 'checkout.session.async_payment_succeeded':
                     $session = $event->data->object;
-                    $this->recordTransaction($tenant, 'stripe', $session);
+
+                    if (($session->payment_status ?? null) === 'paid' && $tenant) {
+                        $this->confirmStripeSession($tenant, $gateway, $session);
+                    }
                     break;
 
-                case 'payment_intent.succeeded':
-                    // Avoid double counting if using both
+                case 'account.application.deauthorized':
+                    $gateway->delete();
                     break;
             }
         } catch (Throwable $e) {
-            Log::error('Merchant Stripe webhook processing failed', [
-                'tenant' => $tenant->id,
+            Log::error('Stripe Connect webhook processing failed', [
+                'tenant' => $gateway->tenant_id,
                 'event' => $event->type,
                 'error' => $e->getMessage(),
             ]);
@@ -99,7 +149,8 @@ final class WebhookController extends Controller
         try {
             if ($event === 'charge.success') {
                 $this->recordTransaction($tenant, 'paystack', (object) $data);
-                $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')));
+                $this->flagMissingCommissionSplit($tenant, (array) $data);
+                $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')), 'paystack', is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : null);
             } elseif ($event === 'charge.failed') {
                 $reference = $data['reference'] ?? null;
 
@@ -136,12 +187,88 @@ final class WebhookController extends Controller
     }
 
     /**
+     * The charge reference is the PaymentIntent, because that is what a refund
+     * is issued against.
+     */
+    private function confirmStripeSession(Tenant $tenant, TenantPaymentGateway $gateway, object $session): void
+    {
+        $currency = mb_strtoupper((string) $session->currency);
+        $paymentIntent = (string) ($session->payment_intent ?? $session->id);
+        $fee = app(\App\Services\Payment\StripeConnect::class)
+            ->gatewayFor($gateway)
+            ->processingFeeFor($paymentIntent, $currency);
+
+        $metadata = $session->metadata ? $session->metadata->toArray() : [];
+
+        $this->recordTransaction($tenant, 'stripe', $session);
+
+        if (($metadata['type'] ?? null) === 'event_contribution') {
+            app(\App\Services\Events\EventContributionService::class)->confirmContributionPayment($paymentIntent, [
+                'metadata' => $metadata,
+                'amount' => (int) $session->amount_total,
+                'fees' => $fee,
+                'provider' => 'stripe',
+            ]);
+
+            return;
+        }
+
+        $this->confirmEventRegistrationIfApplicable(
+            $tenant,
+            $metadata,
+            $paymentIntent,
+            (int) $session->amount_total,
+            $fee,
+            $currency,
+            'stripe',
+        );
+    }
+
+    /**
+     * Checkout records the subaccount it split a charge with in the charge's
+     * metadata, which Paystack returns untouched. If the charge's own payload
+     * names no split at all, flag it for follow-up. Paystack documents the
+     * `split` object only for split groups and the subaccount fields are not
+     * documented for this case, so either shape is accepted, and a miss is a
+     * warning to look at rather than a verdict: the money has already moved.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function flagMissingCommissionSplit(Tenant $tenant, array $data): void
+    {
+        $expected = $data['metadata']['commission_split'] ?? null;
+
+        if (! filled($expected)) {
+            return;
+        }
+
+        $reported = array_filter([
+            $data['subaccount']['subaccount_code'] ?? null,
+            ...array_column((array) ($data['split']['subaccounts'] ?? []), 'subaccount'),
+            ...array_column((array) ($data['split']['subaccounts'] ?? []), 'subaccount_code'),
+        ]);
+
+        if (in_array($expected, $reported, true)) {
+            return;
+        }
+
+        Log::warning('A split ticket charge did not name the commission subaccount in its payload', [
+            'tenant' => $tenant->id,
+            'reference' => $data['reference'] ?? null,
+            'expected' => $expected,
+            'payload_keys' => array_keys($data),
+        ]);
+    }
+
+    /**
      * If this charge was for an event ticket (carried in the checkout
      * metadata), confirm the matching registration. Idempotent: a
-     * registration already confirmed is left untouched, so Paystack's
+     * registration already confirmed is left untouched, so the gateway's
      * at-least-once webhook delivery can't double-process it.
+     *
+     * @param  array<string, mixed>  $metadata
      */
-    private function confirmEventRegistrationIfApplicable(Tenant $tenant, array $metadata, ?string $reference, int $amount, int $gatewayFeeAmount, string $currency): void
+    private function confirmEventRegistrationIfApplicable(Tenant $tenant, array $metadata, ?string $reference, int $amount, int $gatewayFeeAmount, string $currency, string $provider, ?int $splitReceived = null): void
     {
         $registrationId = $metadata['event_registration_id'] ?? null;
         if (! $registrationId) {
@@ -185,16 +312,22 @@ final class WebhookController extends Controller
         $registration->save();
         app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
 
-        // The platform-settled path posts to both ledgers; this one recorded
-        // only the old single-row entry, so an own_gateway tenant had no
-        // double-entry record of their ticket sales at all.
-        app(\App\Services\Finance\LedgerService::class)->recordTicketSale(
+        // The organizer holds the money, so the books carry only the commission:
+        // what reached us with the payment, what was netted against credit we
+        // owed them, and any remainder they owe. Checkout recorded the first
+        // two in the metadata it sent to the gateway.
+        $settlement = self::commissionSettlement($tenant, $currency, $provider, $metadata, $commissionAmount, $splitReceived);
+
+        app(\App\Services\Finance\LedgerService::class)->recordOwnGatewayTicketSale(
             $eventModel,
             $registration,
             $amount,
             $commissionAmount,
             $reference,
-            $gatewayFeeAmount
+            $gatewayFeeAmount,
+            $provider,
+            $settlement['received'],
+            $settlement['credit'],
         );
 
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
@@ -219,7 +352,7 @@ final class WebhookController extends Controller
                 'customer_email' => $provider === 'stripe' ? ($data->customer_details->email ?? null) : ($data->customer['email'] ?? null),
                 'customer_name' => $provider === 'stripe' ? ($data->customer_details->name ?? null) : mb_trim(($data->customer['first_name'] ?? '').' '.($data->customer['last_name'] ?? '')),
                 'description' => $provider === 'stripe' ? 'Stripe Checkout' : 'Paystack Charge',
-                'meta' => (array) $data,
+                'meta' => $data instanceof \Stripe\StripeObject ? $data->toArray() : (array) $data,
             ]
         );
     }

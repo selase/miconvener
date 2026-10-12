@@ -42,6 +42,18 @@ return [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+
+        /*
+         * Tenants who take payments on their own Stripe account link it to the
+         * platform through Connect (Standard accounts, OAuth). Charges are
+         * created on the tenant's account and the platform fee is taken with
+         * application_fee_amount. Connect events arrive on their own webhook
+         * endpoint with their own signing secret.
+         */
+        'connect' => [
+            'client_id' => env('STRIPE_CONNECT_CLIENT_ID'),
+            'webhook_secret' => env('STRIPE_CONNECT_WEBHOOK_SECRET'),
+        ],
     ],
 
     'paystack' => [
@@ -163,6 +175,27 @@ return [
             'secret_key' => env('SETTLEMENT_PAYSTACK_SECRET_KEY') ?: env('PAYSTACK_SECRET_KEY'),
             'public_key' => env('SETTLEMENT_PAYSTACK_PUBLIC_KEY') ?: env('PAYSTACK_PUBLIC_KEY'),
         ],
+    ],
+
+    /*
+     * Where the platform's commission lands when a tenant takes payments on
+     * their own Paystack account. The tenant creates a Paystack subaccount with
+     * these details and enters its code; the platform checks the subaccount
+     * really settles here. Splitting is only enforced once an account number
+     * is set, so a deployment can roll it out before turning it on.
+     */
+    'commission_split' => [
+        'business_name' => env('COMMISSION_SPLIT_BUSINESS_NAME', 'MiConvener'),
+        'settlement_bank' => env('COMMISSION_SPLIT_SETTLEMENT_BANK'),
+        'account_number' => env('COMMISSION_SPLIT_ACCOUNT_NUMBER'),
+
+        /*
+         * Whether commission is given back when an organizer on their own
+         * Paystack account refunds tickets for an event they cancelled. True
+         * returns it as credit against later sales; false keeps it, as some
+         * platforms do for organizer-initiated cancellations.
+         */
+        'return_on_cancelled_event' => (bool) env('COMMISSION_RETURNED_ON_CANCELLED_EVENT', true),
     ],
 
 ];

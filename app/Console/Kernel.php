@@ -52,6 +52,10 @@ final class Kernel extends ConsoleKernel
         $schedule->command('tenants:reset-usage --feature=email_credits')->monthlyOn(1, '00:10');
         $schedule->command('tenants:reset-usage --feature=sms_credits')->monthlyOn(1, '00:15');
 
+        // Own-gateway Paystack tenants route the platform commission through a
+        // subaccount they own; confirm it still points at us before it costs a sale.
+        $schedule->command('payments:verify-commission-splits')->dailyAt('05:30')->withoutOverlapping();
+
         // Invoicing
         $schedule->command('billing:generate-invoices')->monthlyOn(1, '05:00');
         $schedule->command('billing:process-renewals')->dailyAt('07:00')->withoutOverlapping();
@@ -78,6 +82,10 @@ final class Kernel extends ConsoleKernel
         $schedule->command('marketplace:expire-verifications')->dailyAt('03:15');
         // Organiser sending domains switch on/off as SES finds their DNS records.
         $schedule->command('mail:check-sending-domains')->everyFifteenMinutes()->withoutOverlapping();
+        // The SMS provider has no delivery webhook, so delivery is asked for.
+        // On the shared fifteen-minute wake: a per-minute task would hold the
+        // hibernating app awake.
+        $schedule->command('sms:sync-delivery')->everyFifteenMinutes()->withoutOverlapping();
 
         // Compliance
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');

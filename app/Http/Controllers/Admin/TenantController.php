@@ -250,6 +250,8 @@ final class TenantController extends Controller
 
         $this->provisioner->provision($tenant);
 
+        app(\App\Services\Platform\SignupAlerts::class)->signedUp($tenant);
+
         return to_route('tenants.index')->with([
             'status' => 'success',
             'message' => __('locale.messages.created', ['name' => 'Tenant']),

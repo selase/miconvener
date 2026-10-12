@@ -49,6 +49,7 @@ final class EventContributionController extends Controller
             'amount' => ['required', 'numeric', 'min:'.$minAmountGhs, 'max:100000'],
             'tribute_message' => ['nullable', 'string', 'max:1000'],
             'is_anonymous' => ['sometimes', 'boolean'],
+            'provider' => ['sometimes', 'nullable', 'in:paystack,stripe'],
         ]);
 
         $callbackUrl = route('public.events.contributions.callback', [
@@ -58,7 +59,7 @@ final class EventContributionController extends Controller
         ]);
 
         try {
-            $checkoutUrl = $this->contributionService->initiateContribution($eventModel, $validated, $callbackUrl);
+            $checkoutUrl = $this->contributionService->initiateContribution($eventModel, $validated, $callbackUrl, $validated['provider'] ?? 'paystack');
 
             return Inertia::location($checkoutUrl);
         } catch (Throwable $e) {

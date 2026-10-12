@@ -18,6 +18,8 @@ final class RolePermissions
     {
         return [
             'Superadmin' => self::superadminPermissions(),
+            'Platform Finance' => [...self::platformFinancePermissions(), 'view signups'],
+            'Platform Marketing' => self::platformMarketingPermissions(),
             'Org Superadmin' => self::organizationSuperadminPermissions(),
             'Org Admin' => self::organizationAdminPermissions(),
             'Event Staff' => self::eventStaffPermissions(),
@@ -77,6 +79,39 @@ final class RolePermissions
     }
 
     /**
+     * What MiConvener's own finance staff can do across the platform: read the
+     * money, release payouts, bill organisations, and manage the commission
+     * accounts and credits. Changing what an organisation owes (commission
+     * rates, plans, agreed prices) stays with the superadmin.
+     *
+     * @return array<int, string>
+     */
+    private static function platformFinancePermissions(): array
+    {
+        return [
+            'view platform finance',
+            'release payouts',
+            'manage invoices',
+            'manage commission credits',
+            'manage commission destinations',
+        ];
+    }
+
+    /**
+     * MiConvener's own marketing staff: see who has signed up and how far they
+     * got, and record following up with them. Finance may read signups too.
+     *
+     * @return array<int, string>
+     */
+    private static function platformMarketingPermissions(): array
+    {
+        return [
+            'view signups',
+            'follow up signups',
+        ];
+    }
+
+    /**
      * Default permissions for the built-in Superadmin role.
      *
      * @return array<int, string>
@@ -84,6 +119,8 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
+            ...self::platformFinancePermissions(),
+            ...self::platformMarketingPermissions(),
             'create setting',
             'read setting',
             'update setting',

@@ -73,12 +73,6 @@ parameters:
 			path: app/Console/Commands/ReconcilePayoutSchedulesCommand.php
 
 		-
-			rawMessage: 'Parameter #2 $event of method App\Console\Commands\ReconcilePayoutSchedulesCommand::reconcileEventSchedule() expects App\Models\Event, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/ReconcilePayoutSchedulesCommand.php
-
-		-
 			rawMessage: Right side of && is always true.
 			identifier: booleanAnd.rightAlwaysTrue
 			count: 1
@@ -1159,19 +1153,7 @@ parameters:
 			path: app/Http/Controllers/Tenant/ApiKeyController.php
 
 		-
-			rawMessage: 'Method App\Http\Controllers\Tenant\Commerce\WebhookController::confirmEventRegistrationIfApplicable() has parameter $metadata with no value type specified in iterable type array.'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Http/Controllers/Tenant/Commerce/WebhookController.php
-
-		-
 			rawMessage: 'Method App\Http\Controllers\Tenant\Commerce\WebhookController::handlePaystack() has no return type specified.'
-			identifier: missingType.return
-			count: 1
-			path: app/Http/Controllers/Tenant/Commerce/WebhookController.php
-
-		-
-			rawMessage: 'Method App\Http\Controllers\Tenant\Commerce\WebhookController::handleStripe() has no return type specified.'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Tenant/Commerce/WebhookController.php

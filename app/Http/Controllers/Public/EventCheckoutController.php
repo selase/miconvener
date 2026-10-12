@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Public;
 
+use App\Exceptions\CommissionSplitUnavailableException;
+use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
 use App\Libraries\Helper;
 use App\Mail\Events\EventRegistrationOfflineProofSubmitted;
@@ -11,9 +13,11 @@ use App\Mail\Events\EventRegistrationPendingVerification;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
-use App\Models\TenantPaymentGateway;
 use App\Services\Events\PlatformAttendeeWorkspaceAuthorizer;
-use App\Services\Payment\PaystackGateway;
+use App\Services\Finance\CommissionCredit;
+use App\Services\Finance\FeeCalculator;
+use App\Services\Payment\StripeConnect;
+use App\Services\Payment\TenantPaystackResolver;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +32,9 @@ final class EventCheckoutController extends Controller
 {
     public function __construct(
         private readonly PlatformAttendeeWorkspaceAuthorizer $workspaceAuthorizer,
+        private readonly TenantPaystackResolver $paystackResolver,
+        private readonly StripeConnect $stripeConnect,
+        private readonly FeeCalculator $feeCalculator,
     ) {}
 
     public function checkout(string $subdomain, string $event, string $registration): InertiaResponse|Response|RedirectResponse
@@ -52,13 +59,16 @@ final class EventCheckoutController extends Controller
         }
 
         $eventModel = $registrationModel->event;
-        $paystack = $tenant->isPlatformDefaultSettlement()
-            ? $this->platformGateway()
-            : $this->tenantGateway($tenant);
+        $paystackAvailable = $this->paystackResolver->isAvailableFor($tenant);
+        $stripeAvailable = $this->stripeConnect->isAvailableFor($tenant);
 
-        // If the event allows offline payments OR this registration already has an offline status/proof,
-        // render the interactive Checkout page allowing the attendee to select Paystack or Offline methods.
-        if ($eventModel->allowsOfflinePayments() || $registrationModel->offline_payment_status !== null) {
+        // With more than one way to pay, the attendee picks; with exactly one
+        // online way and no offline option there is nothing to choose.
+        $offersChoice = $eventModel->allowsOfflinePayments()
+            || $registrationModel->offline_payment_status !== null
+            || ($paystackAvailable && $stripeAvailable);
+
+        if ($offersChoice) {
             return Inertia::render('Public/Events/Checkout', [
                 'event' => [
                     'name' => $eventModel->name,
@@ -104,39 +114,21 @@ final class EventCheckoutController extends Controller
                         'description' => $registrationModel->ticketType->description,
                     ] : null,
                 ],
-                'paystack_available' => (bool) $paystack,
+                'paystack_available' => $paystackAvailable,
+                'stripe_available' => $stripeAvailable,
                 'workspace_url' => $workspaceUrl,
             ]);
         }
 
-        if (! $paystack) {
-            $hasOtherActiveGateway = ! $tenant->isPlatformDefaultSettlement() && TenantPaymentGateway::where('tenant_id', $tenant->id)
-                ->where('is_active', true)
-                ->exists();
-
-            $message = $hasOtherActiveGateway
-                ? 'This event currently only accepts payments via Paystack, which is not configured for this organizer.'
-                : 'This event is not currently accepting payments.';
-
-            return redirect()->back()->with('error', $message);
+        if ($stripeAvailable) {
+            return $this->startStripeCheckout($tenant, $registrationModel, $workspaceUrl);
         }
 
-        $customerId = $paystack->createCustomer($registrationModel->email, $registrationModel->full_name);
+        if ($paystackAvailable) {
+            return $this->startPaystackCheckout($tenant, $registrationModel, $workspaceUrl);
+        }
 
-        $checkoutUrl = $paystack->createOneTimeCheckoutSession(
-            $customerId,
-            $registrationModel->effectiveChargedAmount(),
-            $registrationModel->currency,
-            $workspaceUrl,
-            [
-                'event_registration_id' => $registrationModel->id,
-                'tenant_id' => $tenant->id,
-                'type' => 'event_ticket',
-                'source' => config('services.paystack.metadata_source'),
-            ]
-        );
-
-        return Inertia::location($checkoutUrl);
+        return redirect()->back()->with('error', 'This event is not currently accepting payments.');
     }
 
     public function payWithPaystack(string $subdomain, string $event, string $registration): Response|RedirectResponse
@@ -160,30 +152,31 @@ final class EventCheckoutController extends Controller
             return redirect($workspaceUrl);
         }
 
-        $paystack = $tenant->isPlatformDefaultSettlement()
-            ? $this->platformGateway()
-            : $this->tenantGateway($tenant);
+        return $this->startPaystackCheckout($tenant, $registrationModel, $workspaceUrl);
+    }
 
-        if (! $paystack) {
-            return redirect()->back()->with('error', 'Online payment via Paystack is currently unavailable for this event.');
+    public function payWithStripe(string $subdomain, string $event, string $registration): Response|RedirectResponse
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        if (! $tenant) {
+            abort(404);
         }
 
-        $customerId = $paystack->createCustomer($registrationModel->email, $registrationModel->full_name);
+        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('id', $registration)
+            ->firstOrFail();
 
-        $checkoutUrl = $paystack->createOneTimeCheckoutSession(
-            $customerId,
-            $registrationModel->effectiveChargedAmount(),
-            $registrationModel->currency,
-            $workspaceUrl,
-            [
-                'event_registration_id' => $registrationModel->id,
-                'tenant_id' => $tenant->id,
-                'type' => 'event_ticket',
-                'source' => config('services.paystack.metadata_source'),
-            ]
-        );
+        $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
-        return Inertia::location($checkoutUrl);
+        if ($this->canClaimWorkspace($registrationModel)) {
+            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
+        }
+
+        if ($registrationModel->isConfirmed()) {
+            return redirect($workspaceUrl);
+        }
+
+        return $this->startStripeCheckout($tenant, $registrationModel, $workspaceUrl);
     }
 
     public function submitOfflineProof(Request $request, string $subdomain, string $event, string $registration): RedirectResponse
@@ -303,6 +296,88 @@ final class EventCheckoutController extends Controller
     }
 
     /**
+     * What MiConvener keeps from this registration, which is also what must be
+     * routed to it when the tenant takes the payment on their own account.
+     */
+    private function commissionFor(EventRegistration $registration): int
+    {
+        return $this->feeCalculator->for($registration->event, (int) $registration->amount)->platformFee;
+    }
+
+    private function startPaystackCheckout(Tenant $tenant, EventRegistration $registration, string $workspaceUrl): Response|RedirectResponse
+    {
+        try {
+            $paystack = $this->paystackResolver->gatewayFor($tenant, $this->commissionFor($registration), (string) $registration->currency);
+        } catch (CommissionSplitUnavailableException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        if (! $paystack) {
+            return redirect()->back()->with('error', 'Online payment via Paystack is currently unavailable for this event.');
+        }
+
+        $customerId = $paystack->createCustomer($registration->email, $registration->full_name);
+
+        $checkoutUrl = $paystack->createOneTimeCheckoutSession(
+            $customerId,
+            $registration->effectiveChargedAmount(),
+            $registration->currency,
+            $workspaceUrl,
+            [
+                'event_registration_id' => $registration->id,
+                'tenant_id' => $tenant->id,
+                'type' => 'event_ticket',
+                'source' => config('services.paystack.metadata_source'),
+                'commission_split' => $paystack->splitSubaccount(),
+                'commission_credit_applied' => $paystack->commissionCreditApplied(),
+            ]
+        );
+
+        return Inertia::location($checkoutUrl);
+    }
+
+    private function startStripeCheckout(Tenant $tenant, EventRegistration $registration, string $workspaceUrl): Response|RedirectResponse
+    {
+        $row = $this->stripeConnect->isAvailableFor($tenant) ? $this->stripeConnect->connectedGateway($tenant) : null;
+
+        if (! $row) {
+            return redirect()->back()->with('error', 'Online payment via Stripe is currently unavailable for this event.');
+        }
+
+        $commission = $this->commissionFor($registration);
+        $creditApplied = min(app(CommissionCredit::class)->balance($tenant, (string) $registration->currency), $commission);
+
+        try {
+            $checkoutUrl = $this->stripeConnect->gatewayFor($row)->createConnectedCheckoutSession(
+                $registration->email,
+                $registration->effectiveChargedAmount(),
+                $registration->currency,
+                $registration->event->name,
+                $workspaceUrl,
+                route('public.events.checkout', [
+                    'subdomain' => $tenant->slug,
+                    'event' => $registration->event->slug,
+                    'registration' => $registration->id,
+                ]),
+                [
+                    'event_registration_id' => (string) $registration->id,
+                    'tenant_id' => (string) $tenant->id,
+                    'type' => 'event_ticket',
+                    'commission_collected' => (string) ($commission - $creditApplied),
+                    'commission_credit_applied' => (string) $creditApplied,
+                ],
+                $commission - $creditApplied,
+            );
+        } catch (PaymentFailedException $e) {
+            report($e);
+
+            return redirect()->back()->with('error', 'Payment could not be started. Please try again in a moment.');
+        }
+
+        return Inertia::location($checkoutUrl);
+    }
+
+    /**
      * Whether this browser may be handed workspace access for a registration
      * it is about to pay for.
      */
@@ -317,22 +392,5 @@ final class EventCheckoutController extends Controller
         }
 
         return $this->workspaceAuthorizer->registeredInThisSession(request()->session(), $registration->id);
-    }
-
-    private function tenantGateway(Tenant $tenant): ?PaystackGateway
-    {
-        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)
-            ->where('provider', 'paystack')
-            ->where('is_active', true)
-            ->first();
-
-        return $gateway ? new PaystackGateway(['secret_key' => $gateway->api_key_encrypted]) : null;
-    }
-
-    private function platformGateway(): ?PaystackGateway
-    {
-        $secret = config('services.settlement.paystack.secret_key');
-
-        return $secret ? new PaystackGateway(['secret_key' => $secret]) : null;
     }
 }

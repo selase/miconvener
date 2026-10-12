@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Heart, Sparkles, Shield, MessageCircle, Send } from 'lucide-react';
 
 export default function ContributionWidget({ event }) {
-    const presets = event.contribution_presets && event.contribution_presets.length > 0
-        ? event.contribution_presets
-        : [5000, 10000, 20000, 50000]; // 50, 100, 200, 500 GHS in pesewas
+    const presets =
+        event.contribution_presets && event.contribution_presets.length > 0
+            ? event.contribution_presets
+            : [5000, 10000, 20000, 50000]; // 50, 100, 200, 500 GHS in pesewas
 
     const minAmountPesewas = event.contribution_min_amount_pesewas || 100;
     const minAmountGhs = minAmountPesewas / 100;
@@ -19,13 +20,16 @@ export default function ContributionWidget({ event }) {
     const [isAnonymous, setIsAnonymous] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const providers = event.contribution_providers || [];
+    const [provider, setProvider] = useState(providers[0] || 'paystack');
 
     const goalPesewas = event.contribution_goal_amount_pesewas;
     const totalPesewas = event.contributions_total_pesewas || 0;
     const contributorsCount = event.contributions_count || 0;
-    const goalPercentage = goalPesewas && goalPesewas > 0
-        ? Math.min(100, Math.round((totalPesewas / goalPesewas) * 100))
-        : null;
+    const goalPercentage =
+        goalPesewas && goalPesewas > 0
+            ? Math.min(100, Math.round((totalPesewas / goalPesewas) * 100))
+            : null;
 
     const tributes = event.tributes || [];
 
@@ -52,7 +56,9 @@ export default function ContributionWidget({ event }) {
         const numericAmount = parseFloat(customAmount);
 
         if (!numericAmount || numericAmount < minAmountGhs) {
-            setErrorMessage(`Please enter an amount of at least ${event.currency || 'GHS'} ${minAmountGhs.toFixed(2)}.`);
+            setErrorMessage(
+                `Please enter an amount of at least ${event.currency || 'GHS'} ${minAmountGhs.toFixed(2)}.`
+            );
             return;
         }
 
@@ -69,7 +75,9 @@ export default function ContributionWidget({ event }) {
             form.method = 'POST';
             form.action = route('public.events.contribute', { event: event.slug });
 
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute('content');
             if (csrfToken) {
                 const csrfInput = document.createElement('input');
                 csrfInput.type = 'hidden';
@@ -94,6 +102,7 @@ export default function ContributionWidget({ event }) {
             appendField('contributor_email', contributorEmail.trim());
             appendField('tribute_message', tributeMessage.trim());
             appendField('is_anonymous', isAnonymous ? '1' : '0');
+            appendField('provider', provider);
 
             document.body.appendChild(form);
             form.submit();
@@ -112,7 +121,9 @@ export default function ContributionWidget({ event }) {
                     <div className="space-y-6">
                         <div className="inline-flex items-center gap-2 rounded-full bg-accent/10 px-3.5 py-1.5 text-xs font-semibold text-accent">
                             <Heart className="h-3.5 w-3.5 fill-current" />
-                            <span>{event.contribution_title || 'Voluntary Contributions & Tributes'}</span>
+                            <span>
+                                {event.contribution_title || 'Voluntary Contributions & Tributes'}
+                            </span>
                         </div>
 
                         <div>
@@ -125,7 +136,9 @@ export default function ContributionWidget({ event }) {
                                 </p>
                             ) : (
                                 <p className="mt-3 text-sm leading-relaxed text-ink-secondary">
-                                    Your voluntary contribution and thoughtful message support this gathering. Mobile Money (MTN, Telecel, AT) and bank cards are welcomed.
+                                    Your voluntary contribution and thoughtful message support this
+                                    gathering. Mobile Money (MTN, Telecel, AT) and bank cards are
+                                    welcomed.
                                 </p>
                             )}
                         </div>
@@ -138,7 +151,11 @@ export default function ContributionWidget({ event }) {
                                         Total Received
                                     </span>
                                     <div className="mt-1 text-2xl font-extrabold text-ink sm:text-3xl">
-                                        {event.currency || 'GHS'} {(totalPesewas / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {event.currency || 'GHS'}{' '}
+                                        {(totalPesewas / 100).toLocaleString(undefined, {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -156,7 +173,8 @@ export default function ContributionWidget({ event }) {
                                     <div className="flex justify-between text-xs text-ink-secondary">
                                         <span>Progress toward goal</span>
                                         <span className="font-semibold text-ink">
-                                            {goalPercentage}% of {event.currency || 'GHS'} {((goalPesewas || 0) / 100).toLocaleString()}
+                                            {goalPercentage}% of {event.currency || 'GHS'}{' '}
+                                            {((goalPesewas || 0) / 100).toLocaleString()}
                                         </span>
                                     </div>
                                     <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
@@ -171,7 +189,9 @@ export default function ContributionWidget({ event }) {
 
                         <div className="flex items-center gap-3 text-xs text-ink-secondary pt-1">
                             <Shield className="h-4 w-4 text-emerald-600 shrink-0" />
-                            <span>Secured via Paystack · Instant MoMo & Card receipts issued directly</span>
+                            <span>
+                                Secured via Paystack · Instant MoMo & Card receipts issued directly
+                            </span>
                         </div>
                     </div>
 
@@ -264,13 +284,17 @@ export default function ContributionWidget({ event }) {
 
                                 <div>
                                     <label className="block text-xs font-medium text-ink mb-1">
-                                        {event.lexicon?.message_field_label || 'Message / Note (Optional)'}
+                                        {event.lexicon?.message_field_label ||
+                                            'Message / Note (Optional)'}
                                     </label>
                                     <textarea
                                         rows={3}
                                         value={tributeMessage}
                                         onChange={(e) => setTributeMessage(e.target.value)}
-                                        placeholder={event.lexicon?.message_placeholder || 'Share a thought, note, or word of encouragement...'}
+                                        placeholder={
+                                            event.lexicon?.message_placeholder ||
+                                            'Share a thought, note, or word of encouragement...'
+                                        }
                                         className="w-full rounded-xl border border-border bg-surface px-3.5 py-2 text-xs text-ink placeholder:text-ink-secondary/50 focus:border-accent focus:outline-none"
                                     />
                                 </div>
@@ -287,6 +311,33 @@ export default function ContributionWidget({ event }) {
                                     </span>
                                 </label>
                             </div>
+
+                            {providers.length > 1 && (
+                                <div
+                                    className="flex gap-2"
+                                    role="radiogroup"
+                                    aria-label="Payment method"
+                                >
+                                    {providers.map((option) => (
+                                        <button
+                                            key={option}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={provider === option}
+                                            onClick={() => setProvider(option)}
+                                            className={`flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                                                provider === option
+                                                    ? 'border-accent bg-accent/10 text-accent'
+                                                    : 'border-border bg-surface text-ink-secondary hover:bg-surface-alt'
+                                            }`}
+                                        >
+                                            {option === 'stripe'
+                                                ? 'International card (Stripe)'
+                                                : 'Mobile Money & local cards'}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
 
                             {errorMessage && (
                                 <div className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 px-3.5 py-2.5 text-xs text-rose-700 dark:text-rose-300">
@@ -320,9 +371,12 @@ export default function ContributionWidget({ event }) {
                                 <MessageCircle className="h-4 w-4" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-ink">{event.lexicon?.wall_title || 'Community Message Wall'}</h3>
+                                <h3 className="text-lg font-bold text-ink">
+                                    {event.lexicon?.wall_title || 'Community Message Wall'}
+                                </h3>
                                 <p className="text-xs text-ink-secondary">
-                                    {event.lexicon?.wall_subtitle || 'Words of encouragement and solidarity from attendees and well-wishers'}
+                                    {event.lexicon?.wall_subtitle ||
+                                        'Words of encouragement and solidarity from attendees and well-wishers'}
                                 </p>
                             </div>
                         </div>
@@ -350,7 +404,8 @@ export default function ContributionWidget({ event }) {
                                             </div>
                                             {item.amount && (
                                                 <span className="shrink-0 text-[11px] font-mono font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md">
-                                                    {event.currency || 'GHS'} {(item.amount / 100).toFixed(2)}
+                                                    {event.currency || 'GHS'}{' '}
+                                                    {(item.amount / 100).toFixed(2)}
                                                 </span>
                                             )}
                                         </div>
@@ -371,7 +426,8 @@ export default function ContributionWidget({ event }) {
                             <Sparkles className="mx-auto h-8 w-8 text-ink-secondary/40 mb-2" />
                             <p className="text-xs font-semibold text-ink">No messages shared yet</p>
                             <p className="text-xs text-ink-secondary mt-1 max-w-sm mx-auto">
-                                Be the first to share a message or note of encouragement alongside your contribution.
+                                Be the first to share a message or note of encouragement alongside
+                                your contribution.
                             </p>
                         </div>
                     )}

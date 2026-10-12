@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Mail\Auth\SetUpRecoveryCodesMail;
 use App\Mail\Billing\AgreedPriceMail;
 use App\Mail\Billing\BillingDailySummaryMail;
+use App\Mail\Billing\CommissionSplitBrokenMail;
 use App\Mail\Billing\PaymentFailedMail;
 use App\Mail\Billing\PaymentReceiptMail;
 use App\Mail\Billing\RenewalReminderMail;
@@ -37,6 +38,7 @@ use App\Mail\Marketplace\QuoteProposalReady;
 use App\Mail\Marketplace\QuoteSentNotification;
 use App\Mail\Moderation\TakedownNoticeMail;
 use App\Mail\NewEnterpriseLead;
+use App\Mail\Platform\TenantSignupMail;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
 use App\Mail\WelcomeMail;
@@ -233,6 +235,8 @@ test('every mailable renders', function (): void {
         'SetUpRecoveryCodesMail' => fn () => new SetUpRecoveryCodesMail('Ama', 'Acme Events', 'https://acme.test/account'),
         'BillingDailySummaryMail' => fn () => new BillingDailySummaryMail($summary),
         'AgreedPriceMail' => fn () => new AgreedPriceMail($tenant, 'Enterprise', 'GHS 2,500.00 a month', false, 'https://acme.test/billing'),
+        'CommissionSplitBrokenMail' => fn () => new CommissionSplitBrokenMail($tenant, 'That subaccount is deactivated.', 'https://acme.test/settings/payments'),
+        'TenantSignupMail' => fn () => new TenantSignupMail($tenant, TenantSignupMail::STAGE_ONBOARDED),
         'PaymentFailedMail' => fn () => new PaymentFailedMail($tenant, 'GHS 250.00', '12 October 2026', 'https://acme.test/billing', '19 October 2026'),
         'PaymentReceiptMail' => fn () => new PaymentReceiptMail($tenant, 'Starter plan', 'GHS 250.00', 'ref_123', '12 October 2026', 'Visa ending 4242', 'Starter', 'https://acme.test/billing'),
         'RenewalReminderMail' => fn () => new RenewalReminderMail($tenant, 'Starter', 'GHS 250.00', '12 October 2026', false, '19 October 2026', 'https://acme.test/pay'),

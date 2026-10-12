@@ -24,4 +24,17 @@ interface SmsGateway
      * when no provider is configured, so nothing sells SMS that cannot go.
      */
     public function isConfigured(): bool;
+
+    /**
+     * What became of the messages sent under one provider reference, keyed
+     * by the recipient's number as international digits.
+     *
+     * Providers here have no delivery webhook, so this is asked for later
+     * (see SmsDeliverySync). "pending" means the provider does not know yet.
+     * Null means the report could not be had right now (not configured, the
+     * provider is busy, or it answered with an error); ask again later.
+     *
+     * @return array<string, array{status: 'delivered'|'undelivered'|'pending', detail: ?string}>|null
+     */
+    public function deliveryReport(string $providerReference): ?array;
 }

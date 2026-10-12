@@ -86,11 +86,33 @@ final class MessageDeliverySearch
                 'channel' => mb_strtoupper((string) $log->channel),
                 'to' => (string) ($log->channel === EventNotificationLog::CHANNEL_SMS ? $log->recipient_phone : $log->recipient_email),
                 'subject' => (string) ($log->subject ?: mb_substr((string) $log->message, 0, 80)),
-                'status' => str_replace('_', ' ', (string) $log->status),
-                'error' => isset($log->metadata['error']) ? (string) $log->metadata['error'] : null,
+                'status' => $this->smsOutcome($log) ?? str_replace('_', ' ', (string) $log->status),
+                'error' => match (true) {
+                    isset($log->metadata['error']) => (string) $log->metadata['error'],
+                    ($log->metadata['delivery'] ?? null) === 'undelivered' => 'The provider reported: '.($log->metadata['delivery_detail'] ?? 'not delivered'),
+                    default => null,
+                },
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * For an SMS the provider accepted, what is known of its delivery (see
+     * SmsDeliverySync). "Sent" alone would overstate it: accepted is not
+     * delivered.
+     */
+    private function smsOutcome(EventNotificationLog $log): ?string
+    {
+        if ($log->channel !== EventNotificationLog::CHANNEL_SMS || $log->status !== EventNotificationLog::STATUS_SENT) {
+            return null;
+        }
+
+        return match ($log->metadata['delivery'] ?? null) {
+            'delivered' => 'delivered',
+            'undelivered' => 'failed to deliver',
+            default => 'accepted, delivery not yet known',
+        };
     }
 
     /**

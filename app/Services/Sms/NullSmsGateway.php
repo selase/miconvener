@@ -27,4 +27,9 @@ final class NullSmsGateway implements SmsGateway
     {
         return false;
     }
+
+    public function deliveryReport(string $providerReference): ?array
+    {
+        return null;
+    }
 }

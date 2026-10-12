@@ -28,15 +28,16 @@ function formatMoney(amount, currency) {
     })}`;
 }
 
-export default function Checkout({ event, registration, paystack_available, workspace_url }) {
+export default function Checkout({ event, registration, paystack_available, stripe_available, workspace_url }) {
     const isPendingVerification = registration.offline_payment_status === 'pending_verification';
     const isRejected = registration.offline_payment_status === 'rejected';
 
     const [selectedGateway, setSelectedGateway] = useState(() => {
-        if (registration.payment_method && registration.payment_method !== 'paystack') {
+        if (registration.payment_method && registration.payment_method.startsWith('offline_')) {
             return 'offline';
         }
-        return paystack_available ? 'paystack' : 'offline';
+        if (paystack_available) return 'paystack';
+        return stripe_available ? 'stripe' : 'offline';
     });
 
     const [offlineMethod, setOfflineMethod] = useState(() => {
@@ -62,6 +63,16 @@ export default function Checkout({ event, registration, paystack_available, work
     const handlePaystackCheckout = (e) => {
         e.preventDefault();
         postPaystack(route('public.events.checkout.paystack', {
+            event: event.slug,
+            registration: registration.id,
+        }));
+    };
+
+    const { post: postStripe, processing: stripeProcessing } = useForm();
+
+    const handleStripeCheckout = (e) => {
+        e.preventDefault();
+        postStripe(route('public.events.checkout.stripe', {
             event: event.slug,
             registration: registration.id,
         }));
@@ -221,6 +232,28 @@ export default function Checkout({ event, registration, paystack_available, work
                                         </button>
                                     )}
 
+                                    {stripe_available && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedGateway('stripe')}
+                                            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
+                                                selectedGateway === 'stripe'
+                                                    ? 'border-accent bg-accent-soft/40 ring-1 ring-accent'
+                                                    : 'border-border bg-surface hover:bg-surface-hover'
+                                            }`}
+                                        >
+                                            <div className="rounded-md bg-accent-soft p-2 text-accent">
+                                                <CreditCard className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-ink">Pay by Card</div>
+                                                <p className="mt-1 text-xs text-ink-muted">
+                                                    International cards via Stripe
+                                                </p>
+                                            </div>
+                                        </button>
+                                    )}
+
                                     {event.allow_offline_payments && (
                                         <button
                                             type="button"
@@ -267,6 +300,28 @@ export default function Checkout({ event, registration, paystack_available, work
                                                 className="w-full justify-center py-2.5 text-sm"
                                             >
                                                 {paystackProcessing ? 'Redirecting to payment...' : `Pay ${formatMoney(registration.charged_amount, registration.currency)} Online`}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedGateway === 'stripe' && stripe_available && (
+                                    <div className="mt-6 rounded-lg border border-border bg-canvas/40 p-5">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                                            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                            Secure card payment
+                                        </div>
+                                        <p className="mt-2 text-xs text-ink-muted leading-relaxed">
+                                            You will be redirected to Stripe to pay {formatMoney(registration.charged_amount, registration.currency)} by card. Once the payment goes through, your ticket code will activate.
+                                        </p>
+                                        <div className="mt-5">
+                                            <Button
+                                                variant="primary"
+                                                onClick={handleStripeCheckout}
+                                                disabled={stripeProcessing}
+                                                className="w-full justify-center py-2.5 text-sm"
+                                            >
+                                                {stripeProcessing ? 'Redirecting to payment...' : `Pay ${formatMoney(registration.charged_amount, registration.currency)} by Card`}
                                             </Button>
                                         </div>
                                     </div>

@@ -133,3 +133,13 @@ test('the superadmin sees the earnings page; organisation admins cannot', functi
 
     $this->actingAs($member)->get(route('admin.billing.earnings.index'))->assertForbidden();
 });
+
+test('commission owed by an own-gateway organizer is reported apart from commission received', function (): void {
+    earnCommission($this->tenant, LedgerTransaction::TYPE_TICKET_SALE, 5000, 'sale-1');
+    earnCommission($this->tenant, LedgerTransaction::TYPE_COMMISSION_RECEIVABLE, 800, 'owed-1');
+
+    $lines = collect(app(PlatformEarnings::class)->between(now()->subDay(), now()->addDay())['lines'])->keyBy('label');
+
+    expect($lines['Ticket commission']['amount'])->toBe(5000)
+        ->and($lines['Commission not yet collected (own gateway)']['amount'])->toBe(800);
+});

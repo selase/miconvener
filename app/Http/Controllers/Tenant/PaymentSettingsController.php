@@ -8,21 +8,29 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdatePaymentGatewayRequest;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
+use App\Services\Finance\CommissionCredit;
+use App\Services\Payment\CommissionSplitVerifier;
+use App\Services\Payment\StripeConnect;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 final class PaymentSettingsController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenantContext) {}
+    public function __construct(
+        private readonly TenantContext $tenantContext,
+        private readonly CommissionSplitVerifier $splitVerifier,
+        private readonly StripeConnect $stripeConnect,
+    ) {}
 
     /**
      * Display the merchant payment settings page.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
@@ -34,14 +42,29 @@ final class PaymentSettingsController extends Controller
         }
 
         $gateways = TenantPaymentGateway::where('tenant_id', $tenant->id)->get()->keyBy('provider');
+        $stripe = $gateways->get('stripe');
         $canSetPlatformFee = Gate::allows('access-superadmin-dashboard');
 
         return Inertia::render('Tenant/Settings/Payments', [
             'settlementMode' => $tenant->settlement_mode,
             'platformSettlementAvailable' => (bool) config('services.settlement.paystack.secret_key'),
-            'gateways' => collect(['stripe', 'paystack'])->mapWithKeys(fn (string $provider): array => [
-                $provider => $this->gatewaySummary($gateways->get($provider), $provider, $tenant),
-            ]),
+            'gateways' => [
+                'paystack' => $this->gatewaySummary($gateways->get('paystack'), $tenant),
+            ],
+            'stripe' => [
+                'configured' => $this->stripeConnect->isConfigured(),
+                'connected' => $stripe?->provider_account_id !== null,
+                'account_id' => $stripe?->provider_account_id,
+                'is_active' => (bool) $stripe?->is_active,
+                'status' => $request->query('stripe'),
+            ],
+            'commissionCredit' => collect(app(CommissionCredit::class)->balances($tenant))
+                ->map(fn (int $amount, string $currency): array => ['currency' => $currency, 'amount' => $amount])
+                ->values(),
+            'commissionSplit' => [
+                'enforced' => $this->splitVerifier->isEnforced(),
+                'destinations' => $this->splitVerifier->destinations(),
+            ],
             'canSetPlatformFee' => $canSetPlatformFee,
             'platformFee' => $canSetPlatformFee ? [
                 'percentage' => $tenant->platform_fee_percentage,
@@ -78,12 +101,83 @@ final class PaymentSettingsController extends Controller
             $attributes['webhook_secret_encrypted'] = $validated['webhook_secret'];
         }
 
-        TenantPaymentGateway::updateOrCreate(
+        $gateway = TenantPaymentGateway::updateOrCreate(
             ['tenant_id' => $tenant->id, 'provider' => $validated['provider']],
             $attributes
         );
 
+        $code = $validated['commission_subaccount_code'] ?? $gateway->commissionSubaccountCode();
+        $keyChanged = $gateway->wasRecentlyCreated || array_key_exists('api_key_encrypted', $attributes);
+
+        if (filled($code) && ($code !== $gateway->commissionSubaccountCode() || $keyChanged)) {
+            $check = $this->splitVerifier->checkAndRecord($gateway, $code);
+
+            if (! $check->ok) {
+                return back()
+                    ->with('success', 'Paystack settings saved.')
+                    ->withErrors(['commission_subaccount_code' => $check->reason]);
+            }
+        }
+
         return back()->with('success', __(':provider settings saved.', ['provider' => ucfirst((string) $validated['provider'])]));
+    }
+
+    /**
+     * Re-checks the saved commission subaccount against Paystack on demand.
+     */
+    public function verifyCommissionSplit(): RedirectResponse
+    {
+        $this->authorize('manage payment settings');
+        $tenant = $this->tenantContext->getTenant();
+
+        $gateway = TenantPaymentGateway::where('tenant_id', $tenant->id)->where('provider', 'paystack')->first();
+
+        if (! $gateway || $gateway->commissionSubaccountCode() === null) {
+            return back()->with('error', 'Enter your commission subaccount code first.');
+        }
+
+        $check = $this->splitVerifier->recheck($gateway);
+
+        if ($check->inconclusive) {
+            return back()->with('error', (string) $check->reason);
+        }
+
+        return $check->ok
+            ? back()->with('success', 'Your commission subaccount is set up correctly.')
+            : back()->withErrors(['commission_subaccount_code' => $check->reason]);
+    }
+
+    /**
+     * Starts linking the tenant's Stripe account through Stripe Connect.
+     */
+    public function connectStripe(Request $request): SymfonyResponse|RedirectResponse
+    {
+        $this->authorize('manage payment settings');
+        $tenant = $this->tenantContext->getTenant();
+
+        if (! $tenant->handlesTicketMoney()) {
+            abort(403, 'Your plan does not include paid tickets.');
+        }
+
+        if (! $this->stripeConnect->isConfigured()) {
+            return back()->with('error', 'Stripe connection is not available yet — the platform has not finished setting it up.');
+        }
+
+        return Inertia::location($this->stripeConnect->authorizationUrl($tenant, $request->user()));
+    }
+
+    public function disconnectStripe(): RedirectResponse
+    {
+        $this->authorize('manage payment settings');
+        $tenant = $this->tenantContext->getTenant();
+
+        $row = TenantPaymentGateway::where('tenant_id', $tenant->id)->where('provider', 'stripe')->first();
+
+        if ($row) {
+            $this->stripeConnect->disconnect($row);
+        }
+
+        return back()->with('success', 'Stripe disconnected.');
     }
 
     /**
@@ -152,19 +246,21 @@ final class PaymentSettingsController extends Controller
     }
 
     /**
-     * What the page may know about a provider: whether it is connected and its
-     * public details, never the secret key or webhook secret themselves.
+     * What the page may know about the Paystack connection: whether it is
+     * connected and its public details, never the secret key itself.
      *
-     * @return array{connected: bool, has_webhook_secret: bool, public_key: ?string, is_active: bool, webhook_url: string}
+     * @return array{connected: bool, public_key: ?string, is_active: bool, webhook_url: string, commission_subaccount_code: ?string, commission_verified: bool, commission_problem: ?string}
      */
-    private function gatewaySummary(?TenantPaymentGateway $gateway, string $provider, Tenant $tenant): array
+    private function gatewaySummary(?TenantPaymentGateway $gateway, Tenant $tenant): array
     {
         return [
             'connected' => $gateway !== null,
-            'has_webhook_secret' => filled($gateway?->webhook_secret_encrypted),
             'public_key' => $gateway?->public_key_encrypted,
             'is_active' => (bool) $gateway?->is_active,
-            'webhook_url' => route("webhooks.merchant.{$provider}", ['tenant' => $tenant->id]),
+            'webhook_url' => route('webhooks.merchant.paystack', ['tenant' => $tenant->id]),
+            'commission_subaccount_code' => $gateway?->commissionSubaccountCode(),
+            'commission_verified' => (bool) $gateway?->commissionSplitIsVerified(),
+            'commission_problem' => $gateway?->commissionSplitFailure(),
         ];
     }
 }

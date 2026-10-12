@@ -227,6 +227,16 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('show');
     });
 
+    Route::get('admin/signups', [App\Http\Controllers\Admin\SignupController::class, 'index'])
+        ->name('admin.signups.index');
+    Route::get('admin/signups/{tenant:uuid}', [App\Http\Controllers\Admin\SignupController::class, 'show'])
+        ->name('admin.signups.show');
+    Route::post('admin/signups/{tenant:uuid}/follow-up', [App\Http\Controllers\Admin\SignupController::class, 'followUp'])
+        ->name('admin.signups.follow-up');
+
+    Route::get('admin/finance', App\Http\Controllers\Admin\FinanceOverviewController::class)
+        ->name('admin.finance.overview');
+
     // Superadmin Global Billing & Analytics
     Route::group(['prefix' => 'admin/billing', 'as' => 'admin.billing.'], function (): void {
         Route::get('earnings', [App\Http\Controllers\Admin\EarningsController::class, 'index'])
@@ -235,6 +245,20 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('payouts.index');
         Route::post('payouts/{payout}/release', [App\Http\Controllers\Admin\PayoutOversightController::class, 'release'])
             ->name('payouts.release');
+        Route::get('commission-credits', [App\Http\Controllers\Admin\CommissionCreditController::class, 'index'])
+            ->name('commission-credits.index');
+        Route::post('commission-credits/{tenant:uuid}/settle', [App\Http\Controllers\Admin\CommissionCreditController::class, 'settle'])
+            ->name('commission-credits.settle');
+        Route::get('commission-destinations', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'index'])
+            ->name('commission-destinations.index');
+        Route::post('commission-destinations', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'store'])
+            ->name('commission-destinations.store');
+        Route::post('commission-destinations/{destination}/retire', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'retire'])
+            ->name('commission-destinations.retire');
+        Route::post('commission-destinations/{destination}/restore', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'restore'])
+            ->name('commission-destinations.restore');
+        Route::delete('commission-destinations/{destination}', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'destroy'])
+            ->name('commission-destinations.destroy');
         Route::get('transactions', [App\Http\Controllers\Admin\BillingController::class, 'transactions'])
             ->name('transactions.index');
         Route::get('subscriptions', [App\Http\Controllers\Admin\BillingController::class, 'subscriptions'])
@@ -281,7 +305,8 @@ Route::post('/webhooks/stripe', [App\Http\Controllers\Billing\WebhookController:
 Route::post('/webhooks/paystack', [App\Http\Controllers\Public\SettlementWebhookController::class, 'handle'])->middleware('throttle:webhooks')->name('webhooks.paystack');
 
 // Merchant Webhooks (Public)
-Route::post('/webhooks/merchant/stripe/{tenant}', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handleStripe'])->middleware('throttle:webhooks')->name('webhooks.merchant.stripe');
+Route::post('/webhooks/stripe/connect', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handleStripeConnect'])->middleware('throttle:webhooks')->name('webhooks.stripe.connect');
+Route::get('/stripe/connect/callback', App\Http\Controllers\Tenant\StripeConnectCallbackController::class)->name('stripe.connect.callback');
 Route::post('/webhooks/merchant/paystack/{tenant}', [App\Http\Controllers\Tenant\Commerce\WebhookController::class, 'handlePaystack'])->middleware('throttle:webhooks')->name('webhooks.merchant.paystack');
 Route::post('/webhooks/settlement/paystack', [App\Http\Controllers\Public\SettlementWebhookController::class, 'handle'])->middleware('throttle:settlement-webhooks')->name('webhooks.settlement.paystack');
 

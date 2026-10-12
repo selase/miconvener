@@ -91,6 +91,55 @@ final class OmnichannelSmsGateway implements SmsGateway
         return $results;
     }
 
+    public function deliveryReport(string $providerReference): ?array
+    {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
+        try {
+            $response = Http::withToken($this->token)
+                ->acceptJson()
+                ->timeout(20)
+                ->get($this->url.'/api/v1/report/sms/'.rawurlencode($providerReference));
+        } catch (ConnectionException) {
+            return null;
+        }
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $report = [];
+
+        foreach ((array) $response->json('data.report') as $row) {
+            $phone = PhoneNumber::toInternationalDigits((string) ($row['recipient'] ?? ''));
+
+            if ($phone === null) {
+                continue;
+            }
+
+            $status = mb_strtolower((string) ($row['status'] ?? ''));
+
+            /*
+             * Before Omnichannel PR #208 a message the gateway had not yet
+             * reported on came back as "Undelivered". Those versions send no
+             * gateway_status field, so without it "Undelivered" cannot be
+             * trusted and is read as not known yet.
+             */
+            if ($status === 'undelivered' && ! array_key_exists('gateway_status', $row)) {
+                $status = 'pending';
+            }
+
+            $report[$phone] = [
+                'status' => in_array($status, ['delivered', 'undelivered'], true) ? $status : 'pending',
+                'detail' => isset($row['gateway_status']) ? mb_strtolower((string) $row['gateway_status']) : null,
+            ];
+        }
+
+        return $report;
+    }
+
     /**
      * @param  list<array<string, mixed>>  $users
      */

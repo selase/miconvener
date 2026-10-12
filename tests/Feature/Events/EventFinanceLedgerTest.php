@@ -105,7 +105,7 @@ test('the settlement statement export shows the real gateway fee for platform-de
     expect(settlementStatementGatewayFees($response->streamedContent()))->toBe(['275']);
 });
 
-test('the settlement statement export redacts the gateway fee to not tracked for own_gateway tenants', function () {
+test('the settlement statement export shows the real gateway fee for own_gateway tenants too', function () {
     [$tenant, $user] = ledgerFinanceHost();
     $tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
     $event = Event::factory()->create(['tenant_id' => $tenant->id]);
@@ -117,7 +117,7 @@ test('the settlement statement export redacts the gateway fee to not tracked for
     $response = $this->actingAs($user)->get("http://{$host}/events/{$event->id}/finance/settlement-statement", ['HTTP_HOST' => $host]);
 
     $response->assertOk();
-    expect(settlementStatementGatewayFees($response->streamedContent()))->toBe(['not tracked']);
+    expect(settlementStatementGatewayFees($response->streamedContent()))->toBe(['275']);
 });
 
 test('the settlement statement export reconciliation footer matches the collected, paid out and available balance figures', function () {
