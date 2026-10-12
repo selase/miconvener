@@ -18,25 +18,25 @@ use Illuminate\Support\Facades\Mail;
  */
 final class CommissionSplitVerifier
 {
+    public function __construct(private readonly CommissionDestinations $destinations) {}
+
     /**
      * Splitting is only enforced once the platform has said where its
      * commission should land.
      */
     public function isEnforced(): bool
     {
-        return filled(config('services.commission_split.account_number'));
+        return $this->destinations->isConfigured();
     }
 
     /**
-     * @return array{business_name: string, settlement_bank: ?string, account_number: ?string}
+     * The accounts to tell organisers to point their subaccount at.
+     *
+     * @return list<array{label: string, currency: string, business_name: string, settlement_bank: ?string, account_number: string}>
      */
-    public function destination(): array
+    public function destinations(): array
     {
-        return [
-            'business_name' => (string) config('services.commission_split.business_name'),
-            'settlement_bank' => config('services.commission_split.settlement_bank'),
-            'account_number' => config('services.commission_split.account_number'),
-        ];
+        return $this->destinations->current();
     }
 
     public function check(TenantPaymentGateway $gateway, string $subaccountCode): CommissionSplitCheck
@@ -57,10 +57,7 @@ final class CommissionSplitVerifier
             return CommissionSplitCheck::invalid('That subaccount is deactivated.');
         }
 
-        $expected = preg_replace('/\D+/', '', (string) config('services.commission_split.account_number'));
-        $actual = preg_replace('/\D+/', '', (string) ($subaccount['account_number'] ?? ''));
-
-        if ($expected === '' || $actual !== $expected) {
+        if (! $this->destinations->accepts($subaccount)) {
             return CommissionSplitCheck::invalid('That subaccount does not settle to the MiConvener commission account.');
         }
 

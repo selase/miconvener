@@ -191,7 +191,7 @@ function PlatformFeeForm({ platformFee }) {
     );
 }
 
-function CommissionSplit({ gateway, destination, data, setData, errors }) {
+function CommissionSplit({ gateway, destinations, data, setData, errors }) {
     const verifying = useForm({});
     const hasCode = Boolean(gateway.commission_subaccount_code);
 
@@ -217,18 +217,30 @@ function CommissionSplit({ gateway, destination, data, setData, errors }) {
                     ))}
             </div>
 
-            <dl className="grid gap-x-6 gap-y-1 rounded-lg border border-border bg-surface-sunken p-3 text-sm sm:grid-cols-[auto_1fr]">
-                <dt className="text-ink-secondary">Business name</dt>
-                <dd className="font-medium text-ink">{destination.business_name}</dd>
-                {destination.settlement_bank && (
-                    <>
-                        <dt className="text-ink-secondary">Settlement bank</dt>
-                        <dd className="font-medium text-ink">{destination.settlement_bank}</dd>
-                    </>
-                )}
-                <dt className="text-ink-secondary">Account number</dt>
-                <dd className="num font-medium text-ink">{destination.account_number}</dd>
-            </dl>
+            {destinations.map((destination) => (
+                <dl
+                    key={`${destination.currency}-${destination.account_number}`}
+                    className="grid gap-x-6 gap-y-1 rounded-lg border border-border bg-surface-sunken p-3 text-sm sm:grid-cols-[auto_1fr]"
+                >
+                    <dt className="text-ink-secondary">Currency</dt>
+                    <dd className="font-medium text-ink">{destination.currency}</dd>
+                    <dt className="text-ink-secondary">Business name</dt>
+                    <dd className="font-medium text-ink">{destination.business_name}</dd>
+                    {destination.settlement_bank && (
+                        <>
+                            <dt className="text-ink-secondary">Settlement bank</dt>
+                            <dd className="font-medium text-ink">{destination.settlement_bank}</dd>
+                        </>
+                    )}
+                    <dt className="text-ink-secondary">Account number</dt>
+                    <dd className="num font-medium text-ink">{destination.account_number}</dd>
+                </dl>
+            ))}
+            {destinations.length > 1 && (
+                <p className="text-xs text-ink-secondary">
+                    Use the account that matches the currency your events are priced in.
+                </p>
+            )}
 
             <div>
                 <Input
@@ -340,7 +352,7 @@ function PaystackForm({ gateway, commissionSplit, commissionCredit }) {
                 {commissionSplit.enforced && (
                     <CommissionSplit
                         gateway={gateway}
-                        destination={commissionSplit.destination}
+                        destinations={commissionSplit.destinations}
                         data={data}
                         setData={setData}
                         errors={errors}

@@ -406,20 +406,10 @@
                     </div>
                 @endcan
 
-                @if(! (auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard')))
-                    @can('manage commission credits')
-                        <div class="menu-item">
-                            <a class="menu-link {{ request()->routeIs('admin.billing.commission-credits.*') ? 'active' : '' }}" href="{{ route('admin.billing.commission-credits.index') }}">
-                                <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
-                                <span class="menu-title">Commission credits</span>
-                            </a>
-                        </div>
-                    @endcan
-                @endif
-
-                @if(auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard'))
+                @php($isSuper = auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard'))
+                @canany(['view platform finance', 'release payouts', 'manage invoices', 'manage commission credits', 'manage commission destinations'])
                      <!-- Billing & Finance Section -->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion {{ request()->is('admin/billing*') ? 'show' : '' }}">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion {{ (request()->is('admin/billing*') || request()->is('admin/finance*')) ? 'show' : '' }}">
                         <span class="menu-link">
                             <span class="menu-icon">
                                 <span class="svg-icon svg-icon-2">
@@ -434,12 +424,23 @@
                             <span class="menu-arrow"></span>
                         </span>
                         <div class="menu-sub menu-sub-accordion">
+                            @can('view platform finance')
+                            <div class="menu-item">
+                                <a class="menu-link {{ request()->routeIs('admin.finance.overview') ? 'active' : '' }}" href="{{ route('admin.finance.overview') }}">
+                                    <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                    <span class="menu-title">Finance overview</span>
+                                </a>
+                            </div>
+                            @endcan
+                            @can('view platform finance')
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.earnings.*') ? 'active' : '' }}" href="{{ route('admin.billing.earnings.index') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
                                     <span class="menu-title">Earnings</span>
                                 </a>
                             </div>
+                            @endcan
+                            @can('view platform finance')
                             @php($payoutsWaiting = \App\Models\EventPayout::query()->withoutGlobalScopes()->whereIn('status', [\App\Models\EventPayout::STATUS_AWAITING_OTP, \App\Models\EventPayout::STATUS_FAILED])->count())
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.payouts.*') ? 'active' : '' }}" href="{{ route('admin.billing.payouts.index') }}">
@@ -450,6 +451,7 @@
                                     @endif
                                 </a>
                             </div>
+                            @endcan
                             @can('manage commission credits')
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.commission-credits.*') ? 'active' : '' }}" href="{{ route('admin.billing.commission-credits.index') }}">
@@ -458,36 +460,54 @@
                                 </a>
                             </div>
                             @endcan
+                            @can('manage commission destinations')
+                            <div class="menu-item">
+                                <a class="menu-link {{ request()->routeIs('admin.billing.commission-destinations.*') ? 'active' : '' }}" href="{{ route('admin.billing.commission-destinations.index') }}">
+                                    <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                    <span class="menu-title">Commission destinations</span>
+                                </a>
+                            </div>
+                            @endcan
+                            @if($isSuper)
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.analytics.usage') ? 'active' : '' }}" href="{{ route('admin.billing.analytics.usage') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
                                     <span class="menu-title">Usage Analytics</span>
                                 </a>
                             </div>
+                            @endif
                             {{-- Usage invoices and Rate Cards & Taxes are left out of the menu:
                                  MiConvener bills plans and add-ons, not metered usage, and none
                                  has ever been issued or priced (checked 2026-10-05). --}}
+                            @if($isSuper)
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('packages.*') ? 'active' : '' }}" href="{{ route('packages.index') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
                                     <span class="menu-title">Subscription Plans</span>
                                 </a>
                             </div>
+                            @endif
+                            @can('view platform finance')
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.transactions.index') ? 'active' : '' }}" href="{{ route('admin.billing.transactions.index') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
                                     <span class="menu-title">Transactions</span>
                                 </a>
                             </div>
+                            @endcan
+                            @can('view platform finance')
                             <div class="menu-item">
                                 <a class="menu-link {{ request()->routeIs('admin.billing.subscriptions.index') ? 'active' : '' }}" href="{{ route('admin.billing.subscriptions.index') }}">
                                     <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
                                     <span class="menu-title">Plan Renewals</span>
                                 </a>
                             </div>
+                            @endcan
                         </div>
                     </div>
+                @endcanany
 
+                @if($isSuper)
                     <div class="menu-item">
                         <a class="menu-link {{ request()->is('admin/operations*') ? 'active' : '' }}" href="{{ route('admin.operations.index') }}">
                             <span class="menu-icon">

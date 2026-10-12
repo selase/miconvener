@@ -29,7 +29,7 @@ final class EarningsController extends Controller
 
     public function index(Request $request, PlatformEarnings $earnings): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         $period = array_key_exists((string) $request->query('period'), self::PERIODS) ? (string) $request->query('period') : 'this_month';
         [$from, $to] = $this->range($period);

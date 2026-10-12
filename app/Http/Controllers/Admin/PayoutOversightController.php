@@ -27,7 +27,7 @@ final class PayoutOversightController extends Controller
 
     public function index(): View
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('view platform finance');
 
         $base = fn () => EventPayout::query()->withoutGlobalScopes()->with(['tenant', 'event' => fn ($query) => $query->withoutGlobalScopes()]);
 
@@ -59,7 +59,7 @@ final class PayoutOversightController extends Controller
 
     public function release(Request $request, string $payout, PayoutRelease $payoutRelease): RedirectResponse
     {
-        $this->authorize('access-superadmin-dashboard');
+        $this->authorize('release payouts');
 
         $validated = $request->validate(['otp' => ['required', 'string', 'max:32']], ['otp.required' => 'Enter the one-time code Paystack sent.']);
         $payoutModel = EventPayout::query()->withoutGlobalScopes()->findOrFail($payout);

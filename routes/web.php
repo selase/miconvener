@@ -227,6 +227,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('show');
     });
 
+    Route::get('admin/finance', App\Http\Controllers\Admin\FinanceOverviewController::class)
+        ->name('admin.finance.overview');
+
     // Superadmin Global Billing & Analytics
     Route::group(['prefix' => 'admin/billing', 'as' => 'admin.billing.'], function (): void {
         Route::get('earnings', [App\Http\Controllers\Admin\EarningsController::class, 'index'])
@@ -239,6 +242,16 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('commission-credits.index');
         Route::post('commission-credits/{tenant:uuid}/settle', [App\Http\Controllers\Admin\CommissionCreditController::class, 'settle'])
             ->name('commission-credits.settle');
+        Route::get('commission-destinations', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'index'])
+            ->name('commission-destinations.index');
+        Route::post('commission-destinations', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'store'])
+            ->name('commission-destinations.store');
+        Route::post('commission-destinations/{destination}/retire', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'retire'])
+            ->name('commission-destinations.retire');
+        Route::post('commission-destinations/{destination}/restore', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'restore'])
+            ->name('commission-destinations.restore');
+        Route::delete('commission-destinations/{destination}', [App\Http\Controllers\Admin\CommissionDestinationController::class, 'destroy'])
+            ->name('commission-destinations.destroy');
         Route::get('transactions', [App\Http\Controllers\Admin\BillingController::class, 'transactions'])
             ->name('transactions.index');
         Route::get('subscriptions', [App\Http\Controllers\Admin\BillingController::class, 'subscriptions'])
