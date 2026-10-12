@@ -60,10 +60,10 @@ final class AuthenticatedSessionController extends Controller
             return redirect()->intended($tenantDomain.RouteServiceProvider::HOME);
         }
 
-        // Platform finance staff belong to no organisation and are not
-        // superadmins, so the generic dashboard is not theirs.
-        if (! $isSuperAdmin && $user?->can('view platform finance')) {
-            return redirect()->intended(route('admin.finance.overview'));
+        // Platform staff who are not superadmins (finance, marketing) belong
+        // to no organisation, so the generic dashboard is not theirs.
+        if (! $isSuperAdmin && $landing = app(\App\Services\Platform\PlatformStaff::class)->landingRouteFor($user)) {
+            return redirect()->intended(route($landing));
         }
 
         return redirect()->intended(RouteServiceProvider::HOME);

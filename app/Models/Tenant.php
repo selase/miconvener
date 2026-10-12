@@ -155,6 +155,14 @@ final class Tenant extends Model
     }
 
     /**
+     * @return HasMany<TenantFollowUp, $this>
+     */
+    public function followUps(): HasMany
+    {
+        return $this->hasMany(TenantFollowUp::class)->latest();
+    }
+
+    /**
      * @return BelongsToMany<User, $this>
      */
     public function users(): BelongsToMany

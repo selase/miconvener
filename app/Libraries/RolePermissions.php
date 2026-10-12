@@ -18,7 +18,8 @@ final class RolePermissions
     {
         return [
             'Superadmin' => self::superadminPermissions(),
-            'Platform Finance' => self::platformFinancePermissions(),
+            'Platform Finance' => [...self::platformFinancePermissions(), 'view signups'],
+            'Platform Marketing' => self::platformMarketingPermissions(),
             'Org Superadmin' => self::organizationSuperadminPermissions(),
             'Org Admin' => self::organizationAdminPermissions(),
             'Event Staff' => self::eventStaffPermissions(),
@@ -97,6 +98,20 @@ final class RolePermissions
     }
 
     /**
+     * MiConvener's own marketing staff: see who has signed up and how far they
+     * got, and record following up with them. Finance may read signups too.
+     *
+     * @return array<int, string>
+     */
+    private static function platformMarketingPermissions(): array
+    {
+        return [
+            'view signups',
+            'follow up signups',
+        ];
+    }
+
+    /**
      * Default permissions for the built-in Superadmin role.
      *
      * @return array<int, string>
@@ -105,6 +120,7 @@ final class RolePermissions
     {
         return [
             ...self::platformFinancePermissions(),
+            ...self::platformMarketingPermissions(),
             'create setting',
             'read setting',
             'update setting',

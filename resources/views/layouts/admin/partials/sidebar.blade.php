@@ -406,6 +406,22 @@
                     </div>
                 @endcan
 
+                @can('view signups')
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->routeIs('admin.signups.*') ? 'active' : '' }}" href="{{ route('admin.signups.index') }}">
+                            <span class="menu-icon">
+                                <span class="svg-icon svg-icon-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path d="M16.5 9C16.5 11.5 14.5 13.5 12 13.5C9.5 13.5 7.5 11.5 7.5 9C7.5 6.5 9.5 4.5 12 4.5C14.5 4.5 16.5 6.5 16.5 9Z" fill="currentColor"/>
+                                        <path opacity="0.3" d="M5 20C5 16.7 8.1 15 12 15C15.9 15 19 16.7 19 20V21H5V20Z" fill="currentColor"/>
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="menu-title">Signups</span>
+                        </a>
+                    </div>
+                @endcan
+
                 @php($isSuper = auth()->user()->isGlobalSuperAdmin() || auth()->user()->can('access-superadmin-dashboard'))
                 @canany(['view platform finance', 'release payouts', 'manage invoices', 'manage commission credits', 'manage commission destinations'])
                      <!-- Billing & Finance Section -->

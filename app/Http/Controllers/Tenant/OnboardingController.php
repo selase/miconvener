@@ -72,8 +72,10 @@ final class OnboardingController extends Controller
     {
         $tenant = app(TenantContext::class)->getTenant();
 
-        if ($tenant) {
+        // Finishing twice (a refresh, a second tab) must not tell the team twice.
+        if ($tenant && $tenant->onboarding_completed_at === null) {
             $tenant->update(['onboarding_completed_at' => now()]);
+            app(\App\Services\Platform\SignupAlerts::class)->onboarded($tenant);
         }
 
         return redirect()->route('tenant.dashboard', ['subdomain' => $subdomain])
