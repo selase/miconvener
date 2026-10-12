@@ -31,12 +31,12 @@ export default function MarketplaceLayout({ children }) {
                                 height={229}
                                 className="hidden h-6 w-auto dark:block"
                             />
-                            <span className="rounded bg-accent/10 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent uppercase">
+                            <span className="hidden rounded bg-accent/10 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent uppercase xl:inline">
                                 Marketplace
                             </span>
                         </Link>
 
-                        <nav className="hidden md:flex items-center gap-5 text-[13px] font-medium text-ink-secondary">
+                        <nav className="hidden lg:flex items-center gap-5 text-[13px] font-medium text-ink-secondary">
                             <Link
                                 href="/marketplace/venues"
                                 className="hover:text-ink transition-colors"
@@ -197,7 +197,7 @@ export default function MarketplaceLayout({ children }) {
                                 </li>
                                 <li>
                                     <span className="text-ink-tertiary">
-                                        Approval-first booking management
+                                        Venue enquiries and coordination
                                     </span>
                                 </li>
                             </ul>

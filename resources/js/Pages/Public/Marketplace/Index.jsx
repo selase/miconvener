@@ -81,12 +81,11 @@ export default function MarketplaceIndex({
                     </div>
 
                     <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-ink max-w-3xl mx-auto leading-tight">
-                        Discover & book verified event spaces across Ghana.
+                        Discover event spaces across Ghana.
                     </h1>
                     <p className="mt-4 text-base sm:text-lg text-ink-secondary max-w-2xl mx-auto">
-                        From luxury beachfront ballrooms to auditorium plenary halls. Compare
-                        transparent capacity breakdowns, generator backups, and included amenities
-                        with approval-first bookings.
+                        Browse listings and contact hosts. Compare capacities, facilities and
+                        included amenities, then send an enquiry about your event.
                     </p>
 
                     {/* Search Mode Tabs */}
@@ -291,7 +290,8 @@ export default function MarketplaceIndex({
                                 Catering & Banqueting
                             </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                Plated dinners, conference coffee breaks, cocktail hors d'oeuvres, and banquets.
+                                Plated dinners, conference coffee breaks, cocktail hors d'oeuvres,
+                                and banquets.
                             </p>
                             <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-accent">
                                 <span>Find Caterers</span>
@@ -316,7 +316,8 @@ export default function MarketplaceIndex({
                                 Audiovisual, Sound & Video
                             </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                PA sound engineering, multi-camera live streaming, LED video walls, and stage lighting.
+                                PA sound engineering, multi-camera live streaming, LED video walls,
+                                and stage lighting.
                             </p>
                             <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
                                 <span>Browse Audio/Visual</span>
@@ -341,7 +342,8 @@ export default function MarketplaceIndex({
                                 Canopies, Decor & Rentals
                             </h3>
                             <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                                Marquees, high-peak canopies, banquet furniture, generators, and exhibition booths.
+                                Marquees, high-peak canopies, banquet furniture, generators, and
+                                exhibition booths.
                             </p>
                             <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
                                 <span>Browse Rentals</span>
@@ -494,7 +496,7 @@ export default function MarketplaceIndex({
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="text-center max-w-2xl mx-auto mb-12">
                         <h2 className="text-2xl font-semibold text-ink">
-                            Why book through MiConvener Marketplace?
+                            Find the right space with MiConvener Marketplace
                         </h2>
                         <p className="mt-2 text-xs text-ink-secondary">
                             Designed specifically for professional event organizers who cannot
@@ -522,12 +524,12 @@ export default function MarketplaceIndex({
                                 <ShieldCheck className="h-5 w-5" />
                             </div>
                             <h3 className="text-sm font-semibold text-ink">
-                                Approval-First Bookings
+                                Enquiries before commitments
                             </h3>
                             <p className="text-xs text-ink-secondary leading-relaxed">
-                                Avoid double-bookings. Dates and bespoke configurations are
-                                confirmed directly with the venue management before any financial
-                                commitments or payments unlock.
+                                Discuss dates and requirements with the host. Online reservations
+                                and payments remain paused for venues marked unavailable for
+                                booking.
                             </p>
                         </div>
 
@@ -536,12 +538,11 @@ export default function MarketplaceIndex({
                                 <Building2 className="h-5 w-5" />
                             </div>
                             <h3 className="text-sm font-semibold text-ink">
-                                Integrated 8-Pillars Coordination
+                                Venue and event coordination
                             </h3>
                             <p className="text-xs text-ink-secondary leading-relaxed">
-                                Confirmed bookings seamlessly bridge into your event operations
-                                dashboard (Pillar 6: Venue & Logistics) with direct real-time
-                                communication threads.
+                                Bring venue preparations, facility tasks and organiser communication
+                                together as you plan the gathering.
                             </p>
                         </div>
                     </div>

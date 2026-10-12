@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Marketing;
 
+use DOMDocument;
+use DOMXPath;
+
 /**
  * The landing page is the first thing every visitor and every shared link
  * reaches, and it is assembled from config plus a Livewire pricing component --
@@ -12,6 +15,32 @@ namespace Tests\Feature\Marketing;
  */
 test('the landing page renders', function (): void {
     $this->get('/')->assertOk();
+});
+
+test('the hero uses the configured platform overview', function (): void {
+    config(['product-page.hero.subtitle' => 'Bring programmes & places together.']);
+
+    $this->get('/')->assertOk()->assertSee('Bring programmes &amp; places together.', false);
+});
+
+test('hero use cases replace the plan limits line without removing pricing details', function (): void {
+    $response = $this->get('/')->assertOk();
+    foreach (['Run academic events', 'Bring people together', 'Run your service', 'Honour a life together', 'Pause animation'] as $copy) {
+        expect(str_contains($response->getContent(), $copy))->toBeTrue();
+    }
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $hero = $xpath->query('//section[@data-homepage-hero]')->item(0);
+    expect($hero->textContent)->not->toContain('One live event at a time and 50 registrations a month. No card required.');
+    $response->assertSee('50 registrations per month');
+});
+
+test('venue and engagement copy covers the supported workflows', function (): void {
+    $this->get('/')->assertOk()
+        ->assertSee('Create facility tasks')
+        ->assertDontSee('Assign facility tasks')
+        ->assertSee('Discussions &amp; forums', false);
 });
 
 test('the landing page describes the event product, not the one this codebase replaced', function (): void {
@@ -35,9 +64,74 @@ test('the enterprise page renders', function (): void {
     $this->get('/product-enterprise')->assertOk();
 });
 
-test('the landing page leaves the marketplace out of navigation and footer until real venues take bookings', function (): void {
+test('the homepage links to the browsing marketplace in a new tab from navigation and footer', function (): void {
     $response = $this->get('/');
-
     $response->assertOk();
-    $response->assertDontSee('/marketplace', false);
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    foreach (['header', 'footer'] as $area) {
+        $links = $xpath->query('//'.$area.'//a[contains(@href, "/marketplace")]');
+        expect($links->length)->toBe(1);
+        $link = $links->item(0);
+        expect($link->getAttribute('href'))->toBe(route('marketplace.index'))
+            ->and($link->getAttribute('target'))->toBe('_blank')
+            ->and($link->getAttribute('rel'))->toContain('noopener')
+            ->and($link->textContent)->toContain('opens in a new tab');
+    }
+});
+
+test('the hero renders five labelled panels and preserves the event-day fallback', function (): void {
+    $response = $this->get('/')->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $tabs = $xpath->query('//*[@data-hero-showcase]//*[@role="tab"]');
+
+    expect($tabs->length)->toBe(5);
+    foreach ($tabs as $tab) {
+        $panel = $document->getElementById($tab->getAttribute('aria-controls'));
+        expect($panel)->not->toBeNull()
+            ->and($panel->getAttribute('aria-labelledby'))->toBe($tab->getAttribute('id'))
+            ->and($panel->hasAttribute('hidden'))->toBe($tab->getAttribute('aria-selected') !== 'true');
+    }
+
+    expect($document->getElementById('hero-panel-run')->textContent)->toContain('Overview');
+    $response->assertSee('Plan &amp; sell', false)->assertSee('Venues &amp; services', false);
+    expect($document->getElementById('hero-panel-venues')->textContent)->toContain('Keep every space ready');
+});
+
+test('the homepage introduces the four audiences it serves', function (): void {
+    $this->get('/')->assertOk()
+        ->assertSee('Built for everyone behind the gathering')
+        ->assertSee('Event organisers')
+        ->assertSee('Door &amp; floor teams', false)
+        ->assertSee('Venue operators')
+        ->assertSee('Attendees &amp; participants', false)
+        ->assertDontSee('From first invite to final payout');
+});
+
+test('the homepage explains facilities recognition and academic coordination', function (): void {
+    $page = $this->get('/')->assertOk();
+    foreach ([
+        'Keep every space ready for the next gathering.',
+        'Academic submissions &amp; peer review',
+        'Receive abstracts, assign reviewers, record decisions and export an abstract book.',
+        'Sponsor commitments',
+        'Certificate verification',
+        'miconvener.com/my',
+        'Know what came in—and what you receive.',
+    ] as $copy) {
+        expect(str_contains($page->getContent(), $copy))->toBeTrue("Missing homepage coverage: {$copy}");
+    }
+});
+
+test('homepage feature groups are labelled and each capability has one home', function (): void {
+    $items = collect(config('product-page.capabilities.items'));
+    expect($items->pluck('group')->unique()->count())->toBe(6)
+        ->and($items->pluck('title')->unique()->count())->toBe($items->count());
+    $page = $this->get('/')->assertOk();
+    foreach ($items->pluck('group')->unique() as $group) {
+        expect(str_contains($page->getContent(), e($group)))->toBeTrue();
+    }
 });

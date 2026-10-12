@@ -122,7 +122,8 @@ export default function QuoteShow({ quote, existingReview }) {
     const [paying, setPaying] = useState(false);
     const status = STATUS[quote.status] ?? STATUS.pending_quote;
     const StatusIcon = status.icon;
-    const canAccept = quote.status === 'quoted' && !quote.is_expired;
+    const canAccept =
+        quote.status === 'quoted' && !quote.is_expired && !quote.venue_payments_paused;
 
     const accept = () => {
         setPaying(true);
@@ -257,6 +258,16 @@ export default function QuoteShow({ quote, existingReview }) {
                         quote.vendor_notes && (
                             <p className="text-sm text-ink-secondary">{quote.vendor_notes}</p>
                         )
+                    )}
+
+                    {quote.venue_payments_paused && !quote.is_deposit_paid && (
+                        <p
+                            role="status"
+                            className="rounded-xl border border-border bg-canvas p-4 text-sm text-ink-secondary"
+                        >
+                            Online payments are paused for this venue. You can still discuss your
+                            enquiry with the host.
+                        </p>
                     )}
 
                     {canAccept && (

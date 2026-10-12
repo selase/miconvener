@@ -94,7 +94,7 @@ final class MarketplaceQuotePublicController extends Controller
     {
         /** @var MarketplaceQuote $quote */
         $quote = MarketplaceQuote::query()
-            ->with('shop')
+            ->with(['shop', 'listing'])
             ->where('quote_reference', $reference)
             ->firstOrFail();
 
@@ -106,6 +106,11 @@ final class MarketplaceQuotePublicController extends Controller
         if ($quote->isExpired()) {
             return redirect()->route('marketplace.quotes.show', ['reference' => $quote->quote_reference])
                 ->with('error', 'This proposal has expired. Please contact the vendor for a revised quote.');
+        }
+
+        if ($quote->venuePaymentsPaused()) {
+            return redirect()->route('marketplace.quotes.show', ['reference' => $quote->quote_reference])
+                ->with('error', 'Online payments are paused for this venue. You can still discuss your enquiry with the host.');
         }
 
         $callbackUrl = route('marketplace.quotes.callback', ['reference' => $quote->quote_reference]);

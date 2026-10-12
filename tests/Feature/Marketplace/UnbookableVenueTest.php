@@ -5,9 +5,92 @@ declare(strict_types=1);
 use App\Models\Shop;
 use App\Models\StoreListing;
 use App\Models\Tenant;
+use App\Services\Marketplace\MarketplaceVendorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 
 uses(RefreshDatabase::class);
+
+test('unbookable venues accept enquiries but cannot take quote payments', function (string $entry): void {
+    Mail::fake();
+    Http::fake();
+    $service = app(MarketplaceVendorService::class);
+    $this->post(route('marketplace.quotes.rfq', $this->unbookableListing->slug), [
+        'planner_name' => 'Test Planner',
+        'planner_email' => 'planner@example.test',
+        'requirements_description' => 'A venue enquiry without a reservation.',
+    ])->assertRedirect();
+    $quote = App\Models\MarketplaceQuote::query()->firstOrFail();
+    $service->submitProposal($quote, [
+        'items' => [['description' => 'Venue hire', 'quantity' => 1, 'unit_price_pesewas' => 100000]],
+    ]);
+    $quote = $quote->fresh();
+    $this->get(route('marketplace.quotes.show', $quote->quote_reference))
+        ->assertOk()->assertInertia(fn ($page) => $page->where('quote.venue_payments_paused', true));
+
+    if ($entry === 'route') {
+        $this->post(route('marketplace.quotes.checkout', $quote->quote_reference))
+            ->assertRedirect(route('marketplace.quotes.show', $quote->quote_reference))
+            ->assertSessionHas('error', 'Online payments are paused for this venue. You can still discuss your enquiry with the host.');
+    } else {
+        expect(fn () => $service->initializeCheckout($quote, 'https://example.test/callback'))
+            ->toThrow(RuntimeException::class, 'Online payments are paused for this venue.');
+    }
+    Http::assertNothingSent();
+    expect($quote->fresh()->buyer_fee_pesewas)->toBe(0)
+        ->and($quote->fresh()->paid_at)->toBeNull();
+})->with(['route', 'service']);
+
+test('venue quote payment eligibility follows the current booking setting', function (): void {
+    Mail::fake();
+    $quote = app(MarketplaceVendorService::class)->createRfq($this->unbookableListing, [
+        'planner_name' => 'Test Planner',
+        'planner_email' => 'planner@example.test',
+        'requirements_description' => 'Venue enquiry.',
+    ]);
+    $this->unbookableListing->update(['is_bookable' => true]);
+    $this->get(route('marketplace.quotes.show', $quote->quote_reference))
+        ->assertOk()->assertInertia(fn ($page) => $page->where('quote.venue_payments_paused', false));
+    $this->unbookableListing->update(['is_bookable' => false]);
+    $this->get(route('marketplace.quotes.show', $quote->quote_reference))
+        ->assertOk()->assertInertia(fn ($page) => $page->where('quote.venue_payments_paused', true));
+});
+
+test('paused venue proposal emails explain that payments cannot confirm a reservation', function (): void {
+    Mail::fake();
+    $service = app(MarketplaceVendorService::class);
+    $quote = $service->createRfq($this->unbookableListing, [
+        'planner_name' => 'Test Planner',
+        'planner_email' => 'planner@example.test',
+        'requirements_description' => 'Venue enquiry.',
+    ]);
+    $service->submitProposal($quote, [
+        'items' => [['description' => 'Venue hire', 'quantity' => 1, 'unit_price_pesewas' => 100000]],
+    ]);
+    $html = (new App\Mail\Marketplace\QuoteProposalReady($quote->fresh()->load(['shop', 'listing']), 'https://example.test/quote'))->render();
+    expect(str_contains($html, 'Online reservations and payments are paused for this venue.'))->toBeTrue()
+        ->and(str_contains($html, 'Deposit to confirm'))->toBeFalse();
+});
+
+test('bookable venue and non-venue quotes retain payment checkout', function (string $kind): void {
+    Mail::fake();
+    $this->unbookableListing->update(['listing_kind' => $kind, 'is_bookable' => $kind === StoreListing::KIND_VENUE]);
+    $service = app(MarketplaceVendorService::class);
+    $quote = $service->createRfq($this->unbookableListing, [
+        'planner_name' => 'Test Planner', 'planner_email' => 'planner@example.test',
+        'requirements_description' => 'A supported quote.',
+    ]);
+    $service->submitProposal($quote, [
+        'items' => [['description' => 'Hire', 'quantity' => 1, 'unit_price_pesewas' => 100000]],
+    ]);
+    Http::fake([
+        'https://api.paystack.co/customer*' => Http::response(['status' => true, 'data' => ['customer_code' => 'CUS_TEST', 'id' => 1]], 200),
+        'https://api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/test', 'access_code' => 'TEST', 'reference' => 'TEST']], 200),
+    ]);
+    $this->withHeaders(['X-Inertia' => 'true'])->post(route('marketplace.quotes.checkout', $quote->quote_reference))
+        ->assertStatus(409)->assertHeader('X-Inertia-Location', 'https://checkout.paystack.com/test');
+})->with([StoreListing::KIND_VENUE, StoreListing::KIND_EQUIPMENT]);
 
 beforeEach(function (): void {
     $this->tenant = Tenant::create([
