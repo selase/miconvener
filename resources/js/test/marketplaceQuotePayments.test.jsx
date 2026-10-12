@@ -3,8 +3,33 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { router } from '@inertiajs/react';
 import Quote from '@/Pages/Public/Marketplace/Quotes/Show';
 import MarketplaceIndex from '@/Pages/Public/Marketplace/Index';
+import VenueShow from '@/Pages/Public/Marketplace/Venues/Show';
 
 vi.mock('@/Layouts/MarketplaceLayout', () => ({ default: ({ children }) => <>{children}</> }));
+vi.mock('@/Components/Marketplace/VenueBookingDrawer', () => ({ default: () => null }));
+vi.mock('@/Components/Marketplace/VendorRfqModal', () => ({ default: () => null }));
+
+test.each(['equipment', 'service'])(
+    'the %s enquiry page does not claim its payments are paused',
+    (kind) => {
+        render(
+            <VenueShow
+                venue={{
+                    title: 'Test Listing',
+                    slug: 'test-listing',
+                    listing_kind: kind,
+                    is_bookable: false,
+                    shop: quote.shop,
+                    capacity_breakdown: {},
+                    media: [],
+                    amenities: [],
+                }}
+            />
+        );
+        expect(screen.getByRole('button', { name: 'Request Itemized Quote (RFQ)' })).toBeTruthy();
+        expect(screen.queryByText(/Online reservations and payments are paused/)).toBeNull();
+    }
+);
 
 const quote = {
     quote_reference: 'RFQ-TEST',

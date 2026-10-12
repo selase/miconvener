@@ -486,7 +486,8 @@ export default function VenueShow({ venue, otherSpaces = [] }) {
                                 <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
                                     <ShieldCheck className="h-4 w-4 shrink-0" />
                                     <span>
-                                        {venue.is_bookable === false
+                                        {venue.listing_kind === 'venue' &&
+                                        venue.is_bookable === false
                                             ? 'Enquiries welcome. Online reservations and payments are paused.'
                                             : 'Approval-First: No upfront charges until dates confirmed'}
                                     </span>
