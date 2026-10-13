@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Finance;
 
 use App\Enum\LedgerCategoryEnum;
+use App\Models\DuesCharge;
 use App\Models\Event;
 use App\Models\EventContribution;
 use App\Models\EventLedgerEntry;
@@ -517,6 +518,80 @@ final class LedgerService
     }
 
     /**
+     * Record a dues payment collected through the platform's gateway, entry
+     * for entry as a contribution, in the dues category with no event:
+     * Debit:  Payment Gateway Clearing (gross collected less gateway processing fee)
+     * Credit: Organizer Payable (net to the organisation)
+     * Credit: Platform Revenue (dues commission, if any)
+     * No EventLedgerEntry is written; the charge row carries the figures.
+     */
+    public function recordDuesPayment(
+        Tenant $tenant,
+        DuesCharge $charge,
+        int $grossAmount,
+        int $platformFee,
+        string $reference,
+        int $gatewayFee = 0
+    ): ?LedgerTransaction {
+        if ($grossAmount <= 0) {
+            return null;
+        }
+
+        if ($gatewayFee < 0 || $gatewayFee >= $grossAmount) {
+            throw new InvalidArgumentException(
+                "Gateway fee ({$gatewayFee}) must be non-negative and smaller than the gross amount ({$grossAmount})."
+            );
+        }
+
+        $alreadyPosted = $this->findPostedTransaction($tenant, $reference, LedgerTransaction::TYPE_DUES_PAYMENT);
+
+        if ($alreadyPosted) {
+            return $alreadyPosted;
+        }
+
+        $cashReceived = $grossAmount - $gatewayFee;
+        $netAmount = $cashReceived - $platformFee;
+        $memberName = $charge->member->name;
+        $period = $charge->period_start->toDateString();
+
+        $entries = [
+            [
+                'code' => LedgerAccount::CODE_GATEWAY_CLEARING,
+                'direction' => LedgerEntry::DIRECTION_DEBIT,
+                'amount' => $cashReceived,
+                'description' => "Dues payment net of processing fee: {$memberName}",
+            ],
+            [
+                'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
+                'direction' => LedgerEntry::DIRECTION_CREDIT,
+                'amount' => $netAmount,
+                'description' => 'Net dues payable to the organisation',
+            ],
+        ];
+
+        if ($platformFee > 0) {
+            $entries[] = [
+                'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
+                'direction' => LedgerEntry::DIRECTION_CREDIT,
+                'amount' => $platformFee,
+                'description' => 'Dues commission ('.config('services.dues.platform_fee_percentage').'%)',
+            ];
+        }
+
+        return $this->postTransaction(
+            $tenant,
+            null,
+            LedgerTransaction::TYPE_DUES_PAYMENT,
+            "Dues: {$memberName} ({$period})",
+            $reference,
+            $entries,
+            null,
+            $charge->currency ?: 'GHS',
+            LedgerCategoryEnum::Dues
+        );
+    }
+
+    /**
      * Record a ticket refund:
      * Debit:  Organizer Payable (net amount deducted)
      * Debit:  Platform Revenue (platform fee reversed, if any)
@@ -632,6 +707,7 @@ final class LedgerService
         ?string $providerReference = null
     ): ?LedgerTransaction {
         return $this->recordOwnGatewaySale(
+            $event->tenant ?? Tenant::find($event->tenant_id),
             $event,
             "Ticket Sale (own gateway): {$event->name} - {$registration->full_name}",
             $reference,
@@ -643,6 +719,10 @@ final class LedgerService
             $creditUsed,
             ['registration_id' => $registration->id],
             $providerReference,
+            LedgerTransaction::TYPE_TICKET_SALE,
+            LedgerCategoryEnum::Event,
+            'Platform commission fee ('.$event->effectivePlatformFeePercentage().'%)',
+            $event->currency ?: 'GHS',
         );
     }
 
@@ -663,6 +743,7 @@ final class LedgerService
         ?string $providerReference = null
     ): ?LedgerTransaction {
         return $this->recordOwnGatewaySale(
+            $event->tenant ?? Tenant::find($event->tenant_id),
             $event,
             "Contribution (own gateway): {$event->name} - {$contribution->displayName()}",
             $reference,
@@ -675,6 +756,47 @@ final class LedgerService
             ['contribution_id' => $contribution->id],
             $providerReference,
             LedgerTransaction::TYPE_CONTRIBUTION,
+            LedgerCategoryEnum::Event,
+            'Platform commission fee ('.$event->effectivePlatformFeePercentage().'%)',
+            $event->currency ?: 'GHS',
+        );
+    }
+
+    /**
+     * Record dues paid on the organisation's own gateway. The organisation
+     * holds the money, so only the platform's commission is booked, met the
+     * same three ways as an own-gateway ticket sale (received with the
+     * payment, netted against credit, or owed as a receivable). Posted in
+     * the dues category with no event; the charge row carries the figures.
+     */
+    public function recordOwnGatewayDuesPayment(
+        Tenant $tenant,
+        DuesCharge $charge,
+        int $grossAmount,
+        int $platformFee,
+        string $reference,
+        int $gatewayFee = 0,
+        string $provider = 'paystack',
+        int $commissionReceived = 0,
+        int $creditUsed = 0
+    ): ?LedgerTransaction {
+        return $this->recordOwnGatewaySale(
+            $tenant,
+            null,
+            "Dues (own gateway): {$charge->member->name} ({$charge->period_start->toDateString()})",
+            $reference,
+            $grossAmount,
+            $platformFee,
+            $gatewayFee,
+            $provider,
+            $commissionReceived,
+            $creditUsed,
+            [],
+            null,
+            LedgerTransaction::TYPE_DUES_PAYMENT,
+            LedgerCategoryEnum::Dues,
+            'Dues commission ('.config('services.dues.platform_fee_percentage').'%)',
+            $charge->currency ?: 'GHS',
         );
     }
 
@@ -856,36 +978,7 @@ final class LedgerService
     ): LedgerTransaction {
         $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
 
-        /*
-         * When the organizer bears the transfer fee it is deducted from what
-         * they are sent, so the payable clears at its full amount and the fee
-         * is not the platform's expense. When the platform absorbs it instead,
-         * it is a real cost and is booked as one.
-         */
-        $entries = [
-            [
-                'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
-                'direction' => LedgerEntry::DIRECTION_DEBIT,
-                'amount' => $amount,
-                'description' => 'Payout settlement deducted from organizer payable',
-            ],
-        ];
-
-        if ($platformAbsorbsTransferFee && $transferFee > 0) {
-            $entries[] = [
-                'code' => LedgerAccount::CODE_GATEWAY_FEES,
-                'direction' => LedgerEntry::DIRECTION_DEBIT,
-                'amount' => $transferFee,
-                'description' => 'Transfer fee absorbed by the platform',
-            ];
-        }
-
-        $entries[] = [
-            'code' => LedgerAccount::CODE_BANK,
-            'direction' => LedgerEntry::DIRECTION_CREDIT,
-            'amount' => $platformAbsorbsTransferFee ? $amount + $transferFee : $amount,
-            'description' => 'Cash transfer to organizer verified bank account',
-        ];
+        $entries = $this->payoutEntries($amount, $transferFee, $platformAbsorbsTransferFee);
 
         $transaction = $this->postTransaction(
             $tenant,
@@ -919,6 +1012,35 @@ final class LedgerService
         ]);
 
         return $transaction;
+    }
+
+    /**
+     * Record a payout of collected dues: the same entries as an event payout,
+     * posted in the dues category with no event. The payout row carries the
+     * figures, so no EventLedgerEntry is written.
+     *
+     * @param  EventPayout  $payout  The dues payout being settled; taken to keep the signature parallel with recordPayout, it is not written to.
+     */
+    public function recordDuesPayout(
+        Tenant $tenant,
+        int $amount,
+        string $reference,
+        EventPayout $payout,
+        string $currency,
+        int $transferFee = 0,
+        bool $platformAbsorbsTransferFee = false
+    ): LedgerTransaction {
+        return $this->postTransaction(
+            $tenant,
+            null,
+            LedgerTransaction::TYPE_PAYOUT,
+            "Dues payout (#{$reference})",
+            $reference,
+            $this->payoutEntries($amount, $transferFee, $platformAbsorbsTransferFee),
+            null,
+            $currency,
+            LedgerCategoryEnum::Dues
+        );
     }
 
     /**
@@ -982,10 +1104,17 @@ final class LedgerService
     }
 
     /**
+     * The shared booking for a payment taken on the organisation's own
+     * gateway. The settlement-statement EventLedgerEntry is written only when
+     * there is an event; money with no event (dues) keeps its figures on its
+     * own row.
+     *
      * @param  array<string, string>  $subject  The registration_id or contribution_id the entry belongs to.
+     * @param  string  $feeLabel  The description on the platform revenue credit.
      */
     private function recordOwnGatewaySale(
-        Event $event,
+        Tenant $tenant,
+        ?Event $event,
         string $description,
         string $reference,
         int $grossAmount,
@@ -996,7 +1125,10 @@ final class LedgerService
         int $creditUsed,
         array $subject,
         ?string $providerReference,
-        string $transactionType = LedgerTransaction::TYPE_TICKET_SALE,
+        string $transactionType,
+        LedgerCategoryEnum $category,
+        string $feeLabel,
+        string $currency,
     ): ?LedgerTransaction {
         $received = min(max($commissionReceived, 0), $platformFee);
         $credited = min(max($creditUsed, 0), $platformFee - $received);
@@ -1018,7 +1150,6 @@ final class LedgerService
             );
         }
 
-        $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
         $transaction = null;
 
         if ($platformFee > 0) {
@@ -1048,7 +1179,7 @@ final class LedgerService
                 'code' => LedgerAccount::CODE_PLATFORM_REVENUE,
                 'direction' => LedgerEntry::DIRECTION_CREDIT,
                 'amount' => $platformFee,
-                'description' => 'Platform commission fee ('.$event->effectivePlatformFeePercentage().'%)',
+                'description' => $feeLabel,
             ];
 
             $transaction = $this->postTransaction(
@@ -1059,8 +1190,13 @@ final class LedgerService
                 $reference,
                 $entries,
                 null,
-                $event->currency ?: 'GHS'
+                $currency,
+                $category
             );
+        }
+
+        if ($event === null) {
+            return $transaction;
         }
 
         EventLedgerEntry::firstOrCreate([
@@ -1073,11 +1209,51 @@ final class LedgerService
             'gateway_fee_amount' => $gatewayFee,
             'commission_amount' => $platformFee,
             'net_amount' => $grossAmount - $gatewayFee - $platformFee,
-            'currency' => $event->currency ?: 'GHS',
+            'currency' => $currency,
             'provider' => $provider,
         ]);
 
         return $transaction;
+    }
+
+    /**
+     * The entries that settle a payout from Organizer Payable.
+     *
+     * When the organizer bears the transfer fee it is deducted from what
+     * they are sent, so the payable clears at its full amount and the fee
+     * is not the platform's expense. When the platform absorbs it instead,
+     * it is a real cost and is booked as one.
+     *
+     * @return list<array{code: string, direction: string, amount: int, description: string}>
+     */
+    private function payoutEntries(int $amount, int $transferFee, bool $platformAbsorbsTransferFee): array
+    {
+        $entries = [
+            [
+                'code' => LedgerAccount::CODE_ORGANIZER_PAYABLE,
+                'direction' => LedgerEntry::DIRECTION_DEBIT,
+                'amount' => $amount,
+                'description' => 'Payout settlement deducted from organizer payable',
+            ],
+        ];
+
+        if ($platformAbsorbsTransferFee && $transferFee > 0) {
+            $entries[] = [
+                'code' => LedgerAccount::CODE_GATEWAY_FEES,
+                'direction' => LedgerEntry::DIRECTION_DEBIT,
+                'amount' => $transferFee,
+                'description' => 'Transfer fee absorbed by the platform',
+            ];
+        }
+
+        $entries[] = [
+            'code' => LedgerAccount::CODE_BANK,
+            'direction' => LedgerEntry::DIRECTION_CREDIT,
+            'amount' => $platformAbsorbsTransferFee ? $amount + $transferFee : $amount,
+            'description' => 'Cash transfer to organizer verified bank account',
+        ];
+
+        return $entries;
     }
 
     /**
