@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -46,6 +47,7 @@ final class LedgerAccount extends Model
     protected $fillable = [
         'tenant_id',
         'event_id',
+        'category',
         'code',
         'name',
         'type',
@@ -55,6 +57,7 @@ final class LedgerAccount extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'category' => LedgerCategoryEnum::class,
     ];
 
     public function event(): BelongsTo

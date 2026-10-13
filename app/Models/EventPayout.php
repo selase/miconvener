@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -36,6 +37,7 @@ final class EventPayout extends Model
     protected $fillable = [
         'tenant_id',
         'event_id',
+        'category',
         'payout_account_id',
         'amount',
         'transfer_fee_amount',
@@ -50,6 +52,7 @@ final class EventPayout extends Model
     ];
 
     protected $casts = [
+        'category' => LedgerCategoryEnum::class,
         'amount' => 'integer',
         'transfer_fee_amount' => 'integer',
         'net_paid_amount' => 'integer',
