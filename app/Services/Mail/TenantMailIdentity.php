@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Mail;
 
 use App\Models\Event;
+use App\Models\Tenant;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Headers;
@@ -39,7 +40,17 @@ final class TenantMailIdentity
         }
 
         // A tenant here implies an event: it was reached through one.
-        $replyTo = $event->contact_email ?: $tenant->email;
+        return $this->tenantEnvelope($subject, $tenant, $event->contact_email ?: $tenant->email);
+    }
+
+    /**
+     * Build an envelope for mail sent on a tenant's behalf that belongs to no
+     * event, such as a member's dues receipt. Replies go to $replyTo, or the
+     * tenant's own address when none is given.
+     */
+    public function tenantEnvelope(string $subject, Tenant $tenant, ?string $replyTo = null): Envelope
+    {
+        $replyTo = $replyTo ?: $tenant->email;
         $ownDomain = $tenant->activeSendingDomain();
 
         $from = $ownDomain !== null
@@ -67,6 +78,17 @@ final class TenantMailIdentity
         return new Headers(text: [
             'X-SES-MESSAGE-TAGS' => "tenant={$event->tenant_id}",
             'X-MiConvener-Event' => (string) $event->id,
+        ]);
+    }
+
+    /**
+     * Tags mail that belongs to a tenant but to no event, so SES can still
+     * report its bounces and complaints per organiser.
+     */
+    public function tenantHeaders(Tenant $tenant): Headers
+    {
+        return new Headers(text: [
+            'X-SES-MESSAGE-TAGS' => "tenant={$tenant->id}",
         ]);
     }
 

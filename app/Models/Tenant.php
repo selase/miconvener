@@ -23,6 +23,7 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * @property string|null $package_id Null until a plan is assigned; self-signups
  *                                   on a paid plan have none until they pay.
+ * @property-read string|null $logo_url The stored logo's public URL, or null when there is none.
  */
 final class Tenant extends Model
 {

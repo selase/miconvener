@@ -500,6 +500,17 @@ Route::post('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'vo
 Route::delete('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'unvote'])->name('public.events.forum.unvote');
 Route::post('/e/{event}/forum/{thread}/report', [PublicForumController::class, 'report'])->name('public.events.forum.report');
 
+// Member dues: the pay link a member is sent. The token is the only
+// credential, so checkout is rate limited per address. A new payment can only
+// be started while dues are switched on; a payment already made still returns
+// to its callback and receipt.
+Route::prefix('pay/{token}')->name('public.dues.')->group(function (): void {
+    Route::get('/', [App\Http\Controllers\Public\MemberPayController::class, 'show'])->middleware('dues.enabled')->name('show');
+    Route::post('/checkout', [App\Http\Controllers\Public\MemberPayController::class, 'checkout'])->middleware(['dues.enabled', 'throttle:dues-pay'])->name('checkout');
+    Route::get('/callback', [App\Http\Controllers\Public\MemberPayController::class, 'callback'])->name('callback');
+    Route::get('/receipt', [App\Http\Controllers\Public\MemberPayController::class, 'receipt'])->name('receipt');
+});
+
 // Staff links: ushers and floor crew scan tickets and answer attendee requests
 // from their own phones, reached by the link's token rather than an account.
 // The limit is generous because a whole crew usually shares one venue Wi-Fi

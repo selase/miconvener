@@ -151,6 +151,7 @@ final class WebhookController extends Controller
                 $this->recordTransaction($tenant, 'paystack', (object) $data);
                 $this->flagMissingCommissionSplit($tenant, (array) $data);
                 $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')), 'paystack', is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : null);
+                $this->confirmMemberDuesIfApplicable($tenant, (array) $data);
             } elseif ($event === 'charge.failed') {
                 $reference = $data['reference'] ?? null;
 
@@ -334,6 +335,46 @@ final class WebhookController extends Controller
         app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
 
         Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
+    }
+
+    /**
+     * If this charge was for member dues, confirm the charges it paid. The
+     * charge reached this organisation's own Paystack account, so it is
+     * booked as an own-gateway payment (commission only), and only for this
+     * organisation's own members: the webhook is signed with a key the
+     * organisation holds, so its metadata must name this organisation.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function confirmMemberDuesIfApplicable(Tenant $tenant, array $data): void
+    {
+        $metadata = \App\Http\Controllers\Billing\WebhookController::metadata($data['metadata'] ?? null);
+        $reference = (string) ($data['reference'] ?? '');
+
+        if (($metadata['type'] ?? null) !== 'member_dues' || $reference === '') {
+            return;
+        }
+
+        if ((string) ($metadata['tenant_id'] ?? '') !== (string) $tenant->id
+            || ($metadata['source'] ?? null) !== config('services.paystack.metadata_source')) {
+            Log::warning('dues.payment.foreign_webhook', [
+                'tenant' => $tenant->id,
+                'reference' => $reference,
+                'metadata_tenant' => $metadata['tenant_id'] ?? null,
+            ]);
+
+            return;
+        }
+
+        app(\App\Services\Dues\DuesPaymentConfirmer::class)->confirm($reference, [
+            'metadata' => $metadata,
+            'amount' => (int) ($data['amount'] ?? 0),
+            'fees' => (int) ($data['fees'] ?? 0),
+            'currency' => mb_strtoupper((string) ($data['currency'] ?? '')),
+            'provider' => 'paystack',
+            'settled_by' => \App\Services\Dues\DuesPaymentConfirmer::SETTLED_BY_OWN_GATEWAY,
+            'split_received' => is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : null,
+        ]);
     }
 
     private function recordTransaction(Tenant $tenant, string $provider, $data, string $status = 'succeeded'): void

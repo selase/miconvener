@@ -104,6 +104,7 @@ final class SettlementWebhookController extends Controller
                     'venue_booking' => $this->confirmVenueBookingCharge($data, $data['reference'] ?? null),
                     'event_contribution' => $this->confirmContributionCharge($data, $data['reference'] ?? null),
                     'marketplace_quote' => $this->confirmMarketplaceQuoteCharge($data, $data['reference'] ?? null),
+                    'member_dues' => $this->confirmDuesCharge($data, $data['reference'] ?? null),
                     default => $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
                 },
                 'transfer.success', 'transfer.failed' => $this->confirmTransfer($event, (string) ($data['reference'] ?? ''), $data),
@@ -138,7 +139,8 @@ final class SettlementWebhookController extends Controller
     }
 
     /**
-     * A charge belongs to settlement only when it carries event ticket or venue booking metadata;
+     * A charge belongs to settlement only when it carries event ticket, venue booking, contribution,
+     * marketplace quote or member dues metadata;
      * a subscription charge from the billing account looks otherwise identical.
      *
      * @param  array<string, mixed>  $metadata
@@ -151,7 +153,7 @@ final class SettlementWebhookController extends Controller
 
         $type = $metadata['type'] ?? null;
 
-        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution', 'marketplace_quote'], true);
+        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution', 'marketplace_quote', 'member_dues'], true);
     }
 
     /**
@@ -167,6 +169,29 @@ final class SettlementWebhookController extends Controller
         $data['metadata'] = $metadata;
 
         app(\App\Services\Marketplace\MarketplaceVendorService::class)->confirmPayment($reference, $data);
+    }
+
+    /**
+     * Dues paid on the platform's settlement account, which only a
+     * platform-default organisation's checkout uses; the confirmer refuses
+     * the payment if the organisation settles on its own gateway.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function confirmDuesCharge(array $data, ?string $reference): void
+    {
+        if (! $reference) {
+            return;
+        }
+
+        app(\App\Services\Dues\DuesPaymentConfirmer::class)->confirm($reference, [
+            'metadata' => BillingWebhookController::metadata($data['metadata'] ?? null),
+            'amount' => (int) ($data['amount'] ?? 0),
+            'fees' => (int) ($data['fees'] ?? 0),
+            'currency' => mb_strtoupper((string) ($data['currency'] ?? '')),
+            'provider' => 'paystack',
+            'settled_by' => \App\Services\Dues\DuesPaymentConfirmer::SETTLED_BY_PLATFORM,
+        ]);
     }
 
     /**
