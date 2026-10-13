@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tenant\Dues;
 
+use App\Models\DuesCharge;
 use App\Services\Tenancy\TenantContext;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
@@ -68,10 +70,23 @@ abstract class MemberRequest extends FormRequest
                 $this->uniquePhone($tenantId, $ignoreId),
             ],
             'dues_class_id' => ['required', Rule::exists('dues_classes', 'id')->where('tenant_id', $tenantId)->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $currentClassId))],
-            'amount_override' => ['nullable', 'integer', 'min:0'],
+            'amount_override' => ['nullable', 'integer', 'min:0', $this->zeroOrChargeable(...)],
             'joined_on' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
+    }
+
+    /**
+     * An override of 0 waives the member's dues; any other amount must be one
+     * the gateway can collect.
+     *
+     * @param  Closure(string): mixed  $fail
+     */
+    private function zeroOrChargeable(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (is_numeric($value) && (int) $value > 0 && (int) $value < DuesCharge::MINIMUM_AMOUNT) {
+            $fail('The amount must be 0 (waived) or at least '.DuesCharge::MINIMUM_AMOUNT.' minor units ('.number_format(DuesCharge::MINIMUM_AMOUNT / 100, 2).').');
+        }
     }
 
     private function uniquePhone(?string $tenantId, ?string $ignoreId): Unique

@@ -31,8 +31,8 @@ function ClassFormModal({ duesClass, onClose, onSaved }) {
         event.preventDefault();
         const amount = toMinorUnits(form.amount);
 
-        if (amount === null || Number.isNaN(amount) || amount < 1) {
-            setErrors({ amount: 'Enter an amount greater than zero, such as 50 or 49.99.' });
+        if (amount === null || Number.isNaN(amount) || amount < 100) {
+            setErrors({ amount: 'Enter an amount of at least 1.00, such as 50 or 49.99.' });
             return;
         }
 

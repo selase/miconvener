@@ -12,6 +12,7 @@ use App\Models\LedgerTransaction;
 use App\Models\Member;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
+use App\Services\Operations\OperationalSignals;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -538,4 +539,63 @@ test('the callback of an own-gateway organisation verifies on its own account an
         ->and(LedgerTransaction::where('tenant_id', $tenant->id)->value('transaction_type'))->toBe(LedgerTransaction::TYPE_DUES_PAYMENT);
     Http::assertSent(fn ($request): bool => $request->hasHeader('Authorization', 'Bearer sk_test_tenant'));
     duesConfirmAssertBalanced($tenant->id);
+});
+
+test('a payment the ledger cannot book leaves the charge open, logs and raises a signal without failing the webhook', function () {
+    Mail::fake();
+    Log::spy();
+    [$tenant, $member] = duesConfirmFixture();
+    $charge = duesConfirmCharge($member, 100);
+
+    duesSettlementWebhook(duesConfirmMetadata($member, [$charge->id]), 100, 100)->assertOk();
+
+    expect($charge->fresh()->status)->toBe(DuesChargeStatusEnum::Open)
+        ->and(LedgerTransaction::where('tenant_id', $tenant->id)->count())->toBe(0)
+        ->and(app(OperationalSignals::class)->webhookFailuresSince(now()->subMinute()->toImmutable(), 'processing'))->toHaveCount(1);
+    Log::shouldHaveReceived('error')->withArgs(fn (string $message, array $context = []): bool => $message === 'dues.payment.ledger_failed'
+        && $context['reference'] === 'ref_dues_1')->once();
+    Mail::assertNothingQueued();
+});
+
+test('a refused payment leaves an operational signal so money that arrived unbooked is seen', function () {
+    Mail::fake();
+    [$tenant, $member] = duesConfirmFixture();
+    duesOwnGateway($tenant);
+    $charge = duesConfirmCharge($member, 10000);
+    $since = now()->subMinute()->toImmutable();
+
+    duesMerchantWebhook($tenant, duesConfirmMetadata($member, [$charge->id]), 10000, 150)->assertOk();
+
+    $signals = app(OperationalSignals::class)->webhookFailuresSince($since, 'processing');
+    expect($signals)->toHaveCount(1)
+        ->and($signals[0]['detail'])->toContain('ref_own_1')
+        ->and($signals[0]['detail'])->toContain('wrong account');
+
+    duesSettlementWebhook(duesConfirmMetadata($member, [$charge->id]), 9000, 150, 'ref_short')->assertOk();
+
+    $signals = app(OperationalSignals::class)->webhookFailuresSince($since, 'processing');
+    expect($signals)->toHaveCount(2)
+        ->and($signals[1]['detail'])->toContain('ref_short')
+        ->and($charge->fresh()->status)->toBe(DuesChargeStatusEnum::Open);
+});
+
+test('a callback whose confirmation fails tells the member the payment is being finalised and logs it', function () {
+    Log::spy();
+    [, $member] = duesConfirmFixture();
+    $charge = duesConfirmCharge($member, 10000);
+    Http::fake([
+        'api.paystack.co/transaction/verify/*' => Http::response(['data' => [
+            'id' => 1, 'status' => 'success', 'reference' => 'ref_cb_5', 'amount' => 10000, 'fees' => 150,
+            'currency' => 'GHS', 'metadata' => duesConfirmMetadata($member, [$charge->id]),
+        ]]),
+    ]);
+    Mail::shouldReceive('to')->andThrow(new RuntimeException('queue is down'));
+    $host = eventSubdomainHost('acme');
+
+    $this->get("http://{$host}/pay/{$member->pay_token}/callback?reference=ref_cb_5")
+        ->assertRedirect(route('public.dues.show', ['subdomain' => 'acme', 'token' => $member->pay_token]))
+        ->assertSessionHas('info', 'We are finalising your payment.');
+
+    Log::shouldHaveReceived('error')->withArgs(fn (string $message, array $context = []): bool => $message === 'dues.callback.confirm_failed'
+        && $context['reference'] === 'ref_cb_5')->once();
 });

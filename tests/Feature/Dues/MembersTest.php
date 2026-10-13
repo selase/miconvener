@@ -242,3 +242,16 @@ test('a tenant without dues gets 404 on member store', function () {
         ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), ['name' => 'X', 'email' => 'x@example.com', 'dues_class_id' => 'x'])
         ->assertNotFound();
 });
+
+test('an override between zero and the minimum charge is rejected', function () {
+    [, $user, $class] = duesMembersTenant();
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 50]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['amount_override' => 'The amount must be 0 (waived) or at least 100 minor units (1.00).']);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 100]))
+        ->assertCreated();
+});

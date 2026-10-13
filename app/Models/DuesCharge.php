@@ -24,6 +24,13 @@ final class DuesCharge extends Model
 
     use HasUuids;
 
+    /**
+     * The smallest charge, in minor units, that can be collected. Below it the
+     * gateway's fee and the commission can swallow the whole payment, which
+     * the ledger cannot book.
+     */
+    public const int MINIMUM_AMOUNT = 100;
+
     protected $connection = 'landlord';
 
     protected $fillable = [

@@ -327,3 +327,26 @@ test('an own-gateway organisation whose commission split is not set up cannot st
 
     Http::assertNotSent(fn (ClientRequest $request): bool => str_contains($request->url(), 'transaction/initialize'));
 });
+
+test('the pay page, callback and receipt share a loose per-address rate limit', function () {
+    [, $member, $host] = payPageFixture();
+
+    for ($attempt = 1; $attempt <= 120; $attempt++) {
+        $this->get("http://{$host}/pay/{$member->pay_token}/receipt")->assertOk();
+    }
+
+    $this->get("http://{$host}/pay/{$member->pay_token}")->assertStatus(429);
+    $this->get("http://{$host}/pay/{$member->pay_token}/receipt")->assertStatus(429);
+    $this->get("http://{$host}/pay/{$member->pay_token}/callback?reference=ref_x")->assertStatus(429);
+});
+
+test('a checkout that cannot start returns the member to their pay page', function () {
+    [, $member, $host] = payPageFixture('acme', ['settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
+    $charge = payPageCharge($member, 10000);
+    payPageFakePaystack();
+
+    $this->from('https://elsewhere.example.com/page')
+        ->post("http://{$host}/pay/{$member->pay_token}/checkout", ['charge_ids' => [$charge->id]])
+        ->assertRedirect(route('public.dues.show', ['subdomain' => 'acme', 'token' => $member->pay_token]))
+        ->assertSessionHas('error', 'Online payments are not currently configured for this organisation.');
+});

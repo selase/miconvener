@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Tenant\Dues;
 
 use App\Enum\DuesPeriodEnum;
+use App\Models\DuesCharge;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -32,7 +33,7 @@ abstract class DuesClassRequest extends FormRequest
             'name.unique' => 'You already have a class with that name.',
             'amount.required' => 'Enter the amount members in this class pay each period.',
             'amount.integer' => 'The amount must be a whole number of minor units.',
-            'amount.min' => 'The amount must be greater than zero.',
+            'amount.min' => 'The amount must be at least '.DuesCharge::MINIMUM_AMOUNT.' minor units ('.number_format(DuesCharge::MINIMUM_AMOUNT / 100, 2).').',
             'currency.required' => 'Choose a currency.',
             'currency.size' => 'The currency must be a three-letter code, such as GHS.',
             'is_active.required' => 'Say whether the class is active.',
@@ -49,7 +50,7 @@ abstract class DuesClassRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:120', $this->uniqueName($ignoreId)],
-            'amount' => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'integer', 'min:'.DuesCharge::MINIMUM_AMOUNT],
             'currency' => ['required', 'string', 'size:3'],
             'period' => ['required', Rule::enum(DuesPeriodEnum::class)],
         ];

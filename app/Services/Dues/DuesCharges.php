@@ -27,7 +27,8 @@ final class DuesCharges
      * waiver) is created already waived. Asking again for the same period
      * returns the charge that already exists.
      *
-     * @throws DomainException When the member has left.
+     * @throws DomainException When the member has left, or the amount is
+     *                         above zero but below the minimum charge.
      */
     public function createFor(Member $member, CarbonImmutable $periodStart): DuesCharge
     {
@@ -38,6 +39,10 @@ final class DuesCharges
         $class = $member->duesClass;
         $start = $periodStart->startOfMonth();
         $amount = $member->effectiveAmount();
+
+        if ($amount > 0 && $amount < DuesCharge::MINIMUM_AMOUNT) {
+            throw new DomainException('A charge must be at least '.DuesCharge::MINIMUM_AMOUNT.' minor units ('.number_format(DuesCharge::MINIMUM_AMOUNT / 100, 2).').');
+        }
 
         return DuesCharge::query()->firstOrCreate(
             ['member_id' => $member->id, 'period_start' => $start->toDateString()],

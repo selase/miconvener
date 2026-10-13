@@ -501,14 +501,14 @@ Route::delete('/e/{event}/forum/{thread}/vote', [PublicForumController::class, '
 Route::post('/e/{event}/forum/{thread}/report', [PublicForumController::class, 'report'])->name('public.events.forum.report');
 
 // Member dues: the pay link a member is sent. The token is the only
-// credential, so checkout is rate limited per address. A new payment can only
-// be started while dues are switched on; a payment already made still returns
-// to its callback and receipt.
+// credential, so every page is loosely rate limited per address and checkout
+// more tightly. A new payment can only be started while dues are switched on;
+// a payment already made still returns to its callback and receipt.
 Route::prefix('pay/{token}')->name('public.dues.')->group(function (): void {
-    Route::get('/', [App\Http\Controllers\Public\MemberPayController::class, 'show'])->middleware('dues.enabled')->name('show');
+    Route::get('/', [App\Http\Controllers\Public\MemberPayController::class, 'show'])->middleware(['dues.enabled', 'throttle:dues-view'])->name('show');
     Route::post('/checkout', [App\Http\Controllers\Public\MemberPayController::class, 'checkout'])->middleware(['dues.enabled', 'throttle:dues-pay'])->name('checkout');
-    Route::get('/callback', [App\Http\Controllers\Public\MemberPayController::class, 'callback'])->name('callback');
-    Route::get('/receipt', [App\Http\Controllers\Public\MemberPayController::class, 'receipt'])->name('receipt');
+    Route::get('/callback', [App\Http\Controllers\Public\MemberPayController::class, 'callback'])->middleware('throttle:dues-view')->name('callback');
+    Route::get('/receipt', [App\Http\Controllers\Public\MemberPayController::class, 'receipt'])->middleware('throttle:dues-view')->name('receipt');
 });
 
 // Staff links: ushers and floor crew scan tickets and answer attendee requests

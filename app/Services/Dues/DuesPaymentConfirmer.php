@@ -10,10 +10,12 @@ use App\Mail\DuesReceipt;
 use App\Models\DuesCharge;
 use App\Models\Tenant;
 use App\Services\Finance\LedgerService;
+use App\Services\Operations\OperationalSignals;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use InvalidArgumentException;
 
 /**
  * Marks the dues charges a confirmed payment covered as paid and books them.
@@ -44,6 +46,7 @@ final class DuesPaymentConfirmer
     public function __construct(
         private readonly LedgerService $ledgerService,
         private readonly DuesFee $duesFee,
+        private readonly OperationalSignals $signals,
     ) {}
 
     /**
@@ -87,14 +90,33 @@ final class DuesPaymentConfirmer
                 'settled_by' => $gatewayData['settled_by'] ?? null,
                 'expected' => $expectedAccount,
             ]);
+            $this->signalUnbooked($reference, 'paid into the wrong account ('.((string) ($gatewayData['settled_by'] ?? 'unknown'))." for an organisation that settles by {$expectedAccount})");
 
             return [];
         }
 
-        /** @var array<int, DuesCharge> $paid */
-        $paid = DB::connection('landlord')->transaction(
-            fn (): array => $this->settle($tenant, $memberId, $chargeIds, $reference, $gatewayData, $metadata)
-        );
+        /*
+         * A payment the ledger refuses (a gateway fee and commission that
+         * swallow the whole amount) is rolled back and left open rather than
+         * thrown: a 500 would only have Paystack redeliver it to the same
+         * refusal. The signal and log let someone book it by hand.
+         */
+        try {
+            /** @var array<int, DuesCharge> $paid */
+            $paid = DB::connection('landlord')->transaction(
+                fn (): array => $this->settle($tenant, $memberId, $chargeIds, $reference, $gatewayData, $metadata)
+            );
+        } catch (InvalidArgumentException $e) {
+            Log::error('dues.payment.ledger_failed', [
+                'tenant_id' => $tenantId,
+                'member_id' => $memberId,
+                'reference' => $reference,
+                'error' => $e->getMessage(),
+            ]);
+            $this->signalUnbooked($reference, "the ledger refused it: {$e->getMessage()}");
+
+            return [];
+        }
 
         $member = $paid[0]->member ?? null;
 
@@ -159,6 +181,7 @@ final class DuesPaymentConfirmer
                 'currency' => $reportedCurrency,
                 'expected_currency' => $currency,
             ]);
+            $this->signalUnbooked($reference, "{$reportedCurrency} {$gross} does not cover {$currency} {$chargesTotal} of charges");
 
             return [];
         }
@@ -217,6 +240,16 @@ final class DuesPaymentConfirmer
         }
 
         return $open->all();
+    }
+
+    /**
+     * Money that reached a gateway but was not booked: raised as a webhook
+     * processing failure, which the health check and the daily billing
+     * summary both surface.
+     */
+    private function signalUnbooked(string $reference, string $reason): void
+    {
+        $this->signals->recordWebhookFailure('processing', "dues payment {$reference} not booked: {$reason}");
     }
 
     private function wasPaidBy(DuesCharge $charge, string $reference): bool

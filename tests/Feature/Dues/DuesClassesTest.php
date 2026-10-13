@@ -118,7 +118,7 @@ test('another tenant cannot edit this tenant\'s class', function () {
     $betaClass = DuesClass::factory()->create(['tenant_id' => $beta->id, 'name' => 'Beta class', 'amount' => 1000]);
 
     $this->actingAs($acmeAdmin)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $betaClass->id]), ['name' => 'Hacked', 'amount' => 1, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true])
+        ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $betaClass->id]), ['name' => 'Hacked', 'amount' => 1000, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true])
         ->assertNotFound();
 
     expect($betaClass->fresh()->name)->toBe('Beta class');
@@ -156,4 +156,24 @@ test('a tenant without dues gets 404 on the class pages', function () {
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->get(route('tenant.dues.classes.index', ['subdomain' => 'acme']))
         ->assertNotFound();
+});
+
+test('a class amount below the minimum charge is rejected on create and edit', function () {
+    [$tenant, $user] = duesClassesTenant();
+    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
+    $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
+
+    $this->actingAs($user)->withServerVariables($host)
+        ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Student', 'amount' => 99, 'currency' => 'GHS', 'period' => 'monthly'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['amount' => 'The amount must be at least 100 minor units (1.00).']);
+
+    $this->actingAs($user)->withServerVariables($host)
+        ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $class->id]), ['name' => 'Full member', 'amount' => 50, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['amount']);
+
+    $this->actingAs($user)->withServerVariables($host)
+        ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Student', 'amount' => 100, 'currency' => 'GHS', 'period' => 'monthly'])
+        ->assertCreated();
 });

@@ -83,7 +83,7 @@ final class MemberPayController extends Controller
                 default => $e->getMessage(),
             };
 
-            return back()->with('error', $message);
+            return redirect()->route('public.dues.show', ['subdomain' => $member->tenant->slug, 'token' => $token])->with('error', $message);
         }
     }
 
@@ -141,16 +141,27 @@ final class MemberPayController extends Controller
 
         $verifiedReference = (string) ($verification['reference'] ?? $reference);
 
-        $this->confirmer->confirm($verifiedReference, [
-            'metadata' => $metadata,
-            'amount' => $verifiedAmount,
-            'fees' => (int) ($verification['fees'] ?? 0),
-            'currency' => $verifiedCurrency,
-            'provider' => 'paystack',
-            'settled_by' => $tenant->isPlatformDefaultSettlement()
-                ? DuesPaymentConfirmer::SETTLED_BY_PLATFORM
-                : DuesPaymentConfirmer::SETTLED_BY_OWN_GATEWAY,
-        ]);
+        /*
+         * The webhook will confirm it anyway, so a failure here is logged and
+         * the member is told the payment is being finalised, not shown an
+         * error page for money they have already paid.
+         */
+        try {
+            $this->confirmer->confirm($verifiedReference, [
+                'metadata' => $metadata,
+                'amount' => $verifiedAmount,
+                'fees' => (int) ($verification['fees'] ?? 0),
+                'currency' => $verifiedCurrency,
+                'provider' => 'paystack',
+                'settled_by' => $tenant->isPlatformDefaultSettlement()
+                    ? DuesPaymentConfirmer::SETTLED_BY_PLATFORM
+                    : DuesPaymentConfirmer::SETTLED_BY_OWN_GATEWAY,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('dues.callback.confirm_failed', ['member_id' => $member->id, 'reference' => $verifiedReference, 'error' => $e->getMessage()]);
+
+            return redirect($show)->with('info', 'We are finalising your payment.');
+        }
 
         /*
          * The webhook may have confirmed it already, so success is judged by

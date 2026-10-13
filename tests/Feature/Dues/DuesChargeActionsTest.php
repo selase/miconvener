@@ -231,3 +231,18 @@ test('a tenant without dues gets 404 on charge store', function () {
         ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => 'x', 'period_start' => '2026-04-01'])
         ->assertNotFound();
 });
+
+test('a charge below the minimum is refused, and the route says so', function () {
+    [, $user, $member] = duesChargeTenant();
+    $member->update(['amount_override' => 50]);
+
+    expect(fn () => app(DuesCharges::class)->createFor($member->fresh(), CarbonImmutable::parse('2026-03-01')))
+        ->toThrow(DomainException::class, 'A charge must be at least 100 minor units (1.00).');
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-01'])
+        ->assertUnprocessable()
+        ->assertJson(['message' => 'A charge must be at least 100 minor units (1.00).']);
+
+    expect(DuesCharge::query()->where('member_id', $member->id)->count())->toBe(0);
+});
