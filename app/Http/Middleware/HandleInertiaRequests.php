@@ -58,6 +58,7 @@ final class HandleInertiaRequests extends Middleware
                     'read_finance' => fn (): bool => (bool) $request->user()?->can('read finance'),
                     'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),
                     'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
+                    'manage_members' => fn (): bool => (bool) $request->user()?->can('manage members'),
                     'manage_payment_settings' => fn (): bool => (bool) $request->user()?->can('manage payment settings'),
                     'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
                     'update_user' => fn (): bool => (bool) $request->user()?->can('update user'),
@@ -76,6 +77,7 @@ final class HandleInertiaRequests extends Middleware
                     // from tickets sold before a lapse still to refund or pay out.
                     'finance' => $tenant->handlesTicketMoney(),
                     'llm_byok' => $tenant->featureEnabled('llm_byok'),
+                    'member_dues' => $tenant->duesEnabled(),
                 ],
             ] : null,
             'flash' => [

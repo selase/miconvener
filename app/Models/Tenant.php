@@ -265,6 +265,11 @@ final class Tenant extends Model
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();
     }
 
+    public function duesEnabled(): bool
+    {
+        return $this->featureEnabled('member_dues');
+    }
+
     public function paymentGateways(): HasMany
     {
         return $this->hasMany(TenantPaymentGateway::class);
