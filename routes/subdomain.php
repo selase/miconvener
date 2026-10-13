@@ -15,6 +15,7 @@ use App\Http\Controllers\Public\SpeakerPortalController;
 use App\Http\Controllers\Tenant\AccountController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DesignSystemController;
+use App\Http\Controllers\Tenant\DuesPayoutController;
 use App\Http\Controllers\Tenant\EventBadgeController;
 use App\Http\Controllers\Tenant\EventBlastController;
 use App\Http\Controllers\Tenant\EventCheckInController;
@@ -299,6 +300,13 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::get('payout-accounts/banks', [TenantPayoutAccountController::class, 'banks'])->name('tenant.payout-accounts.banks');
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
+
+    Route::middleware('dues.enabled')->prefix('dues')->name('tenant.dues.')->group(function (): void {
+        Route::get('payouts', [DuesPayoutController::class, 'index'])->name('payouts.index');
+        Route::post('payouts', [DuesPayoutController::class, 'store'])->name('payouts.store');
+        Route::post('payouts/{payout}/send', [DuesPayoutController::class, 'send'])->name('payouts.send');
+        Route::post('payouts/{payout}/finalize', [DuesPayoutController::class, 'finalize'])->name('payouts.finalize');
+    });
 
     Route::prefix('venue')->name('tenant.venue.')->group(function (): void {
         Route::get('profile', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'show'])->name('profile');

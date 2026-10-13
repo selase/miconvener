@@ -1032,11 +1032,6 @@ parameters:
 			count: 1
 			path: app/Http/Controllers/Public/SettlementWebhookController.php
 
-		-
-			rawMessage: 'Parameter #1 $event of method App\Services\Finance\LedgerService::recordPayout() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Public/SettlementWebhookController.php
 
 		-
 			rawMessage: 'Method App\Http\Controllers\Settings\ApiTokenController::destroy() has no return type specified.'
@@ -1690,13 +1685,13 @@ parameters:
 			rawMessage: 'Offset ''status'' on array{transfer_code: string, status: string, fee: int|null} on left side of ?? always exists and is not nullable.'
 			identifier: nullCoalesce.offset
 			count: 1
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
+			path: app/Services/Finance/PayoutSender.php
 
 		-
 			rawMessage: 'Offset ''transfer_code'' on array{transfer_code: string, status: string, fee: int|null} on left side of ?? always exists and is not nullable.'
 			identifier: nullCoalesce.offset
 			count: 2
-			path: app/Http/Controllers/Tenant/EventFinanceController.php
+			path: app/Services/Finance/PayoutSender.php
 
 		-
 			rawMessage: Using nullsafe property access "?->full_name" on left side of ?? is unnecessary. Use -> instead.

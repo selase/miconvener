@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
-use App\Contracts\SettlementGateway;
 use App\Enum\LedgerCategoryEnum;
-use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
 use App\Models\TenantPayoutAccount;
+use App\Services\Finance\PayoutSender;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -130,14 +129,13 @@ final class EventFinanceController extends Controller
         string $subdomain,
         string $event,
         string $payout,
-        SettlementGateway $settlementGateway,
-        \App\Services\Finance\TransferFeeSchedule $transferFeeSchedule
+        PayoutSender $payoutSender
     ): JsonResponse {
         $this->authorize('manage payouts');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        return DB::transaction(function () use ($eventModel, $payout, $settlementGateway, $transferFeeSchedule): JsonResponse {
+        return DB::transaction(function () use ($eventModel, $payout, $payoutSender): JsonResponse {
             // Lock the payout row for the whole check-send-write sequence so two
             // concurrent "send" requests for the same payout can't both pass the
             // status check and both fire a live Paystack transfer. Each retry
@@ -149,102 +147,9 @@ final class EventFinanceController extends Controller
                 return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
             }
 
-            $account = $payoutModel->payoutAccount;
-            $currency = $eventModel->currency;
+            $result = $payoutSender->send($payoutModel, $eventModel->currency);
 
-            try {
-                if (! $account->recipient_code) {
-                    $recipientCode = $settlementGateway->createRecipient(
-                        $account->type === TenantPayoutAccount::TYPE_MOBILE_MONEY ? 'mobile_money' : 'nuban',
-                        $account->resolved_account_name ?? $account->account_name,
-                        (string) $account->account_number_encrypted,
-                        (string) $account->bank_code,
-                        $currency
-                    );
-                    $account->update(['recipient_code' => $recipientCode]);
-                }
-
-                /*
-                 * Paystack sends the recipient this amount and debits the
-                 * platform that amount plus its fee. Deducting the fee first
-                 * means the platform's balance falls by exactly what it owed,
-                 * and the organizer bears the cost of their own payout.
-                 */
-                $transferFee = $transferFeeSchedule->feeFor($account->type);
-                $netToSend = $payoutModel->amount - $transferFee;
-
-                if ($netToSend <= 0) {
-                    return response()->json([
-                        'message' => 'This balance is smaller than the transfer fee, so it cannot be sent on its own. It will be paid out with the next batch.',
-                    ], 422);
-                }
-
-                $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
-                $transfer = $settlementGateway->initiateTransfer($account->recipient_code, $netToSend, $currency, $reference);
-            } catch (PaymentFailedException $e) {
-                return response()->json(['message' => 'Could not send payout: '.$e->getMessage()], 502);
-            }
-
-            $transferStatus = (string) ($transfer['status'] ?? '');
-
-            /*
-             * Paystack parks the transfer when the account requires a one-time
-             * code per transfer. No money has moved and no webhook follows, but
-             * this is not a failure either — the transfer is real and waiting.
-             * Park the payout in the same state so it can be released with the
-             * code rather than re-sent, which would create a second transfer.
-             */
-            if ($transferStatus === 'otp') {
-                $transferCode = (string) ($transfer['transfer_code'] ?? '');
-
-                /*
-                 * Without a transfer code there is nothing to release, and a
-                 * parked payout cannot be re-sent — it would strand here. Fail
-                 * it instead, which keeps it re-sendable.
-                 */
-                if ($transferCode === '') {
-                    $payoutModel->update([
-                        'status' => EventPayout::STATUS_FAILED,
-                        'failure_reason' => 'The payment provider asked for a one-time code but returned no transfer to release. Send this payout again.',
-                    ]);
-
-                    return response()->json(['message' => $payoutModel->failure_reason], 502);
-                }
-
-                $payoutModel->update([
-                    'status' => EventPayout::STATUS_AWAITING_OTP,
-                    'provider_reference' => $reference,
-                    'provider_transfer_code' => $transferCode,
-                    'failure_reason' => null,
-                ]);
-
-                return response()->json([
-                    'message' => 'Paystack sent a one-time code to the account owner. Enter it to release this payout.',
-                    'status' => EventPayout::STATUS_AWAITING_OTP,
-                ]);
-            }
-
-            if (! in_array($transferStatus, ['success', 'pending', 'queued'], true)) {
-                $payoutModel->update([
-                    'status' => EventPayout::STATUS_FAILED,
-                    'failure_reason' => "The payment provider did not release the transfer (status: {$transferStatus}).",
-                ]);
-
-                return response()->json([
-                    'message' => $payoutModel->failure_reason,
-                ], 502);
-            }
-
-            $payoutModel->update([
-                'status' => EventPayout::STATUS_PROCESSING,
-                'provider_reference' => $reference,
-                'provider_transfer_code' => (string) ($transfer['transfer_code'] ?? ''),
-                'failure_reason' => null,
-                'transfer_fee_amount' => $transferFeeSchedule->feeFromProviderResponse($transfer) ?? $transferFee,
-                'net_paid_amount' => $netToSend,
-            ]);
-
-            return response()->json(['message' => 'Payout sent.', 'transfer_code' => $transfer['transfer_code']]);
+            return response()->json(Arr::except($result, 'http_status'), $result['http_status']);
         });
     }
 

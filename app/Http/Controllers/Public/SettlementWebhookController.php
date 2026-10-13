@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Public;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Http\Controllers\Billing\WebhookController as BillingWebhookController;
 use App\Http\Controllers\Controller;
 use App\Mail\Events\EventRegistrationConfirmed;
+use App\Models\Event;
 use App\Models\EventPayout;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Operations\OperationalSignals;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -278,12 +281,32 @@ final class SettlementWebhookController extends Controller
         }
 
         if ($event === 'transfer.success') {
+            if ($payout->category === LedgerCategoryEnum::Dues) {
+                $this->confirmDuesTransfer($payout, $reference);
+
+                return;
+            }
+
             $payout->update(['status' => EventPayout::STATUS_PAID, 'paid_at' => now()]);
+
+            // A payout with no event that is not dues (a commission credit)
+            // is settled by its own path; recordPayout() needs an event.
+            $eventModel = $payout->event;
+
+            if (! $eventModel instanceof Event) {
+                Log::warning('Confirmed transfer for an event-less payout outside the dues category; no ledger posting made here', [
+                    'payout_id' => $payout->id,
+                    'category' => $payout->category?->value,
+                    'reference' => $reference,
+                ]);
+
+                return;
+            }
 
             // Without this the organizer payable is only ever debited on paths
             // that happen to be instrumented, so the balance drifts upward.
             app(\App\Services\Finance\LedgerService::class)->recordPayout(
-                $payout->event,
+                $eventModel,
                 (int) $payout->amount,
                 $reference,
                 $payout
@@ -296,5 +319,26 @@ final class SettlementWebhookController extends Controller
             'status' => EventPayout::STATUS_FAILED,
             'failure_reason' => (string) ($data['reason'] ?? 'Transfer failed'),
         ]);
+    }
+
+    /**
+     * Mark a dues payout paid and debit the dues Organizer Payable in one
+     * transaction, so DuesBalance never sees the payout gone from "in flight"
+     * without the payable having fallen by the same amount. The posting is
+     * keyed on the transfer reference, so a redelivery cannot post it twice.
+     */
+    private function confirmDuesTransfer(EventPayout $payout, string $reference): void
+    {
+        DB::transaction(function () use ($payout, $reference): void {
+            $payout->update(['status' => EventPayout::STATUS_PAID, 'paid_at' => now()]);
+
+            app(\App\Services\Finance\LedgerService::class)->recordDuesPayout(
+                $payout->tenant,
+                (int) $payout->amount,
+                $reference,
+                $payout,
+                (string) $payout->currency
+            );
+        });
     }
 }
