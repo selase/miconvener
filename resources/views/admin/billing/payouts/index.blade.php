@@ -57,7 +57,7 @@
                                         —
                                     @endif
                                 </td>
-                                <td>{{ $payout->event->name ?? '—' }}</td>
+                                <td>{{ $payout->event->name ?? '—' }}<div class="text-muted fs-8">{{ $payout->category->label() }}</div></td>
                                 <td class="text-end">{{ $money((int) $payout->amount) }}</td>
                                 <td>
                                     <span class="badge {{ $payout->status === 'failed' ? 'badge-light-danger' : 'badge-light-warning' }}">{{ str_replace('_', ' ', $payout->status) }}</span>
@@ -97,7 +97,7 @@
                             <tbody class="text-gray-700 fw-bold">
                                 @forelse ($recent as $payout)
                                     <tr>
-                                        <td>{{ $payout->tenant->name ?? '—' }}<div class="text-muted fs-8">{{ $payout->event->name ?? '' }}</div></td>
+                                        <td>{{ $payout->tenant->name ?? '—' }}<div class="text-muted fs-8">{{ $payout->category->label() }}{{ $payout->event ? ' · '.$payout->event->name : '' }}</div></td>
                                         <td class="text-end">{{ $money((int) $payout->amount) }}</td>
                                         <td>{{ str_replace('_', ' ', $payout->status) }}</td>
                                         <td class="text-nowrap text-muted">{{ ($payout->paid_at ?? $payout->created_at)?->format('j M Y') }}</td>
