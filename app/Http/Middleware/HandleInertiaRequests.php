@@ -83,6 +83,7 @@ final class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                'info' => fn () => $request->session()->get('info'),
                 'plainKey' => fn () => $request->session()->get('plainKey'),
                 // Two-factor recovery codes are shown on exactly the response
                 // that generated them; they are not readable afterwards.

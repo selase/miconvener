@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enum\DuesChargeStatusEnum;
 use App\Enum\MemberStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Dues\StoreMemberRequest;
 use App\Http\Requests\Tenant\Dues\UpdateMemberRequest;
+use App\Models\DuesCharge;
+use App\Models\DuesClass;
 use App\Models\Member;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
@@ -17,11 +20,14 @@ use Inertia\Response;
 
 /**
  * The organisation's members and their dues. The member payload never
- * includes the pay token; the payment link is exposed separately.
+ * includes the raw pay token, only the finished pay link.
  */
 final class MemberController extends Controller
 {
     private const PER_PAGE = 25;
+
+    /** Charges listed in a member's drawer, newest first. */
+    private const CHARGES_SHOWN = 12;
 
     public function index(): Response
     {
@@ -30,7 +36,10 @@ final class MemberController extends Controller
 
         $members = Member::query()
             ->where('tenant_id', $tenant->id)
-            ->with('duesClass')
+            ->with([
+                'duesClass',
+                'charges' => fn ($query) => $query->orderByDesc('period_start')->limit(self::CHARGES_SHOWN),
+            ])
             ->withSum(['charges as open_total' => fn ($query) => $query->open()], 'amount')
             ->withExists(['charges as overdue' => fn ($query) => $query->overdue()])
             ->orderBy('name')
@@ -45,12 +54,38 @@ final class MemberController extends Controller
                 'effective_amount' => $member->effectiveAmount(),
                 'currency' => $member->duesClass->currency,
                 'amount_override' => $member->amount_override,
+                'dues_class_id' => $member->dues_class_id,
+                'joined_on' => $member->joined_on?->toDateString(),
+                'notes' => $member->notes,
+                'pay_url' => route('public.dues.show', ['subdomain' => $tenant->slug, 'token' => $member->pay_token]),
+                'charges' => $member->charges->map(fn (DuesCharge $charge): array => [
+                    'id' => $charge->id,
+                    'status' => $charge->status->value,
+                    'amount' => $charge->amount,
+                    'currency' => $charge->currency,
+                    'period_start' => $charge->period_start->toDateString(),
+                    'period_end' => $charge->period_end->toDateString(),
+                    'due_on' => $charge->due_on->toDateString(),
+                    'overdue' => $charge->status === DuesChargeStatusEnum::Open && $charge->due_on->lt(today()),
+                ])->values(),
                 'open_total' => (int) $member->getAttribute('open_total'),
                 'overdue' => (bool) $member->getAttribute('overdue'),
             ]);
 
         return Inertia::render('Tenant/Dues/Members', [
             'members' => $members,
+            'classes' => DuesClass::query()
+                ->where('tenant_id', $tenant->id)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(fn (DuesClass $class): array => [
+                    'id' => $class->id,
+                    'name' => $class->name,
+                    'amount' => $class->amount,
+                    'currency' => $class->currency,
+                    'period' => $class->period->value,
+                ])->values(),
         ]);
     }
 
