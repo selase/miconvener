@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
@@ -155,6 +156,7 @@ final class ReconcilePayoutSchedulesCommand extends Command
                 $payout = EventPayout::create([
                     'tenant_id' => $event->tenant_id,
                     'event_id' => $event->id,
+                    'category' => LedgerCategoryEnum::Event,
                     'payout_account_id' => $payoutAccount->id,
                     'amount' => $netPayable,
                     'status' => EventPayout::STATUS_SCHEDULED,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Contracts\SettlementGateway;
+use App\Enum\LedgerCategoryEnum;
 use App\Exceptions\PaymentFailedException;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
@@ -114,6 +115,7 @@ final class EventFinanceController extends Controller
 
             $payout = $eventModel->payouts()->create([
                 'tenant_id' => $tenant->id,
+                'category' => LedgerCategoryEnum::Event,
                 'payout_account_id' => $validated['payout_account_id'],
                 'amount' => $validated['amount'],
                 'scheduled_at' => $validated['scheduled_at'] ?? null,

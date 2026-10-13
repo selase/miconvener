@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 final class EventPayout extends Model
 {
@@ -76,5 +77,25 @@ final class EventPayout extends Model
     public function ledgerEntries(): HasMany
     {
         return $this->hasMany(EventLedgerEntry::class, 'payout_id');
+    }
+
+    /**
+     * Every payout belongs to an accounting category. One for an event is an
+     * event payout without anyone having to say so; any other kind of payout
+     * must name its category, because there is nothing to infer it from.
+     */
+    protected static function booted(): void
+    {
+        self::creating(function (EventPayout $payout): void {
+            if ($payout->category !== null) {
+                return;
+            }
+
+            if ($payout->event_id === null) {
+                throw new LogicException('A payout without an event needs an accounting category.');
+            }
+
+            $payout->category = LedgerCategoryEnum::Event;
+        });
     }
 }
