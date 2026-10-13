@@ -151,11 +151,31 @@ test('hero pairs each use case with relevant copy and responsive local photograp
     $images = $xpath->query('//img[@data-headline-image]');
     foreach (config('product-page.hero.use_cases') as $index => $useCase) {
         $image = $images->item($index);
-        expect($image->getAttribute($index === 0 ? 'src' : 'data-src'))->toContain('/'.$useCase['key'].'-1600.webp');
+        $imageKey = $useCase['image_key'] ?? $useCase['key'];
+        expect($image->getAttribute($index === 0 ? 'src' : 'data-src'))->toContain('/'.$imageKey.'-1600.webp');
         foreach ([640, 1600] as $width) {
-            $path = public_path('assets/media/hero/'.$useCase['key'].'-'.$width.'.webp');
+            $path = public_path('assets/media/hero/'.$imageKey.'-'.$width.'.webp');
             expect(is_file($path))->toBeTrue()
                 ->and(filesize($path))->toBeLessThan(220000);
         }
     }
+});
+
+test('the deeper blue trial is confined to the homepage hero', function (): void {
+    $response = $this->get('/')->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $hero = $xpath->query('//section[@data-homepage-hero]')->item(0);
+    expect($hero->getAttribute('style'))->toContain('--hero-field: #0b3ea8');
+    $response->assertSee('--field: #155dfc', false);
+});
+
+test('the opening hero reuses the selected services auditorium photograph', function (): void {
+    $response = $this->get('/')->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    $images = $xpath->query('//img[@data-headline-image]');
+    expect($images->item(0)->getAttribute('src'))->toBe($images->item(4)->getAttribute('data-src'));
 });

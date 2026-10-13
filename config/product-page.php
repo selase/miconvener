@@ -30,9 +30,10 @@ return [
         'use_cases' => [
             [
                 'key' => 'overview',
+                'image_key' => 'service',
                 'copy' => '',
-                'photographer' => 'Matt Benson',
-                'photo_source' => 'https://unsplash.com/photos/empty-event-space-with-decorated-high-top-tables-4PEkh4rvyMQ',
+                'photographer' => null,
+                'photo_source' => 'https://images.unsplash.com/photo-1582192903020-8a5e59dcdcf2',
                 'photo_license' => 'https://unsplash.com/license',
             ],
             [
@@ -59,8 +60,8 @@ return [
             [
                 'key' => 'service',
                 'copy' => 'Organise recurring gatherings, welcome your community and collect offerings. Keep announcements and prayer messages connected.',
-                'photographer' => 'Edwin Andrade',
-                'photo_source' => 'https://unsplash.com/photos/group-of-people-waving-their-hands-6liebVeAfrY',
+                'photographer' => null,
+                'photo_source' => 'https://images.unsplash.com/photo-1582192903020-8a5e59dcdcf2',
                 'photo_license' => 'https://unsplash.com/license',
             ],
             [

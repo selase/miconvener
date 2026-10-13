@@ -6,7 +6,7 @@
 <style>
     /* ── Field ───────────────────────────────────────────────────────── */
     .field {
-        background: var(--field);
+        background: var(--hero-field, var(--field));
         position: relative; overflow: hidden;
     }
     .field::before {
@@ -21,7 +21,7 @@
     .field > * { position: relative; z-index: 2; }
     .field::before { z-index: 1; }
     .field > .hero-images { position: absolute; inset: 0 0 auto; height: clamp(600px, 65vw, 720px); z-index: 0; pointer-events: none; }
-    .hero-images::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(21,93,252,.78) 55%, var(--field) 100%); }
+    .hero-images::after { content: ""; position: absolute; inset: 0; background: linear-gradient(var(--hero-image-overlay) 55%, var(--hero-field) 100%); }
     .hero-images img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 38%; opacity: 0; filter: brightness(.65); transition: opacity .6s ease; }
     .hero-images img.is-active { opacity: 1; }
     .hero-copy-phrases { display: grid; }
@@ -264,9 +264,9 @@
 @section('content')
 
 {{-- ══ HERO ══════════════════════════════════════════════════════════ --}}
-<section class="field" data-homepage-hero>
+<section class="field" data-homepage-hero style="--hero-field: #0b3ea8; --hero-image-overlay: rgba(11,62,168,.78)">
     <div class="hero-images" aria-hidden="true">
-        <img data-headline-image class="is-active" src="{{ asset('assets/media/hero/overview-1600.webp') }}" srcset="{{ asset('assets/media/hero/overview-640.webp') }} 640w, {{ asset('assets/media/hero/overview-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" fetchpriority="high">
+        <img data-headline-image class="is-active" src="{{ asset('assets/media/hero/service-1600.webp') }}" srcset="{{ asset('assets/media/hero/service-640.webp') }} 640w, {{ asset('assets/media/hero/service-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" fetchpriority="high">
         <img data-headline-image data-src="{{ asset('assets/media/hero/conference-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/conference-640.webp') }} 640w, {{ asset('assets/media/hero/conference-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
         <img data-headline-image data-src="{{ asset('assets/media/hero/academic-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/academic-640.webp') }} 640w, {{ asset('assets/media/hero/academic-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
         <img data-headline-image data-src="{{ asset('assets/media/hero/social-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/social-640.webp') }} 640w, {{ asset('assets/media/hero/social-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
