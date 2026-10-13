@@ -81,7 +81,9 @@ final class MemberController extends Controller
     {
         $this->authorize('manage members');
         $model = $this->findMember($member);
-        $model->update(['status' => MemberStatusEnum::Exited, 'exited_on' => today()]);
+        if ($model->status !== MemberStatusEnum::Exited) {
+            $model->update(['status' => MemberStatusEnum::Exited, 'exited_on' => today()]);
+        }
 
         return response()->json(['id' => $model->id, 'status' => MemberStatusEnum::Exited->value]);
     }

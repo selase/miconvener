@@ -205,3 +205,40 @@ test('a user without manage members is forbidden on every member action', functi
     $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.dues.members.exit', $params))->assertForbidden();
     $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.dues.members.rotate-link', $params))->assertForbidden();
 });
+
+test('a member of a deactivated class can still be edited, but cannot be moved into another inactive class', function () {
+    [$tenant, $user, $class] = duesMembersTenant();
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'phone' => '0244000002']);
+    $class->update(['is_active' => false]);
+    $other = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'is_active' => false]);
+    $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
+    $params = ['subdomain' => 'acme', 'member' => $member->id];
+
+    $this->actingAs($user)->withServerVariables($host)
+        ->patchJson(route('tenant.dues.members.update', $params), duesMemberPayload($class, ['name' => 'Still here', 'phone' => '0244000002', 'amount_override' => 100]))
+        ->assertOk();
+    $this->actingAs($user)->withServerVariables($host)
+        ->patchJson(route('tenant.dues.members.update', $params), duesMemberPayload($other, ['phone' => '0244000002']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['dues_class_id']);
+
+    expect($member->fresh()->name)->toBe('Still here')->and($member->fresh()->dues_class_id)->toBe($class->id);
+});
+
+test('exiting an already exited member keeps the original exit date', function () {
+    [$tenant, $user, $class] = duesMembersTenant();
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'status' => MemberStatusEnum::Exited, 'exited_on' => '2026-01-10']);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.members.exit', ['subdomain' => 'acme', 'member' => $member->id]))
+        ->assertOk();
+
+    expect($member->fresh()->exited_on->toDateString())->toBe('2026-01-10');
+});
+
+test('a tenant without dues gets 404 on member store', function () {
+    [, $user] = eventHost('acme');
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), ['name' => 'X', 'email' => 'x@example.com', 'dues_class_id' => 'x'])
+        ->assertNotFound();
+});

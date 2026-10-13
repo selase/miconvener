@@ -58,7 +58,7 @@ final class DuesChargeController extends Controller
         $model = $this->findCharge($charge);
 
         return $this->guard(fn (): JsonResponse => response()->json($this->payload(
-            $duesCharges->recordOffline($model, (string) $request->user()?->id, $request->validated('note')),
+            $duesCharges->recordOffline($model, (int) $request->user()?->id, $request->validated('note')),
         )));
     }
 

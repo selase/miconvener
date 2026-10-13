@@ -81,13 +81,13 @@ final class DuesCharges
      *
      * @throws DomainException When the charge is not open.
      */
-    public function recordOffline(DuesCharge $charge, string $userId, ?string $note): DuesCharge
+    public function recordOffline(DuesCharge $charge, int $userId, ?string $note): DuesCharge
     {
         return $this->closeOpen($charge, [
             'status' => DuesChargeStatusEnum::Paid,
             'payment_method' => 'offline',
             'paid_at' => now(),
-            'recorded_by' => (int) $userId,
+            'recorded_by' => $userId,
             'note' => $note,
         ]);
     }

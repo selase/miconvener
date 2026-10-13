@@ -47,7 +47,7 @@ abstract class MemberRequest extends FormRequest
     /**
      * @return array<string, mixed>
      */
-    protected function memberRules(?string $ignoreId): array
+    protected function memberRules(?string $ignoreId, ?string $currentClassId = null): array
     {
         $tenantId = app(TenantContext::class)->getTenant()?->id;
 
@@ -67,7 +67,7 @@ abstract class MemberRequest extends FormRequest
                 'max:32',
                 $this->uniquePhone($tenantId, $ignoreId),
             ],
-            'dues_class_id' => ['required', Rule::exists('dues_classes', 'id')->where('tenant_id', $tenantId)->where('is_active', true)],
+            'dues_class_id' => ['required', Rule::exists('dues_classes', 'id')->where('tenant_id', $tenantId)->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $currentClassId))],
             'amount_override' => ['nullable', 'integer', 'min:0'],
             'joined_on' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],

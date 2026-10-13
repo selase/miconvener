@@ -223,3 +223,11 @@ test('a user without manage members is forbidden on every charge action', functi
             ->postJson(route("tenant.dues.charges.{$action}", ['subdomain' => 'acme', 'charge' => $charge->id]))->assertForbidden();
     }
 });
+
+test('a tenant without dues gets 404 on charge store', function () {
+    [, $user] = eventHost('acme');
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => 'x', 'period_start' => '2026-04-01'])
+        ->assertNotFound();
+});
