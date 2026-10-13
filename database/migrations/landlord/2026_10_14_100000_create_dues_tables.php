@@ -63,7 +63,7 @@ return new class extends Migration
             $t->unsignedBigInteger('charged_amount')->nullable();
             $t->unsignedBigInteger('gateway_fee_amount')->nullable();
             $t->unsignedBigInteger('commission_amount')->nullable();
-            $t->foreignUuid('recorded_by')->nullable();
+            $t->foreignId('recorded_by')->nullable()->constrained('users')->nullOnDelete();
             $t->text('note')->nullable();
             $t->timestamps();
             $t->unique(['member_id', 'period_start']);

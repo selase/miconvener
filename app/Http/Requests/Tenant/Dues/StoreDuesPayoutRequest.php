@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tenant\Dues;
 
+use App\Enum\LedgerCategoryEnum;
+use App\Models\LedgerAccount;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
  * A request to pay collected dues out to one of the organisation's own payout
- * accounts. Whether the balance covers it is checked under a lock by the
+ * accounts, in a currency it has collected dues in: the app keeps no list of
+ * supported currencies, and a dues payable account exists exactly for the
+ * currencies dues were recorded in, so an unknown code cannot create one. Whether the balance covers it is checked under a lock by the
  * controller, not here.
  */
 final class StoreDuesPayoutRequest extends FormRequest
@@ -30,7 +34,16 @@ final class StoreDuesPayoutRequest extends FormRequest
         return [
             'payout_account_id' => ['required', Rule::exists('tenant_payout_accounts', 'id')->where('tenant_id', $tenantId)],
             'amount' => ['required', 'integer', 'min:1'],
-            'currency' => ['required', 'string', 'size:3'],
+            'currency' => [
+                'required',
+                'string',
+                'size:3',
+                Rule::exists('ledger_accounts', 'currency')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('event_id')
+                    ->where('category', LedgerCategoryEnum::Dues->value)
+                    ->where('code', LedgerAccount::CODE_ORGANIZER_PAYABLE),
+            ],
             'scheduled_at' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:255'],
         ];
@@ -49,6 +62,7 @@ final class StoreDuesPayoutRequest extends FormRequest
             'amount.min' => 'The amount must be greater than zero.',
             'currency.required' => 'Choose the currency to pay out.',
             'currency.size' => 'The currency must be a three-letter code, such as GHS.',
+            'currency.exists' => 'No dues have been collected in that currency.',
         ];
     }
 

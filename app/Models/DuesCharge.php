@@ -18,7 +18,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class DuesCharge extends Model
 {
     use BelongsToTenant;
+
+    /** @use HasFactory<\Database\Factories\DuesChargeFactory> */
     use HasFactory;
+
     use HasUuids;
 
     protected $connection = 'landlord';
@@ -51,6 +54,7 @@ final class DuesCharge extends Model
         'charged_amount' => 'integer',
         'gateway_fee_amount' => 'integer',
         'commission_amount' => 'integer',
+        'recorded_by' => 'integer',
         'status' => DuesChargeStatusEnum::class,
         'paid_at' => 'datetime',
     ];

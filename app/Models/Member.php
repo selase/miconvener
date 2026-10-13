@@ -20,7 +20,10 @@ use Illuminate\Support\Str;
 final class Member extends Model
 {
     use BelongsToTenant;
+
+    /** @use HasFactory<\Database\Factories\MemberFactory> */
     use HasFactory;
+
     use HasUuids;
 
     protected $connection = 'landlord';

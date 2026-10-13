@@ -147,7 +147,7 @@ final class EventFinanceController extends Controller
                 return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
             }
 
-            $result = $payoutSender->send($payoutModel, $eventModel->currency);
+            $result = $payoutSender->send($payoutModel, $eventModel->currency ?: 'GHS');
 
             return response()->json(Arr::except($result, 'http_status'), $result['http_status']);
         });

@@ -132,20 +132,38 @@ final class DuesPayoutController extends Controller
     /**
      * Send a scheduled or failed dues payout. The payout row is locked for
      * the whole check-send-write sequence, as for event payouts.
+     *
+     * A failed payout no longer counts as in flight, so its money may since
+     * have been reserved by another payout. Re-sending one therefore checks
+     * the balance again under the same payable-account lock that store()
+     * takes. Locks are always taken in the same order, payable account first
+     * and then the payout, so a send and a store cannot deadlock.
      */
-    public function send(string $subdomain, string $payout, PayoutSender $payoutSender): JsonResponse
+    public function send(string $subdomain, string $payout, PayoutSender $payoutSender, LedgerService $ledgerService, DuesBalance $duesBalance): JsonResponse
     {
         $this->authorize('manage payouts');
         $tenant = $this->getTenant();
+        $currency = (string) $this->duesPayouts($tenant)->whereKey($payout)->firstOrFail()->currency;
 
-        return DB::transaction(function () use ($tenant, $payout, $payoutSender): JsonResponse {
+        $ledgerService->ensureAccountsExist($tenant, null, $currency, LedgerCategoryEnum::Dues);
+
+        return DB::transaction(function () use ($tenant, $payout, $currency, $payoutSender, $duesBalance): JsonResponse {
+            $duesBalance->lockPayableAccount($tenant, $currency);
             $payoutModel = $this->duesPayouts($tenant)->whereKey($payout)->lockForUpdate()->firstOrFail();
 
             if (! in_array($payoutModel->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true)) {
                 return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
             }
 
-            $result = $payoutSender->send($payoutModel, (string) $payoutModel->currency);
+            if ($payoutModel->status === EventPayout::STATUS_FAILED) {
+                $available = $duesBalance->available($tenant, $currency);
+
+                if ($payoutModel->amount > $available) {
+                    return response()->json(['message' => "This payout ({$payoutModel->amount}) is more than the available dues balance ({$available}), so it cannot be sent again."], 422);
+                }
+            }
+
+            $result = $payoutSender->send($payoutModel, $currency);
 
             return response()->json(Arr::except($result, 'http_status'), $result['http_status']);
         });

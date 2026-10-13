@@ -18,7 +18,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 final class DuesClass extends Model
 {
     use BelongsToTenant;
+
+    /** @use HasFactory<\Database\Factories\DuesClassFactory> */
     use HasFactory;
+
     use HasUuids;
 
     protected $connection = 'landlord';

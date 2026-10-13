@@ -26,7 +26,7 @@ final class EnableDuesCommand extends Command
 
         $enabled = ! $this->option('off');
 
-        $meta = $tenant->features()->where('feature_key', 'member_dues')->first()?->meta ?? [];
+        $meta = $tenant->features()->where('feature_key', 'member_dues')->first()->meta ?? [];
         $meta['source'] = 'admin_override';
 
         $tenant->features()->updateOrCreate(

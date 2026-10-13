@@ -209,6 +209,47 @@ test('a dues payout is sent through the shared payout sender', function () {
     Http::assertSent(fn ($request) => $request->url() === 'https://api.paystack.co/transfer' && $request['currency'] === 'GHS');
 });
 
+test('a failed dues payout cannot be re-sent once its money has been reserved by another payout', function () {
+    [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
+    $failed = duesPayoutScheduled($tenant, $account, 9900, EventPayout::STATUS_FAILED);
+    duesPayoutScheduled($tenant, $account, 9900);
+    Http::fake();
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $failed->id]))
+        ->assertStatus(422)
+        ->assertExactJson(['message' => 'This payout (9900) is more than the available dues balance (0), so it cannot be sent again.']);
+
+    Http::assertNothingSent();
+    expect($failed->fresh()->status)->toBe(EventPayout::STATUS_FAILED);
+});
+
+test('a failed dues payout the balance still covers can be re-sent', function () {
+    [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
+    $failed = duesPayoutScheduled($tenant, $account, 9900, EventPayout::STATUS_FAILED);
+    Http::fake([
+        'api.paystack.co/transfer' => Http::response(['status' => true, 'data' => ['transfer_code' => 'TRF_dues_retry', 'status' => 'pending']]),
+    ]);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $failed->id]))
+        ->assertOk()
+        ->assertExactJson(['message' => 'Payout sent.', 'transfer_code' => 'TRF_dues_retry']);
+
+    expect($failed->fresh()->status)->toBe(EventPayout::STATUS_PROCESSING);
+});
+
+test('a payout cannot be requested in a currency the organisation holds no dues in', function () {
+    [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 1000, 'currency' => 'XYZ'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['currency' => 'No dues have been collected in that currency.']);
+
+    expect(App\Models\LedgerAccount::on('landlord')->where('tenant_id', $tenant->id)->where('currency', 'XYZ')->exists())->toBeFalse();
+});
+
 test('an event payout cannot be sent through the dues route', function () {
     [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
     $eventPayout = EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => Event::factory()->create(['tenant_id' => $tenant->id])->id, 'payout_account_id' => $account->id]);

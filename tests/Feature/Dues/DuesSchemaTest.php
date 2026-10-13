@@ -89,3 +89,12 @@ test('a dues class lists its members and a member lists its charges', function (
         ->and($charge->member->charges)->toHaveCount(1)
         ->and($charge->duesClass->is($charge->member->duesClass))->toBeTrue();
 });
+
+test('a charge can be recorded by a real user', function () {
+    $tenant = Tenant::factory()->create();
+    $user = App\Models\User::factory()->create(['tenant_id' => $tenant->id]);
+
+    $charge = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'recorded_by' => $user->id]);
+
+    expect($charge->fresh()->recorded_by)->toBe((int) $user->id);
+});
