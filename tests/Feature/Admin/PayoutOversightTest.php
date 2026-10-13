@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
@@ -116,4 +117,24 @@ test('organisation admins cannot reach payouts oversight or release payouts', fu
 
     $this->actingAs($user)->get(route('admin.billing.payouts.index'))->assertForbidden();
     $this->actingAs($user)->post(route('admin.billing.payouts.release', $payout->id), ['otp' => '1'])->assertForbidden();
+});
+
+test('each payout shows its accounting category, including payouts with no event', function (): void {
+    [$tenant] = oversightPayout(EventPayout::STATUS_AWAITING_OTP, ['provider_transfer_code' => 'TRF_9']);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+    EventPayout::create([
+        'tenant_id' => $tenant->id,
+        'category' => LedgerCategoryEnum::Dues,
+        'payout_account_id' => $account->id,
+        'amount' => 12_000,
+        'status' => EventPayout::STATUS_AWAITING_OTP,
+        'provider_transfer_code' => 'TRF_10',
+    ]);
+
+    $this->actingAs($this->superadmin)
+        ->get(route('admin.billing.payouts.index'))
+        ->assertOk()
+        ->assertSee('Event sales')
+        ->assertSee('Health Summit')
+        ->assertSee('Member dues');
 });

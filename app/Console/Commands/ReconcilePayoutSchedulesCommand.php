@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
@@ -67,6 +68,7 @@ final class ReconcilePayoutSchedulesCommand extends Command
         // 1. Check Holdback Release if past release days
         $holdbackAccount = LedgerAccount::on('landlord')
             ->where('event_id', $event->id)
+            ->where('category', LedgerCategoryEnum::Event->value)
             ->where('code', LedgerAccount::CODE_HOLDBACK_RESERVE)
             ->first();
 
@@ -89,6 +91,7 @@ final class ReconcilePayoutSchedulesCommand extends Command
         if ($schedule->isPostEvent() && $event->ends_at && $now->gte($event->ends_at->copy()->addDays($schedule->days_after_event))) {
             $clearingAccount = LedgerAccount::on('landlord')
                 ->where('event_id', $event->id)
+                ->where('category', LedgerCategoryEnum::Event->value)
                 ->where('code', LedgerAccount::CODE_GATEWAY_CLEARING)
                 ->first();
 
@@ -113,6 +116,7 @@ final class ReconcilePayoutSchedulesCommand extends Command
         // 3. Compute available balance and disburse payout if threshold reached
         $payableAccount = LedgerAccount::on('landlord')
             ->where('event_id', $event->id)
+            ->where('category', LedgerCategoryEnum::Event->value)
             ->where('code', LedgerAccount::CODE_ORGANIZER_PAYABLE)
             ->first();
 
@@ -155,6 +159,7 @@ final class ReconcilePayoutSchedulesCommand extends Command
                 $payout = EventPayout::create([
                     'tenant_id' => $event->tenant_id,
                     'event_id' => $event->id,
+                    'category' => LedgerCategoryEnum::Event,
                     'payout_account_id' => $payoutAccount->id,
                     'amount' => $netPayable,
                     'status' => EventPayout::STATUS_SCHEDULED,

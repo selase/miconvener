@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Marketplace;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\LedgerAccount;
 use App\Models\LedgerEntry;
@@ -69,6 +70,7 @@ final class MarketplaceLedger
                 description: "Marketplace payment: {$label}",
                 reference: $reference,
                 entries: $entries,
+                category: LedgerCategoryEnum::Marketplace,
             );
         } catch (Throwable $e) {
             Log::error('Failed to post marketplace payment to ledger', [

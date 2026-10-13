@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Events;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
@@ -105,6 +106,7 @@ test('host can record a payout and mark it paid', function () {
 
     $payout = EventPayout::where('event_id', $event->id)->firstOrFail();
     expect($payout->status)->toBe(EventPayout::STATUS_SCHEDULED);
+    expect($payout->category)->toBe(LedgerCategoryEnum::Event);
 
     $this->actingAs($user)->patchJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}", [
         'status' => 'paid',

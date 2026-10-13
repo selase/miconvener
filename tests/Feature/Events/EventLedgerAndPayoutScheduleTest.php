@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Events;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayoutSchedule;
@@ -195,6 +196,7 @@ test('reconcile payout schedules command processes matured payouts and holdback 
     expect($payouts)->not->toBeEmpty();
     $payout = $payouts->first();
     expect($payout->payout_account_id)->toBe($account->id);
+    expect($payout->category)->toBe(LedgerCategoryEnum::Event);
     expect($payout->amount)->toBe(8_500); // 9,500 net - 1,000 (10% of 10,000 gross) holdback
 });
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,6 +41,7 @@ final class LedgerTransaction extends Model
     protected $fillable = [
         'tenant_id',
         'event_id',
+        'category',
         'reference',
         'description',
         'transaction_type',
@@ -49,6 +51,7 @@ final class LedgerTransaction extends Model
 
     protected $casts = [
         'posted_at' => 'datetime',
+        'category' => LedgerCategoryEnum::class,
     ];
 
     public function event(): BelongsTo
