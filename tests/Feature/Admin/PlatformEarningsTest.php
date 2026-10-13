@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\LedgerAccount;
 use App\Models\LedgerEntry;
 use App\Models\LedgerTransaction;
@@ -33,7 +34,7 @@ function earnCommission(Tenant $tenant, string $type, int $commission, string $r
     app(LedgerService::class)->postTransaction($tenant, null, $type, 'test', $reference, [
         ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => $other, 'amount' => $commission],
         ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => $direction, 'amount' => $commission],
-    ]);
+    ], null, 'GHS', LedgerCategoryEnum::Marketplace);
 }
 
 function paidUs(Tenant $tenant, int $amount, array $meta, array $overrides = []): void

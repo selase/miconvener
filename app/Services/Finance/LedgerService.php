@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Finance;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\Event;
 use App\Models\EventContribution;
 use App\Models\EventLedgerEntry;
@@ -24,8 +25,10 @@ final class LedgerService
      *
      * @return array<string, LedgerAccount>
      */
-    public function ensureAccountsExist(Tenant $tenant, ?Event $event = null, string $currency = 'GHS'): array
+    public function ensureAccountsExist(Tenant $tenant, ?Event $event = null, string $currency = 'GHS', ?LedgerCategoryEnum $category = null): array
     {
+        $category = $this->resolveCategory($event, $category);
+
         $definitions = [
             LedgerAccount::CODE_GATEWAY_CLEARING => [
                 'name' => 'Payment Gateway Clearing',
@@ -60,6 +63,7 @@ final class LedgerService
             $account = LedgerAccount::on('landlord')->firstOrCreate([
                 'tenant_id' => $tenant->id,
                 'event_id' => $eventId,
+                'category' => $category->value,
                 'code' => $code,
                 'currency' => $currency,
             ], [
@@ -88,8 +92,11 @@ final class LedgerService
         string $reference,
         array $entries,
         ?string $userId = null,
-        string $currency = 'GHS'
+        string $currency = 'GHS',
+        ?LedgerCategoryEnum $category = null
     ): LedgerTransaction {
+        $category = $this->resolveCategory($event, $category);
+
         if (empty($entries)) {
             throw new InvalidArgumentException('Cannot post an empty ledger transaction.');
         }
@@ -129,13 +136,14 @@ final class LedgerService
             return $alreadyPosted;
         }
 
-        $accounts = $this->ensureAccountsExist($tenant, $event, $currency);
+        $accounts = $this->ensureAccountsExist($tenant, $event, $currency, $category);
 
         try {
-            return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts): LedgerTransaction {
+            return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts, $category): LedgerTransaction {
                 $transaction = LedgerTransaction::create([
                     'tenant_id' => $tenant->id,
                     'event_id' => $event?->id,
+                    'category' => $category,
                     'reference' => $reference,
                     'description' => $description,
                     'transaction_type' => $transactionType,
@@ -952,6 +960,25 @@ final class LedgerService
             'total_credits' => $totalCredits,
             'accounts' => $rows,
         ];
+    }
+
+    /**
+     * The category a posting belongs to: an explicit one, or `event` when an
+     * event is given. Money with no event must say what it is.
+     */
+    private function resolveCategory(?Event $event, ?LedgerCategoryEnum $category): LedgerCategoryEnum
+    {
+        $category ??= $event !== null ? LedgerCategoryEnum::Event : null;
+
+        if ($category === null) {
+            throw new InvalidArgumentException('A ledger category is required when there is no event.');
+        }
+
+        if (! $category->allowsEvent($event !== null)) {
+            throw new InvalidArgumentException(sprintf('The %s category cannot be posted %s an event.', $category->value, $event !== null ? 'with' : 'without'));
+        }
+
+        return $category;
     }
 
     /**

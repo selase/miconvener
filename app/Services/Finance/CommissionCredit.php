@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Finance;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Models\LedgerAccount;
 use App\Models\LedgerEntry;
 use App\Models\LedgerTransaction;
@@ -118,6 +119,7 @@ final class CommissionCredit
             ],
             null,
             mb_strtoupper($currency),
+            LedgerCategoryEnum::CommissionCredit,
         );
 
         return $taken;
