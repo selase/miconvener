@@ -75,11 +75,6 @@ export default function MarketplaceIndex({
             {/* Hero Section */}
             <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-surface to-canvas py-16 sm:py-24">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-3 py-1 text-xs font-medium text-accent mb-6">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>MiConvener Marketplace: Venues & Event Spaces</span>
-                    </div>
-
                     <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-ink max-w-3xl mx-auto leading-tight">
                         Discover event spaces across Ghana.
                     </h1>
