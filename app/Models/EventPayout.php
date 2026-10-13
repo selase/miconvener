@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
+/**
+ * @property LedgerCategoryEnum|null $category
+ */
 final class EventPayout extends Model
 {
     use BelongsToTenant;
@@ -91,7 +94,7 @@ final class EventPayout extends Model
                 return;
             }
 
-            if ($payout->event_id === null) {
+            if (blank($payout->event_id)) {
                 throw new LogicException('A payout without an event needs an accounting category.');
             }
 
