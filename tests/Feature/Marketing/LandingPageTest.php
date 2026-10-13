@@ -135,3 +135,27 @@ test('homepage feature groups are labelled and each capability has one home', fu
         expect(str_contains($page->getContent(), e($group)))->toBeTrue();
     }
 });
+
+test('hero pairs each use case with relevant copy and responsive local photography', function (): void {
+    $response = $this->get('/')->assertOk();
+    foreach (['Receive abstracts', 'coordinate peer review', 'collect offerings', 'gather tributes'] as $copy) {
+        $response->assertSee($copy);
+    }
+    $document = new DOMDocument;
+    @$document->loadHTML($response->getContent());
+    $xpath = new DOMXPath($document);
+    expect($xpath->query('//*[@data-headline-copy]')->length)->toBe(6)
+        ->and($xpath->query('//img[@data-headline-image]')->length)->toBe(6);
+    $control = $xpath->query('//*[@data-headline-pause]')->item(0);
+    expect($control->getAttribute('aria-label'))->toBe('Pause animation');
+    $images = $xpath->query('//img[@data-headline-image]');
+    foreach (config('product-page.hero.use_cases') as $index => $useCase) {
+        $image = $images->item($index);
+        expect($image->getAttribute($index === 0 ? 'src' : 'data-src'))->toContain('/'.$useCase['key'].'-1600.webp');
+        foreach ([640, 1600] as $width) {
+            $path = public_path('assets/media/hero/'.$useCase['key'].'-'.$width.'.webp');
+            expect(is_file($path))->toBeTrue()
+                ->and(filesize($path))->toBeLessThan(220000);
+        }
+    }
+});

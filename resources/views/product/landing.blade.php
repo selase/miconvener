@@ -7,9 +7,6 @@
     /* ── Field ───────────────────────────────────────────────────────── */
     .field {
         background: var(--field);
-        background-image:
-            radial-gradient(120% 90% at 50% -20%, #3b7bff 0%, rgba(59,123,255,0) 62%),
-            radial-gradient(70% 60% at 88% 4%, rgba(203,242,251,.18) 0%, rgba(203,242,251,0) 70%);
         position: relative; overflow: hidden;
     }
     .field::before {
@@ -21,7 +18,16 @@
         mask-image: radial-gradient(115% 85% at 50% 25%, #000 32%, transparent 80%);
         pointer-events: none;
     }
-    .field > * { position: relative; }
+    .field > * { position: relative; z-index: 2; }
+    .field::before { z-index: 1; }
+    .field > .hero-images { position: absolute; inset: 0 0 auto; height: clamp(600px, 65vw, 720px); z-index: 0; pointer-events: none; }
+    .hero-images::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(21,93,252,.78) 55%, var(--field) 100%); }
+    .hero-images img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 38%; opacity: 0; filter: brightness(.65); transition: opacity .6s ease; }
+    .hero-images img.is-active { opacity: 1; }
+    .hero-copy-phrases { display: grid; }
+    .hero-copy-phrases > span { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity .4s ease; }
+    .hero-copy-phrases > .is-active { opacity: 1; visibility: visible; }
+    [data-headline-image][data-failed] { display: none; }
 
     .hero-title {
         font-size: clamp(2.5rem, 6.2vw, 72px);
@@ -38,13 +44,15 @@
     }
     .hero-headline-phrases > .is-active { opacity: 1; transform: translateY(0); }
     .hero-animation-control {
-        margin-top: .8rem; padding: .35rem .7rem; border-radius: 999px;
+        margin: 1rem auto 0; width: 40px; height: 40px; border-radius: 999px;
+        display: flex; align-items: center; justify-content: center;
         color: #fff; font-size: .75rem; border: 1px solid rgba(255,255,255,.35);
     }
+    .hero-animation-control[hidden], .hero-animation-control svg[hidden] { display: none; }
     .hero-animation-control:hover { background: rgba(255,255,255,.12); }
     .hero-animation-control:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
     @media (prefers-reduced-motion: reduce) {
-        .hero-headline-phrases > span { transition: none; transform: none; }
+        .hero-headline-phrases > span, .hero-copy-phrases > span, .hero-images img { transition: none; transform: none; }
     }
     .hero-sub {
         margin: 1.6rem auto 0; max-width: 38rem;
@@ -257,6 +265,14 @@
 
 {{-- ══ HERO ══════════════════════════════════════════════════════════ --}}
 <section class="field" data-homepage-hero>
+    <div class="hero-images" aria-hidden="true">
+        <img data-headline-image class="is-active" src="{{ asset('assets/media/hero/overview-1600.webp') }}" srcset="{{ asset('assets/media/hero/overview-640.webp') }} 640w, {{ asset('assets/media/hero/overview-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" fetchpriority="high">
+        <img data-headline-image data-src="{{ asset('assets/media/hero/conference-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/conference-640.webp') }} 640w, {{ asset('assets/media/hero/conference-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
+        <img data-headline-image data-src="{{ asset('assets/media/hero/academic-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/academic-640.webp') }} 640w, {{ asset('assets/media/hero/academic-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
+        <img data-headline-image data-src="{{ asset('assets/media/hero/social-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/social-640.webp') }} 640w, {{ asset('assets/media/hero/social-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
+        <img data-headline-image data-src="{{ asset('assets/media/hero/service-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/service-640.webp') }} 640w, {{ asset('assets/media/hero/service-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
+        <img data-headline-image data-src="{{ asset('assets/media/hero/memorial-1600.webp') }}" data-srcset="{{ asset('assets/media/hero/memorial-640.webp') }} 640w, {{ asset('assets/media/hero/memorial-1600.webp') }} 1600w" sizes="100vw" alt="" width="1600" height="900" decoding="async">
+    </div>
     <div class="mx-auto max-w-7xl px-6 pt-24 text-center md:pt-32">
 
         <h1 class="hero-title display" data-hero-headline>
@@ -271,11 +287,18 @@
             </span>
             <em aria-hidden="true">from one place</em>
         </h1>
-        <button type="button" class="hero-animation-control" data-headline-pause hidden>Pause animation</button>
-
-        <p class="hero-sub">
-            {{ config('product-page.hero.subtitle') }}
+        <p class="hero-sub hero-copy-phrases">
+            <span data-headline-copy class="is-active">{{ config('product-page.hero.subtitle') }}</span>
+            <span data-headline-copy aria-hidden="true">{{ config('product-page.hero.use_cases.1.copy') }}</span>
+            <span data-headline-copy aria-hidden="true">{{ config('product-page.hero.use_cases.2.copy') }}</span>
+            <span data-headline-copy aria-hidden="true">{{ config('product-page.hero.use_cases.3.copy') }}</span>
+            <span data-headline-copy aria-hidden="true">{{ config('product-page.hero.use_cases.4.copy') }}</span>
+            <span data-headline-copy aria-hidden="true">{{ config('product-page.hero.use_cases.5.copy') }}</span>
         </p>
+        <button type="button" class="hero-animation-control" data-headline-pause aria-label="Pause animation" title="Pause animation" hidden>
+            <svg data-icon-pause aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
+            <svg data-icon-resume aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" hidden><path d="m7 4 14 8-14 8z" /></svg>
+        </button>
 
         <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
             <a href="{{ route('register', ['plan' => 'free']) }}" class="btn-solid">Start free</a>
@@ -896,24 +919,53 @@
     if (!root || !window.matchMedia) return;
     const phrases = [...root.querySelectorAll('[data-headline-phrase]')];
     const control = document.querySelector('[data-headline-pause]');
+    const copies = [...document.querySelectorAll('[data-headline-copy]')];
+    const images = [...document.querySelectorAll('[data-headline-image]')];
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let index = 0;
     let paused = false;
     let timer;
+    let preloadTimer;
+    const loadImage = position => {
+        const image = images[position];
+        if (!image || image.hasAttribute('src') || image.hasAttribute('data-failed')) return;
+        image.srcset = image.dataset.srcset;
+        image.src = image.dataset.src;
+    };
+    images.forEach(image => image.addEventListener('error', () => {
+        image.setAttribute('data-failed', '');
+        image.classList.remove('is-active');
+    }));
     const show = next => {
         index = next;
+        loadImage(index);
         phrases.forEach((phrase, position) => phrase.classList.toggle('is-active', position === index));
+        copies.forEach((copy, position) => {
+            copy.classList.toggle('is-active', position === index);
+            copy.setAttribute('aria-hidden', String(position !== index));
+        });
+        images.forEach((image, position) => image.classList.toggle('is-active', position === index && !image.hasAttribute('data-failed')));
+        window.clearTimeout(preloadTimer);
+        if (!paused && !motion.matches && !document.hidden) {
+            preloadTimer = window.setTimeout(() => loadImage((index + 1) % images.length), 1500);
+        }
     };
     const sync = () => {
         window.clearInterval(timer);
         control.hidden = motion.matches;
-        control.textContent = paused ? 'Resume animation' : 'Pause animation';
+        window.clearTimeout(preloadTimer);
+        const label = paused ? 'Resume animation' : 'Pause animation';
+        control.setAttribute('aria-label', label);
+        control.title = label;
+        control.querySelector('[data-icon-pause]').toggleAttribute('hidden', paused);
+        control.querySelector('[data-icon-resume]').toggleAttribute('hidden', !paused);
         if (motion.matches) {
             show(0);
             return;
         }
         if (!paused && !document.hidden) {
-            timer = window.setInterval(() => show((index + 1) % phrases.length), 5000);
+            show(index);
+            timer = window.setInterval(() => show((index + 1) % phrases.length), 8000);
         }
     };
     control.addEventListener('click', () => {
