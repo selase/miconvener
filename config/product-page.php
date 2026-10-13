@@ -16,6 +16,7 @@ return [
     'nav' => [
         'links' => [
             ['label' => 'Features', 'href' => '/#features'],
+            ['label' => 'Use cases', 'href' => '/use-cases', 'route' => 'use-cases.index'],
             ['label' => 'Pricing', 'href' => '/#pricing'],
             ['label' => 'Enterprise', 'href' => '/product-enterprise'],
             ['label' => 'Marketplace', 'href' => '/marketplace', 'route' => 'marketplace.index', 'target' => '_blank'],
@@ -241,6 +242,7 @@ return [
         'columns' => [
             'Product' => [
                 ['label' => 'Features', 'href' => '/#features'],
+                ['label' => 'Use cases', 'href' => '/use-cases', 'route' => 'use-cases.index'],
                 ['label' => 'Pricing', 'href' => '/#pricing'],
                 ['label' => 'Enterprise', 'href' => '/product-enterprise'],
                 ['label' => 'Marketplace', 'href' => '/marketplace', 'route' => 'marketplace.index', 'target' => '_blank'],
