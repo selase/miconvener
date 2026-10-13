@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Libraries\Helper;
 use App\Traits\BelongsToTenant;
 use App\Traits\SpatieActivityLogs;
@@ -570,7 +571,7 @@ final class Event extends Model
 
     public function ledgerTransactions(): HasMany
     {
-        return $this->hasMany(LedgerTransaction::class);
+        return $this->hasMany(LedgerTransaction::class)->where('category', LedgerCategoryEnum::Event->value);
     }
 
     public function operationPillars(): HasMany
