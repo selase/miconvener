@@ -569,7 +569,7 @@ test('a refused payment leaves an operational signal so money that arrived unboo
     $signals = app(OperationalSignals::class)->webhookFailuresSince($since, 'processing');
     expect($signals)->toHaveCount(1)
         ->and($signals[0]['detail'])->toContain('ref_own_1')
-        ->and($signals[0]['detail'])->toContain('wrong account');
+        ->and($signals[0]['detail'])->toContain('own Paystack account');
 
     duesSettlementWebhook(duesConfirmMetadata($member, [$charge->id]), 9000, 150, 'ref_short')->assertOk();
 
@@ -598,4 +598,72 @@ test('a callback whose confirmation fails tells the member the payment is being 
 
     Log::shouldHaveReceived('error')->withArgs(fn (string $message, array $context = []): bool => $message === 'dues.callback.confirm_failed'
         && $context['reference'] === 'ref_cb_5')->once();
+});
+
+test('a payment paid into the wrong account leaves a note on the charge, written once', function () {
+    Mail::fake();
+    [$tenant, $member] = duesConfirmFixture();
+    duesOwnGateway($tenant);
+    $charge = duesConfirmCharge($member, 10000);
+
+    duesMerchantWebhook($tenant, duesConfirmMetadata($member, [$charge->id]), 10000, 150)->assertOk();
+    duesMerchantWebhook($tenant, duesConfirmMetadata($member, [$charge->id]), 10000, 150)->assertOk();
+
+    $note = (string) $charge->fresh()->note;
+    expect($charge->fresh()->status)->toBe(DuesChargeStatusEnum::Open)
+        ->and($note)->toContain('Payment ref_own_1 received but not booked:')
+        ->and($note)->toContain('own Paystack account')
+        ->and(mb_substr_count($note, 'ref_own_1'))->toBe(1);
+});
+
+test('a payment the ledger refuses leaves a note on the charge after the rollback', function () {
+    Mail::fake();
+    [, $member] = duesConfirmFixture();
+    $charge = duesConfirmCharge($member, 100);
+
+    duesSettlementWebhook(duesConfirmMetadata($member, [$charge->id]), 100, 100)->assertOk();
+
+    expect($charge->fresh()->status)->toBe(DuesChargeStatusEnum::Open)
+        ->and($charge->fresh()->note)->toStartWith('Payment ref_dues_1 received but not booked: the ledger refused it');
+});
+
+test('a payment that does not cover the charges leaves a note on each charge', function () {
+    Mail::fake();
+    [, $member] = duesConfirmFixture();
+    $first = duesConfirmCharge($member, 10000, '2026-08-01');
+    $second = duesConfirmCharge($member, 5000, '2026-09-01');
+
+    duesSettlementWebhook(duesConfirmMetadata($member, [$first->id, $second->id]), 9000, 150, 'ref_short')->assertOk();
+
+    expect($first->fresh()->note)->toBe('Payment ref_short received but not booked: GHS 9000 does not cover GHS 15000 of charges.')
+        ->and($second->fresh()->note)->toBe('Payment ref_short received but not booked: GHS 9000 does not cover GHS 15000 of charges.')
+        ->and($first->fresh()->status)->toBe(DuesChargeStatusEnum::Open);
+});
+
+test('a payment that matches none of the member\'s charges leaves a note on the member and a signal', function () {
+    Mail::fake();
+    [$tenant, $member] = duesConfirmFixture();
+    $other = Member::factory()->create(['tenant_id' => $tenant->id]);
+    $othersCharge = duesConfirmCharge($other, 10000);
+
+    duesSettlementWebhook(duesConfirmMetadata($member, [$othersCharge->id]), 10000, 150, 'ref_none')->assertOk();
+
+    expect($othersCharge->fresh()->status)->toBe(DuesChargeStatusEnum::Open)
+        ->and($othersCharge->fresh()->note)->toBeNull()
+        ->and((string) $member->fresh()->notes)->toContain('Payment ref_none received but not booked: it named none of this member\'s charges.')
+        ->and(app(OperationalSignals::class)->webhookFailuresSince(now()->subMinute()->toImmutable(), 'processing'))->toHaveCount(1);
+});
+
+test('a payment naming an organisation that does not exist is logged and signalled', function () {
+    Mail::fake();
+    Log::spy();
+    [, $member] = duesConfirmFixture();
+    $charge = duesConfirmCharge($member, 10000);
+
+    duesSettlementWebhook(duesConfirmMetadata($member, [$charge->id], ['tenant_id' => (string) Illuminate\Support\Str::uuid()]), 10000, 150, 'ref_ghost')->assertOk();
+
+    expect($charge->fresh()->status)->toBe(DuesChargeStatusEnum::Open)
+        ->and(app(OperationalSignals::class)->webhookFailuresSince(now()->subMinute()->toImmutable(), 'processing'))->toHaveCount(1);
+    Log::shouldHaveReceived('error')->withArgs(fn (string $message, array $context = []): bool => $message === 'dues.payment.unknown_tenant'
+        && $context['reference'] === 'ref_ghost')->once();
 });

@@ -24,7 +24,10 @@ function Notice({ tone, children }) {
 }
 
 function Shell({ organisation, children }) {
-    const { flash } = usePage().props;
+    const { flash, errors } = usePage().props;
+    // A refused checkout comes back as validation errors keyed by charge
+    // (charge_ids.0, charge_ids.1, ...), often with the same message.
+    const validationMessages = [...new Set(Object.values(errors ?? {}))];
 
     return (
         <div className="min-h-screen bg-canvas font-console text-ink">
@@ -47,6 +50,11 @@ function Shell({ organisation, children }) {
 
                 <div className="space-y-3">
                     {flash?.error && <Notice tone="error">{flash.error}</Notice>}
+                    {validationMessages.map((message) => (
+                        <Notice key={message} tone="error">
+                            {message}
+                        </Notice>
+                    ))}
                     {flash?.info && <Notice tone="info">{flash.info}</Notice>}
                     {flash?.success && <Notice tone="success">{flash.success}</Notice>}
                 </div>

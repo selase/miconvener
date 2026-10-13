@@ -166,7 +166,7 @@ function OtpModal({ payout, onClose, onDone }) {
     );
 }
 
-export default function Payouts({ balances, accounts, payouts }) {
+export default function Payouts({ balances, accounts, payouts, canManagePayouts = false }) {
     const showToast = useToast();
     const [modal, setModal] = useState(null);
     const [sending, setSending] = useState(null);
@@ -202,14 +202,16 @@ export default function Payouts({ balances, accounts, payouts }) {
             <PageHeader
                 title="Dues payouts"
                 actions={
-                    <Button
-                        icon={Plus}
-                        variant="primary"
-                        disabled={!canRequest}
-                        onClick={() => setModal({ kind: 'request' })}
-                    >
-                        Request payout
-                    </Button>
+                    canManagePayouts && (
+                        <Button
+                            icon={Plus}
+                            variant="primary"
+                            disabled={!canRequest}
+                            onClick={() => setModal({ kind: 'request' })}
+                        >
+                            Request payout
+                        </Button>
+                    )
                 }
             />
 
@@ -282,15 +284,18 @@ export default function Payouts({ balances, accounts, payouts }) {
                                 </Td>
                                 <Td>
                                     <div className="flex justify-end gap-2">
-                                        {['scheduled', 'failed'].includes(payout.status) && (
-                                            <Button
-                                                disabled={sending === payout.id}
-                                                onClick={() => send(payout)}
-                                            >
-                                                {payout.status === 'failed' ? 'Send again' : 'Send'}
-                                            </Button>
-                                        )}
-                                        {payout.status === 'awaiting_otp' && (
+                                        {canManagePayouts &&
+                                            ['scheduled', 'failed'].includes(payout.status) && (
+                                                <Button
+                                                    disabled={sending === payout.id}
+                                                    onClick={() => send(payout)}
+                                                >
+                                                    {payout.status === 'failed'
+                                                        ? 'Send again'
+                                                        : 'Send'}
+                                                </Button>
+                                            )}
+                                        {canManagePayouts && payout.status === 'awaiting_otp' && (
                                             <Button
                                                 onClick={() => setModal({ kind: 'otp', payout })}
                                             >

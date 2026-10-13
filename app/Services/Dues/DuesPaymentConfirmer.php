@@ -8,6 +8,7 @@ use App\Enum\DuesChargeStatusEnum;
 use App\Http\Controllers\Tenant\Commerce\WebhookController;
 use App\Mail\DuesReceipt;
 use App\Models\DuesCharge;
+use App\Models\Member;
 use App\Models\Tenant;
 use App\Services\Finance\LedgerService;
 use App\Services\Operations\OperationalSignals;
@@ -78,6 +79,9 @@ final class DuesPaymentConfirmer
         $tenant = Tenant::find($tenantId);
 
         if (! $tenant instanceof Tenant) {
+            Log::error('dues.payment.unknown_tenant', ['tenant_id' => $tenantId, 'member_id' => $memberId, 'reference' => $reference]);
+            $this->signals->recordWebhookFailure('processing', "dues payment {$reference} not booked: organisation {$tenantId} does not exist");
+
             return [];
         }
 
@@ -90,7 +94,10 @@ final class DuesPaymentConfirmer
                 'settled_by' => $gatewayData['settled_by'] ?? null,
                 'expected' => $expectedAccount,
             ]);
-            $this->signalUnbooked($reference, 'paid into the wrong account ('.((string) ($gatewayData['settled_by'] ?? 'unknown'))." for an organisation that settles by {$expectedAccount})");
+            $paidInto = ($gatewayData['settled_by'] ?? null) === self::SETTLED_BY_OWN_GATEWAY
+                ? "the organisation's own Paystack account"
+                : "the platform's account";
+            $this->refuse($tenant, $memberId, $chargeIds, $reference, "it was paid into {$paidInto}, which this organisation does not settle through");
 
             return [];
         }
@@ -113,7 +120,7 @@ final class DuesPaymentConfirmer
                 'reference' => $reference,
                 'error' => $e->getMessage(),
             ]);
-            $this->signalUnbooked($reference, "the ledger refused it: {$e->getMessage()}");
+            $this->refuse($tenant, $memberId, $chargeIds, $reference, "the ledger refused it ({$e->getMessage()})");
 
             return [];
         }
@@ -159,6 +166,8 @@ final class DuesPaymentConfirmer
         }
 
         if ($charges->isEmpty()) {
+            $this->refuse($tenant, $memberId, $chargeIds, $reference, "it named none of this member's charges");
+
             return [];
         }
 
@@ -181,7 +190,7 @@ final class DuesPaymentConfirmer
                 'currency' => $reportedCurrency,
                 'expected_currency' => $currency,
             ]);
-            $this->signalUnbooked($reference, "{$reportedCurrency} {$gross} does not cover {$currency} {$chargesTotal} of charges");
+            $this->refuse($tenant, $memberId, $chargeIds, $reference, "{$reportedCurrency} {$gross} does not cover {$currency} {$chargesTotal} of charges");
 
             return [];
         }
@@ -243,13 +252,43 @@ final class DuesPaymentConfirmer
     }
 
     /**
-     * Money that reached a gateway but was not booked: raised as a webhook
-     * processing failure, which the health check and the daily billing
-     * summary both surface.
+     * Money that reached a gateway but was not booked. Besides the log line
+     * the caller writes, it leaves two trails: a webhook processing failure,
+     * which the health check and the daily billing summary surface, and a
+     * durable note for the organisation on each charge the payment named, or
+     * on the member when it named none of theirs. The note is written once
+     * however often the payment is redelivered.
+     *
+     * @param  array<int, string>  $chargeIds
      */
-    private function signalUnbooked(string $reference, string $reason): void
+    private function refuse(Tenant $tenant, string $memberId, array $chargeIds, string $reference, string $reason): void
     {
         $this->signals->recordWebhookFailure('processing', "dues payment {$reference} not booked: {$reason}");
+
+        $line = "Payment {$reference} received but not booked: {$reason}.";
+        $marker = "Payment {$reference} received but not booked";
+
+        $charges = DuesCharge::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('member_id', $memberId)
+            ->whereIn('id', $chargeIds)
+            ->get();
+
+        foreach ($charges as $charge) {
+            if (! str_contains((string) $charge->note, $marker)) {
+                $charge->update(['note' => filled($charge->note) ? "{$charge->note}\n{$line}" : $line]);
+            }
+        }
+
+        if ($charges->isNotEmpty()) {
+            return;
+        }
+
+        $member = Member::query()->where('tenant_id', $tenant->id)->find($memberId);
+
+        if ($member instanceof Member && ! str_contains((string) $member->notes, $marker)) {
+            $member->update(['notes' => filled($member->notes) ? "{$member->notes}\n{$line}" : $line]);
+        }
     }
 
     private function wasPaidBy(DuesCharge $charge, string $reference): bool
@@ -267,7 +306,7 @@ final class DuesPaymentConfirmer
     {
         $line = "Payment {$reference} received again after this charge was {$charge->status->value}.";
 
-        if (str_contains((string) $charge->note, "Payment {$reference} ")) {
+        if (str_contains((string) $charge->note, "Payment {$reference} received again")) {
             return;
         }
 

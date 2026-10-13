@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Console\Commands\Events;
 
 use App\Contracts\SettlementGateway;
+use App\Enum\LedgerCategoryEnum;
 use App\Exceptions\PaymentFailedException;
+use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
+use App\Services\Finance\LedgerService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -44,6 +47,8 @@ final class ReconcileStuckPayouts extends Command
             ->where('status', EventPayout::STATUS_PROCESSING)
             ->whereNotNull('provider_reference')
             ->where('updated_at', '<=', $threshold)
+            ->orderBy('updated_at')
+            ->orderBy('id')
             ->get();
 
         if ($stuck->isEmpty()) {
@@ -66,7 +71,14 @@ final class ReconcileStuckPayouts extends Command
                 continue;
             }
 
-            $this->resolve($payout, (string) $status);
+            try {
+                $this->resolve($payout, (string) $status);
+            } catch (Throwable $e) {
+                // One payout that cannot be settled must not stop the rest of
+                // the run; it stays in processing for the next one.
+                Log::error("Could not reconcile payout {$payout->id}: ".$e->getMessage());
+                $this->error("  {$payout->id}: could not reconcile — {$e->getMessage()}");
+            }
         }
 
         return self::SUCCESS;
@@ -85,12 +97,42 @@ final class ReconcileStuckPayouts extends Command
                 }
 
                 $locked->update(['status' => EventPayout::STATUS_PAID, 'paid_at' => now()]);
+                $ledger = app(LedgerService::class);
+
+                /*
+                 * The same branches as the transfer webhook: a dues payout is
+                 * posted in the dues category on the transfer reference the
+                 * webhook would use, so whichever lands first posts it once;
+                 * any other payout without an event is settled elsewhere.
+                 */
+                if ($locked->category === LedgerCategoryEnum::Dues) {
+                    $ledger->recordDuesPayout(
+                        $locked->tenant,
+                        (int) $locked->amount,
+                        (string) $locked->provider_reference,
+                        $locked,
+                        (string) $locked->currency
+                    );
+
+                    return;
+                }
+
+                $event = $locked->event;
+
+                if (! $event instanceof Event) {
+                    Log::warning('Reconciled transfer for an event-less payout outside the dues category; no ledger posting made here', [
+                        'payout_id' => $locked->id,
+                        'category' => $locked->category?->value,
+                    ]);
+
+                    return;
+                }
 
                 if (! $locked->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->exists()) {
                     // Inside the same idempotency guard as the entry above, so
                     // a re-run cannot double-post.
-                    app(\App\Services\Finance\LedgerService::class)->recordPayout(
-                        $locked->event,
+                    $ledger->recordPayout(
+                        $event,
                         (int) $locked->amount,
                         (string) $locked->provider_reference,
                         $locked

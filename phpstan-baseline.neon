@@ -61,12 +61,6 @@ parameters:
 			path: app/Console/Commands/Events/ReconcileStuckPayouts.php
 
 		-
-			rawMessage: 'Parameter #1 $event of method App\Services\Finance\LedgerService::recordPayout() expects App\Models\Event, Illuminate\Database\Eloquent\Model|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/Events/ReconcileStuckPayouts.php
-
-		-
 			rawMessage: Left side of && is always true.
 			identifier: booleanAnd.leftAlwaysTrue
 			count: 2

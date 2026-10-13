@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $amount Minor currency units.
  * @property DuesPeriodEnum $period
+ * @property-read bool|null $charges_exists Set by withExists('charges') or loadExists('charges').
  */
 final class DuesClass extends Model
 {
@@ -47,5 +48,13 @@ final class DuesClass extends Model
     public function members(): HasMany
     {
         return $this->hasMany(Member::class);
+    }
+
+    /**
+     * @return HasMany<DuesCharge, $this>
+     */
+    public function charges(): HasMany
+    {
+        return $this->hasMany(DuesCharge::class);
     }
 }

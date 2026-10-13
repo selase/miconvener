@@ -89,3 +89,78 @@ test('a payout that has only just started processing is not chased yet', functio
     expect($payout->fresh())->status->toBe(EventPayout::STATUS_PROCESSING);
     Http::assertNothingSent();
 });
+
+function stuckDuesPayout(array $attributes = []): EventPayout
+{
+    $tenant = Tenant::factory()->create(['isolation_mode' => 'shared']);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+
+    return EventPayout::factory()->create([
+        'tenant_id' => $tenant->id,
+        'event_id' => null,
+        'category' => \App\Enum\LedgerCategoryEnum::Dues,
+        'payout_account_id' => $account->id,
+        'amount' => 4_000,
+        'currency' => 'GHS',
+        'status' => EventPayout::STATUS_PROCESSING,
+        'provider_reference' => 'payout_ref_dues_stuck',
+        'updated_at' => now()->subHours(2),
+        ...$attributes,
+    ]);
+}
+
+test('a stuck dues payout whose transfer succeeded is marked paid with one dues ledger posting, and a re-run changes nothing', function () {
+    Http::fake(['api.paystack.co/transfer/verify/*' => Http::response(['data' => ['status' => 'success']])]);
+
+    $payout = stuckDuesPayout();
+    $postings = fn () => \App\Models\LedgerTransaction::where('tenant_id', $payout->tenant_id)
+        ->where('reference', 'payout_ref_dues_stuck')
+        ->where('transaction_type', \App\Models\LedgerTransaction::TYPE_PAYOUT)
+        ->get();
+
+    expect(Artisan::call('payouts:reconcile'))->toBe(0);
+
+    expect($payout->fresh())->status->toBe(EventPayout::STATUS_PAID)->paid_at->not->toBeNull();
+    expect($postings())->toHaveCount(1)
+        ->and($postings()->first()->category)->toBe(\App\Enum\LedgerCategoryEnum::Dues);
+
+    Artisan::call('payouts:reconcile');
+
+    expect($postings())->toHaveCount(1);
+});
+
+test('a dues payout does not stop an event payout later in the same run from being reconciled', function () {
+    Http::fake(['api.paystack.co/transfer/verify/*' => Http::response(['data' => ['status' => 'success']])]);
+
+    $dues = stuckDuesPayout();
+    $event = stuckPayout();
+
+    expect(Artisan::call('payouts:reconcile'))->toBe(0);
+
+    expect($dues->fresh()->status)->toBe(EventPayout::STATUS_PAID)
+        ->and($event->fresh()->status)->toBe(EventPayout::STATUS_PAID)
+        ->and($event->fresh()->ledgerEntries()->where('type', EventLedgerEntry::TYPE_PAYOUT)->count())->toBe(1);
+});
+
+test('a stuck dues payout whose transfer failed is marked failed and posts nothing', function () {
+    Http::fake(['api.paystack.co/transfer/verify/*' => Http::response(['data' => ['status' => 'reversed']])]);
+
+    $payout = stuckDuesPayout();
+
+    Artisan::call('payouts:reconcile');
+
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_FAILED)
+        ->and($payout->fresh()->failure_reason)->toContain('reversed')
+        ->and(\App\Models\LedgerTransaction::where('tenant_id', $payout->tenant_id)->count())->toBe(0);
+});
+
+test('a stuck event-less payout outside the dues category is marked paid but posts nothing', function () {
+    Http::fake(['api.paystack.co/transfer/verify/*' => Http::response(['data' => ['status' => 'success']])]);
+
+    $payout = stuckDuesPayout(['category' => \App\Enum\LedgerCategoryEnum::CommissionCredit, 'provider_reference' => 'payout_ref_other']);
+
+    expect(Artisan::call('payouts:reconcile'))->toBe(0);
+
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PAID)
+        ->and(\App\Models\LedgerTransaction::where('tenant_id', $payout->tenant_id)->count())->toBe(0);
+});

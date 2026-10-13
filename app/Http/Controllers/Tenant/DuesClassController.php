@@ -28,6 +28,7 @@ final class DuesClassController extends Controller
         $classes = DuesClass::query()
             ->where('tenant_id', $tenant->id)
             ->withCount('members')
+            ->withExists('charges')
             ->orderBy('name')
             ->get();
 
@@ -46,7 +47,7 @@ final class DuesClassController extends Controller
             'is_active' => true,
         ]);
 
-        return response()->json($this->payload($class->loadCount('members')), 201);
+        return response()->json($this->payload($class->loadCount('members')->loadExists('charges')), 201);
     }
 
     public function update(UpdateDuesClassRequest $request, string $subdomain, string $class): JsonResponse
@@ -54,7 +55,7 @@ final class DuesClassController extends Controller
         $model = DuesClass::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($class);
         $model->update($request->validated());
 
-        return response()->json($this->payload($model->loadCount('members')));
+        return response()->json($this->payload($model->loadCount('members')->loadExists('charges')));
     }
 
     /**
@@ -70,6 +71,7 @@ final class DuesClassController extends Controller
             'period' => $class->period->value,
             'is_active' => $class->is_active,
             'member_count' => (int) $class->members_count,
+            'has_charges' => (bool) $class->charges_exists,
         ];
     }
 

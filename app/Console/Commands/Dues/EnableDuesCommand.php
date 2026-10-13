@@ -33,6 +33,7 @@ final class EnableDuesCommand extends Command
             ['feature_key' => 'member_dues'],
             ['enabled' => $enabled, 'meta' => $meta],
         );
+        // FeatureService::enabled() (the `feature` middleware and @feature) caches this key.
         Cache::forget("tenant_{$tenant->id}_feature_member_dues");
 
         $this->info('Member dues '.($enabled ? 'enabled' : 'disabled')." for {$tenant->slug}.");

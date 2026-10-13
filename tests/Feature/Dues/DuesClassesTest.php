@@ -177,3 +177,38 @@ test('a class amount below the minimum charge is rejected on create and edit', f
         ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Student', 'amount' => 100, 'currency' => 'GHS', 'period' => 'monthly'])
         ->assertCreated();
 });
+
+test('a class with charges keeps its currency and period but can still be renamed and repriced', function () {
+    [$tenant, $user] = duesClassesTenant();
+    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member', 'currency' => 'GHS', 'period' => 'monthly']);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    App\Models\DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id]);
+    $update = fn (array $changes) => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $class->id]), [
+            'name' => 'Full member', 'amount' => 5000, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true, ...$changes,
+        ]);
+
+    $update(['currency' => 'NGN', 'period' => 'yearly'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'currency' => 'This class already has charges, so its currency cannot change. Create a new class instead.',
+            'period' => 'This class already has charges, so its billing period cannot change. Create a new class instead.',
+        ]);
+
+    expect($class->fresh()->currency)->toBe('GHS')->and($class->fresh()->period)->toBe(DuesPeriodEnum::Monthly);
+
+    $update(['name' => 'Full member (2027)', 'amount' => 6000])->assertOk()->assertJsonPath('has_charges', true);
+    expect($class->fresh()->amount)->toBe(6000);
+});
+
+test('a class without charges can change its currency and period', function () {
+    [$tenant, $user] = duesClassesTenant();
+    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $class->id]), ['name' => 'Full member', 'amount' => 5000, 'currency' => 'NGN', 'period' => 'yearly', 'is_active' => true])
+        ->assertOk()
+        ->assertJsonPath('has_charges', false);
+
+    expect($class->fresh()->currency)->toBe('NGN');
+});

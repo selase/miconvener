@@ -255,3 +255,20 @@ test('an override between zero and the minimum charge is rejected', function () 
         ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 100]))
         ->assertCreated();
 });
+
+test('an override of zero waives the member\'s dues and is accepted on create and edit', function () {
+    [$tenant, $user, $class] = duesMembersTenant();
+    $console = fn () => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')]);
+
+    $id = $console()->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 0]))
+        ->assertCreated()
+        ->json('id');
+
+    expect(Member::query()->findOrFail($id)->amount_override)->toBe(0);
+
+    $other = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'phone' => '0244000099', 'amount_override' => 3000]);
+    $console()->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $other->id]), duesMemberPayload($class, ['phone' => '0244000099', 'email' => null, 'amount_override' => 0]))
+        ->assertOk();
+
+    expect($other->fresh()->amount_override)->toBe(0)->and($other->fresh()->effectiveAmount())->toBe(0);
+});

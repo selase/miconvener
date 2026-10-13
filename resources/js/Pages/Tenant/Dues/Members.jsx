@@ -41,9 +41,13 @@ const CHARGE_ACTIONS = {
     },
 };
 
-function memberPill(member) {
+export function memberPill(member) {
     if (member.status === 'exited') {
         return <StatusPill status="neutral">Exited</StatusPill>;
+    }
+
+    if (member.status === 'lapsed') {
+        return <StatusPill status="pending">Lapsed</StatusPill>;
     }
 
     if (member.overdue) {

@@ -315,3 +315,15 @@ test('a confirmed transfer for an event-less payout of another category is left 
     expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PAID)
         ->and(LedgerTransaction::where('tenant_id', $tenant->id)->where('reference', 'payout_cc_1')->count())->toBe(0);
 });
+
+test('the payouts page tells the client whether the user may request and send payouts', function () {
+    [$tenant, $admin] = duesPayoutTenantWithBalance(10000);
+    $reader = User::factory()->create(['tenant_id' => $tenant->id]);
+    $tenant->users()->attach($reader->id);
+    $reader->givePermissionTo('read finance');
+    $page = fn (User $user) => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->get(route('tenant.dues.payouts.index', ['subdomain' => 'acme']));
+
+    $page($admin)->assertOk()->assertInertia(fn (Assert $p) => $p->where('canManagePayouts', true)->etc());
+    $page($reader)->assertOk()->assertInertia(fn (Assert $p) => $p->where('canManagePayouts', false)->etc());
+});

@@ -17,6 +17,7 @@ const PERIODS = { monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' }
 
 function ClassFormModal({ duesClass, onClose, onSaved }) {
     const editing = duesClass !== null;
+    const locked = editing && duesClass.has_charges;
     const [form, setForm] = useState({
         name: duesClass?.name ?? '',
         amount: toMajorUnits(duesClass?.amount),
@@ -86,6 +87,7 @@ function ClassFormModal({ duesClass, onClose, onSaved }) {
                         maxLength={3}
                         onChange={(e) => setForm({ ...form, currency: e.target.value })}
                         error={errors.currency}
+                        disabled={locked}
                         required
                     />
                 </div>
@@ -94,6 +96,7 @@ function ClassFormModal({ duesClass, onClose, onSaved }) {
                     value={form.period}
                     onChange={(e) => setForm({ ...form, period: e.target.value })}
                     error={errors.period}
+                    disabled={locked}
                 >
                     {Object.entries(PERIODS).map(([value, label]) => (
                         <option key={value} value={value}>
@@ -101,6 +104,12 @@ function ClassFormModal({ duesClass, onClose, onSaved }) {
                         </option>
                     ))}
                 </Select>
+                {locked && (
+                    <p className="text-sm text-ink-secondary">
+                        This class already has charges, so its currency and billing period are
+                        fixed. Create a new class to bill differently.
+                    </p>
+                )}
                 <Button type="submit" variant="primary" disabled={processing}>
                     {editing ? 'Save changes' : 'Add class'}
                 </Button>

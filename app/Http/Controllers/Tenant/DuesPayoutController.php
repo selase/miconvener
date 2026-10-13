@@ -84,6 +84,7 @@ final class DuesPayoutController extends Controller
                 'payout_account_label' => $p->payoutAccount?->label,
                 'payout_account_masked_number' => $p->payoutAccount?->maskedAccountNumber(),
             ])->values(),
+            'canManagePayouts' => (bool) request()->user()?->can('manage payouts'),
         ]);
     }
 
