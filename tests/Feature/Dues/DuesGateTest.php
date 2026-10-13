@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Package;
 use App\Models\Tenant;
 use App\Models\TenantFeature;
 use Illuminate\Support\Facades\Artisan;
@@ -19,7 +20,7 @@ test('dues are off for a tenant until enabled', function () {
 });
 
 test('dues:enable switches dues on as an admin override that a feature sync keeps', function () {
-    $tenant = Tenant::factory()->create(['slug' => 'union']);
+    $tenant = Tenant::factory()->create(['slug' => 'union', 'package_id' => Package::factory()->create()->id]);
 
     $this->artisan('dues:enable', ['tenant' => 'union'])->assertSuccessful();
     expect($tenant->fresh()->duesEnabled())->toBeTrue();
@@ -44,10 +45,21 @@ test('dues:enable fails clearly for an unknown tenant', function () {
     $this->artisan('dues:enable', ['tenant' => 'nope'])->assertFailed();
 });
 
-test('org superadmin and org admin roles hold manage members, other roles do not', function () {
-    [$tenant, $user] = eventHost('acme');
+test('org superadmin and org admin roles hold manage members, event staff do not', function () {
+    [$tenant, $owner] = eventHost('acme');
 
-    expect($user->can('manage members'))->toBeTrue();
+    foreach (['Org Admin' => true, 'Event Staff' => false] as $role => $expected) {
+        $user = App\Models\User::factory()->create(['tenant_id' => $tenant->id]);
+        setPermissionsTeamId($tenant->id);
+        $user->assignRole($role);
+
+        expect($user->can('manage members'))->toBe($expected);
+    }
+
+    expect($owner->can('manage members'))->toBeTrue();
+});
+
+test('the dues platform fee defaults to one percent', function () {
     expect(config('services.dues.platform_fee_percentage'))->toBe(1.0);
 });
 
