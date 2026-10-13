@@ -26,7 +26,52 @@ return [
 
     'hero' => [
         'title' => "Run the whole event\nfrom one place",
-        'subtitle' => 'Bring programmes, people, payments and places together. Plan the event, equip your crew, engage your guests and keep the venue ready—from the first registration to the final settlement.',
+        'subtitle' => 'Bring programmes, people, payments and places together—from the first registration to the final settlement.',
+        'use_cases' => [
+            [
+                'key' => 'overview',
+                'image_key' => 'service',
+                'copy' => '',
+                'photographer' => null,
+                'photo_source' => 'https://images.unsplash.com/photo-1582192903020-8a5e59dcdcf2',
+                'photo_license' => 'https://unsplash.com/license',
+            ],
+            [
+                'key' => 'conference',
+                'copy' => 'Coordinate speakers, sessions and registrations. Welcome delegates, engage your audience and keep your crew connected.',
+                'photographer' => 'Jakob Dalbjörn',
+                'photo_source' => 'https://unsplash.com/photos/people-inside-conference-cuKJre3nyYc',
+                'photo_license' => 'https://unsplash.com/license',
+            ],
+            [
+                'key' => 'academic',
+                'copy' => 'Receive abstracts, coordinate peer review and build your programme. Issue certificates and publish an abstract book.',
+                'photographer' => 'Vitaly Gariev',
+                'photo_source' => 'https://unsplash.com/photos/professor-lecturing-students-in-a-university-lecture-hall-nrE0LK_qN7E',
+                'photo_license' => 'https://unsplash.com/license',
+            ],
+            [
+                'key' => 'social',
+                'copy' => 'Manage invitations, tickets and guest arrivals. Coordinate your venue and crew, and keep everyone informed.',
+                'photographer' => 'Andrii Solok',
+                'photo_source' => 'https://unsplash.com/photos/friends-gathered-around-a-table-with-food-and-candles-YfidYnwtXok',
+                'photo_license' => 'https://unsplash.com/license',
+            ],
+            [
+                'key' => 'service',
+                'copy' => 'Organise recurring gatherings, welcome your community and collect offerings. Keep announcements and prayer messages connected.',
+                'photographer' => null,
+                'photo_source' => 'https://images.unsplash.com/photo-1582192903020-8a5e59dcdcf2',
+                'photo_license' => 'https://unsplash.com/license',
+            ],
+            [
+                'key' => 'memorial',
+                'copy' => 'Share arrangements, welcome guests and gather tributes. Coordinate the gathering and collect contributions in one place.',
+                'photographer' => 'Mike Labrum',
+                'photo_source' => 'https://unsplash.com/photos/low-angle-photo-of-lightened-candles-fvl4b1gjpbk',
+                'photo_license' => 'https://unsplash.com/license',
+            ],
+        ],
         'cta_primary' => ['label' => 'Start Free', 'href' => '/register'],
         'cta_secondary' => ['label' => 'See pricing', 'href' => '/#pricing'],
     ],
