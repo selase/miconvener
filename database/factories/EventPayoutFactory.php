@@ -22,6 +22,7 @@ final class EventPayoutFactory extends Factory
             'event_id' => Event::factory(),
             'payout_account_id' => TenantPayoutAccount::factory(),
             'amount' => 120_000,
+            'currency' => 'GHS',
             'status' => EventPayout::STATUS_SCHEDULED,
             'scheduled_at' => now()->addDays(3),
         ];
