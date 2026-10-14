@@ -156,3 +156,56 @@ test('an otp response with no transfer to release fails rather than stranding th
     // not park — it has to stay in a state the organizer can act on.
     expect($payout->refresh()->status)->toBe(EventPayout::STATUS_FAILED);
 });
+
+test('a code entered after the transfer expired fails the payout so it can be sent again', function () {
+    [, $user, $event, $payout, $host] = otpPayoutFixture();
+    $payout->update(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_transfer_code' => 'TRF_otp_1', 'provider_reference' => 'payout_ref_otp_1']);
+
+    Http::fake([
+        'api.paystack.co/transfer/finalize_transfer' => Http::response(['status' => false, 'message' => 'Transfer is not currently awaiting OTP'], 400),
+        'api.paystack.co/transfer/verify/payout_ref_otp_1' => Http::response(['status' => true, 'data' => ['status' => 'abandoned']]),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/finalize", ['otp' => '123456'], ['HTTP_HOST' => $host])
+        ->assertStatus(422)
+        ->assertJsonPath('message', 'The one-time code expired before it was entered. Send the payout again.');
+
+    expect($payout->refresh()->status)->toBe(EventPayout::STATUS_FAILED)
+        ->and($payout->failure_reason)->toBe('The one-time code expired before it was entered. Send the payout again.');
+});
+
+test('a rejected code on a transfer still waiting shows the provider\'s own message, not the raw response', function () {
+    [, $user, $event, $payout, $host] = otpPayoutFixture();
+    $payout->update(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_transfer_code' => 'TRF_otp_1', 'provider_reference' => 'payout_ref_otp_1']);
+
+    Http::fake([
+        'api.paystack.co/transfer/finalize_transfer' => Http::response(['status' => false, 'message' => 'Velocity alarm triggered. Please try again'], 400),
+        'api.paystack.co/transfer/verify/payout_ref_otp_1' => Http::response(['status' => true, 'data' => ['status' => 'otp']]),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/finalize", ['otp' => '000000'], ['HTTP_HOST' => $host])
+        ->assertStatus(422)
+        ->assertJsonPath('message', 'The one-time code was not accepted: Velocity alarm triggered. Please try again');
+
+    expect($payout->refresh()->status)->toBe(EventPayout::STATUS_AWAITING_OTP)
+        ->and($payout->failure_reason)->not->toContain('HTTP request returned');
+});
+
+test('when the transfer cannot be checked after a rejected code the payout keeps waiting', function () {
+    [, $user, $event, $payout, $host] = otpPayoutFixture();
+    $payout->update(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_transfer_code' => 'TRF_otp_1', 'provider_reference' => 'payout_ref_otp_1']);
+
+    Http::fake([
+        'api.paystack.co/transfer/finalize_transfer' => Http::response(['status' => false, 'message' => 'Invalid OTP'], 400),
+        'api.paystack.co/transfer/verify/*' => Http::response(['message' => 'down'], 500),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/finalize", ['otp' => '000000'], ['HTTP_HOST' => $host])
+        ->assertStatus(422)
+        ->assertJsonPath('message', 'The one-time code was not accepted: Invalid OTP');
+
+    expect($payout->refresh()->status)->toBe(EventPayout::STATUS_AWAITING_OTP);
+});

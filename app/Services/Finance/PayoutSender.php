@@ -67,7 +67,7 @@ final class PayoutSender
             $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
             $transfer = $this->settlementGateway->initiateTransfer($account->recipient_code, $netToSend, $currency, $reference);
         } catch (PaymentFailedException $e) {
-            return ['message' => 'Could not send payout: '.$e->getMessage(), 'http_status' => 502];
+            return ['message' => 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
         }
 
         $transferStatus = (string) ($transfer['status'] ?? '');

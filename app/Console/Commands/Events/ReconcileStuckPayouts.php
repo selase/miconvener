@@ -11,6 +11,7 @@ use App\Models\Event;
 use App\Models\EventLedgerEntry;
 use App\Models\EventPayout;
 use App\Services\Finance\LedgerService;
+use App\Services\Finance\PayoutRelease;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,34 +31,44 @@ final class ReconcileStuckPayouts extends Command
      *
      * @var string
      */
-    protected $signature = 'payouts:reconcile {--minutes=30 : How long a payout may sit in processing before it is chased}';
+    protected $signature = 'payouts:reconcile
+        {--minutes=30 : How long a payout may sit in processing before it is chased}
+        {--otp-minutes=35 : How long a payout may wait for a one-time code before its transfer is checked for expiry}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Ask the settlement provider to resolve payouts stuck in processing';
+    protected $description = 'Ask the settlement provider to resolve payouts stuck in processing or left waiting for an expired one-time code';
 
     public function handle(SettlementGateway $settlementGateway): int
     {
         $threshold = now()->subMinutes((int) $this->option('minutes'));
+        $otpThreshold = now()->subMinutes((int) $this->option('otp-minutes'));
 
+        /*
+         * A payout parked for a one-time code holds its balance until the
+         * code is entered. Paystack abandons the transfer once the code
+         * expires, after which no code is accepted, so a payout still waiting
+         * past the code's lifetime is checked and failed if the transfer died.
+         */
         $stuck = EventPayout::query()
-            ->where('status', EventPayout::STATUS_PROCESSING)
             ->whereNotNull('provider_reference')
-            ->where('updated_at', '<=', $threshold)
+            ->where(fn ($query) => $query
+                ->where(fn ($processing) => $processing->where('status', EventPayout::STATUS_PROCESSING)->where('updated_at', '<=', $threshold))
+                ->orWhere(fn ($awaiting) => $awaiting->where('status', EventPayout::STATUS_AWAITING_OTP)->where('updated_at', '<=', $otpThreshold)))
             ->orderBy('updated_at')
             ->orderBy('id')
             ->get();
 
         if ($stuck->isEmpty()) {
-            $this->info('No payouts are stuck in processing.');
+            $this->info('No payouts are stuck in processing or waiting on an expired code.');
 
             return self::SUCCESS;
         }
 
-        $this->info("Reconciling {$stuck->count()} payout(s) stuck in processing.");
+        $this->info("Reconciling {$stuck->count()} stuck payout(s).");
 
         foreach ($stuck as $payout) {
             try {
@@ -86,6 +97,19 @@ final class ReconcileStuckPayouts extends Command
 
     private function resolve(EventPayout $payout, string $status): void
     {
+        if ($payout->status === EventPayout::STATUS_AWAITING_OTP) {
+            if (in_array($status, PayoutRelease::DEAD_TRANSFER_STATUSES, true)
+                && $this->markFailed($payout, EventPayout::STATUS_AWAITING_OTP, PayoutRelease::OTP_EXPIRED_REASON)) {
+                $this->line("  {$payout->id}: code expired (transfer {$status}) — marked failed and re-sendable.");
+
+                return;
+            }
+
+            $this->line("  {$payout->id}: still {$status} — left waiting for its code.");
+
+            return;
+        }
+
         if ($status === 'success') {
             DB::transaction(function () use ($payout): void {
                 // Re-read under a lock: the webhook may have landed while the
@@ -145,18 +169,34 @@ final class ReconcileStuckPayouts extends Command
             return;
         }
 
-        if (in_array($status, ['failed', 'reversed', 'abandoned'], true)) {
-            $payout->update([
-                'status' => EventPayout::STATUS_FAILED,
-                'failure_reason' => "The payment provider reported the transfer as {$status}.",
-            ]);
-
-            $this->line("  {$payout->id}: transfer {$status} — marked failed and re-sendable.");
+        if (in_array($status, PayoutRelease::DEAD_TRANSFER_STATUSES, true)) {
+            if ($this->markFailed($payout, EventPayout::STATUS_PROCESSING, "The payment provider reported the transfer as {$status}.")) {
+                $this->line("  {$payout->id}: transfer {$status} — marked failed and re-sendable.");
+            }
 
             return;
         }
 
         // Still in flight (pending, otp, or an unfamiliar status). Leave it be.
         $this->line("  {$payout->id}: still {$status} — left in processing.");
+    }
+
+    /**
+     * Fails the payout if it is still in $expectedStatus, re-read under a lock
+     * because a webhook or a code being entered may have moved it meanwhile.
+     */
+    private function markFailed(EventPayout $payout, string $expectedStatus, string $reason): bool
+    {
+        return DB::transaction(function () use ($payout, $expectedStatus, $reason): bool {
+            $locked = EventPayout::query()->whereKey($payout->id)->lockForUpdate()->first();
+
+            if (! $locked || $locked->status !== $expectedStatus) {
+                return false;
+            }
+
+            $locked->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => $reason]);
+
+            return true;
+        });
     }
 }

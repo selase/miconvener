@@ -23,6 +23,15 @@ use Illuminate\Support\Facades\DB;
  */
 final class PayoutRelease
 {
+    /**
+     * Transfer statuses from which the money will never move.
+     *
+     * @var list<string>
+     */
+    public const array DEAD_TRANSFER_STATUSES = ['failed', 'reversed', 'abandoned'];
+
+    public const string OTP_EXPIRED_REASON = 'The one-time code expired before it was entered. Send the payout again.';
+
     public function __construct(
         private readonly SettlementGateway $settlementGateway,
         private readonly TransferFeeSchedule $transferFeeSchedule,
@@ -50,10 +59,21 @@ final class PayoutRelease
                 $transfer = $this->settlementGateway->finalizeTransfer($payoutModel->provider_transfer_code, $otp);
             } catch (PaymentFailedException $e) {
                 /*
+                 * Paystack abandons a transfer whose code was not entered in
+                 * time and then refuses every code. Such a payout is failed so
+                 * it can be sent again and stops holding the balance.
+                 */
+                if ($this->transferIsDead($payoutModel)) {
+                    $payoutModel->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => self::OTP_EXPIRED_REASON]);
+
+                    return ['released' => false, 'message' => self::OTP_EXPIRED_REASON, 'http_status' => 422];
+                }
+
+                /*
                  * A rejected code is not a failed payout — the transfer is
                  * still parked and the code can be entered again.
                  */
-                $payoutModel->update(['failure_reason' => 'The one-time code was not accepted: '.$e->getMessage()]);
+                $payoutModel->update(['failure_reason' => 'The one-time code was not accepted: '.$e->providerMessage()]);
 
                 return ['released' => false, 'message' => (string) $payoutModel->failure_reason, 'http_status' => 422];
             }
@@ -88,5 +108,25 @@ final class PayoutRelease
 
             return ['released' => true, 'message' => 'Payout released.', 'http_status' => 200];
         });
+    }
+
+    /**
+     * Whether the provider says the payout's transfer is dead. A transfer
+     * that cannot be checked is not assumed dead: an outage must never fail
+     * a payout whose money may still move.
+     */
+    private function transferIsDead(EventPayout $payout): bool
+    {
+        if (blank($payout->provider_reference)) {
+            return false;
+        }
+
+        try {
+            $status = $this->settlementGateway->verifyTransfer((string) $payout->provider_reference)['status'];
+        } catch (PaymentFailedException) {
+            return false;
+        }
+
+        return in_array($status, self::DEAD_TRANSFER_STATUSES, true);
     }
 }

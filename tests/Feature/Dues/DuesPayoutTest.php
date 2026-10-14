@@ -348,3 +348,42 @@ test('a dues-only tenant with no events can add a payout account and then see it
         ->get(route('tenant.dues.payouts.index', ['subdomain' => 'acme']))
         ->assertInertia(fn (Assert $page) => $page->has('accounts', 1)->where('accounts.0.label', 'Union current'));
 });
+
+test('a dues payout whose code expired is failed, frees the balance and can be sent again', function () {
+    [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
+    $payout = duesPayoutScheduled($tenant, $account, 900, EventPayout::STATUS_AWAITING_OTP);
+    $payout->update(['provider_transfer_code' => 'TRF_dues_otp', 'provider_reference' => 'payout_dues_expired']);
+    expect(app(DuesBalance::class)->available($tenant, 'GHS'))->toBe(9000);
+
+    Http::fake([
+        'api.paystack.co/transfer/finalize_transfer' => Http::response(['status' => false, 'message' => 'Transfer is not currently awaiting OTP'], 400),
+        'api.paystack.co/transfer/verify/payout_dues_expired' => Http::response(['status' => true, 'data' => ['status' => 'abandoned']]),
+        'api.paystack.co/transfer' => Http::response(['status' => true, 'data' => ['transfer_code' => 'TRF_dues_again', 'status' => 'pending']]),
+    ]);
+    $console = fn () => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')]);
+
+    $console()->postJson(route('tenant.dues.payouts.finalize', ['subdomain' => 'acme', 'payout' => $payout->id]), ['otp' => '123456'])
+        ->assertStatus(422)
+        ->assertExactJson(['message' => 'The one-time code expired before it was entered. Send the payout again.']);
+
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_FAILED)
+        ->and(app(DuesBalance::class)->available($tenant, 'GHS'))->toBe(9900);
+
+    $console()->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
+        ->assertOk()
+        ->assertJsonPath('transfer_code', 'TRF_dues_again');
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PROCESSING);
+});
+
+test('a payout the provider refuses to send shows the provider\'s own message', function () {
+    [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
+    $payout = duesPayoutScheduled($tenant, $account, 5000);
+    Http::fake([
+        'api.paystack.co/transfer' => Http::response(['status' => false, 'message' => 'Velocity alarm triggered. Please try again'], 400),
+    ]);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
+        ->assertStatus(502)
+        ->assertExactJson(['message' => 'Could not send payout: Velocity alarm triggered. Please try again']);
+});

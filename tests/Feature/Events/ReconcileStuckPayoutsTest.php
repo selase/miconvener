@@ -164,3 +164,48 @@ test('a stuck event-less payout outside the dues category is marked paid but pos
     expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PAID)
         ->and(\App\Models\LedgerTransaction::where('tenant_id', $payout->tenant_id)->count())->toBe(0);
 });
+
+test('payouts left waiting for a code past its lifetime are failed when the transfer died, fresh ones are left alone', function () {
+    Http::fake([
+        'api.paystack.co/transfer/verify/payout_ref_dues_otp' => Http::response(['data' => ['status' => 'abandoned']]),
+        'api.paystack.co/transfer/verify/payout_ref_event_otp' => Http::response(['data' => ['status' => 'abandoned']]),
+        'api.paystack.co/transfer/verify/payout_ref_fresh_otp' => Http::response(['data' => ['status' => 'abandoned']]),
+    ]);
+
+    $dues = stuckDuesPayout(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_reference' => 'payout_ref_dues_otp', 'updated_at' => now()->subMinutes(40)]);
+    $event = stuckPayout(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_reference' => 'payout_ref_event_otp', 'updated_at' => now()->subMinutes(40)]);
+    $fresh = stuckPayout(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_reference' => 'payout_ref_fresh_otp', 'updated_at' => now()->subMinutes(10)]);
+
+    expect(Artisan::call('payouts:reconcile'))->toBe(0);
+
+    expect($dues->fresh()->status)->toBe(EventPayout::STATUS_FAILED)
+        ->and($dues->fresh()->failure_reason)->toBe('The one-time code expired before it was entered. Send the payout again.')
+        ->and($event->fresh()->status)->toBe(EventPayout::STATUS_FAILED)
+        ->and($fresh->fresh()->status)->toBe(EventPayout::STATUS_AWAITING_OTP);
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'payout_ref_fresh_otp'));
+});
+
+test('a payout waiting for a code whose transfer is still waiting, or cannot be checked, is left alone', function () {
+    Http::fake([
+        'api.paystack.co/transfer/verify/payout_ref_still_otp' => Http::response(['data' => ['status' => 'otp']]),
+        'api.paystack.co/transfer/verify/payout_ref_outage' => Http::response(['message' => 'boom'], 500),
+    ]);
+
+    $waiting = stuckPayout(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_reference' => 'payout_ref_still_otp', 'updated_at' => now()->subHour()]);
+    $outage = stuckDuesPayout(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_reference' => 'payout_ref_outage', 'updated_at' => now()->subHour()]);
+
+    Artisan::call('payouts:reconcile');
+
+    expect($waiting->fresh()->status)->toBe(EventPayout::STATUS_AWAITING_OTP)
+        ->and($outage->fresh()->status)->toBe(EventPayout::STATUS_AWAITING_OTP);
+});
+
+test('a payout waiting for a code is never marked paid by the sweep', function () {
+    Http::fake(['api.paystack.co/transfer/verify/*' => Http::response(['data' => ['status' => 'success']])]);
+
+    $payout = stuckPayout(['status' => EventPayout::STATUS_AWAITING_OTP, 'updated_at' => now()->subHour()]);
+
+    Artisan::call('payouts:reconcile');
+
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_AWAITING_OTP);
+});
