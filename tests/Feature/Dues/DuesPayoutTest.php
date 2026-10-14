@@ -184,6 +184,7 @@ test('the dues payouts page lists balances, accounts and dues payouts only', fun
             ->where('balances.0.payable', 9900)
             ->where('balances.0.available', 6900)
             ->where('accounts.0.id', $account->id)
+            ->where('canManagePaymentSettings', true)
             ->has('payouts', 1)
             ->where('payouts.0.id', $duesPayout->id));
 });
@@ -326,4 +327,24 @@ test('the payouts page tells the client whether the user may request and send pa
 
     $page($admin)->assertOk()->assertInertia(fn (Assert $p) => $p->where('canManagePayouts', true)->etc());
     $page($reader)->assertOk()->assertInertia(fn (Assert $p) => $p->where('canManagePayouts', false)->etc());
+});
+
+test('a dues-only tenant with no events can add a payout account and then see it on the payouts page', function () {
+    Http::fake(['api.paystack.co/bank/resolve*' => Http::response(['status' => true, 'data' => ['account_name' => 'Union Treasurer']])]);
+    [$tenant, $user] = eventHost('acme');
+    Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+    $host = eventSubdomainHost('acme');
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
+        ->postJson(route('tenant.payout-accounts.store', ['subdomain' => 'acme']), [
+            'type' => 'bank', 'label' => 'Union current', 'account_name' => 'Union Ltd', 'account_number' => '1234567894417', 'bank_code' => '030',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('is_verified', true);
+
+    expect(Event::query()->where('tenant_id', $tenant->id)->exists())->toBeFalse();
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
+        ->get(route('tenant.dues.payouts.index', ['subdomain' => 'acme']))
+        ->assertInertia(fn (Assert $page) => $page->has('accounts', 1)->where('accounts.0.label', 'Union current'));
 });

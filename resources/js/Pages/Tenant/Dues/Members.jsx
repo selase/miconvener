@@ -114,6 +114,22 @@ function CreateChargeModal({ member, onClose, onDone }) {
     );
 }
 
+const PAID_VIA = { online: 'online', offline: 'by cash/transfer' };
+
+/** "Paid online · 14 Oct 2026", or whatever part of that the charge records. */
+function paidLabel(charge) {
+    const via = PAID_VIA[charge.payment_method];
+    const date = charge.paid_at
+        ? new Date(charge.paid_at).toLocaleDateString(undefined, {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+          })
+        : null;
+
+    return ['Paid' + (via ? ` ${via}` : ''), date].filter(Boolean).join(' · ');
+}
+
 export default function Members({ members, classes }) {
     const showToast = useToast();
     const [selectedId, setSelectedId] = useState(null);
@@ -304,7 +320,7 @@ export default function Members({ members, classes }) {
                 <Drawer open={selected !== null} onClose={() => setSelectedId(null)}>
                     {selected && (
                         <div>
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start justify-between gap-3 pr-12">
                                 <div>
                                     <div className="text-lg font-bold text-ink">
                                         {selected.name}
@@ -380,6 +396,11 @@ export default function Members({ members, classes }) {
                                                             {charge.status === 'open' &&
                                                                 ` · due ${charge.due_on}`}
                                                         </div>
+                                                        {charge.status === 'paid' && (
+                                                            <div className="text-xs text-ink-secondary">
+                                                                {paidLabel(charge)}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <StatusPill
                                                         status={

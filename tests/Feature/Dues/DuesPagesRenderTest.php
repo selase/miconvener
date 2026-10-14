@@ -46,8 +46,25 @@ test('the members page sends the members, the active classes and each member\'s 
             ->where('members.data.0.id', $first->id)
             ->has('members.data.0.charges', 1)
             ->where('members.data.0.charges.0.status', 'open')
+            ->where('members.data.0.charges.0.payment_method', null)
+            ->where('members.data.0.charges.0.paid_at', null)
             ->where('members.data.0.pay_url', route('public.dues.show', ['subdomain' => 'acme', 'token' => $first->pay_token]))
             ->missing('members.data.0.pay_token'));
+});
+
+test('a paid charge reports how and when it was paid', function () {
+    [$tenant, $user, $class, $host] = duesPagesFixture();
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    DuesCharge::factory()->create([
+        'tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id, 'amount' => 5000,
+        'status' => DuesChargeStatusEnum::Paid, 'payment_method' => 'offline', 'paid_at' => '2026-10-14 09:30:00',
+    ]);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
+        ->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('members.data.0.charges.0.payment_method', 'offline')
+            ->where('members.data.0.charges.0.paid_at', fn ($value) => str_starts_with((string) $value, '2026-10-14')));
 });
 
 test('a member\'s pay link opens that member\'s own pay page', function () {

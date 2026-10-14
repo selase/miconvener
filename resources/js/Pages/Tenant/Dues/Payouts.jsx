@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
@@ -11,6 +11,7 @@ import StatusPill from '@/Components/Console/StatusPill';
 import { useToast } from '@/Components/Console/Toast';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { formatDuesMoney, sendJson, toMinorUnits } from '@/lib/dues';
+import csrfFetch from '@/lib/csrfFetch';
 
 const PAYOUT_LABEL = {
     scheduled: 'Scheduled',
@@ -28,7 +29,7 @@ const PAYOUT_PILL = {
     failed: 'failed',
 };
 
-function RequestPayoutModal({ balances, accounts, onClose, onDone }) {
+function RequestPayoutModal({ balances, accounts, onClose, onDone, onAddAccount }) {
     const showToast = useToast();
     const [form, setForm] = useState({
         payout_account_id: accounts[0]?.id ?? '',
@@ -83,6 +84,15 @@ function RequestPayoutModal({ balances, accounts, onClose, onDone }) {
                         </option>
                     ))}
                 </Select>
+                {onAddAccount && (
+                    <button
+                        type="button"
+                        onClick={onAddAccount}
+                        className="-mt-2 text-xs font-medium text-accent hover:underline"
+                    >
+                        Add payout account
+                    </button>
+                )}
                 {balances.length > 1 && (
                     <Select
                         label="Currency"
@@ -112,6 +122,98 @@ function RequestPayoutModal({ balances, accounts, onClose, onDone }) {
                 />
                 <Button type="submit" variant="primary" disabled={processing}>
                     Request payout
+                </Button>
+            </form>
+        </Modal>
+    );
+}
+
+function AddAccountModal({ onClose, onDone }) {
+    const showToast = useToast();
+    const [form, setForm] = useState({
+        type: 'bank',
+        label: '',
+        account_name: '',
+        account_number: '',
+        bank_code: '',
+    });
+    const [banks, setBanks] = useState([]);
+    const [errors, setErrors] = useState({});
+    const [processing, setProcessing] = useState(false);
+
+    useEffect(() => {
+        csrfFetch(route('tenant.payout-accounts.banks'))
+            .then((r) => (r.ok ? r.json() : []))
+            .then((list) => setBanks(Array.isArray(list) ? list : []))
+            .catch(() => setBanks([]));
+    }, []);
+
+    const submit = async (event) => {
+        event.preventDefault();
+        setProcessing(true);
+        const result = await sendJson('POST', route('tenant.payout-accounts.store'), form);
+        setProcessing(false);
+
+        if (!result.ok) {
+            setErrors(result.errors);
+            if (Object.keys(result.errors).length === 0) {
+                showToast?.(result.message);
+            }
+            return;
+        }
+
+        showToast?.('Payout account added.');
+        onDone();
+    };
+
+    const set = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+
+    return (
+        <Modal open onClose={onClose} title="Add payout account">
+            <form onSubmit={submit} className="space-y-4">
+                <Select label="Type" value={form.type} onChange={set('type')} error={errors.type}>
+                    <option value="bank">Bank account</option>
+                    <option value="mobile_money">Mobile money</option>
+                </Select>
+                <Select
+                    label={form.type === 'mobile_money' ? 'Network' : 'Bank'}
+                    value={form.bank_code}
+                    onChange={set('bank_code')}
+                    error={errors.bank_code}
+                    required
+                >
+                    <option value="">Select…</option>
+                    {banks.map((b) => (
+                        <option key={b.code} value={b.code}>
+                            {b.name}
+                        </option>
+                    ))}
+                </Select>
+                <Input
+                    label="Label"
+                    placeholder="e.g. Union current account"
+                    value={form.label}
+                    onChange={set('label')}
+                    error={errors.label}
+                    required
+                />
+                <Input
+                    label="Account name"
+                    value={form.account_name}
+                    onChange={set('account_name')}
+                    error={errors.account_name}
+                    required
+                />
+                <Input
+                    label="Account number"
+                    value={form.account_number}
+                    onChange={set('account_number')}
+                    error={errors.account_number}
+                    hint="We check this account with the bank before saving it."
+                    required
+                />
+                <Button type="submit" variant="primary" disabled={processing}>
+                    Add account
                 </Button>
             </form>
         </Modal>
@@ -166,7 +268,13 @@ function OtpModal({ payout, onClose, onDone }) {
     );
 }
 
-export default function Payouts({ balances, accounts, payouts, canManagePayouts = false }) {
+export default function Payouts({
+    balances,
+    accounts,
+    payouts,
+    canManagePayouts = false,
+    canManagePaymentSettings = false,
+}) {
     const showToast = useToast();
     const [modal, setModal] = useState(null);
     const [sending, setSending] = useState(null);
@@ -241,11 +349,25 @@ export default function Payouts({ balances, accounts, payouts, canManagePayouts 
                     </div>
                 )}
 
-                {balances.length > 0 && accounts.length === 0 && (
-                    <p className="text-sm text-ink-secondary">
-                        Add a payout account from the Finance tab of any event before requesting a
-                        payout.
-                    </p>
+                {accounts.length === 0 && (
+                    <div className="border border-border p-5">
+                        <div className="text-sm font-medium text-ink">No payout account yet</div>
+                        <p className="mt-1 text-sm text-ink-secondary">
+                            Add the bank or mobile money account collected dues are paid into.
+                            {!canManagePaymentSettings &&
+                                ' Ask someone who manages payment settings to add one.'}
+                        </p>
+                        {canManagePaymentSettings && (
+                            <Button
+                                className="mt-3"
+                                icon={Plus}
+                                variant="primary"
+                                onClick={() => setModal({ kind: 'account' })}
+                            >
+                                Add payout account
+                            </Button>
+                        )}
+                    </div>
                 )}
 
                 <Table>
@@ -321,6 +443,19 @@ export default function Payouts({ balances, accounts, payouts, canManagePayouts 
                 <RequestPayoutModal
                     balances={balances}
                     accounts={accounts}
+                    onClose={() => setModal(null)}
+                    onAddAccount={
+                        canManagePaymentSettings ? () => setModal({ kind: 'account' }) : undefined
+                    }
+                    onDone={() => {
+                        setModal(null);
+                        refresh();
+                    }}
+                />
+            )}
+
+            {modal?.kind === 'account' && (
+                <AddAccountModal
                     onClose={() => setModal(null)}
                     onDone={() => {
                         setModal(null);

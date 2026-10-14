@@ -58,16 +58,7 @@ final class MemberController extends Controller
                 'joined_on' => $member->joined_on?->toDateString(),
                 'notes' => $member->notes,
                 'pay_url' => route('public.dues.show', ['subdomain' => $tenant->slug, 'token' => $member->pay_token]),
-                'charges' => $member->charges->map(fn (DuesCharge $charge): array => [
-                    'id' => $charge->id,
-                    'status' => $charge->status->value,
-                    'amount' => $charge->amount,
-                    'currency' => $charge->currency,
-                    'period_start' => $charge->period_start->toDateString(),
-                    'period_end' => $charge->period_end->toDateString(),
-                    'due_on' => $charge->due_on->toDateString(),
-                    'overdue' => $charge->status === DuesChargeStatusEnum::Open && $charge->due_on->lt(today()),
-                ])->values(),
+                'charges' => $member->charges->map(fn (DuesCharge $charge): array => $this->chargePayload($charge))->values(),
                 'open_total' => (int) $member->getAttribute('open_total'),
                 'overdue' => (bool) $member->getAttribute('overdue'),
             ]);
@@ -148,5 +139,24 @@ final class MemberController extends Controller
         }
 
         return $tenant;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function chargePayload(DuesCharge $charge): array
+    {
+        return [
+            'id' => $charge->id,
+            'status' => $charge->status->value,
+            'amount' => $charge->amount,
+            'currency' => $charge->currency,
+            'period_start' => $charge->period_start->toDateString(),
+            'period_end' => $charge->period_end->toDateString(),
+            'due_on' => $charge->due_on->toDateString(),
+            'overdue' => $charge->status === DuesChargeStatusEnum::Open && $charge->due_on->lt(today()),
+            'payment_method' => $charge->payment_method,
+            'paid_at' => $charge->paid_at?->toIso8601String(),
+        ];
     }
 }
