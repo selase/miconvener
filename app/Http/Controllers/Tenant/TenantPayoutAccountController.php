@@ -63,7 +63,7 @@ final class TenantPayoutAccountController extends Controller
     {
         $this->authorize('manage payment settings');
 
-        return response()->json($settlementGateway->listBanks());
+        return response()->json($this->withTestBank($settlementGateway->listBanks()));
     }
 
     public function destroy(string $subdomain, string $account): JsonResponse
@@ -84,6 +84,25 @@ final class TenantPayoutAccountController extends Controller
         $accountModel->delete();
 
         return response()->json(['message' => 'Payout account removed.']);
+    }
+
+    /**
+     * Paystack test mode resolves only its own test account (bank code 001,
+     * account 0000000000), which its bank list never includes, so a test key
+     * gets that bank added. A live key never does.
+     *
+     * @param  list<array{name: string, code: string}>  $banks
+     * @return list<array{name: string, code: string}>
+     */
+    private function withTestBank(array $banks): array
+    {
+        if (! str_starts_with((string) config('services.settlement.paystack.secret_key'), 'sk_test_')) {
+            return $banks;
+        }
+
+        $banks[] = ['name' => 'Paystack test bank (account 0000000000)', 'code' => '001'];
+
+        return $banks;
     }
 
     /**
