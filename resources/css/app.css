@@ -62,6 +62,42 @@
     font-variant-numeric: tabular-nums;
 }
 
+@layer base {
+    .console-root {
+        color-scheme: light;
+    }
+
+    .dark .console-root {
+        color-scheme: dark;
+    }
+
+    .console-root input:not([type]),
+    .console-root input[type='text'],
+    .console-root input[type='email'],
+    .console-root input[type='url'],
+    .console-root input[type='password'],
+    .console-root input[type='number'],
+    .console-root input[type='date'],
+    .console-root input[type='datetime-local'],
+    .console-root input[type='month'],
+    .console-root input[type='search'],
+    .console-root input[type='tel'],
+    .console-root input[type='time'],
+    .console-root input[type='week'],
+    .console-root select,
+    .console-root textarea {
+        background-color: var(--color-surface);
+        color: var(--color-text);
+        caret-color: var(--color-text);
+    }
+
+    .console-root input::placeholder,
+    .console-root textarea::placeholder {
+        color: var(--color-text-secondary);
+        opacity: 1;
+    }
+}
+
 .console-root,
 .console-root * {
     border-radius: 0 !important;
