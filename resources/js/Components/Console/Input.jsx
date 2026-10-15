@@ -1,17 +1,40 @@
+import { useId } from 'react';
+
 export default function Input({ label, error, hint, className = '', ...props }) {
+    const generatedId = useId();
+    const id = props.id ?? generatedId;
+    const descriptionId = `${id}-description`;
+    const describedBy =
+        [props['aria-describedby'], error || hint ? descriptionId : null]
+            .filter(Boolean)
+            .join(' ') || undefined;
+
     return (
         <div>
-            {label && <label className="mb-1.5 block text-sm font-medium text-ink">{label}</label>}
+            {label && (
+                <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-ink">
+                    {label}
+                </label>
+            )}
             <input
                 {...props}
+                id={id}
+                aria-describedby={describedBy}
+                aria-invalid={error ? true : props['aria-invalid']}
                 className={`w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent ${className}`}
             />
             {/* An error replaces the hint rather than stacking under it: once a
                 field is wrong, what to fix matters more than what it is for. */}
             {error ? (
-                <p className="mt-1 text-sm text-danger-fg">{error}</p>
+                <p id={descriptionId} className="mt-1 text-sm text-danger-fg">
+                    {error}
+                </p>
             ) : (
-                hint && <p className="mt-1 text-xs text-ink-secondary">{hint}</p>
+                hint && (
+                    <p id={descriptionId} className="mt-1 text-xs text-ink-secondary">
+                        {hint}
+                    </p>
+                )
             )}
         </div>
     );
