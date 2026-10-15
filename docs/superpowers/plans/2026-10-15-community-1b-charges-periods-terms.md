@@ -162,7 +162,59 @@ Ruling: Add a canonical PostgreSQL unique index as well as the raw composite key
 
 ### Task 5: Verification
 
-- [ ] Full suite, `pint --dirty`, phpstan, lint, JS tests, build (commit rebuilt `public/build` if JSX or CSS changed).
-- [ ] Local: migrate, run `"$PHP" artisan dues:process --tenant=purpledot`, check charges appear for the local member.
-- [ ] One whole-branch review by a fresh reviewer; fix Critical and Important findings with tests.
-- [ ] Update `docs/superpowers/community-roadmap.md` (status `built`, evidence) and push.
+- [x] Full suite, `pint --dirty`, phpstan, lint, JS tests, build (commit rebuilt `public/build` if JSX or CSS changed).
+- [x] Local acceptance: migrations, `dues:process --tenant=... --date=...` and charge assertions pass on isolated QA tenant fixtures. Ruling: do not generate charges against the owner’s existing Purpledot data merely for verification; its data and settlement setting remain unchanged.
+- [x] One whole-branch review by a fresh reviewer; fix Critical and Important findings with tests.
+- [x] Update `docs/superpowers/community-roadmap.md` (status `built`, evidence) and push.
+
+
+## Self-Review Report
+
+### Touchpoints updated
+
+- [x] AGENTS.md — dues snapshot and generation invariants documented.
+- [x] Shared handover — roadmap and this plan carry the implementation decisions; no separate personal memory file is needed.
+- [x] Navigation — rejoin lives in People; inactive-type notice in Money > Dues; commercial terms on the existing superadmin tenant page.
+- [x] Permissions — existing `manage members` and application-superadmin gate reused and tested; no new permission or role seed is required.
+- [x] Configuration / `.env.example` — no new environment variable; Free-plan dues default and fixed legacy fallback recorded in services config; no new environment variable or dependency.
+- [x] Tests — new anchor, settings, commercial terms, frozen checkout, generation, lifecycle and shared-number coverage; existing financial assertions retained.
+
+### UI Gap Analysis
+
+- **Discoverability:** existing Community pages and superadmin tenant entry point.
+- **Empty state:** existing member/type empty states and creation actions retained.
+- **Permission gating:** server-side authorization and existing page gating; forbidden/foreign-tenant cases tested.
+- **Loading/errors:** existing confirmation busy/error handling reused; invalid rejoin returns 422.
+- **Responsive:** existing drawer, console and Bootstrap responsive form patterns retained.
+- **Accessibility:** labelled native form controls, native action buttons and status notice. React render/interaction tests pass; no manual browser/phone visual sign-off was performed for this milestone.
+
+### Solved (auto-fixed)
+
+- Rejoin/lapsed reactivation ignores the initial-join current-period switch, preventing back-charges for time away (`app/Services/Dues/DuesScheduler.php:69`).
+- Exit/lapse cancels only unpaid advance periods; paid and past history is preserved. Member-first locks prevent a delayed manual request from charging a stale active member (`app/Services/Dues/DuesCharges.php:33`, `:83`).
+- Concurrent settings creation is tolerated; impossible calendar dates and banned organisations are refused (`app/Console/Commands/Dues/ProcessDuesCommand.php:51`).
+- Explicit-tenant overrides bypass unrelated active-tenant scopes; no-package dues use Free's 2%, while genuine legacy payments keep 1% (`app/Services/Finance/CommercialTerms.php`).
+- Canonical database uniqueness closes normalized-name/phone races without rewriting contacts (`database/migrations/landlord/2026_10_16_100300_allow_shared_member_phones.php`).
+- Contributions/giving controls clearly state that they are future configuration, leaving existing contribution checkout behaviour unchanged (`resources/views/admin/tenants/show.blade.php:29`).
+
+### Recommended for user decision
+
+No new decision blocks 1b. The roadmap's shared/recycled-phone identity decision (milestone 3) and lapsed-member pricing decision (milestone 6) remain open before those milestones. A separate explicit adjustment workflow would be needed if administrators want to replace cancelled future dues; automatic generation intentionally never revives voids.
+
+### Not gaps
+
+- Tickets keep their established resolver; giving and contributions payment integration remains later work.
+- Community settings have persisted defaults; a settings editor was not part of this implementation plan.
+- Local acceptance used isolated QA fixtures and real command/HTTP tests, preserving the owner's Purpledot data and settlement setting. No merge, production migration or deployment was performed.
+
+
+## Final verification — 2026-10-15
+
+- Implementation: `0ad164c` on `community-1b`, based on `community-1a` at `0173494`.
+- Full PHP suite: **2473/2473 passed**, **11621 assertions**, four workers on isolated QA databases.
+- Required Community / Dues / Finance / Payments regression run: **395/395 passed**, **1954 assertions**. Final lifecycle suite: **21/21**, **80 assertions**.
+- JavaScript: **258/258 passed** across 34 files (`npm test -- --maxWorkers=1`). Earlier concurrent runs hit timing-sensitive existing badge tests; the isolated badge file also passed 25/25.
+- PHPStan: **0 errors**, baseline unchanged. Pint, ESLint and production build passed; rebuilt `public/build` committed with the JSX changes. Build retains its existing large-chunk advisory.
+- `finance:verify-categories`: exits **0** on isolated QA database; financial suites exercise populated ledger cases.
+- Fresh whole-branch review and targeted rechecks: no unresolved Critical or Important findings. All reported findings fixed.
+- Original checkout remains clean on `community-1a` at `0173494`. Owner’s local database, settlement mode and production untouched. No merge or deployment.

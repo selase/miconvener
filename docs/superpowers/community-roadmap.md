@@ -15,7 +15,7 @@ Status values: `not started` → `planned` (plan written) → `in progress` → 
 | D1 | Ledger categories (dues spec M1) | deployed | `main` | [plan](plans/2026-10-13-ledger-categories-foundation.md) | PR #23, deployed 2026-10-13 |
 | D2 | Collecting dues (dues spec M2) | built, not merged | `member-dues-m2` | [plan](plans/2026-10-13-member-dues-collecting.md) | `61224d2`, 2377 tests green, clicked through in Paystack test mode |
 | 1a | Shell and re-homing | built (reviewed) | `community-1a` (from D2) | [plan](plans/2026-10-15-community-1a-shell-and-rehoming.md) | final review fixes applied; full suite 2391/2391, phpstan 0, lint and JS tests (253) green; deferred minors listed in the 1a plan |
-| 1b | Charges, periods and commercial terms | in progress | `community-1b` from `0173494` (isolated checkout) | [plan](plans/2026-10-15-community-1b-charges-periods-terms.md) | |
+| 1b | Charges, periods and commercial terms | built (reviewed), not merged | `community-1b` from `0173494` | [plan](plans/2026-10-15-community-1b-charges-periods-terms.md) | `0ad164c`; full PHP 2473/2473 (11621 assertions), JS 258/258, PHPStan 0 with unchanged baseline, Pint/lint/build green and rebuilt assets committed; fresh review findings fixed; isolated QA acceptance only |
 | 1c | Import, reminders and Finance | planned | after 1b | [plan](plans/2026-10-15-community-1c-import-reminders-finance.md) | |
 | 2 | Messages and groups | not started | | brief below | |
 | 3 | People, Following and Join | not started | | brief below | |
@@ -26,11 +26,12 @@ Status values: `not started` → `planned` (plan written) → `in progress` → 
 
 Merge policy (owner's decision): D2 is not merged on its own. 1a, 1b and 1c land on top of it; the branch is merged to `main` when the owner says so (the spec recommends after 1a at the earliest, since 1a keeps money logic unchanged).
 
-## Next action (handover to Codex, 2026-10-15)
+## Next action (handover, 2026-10-15)
 
-- Branch `community-1a` at `4c381bc` holds D2 + 1a (built, reviewed, pushed, **not merged**). Start 1b on this branch (or cut `community-1b` from it).
-- Do not merge or deploy without the owner's go-ahead. The owner may first click through 1a locally (local tenant `purpledot`, Community already enabled).
-- Read the 1a plan's "Final review" section for deferred minors and the PaymentSettings ruling to revisit in 1c.
+- `community-1b` at implementation commit `0ad164c` holds D2 + 1a + 1b, built and reviewed, **not merged**. The plan contains completed steps, review rulings and verification evidence.
+- Isolated checkout: `/Users/selase/Sites/miconvener/.worktrees/artifact-completion`. The original checkout remains clean on `community-1a` at `0173494`; the owner’s local Purpledot database and settlement mode were not changed. 1b migrations and command acceptance ran on isolated QA databases.
+- The owner can review 1b before deciding integration. **Do not merge, deploy or change production without the owner’s go-ahead.**
+- Next implementation milestone is 1c, using its existing plan after review. Read the 1a plan’s deferred minors and PaymentSettings ruling as well as 1b’s final self-review. Voids remain cancelled; rejoin starts next period; unpaid advance charges cancel on exit/lapse.
 
 ## How to continue
 
