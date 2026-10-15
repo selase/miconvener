@@ -5,10 +5,13 @@ declare(strict_types=1);
 use App\Models\Member;
 use App\Models\MembershipType;
 use App\Services\Community\MemberImport;
+use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
+
+uses(DatabaseTruncation::class);
 
 test('concurrent confirmations and manual additions serialize identity and cap checks', function (string $race) {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);

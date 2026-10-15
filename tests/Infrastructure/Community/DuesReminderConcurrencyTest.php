@@ -9,9 +9,12 @@ use App\Models\Member;
 use App\Models\MembershipType;
 use App\Models\TenantAddon;
 use App\Models\TenantNotificationSetting;
+use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
+
+uses(DatabaseTruncation::class);
 
 test('concurrent automatic and manual reminders respect daily credit and monthly reservations', function (string $constraint) {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
