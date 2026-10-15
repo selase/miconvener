@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services\Dues;
 
+use App\Enum\CommercialStreamEnum;
 use App\Enum\DuesChargeStatusEnum;
 use App\Exceptions\PaymentFailedException;
 use App\Models\DuesCharge;
+use App\Models\DuesPaymentAttempt;
 use App\Models\Member;
 use App\Models\Tenant;
+use App\Services\Finance\CommercialTerms;
 use App\Services\Payment\StripeConnect;
 use App\Services\Payment\TenantPaystackResolver;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -27,7 +32,7 @@ final class DuesCheckout
     public function __construct(
         private readonly TenantPaystackResolver $paystackResolver,
         private readonly StripeConnect $stripeConnect,
-        private readonly DuesFee $duesFee,
+        private readonly CommercialTerms $commercialTerms,
     ) {}
 
     /**
@@ -95,10 +100,30 @@ final class DuesCheckout
             throw new RuntimeException('Card payments are not available for this organisation yet.');
         }
 
-        $charges = $this->chargesFor($member, $chargeIds);
+        [$charges, $attempt] = DB::connection('landlord')->transaction(function () use ($member, $chargeIds, $tenant): array {
+            Member::query()->whereKey($member->id)->lockForUpdate()->firstOrFail();
+            $charges = $this->chargesFor($member, $chargeIds);
+            $ids = $charges->pluck('id')->sort()->values()->all();
+            $terms = $this->commercialTerms->for($tenant, CommercialStreamEnum::Dues);
+            $prior = DuesPaymentAttempt::query()->where('tenant_id', $tenant->id)->where('member_id', $member->id)->where('status', 'open')->get();
+            foreach ($prior as $old) {
+                if ($old->charge_ids === $ids) {
+                    $old->update(['status' => 'superseded']);
+                }
+            }
+            $attempt = DuesPaymentAttempt::query()->create([
+                'reference' => 'dues_'.Str::uuid(), 'tenant_id' => $tenant->id, 'member_id' => $member->id,
+                'charge_ids' => $ids, 'currency' => $charges->first()->currency, 'expected_amount' => (int) $charges->sum('amount'),
+                'rate' => $terms->rate, 'cap_amount' => $terms->capAmount, 'bearer' => $terms->bearer,
+                'commissions' => $charges->mapWithKeys(fn (DuesCharge $charge): array => [$charge->id => $this->commercialTerms->commission($terms, (int) $charge->amount)])->all(),
+                'terms_source' => $terms->source, 'status' => 'open',
+            ]);
+
+            return [$charges, $attempt];
+        });
         $currency = (string) $charges->first()->currency;
         $total = (int) $charges->sum('amount');
-        $platformShare = (int) $charges->sum(fn (DuesCharge $charge): int => $this->duesFee->for((int) $charge->amount));
+        $platformShare = array_sum($attempt->commissions);
 
         $paystack = $this->paystackResolver->gatewayFor($tenant, $platformShare, $currency);
 
@@ -110,13 +135,14 @@ final class DuesCheckout
 
         return $paystack->createOneTimeCheckoutSession($customerId, $total, $currency, $callbackUrl, [
             'type' => 'member_dues',
+            'dues_attempt_id' => $attempt->id,
             'tenant_id' => $tenant->id,
             'member_id' => $member->id,
             'charge_ids' => $charges->pluck('id')->all(),
             'source' => config('services.paystack.metadata_source'),
             'commission_split' => $paystack->splitSubaccount(),
             'commission_credit_applied' => $paystack->commissionCreditApplied(),
-        ]);
+        ], $attempt->reference);
     }
 
     /**

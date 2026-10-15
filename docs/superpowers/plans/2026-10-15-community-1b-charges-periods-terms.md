@@ -84,7 +84,7 @@ test('settings default when an organisation has none', function () { /* Communit
 - `CommercialTerms::for(Tenant $tenant, CommercialStreamEnum $stream): ResolvedTerms`; `CommercialTerms::commission(ResolvedTerms $terms, int $amount): int` (rounding half up, cap applied, never negative). Precedence: override row → plan default (Free 2%, otherwise 1% for dues) → platform config.
 - `CommercialTerms::setOverride(Tenant, CommercialStreamEnum, ?float $rate, ?int $cap, string $reason, User $by): void` (null rate removes the override; writes the audit row in the same transaction).
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
 
 ```php
 test('dues default to 1% on a paid plan and 2% on Free', function () {});
@@ -116,10 +116,12 @@ test('a retried checkout supersedes the earlier open attempt for the same charge
 test('the callback and the webhook for one payment book it once, in either order', function () {});
 ```
 
-- [ ] **Step 2: Run, see them fail.**
-- [ ] **Step 3: Implement.** Keep `DuesPaymentConfirmer`'s apportioning and own-gateway allocation exactly as they are, replacing only where per-charge commissions come from. Delete `DuesFee` and update its tests to the resolver (no test may lose its assertion; rename, do not delete).
-- [ ] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues tests/Feature/Finance tests/Feature/Payments`. Expected: PASS, with the same per-file counts for Finance and Payments as before the task.
-- [ ] **Step 5: Commit** `feat(finance): commercial terms resolver with frozen dues checkout terms`.
+- [x] **Step 2: Run, see them fail.**
+- [x] **Step 3: Implement.** Keep `DuesPaymentConfirmer`'s apportioning and own-gateway allocation exactly as they are, replacing only where per-charge commissions come from. Delete `DuesFee` and update its tests to the resolver (no test may lose its assertion; rename, do not delete).
+- [x] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues tests/Feature/Finance tests/Feature/Payments`. Expected: PASS, with the same per-file counts for Finance and Payments as before the task.
+- [x] **Step 5: Commit** `feat(finance): commercial terms resolver with frozen dues checkout terms`.
+
+Ruling: Free-plan dues defaults include organisations without a package (2%); only genuine legacy checkout references retain 1%. Giving and contributions controls are clearly labelled future-only until their payment streams adopt the resolver.
 
 ### Task 3: Charge generation (`dues:process`)
 
@@ -133,7 +135,7 @@ test('the callback and the webhook for one payment book it once, in either order
   - **Eligible window:** from the first eligible period (the period containing `active_since` when `charge_current_period_on_join`, otherwise the next period after `active_since`) to `localToday + generate_days_ahead`.
   - **Bounded search for gaps, not "after the latest charge":** walk every period start in the window and create each one that has no charge (any status), oldest first, so an earlier gap is filled even when a later charge exists. The window is capped at the most recent 400 periods (logged when hit).
   - Override of 0 → the charge is created as `waived`.
-  - **Effective-date rules:** a membership type or override change applies to periods with no charge yet; charges already generated (including future ones inside the horizon) keep their amount; an admin can void an open future charge to have it regenerated with the new terms. Exit ends eligibility from `exited_on`; rejoin opens a new window at the rejoin date; periods between exit and rejoin, or while lapsed, are never charged.
+  - **Effective-date rules:** a membership type or override change applies to periods with no charge yet; charges already generated (including future ones inside the horizon) keep their amount. A void is an explicit cancellation and is not automatically regenerated. Exit/lapse voids unpaid periods starting on or after the local eligibility-end date; paid and historical charges remain. Rejoin/reactivation opens a new window from the next period regardless of the initial-join setting; periods between exit and rejoin, or while lapsed, are never charged.
 - Members `pending`, `lapsed`, `exited` get none. Types without dues or inactive get none; inactive types' members are listed on Money > Dues (a notice with a count).
 - `members.rejoin`: `exited` → `active`, sets `rejoined_on` (new nullable date column on `members`) and clears `exited_on`.
 
