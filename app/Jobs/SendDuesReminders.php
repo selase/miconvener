@@ -24,7 +24,10 @@ final class SendDuesReminders implements ShouldQueue
 
     public int $backoff = 10;
 
-    public function __construct(public string $tenantId, public ?int $userId = null, public ?string $localDate = null, public ?string $afterMemberId = null) {}
+    public function __construct(public string $tenantId, public ?int $userId = null, public ?string $localDate = null, public ?string $afterMemberId = null)
+    {
+        $this->localDate ??= CarbonImmutable::now(CommunitySettings::for(Tenant::query()->findOrFail($tenantId))->timezone)->toDateString();
+    }
 
     public function handle(DuesReminders $reminders): void
     {
@@ -32,7 +35,7 @@ final class SendDuesReminders implements ShouldQueue
         if ($tenant === null) {
             return;
         }
-        $localDate = $this->localDate ?? CarbonImmutable::now(CommunitySettings::for($tenant)->timezone)->toDateString();
+        $localDate = $this->localDate;
         $ids = $reminders->queuedRecipientIds($tenant, $this->userId, $localDate, $this->afterMemberId, self::PAGE_SIZE);
         foreach (array_chunk($ids, DuesReminders::SMS_BATCH_SIZE) as $batch) {
             DeliverDuesReminders::dispatch($this->tenantId, $batch, 'sms', $this->userId, $localDate)->afterCommit();

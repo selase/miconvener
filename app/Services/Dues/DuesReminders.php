@@ -127,7 +127,7 @@ final class DuesReminders
         }
         $today = CarbonImmutable::now($settings->timezone)->startOfDay();
 
-        return $userId === null && $localDate !== null && $localDate !== $today->toDateString() ? null : $today;
+        return $localDate === $today->toDateString() ? $today : null;
     }
 
     /** @return Builder<Member> */

@@ -366,3 +366,49 @@ test('retried SMS units retain unknown claims and deliver only untouched recipie
     expect(Reminder::query()->where('member_id', $other->id)->sole()->status)->toBe('sent')->and($this->pack->fresh()->meta['remaining'])->toBe(8);
     Mail::assertNothingSent();
 });
+
+test('serialized manual delivery retries never replay across local midnight', function (int $responseStatus, string $status) {
+    Http::swap(new Illuminate\Http\Client\Factory);
+    Http::preventStrayRequests();
+    Http::fake(['messaging.test/*' => Http::response(['data' => ['campaign_id' => 'before-midnight']], $responseStatus)]);
+    $this->travelTo(CarbonImmutable::parse('2026-10-15 23:59:59', 'Africa/Accra'));
+    $payload = serialize(new App\Jobs\DeliverDuesReminders($this->tenant->id, [$this->member->id], 'sms', (int) $this->owner->id));
+    unserialize($payload)->handle(app(DuesReminders::class));
+    expect(Reminder::query()->sole()->status)->toBe($status);
+    $this->travelTo(CarbonImmutable::parse('2026-10-16 00:00:01', 'Africa/Accra'));
+    unserialize($payload)->handle(app(DuesReminders::class));
+    Http::assertSentCount(1);
+    expect(Reminder::query()->count())->toBe(1)->and($this->pack->fresh()->meta['remaining'])->toBe(9);
+    expect(Reminder::query()->sole()->sent_for_date->toDateString())->toBe('2026-10-15');
+    Queue::fake();
+    $this->postJson(route('tenant.community.money.dues.remind-arrears', ['subdomain' => 'reminders']))->assertAccepted();
+    $nextRun = Queue::pushed(SendDuesReminders::class)->sole();
+    expect($nextRun->localDate)->toBe('2026-10-16');
+    $nextRun->handle(app(DuesReminders::class));
+    Queue::pushed(App\Jobs\DeliverDuesReminders::class)->first()->handle(app(DuesReminders::class));
+    Http::assertSentCount(2);
+    expect(Reminder::query()->count())->toBe(2)->and($this->pack->fresh()->meta['remaining'])->toBe(8);
+})->with([[500, 'reserved'], [202, 'sent']]);
+
+test('manual dispatcher payload freezes the run day before dispatch and continuation retries', function () {
+    Queue::fake();
+    foreach (range(1, 100) as $number) {
+        $member = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id]);
+        DuesCharge::factory()->create(['tenant_id' => $this->tenant->id, 'member_id' => $member->id, 'membership_type_id' => $this->type->id, 'due_on' => '2026-10-08']);
+    }
+    $payload = serialize(new SendDuesReminders($this->tenant->id, (int) $this->owner->id));
+    expect(unserialize($payload)->localDate)->toBe('2026-10-15');
+    unserialize($payload)->handle(app(DuesReminders::class));
+    $continuation = serialize(Queue::pushed(SendDuesReminders::class)->sole());
+    expect(unserialize($continuation)->localDate)->toBe('2026-10-15');
+    foreach (Queue::pushed(App\Jobs\DeliverDuesReminders::class) as $unit) {
+        expect(unserialize(serialize($unit))->localDate)->toBe('2026-10-15');
+    }
+    $this->travelTo(CarbonImmutable::parse('2026-10-16 00:00:01', 'Africa/Accra'));
+    Queue::fake();
+    unserialize($payload)->handle(app(DuesReminders::class));
+    unserialize($continuation)->handle(app(DuesReminders::class));
+    Queue::assertNothingPushed();
+    Http::assertNothingSent();
+    Mail::assertNothingSent();
+});

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\CommunitySettings;
 use App\Models\Tenant;
 use App\Services\Dues\DuesReminders;
 use App\Services\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -22,7 +24,10 @@ final class DeliverDuesReminders implements ShouldQueue
     public int $backoff = 10;
 
     /** @param list<string> $memberIds */
-    public function __construct(public string $tenantId, public array $memberIds, public string $channel, public ?int $userId = null, public ?string $localDate = null) {}
+    public function __construct(public string $tenantId, public array $memberIds, public string $channel, public ?int $userId = null, public ?string $localDate = null)
+    {
+        $this->localDate ??= CarbonImmutable::now(CommunitySettings::for(Tenant::query()->findOrFail($tenantId))->timezone)->toDateString();
+    }
 
     public function handle(DuesReminders $reminders): void
     {
