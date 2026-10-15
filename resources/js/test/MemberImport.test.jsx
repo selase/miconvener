@@ -1,8 +1,9 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ImportMembers from '@/Pages/Tenant/Community/ImportMembers';
 
 vi.mock('@/Layouts/ConsoleLayout', () => ({ default: ({ children }) => children }));
+afterEach(() => vi.restoreAllMocks());
 
 const preview = {
     token: 'preview-token',
@@ -12,6 +13,7 @@ const preview = {
             line: 2,
             name: 'Ama',
             phone: '+233241234567',
+            email: 'ama@example.test',
             membership_type: 'Regular',
             status: 'new',
             errors: [],
@@ -62,15 +64,43 @@ it('previews without saving then filters errors and confirms the selected policy
     });
     fireEvent.click(screen.getByRole('button', { name: 'Preview spreadsheet' }));
     await screen.findByText('Bad Row');
+    expect(screen.getByText('+233241234567')).toBeTruthy();
+    expect(screen.getByText('ama@example.test')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Show rows'), { target: { value: 'error' } });
     expect(screen.queryByText('Ama')).toBeNull();
     expect(screen.getByText('Choose an active membership type.')).toBeTruthy();
     fireEvent.click(screen.getByLabelText('Update matching members'));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
     await screen.findByText(/1 added/);
+    expect(screen.getByRole('status').textContent).toContain('1 error');
+    expect(screen.getByRole('status').textContent).not.toContain('1 errors');
     expect(screen.getByText('Membership type changed after preview.')).toBeTruthy();
     expect(JSON.parse(fetch.mock.calls[1][1].body).existing_policy).toBe('update');
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
+    fetch.mockRestore();
+});
+
+it.each([0, 1, 2])('uses correct grammar for %i import errors', async (errors) => {
+    const fetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce({ ok: true, json: async () => preview })
+        .mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ created: 0, updated: 0, skipped: 0, errors, rows: [] }),
+        });
+    render(<ImportMembers />);
+    fireEvent.change(screen.getByLabelText('Spreadsheet'), {
+        target: { files: [new File(['a'], 'members.csv')] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview spreadsheet' }));
+    await screen.findByText('Bad Row');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+    await screen.findByText(/0 added/);
+    const message = screen.getByRole('status').textContent;
+    expect(message).toContain(`${errors} ${errors === 1 ? 'error' : 'errors'}`);
+    if (errors === 1) {
+        expect(message).not.toContain('1 errors');
+    }
     fetch.mockRestore();
 });
 

@@ -56,6 +56,7 @@
 - [x] **Step 2: Run, see them fail.** **Step 3: Implement** (page: upload, preview table with filters for errors, policy choice, confirm). **Step 4: Run** `tests/Feature/Community`.
 - [x] **Step 5: Commit** `feat(community): import members from a spreadsheet with preview`.
 - [x] **Task review fix 1:** reject ambiguous active normalized type names in preview and confirmation; cover existing case/whitespace collisions and collisions introduced after preview.
+- [x] **Final review I1 / M1 / M2:** reject rows whose reserved email and name/phone identify different members, both in preview and under the current tenant lock at confirmation; preserve per-row errors, good-row consume-once import and planned identity uniqueness. Cover collisions before/after preview, manual-update agreement, untouched member/history/pay-token fields and multiple planned updates. Preview shows both contacts; import error counts use singular/plural grammar. Evidence: `.superpowers/sdd/2026-10-15-community-1c-import-reminders-finance/final-fix-report.md`.
 
 ### Task 2: Reminders and the arrears button
 
@@ -81,6 +82,8 @@ Rulings recorded during Task 2:
 - Manual HTTP requests queue delivery and return 202/`queued`; the confirmation is an estimate and re-evaluates audience, permissions, settings and funds at job execution. Shared contact numbers retain the spec's per-member transactional reminder limit.
 - Review fix: dispatch pages of 100 recipients with an independently queued cursor continuation; each delivery unit handles one email or at most 50 personalised SMS recipients. Dispatch SMS units before email units and reserve only inside the executing channel unit. Dispatcher/delivery timeouts are 30/60 seconds, below the existing 90-second retry-after; up to three attempts can reach unclaimed recipients while persisted daily claims prevent replay. Each unit rechecks current actor permissions, settings, local date and charges. Cost: more small queue jobs, while ambiguous transport outcomes still require reconciliation.
 - Review fix: Overview owns the settings draft and field errors, so Settings can unmount on tab changes while retaining saved choices and unsaved validation state. A full page reload reinitialises from server values; hidden duplicate forms are unnecessary.
+- Final-review operational follow-up: the organisation owner/admin must establish unknown SMS provider outcomes manually before high-volume SMS rollout. Keep uncertain reservations held; never blindly refund or retry them. An auditable operator reconciliation workflow belongs to Messages milestone 2 and must reuse the allowance lock and account for existing reserved/sent reminder usage. No operator screen or command is included in milestone 1c.
+- [x] **Final review M2:** arrears confirmation uses `member currently has` for one and `members currently have` for zero/many, with component coverage.
 
 ### Task 3: Member caps by plan
 
@@ -114,6 +117,7 @@ Ruling: Task 3 supplies the cap and shared advisory lock first. Task 1 will wire
 - [x] Overview uses DuesReport stored online receipts and organisation-local month boundaries, labels collections separately from payable, links Finance reporting and uses a currency-neutral empty state. Finance links/totals require `read finance`.
 - [x] Historical cash-only organisations retain Finance after Community is switched off: `hasDuesMoney()` includes paid charges alongside ledger/payout history. Cash remains outside ledgers and payable; Community writing routes stay switched off.
 - [x] Dues-only Finance emphasises dues instead of empty ticket totals; ticket-only props and both settlement readers remain unchanged. Current arrears/payable/in-flight are labelled independently of filtered collections. CSV amounts remain integer minor units and currencies never mix.
+- [x] **Final review M3:** applying dues dates preserves applied ticket search/status on mixed Finance; covered by a component test. Evidence: final fix report linked above.
 
 ### Task 5: Verification
 

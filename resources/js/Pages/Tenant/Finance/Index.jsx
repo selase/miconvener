@@ -47,7 +47,7 @@ function StatCard({ label, value }) {
     );
 }
 
-function DuesSection({ dues }) {
+function DuesSection({ dues, filters }) {
     const [from, setFrom] = useState(dues.from);
     const [to, setTo] = useState(dues.to);
     const [processing, setProcessing] = useState(false);
@@ -86,7 +86,7 @@ function DuesSection({ dues }) {
                     setProcessing(true);
                     router.get(
                         route('tenant.finance.index'),
-                        { from, to },
+                        { search: filters.search, status: filters.status, from, to },
                         {
                             preserveScroll: true,
                             onFinish: () => setProcessing(false),
@@ -229,7 +229,13 @@ export default function Index({ transactions, stats, filters, dues }) {
                             : 'min-w-0 flex-1 space-y-6 px-8 py-6'
                     }
                 >
-                    {dues && <DuesSection key={`${dues.from}-${dues.to}`} dues={dues} />}
+                    {dues && (
+                        <DuesSection
+                            key={`${dues.from}-${dues.to}`}
+                            dues={dues}
+                            filters={filters}
+                        />
+                    )}
                     {(!dues || dues.show_ticket_finance) && (
                         <>
                             {dues && (

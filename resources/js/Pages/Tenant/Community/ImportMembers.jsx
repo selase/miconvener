@@ -140,7 +140,7 @@ export default function ImportMembers() {
                     >
                         <p>
                             {result.created} added · {result.updated} updated · {result.skipped}{' '}
-                            skipped · {result.errors} errors
+                            skipped · {result.errors} {result.errors === 1 ? 'error' : 'errors'}
                         </p>
                         <p>
                             Rows added since the preview are skipped. Existing members keep their
@@ -283,7 +283,19 @@ export default function ImportMembers() {
                                         <tr key={row.line}>
                                             <Td>{row.line}</Td>
                                             <Td>{row.name || '—'}</Td>
-                                            <Td>{row.phone || row.email || '—'}</Td>
+                                            <Td>
+                                                {row.phone && (
+                                                    <p>
+                                                        Phone: <span>{row.phone}</span>
+                                                    </p>
+                                                )}
+                                                {row.email && (
+                                                    <p>
+                                                        Email: <span>{row.email}</span>
+                                                    </p>
+                                                )}
+                                                {!row.phone && !row.email && '—'}
+                                            </Td>
                                             <Td>{row.membership_type || '—'}</Td>
                                             <Td>{row.joined_on || 'Today'}</Td>
                                             <Td>

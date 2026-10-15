@@ -64,6 +64,7 @@ final class MemberImport
                 $data['joined_on'] = Date::excelToDateTimeObject((float) $data['joined_on'])->format('Y-m-d');
             }
             $row = $this->validateRow($data, $offset + 2, $types);
+            $this->validateIdentity($row, $register);
             if ($row['errors'] !== []) {
                 $row['status'] = 'error';
             } elseif ($this->identity->matchingId($seen, $row['name'], $row['phone'], $row['email']) !== null) {
@@ -107,6 +108,9 @@ final class MemberImport
                 $errors = 0;
                 foreach ($preview['rows'] as $original) {
                     $row = $this->validateRow($original, $original['line'], $types);
+                    if (in_array($original['status'], ['new', 'existing'], true)) {
+                        $this->validateIdentity($row, $register);
+                    }
                     $status = 'skipped';
                     if ($original['status'] === 'error' || $row['errors'] !== []) {
                         $row['errors'] = $original['status'] === 'error' ? $original['errors'] : $row['errors'];
@@ -147,6 +151,17 @@ final class MemberImport
                 return new ImportResult(count($creates), count($updates), $skipped, $errors, $outcomes);
             });
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<string, string>  $register
+     */
+    private function validateIdentity(array &$row, array $register): void
+    {
+        if ($row['errors'] === [] && count($this->identity->matchingIds($register, $row['name'], $row['phone'], $row['email'])) > 1) {
+            $row['errors'][] = 'The email and name/phone match different members. Correct the contacts before importing.';
+        }
     }
 
     /** @return array<int, array<array-key, mixed>> */

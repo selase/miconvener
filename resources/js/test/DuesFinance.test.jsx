@@ -51,6 +51,22 @@ it('dues report has an empty state without a made-up currency', () => {
     render(<Finance {...props} dues={{ ...dues, currencies: {} }} />);
     expect(screen.getByText(/No dues collections or current balances/)).toBeTruthy();
 });
+it('applying dues dates preserves current ticket search and status on mixed finance', () => {
+    render(
+        <Finance
+            {...props}
+            filters={{ search: 'Ama', status: 'pending' }}
+            dues={{ ...dues, show_ticket_finance: true }}
+        />
+    );
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-09-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply dates' }));
+    expect(router.get).toHaveBeenLastCalledWith(
+        expect.any(String),
+        { search: 'Ama', status: 'pending', from: '2026-09-01', to: '2026-10-15' },
+        expect.any(Object)
+    );
+});
 it('ticket-only finance retains its transaction screen', () => {
     render(<Finance {...props} />);
     expect(screen.getByText('Total volume')).toBeTruthy();

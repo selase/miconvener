@@ -1,9 +1,10 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import MoneyDues from '@/Pages/Tenant/Community/MoneyDues';
 import Overview from '@/Pages/Tenant/Community/Overview';
 
 vi.mock('@/Layouts/ConsoleLayout', () => ({ default: ({ children }) => children }));
+afterEach(() => vi.restoreAllMocks());
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/Components/Console/Toast', () => ({ useToast: () => toast }));
 
@@ -34,6 +35,23 @@ it('previews recipients before confirmation and reports queued delivery', async 
     expect(fetch.mock.calls[0][1].method).toBe('GET');
     expect(fetch.mock.calls[1][1].method).toBe('POST');
     expect(screen.queryByRole('dialog')).toBeNull();
+    fetch.mockRestore();
+});
+
+it.each([
+    [0, 'members currently have'],
+    [1, 'member currently has'],
+    [2, 'members currently have'],
+])('uses correct arrears grammar for %i members', async (members, phrase) => {
+    const fetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue({
+            ok: true,
+            json: async () => ({ members, sms_credits_needed: 0, reminders_enabled: true }),
+        });
+    render(<MoneyDues membershipTypes={[]} canRemindArrears />);
+    fireEvent.click(screen.getByRole('button', { name: 'Remind everyone in arrears' }));
+    expect(await screen.findByText(new RegExp(`${members} ${phrase}`))).toBeTruthy();
     fetch.mockRestore();
 });
 
@@ -93,12 +111,10 @@ it('settings tab edits and saves validated reminder preferences', async () => {
 });
 
 it('keeps saved reminder choices after returning to Settings and an unrelated save', async () => {
-    const fetch = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue({
-            ok: true,
-            json: async () => ({ message: 'Reminder settings saved.' }),
-        });
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: 'Reminder settings saved.' }),
+    });
     render(
         <Overview
             counts={{ members: 0, activeMembers: 0, openCharges: 0, overdueCharges: 0 }}
@@ -142,13 +158,11 @@ it('keeps saved reminder choices after returning to Settings and an unrelated sa
 });
 
 it('preserves unsaved reminder inputs and validation errors across tab changes', async () => {
-    const fetch = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue({
-            ok: false,
-            status: 422,
-            json: async () => ({ errors: { sms_monthly_limit: ['Use a whole number.'] } }),
-        });
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({ errors: { sms_monthly_limit: ['Use a whole number.'] } }),
+    });
     render(
         <Overview
             counts={{ members: 0, activeMembers: 0, openCharges: 0, overdueCharges: 0 }}

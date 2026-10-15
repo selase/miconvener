@@ -266,3 +266,40 @@ test('confirmation rejects an active name collision introduced after preview wit
         ->and($member->fresh()->membership_type_id)->toBe($this->type->id)
         ->and(Member::query()->count())->toBe(1);
 });
+
+test('conflicting email and phone identities are row errors and preserve both members', function (bool $afterPreview) {
+    $alice = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'name' => 'Alice', 'phone' => null, 'email' => 'shared@example.test', 'status' => 'exited', 'notes' => 'retain history', 'amount_override' => 700]);
+    $paid = DuesCharge::factory()->create(['status' => 'paid', 'tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'member_id' => $alice->id]);
+    $createSam = fn () => Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'name' => 'Sam', 'phone' => '+233241234567', 'email' => 'sam@example.test']);
+    $sam = $afterPreview ? null : $createSam();
+    $preview = previewMembers($this, "Sam,0241234567,shared@example.test,Regular,\nUnrelated,0241234568,valid@example.test,Regular,\n");
+    expect($preview['summary']['error'])->toBe($afterPreview ? 0 : 1);
+    if (! $afterPreview) {
+        expect($preview['rows'][0]['errors'])->toBe(['The email and name/phone match different members. Correct the contacts before importing.']);
+    }
+    $sam ??= $createSam();
+    $originalAlice = $alice->fresh()->getAttributes();
+    $originalSam = $sam->fresh()->getAttributes();
+    $originalPaid = $paid->fresh()->getAttributes();
+    $this->patchJson(route('tenant.community.members.update', ['subdomain' => 'imports', 'member' => $alice->id]), ['name' => 'Sam', 'phone' => '0241234567', 'email' => 'shared@example.test', 'membership_type_id' => $this->type->id])
+        ->assertUnprocessable()->assertJsonValidationErrors(['phone']);
+    $payload = ['token' => $preview['token'], 'existing_policy' => 'update'];
+    $this->postJson(importRoute('confirm'), $payload)->assertOk()->assertJsonPath('created', 1)->assertJsonPath('updated', 0)->assertJsonPath('errors', 1)
+        ->assertJsonPath('rows.0.status', 'error')->assertJsonPath('rows.0.errors.0', 'The email and name/phone match different members. Correct the contacts before importing.');
+    $this->postJson(importRoute('confirm'), $payload)->assertGone();
+    expect($alice->fresh()->getAttributes())->toBe($originalAlice)
+        ->and($sam->fresh()->getAttributes())->toBe($originalSam)
+        ->and($paid->fresh()->getAttributes())->toBe($originalPaid)
+        ->and(Member::query()->where('name', 'Unrelated')->count())->toBe(1)
+        ->and(Member::query()->count())->toBe(3);
+})->with(['before preview' => false, 'after preview' => true]);
+
+test('planned updates cannot claim the same new phone identity for different members', function () {
+    $first = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'phone' => null, 'email' => 'first@example.test']);
+    $second = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'phone' => null, 'email' => 'second@example.test']);
+    $originalSecond = $second->fresh()->getAttributes();
+    $preview = previewMembers($this, "Sam,0241234567,first@example.test,Regular,\nSam,0241234567,second@example.test,Regular,\n");
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update'])->assertOk()->assertJsonPath('updated', 1)->assertJsonPath('skipped', 1);
+    expect($first->fresh()->name)->toBe('Sam')->and($first->fresh()->phone)->toBe('+233241234567')
+        ->and($second->fresh()->getAttributes())->toBe($originalSecond);
+});

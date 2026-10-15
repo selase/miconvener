@@ -54,13 +54,26 @@ final class MemberIdentity
     /** @param array<string, string> $index */
     public function matchingId(array $index, string $name, ?string $phone, ?string $email): ?string
     {
+        return $this->matchingIds($index, $name, $phone, $email)[0] ?? null;
+    }
+
+    /**
+     * @param  array<string, string>  $index
+     * @return list<string>
+     */
+    public function matchingIds(array $index, string $name, ?string $phone, ?string $email): array
+    {
+        $matches = [];
         $email = $this->normaliseEmail($email);
         if ($email !== null && isset($index['email:'.$email])) {
-            return $index['email:'.$email];
+            $matches[] = $index['email:'.$email];
         }
         $key = $this->keys($name, $phone, $email)['person'] ?? null;
+        if ($key !== null && isset($index[$key])) {
+            $matches[] = $index[$key];
+        }
 
-        return $key !== null ? ($index[$key] ?? null) : null;
+        return array_values(array_unique($matches));
     }
 
     /** @return array<string, string> */

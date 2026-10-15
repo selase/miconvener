@@ -362,9 +362,12 @@ export default function MoneyDues({ membershipTypes, canRemindArrears }) {
                 {reminderPreview && (
                     <div className="space-y-4 text-sm">
                         <p>
-                            {reminderPreview.members} members currently have overdue charges. Up to{' '}
-                            {reminderPreview.sms_credits_needed} SMS credits are needed before daily
-                            limits and message-length checks.
+                            {reminderPreview.members}{' '}
+                            {reminderPreview.members === 1
+                                ? 'member currently has'
+                                : 'members currently have'}{' '}
+                            overdue charges. Up to {reminderPreview.sms_credits_needed} SMS credits
+                            are needed before daily limits and message-length checks.
                         </p>
                         <p className="text-ink-secondary">
                             SMS credits available:{' '}
