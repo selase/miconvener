@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { Layers, Plus } from 'lucide-react';
+import { Layers, Plus, Upload } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
@@ -274,6 +274,9 @@ export default function People({ members, membershipTypes, memberUsage }) {
                 activeTab="members"
                 actions={
                     <>
+                        <Button href={route('tenant.community.people.import.show')} icon={Upload}>
+                            Import
+                        </Button>
                         <Button href={route('tenant.community.money.dues.index')} icon={Layers}>
                             Membership types
                         </Button>

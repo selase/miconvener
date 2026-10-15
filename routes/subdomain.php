@@ -36,6 +36,7 @@ use App\Http\Controllers\Tenant\EventSponsorController;
 use App\Http\Controllers\Tenant\EventTicketTypeController;
 use App\Http\Controllers\Tenant\EventVenueController;
 use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\MemberImportController;
 use App\Http\Controllers\Tenant\MembershipTypeController;
 use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\OrgSettingsController;
@@ -308,6 +309,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
             Route::get('/', [App\Http\Controllers\Tenant\CommunityOverviewController::class, 'index'])->name('overview');
             Route::get('people', [MemberController::class, 'index'])->name('people.index');
+            Route::get('people/import', [MemberImportController::class, 'show'])->name('people.import.show');
+            Route::get('people/import/template', [MemberImportController::class, 'template'])->name('people.import.template');
+            Route::post('people/import/preview', [MemberImportController::class, 'preview'])->name('people.import.preview');
+            Route::post('people/import/confirm', [MemberImportController::class, 'confirm'])->name('people.import.confirm');
             Route::post('people/members', [MemberController::class, 'store'])->name('members.store');
             Route::patch('people/members/{member}', [MemberController::class, 'update'])->name('members.update');
             Route::post('people/members/{member}/exit', [MemberController::class, 'exit'])->name('members.exit');

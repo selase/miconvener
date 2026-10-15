@@ -15,6 +15,7 @@ use App\Models\Member;
 use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Services\Community\MemberCap;
+use App\Services\Community\MemberIdentity;
 use App\Services\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -97,6 +98,7 @@ final class MemberController extends Controller
         $cap = app(MemberCap::class);
         try {
             $member = $cap->withLock($tenant, function () use ($request, $tenant, $cap): Member {
+                app(MemberIdentity::class)->assertUnique($tenant, $request->validated());
                 $cap->assertRoomFor($tenant, 1);
 
                 return Member::query()->create([
@@ -114,8 +116,14 @@ final class MemberController extends Controller
 
     public function update(UpdateMemberRequest $request, string $subdomain, string $member): JsonResponse
     {
-        $model = $this->findMember($member);
-        DB::connection('landlord')->transaction(fn (): bool => $model->update($request->validated()));
+        $tenant = $this->getTenant();
+        $model = app(MemberCap::class)->withLock($tenant, function () use ($request, $tenant, $member): Member {
+            $model = $this->findMember($member);
+            app(MemberIdentity::class)->assertUnique($tenant, $request->validated(), $model->id);
+            $model->update($request->validated());
+
+            return $model;
+        });
 
         return response()->json(['id' => $model->id]);
     }
