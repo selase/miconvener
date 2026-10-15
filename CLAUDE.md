@@ -269,3 +269,8 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - IMPORTANT: Always use `search-docs` tool for version-specific Tailwind CSS documentation and updated code examples. Never rely on training data.
 - IMPORTANT: Activate `tailwindcss-development` every time you're working with a Tailwind CSS or styling-related task.
 </laravel-boost-guidelines>
+
+
+# Current work: Community
+
+Before starting work on members, dues, giving, following, `/my` or community messaging, read `docs/superpowers/community-roadmap.md`. It holds the milestone status table, links to the spec and plans, the rules for continuing, and the briefs for milestones without a plan. Tick plan steps (`- [ ]` to `- [x]`) in the same commit as the work, and update the roadmap's status table when a milestone changes state.

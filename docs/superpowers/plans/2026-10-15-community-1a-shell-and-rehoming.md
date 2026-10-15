@@ -1,6 +1,6 @@
 # Community 1a: Shell and Re-homing Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Tick each step in this file in the same commit as the work.
 
 **Goal:** Give the console a grouped menu with a new Community section, and move the milestone 2 dues screens into it (members under People, membership types under Money, payouts under Finance) without changing any money logic or any public URL.
 
@@ -331,7 +331,7 @@ describe('visibleGroups', () => {
 - [ ] **Step 1:** Full suite: `"$PHP" artisan test --parallel --processes=4 --compact`. Expected: all pass; name every failure.
 - [ ] **Step 2:** `"$PHP" vendor/bin/pint --test` (clean), phpstan (0 errors, baseline not grown), `npm run lint`, `npm run test`, `npm run build`.
 - [ ] **Step 3:** On the owner's local database: `"$PHP" artisan migrate --database=landlord` (applies the two new migrations), `"$PHP" artisan community:enable purpledot`, and confirm the existing local member, charges and payouts still show under the new pages (database query check is enough; the owner will click through).
-- [ ] **Step 4:** Update the project memory file `member_dues_design_decisions.md` with: 1a done, branch and commit, the new command name, and what 1b starts with.
+- [ ] **Step 4:** Update `docs/superpowers/community-roadmap.md` (1a status `built`, evidence commit) and the project memory file `member_dues_design_decisions.md` (1a done, new command name).
 - [ ] **Step 5:** Commit any remaining changes and push `community-1a`.
 
 ## Self-review against the spec

@@ -291,3 +291,8 @@ These are enforced by tests. Breaking one is a bug, not a style choice.
 - **Billing is the owner's.** `manage billing` (Superadmin, Org Superadmin only; not in `Permission::TENANT_SAFE`, so custom roles can't be given it) gates the billing and pricing pages, plan/token/renewal checkouts, invoices and `SubscriptionManager` actions. The Paystack callback is deliberately ungated: it records money already taken. The console hides billing UI via `auth.can.manage_billing`, but every route checks the permission itself.
 - **Token packs and plans are priced in GHS.** The platform Paystack account settles cedis only.
 - **Billing emails go through `BillingNotifier` only.** Receipt, payment failed, plan ending and plan ended are sent to the payer and `tenants.email`, once per `(type, dedupe_key)` in `billing_emails`. Call the notifier from every path that sees the event; the guard makes repeats a no-op. They are transactional: not metered against email credits, no opt-out.
+
+
+# Current work: Community
+
+Before starting work on members, dues, giving, following, `/my` or community messaging, read `docs/superpowers/community-roadmap.md`. It holds the milestone status table, links to the spec and plans, the rules for continuing, and the briefs for milestones without a plan. Tick plan steps (`- [ ]` to `- [x]`) in the same commit as the work, and update the roadmap's status table when a milestone changes state.
