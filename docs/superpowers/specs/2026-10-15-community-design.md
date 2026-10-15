@@ -41,7 +41,13 @@ Success looks like this:
 | Finance | One section for all money, reported by category; the separate "Dues payouts" menu from milestone 2 moves into Finance. |
 | Person's base | `/my` gains a Communities tab. Pay links keep working without sign-in. |
 | Polls and surveys | Live polls stay in Events. Community gets polls and surveys sent to an audience, answered in `/my` or from a link. Votes with eligibility rules come later. |
-| Simplicity | The owner's explicit constraint: every entry point must be simple to reason about and never confusing. |
+| Simplicity | Every entry point must be simple to reason about and never confusing. Simplicity guides the design but never blocks a needed expansion (owner, 2026-10-15). |
+| `/my` look | Must feel gorgeous on mobile (app-like) and gorgeous on desktop; designed mobile-first. |
+| Commission | Base 1% for dues and giving, **negotiable per organisation**, and can be set higher; superadmin sets it per organisation and per stream. |
+| Event contributions | Become **funds linked to an event** (all current tenants are testing, so the data can be converted). |
+| Followers and SMS | Followers may be messaged by SMS; the organisation pays for its SMS. |
+| `/my` visibility | A person sees every organisation that holds their verified email or phone, including ones that added them as a member without a follow. |
+| Periods | Daily, weekly, monthly, quarterly and yearly. |
 
 ## 4. Community sub-menus
 
@@ -64,7 +70,7 @@ Every cedi coming in through Community is either **owed** or **given**.
 | Shape | A member owes an amount per period | A gift to a fund; a campaign fund has a target and a deadline |
 | Arrears | Yes | No (pledges may come later) |
 | Ledger category | `dues` (exists) | `giving` (new, carries the fund) |
-| Commission | 1%, uncapped, borne by the organisation (agreed) | Open decision (contributions are 1% today) |
+| Commission | Base 1%, uncapped, borne by the organisation; negotiable per organisation | Base 1%; negotiable per organisation |
 
 Cash and transfer payments recorded by an admin carry no commission and post no ledger entry, as for dues today.
 
@@ -118,10 +124,19 @@ Ordered by what makes the product usable for a paying association soonest; Follo
 1. **Community shell and usable dues.** Re-home milestone 2 under Community (section, gate, routes, membership types with optional amount, weekly period); `dues:process` charge generation; reminders and the arrears button; CSV import; payouts moved into Finance; Finance page open to non-ticket organisations with a dues collections and arrears report.
 2. **Messages and groups.** Organisation-level messages (generalised blasts) with audiences (all members, group, arrears) and scheduling; groups.
 3. **People and Following.** Follow button on organisation and event pages (opt-in), followers tab, announcing new events to followers, `/my` Communities tab, SMS sign-in for `/my`.
-4. **Giving.** Funds and campaigns, give pages, bulk cash entry, giving reports and member statements. Event contributions stay as they are and appear in the same reports; converting them into event-linked funds is a later, separate step (existing receipts, tributes and `/my` history depend on them).
+4. **Giving.** Funds and campaigns, give pages, bulk cash entry, giving reports and member statements. Event contributions are converted into funds linked to their event (current tenants are all testing, so a one-time data conversion is acceptable); receipts, tributes and `/my` history move with them.
 5. **Library and polls.** Organisation-level library and polls/surveys, answered in `/my`.
 
 Votes, pledges and chapter hierarchies come after, each with its own design.
+
+## 11. Decisions on the former open questions (2026-10-15)
+
+1. Commission: base 1% for dues and giving, negotiable and possibly higher per organisation; set by the superadmin per organisation and per stream (tickets, contributions/giving, dues).
+2. Milestone 2 is re-homed under Community on its own branch, then merged.
+3. Followers may be messaged by SMS; the organisation pays for it.
+4. A person sees in `/my` every organisation that holds their verified email or phone.
+5. Plans and pricing: see section 13 (recommendation, awaiting the owner's confirmation).
+6. Daily periods are included alongside weekly.
 
 ## 11. Open decisions
 
@@ -140,3 +155,22 @@ Votes, pledges and chapter hierarchies come after, each with its own design.
 - **SMS sign-in cost and abuse.** Each `/my` sign-in code by SMS costs the platform a credit; it needs per-number and per-IP throttles.
 - **Name clashes.** The console already has "Inquiries & Leads" (venue enquiries) and "Team" (staff). Community must not reuse "leads", "contacts" or "team".
 - **Payment-processor classification** for dues and giving (Paystack): confirm before enabling for real organisations (carried from the dues design).
+
+## 13. Plans and pricing (recommendation, to confirm)
+
+Principles: Following is the growth engine for events, so it is free on every plan; Community revenue comes mainly from the plan (priced by member count) and SMS packs, because commission on small, frequent dues (for example a GHS 2 daily driver's due earns GHS 0.02 at 1%) is too small to carry the product.
+
+| | Free | Starter (GHS 249) | Growth (GHS 499) | Enterprise |
+|---|---|---|---|---|
+| Followers and announcing events | Yes | Yes | Yes | Yes |
+| Members | 50 | 500 | 5,000 | Unlimited / negotiated |
+| Dues and giving online | Yes, at 2% | Yes | Yes | Yes |
+| Messages (email; SMS from packs) | Send now | Send now and schedule | Schedule, groups | All |
+| Library | No | Yes | Yes | Yes |
+| Polls and surveys | No | No | Yes (with live polling) | Yes |
+| Reports and statements | Basic | Full | Full | Full |
+
+- Commission default 1% on paid plans, 2% on Free, overridable per organisation (higher or lower).
+- Add-on: extra members in blocks (for example +1,000 members for GHS 50 a month) so a growing union upgrades smoothly instead of hitting a wall.
+- SMS packs (already on sale once a provider token is set) are the main usage revenue for reminders and messages.
+- Annual billing discount as for existing plans.
