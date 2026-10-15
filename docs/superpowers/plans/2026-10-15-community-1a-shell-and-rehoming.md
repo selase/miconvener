@@ -362,11 +362,11 @@ describe('visibleGroups', () => {
 
 ### Task 5: Verification and handoff
 
-- [ ] **Step 1:** Full suite: `"$PHP" artisan test --parallel --processes=4 --compact`. Expected: all pass; name every failure.
-- [ ] **Step 2:** `"$PHP" vendor/bin/pint --dirty` (clean), phpstan (0 errors, baseline not grown), `npm run lint`, `npm run test`, `npm run build`.
-- [ ] **Step 3:** On the owner's local database: `"$PHP" artisan migrate --database=landlord` (applies the two new migrations), `"$PHP" artisan community:enable purpledot`, and confirm the existing local member, charges and payouts still show under the new pages (database query check is enough; the owner will click through).
-- [ ] **Step 4:** Update `docs/superpowers/community-roadmap.md` (1a status `built`, evidence commit) and the project memory file `member_dues_design_decisions.md` (1a done, new command name).
-- [ ] **Step 5:** Commit any remaining changes and push `community-1a`.
+- [x] **Step 1:** Full suite: `"$PHP" artisan test --parallel --processes=4 --compact`. Expected: all pass; name every failure.
+- [x] **Step 2:** `"$PHP" vendor/bin/pint --dirty` (clean), phpstan (0 errors, baseline not grown), `npm run lint`, `npm run test`, `npm run build`.
+- [x] **Step 3:** On the owner's local database: `"$PHP" artisan migrate --database=landlord` (applies the two new migrations), `"$PHP" artisan community:enable purpledot`, and confirm the existing local member, charges and payouts still show under the new pages (database query check is enough; the owner will click through).
+- [x] **Step 4:** Update `docs/superpowers/community-roadmap.md` (1a status `built`, evidence commit) and the project memory file `member_dues_design_decisions.md` (1a done, new command name).
+- [x] **Step 5:** Commit any remaining changes and push `community-1a`.
 
 ## Self-review against the spec
 
