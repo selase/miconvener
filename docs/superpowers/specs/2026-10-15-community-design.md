@@ -144,7 +144,7 @@ Votes, pledges and chapter hierarchies come after, each with its own design.
 2. Milestone 2 is re-homed under Community on its own branch, then merged.
 3. Followers may be messaged by SMS; the organisation pays for it.
 4. A person sees in `/my` every organisation that holds their verified email or phone.
-5. Plans and pricing: see section 13 (recommendation, awaiting the owner's confirmation).
+5. Plans and pricing: section 13, confirmed by the owner.
 6. Daily periods are included alongside weekly.
 
 ## 11. Open decisions
@@ -165,7 +165,7 @@ Votes, pledges and chapter hierarchies come after, each with its own design.
 - **Name clashes.** The console already has "Inquiries & Leads" (venue enquiries) and "Team" (staff). Community must not reuse "leads", "contacts" or "team".
 - **Payment-processor classification** for dues and giving (Paystack): confirm before enabling for real organisations (carried from the dues design).
 
-## 13. Plans and pricing (recommendation, to confirm)
+## 13. Plans and pricing (confirmed by the owner, 2026-10-15)
 
 Principles: Following is the growth engine for events, so it is free on every plan; Community revenue comes mainly from the plan (priced by member count) and SMS packs, because commission on small, frequent dues (for example a GHS 2 daily driver's due earns GHS 0.02 at 1%) is too small to carry the product.
 
