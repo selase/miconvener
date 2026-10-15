@@ -317,7 +317,7 @@ export function visibleGroups(groups, { features = {}, can = {} } = {}) {
   Icons are names mapped to lucide components inside the layout (the module stays free of React so it is trivially testable). Item labels and order above are the spec's section 14; "Refunds" is not a separate page today (refunds live on the Finance page), so it is not listed.
 - Layout behaviour: a group label renders above its items (not in the `top` and `bottom` groups); groups collapse by clicking the label; the collapsed state is stored per group in `localStorage` under `console.nav.collapsed.{key}` wrapped in try/catch (render expanded when storage throws); the group holding the current page is always expanded; in `compact` mode (icon rail inside an event) labels are hidden and a thin divider separates groups; the phone drawer shows the same groups.
 
-- [ ] **Step 1: Write the failing Vitest tests** (`resources/js/test/console/consoleNav.test.js`):
+- [x] **Step 1: Write the failing Vitest tests** (`resources/js/test/console/consoleNav.test.js`):
 
 ```js
 import { describe, expect, it } from 'vitest';
@@ -350,10 +350,13 @@ describe('visibleGroups', () => {
 });
 ```
 
-- [ ] **Step 2: Run, see them fail.** Run: `npx vitest run resources/js/test/console/consoleNav.test.js`. Expected: FAIL (module not found).
-- [ ] **Step 3: Implement** the module and the layout change. Keep the active-item logic as it is (Events stays lit inside an event).
-- [ ] **Step 4: Run** `npm run test`, `npm run lint`, `npm run build`. Expected: all pass. Commit the rebuilt `public/build` with the task (built assets are tracked; see Global Constraints).
-- [ ] **Step 5: Commit** `feat(console): grouped navigation with Community, Venue, Finance and Organisation`.
+- [x] **Step 2: Run, see them fail.** Run: `npx vitest run resources/js/test/console/consoleNav.test.js`. Expected: FAIL (module not found).
+- [x] **Step 3: Implement** the module and the layout change. Keep the active-item logic as it is (Events stays lit inside an event).
+- [x] **Step 4: Run** `npm run test`, `npm run lint`, `npm run build`. Expected: all pass. Commit the rebuilt `public/build` with the task (built assets are tracked; see Global Constraints).
+- [x] **Step 5: Commit**
+
+  Ruling: Community items also require `manage_members` (as the plan's table says) and Overview needs it too; the active item is the longest matching path, so Community > Overview (`/community`) is not lit on `/community/people` while Events stays lit inside an event.
+ `feat(console): grouped navigation with Community, Venue, Finance and Organisation`.
 
 ---
 
