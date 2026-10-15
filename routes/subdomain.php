@@ -146,6 +146,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     // Merchant Finance & Sales
     Route::get('/finance', [App\Http\Controllers\Tenant\FinanceController::class, 'index'])->name('tenant.finance.index');
+    Route::get('/finance/dues/collections/export', [App\Http\Controllers\Tenant\FinanceController::class, 'exportDuesCollections'])->name('tenant.finance.dues.collections.export');
+    Route::get('/finance/dues/arrears/export', [App\Http\Controllers\Tenant\FinanceController::class, 'exportDuesArrears'])->name('tenant.finance.dues.arrears.export');
     Route::post('/finance/refund/{transaction}', [App\Http\Controllers\Tenant\FinanceController::class, 'refund'])->name('tenant.finance.refund');
 
     Route::prefix('llm-config')->name('tenant.llm-config.')->group(function () {

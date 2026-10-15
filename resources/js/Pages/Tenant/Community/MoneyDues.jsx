@@ -232,7 +232,19 @@ export default function MoneyDues({ membershipTypes, canRemindArrears }) {
 
             <div className="px-4 py-6 sm:px-8">
                 {canRemindArrears && (
-                    <div className="mb-5">
+                    <div className="mb-5 flex flex-wrap items-center gap-4">
+                        <a
+                            className="text-sm font-medium text-accent underline"
+                            href={route('tenant.finance.index')}
+                        >
+                            Dues reports
+                        </a>
+                        <a
+                            className="text-sm font-medium text-accent underline"
+                            href={route('tenant.finance.payouts.index')}
+                        >
+                            Payouts
+                        </a>
                         <Button onClick={previewReminders} disabled={reminding}>
                             {reminding ? 'Checking…' : 'Remind everyone in arrears'}
                         </Button>

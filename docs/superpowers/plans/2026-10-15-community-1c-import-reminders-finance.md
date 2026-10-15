@@ -105,9 +105,15 @@ Ruling: Task 3 supplies the cap and shared advisory lock first. Task 1 will wire
 - `DuesReport::summary(Tenant, CarbonImmutable $from, CarbonImmutable $to): array` per currency: `collected_online_gross`, `gateway_fees`, `commission`, `net_online`, `recorded_cash`, `collected_total` (online gross + cash), `available_to_pay_out` (from `DuesBalance`), `in_flight`, `arrears_total`, `members_in_arrears`.
 - Collections CSV: one row per paid charge in the range (member, phone, email, type, period, amount, method, paid at, reference, gateway fee, commission, net). Arrears CSV: one row per member in arrears (member, contacts, type, open charges, total, oldest due date).
 
-- [ ] **Step 1: Failing tests:** a dues-only tenant (no ticket money) can open Finance; a ticket tenant without Community sees exactly what it saw before (snapshot of the existing props); recorded cash in collections and never in available; own-gateway tenant: collections from charges, available 0; date range and currency grouping; CSV headers and rows; `read finance` required; tenant isolation.
-- [ ] **Step 2–4:** fail, implement, pass (`tests/Feature/Community tests/Feature/Finance`).
-- [ ] **Step 5: Commit** `feat(finance): dues collections, cash, arrears and payable in Finance`.
+- [x] **Step 1: Failing tests:** a dues-only tenant (no ticket money) can open Finance; a ticket tenant without Community sees exactly what it saw before (snapshot of the existing props); recorded cash in collections and never in available; own-gateway tenant: collections from charges, available 0; date range and currency grouping; CSV headers and rows; `read finance` required; tenant isolation.
+- [ ] **Step 2–4:** fail, implement, pass (`tests/Feature/Community tests/Feature/Finance`). Focused Task 4 PHP 22/22 (189 assertions), JS 35/35, scoped PHPStan 0, Pint/lint/build green; broader Community/Finance/Dues/Payments regression pass is running and remains pending. Implementation committed for independent review; Task 4 is not yet marked complete.
+- [x] **Step 5: Commit** `feat(finance): dues collections, cash, arrears and payable in Finance`.
+
+**Task 4 integration rulings (approved by parent):**
+- [x] Dues-only PaymentSettings uses unchanged `manage payment settings` plus `showsFinance()` eligibility for reading/configuring Paystack. Stripe Connect keeps its existing ticket entitlement; dues remain Paystack-only; commercial overrides remain superadmin-only.
+- [x] Overview uses DuesReport stored online receipts and organisation-local month boundaries, labels collections separately from payable, links Finance reporting and uses a currency-neutral empty state. Finance links/totals require `read finance`.
+- [x] Historical cash-only organisations retain Finance after Community is switched off: `hasDuesMoney()` includes paid charges alongside ledger/payout history. Cash remains outside ledgers and payable; Community writing routes stay switched off.
+- [x] Dues-only Finance emphasises dues instead of empty ticket totals; ticket-only props and both settlement readers remain unchanged. Current arrears/payable/in-flight are labelled independently of filtered collections. CSV amounts remain integer minor units and currencies never mix.
 
 ### Task 5: Verification
 

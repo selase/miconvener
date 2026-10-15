@@ -123,13 +123,18 @@ function ReminderSettings({ settings, form, setForm, errors, setErrors }) {
     );
 }
 
-export default function Overview({ counts, collectedThisMonth, reminderSettings }) {
+export default function Overview({
+    counts,
+    collectedThisMonth,
+    reminderSettings,
+    canReadFinance = false,
+}) {
     const [tab, setTab] = useState('overview');
     const [settingsForm, setSettingsForm] = useState(reminderSettings);
     const [settingsErrors, setSettingsErrors] = useState({});
     const collected =
         collectedThisMonth.length === 0
-            ? formatDuesMoney(0, 'GHS')
+            ? 'No online collections'
             : collectedThisMonth
                   .map((row) => formatDuesMoney(row.amount, row.currency))
                   .join(' · ');
@@ -196,12 +201,14 @@ export default function Overview({ counts, collectedThisMonth, reminderSettings 
                             hint={`${counts.overdueCharges} overdue`}
                             href={route('tenant.community.money.dues.index')}
                         />
-                        <Stat
-                            label="Collected online this month"
-                            value={collected}
-                            hint="Ready to pay out from Finance > Payouts"
-                            href={route('tenant.finance.payouts.index')}
-                        />
+                        {canReadFinance && (
+                            <Stat
+                                label="Collected online this month"
+                                value={collected}
+                                hint="View collections, cash and current balances in Finance"
+                                href={route('tenant.finance.index')}
+                            />
+                        )}
                     </div>
                 )}
             </div>

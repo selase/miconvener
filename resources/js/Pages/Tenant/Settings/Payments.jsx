@@ -68,7 +68,11 @@ function WebhookUrl({ url, hint }) {
     );
 }
 
-function SettlementModeForm({ settlementMode, platformSettlementAvailable }) {
+function SettlementModeForm({
+    settlementMode,
+    platformSettlementAvailable,
+    ticketPaymentsAvailable,
+}) {
     const { data, setData, post, processing } = useForm({ settlement_mode: settlementMode });
 
     const submit = (event) => {
@@ -112,7 +116,12 @@ function SettlementModeForm({ settlementMode, platformSettlementAvailable }) {
                                 <span className="mt-0.5 block text-sm text-ink-secondary">
                                     {unavailable
                                         ? 'Not available yet: the platform has not finished setting up payouts.'
-                                        : option.description}
+                                        : ticketPaymentsAvailable
+                                          ? option.description
+                                          : option.description.replaceAll(
+                                                'Paystack or Stripe',
+                                                'Paystack'
+                                            )}
                                 </span>
                             </span>
                         </label>
@@ -456,6 +465,7 @@ function StripeCard({ stripe }) {
 export default function Payments({
     settlementMode,
     platformSettlementAvailable,
+    ticketPaymentsAvailable = true,
     gateways,
     stripe,
     commissionSplit,
@@ -471,6 +481,7 @@ export default function Payments({
                 <SettlementModeForm
                     settlementMode={settlementMode}
                     platformSettlementAvailable={platformSettlementAvailable}
+                    ticketPaymentsAvailable={ticketPaymentsAvailable}
                 />
 
                 {canSetPlatformFee && <PlatformFeeForm platformFee={platformFee} />}
@@ -479,7 +490,9 @@ export default function Payments({
                     <h2 className="text-sm font-semibold text-ink-secondary">Your own gateway</h2>
                     <p className="mt-1 text-sm text-ink-secondary">
                         {settlementMode === 'own_gateway'
-                            ? 'Ticket payments go to the provider you mark active here.'
+                            ? ticketPaymentsAvailable
+                                ? 'Ticket payments go to the provider you mark active here. Dues use Paystack only.'
+                                : 'Dues payments use your active Paystack account. Stripe is supported for event tickets only.'
                             : 'Only used when the settlement mode is Own gateway.'}
                     </p>
                 </div>
@@ -489,7 +502,7 @@ export default function Payments({
                         commissionSplit={commissionSplit}
                         commissionCredit={commissionCredit}
                     />
-                    <StripeCard stripe={stripe} />
+                    {ticketPaymentsAvailable && <StripeCard stripe={stripe} />}
                 </div>
             </div>
         </ConsoleLayout>

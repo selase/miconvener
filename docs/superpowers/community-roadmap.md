@@ -16,7 +16,7 @@ Status values: `not started` → `planned` (plan written) → `in progress` → 
 | D2 | Collecting dues (dues spec M2) | built, not merged | `member-dues-m2` | [plan](plans/2026-10-13-member-dues-collecting.md) | `61224d2`, 2377 tests green, clicked through in Paystack test mode |
 | 1a | Shell and re-homing | built (reviewed) | `community-1a` (from D2) | [plan](plans/2026-10-15-community-1a-shell-and-rehoming.md) | final review fixes applied; full suite 2391/2391, phpstan 0, lint and JS tests (253) green; deferred minors listed in the 1a plan |
 | 1b | Charges, periods and commercial terms | built (reviewed), not merged | `community-1b` from `0173494` | [plan](plans/2026-10-15-community-1b-charges-periods-terms.md) | `0ad164c`; full PHP 2473/2473 (11621 assertions), JS 258/258, PHPStan 0 with unchanged baseline, Pint/lint/build green and rebuilt assets committed; fresh review findings fixed; isolated QA acceptance only |
-| 1c | Import, reminders and Finance | in progress | `community-1c` from `0ed29f6` | [plan](plans/2026-10-15-community-1c-import-reminders-finance.md) | Tasks 3 (caps) and 1 (import) implemented and reviewed; Task 2 reminders implemented with focused verification. Task 2 review, Task 4 Finance and Task 5 milestone verification remain. |
+| 1c | Import, reminders and Finance | in progress | `community-1c` from `0ed29f6` | [plan](plans/2026-10-15-community-1c-import-reminders-finance.md) | Tasks 1–4 implemented; caps, import and reminders reviewed. Task 4 focused PHP 22/22 (189 assertions), JS 35/35, scoped PHPStan 0, Pint/lint/build green with rebuilt assets; Finance task review and final milestone-wide verification pending. |
 | 2 | Messages and groups | not started | | brief below | |
 | 3 | People, Following and Join | not started | | brief below | |
 | 4 | The `/my` app | not started | | brief below | |
@@ -31,7 +31,7 @@ Merge policy (owner's decision): D2 is not merged on its own. 1a, 1b and 1c land
 - `community-1b` at implementation commit `0ad164c` holds D2 + 1a + 1b, built and reviewed, **not merged**. The plan contains completed steps, review rulings and verification evidence.
 - Isolated checkout: `/Users/selase/Sites/miconvener/.worktrees/artifact-completion`. The original checkout remains clean on `community-1a` at `0173494`; the owner’s local Purpledot database and settlement mode were not changed. 1b migrations and command acceptance ran on isolated QA databases.
 - The owner can review 1b before deciding integration. **Do not merge, deploy or change production without the owner’s go-ahead.**
-- Milestone 1c is in progress: Task 3 caps and Task 1 import are reviewed; Task 2 reminders are implemented and await task review. Next implement Task 4 Finance, then Task 5 milestone-wide verification. Read the 1a plan’s deferred minors and PaymentSettings ruling as well as 1b’s final self-review. Voids remain cancelled; rejoin starts next period; unpaid advance charges cancel on exit/lapse.
+- Milestone 1c is in progress: Tasks 1–4 are implemented; caps, import and reminders are reviewed. Finance has per-currency collections, recorded cash, current balances/arrears, streamed CSVs and dues-only Paystack settings. Next review Task 4, then complete Task 5 milestone-wide verification. Read the 1a plan’s deferred minors and PaymentSettings ruling as well as 1b’s final self-review. Voids remain cancelled; rejoin starts next period; unpaid advance charges cancel on exit/lapse.
 
 ## How to continue
 

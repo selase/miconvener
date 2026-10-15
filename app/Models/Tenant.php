@@ -276,14 +276,15 @@ final class Tenant extends Model
     }
 
     /**
-     * Whether the tenant holds or has paid out dues money: a dues ledger
-     * account or a dues payout exists. Payouts and reports stay reachable on
+     * Whether the tenant has dues history: a paid charge (including cash),
+     * dues ledger account or dues payout exists. Payouts and reports stay reachable on
      * this alone, so turning Community off never strands collected money.
      */
     public function hasDuesMoney(): bool
     {
         return LedgerAccount::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists()
-            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists();
+            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists()
+            || DuesCharge::query()->where('tenant_id', $this->id)->where('status', \App\Enum\DuesChargeStatusEnum::Paid)->exists();
     }
 
     /**
