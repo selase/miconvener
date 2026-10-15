@@ -244,3 +244,25 @@ test('a legacy phone-bearing record does not reserve its email even if the old p
     $preview = previewMembers($this, "Email Only,,family@example.test,Regular,\n");
     expect($preview['summary']['new'])->toBe(1);
 });
+
+test('preview rejects ambiguous active membership type names instead of choosing a dues price', function (string $collision) {
+    MembershipType::factory()->create(['tenant_id' => $this->tenant->id, 'name' => $collision, 'amount' => $this->type->amount + 1000]);
+    $preview = previewMembers($this, "Ama,0241234567,,Regular,\n");
+    expect($preview['summary']['error'])->toBe(1)
+        ->and($preview['rows'][0]['membership_type_id'])->toBeNull()
+        ->and($preview['rows'][0]['errors'])->toBe(['More than one active membership type matches "Regular". Rename the conflicting membership types before importing.'])
+        ->and(Member::query()->count())->toBe(0);
+})->with(['regular', ' Regular ']);
+
+test('confirmation rejects an active name collision introduced after preview without changing existing members', function () {
+    $member = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'name' => 'Ama', 'phone' => '0241234567', 'email' => 'keep@example.test']);
+    $preview = previewMembers($this, "Ama,0241234567,changed@example.test,Regular,\nKojo,0241234568,,Regular,\n");
+    expect($preview['summary']['error'])->toBe(0);
+    MembershipType::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'regular', 'amount' => $this->type->amount + 1000]);
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update'])
+        ->assertOk()->assertJsonPath('created', 0)->assertJsonPath('updated', 0)->assertJsonPath('errors', 2)
+        ->assertJsonPath('rows.0.errors.0', 'More than one active membership type matches "Regular". Rename the conflicting membership types before importing.');
+    expect($member->fresh()->email)->toBe('keep@example.test')
+        ->and($member->fresh()->membership_type_id)->toBe($this->type->id)
+        ->and(Member::query()->count())->toBe(1);
+});

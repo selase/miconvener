@@ -35,6 +35,7 @@
 - Execute Task 3's cap and advisory-lock foundation before Task 1 because confirming an import requires that interface. Task 1 then integrates it; Task 2 and Task 4 follow. Review each task before proceeding.
 - All additions, including rejoining an exited member, enforce the cap under the same per-tenant advisory transaction lock. Pending and lapsed members already count.
 - Preserve the existing stricter email-only duplicate guard while name + phone permits shared family numbers. A single normalizer applies that rule consistently to import and manual writes; existing records are not rewritten.
+- Import refuses ambiguous active membership-type names after case/whitespace normalization with a per-row error in both preview and confirmation. Existing manual uniqueness/schema remain unchanged; administrators must rename conflicting types before importing.
 - Arrears audiences require both `manage members` and `read finance`, following spec section 8.
 - Reserve SMS credits and a reminder row before sending, then refund the exact reservation on confirmed provider failure. Persist a distinct reserved state rather than reporting an unsent message as sent. Unknown/interrupted outcomes require reconciliation and never a blind retry.
 - Browser acceptance uses a separate QA database, email log and null SMS gateway; the owner's existing Purpledot data and settlement settings remain unchanged.
@@ -54,6 +55,7 @@
 - [x] **Step 1: Failing tests:** two simultaneous confirms of one preview create the rows once; an import racing a manual add of the same person creates one member; imports and manual adds together cannot exceed the cap; manual entry and import reject the same duplicate; preview saves nothing; per-row errors with line numbers (missing contact, unknown type, inactive type, bad date, bad phone); in-file duplicates; existing members skipped or updated by policy; XLSX works; confirm creates exactly the good rows once (second confirm with the same token → 410 "This import has already been used"); a token from another tenant → 404; over-cap import refused whole; permission `manage members` required; switch off → 404.
 - [x] **Step 2: Run, see them fail.** **Step 3: Implement** (page: upload, preview table with filters for errors, policy choice, confirm). **Step 4: Run** `tests/Feature/Community`.
 - [x] **Step 5: Commit** `feat(community): import members from a spreadsheet with preview`.
+- [x] **Task review fix 1:** reject ambiguous active normalized type names in preview and confirmation; cover existing case/whitespace collisions and collisions introduced after preview.
 
 ### Task 2: Reminders and the arrears button
 

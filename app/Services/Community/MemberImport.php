@@ -188,16 +188,21 @@ final class MemberImport
         }
     }
 
-    /** @return array<string, string> */
+    /** @return array<string, string|null> */
     private function types(Tenant $tenant): array
     {
-        return MembershipType::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->where('is_active', true)->get()
-            ->mapWithKeys(fn (MembershipType $type): array => [Str::lower(mb_trim($type->name)) => $type->id])->all();
+        $types = [];
+        foreach (MembershipType::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->where('is_active', true)->get() as $type) {
+            $key = Str::lower(mb_trim($type->name));
+            $types[$key] = array_key_exists($key, $types) ? null : $type->id;
+        }
+
+        return $types;
     }
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array<string, string>  $types
+     * @param  array<string, string|null>  $types
      * @return array<string, mixed>
      */
     private function validateRow(array $data, int $line, array $types): array
@@ -223,8 +228,11 @@ final class MemberImport
             'joined_on' => ['nullable', 'date_format:Y-m-d'],
         ], ['name.required' => 'Enter the member\'s name.', 'phone.required_without' => 'Add a phone number or email address.', 'email.required_without' => 'Add a phone number or email address.', 'joined_on.date_format' => 'Enter a valid join date in YYYY-MM-DD format.']);
         $errors = $validator->errors()->all();
-        $row['membership_type_id'] = $types[Str::lower($row['membership_type'])] ?? null;
-        if ($row['membership_type_id'] === null) {
+        $typeKey = Str::lower($row['membership_type']);
+        $row['membership_type_id'] = $types[$typeKey] ?? null;
+        if (array_key_exists($typeKey, $types) && $types[$typeKey] === null) {
+            $errors[] = 'More than one active membership type matches "'.$row['membership_type'].'". Rename the conflicting membership types before importing.';
+        } elseif ($row['membership_type_id'] === null) {
             $errors[] = 'Choose an active membership type of this organisation.';
         }
         $row['errors'] = array_values(array_unique($errors));
