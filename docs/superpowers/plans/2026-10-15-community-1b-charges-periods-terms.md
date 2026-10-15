@@ -42,7 +42,7 @@
 - `community_settings`: `tenant_id` (unique), `timezone` (default `Africa/Accra`), `week_starts_on` (1–7, ISO, default 1), `financial_year_start_month` (1–12, default 1), `generate_days_ahead` (default 7), `charge_current_period_on_join` (bool, default false), timestamps. `CommunitySettings::for(Tenant): self` returns the row or an unsaved default.
 - `DuesPeriodEnum::periodStartFor(CarbonImmutable $localDate, CommunitySettings $s): CarbonImmutable` (the anchor on or before the date), `nextStart(CarbonImmutable $start, CommunitySettings $s): CarbonImmutable`, `periodEnd(CarbonImmutable $start, CommunitySettings $s): CarbonImmutable` (= next start − 1 day). Anchors: daily = the date; weekly = the most recent `week_starts_on`; monthly = day 1; quarterly = 1 Jan/Apr/Jul/Oct; yearly = 1st of `financial_year_start_month`.
 
-- [ ] **Step 1: Failing tests** (`DuesPeriodsTest.php`), one per anchor plus edges:
+- [x] **Step 1: Failing tests** (`DuesPeriodsTest.php`), one per anchor plus edges:
 
 ```php
 dataset('anchors', [
@@ -69,10 +69,10 @@ test('monthly periods never drift on the 31st', function () { /* start 2026-01-0
 test('settings default when an organisation has none', function () { /* CommunitySettings::for($tenant) → Africa/Accra, 1, 1, 7, false */ });
 ```
 
-- [ ] **Step 2: Run, see them fail.** `"$PHP" artisan test --compact tests/Feature/Community/DuesPeriodsTest.php`. Expected: FAIL.
-- [ ] **Step 3: Implement** the migration, model and enum methods. Replace the old `nextStart`/`periodEnd` signatures; update their callers (`DuesCharges::createFor`).
-- [ ] **Step 4: Run** the new file and `tests/Feature/Dues`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(community): community settings and anchored dues periods`.
+- [x] **Step 2: Run, see them fail.** `"$PHP" artisan test --compact tests/Feature/Community/DuesPeriodsTest.php`. Expected: FAIL.
+- [x] **Step 3: Implement** the migration, model and enum methods. Replace the old `nextStart`/`periodEnd` signatures; update their callers (`DuesCharges::createFor`).
+- [x] **Step 4: Run** the new file and `tests/Feature/Dues`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(community): community settings and anchored dues periods`.
 
 ### Task 2: Commercial terms and frozen checkout terms
 

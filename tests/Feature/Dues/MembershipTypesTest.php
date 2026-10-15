@@ -77,7 +77,7 @@ test('invalid class input is rejected', function () {
     [, $user] = membershipTypesTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.community.money.dues.store', ['subdomain' => 'acme']), ['name' => '', 'amount' => 0, 'currency' => 'GH', 'period' => 'weekly'])
+        ->postJson(route('tenant.community.money.dues.store', ['subdomain' => 'acme']), ['name' => '', 'amount' => 0, 'currency' => 'GH', 'period' => 'fortnightly'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['name', 'amount', 'currency', 'period']);
 });
@@ -281,3 +281,13 @@ test('a member of a type without dues cannot be charged', function () {
         ->assertUnprocessable()
         ->assertJsonPath('message', 'This membership type has no dues.');
 });
+
+test('an admin can choose daily and weekly dues', function (string $period) {
+    [$tenant, $user] = membershipTypesTenant();
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.community.money.dues.store', ['subdomain' => 'acme']), ['name' => 'Full member', 'amount' => 5000, 'currency' => 'GHS', 'period' => $period])
+        ->assertCreated();
+
+    expect(MembershipType::query()->where('tenant_id', $tenant->id)->firstOrFail()->period->value)->toBe($period);
+})->with(['daily', 'weekly']);

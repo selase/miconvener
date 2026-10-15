@@ -15,7 +15,7 @@ Status values: `not started` → `planned` (plan written) → `in progress` → 
 | D1 | Ledger categories (dues spec M1) | deployed | `main` | [plan](plans/2026-10-13-ledger-categories-foundation.md) | PR #23, deployed 2026-10-13 |
 | D2 | Collecting dues (dues spec M2) | built, not merged | `member-dues-m2` | [plan](plans/2026-10-13-member-dues-collecting.md) | `61224d2`, 2377 tests green, clicked through in Paystack test mode |
 | 1a | Shell and re-homing | built (reviewed) | `community-1a` (from D2) | [plan](plans/2026-10-15-community-1a-shell-and-rehoming.md) | final review fixes applied; full suite 2391/2391, phpstan 0, lint and JS tests (253) green; deferred minors listed in the 1a plan |
-| 1b | Charges, periods and commercial terms | planned | continue on `community-1a` after 1a, or `community-1b` cut from it | [plan](plans/2026-10-15-community-1b-charges-periods-terms.md) | |
+| 1b | Charges, periods and commercial terms | in progress | `community-1b` from `0173494` (isolated checkout) | [plan](plans/2026-10-15-community-1b-charges-periods-terms.md) | |
 | 1c | Import, reminders and Finance | planned | after 1b | [plan](plans/2026-10-15-community-1c-import-reminders-finance.md) | |
 | 2 | Messages and groups | not started | | brief below | |
 | 3 | People, Following and Join | not started | | brief below | |

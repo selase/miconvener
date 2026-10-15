@@ -13,7 +13,13 @@ import { useToast } from '@/Components/Console/Toast';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { formatDuesMoney, sendJson, toMajorUnits, toMinorUnits } from '@/lib/dues';
 
-const PERIODS = { monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' };
+const PERIODS = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    quarterly: 'Quarterly',
+    yearly: 'Yearly',
+};
 
 function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
     const editing = membershipType !== null;

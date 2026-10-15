@@ -6,6 +6,7 @@ namespace App\Services\Dues;
 
 use App\Enum\DuesChargeStatusEnum;
 use App\Enum\MemberStatusEnum;
+use App\Models\CommunitySettings;
 use App\Models\DuesCharge;
 use App\Models\Member;
 use Carbon\CarbonImmutable;
@@ -20,9 +21,8 @@ use Illuminate\Support\Facades\DB;
 final class DuesCharges
 {
     /**
-     * The charge for the period containing $periodStart. Every period is
-     * anchored to the first of the month, so a start on the 29th to 31st is
-     * moved back to day 1 before the period end is worked out. The amount is
+     * The charge for the period containing $periodStart. Calendar periods use
+     * the organisation's configured weekday and financial-year anchors. The amount is
      * frozen from the member's effective amount now, and a zero amount (a
      * waiver) is created already waived. Asking again for the same period
      * returns the charge that already exists.
@@ -42,7 +42,8 @@ final class DuesCharges
             throw new DomainException('This membership type has no dues.');
         }
 
-        $start = $periodStart->startOfMonth();
+        $settings = CommunitySettings::for($member->tenant);
+        $start = $class->period->periodStartFor($periodStart, $settings);
         $amount = (int) $member->effectiveAmount();
 
         if ($amount > 0 && $amount < DuesCharge::MINIMUM_AMOUNT) {
@@ -54,7 +55,7 @@ final class DuesCharges
             [
                 'tenant_id' => $member->tenant_id,
                 'membership_type_id' => $class->id,
-                'period_end' => $class->period->periodEnd($start)->toDateString(),
+                'period_end' => $class->period->periodEnd($start, $settings)->toDateString(),
                 'due_on' => $start->toDateString(),
                 'amount' => $amount,
                 'currency' => $class->currency,
