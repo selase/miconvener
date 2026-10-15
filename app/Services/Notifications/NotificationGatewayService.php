@@ -385,9 +385,15 @@ final class NotificationGatewayService
     {
         $results = [];
         $sendable = [];
+        $eventAnnouncements = [];
 
         foreach ($deliveries as $delivery) {
             $id = (string) $delivery->id;
+            if ($delivery->source_type === (new \App\Models\EventBlast)->getMorphClass()) {
+                $eventAnnouncements[] = $delivery;
+
+                continue;
+            }
 
             if (in_array($delivery->status, [
                 EventNotificationLog::STATUS_SENT,
@@ -422,6 +428,9 @@ final class NotificationGatewayService
             $sendable[] = $delivery;
         }
 
+        if ($eventAnnouncements !== []) {
+            $results += app(\App\Services\Community\EventAnnouncementDelivery::class)->sms($eventAnnouncements);
+        }
         $retryAfter = null;
 
         foreach (collect($sendable)->groupBy('tenant_id') as $tenantId => $tenantDeliveries) {

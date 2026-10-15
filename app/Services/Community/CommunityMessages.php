@@ -24,7 +24,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -34,7 +33,7 @@ final class CommunityMessages
 {
     public const int PAGE_SIZE = 100;
 
-    public function __construct(private AudienceResolver $audiences, private MemberAudienceSource $members, private MessagingPreferences $preferences, private MessageEntitlements $entitlements, private CommunitySmsBudget $budget, private EmailAllowance $email, private SmsAllowance $sms, private SmsGateway $gateway) {}
+    public function __construct(private AudienceResolver $audiences, private MemberAudienceSource $members, private MessagingPreferences $preferences, private MessageEntitlements $entitlements, private CommunitySmsBudget $budget, private EmailAllowance $email, private SmsAllowance $sms, private SmsGateway $gateway, private AnnouncementTransport $transport) {}
 
     /** @param array<string, mixed> $input
      * @return array<string, mixed>
@@ -193,7 +192,7 @@ final class CommunityMessages
             }
             if ($channel === 'email') {
                 try {
-                    Mail::to($delivery->address)->send(new MessageMail($message, $this->unsubscribeUrl($tenant, $delivery->unsubscribe_token)));
+                    $this->transport->email($delivery->address, new MessageMail($message, $this->unsubscribeUrl($tenant, $delivery->unsubscribe_token)));
                     $delivery->update(['status' => 'accepted']);
                 } catch (Throwable) {
                     $delivery->update(['status' => 'unknown', 'reason' => 'outcome_unknown']);
@@ -206,7 +205,7 @@ final class CommunityMessages
         if ($pending !== []) {
             $sms = array_map(fn ($row) => new SmsMessage($row->address, $this->smsText($tenant, $message->subject, $message->body, $row->unsubscribe_token), $row->id), array_values($pending));
             try {
-                $results = $this->gateway->send($sms);
+                $results = $this->transport->sms($sms);
             } catch (Throwable) {
                 $results = [];
                 Log::warning('Community SMS outcome unknown.', ['message_id' => $message->id]);

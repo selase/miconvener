@@ -33,12 +33,17 @@ final class CommunitySmsBudget
             ->whereIn('status', ['reserved', 'sent'])->whereBetween('sent_for_date', [$local->startOfMonth()->toDateString(), $local->endOfMonth()->toDateString()])
             ->whereNotIn('id', CommunitySmsReservation::query()->where('tenant_id', $tenant->id)->where('source_type', 'dues_reminder')->select('source_id'))->count();
 
-        return $reserved + $legacy;
+        $events = \App\Models\EventNotificationLog::withoutGlobalScopes()->where('tenant_id', $tenant->id)
+            ->where('source_type', (new \App\Models\EventBlast)->getMorphClass())->where('channel', 'sms')->whereIn('status', ['sent', 'staged_omnichannel'])
+            ->whereBetween('sent_at', [$local->startOfMonth()->utc(), $local->endOfMonth()->utc()])
+            ->whereNotIn('id', CommunitySmsReservation::query()->where('tenant_id', $tenant->id)->where('source_type', 'event_blast')->select('source_id'))->count();
+
+        return $reserved + $legacy + $events;
     }
 
     public function reserve(Tenant $tenant, string $sourceType, string $sourceId, CarbonImmutable $at): ?CommunitySmsReservation
     {
-        if (! in_array($sourceType, ['dues_reminder', 'community_message'], true)) {
+        if (! in_array($sourceType, ['dues_reminder', 'community_message', 'event_blast'], true)) {
             throw new InvalidArgumentException('Unknown Community SMS source.');
         }
 

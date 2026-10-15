@@ -171,9 +171,9 @@ it('honors an opt-out made after scheduling', function () {
 
 **Interfaces:** Transport accepts a claimed delivery ID, destination, subject/text and channel; uses existing adapters, returns accepted/refused/unknown. Domain adapters own templates, tracking and idempotency; never force Event mail into Community records. EventAudienceSource calls EventBlast::audienceQuery for the original selector, preserving every event-specific option.
 
-- [ ] Write tests red: explicit tenant/channel marketing opt-out suppresses a free-form blast but not ticket/receipt mail; duplicate contact sent once per channel; retried blast does not repeat accepted email or re-meter it; registration tracking/pixel and SMS source-reference contracts remain intact.
-- [ ] Extract normalized-address selection first, run existing event blast tests. Extract transport second, rerun those tests plus notification/SMS gateway tests. No event milestone gate or new Community entitlement may block existing event tools. Preserve event blast scheduling contract unless an explicit spec requirement needs a documented change.
-- [ ] Commit `refactor(messages): share audience and transport with event blasts`. Any necessary existing-test change must explain actual behavior correction, not weaken assertions to hide regressions.
+- [x] Write tests red: explicit tenant/channel marketing opt-out suppresses a free-form blast but not ticket/receipt mail; duplicate contact sent once per channel; retried blast does not repeat accepted email or re-meter it; registration tracking/pixel and SMS source-reference contracts remain intact.
+- [x] Extract normalized-address selection first, run existing event blast tests. Extract transport second, rerun those tests plus notification/SMS gateway tests. No event milestone gate or new Community entitlement may block existing event tools. Preserve event blast scheduling contract unless an explicit spec requirement needs a documented change.
+- [x] Commit `refactor(messages): share audience and transport with event blasts`. Any necessary existing-test change must explain actual behavior correction, not weaken assertions to hide regressions.
 
 ## Task 6: Operator resolution for unknown SMS outcomes
 
@@ -217,3 +217,5 @@ it('honors an opt-out made after scheduling', function () {
 - Task3: shared budget/reminder53 tests and six real-worker race tests pass; plan reset/refund and legacy-reservation counting covered. No production activity. Tests use separate feature and infrastructure databases after correcting a local overlap.
 
 - Task4: durable delivery/scheduling implemented with own `community_messages` rollout switch (off by default); group routes share that milestone switch.35 focused feature checks across separate runs plus2 actual competing email/SMS workers pass. Invalid DST offsets, replay, cancellation, changed consent/contacts/groups/permissions, low credits and interrupted claims covered. Due jobs are delayed to their UTC time with a15-minute recovery sweep, preserving existing scale-to-zero scheduling policy.
+
+- Task5:47 Events/gateway/credit checks and29 shared-domain checks pass in recorded runs. Event email queues retain tracking and gain durable claims; queued mail rechecks consent. One SMS regression assertion intentionally now checks the existing personalised placeholder transport with distinct opt-out links, still one provider request. Event announcements count toward the shared SMS cap; existing service notifications do not use marketing opt-outs. Previous-release queued SMS resolves its registration from the legacy key.
