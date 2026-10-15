@@ -127,7 +127,7 @@ it('deduplicates normalized email only inside the selected tenant', function () 
 
 **Interfaces:** `reserve(Tenant, string $sourceType, string $sourceId, CarbonImmutable $at): ?CommunitySmsReservation`; `finish(Tenant, string $reservationId, SmsResult): void`; `remaining(Tenant, CarbonImmutable): ?int`. All budget checks and prepaid reserve/refund use `SmsAllowance::withLock`; lock ordering fixed allowance first, then source claim, never reverse. Reserve before submission, not for a future scheduled message. A month reset cannot return old-month allowance into new-month usage; retain existing receipt refund contract.
 
-- [ ] Write failing tests for reminder+message combined limit, last-slot race, unknown hold, refused exact refund once, provider throttle, monthly boundary/timezone, existing sent/reserved reminders and two simultaneous finalizers. Example assertion:
+- [x] Write failing tests for reminder+message combined limit, last-slot race, unknown hold, refused exact refund once, provider throttle, monthly boundary/timezone, existing sent/reserved reminders and two simultaneous finalizers. Example assertion:
 
 ```php
 expect($budget->reserve($tenant, 'community_message', $firstId, $now))->not->toBeNull();
@@ -135,8 +135,8 @@ expect($budget->reserve($tenant, 'community_message', $secondId, $now))->toBeNul
 expect(app(SmsAllowance::class)->remaining($tenant))->toBe($before - 1);
 ```
 
-- [ ] Run focused files red. Implement budget and delegate reminder spending; preserve reminder member/day uniqueness, scheduler date guard and send content. No ledger writes.
-- [ ] Run budget files, existing DuesRemindersTest, its concurrency test and prepaid credit tests green; commit `feat(community): share SMS budget across reminders and messages`.
+- [x] Run focused files red. Implement budget and delegate reminder spending; preserve reminder member/day uniqueness, scheduler date guard and send content. No ledger writes.
+- [x] Run budget files, existing DuesRemindersTest, its concurrency test and prepaid credit tests green; commit `feat(community): share SMS budget across reminders and messages`.
 
 ## Task 4: Durable messages, scheduling and bounded delivery
 
@@ -213,3 +213,5 @@ it('honors an opt-out made after scheduling', function () {
 - Task1:13 focused tests/43 assertions and11 permission/package regression tests/39 assertions pass on dedicated `miconvener_community_2_testing`; Pint applied.
 
 - Task2:10 focused tests/27 assertions pass. Temporary encrypted run-address rows provide bounded deduplication and hourly expiry cleanup. Multiple hashed opt-out tokens retain old links. These implementation refinements preserve the approved no-person model.
+
+- Task3: shared budget/reminder53 tests and six real-worker race tests pass; plan reset/refund and legacy-reservation counting covered. No production activity. Tests use separate feature and infrastructure databases after correcting a local overlap.

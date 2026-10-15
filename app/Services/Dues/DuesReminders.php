@@ -9,6 +9,7 @@ use App\Enum\DuesChargeStatusEnum;
 use App\Enum\TenantStatusEnum;
 use App\Mail\DuesReminder as ReminderMail;
 use App\Models\CommunitySettings;
+use App\Models\CommunitySmsReservation;
 use App\Models\DuesCharge;
 use App\Models\DuesReminder;
 use App\Models\Member;
@@ -16,6 +17,7 @@ use App\Models\Tenant;
 use App\Models\TenantNotificationSetting;
 use App\Models\User;
 use App\Scopes\TenantScope;
+use App\Services\Community\CommunitySmsBudget;
 use App\Services\Notifications\NotificationGatewayService;
 use App\Services\Sms\SmsAllowance;
 use App\Services\Sms\SmsMessage;
@@ -255,17 +257,20 @@ final class DuesReminders
                     default => null,
                 };
             }
-            $receipt = $reason === null && $channel === 'sms' ? $this->allowance->reserve($tenant, 1) : null;
-            if ($channel === 'sms' && $reason === null && $receipt === null) {
-                $reason = 'no_credit';
-            }
-
-            return DuesReminder::withoutGlobalScopes()->create([
+            $row = DuesReminder::withoutGlobalScopes()->create([
                 'tenant_id' => $tenant->id, 'member_id' => $member->id, 'step' => $step,
                 'channel' => $channel, 'charge_ids' => $member->charges->modelKeys(),
-                'sent_for_date' => $today->toDateString(), 'status' => $reason === null ? 'reserved' : 'skipped',
-                'reason' => $reason, 'credit_receipt_id' => $receipt?->id,
+                'sent_for_date' => $today->toDateString(), 'status' => $reason === null ? ($channel === 'sms' ? 'pending' : 'reserved') : 'skipped',
+                'reason' => $reason,
             ]);
+            if ($channel === 'sms' && $reason === null) {
+                $reservation = app(CommunitySmsBudget::class)->reserve($tenant, 'dues_reminder', $row->id, $today);
+                $row->update($reservation === null
+                    ? ['status' => 'skipped', 'reason' => 'no_credit']
+                    : ['status' => 'reserved', 'credit_receipt_id' => $reservation->credit_receipt_id]);
+            }
+
+            return $row;
         };
         if ($channel === 'sms') {
             return $this->allowance->withLock($tenant, $callback);
@@ -285,12 +290,18 @@ final class DuesReminders
             if ($locked->status !== 'reserved') {
                 return;
             }
+            $reservation = CommunitySmsReservation::query()->where('tenant_id', $tenant->id)->where('source_type', 'dues_reminder')->where('source_id', $locked->id)->first();
+            if ($reservation !== null) {
+                app(CommunitySmsBudget::class)->finish($tenant, $reservation->id, $result);
+            }
             if ($result->accepted) {
                 $locked->update(['status' => 'sent', 'provider_reference' => $result->providerReference, 'reason' => null]);
             } elseif ($result->uncertain) {
                 $locked->update(['reason' => 'outcome_unknown']);
             } else {
-                $this->allowance->refund($tenant, $locked->credit_receipt_id);
+                if ($reservation === null) {
+                    $this->allowance->refund($tenant, $locked->credit_receipt_id);
+                }
                 $locked->update(['status' => $result->isThrottled() ? 'skipped' : 'failed', 'reason' => $result->isThrottled() ? 'provider_throttled' : 'provider_refused']);
             }
         });
@@ -303,8 +314,7 @@ final class DuesReminders
 
     private function monthlySmsCount(Tenant $tenant, CarbonImmutable $today): int
     {
-        return DuesReminder::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('channel', 'sms')->whereIn('status', ['reserved', 'sent'])
-            ->whereBetween('sent_for_date', [$today->startOfMonth()->toDateString(), $today->endOfMonth()->toDateString()])->count();
+        return app(CommunitySmsBudget::class)->used($tenant, $today);
     }
 
     private function smsText(Member $member): string
