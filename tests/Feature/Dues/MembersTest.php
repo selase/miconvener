@@ -80,11 +80,11 @@ test('a member needs an active class of the same organisation', function () {
         ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
 });
 
-test('a duplicate phone in the same organisation is rejected, the same phone in another is fine', function () {
+test('a duplicate name and phone in the same organisation is rejected, the same identity in another is fine', function () {
     [$tenant, $user, $class] = duesMembersTenant();
     $beta = Tenant::factory()->create(['slug' => 'beta']);
-    Member::factory()->create(['tenant_id' => $beta->id, 'phone' => '0244000001']);
-    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000002']);
+    Member::factory()->create(['tenant_id' => $beta->id, 'name' => 'Ama Mensah', 'phone' => '0244000001']);
+    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'name' => 'Ama Mensah', 'phone' => '0244000002']);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)

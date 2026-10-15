@@ -149,9 +149,12 @@ test('the callback and the webhook for one payment book it once, in either order
 - Create: migration `2026_10_16_100300_allow_shared_member_phones.php` (drop unique `(tenant_id, phone)`, add a non-unique index; add unique `(tenant_id, phone, name)` as the duplicate guard), `tests/Feature/Community/SharedNumbersTest.php`
 - Modify: `MemberRequest` (replace the phone-unique rule with name + phone uniqueness; keep the email rule for members with no phone), `MembersTest.php` cases that asserted phone uniqueness (update to the new rule, keep them).
 
-- [ ] **Step 1: Failing tests:** two members with the same phone and different names → both created; same name and phone → 422 with "This person is already a member."; each keeps their own pay link and charges; the pay page for one never shows the other's charges.
-- [ ] **Step 2: Run, see them fail.** **Step 3: Implement.** **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`.
-- [ ] **Step 5: Commit** `feat(community): members may share a phone number`.
+- [x] **Step 1: Failing tests:** two members with the same phone and different names → both created; same name and phone → 422 with "This person is already a member."; each keeps their own pay link and charges; the pay page for one never shows the other's charges.
+- [x] **Step 2: Run, see them fail.** **Step 3: Implement.** **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`.
+- [x] **Step 5: Commit** `feat(community): members may share a phone number`.
+
+
+Ruling: Add a canonical PostgreSQL unique index as well as the raw composite key. Request validation alone cannot prevent concurrent equivalent name/phone identities. Stored contact values remain unchanged; migration refuses ambiguous legacy duplicates without deleting data. Cost if wrong: resolve duplicates before migrating.
 
 ### Task 5: Verification
 

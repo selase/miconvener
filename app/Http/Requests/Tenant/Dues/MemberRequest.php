@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Requests\Tenant\Dues;
 
 use App\Models\DuesCharge;
+use App\Models\Member;
 use App\Services\Tenancy\TenantContext;
+use App\Support\PhoneNumber;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Unique;
 
 /**
- * A new member. A member is identified in the organisation by phone, or by
- * email when they have no phone; only phone is unique in the database, so the
- * email rule lives here: an email may not repeat among members without a phone.
+ * Members may share a phone; name plus phone guards against duplicates.
+ * An email may not repeat among members without a phone.
  */
 abstract class MemberRequest extends FormRequest
 {
@@ -36,7 +37,6 @@ abstract class MemberRequest extends FormRequest
             'email.unique' => 'A member with that email already exists.',
             'phone.required_without_all' => 'Add an email or a phone number so we can reach this member.',
             'phone.max' => 'The phone number may not be longer than 32 characters.',
-            'phone.unique' => 'A member with that phone number already exists.',
             'membership_type_id.required' => 'Choose a dues class.',
             'membership_type_id.exists' => 'Choose an active dues class of this organisation.',
             'amount_override.integer' => 'The amount must be a whole number of minor units.',
@@ -89,8 +89,28 @@ abstract class MemberRequest extends FormRequest
         }
     }
 
-    private function uniquePhone(?string $tenantId, ?string $ignoreId): Unique
+    private function uniquePhone(?string $tenantId, ?string $ignoreId): Closure
     {
-        return Rule::unique('members', 'phone')->where('tenant_id', $tenantId)->ignore($ignoreId);
+        return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $ignoreId): void {
+            if (! is_string($value) || ! is_string($this->input('name'))) {
+                return;
+            }
+
+            $phone = PhoneNumber::toInternationalDigits($value) ?? mb_trim($value);
+            $name = Str::lower(Str::squish($this->input('name')));
+
+            $duplicate = Member::query()
+                ->where('tenant_id', $tenantId)
+                ->whereNotNull('phone')
+                ->when($ignoreId !== null, fn ($query) => $query->whereKeyNot($ignoreId))
+                ->select(['id', 'name', 'phone'])
+                ->cursor()
+                ->contains(fn (Member $member): bool => (PhoneNumber::toInternationalDigits($member->phone) ?? mb_trim($member->phone)) === $phone
+                    && Str::lower(Str::squish($member->name)) === $name);
+
+            if ($duplicate) {
+                $fail('This person is already a member.');
+            }
+        };
     }
 }
