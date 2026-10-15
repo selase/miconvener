@@ -4,7 +4,7 @@ import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
 import { useToast } from '@/Components/Console/Toast';
-import { formatDuesMoney, sendJson, toMajorUnits, toMinorUnits } from '@/lib/dues';
+import { formatMemberDues, sendJson, toMajorUnits, toMinorUnits } from '@/lib/dues';
 
 export default function MemberFormModal({ member, membershipTypes, onClose, onSaved }) {
     const editing = member !== null;
@@ -118,7 +118,7 @@ export default function MemberFormModal({ member, membershipTypes, onClose, onSa
                         <option key={c.id} value={c.id}>
                             {c.name}
                             {c.amount !== undefined
-                                ? ` – ${formatDuesMoney(c.amount, c.currency)}`
+                                ? ` – ${formatMemberDues(c.amount, c.currency)}`
                                 : ''}
                         </option>
                     ))}

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import Payouts from '@/Pages/Tenant/Finance/Payouts';
 import MemberPay from '@/Pages/Public/MemberPay';
-import { memberPill } from '@/Pages/Tenant/Community/People';
+import { canCreateCharge, memberPill } from '@/Pages/Tenant/Community/People';
 
 const page = vi.hoisted(() => ({ props: {} }));
 vi.mock('@inertiajs/react', () => ({
@@ -89,5 +89,19 @@ describe('the member pay page', () => {
         expect(screen.getByText('Pay at most 60 charges at a time.')).toBeTruthy();
         expect(screen.getAllByText('One of the chosen charges is not valid.')).toHaveLength(1);
         page.props = {};
+    });
+});
+
+describe('creating a charge from the member drawer', () => {
+    it('is offered to an active member whose type has dues', () => {
+        expect(canCreateCharge({ status: 'active', effective_amount: 5000 })).toBe(true);
+    });
+
+    it('is not offered when the membership type has no dues', () => {
+        expect(canCreateCharge({ status: 'active', effective_amount: null })).toBe(false);
+    });
+
+    it('is not offered to a member who has left', () => {
+        expect(canCreateCharge({ status: 'exited', effective_amount: 5000 })).toBe(false);
     });
 });

@@ -375,3 +375,9 @@ describe('visibleGroups', () => {
 - Section 15 compatibility: pay links (Task 3 test), metadata type kept (Task 2 note), no money logic touched (Global Constraints).
 - Placeholders: none; commented test bodies in Tasks 1 and 3 name exactly what to assert and which existing test file shows the pattern.
 - Type consistency: `MembershipType`, `membership_type_id`, `communityEnabled()`, `community.enabled`, `tenant.community.*`, `tenant.finance.payouts.*` are used identically across tasks.
+
+## Final review (2026-10-15)
+
+Fixed (test first): Payouts menu item now follows `dues_payouts` (Community on or dues money held); groups never collapse in the compact icon rail; a type without dues shows "No dues" and the drawer hides "Create charge".
+
+Deferred minors (for 1c or later): Overview cards' links and hard-coded GHS 0.00; leftover "class" wording in validation messages and docblocks and the `class_name` payload key; `amount_override` accepted but ignored for a type without dues; `showsFinance()` queries on every Inertia request; `hasDuesMoney()` true once a dues ledger account exists; payouts-with-switch-off test covers index only; no JS render tests for the nav. Ruling: PaymentSettings is still gated on `handlesTicketMoney()` (pre-existing); revisit in 1c for dues-only organisations on their own gateway.

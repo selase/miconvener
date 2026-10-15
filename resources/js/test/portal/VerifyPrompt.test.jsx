@@ -22,7 +22,9 @@ describe('verify prompt', () => {
             target: { value: 'ama@stem.org' },
         });
         fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
-        fireEvent.change(await screen.findByLabelText('Verification code'), { target: { value: '482913' } });
+        fireEvent.change(await screen.findByLabelText('Verification code'), {
+            target: { value: '482913' },
+        });
         fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
         await waitFor(() => expect(onVerified).toHaveBeenCalledWith('am•@stem.org'));

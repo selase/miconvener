@@ -91,7 +91,7 @@ export const NAV_GROUPS = [
                 label: 'Payouts',
                 href: 'tenant.finance.payouts.index',
                 icon: 'HandCoins',
-                feature: 'community',
+                feature: 'dues_payouts',
                 permission: 'read_finance',
             },
         ],
@@ -121,6 +121,15 @@ export const NAV_GROUPS = [
     },
     { key: 'bottom', items: [{ label: 'My account', href: 'tenant.account', icon: 'UserRound' }] },
 ];
+
+/**
+ * Whether a group's items are hidden. Unlabelled groups never collapse; the
+ * group holding the current page never collapses; and nothing collapses in the
+ * compact icon rail, which shows no labels to reopen a group with.
+ */
+export function isGroupCollapsed({ hasLabel, collapsed, containsActive, compact }) {
+    return Boolean(hasLabel) && Boolean(collapsed) && !containsActive && !compact;
+}
 
 /**
  * The groups this person may see: items filtered by feature and permission,

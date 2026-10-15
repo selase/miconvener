@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_GROUPS, visibleGroups } from '@/Layouts/consoleNav';
+import { NAV_GROUPS, isGroupCollapsed, visibleGroups } from '@/Layouts/consoleNav';
 
 describe('visibleGroups', () => {
     it('hides the Community group without the community feature', () => {
@@ -16,9 +16,9 @@ describe('visibleGroups', () => {
         expect(keys).not.toContain('venue');
     });
 
-    it('shows Payouts only with the community feature and read_finance', () => {
+    it('shows Payouts with dues payouts and read_finance, even with Community off', () => {
         const finance = visibleGroups(NAV_GROUPS, {
-            features: { community: true, finance: true },
+            features: { community: false, dues_payouts: true, finance: true },
             can: { read_finance: true },
         }).find((g) => g.key === 'finance');
         expect(finance.items.map((i) => i.label)).toEqual(['Overview', 'Payouts']);
@@ -38,5 +38,40 @@ describe('visibleGroups', () => {
 
     it('never returns an empty group', () => {
         visibleGroups(NAV_GROUPS, {}).forEach((g) => expect(g.items.length).toBeGreaterThan(0));
+    });
+});
+
+describe('isGroupCollapsed', () => {
+    it('collapses a labelled group the person collapsed', () => {
+        expect(
+            isGroupCollapsed({
+                hasLabel: true,
+                collapsed: true,
+                containsActive: false,
+                compact: false,
+            })
+        ).toBe(true);
+    });
+
+    it('never collapses the group holding the current page', () => {
+        expect(
+            isGroupCollapsed({
+                hasLabel: true,
+                collapsed: true,
+                containsActive: true,
+                compact: false,
+            })
+        ).toBe(false);
+    });
+
+    it('never collapses anything in the compact icon rail, which has no labels to reopen them', () => {
+        expect(
+            isGroupCollapsed({
+                hasLabel: true,
+                collapsed: true,
+                containsActive: false,
+                compact: true,
+            })
+        ).toBe(false);
     });
 });

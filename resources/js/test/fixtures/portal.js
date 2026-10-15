@@ -44,4 +44,9 @@ export function portalProps(overrides = {}) {
     };
 }
 
-export const keynote = { id: 'm1', title: 'Keynote', remaining_attempts: 3, download_url: '/dl/m1' };
+export const keynote = {
+    id: 'm1',
+    title: 'Keynote',
+    remaining_attempts: 3,
+    download_url: '/dl/m1',
+};

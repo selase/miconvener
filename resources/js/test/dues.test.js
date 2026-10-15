@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuesMoney, toMajorUnits, toMinorUnits } from '@/lib/dues';
+import { formatDuesMoney, formatMemberDues, toMajorUnits, toMinorUnits } from '@/lib/dues';
 
 describe('toMinorUnits', () => {
     it('converts major units without float drift', () => {
@@ -28,5 +28,15 @@ describe('money display', () => {
     it('fills an edit box with major units', () => {
         expect(toMajorUnits(5000)).toBe('50.00');
         expect(toMajorUnits(null)).toBe('');
+    });
+});
+
+describe('formatMemberDues', () => {
+    it('says No dues for a type without dues, not GHS 0.00', () => {
+        expect(formatMemberDues(null, 'GHS')).toBe('No dues');
+    });
+
+    it('keeps a waived amount of zero as money', () => {
+        expect(formatMemberDues(0, 'GHS')).toBe(formatDuesMoney(0, 'GHS'));
     });
 });

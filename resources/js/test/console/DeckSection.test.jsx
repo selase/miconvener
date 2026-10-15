@@ -20,15 +20,25 @@ const deck = {
     join_code: '4QJ8ET',
     current_poll_id: null,
     polls: [
-        { id: 'p1', position: 0, question: 'Are you with us?', type: 'multiple_choice', status: 'live' },
-        { id: 'p2', position: 1, question: 'Coffee or tea?', type: 'multiple_choice', status: 'draft' },
+        {
+            id: 'p1',
+            position: 0,
+            question: 'Are you with us?',
+            type: 'multiple_choice',
+            status: 'live',
+        },
+        {
+            id: 'p2',
+            position: 1,
+            question: 'Coffee or tea?',
+            type: 'multiple_choice',
+            status: 'draft',
+        },
     ],
 };
 
 const respondWith = (decks) =>
-    csrfFetch.mockImplementation(() =>
-        Promise.resolve({ ok: true, json: async () => decks })
-    );
+    csrfFetch.mockImplementation(() => Promise.resolve({ ok: true, json: async () => decks }));
 
 describe('driving a deck from the console', () => {
     beforeEach(() => csrfFetch.mockReset());
@@ -48,7 +58,9 @@ describe('driving a deck from the console', () => {
         render(<DeckSection event={event} polls={polls} onChange={() => {}} />);
 
         const select = await screen.findByRole('combobox');
-        const labels = within(select).getAllByRole('option').map((o) => o.textContent);
+        const labels = within(select)
+            .getAllByRole('option')
+            .map((o) => o.textContent);
 
         // Adding a question the deck already holds would ask the server to put
         // it in twice, and (deck_id, position) is unique.

@@ -78,6 +78,8 @@ final class HandleInertiaRequests extends Middleware
                     'finance' => $tenant->showsFinance(),
                     'llm_byok' => $tenant->featureEnabled('llm_byok'),
                     'community' => $tenant->communityEnabled(),
+                    // Payouts stay in the menu while dues money is held, even with Community off.
+                    'dues_payouts' => $tenant->communityEnabled() || $tenant->hasDuesMoney(),
                 ],
             ] : null,
             'flash' => [

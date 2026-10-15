@@ -9,6 +9,14 @@ export function formatDuesMoney(amount, currency) {
 }
 
 /**
+ * A member's or a membership type's dues: "No dues" when the type carries
+ * none (null), so it never reads like a waived GHS 0.00.
+ */
+export function formatMemberDues(amount, currency) {
+    return amount === null || amount === undefined ? 'No dues' : formatDuesMoney(amount, currency);
+}
+
+/**
  * Minor units from what the user typed in major units. A blank box is
  * null (no value); anything that is not a non-negative number is NaN so the
  * caller can refuse it instead of sending a wrong amount.

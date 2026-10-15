@@ -28,7 +28,7 @@ import {
     X,
 } from 'lucide-react';
 import ThemeToggle from '@/Components/Console/ThemeToggle';
-import { NAV_GROUPS, visibleGroups } from '@/Layouts/consoleNav';
+import { NAV_GROUPS, isGroupCollapsed, visibleGroups } from '@/Layouts/consoleNav';
 
 const ICONS = {
     LayoutDashboard,
@@ -183,8 +183,12 @@ export default function ConsoleLayout({ children, compact = false }) {
                 <nav className="flex flex-col py-2">
                     {groups.map((group, index) => {
                         const containsActive = group.items.some((item) => item.href === activeHref);
-                        const isCollapsed =
-                            Boolean(group.label) && collapsed[group.key] && !containsActive;
+                        const isCollapsed = isGroupCollapsed({
+                            hasLabel: Boolean(group.label),
+                            collapsed: collapsed[group.key],
+                            containsActive,
+                            compact,
+                        });
 
                         return (
                             <div key={group.key} className={index > 0 ? 'mt-1' : undefined}>

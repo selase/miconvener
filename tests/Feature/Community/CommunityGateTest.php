@@ -116,3 +116,12 @@ test('finance shows for a tenant with community on, even without ticket money', 
         ->get(route('tenant.finance.index', ['subdomain' => 'acme']))
         ->assertOk();
 });
+
+test('payouts stay in the menu for a tenant with dues money after Community is switched off', function () {
+    [$tenant, $user] = eventHost('acme');
+    app(App\Services\Finance\LedgerService::class)->ensureAccountsExist($tenant, null, 'GHS', App\Enum\LedgerCategoryEnum::Dues);
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->get(route('tenant.dashboard', ['subdomain' => 'acme']))
+        ->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->where('tenant.features.community', false)->where('tenant.features.dues_payouts', true));
+});

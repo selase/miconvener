@@ -13,7 +13,7 @@ import ConfirmModal from '@/Components/Console/ConfirmModal';
 import StatusPill from '@/Components/Console/StatusPill';
 import { useToast } from '@/Components/Console/Toast';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
-import { formatDuesMoney, sendJson } from '@/lib/dues';
+import { formatDuesMoney, formatMemberDues, sendJson } from '@/lib/dues';
 import MemberFormModal from './MemberFormModal';
 
 const CHARGE_PILL = { open: 'pending', paid: 'success', waived: 'neutral', void: 'neutral' };
@@ -103,7 +103,7 @@ function CreateChargeModal({ member, onClose, onDone }) {
                     value={periodStart}
                     onChange={(e) => setPeriodStart(e.target.value)}
                     error={error}
-                    hint={`Charges ${formatDuesMoney(member.effective_amount, member.currency)} for the class period containing this date.`}
+                    hint={`Charges ${formatMemberDues(member.effective_amount, member.currency)} for the class period containing this date.`}
                     required
                 />
                 <Button type="submit" variant="primary" disabled={processing}>
@@ -128,6 +128,14 @@ function paidLabel(charge) {
         : null;
 
     return ['Paid' + (via ? ` ${via}` : ''), date].filter(Boolean).join(' · ');
+}
+
+/**
+ * Whether the drawer offers "Create charge": not for a member who has left,
+ * and not when their membership type carries no dues.
+ */
+export function canCreateCharge(member) {
+    return member.status !== 'exited' && member.effective_amount !== null;
 }
 
 export default function People({ members, membershipTypes }) {
@@ -373,7 +381,7 @@ export default function People({ members, membershipTypes }) {
                                 <div>
                                     <div className="mb-3 flex items-center justify-between">
                                         <h3 className="text-sm font-semibold text-ink">Charges</h3>
-                                        {selected.status !== 'exited' && (
+                                        {canCreateCharge(selected) && (
                                             <Button
                                                 icon={Plus}
                                                 onClick={() =>

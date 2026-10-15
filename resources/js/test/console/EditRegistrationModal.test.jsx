@@ -15,10 +15,17 @@ describe('editing a registration', () => {
         csrfFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
         const onSaved = vi.fn();
         render(
-            <EditRegistrationModal event={event} registration={registration} onClose={() => {}} onSaved={onSaved} />
+            <EditRegistrationModal
+                event={event}
+                registration={registration}
+                onClose={() => {}}
+                onSaved={onSaved}
+            />
         );
 
-        fireEvent.change(screen.getByDisplayValue('ama@stme.org'), { target: { value: 'ama@stem.org' } });
+        fireEvent.change(screen.getByDisplayValue('ama@stme.org'), {
+            target: { value: 'ama@stem.org' },
+        });
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
         await waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -32,14 +39,19 @@ describe('editing a registration', () => {
         });
     });
 
-    it('shows the server\'s reason when the address is refused, and stays open', async () => {
+    it("shows the server's reason when the address is refused, and stays open", async () => {
         csrfFetch.mockResolvedValue({
             ok: false,
             json: async () => ({ errors: { email: ["That doesn't look like an email address."] } }),
         });
         const onSaved = vi.fn();
         render(
-            <EditRegistrationModal event={event} registration={registration} onClose={() => {}} onSaved={onSaved} />
+            <EditRegistrationModal
+                event={event}
+                registration={registration}
+                onClose={() => {}}
+                onSaved={onSaved}
+            />
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -71,13 +83,20 @@ describe('editing a registration: the request never reaches the server', () => {
         failingRequest.mockRejectedValue(new Error('offline'));
         const onSaved = vi.fn();
         render(
-            <EditRegistrationModal event={event} registration={registration} onClose={() => {}} onSaved={onSaved} />
+            <EditRegistrationModal
+                event={event}
+                registration={registration}
+                onClose={() => {}}
+                onSaved={onSaved}
+            />
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
         expect(
-            await screen.findByText("Couldn't reach the server. Check your connection and try again.")
+            await screen.findByText(
+                "Couldn't reach the server. Check your connection and try again."
+            )
         ).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Save' }).disabled).toBe(false);
         expect(onSaved).not.toHaveBeenCalled();
