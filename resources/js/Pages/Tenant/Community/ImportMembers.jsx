@@ -182,7 +182,8 @@ export default function ImportMembers() {
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-3 text-sm text-ink-secondary">
                             <span>
-                                {resultIssues.length.toLocaleString()} rows · Page {page} of{' '}
+                                {resultIssues.length.toLocaleString()}{' '}
+                                {resultIssues.length === 1 ? 'row' : 'rows'} · Page {page} of{' '}
                                 {Math.ceil(resultIssues.length / PAGE_SIZE)}
                             </span>
                             <Button disabled={page === 1} onClick={() => setPage(page - 1)}>
@@ -325,8 +326,9 @@ export default function ImportMembers() {
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-3 text-sm text-ink-secondary">
                             <span>
-                                {rows.length.toLocaleString()} rows · Page {page} of{' '}
-                                {Math.max(1, Math.ceil(rows.length / PAGE_SIZE))}
+                                {rows.length.toLocaleString()} {rows.length === 1 ? 'row' : 'rows'}
+                                {' · Page '}
+                                {page} of {Math.max(1, Math.ceil(rows.length / PAGE_SIZE))}
                             </span>
                             <Button disabled={page === 1} onClick={() => setPage(page - 1)}>
                                 Previous

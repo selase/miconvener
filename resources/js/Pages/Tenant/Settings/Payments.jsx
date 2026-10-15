@@ -25,7 +25,7 @@ const SETTLEMENT_OPTIONS = [
 
 function Card({ title, description, aside, children }) {
     return (
-        <section className="rounded-lg border border-border p-5 sm:p-6">
+        <section className="min-w-0 rounded-lg border border-border p-5 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
                     <h2 className="text-base font-semibold text-ink">{title}</h2>
@@ -496,7 +496,7 @@ export default function Payments({
                             : 'Only used when the settlement mode is Own gateway.'}
                     </p>
                 </div>
-                <div className="grid gap-6 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                     <PaystackForm
                         gateway={gateways.paystack}
                         commissionSplit={commissionSplit}
