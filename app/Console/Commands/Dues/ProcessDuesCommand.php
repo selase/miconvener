@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Dues;
 
+use App\Enum\TenantStatusEnum;
+use App\Jobs\SendDuesReminders;
 use App\Models\CommunitySettings;
 use App\Models\Tenant;
-use App\Enum\TenantStatusEnum;
 use App\Services\Dues\DuesScheduler;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -22,7 +23,7 @@ final class ProcessDuesCommand extends Command
     public function handle(DuesScheduler $scheduler): int
     {
         $date = $this->option('date');
-        if ($date !== null && (! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $date) || ! checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4)))) {
+        if ($date !== null && (! preg_match('/^\d{4}-\d{2}-\d{2}$/D', $date) || ! checkdate((int) mb_substr($date, 5, 2), (int) mb_substr($date, 8, 2), (int) mb_substr($date, 0, 4)))) {
             $this->error('The date must be a valid YYYY-MM-DD date.');
 
             return self::FAILURE;
@@ -59,7 +60,8 @@ final class ProcessDuesCommand extends Command
 
                     return $count;
                 });
-                $this->info("{$tenant->slug}: {$count} charges created.");
+                SendDuesReminders::dispatch($tenant->id, localDate: $today->toDateString())->afterCommit();
+                $this->info("{$tenant->slug}: {$count} charges created; reminders queued.");
             } catch (Throwable $exception) {
                 report($exception);
                 $this->error("Dues processing failed for {$tenant->slug}; see the application log.");

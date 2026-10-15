@@ -147,7 +147,7 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
     );
 }
 
-export default function MoneyDues({ membershipTypes }) {
+export default function MoneyDues({ membershipTypes, canRemindArrears }) {
     const inactiveMembers = membershipTypes.reduce(
         (sum, type) => sum + (!type.is_active ? type.member_count : 0),
         0
@@ -156,6 +156,34 @@ export default function MoneyDues({ membershipTypes }) {
     const [modal, setModal] = useState(null);
     const [toggling, setToggling] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [reminderPreview, setReminderPreview] = useState(null);
+    const [reminding, setReminding] = useState(false);
+    const previewReminders = async () => {
+        setReminding(true);
+        const result = await sendJson(
+            'GET',
+            route('tenant.community.money.dues.remind-arrears.preview')
+        );
+        setReminding(false);
+        if (!result.ok) {
+            showToast?.(result.message);
+            return;
+        }
+        setReminderPreview(result.body);
+    };
+    const sendReminders = async () => {
+        setReminding(true);
+        const result = await sendJson(
+            'POST',
+            route('tenant.community.money.dues.remind-arrears'),
+            {}
+        );
+        setReminding(false);
+        showToast?.(result.message ?? result.body?.message);
+        if (result.ok) {
+            setReminderPreview(null);
+        }
+    };
 
     const refresh = () => router.reload({ only: ['membershipTypes'], preserveScroll: true });
 
@@ -202,7 +230,14 @@ export default function MoneyDues({ membershipTypes }) {
                 }
             />
 
-            <div className="px-8 py-6">
+            <div className="px-4 py-6 sm:px-8">
+                {canRemindArrears && (
+                    <div className="mb-5">
+                        <Button onClick={previewReminders} disabled={reminding}>
+                            {reminding ? 'Checking…' : 'Remind everyone in arrears'}
+                        </Button>
+                    </div>
+                )}
                 {inactiveMembers > 0 && (
                     <div
                         role="status"
@@ -307,6 +342,48 @@ export default function MoneyDues({ membershipTypes }) {
                 />
             )}
 
+            <Modal
+                open={reminderPreview !== null}
+                onClose={() => !reminding && setReminderPreview(null)}
+                title="Remind everyone in arrears"
+            >
+                {reminderPreview && (
+                    <div className="space-y-4 text-sm">
+                        <p>
+                            {reminderPreview.members} members currently have overdue charges. Up to{' '}
+                            {reminderPreview.sms_credits_needed} SMS credits are needed before daily
+                            limits and message-length checks.
+                        </p>
+                        <p className="text-ink-secondary">
+                            SMS credits available:{' '}
+                            {reminderPreview.sms_credits_remaining ?? 'unlimited'}. Remaining
+                            monthly spending limit:{' '}
+                            {reminderPreview.sms_monthly_remaining ?? 'unlimited'}. Email reminders
+                            still send when SMS credits run out.
+                        </p>
+                        <p className="text-ink-secondary">
+                            This queues delivery. Recipients are checked again when sending. Members
+                            already reminded today will be skipped.
+                        </p>
+                        {!reminderPreview.reminders_enabled && (
+                            <p role="alert">
+                                Reminders are disabled. Enable them in Community → Settings first.
+                            </p>
+                        )}
+                        <Button
+                            variant="primary"
+                            onClick={sendReminders}
+                            disabled={
+                                reminding ||
+                                !reminderPreview.reminders_enabled ||
+                                reminderPreview.members === 0
+                            }
+                        >
+                            {reminding ? 'Queuing…' : 'Queue reminders'}
+                        </Button>
+                    </div>
+                )}
+            </Modal>
             <ConfirmModal
                 open={toggling !== null}
                 onClose={() => setToggling(null)}

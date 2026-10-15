@@ -307,6 +307,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::patch('settings/reminders', [App\Http\Controllers\Tenant\DuesReminderController::class, 'updateSettings'])->name('settings.update');
+            Route::get('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'preview'])->name('money.dues.remind-arrears.preview');
+            Route::post('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'send'])->name('money.dues.remind-arrears');
             Route::get('/', [App\Http\Controllers\Tenant\CommunityOverviewController::class, 'index'])->name('overview');
             Route::get('people', [MemberController::class, 'index'])->name('people.index');
             Route::get('people/import', [MemberImportController::class, 'show'])->name('people.import.show');

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Enum\DuesChargeStatusEnum;
 use App\Enum\MemberStatusEnum;
 use App\Http\Controllers\Controller;
+use App\Models\CommunitySettings;
 use App\Models\DuesCharge;
 use App\Models\Member;
 use App\Models\Tenant;
@@ -28,6 +29,7 @@ final class CommunityOverviewController extends Controller
         $charges = DuesCharge::query()->where('tenant_id', $tenant->id);
 
         return Inertia::render('Tenant/Community/Overview', [
+            'reminderSettings' => CommunitySettings::for($tenant)->only(['reminders_enabled', 'reminder_offsets', 'frequent_digest', 'sms_monthly_limit', 'week_starts_on']),
             'counts' => [
                 'members' => Member::query()->where('tenant_id', $tenant->id)->count(),
                 'activeMembers' => Member::query()->where('tenant_id', $tenant->id)->where('status', MemberStatusEnum::Active)->count(),

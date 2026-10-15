@@ -17,6 +17,10 @@ final class CommunitySettingsFactory extends Factory
     {
         return [
             'tenant_id' => Tenant::factory(),
+            'reminders_enabled' => true,
+            'reminder_offsets' => ['before' => 7, 'on_day' => 0, 'after_7' => 7, 'after_30' => 30],
+            'frequent_digest' => 'daily',
+            'sms_monthly_limit' => null,
             'timezone' => 'Africa/Accra',
             'week_starts_on' => 1,
             'financial_year_start_month' => 1,

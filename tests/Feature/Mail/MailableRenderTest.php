@@ -12,6 +12,7 @@ use App\Mail\Billing\RenewalReminderMail;
 use App\Mail\Billing\SubscriptionEndedMail;
 use App\Mail\Billing\SubscriptionEndingMail;
 use App\Mail\DuesReceipt;
+use App\Mail\DuesReminder;
 use App\Mail\Events\AbstractDecisionNotificationMail;
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Mail\Events\EventBlastMail;
@@ -278,6 +279,7 @@ test('every mailable renders', function (): void {
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),
         'WelcomeMail' => fn () => new WelcomeMail($user),
+        'DuesReminder' => fn () => new DuesReminder($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge])),
         'DuesReceipt' => fn () => new DuesReceipt($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge]), 'ref_render_dues'),
         'BookingConfirmationGuest' => fn () => new BookingConfirmationGuest($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
         'NewVenueBookingNotification' => fn () => new NewVenueBookingNotification($booking, 'https://acme.test/console/venue/inquiries/BK-RENDER-001'),

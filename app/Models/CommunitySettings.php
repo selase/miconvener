@@ -22,6 +22,7 @@ final class CommunitySettings extends Model
     protected $connection = 'landlord';
 
     protected $fillable = [
+        'reminders_enabled', 'reminder_offsets', 'frequent_digest', 'sms_monthly_limit',
         'tenant_id',
         'timezone',
         'week_starts_on',
@@ -31,6 +32,9 @@ final class CommunitySettings extends Model
     ];
 
     protected $attributes = [
+        'reminders_enabled' => true,
+        'reminder_offsets' => '{"before":7,"on_day":0,"after_7":7,"after_30":30}',
+        'frequent_digest' => 'daily',
         'timezone' => 'Africa/Accra',
         'week_starts_on' => 1,
         'financial_year_start_month' => 1,
@@ -39,6 +43,9 @@ final class CommunitySettings extends Model
     ];
 
     protected $casts = [
+        'reminders_enabled' => 'boolean',
+        'reminder_offsets' => 'array',
+        'sms_monthly_limit' => 'integer',
         'week_starts_on' => 'integer',
         'financial_year_start_month' => 'integer',
         'generate_days_ahead' => 'integer',

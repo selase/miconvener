@@ -33,6 +33,7 @@ final class MembershipTypeController extends Controller
             ->get();
 
         return Inertia::render('Tenant/Community/MoneyDues', [
+            'canRemindArrears' => auth()->user()->can('read finance'),
             'membershipTypes' => $classes->map(fn (MembershipType $class): array => $this->payload($class))->values(),
         ]);
     }
