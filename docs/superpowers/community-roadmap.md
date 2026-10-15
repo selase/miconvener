@@ -26,6 +26,12 @@ Status values: `not started` → `planned` (plan written) → `in progress` → 
 
 Merge policy (owner's decision): D2 is not merged on its own. 1a, 1b and 1c land on top of it; the branch is merged to `main` when the owner says so (the spec recommends after 1a at the earliest, since 1a keeps money logic unchanged).
 
+## Next action (handover to Codex, 2026-10-15)
+
+- Branch `community-1a` at `4c381bc` holds D2 + 1a (built, reviewed, pushed, **not merged**). Start 1b on this branch (or cut `community-1b` from it).
+- Do not merge or deploy without the owner's go-ahead. The owner may first click through 1a locally (local tenant `purpledot`, Community already enabled).
+- Read the 1a plan's "Final review" section for deferred minors and the PaymentSettings ruling to revisit in 1c.
+
 ## How to continue
 
 1. Read the spec, then the next milestone's plan (or brief).
