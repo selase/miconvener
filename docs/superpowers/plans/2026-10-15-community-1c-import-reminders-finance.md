@@ -13,17 +13,17 @@
 ## Global Constraints
 
 - Dues reminders and receipts are **service messages**: no marketing opt-out, but they respect `community_settings.reminders_enabled` and the organisation's SMS spending limit.
-- Email reminders use `TenantMailIdentity` (organisation display name and Reply-To). SMS uses the `SmsGateway` contract and consumes the organisation's credits through `SmsAllowance` (`canSend` before sending, `consume` after); a reminder that cannot be sent for lack of credit or the spending limit is recorded as `skipped` with the reason and never retried in a loop.
+- Email reminders use `TenantMailIdentity` (organisation display name and Reply-To). SMS uses the `SmsGateway` contract and reserves the organisation's credits through `SmsAllowance` before provider submission, with receipt-backed refunds only on confirmed failure; a reminder that cannot be sent for lack of credit or the spending limit is recorded as `skipped` with the reason and never retried in a loop.
 - Every reminder carries the member's pay link (`route('public.dues.show', …)`), the organisation's name, the total open and the oldest due date.
 - Member caps (spec 13): Free 50, Starter 500, Growth 5,000, Enterprise unlimited. Counted: `pending`, `active`, `lapsed`. Over the cap nothing is deleted and existing members keep being charged; adding, importing and approving are refused with a message naming the plan and the number.
 - Finance figures: **collected** (paid charges by `paid_at`, gross, with recorded cash as its own line), **collected online** (excludes recorded cash), **available to pay out** (`DuesBalance::available`, never includes cash). Never mix them.
 - The tenant Finance page and menu follow the 1a rule `handlesTicketMoney() || communityEnabled() || hasDuesMoney()`; existing ticket figures are unchanged.
-- PHP style, toolchain, PostgreSQL, Pint, phpstan and commit trailer as in the 1a plan.
+- PHP style, toolchain, PostgreSQL, Pint and phpstan as in the 1a plan. Commit authorship must identify the actual contributor; Codex changes do not inherit 1a’s Claude co-author trailer.
 
 ## Review Focus
 
 1. **A 3,000-row import with 40 bad rows** saves nothing until confirmed, reports each bad row with its line number and reason, and saves the good rows once (Task 1).
-2. **A daily payer** receives at most one reminder a day (or one a week if the organisation chose the weekly digest), listing every open charge (Task 2).
+2. **A daily payer** receives at most one reminder a day (or one a week if the organisation chose the weekly digest), with email listing every open charge and SMS carrying the bounded summary/full pay link (Task 2).
 3. **An organisation out of SMS credit** still gets email reminders sent and SMS reminders recorded as skipped (Task 2).
 4. **Recorded cash** appears in collections but never in available to pay out (Task 4).
 5. **A downgrade below the member count** keeps every member and charge, and blocks only new additions (Task 3).
@@ -56,7 +56,7 @@
 - [x] **Step 2: Run, see them fail.** **Step 3: Implement** (page: upload, preview table with filters for errors, policy choice, confirm). **Step 4: Run** `tests/Feature/Community`.
 - [x] **Step 5: Commit** `feat(community): import members from a spreadsheet with preview`.
 - [x] **Task review fix 1:** reject ambiguous active normalized type names in preview and confirmation; cover existing case/whitespace collisions and collisions introduced after preview.
-- [x] **Final review I1 / M1 / M2:** reject rows whose reserved email and name/phone identify different members, both in preview and under the current tenant lock at confirmation; preserve per-row errors, good-row consume-once import and planned identity uniqueness. Cover collisions before/after preview, manual-update agreement, untouched member/history/pay-token fields and multiple planned updates. Preview shows both contacts; import error counts use singular/plural grammar. Evidence: `.superpowers/sdd/2026-10-15-community-1c-import-reminders-finance/final-fix-report.md`.
+- [x] **Final review I1 / M1 / M2:** reject rows whose reserved email and name/phone identify different members, both in preview and under the current tenant lock at confirmation; preserve per-row errors, good-row consume-once import and planned identity uniqueness. Cover collisions before/after preview, manual-update agreement, untouched member/history/pay-token fields and multiple planned updates. Preview shows both contacts; import error counts use singular/plural grammar. Evidence: `5c39e8b`; 49 affected PHP tests (262 assertions), 26 JS tests, scoped PHPStan 0, Pint/lint/build green; scoped independent re-review approved all four findings.
 
 ### Task 2: Reminders and the arrears button
 
@@ -67,9 +67,9 @@
 **Interfaces:**
 - `DuesReminders::sendDue(Tenant, CarbonImmutable $localToday): array{sent: int, skipped: int}`: for each member with open charges, decide today's step: monthly, quarterly and yearly charges use the offsets per charge (but one message per member per day lists all open charges); daily and weekly charges use the digest (daily: one per day while anything is open; weekly: on `week_starts_on`). Email when the member has an email; SMS when they have a phone, SMS is enabled for the tenant, credits remain and the monthly limit is not reached.
 - `DuesReminders::remindArrears(Tenant, int $userId): array{sent: int, skipped: int}`: step `manual`; shares the per-member, per-channel, per-day limit with automatic reminders.
-- **Reserve before sending:** inside a transaction holding a per-tenant advisory lock (`pg_advisory_xact_lock`), check the monthly SMS limit (this month's sent SMS reminders) and `SmsAllowance::canSend`, `consume` the credit and insert the `dues_reminders` row; commit; then send. On a provider failure mark the row `failed` and return the credit. Concurrent workers can never overspend credits or the monthly limit. Email uses the same row-first pattern for its daily limit.
+- **Reserve before sending:** inside a transaction holding a per-tenant advisory lock (`pg_advisory_xact_lock`), check the monthly SMS limit (this month's reserved plus sent SMS reminders) and allowance, reserve the credit with its exact source receipt and insert the `dues_reminders` row; commit; then send. On a confirmed provider refusal mark the row `failed` and refund that exact reservation once; uncertain/interrupted outcomes remain reserved for investigation. Concurrent workers can never overspend credits or the monthly limit. Email uses the same row-first pattern for its daily limit.
 
-- [x] **Step 1: Failing tests:** automatic plus manual on one day sends one per channel; concurrent reminder runs never exceed the remaining credits or the monthly limit; a provider failure returns the credit; the four offsets for a monthly charge; one message listing several open charges; daily digest once per day; weekly digest only on the week start; reminders off → none; no credit → email sent, SMS skipped with reason; monthly SMS limit reached → skipped; arrears button sends once per day per member and needs `manage members`; message content has pay link, organisation name, total and oldest due date; white-label from/reply-to; tenant isolation.
+- [x] **Step 1: Failing tests:** automatic plus manual on one day sends one per channel; concurrent reminder runs never exceed the remaining credits or the monthly limit; a provider failure returns the credit; the four offsets for a monthly charge; one message listing several open charges; daily digest once per day; weekly digest only on the week start; reminders off → none; no credit → email sent, SMS skipped with reason; monthly SMS limit reached → skipped; arrears button sends once per day per member and needs both `manage members` and `read finance`; message content has pay link, organisation name, total and oldest due date; white-label from/reply-to; tenant isolation.
 - [x] **Step 2–4:** fail, implement, pass (`tests/Feature/Community tests/Feature/Dues tests/Feature/Mail`).
 - [x] **Step 5: Commit** `feat(community): automatic dues reminders and the arrears button`.
 - [x] **Task review fix 2 (N1):** freeze the organisation-local day in every queued run payload before serialization; stale manual/automatic dispatcher, continuation and delivery retries stop. Cover unknown/sent SMS across midnight, stable serialized continuation dates, and fresh next-day HTTP requests.
@@ -117,11 +117,81 @@ Ruling: Task 3 supplies the cap and shared advisory lock first. Task 1 will wire
 - [x] Overview uses DuesReport stored online receipts and organisation-local month boundaries, labels collections separately from payable, links Finance reporting and uses a currency-neutral empty state. Finance links/totals require `read finance`.
 - [x] Historical cash-only organisations retain Finance after Community is switched off: `hasDuesMoney()` includes paid charges alongside ledger/payout history. Cash remains outside ledgers and payable; Community writing routes stay switched off.
 - [x] Dues-only Finance emphasises dues instead of empty ticket totals; ticket-only props and both settlement readers remain unchanged. Current arrears/payable/in-flight are labelled independently of filtered collections. CSV amounts remain integer minor units and currencies never mix.
-- [x] **Final review M3:** applying dues dates preserves applied ticket search/status on mixed Finance; covered by a component test. Evidence: final fix report linked above.
+- [x] **Final review M3:** applying dues dates preserves applied ticket search/status on mixed Finance; covered by a component test. Evidence: `5c39e8b` and the verification evidence below.
 
 ### Task 5: Verification
 
 - [ ] Full suite, `pint --dirty`, phpstan, lint, JS tests, build (commit rebuilt `public/build` if JSX or CSS changed).
-- [ ] Local: import the owner's sample sheet (ask for one, or use the fixture), run `dues:process` with reminders, check the Finance page.
-- [ ] One whole-branch review by a fresh reviewer; fix Critical and Important findings with tests.
+- [x] Local: used fictional CSV/XLSX fixtures and isolated QA; import preview/confirmation/update, scheduler/reminders and Finance cash/date checks passed. Outstanding browser visual/download checks are listed below.
+- [x] One whole-branch review by a fresh reviewer; I1 and three minors fixed with tests in `5c39e8b`; one scoped re-review approved all findings, no new Critical/Important issue.
 - [ ] Update `docs/superpowers/community-roadmap.md` (status `built`, evidence) and push.
+
+
+## Final review and acceptance record (2026-10-15)
+
+Fresh whole-branch review covered `0ed29f6..7485df9`. One Important finding was fixed in `5c39e8b`: conflicting email and name/phone matches could pass preview and cause a database uniqueness exception at confirmation, rolling back good rows and consuming the preview. Both preview and confirmation now reject the conflicting row without guessing a target. Tests preserve good-row import, consume-once behavior, manual-update agreement, contacts, membership/history and pay tokens. Three minor UI findings were also fixed: both contacts are visible, singular grammar is correct, and dues date submission retains ticket filters. One scoped re-review approved all findings with no new Critical/Important issue. `592982f` only removes an accidentally tracked scratch report; source is unchanged.
+
+### Self-Review Report
+
+“Is there anything I have overlooked? Is the solution optimal? Let me take a step back.”
+
+#### Touchpoints updated
+
+- AGENTS.md records reservation/refund/locking and report/access contracts, including reuse by future Messages work.
+- Existing plan and roadmap carry handover and decisions. No independent memory file is needed.
+- EventPackageSeeder includes member caps; no new permission is introduced. Existing manage-members/read-finance/manage-payment-settings gates and superadmin commercial controls remain. Package feature sync must be included in the later approved deployment preparation.
+- People links Import; Overview settings expose reminders; Money and Overview link Finance where authorized. Public pay links retain their original scope.
+- No new dependency, environment variable or configuration key: composer/npm manifests, lockfiles and PHPStan baseline are unchanged. No unused dependency was installed.
+- Behavioral tests cover endpoints, row validation, tenant isolation, permissions, currencies, date boundaries, historical cash/payable, identity/cap races, credit reset/reservation races, uncertain provider outcomes and queued-date retries. Final full-suite evidence is recorded below when complete.
+- Tracked public/build was rebuilt in every UI commit. No ledger writer was added outside LedgerService.
+
+#### UI Gap Analysis
+
+- Discoverability: existing People/Money/Overview/Finance entry points link the new actions.
+- Empty states: imports show file guidance; cap and row errors have explicit outcomes; empty collections use currency-neutral/date guidance; arrears confirmation describes the audience and SMS credit estimate.
+- Permissions: backend gates apply independently of hidden controls; arrears audiences require both permissions, and the queued actor is checked again. Finance totals are omitted for unauthorized readers.
+- Loading/errors: upload/confirmation/date actions disable during work; malformed rows, expired/reused previews and quota failures have visible errors. SMS persists accepted/reserved/skipped/failed outcomes honestly.
+- Mobile/accessibility: import and reminder interactions were exercised with a 390px override, but the preserved small mobile screenshot is insufficient to substantiate visual readability; narrow-screen visual acceptance remains open. Desktop dark-mode typed fields were readable. Existing semantic labels, buttons, modal structure and keyboard controls remain. Finance desktop totals and normal keyboard date editing passed.
+- Outstanding browser checks: CSV download, narrow-screen visual acceptance (including import/reminders/Finance), PaymentSettings visual acceptance and post-fix visual refresh remain unverified because the isolated browser connection disappeared after a download timeout. Backend exports/access and component tests cover these behaviors, but are not described as completed browser checks.
+
+#### Solved (auto-fixed)
+
+Task reviews corrected ambiguous membership type names, queued delivery timing/continuation, settings drafts after tab remount and frozen queued dates across midnight. Final review corrected the importer conflict and three UI findings described above. Real cash recording was checked through the existing UI and reports cash without changing payable.
+
+#### Recommended for user decision
+
+Before high-volume SMS rollout, assign an application operator with the organisation owner/admin to investigate provider outcomes for uncertain reservations. Keep credits held until the outcome is established; do not blindly retry, refund or edit balances. Add an auditable reconciliation workflow in Messages milestone 2 (estimated 1–2 development days including tests and operator UI, subject to provider status-API availability). This is a rollout prerequisite for substantial SMS volume, not functionality claimed by 1c. Finish the outstanding browser checks when the isolated browser is available. Bundle-size optimization remains a separate performance follow-up; the existing >500 kB build warning is retained.
+
+#### Not gaps
+
+- New groups, following/join approval, verified identifiers, /my PWA, giving and member benefits belong to later roadmap milestones.
+- This report reads existing dues states; it does not introduce refunds or correction writers.
+- Provider acceptance is not a claim of handset delivery. QA used log email, disabled SMS and empty payment keys.
+- The earlier D2/1a/1b code was not broadly re-audited; targeted changed touchpoints and the whole 1c delta were reviewed. Generated assets were rebuilt and their manifest checked, rather than reverse-engineered.
+- Original checkout, owner Purpledot data/settlement mode and production remain untouched.
+
+
+### Rulings carried forward and their costs
+
+1. Build caps before import. Cost: task execution order differs from numbering.
+2. Require manage-members plus read-finance for arrears audiences. Cost: some staff need another permission.
+3. Preserve the existing reserved-email identity rule alongside name/phone matching. Cost: distinct people sharing only that reserved email need separate contact details or a later deliberate identity-policy change.
+4. Reserve SMS credit before submission; refund exact sources only on confirmed failure. Cost: uncertain/interrupted sends retain credits pending reconciliation.
+5. Count rejoining members against the cap under the shared lock. Cost: rejoining can be blocked at capacity.
+6. Reject ambiguous normalized membership-type names per row. Cost: administrators must rename colliding types before importing.
+7. Itemise charges in email; use a bounded SMS summary and full pay link, skipping summaries over 459 characters. Cost: SMS recipients open the link for details and unusually long content needs email.
+8. Skip stale automatic runs instead of sending historical reminder bursts. Cost: delayed automatic reminders wait for an eligible current-day run. The initial manual execution-day approach was refined by ruling 10.
+9. Allow Finance-eligible organisations to configure Paystack under the existing payment-settings permission, retaining Stripe ticket/superadmin fee gates; correct Overview collection labels/links. Cost: Paystack setup eligibility extends beyond paid-ticket plans.
+10. Freeze every queued logical run's local day, including manual runs and retries. Cost: an overnight-delayed manual run needs a fresh request; synchronous new requests still resolve the current day.
+11. Retain Finance for paid cash history after Community is switched off. Cost: historical cash-only tenants retain Finance and potentially empty Payouts visibility under existing permissions.
+12. Do not copy the earlier Claude co-author trailer onto Codex commits. Cost: commit metadata differs from the earlier Claude-specific convention; authorship remains accurate.
+
+13. Use a draft PR and the existing clean CI runner for the final full suite after the observed local PostgreSQL I/O/setup failures, keeping status in progress until green. Cost: a draft PR/remote branch exists before final verification; it can be closed without merging or deploying. This changes the push order, not the integration prohibition.
+
+### Full-suite verification investigation
+
+The first completed four-worker run on the reviewed code returned 2,589/2,593 passing, 12,563 assertions, with four errors in 1,858.576s. One badge PDF pagination dataset encountered text-fit validation; three SMS/own-gateway tests encountered PostgreSQL connection timeout or a worker database still in use during setup. No Community assertion failed. Read-only database activity during the slow run showed no blocking queries and prolonged tenant-database creation waiting on DataFileRead. These results are not recorded as a green full suite. Focused reproduction/root-cause investigation precedes any correction or final rerun.
+
+
+
+The unchanged three affected files passed 67/67 tests (249 assertions) in 346.871s on a clean focused rerun. Before/during/after database activity had no blockers or I/O waits. The framework's schema-probe exception path can attempt database recreation, explaining the secondary database-in-use error following the initial timeout. A controlled valid Faker-vocabulary event title, “Necessitatibus exercitationem reprehenderit voluptatibus.”, then reproduced the exact original Letter/8 pagination failure at `layout.event_name`; attendee names, ticket codes and ticket types were normal. The permanent correction pins only that pagination test's event title to “Medical Congress”, without changing production validators, bounds or assertions. All 14 pagination datasets passed after the one-line fixture correction in `1890366`; production validation and assertions are unchanged. Scoped test-only review and clean CI results follow when complete.
