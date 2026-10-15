@@ -15,6 +15,7 @@ use App\Models\TenantPayoutAccount;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 
 beforeEach(function () {
     refreshTenantDatabases();
@@ -313,4 +314,42 @@ test('a transfer parked awaiting an OTP is never recorded as sent', function () 
     // Nothing has moved, so nothing has been charged for moving it.
     expect($payout->transfer_fee_amount)->toBe(0)
         ->and($payout->net_paid_amount)->toBeNull();
+});
+
+test('a payout no larger than the transfer fee is refused with the exact message', function () {
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'type' => TenantPayoutAccount::TYPE_BANK, 'recipient_code' => 'RCP_small_1']);
+    $payout = EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'payout_account_id' => $account->id, 'amount' => 800]);
+    config(['services.platform.transfer_fees.bank' => 800]);
+    Http::fake();
+
+    $host = 'acme.'.mb_ltrim((string) config('session.domain'), '.');
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host])
+        ->assertStatus(422)
+        ->assertExactJson(['message' => 'This balance is smaller than the transfer fee, so it cannot be sent on its own. It will be paid out with the next batch.']);
+
+    Http::assertNothingSent();
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_SCHEDULED);
+});
+
+test('a gateway failure while sending answers 502 with the exact message and leaves the payout untouched', function () {
+    [$tenant, $user] = payoutSendingHost();
+    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'bank_code' => '030']);
+    $payout = EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'payout_account_id' => $account->id, 'amount' => 5_000]);
+
+    $gateway = Mockery::mock(\App\Contracts\SettlementGateway::class);
+    $gateway->shouldReceive('createRecipient')->once()->andThrow(new \App\Exceptions\PaymentFailedException('Recipient rejected'));
+    $gateway->shouldNotReceive('initiateTransfer');
+    app()->instance(\App\Contracts\SettlementGateway::class, $gateway);
+
+    $host = 'acme.'.mb_ltrim((string) config('session.domain'), '.');
+
+    $this->actingAs($user)->postJson("http://{$host}/events/{$event->id}/finance/payouts/{$payout->id}/send", [], ['HTTP_HOST' => $host])
+        ->assertStatus(502)
+        ->assertExactJson(['message' => 'Could not send payout: Recipient rejected']);
+
+    expect($payout->fresh()->status)->toBe(EventPayout::STATUS_SCHEDULED);
 });

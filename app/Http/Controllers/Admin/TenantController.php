@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enum\CommercialStreamEnum;
 use App\Enum\TenantStatusEnum;
 use App\Enum\UsageMetric;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\CreateTenantRequest;
+use App\Http\Requests\Tenant\UpdateCommercialTermsRequest;
 use App\Libraries\Helper;
+use App\Models\CommercialTermsOverride;
 use App\Models\Tenant;
 use App\Models\UsageRollup;
 use App\Providers\RouteServiceProvider;
+use App\Services\Finance\CommercialTerms;
 use App\Services\Tenancy\TenantProvisioner;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\Factory;
@@ -258,9 +262,16 @@ final class TenantController extends Controller
         ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
+    public function updateCommercialTerms(UpdateCommercialTermsRequest $request, Tenant $tenant, CommercialTerms $terms): RedirectResponse
+    {
+        $rate = $request->validated('rate');
+        $cap = $request->validated('cap_amount');
+        $terms->setOverride($tenant, CommercialStreamEnum::from($request->validated('stream')), $rate === null ? null : (float) $rate,
+            $cap === null ? null : (int) $cap, $request->validated('reason'), $request->user());
+
+        return back()->with('success', 'Commercial terms saved and audited.');
+    }
+
     public function show(Request $request, string $id): View
     {
         $this->authorize('read tenant');
@@ -312,6 +323,12 @@ final class TenantController extends Controller
         return view('admin.tenants.show', [
             'breadcrumbs' => $breadcrumbs,
             'tenant' => $tenant,
+            'commercialTerms' => $request->user()->can('access-superadmin-dashboard')
+                ? collect(CommercialStreamEnum::cases())->mapWithKeys(fn (CommercialStreamEnum $stream): array => [$stream->value => app(CommercialTerms::class)->for($tenant, $stream)])
+                : collect(),
+            'commercialOverrides' => $request->user()->can('access-superadmin-dashboard')
+                ? CommercialTermsOverride::query()->withoutGlobalScopes()->where('tenant_id', $tenant->id)->get()->keyBy(fn (CommercialTermsOverride $override): string => $override->stream->value)
+                : collect(),
             'days' => $days,
             'start_date' => $startDate->format('Y-m-d'),
             'end_date' => $endDate->format('Y-m-d'),

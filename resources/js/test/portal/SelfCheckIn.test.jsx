@@ -31,7 +31,13 @@ describe('marking yourself present', () => {
     });
 
     it('records presence and says so', async () => {
-        csrfFetch.mockResolvedValue({ ok: true, json: async () => ({ checked_in: true, message: "You're checked in. Enjoy the event." }) });
+        csrfFetch.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                checked_in: true,
+                message: "You're checked in. Enjoy the event.",
+            }),
+        });
         render(<MyTicketPanel event={event} registration={registration()} />);
 
         fireEvent.click(screen.getByRole('button', { name: /I'm here/ }));
@@ -60,7 +66,10 @@ describe('marking yourself present', () => {
 
     it('offers nothing when check-in is not available, and says so when already present', () => {
         const { unmount } = render(
-            <MyTicketPanel event={event} registration={registration({ self_check_in_available: false })} />
+            <MyTicketPanel
+                event={event}
+                registration={registration({ self_check_in_available: false })}
+            />
         );
         expect(screen.queryByRole('button', { name: /I'm here/ })).toBeNull();
         unmount();

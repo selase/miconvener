@@ -103,6 +103,12 @@ return [
         'platform_fee_percentage' => env('CONTRIBUTION_PLATFORM_FEE_PERCENTAGE', 1),
     ],
 
+    'dues' => [
+        'platform_fee_percentage' => (float) env('DUES_PLATFORM_FEE_PERCENTAGE', 1),
+        'free_plan_fee_percentage' => 2,
+        'legacy_fee_percentage' => 1,
+    ],
+
     'sms' => [
         'driver' => env('SMS_DRIVER', 'omnichannel'),
     ],

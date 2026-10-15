@@ -124,7 +124,7 @@ final class PaystackGateway implements PaymentGateway
         }
     }
 
-    public function createOneTimeCheckoutSession(string $customerId, int $amount, string $currency, string $redirectUrl, array $metadata = []): string
+    public function createOneTimeCheckoutSession(string $customerId, int $amount, string $currency, string $redirectUrl, array $metadata = [], ?string $reference = null): string
     {
         try {
             $customerResponse = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/customer/{$customerId}")->throw();
@@ -137,6 +137,10 @@ final class PaystackGateway implements PaymentGateway
                 'callback_url' => $redirectUrl,
                 'metadata' => $metadata,
             ];
+
+            if ($reference !== null) {
+                $payload['reference'] = $reference;
+            }
 
             if ($this->split !== null) {
                 $payload['subaccount'] = $this->split['subaccount'];

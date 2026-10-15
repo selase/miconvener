@@ -6,10 +6,12 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Contracts\PaymentGateway;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\DuesFinanceRequest;
 use App\Models\EventLedgerEntry;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
+use App\Services\Dues\DuesReport;
 use App\Services\Payment\PaystackGateway;
 use App\Services\Tenancy\TenantContext;
 use Exception;
@@ -17,18 +19,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class FinanceController extends Controller
 {
     public function __construct(private readonly TenantContext $tenantContext) {}
 
-    public function index(Request $request): Response
+    public function index(DuesFinanceRequest $request): Response
     {
         $this->authorize('read finance');
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        if (! $tenant->showsFinance()) {
+            abort(403, 'Finance is not available for this organisation.');
         }
 
         // A platform_default tenant's charges are collected on the platform's own
@@ -43,6 +46,22 @@ final class FinanceController extends Controller
         return $tenant->isPlatformDefaultSettlement()
             ? $this->ledgerBackedIndex($request, $tenant)
             : $this->merchantTransactionBackedIndex($request, $tenant);
+    }
+
+    public function exportDuesCollections(DuesFinanceRequest $request): StreamedResponse
+    {
+        $tenant = $this->tenantContext->getTenant();
+        abort_unless($tenant->communityEnabled() || $tenant->hasDuesMoney(), 404);
+
+        return app(DuesReport::class)->exportCollections($tenant, $request->from(), $request->to());
+    }
+
+    public function exportDuesArrears(DuesFinanceRequest $request): StreamedResponse
+    {
+        $tenant = $this->tenantContext->getTenant();
+        abort_unless($tenant->communityEnabled() || $tenant->hasDuesMoney(), 404);
+
+        return app(DuesReport::class)->exportArrears($tenant);
     }
 
     public function refund(Request $request, string $subdomain, MerchantTransaction $transaction)
@@ -99,7 +118,22 @@ final class FinanceController extends Controller
         }
     }
 
-    private function merchantTransactionBackedIndex(Request $request, Tenant $tenant): Response
+    /** @return array<string, mixed> */
+    private function duesProps(DuesFinanceRequest $request, Tenant $tenant): array
+    {
+        if (! $tenant->communityEnabled() && ! $tenant->hasDuesMoney()) {
+            return [];
+        }
+
+        return ['dues' => [
+            'show_ticket_finance' => $tenant->handlesTicketMoney(),
+            'from' => $request->validated('from'), 'to' => $request->validated('to'),
+            'timezone' => $request->timezone(),
+            'currencies' => app(DuesReport::class)->summary($tenant, $request->from(), $request->to()),
+        ]];
+    }
+
+    private function merchantTransactionBackedIndex(DuesFinanceRequest $request, Tenant $tenant): Response
     {
         $query = MerchantTransaction::where('tenant_id', $tenant->id)->latest();
 
@@ -142,6 +176,7 @@ final class FinanceController extends Controller
             'transactions' => $transactions,
             'stats' => $stats,
             'filters' => $request->only(['search', 'status']),
+            ...$this->duesProps($request, $tenant),
         ]);
     }
 
@@ -152,7 +187,7 @@ final class FinanceController extends Controller
      * (gross_amount summed by type) so the tenant-wide totals agree with the
      * per-event panel they are rolling up.
      */
-    private function ledgerBackedIndex(Request $request, Tenant $tenant): Response
+    private function ledgerBackedIndex(DuesFinanceRequest $request, Tenant $tenant): Response
     {
         $query = EventLedgerEntry::where('tenant_id', $tenant->id)
             ->whereIn('type', [EventLedgerEntry::TYPE_CHARGE, EventLedgerEntry::TYPE_REFUND])
@@ -210,6 +245,7 @@ final class FinanceController extends Controller
             'transactions' => $transactions,
             'stats' => $stats,
             'filters' => $request->only(['search', 'status']),
+            ...$this->duesProps($request, $tenant),
         ]);
     }
 

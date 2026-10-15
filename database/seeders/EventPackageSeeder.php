@@ -16,6 +16,7 @@ final class EventPackageSeeder extends Seeder
     private array $features = [
         'events_in_flight' => ['name' => 'Concurrent Live Events', 'type' => 'limit', 'description' => 'Maximum non-archived events at a time.'],
         'event_registrations' => ['name' => 'Registrations Per Month', 'type' => 'limit', 'description' => 'Maximum confirmed registrations across all events per month.'],
+        'community_members' => ['name' => 'Community Members', 'type' => 'limit', 'description' => 'Maximum pending, active and lapsed community members. Exited members do not count.'],
         'team_seats' => ['name' => 'Team Seats', 'type' => 'limit', 'description' => 'Maximum team members for this organization.'],
         'staff_links' => ['name' => 'Staff Links', 'type' => 'limit', 'description' => 'Active staff links (ushers and floor crew without an account) at a time. Each usher pack adds five.'],
         'email_credits' => ['name' => 'Email Credits Per Month', 'type' => 'limit', 'description' => 'Maximum event-related emails sent per month.'],
@@ -48,6 +49,7 @@ final class EventPackageSeeder extends Seeder
             'features' => [
                 'events_in_flight' => 1,
                 'event_registrations' => 50,
+                'community_members' => 50,
                 'team_seats' => 1,
                 'staff_links' => 1,
                 'email_credits' => 200,
@@ -76,6 +78,7 @@ final class EventPackageSeeder extends Seeder
             'features' => [
                 'events_in_flight' => 3,
                 'event_registrations' => 500,
+                'community_members' => 500,
                 'team_seats' => 3,
                 'staff_links' => 2,
                 'email_credits' => 3000,
@@ -104,6 +107,7 @@ final class EventPackageSeeder extends Seeder
             'features' => [
                 'events_in_flight' => 15,
                 'event_registrations' => 3000,
+                'community_members' => 5000,
                 'team_seats' => 6,
                 'staff_links' => 5,
                 'email_credits' => 15000,
@@ -132,6 +136,7 @@ final class EventPackageSeeder extends Seeder
             'features' => [
                 'events_in_flight' => -1,
                 'event_registrations' => -1,
+                'community_members' => -1,
                 'team_seats' => -1,
                 'staff_links' => -1,
                 'email_credits' => -1,

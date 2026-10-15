@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Http\Client\RequestException;
 use RuntimeException;
 use Throwable;
 
@@ -27,5 +28,27 @@ final class PaymentFailedException extends RuntimeException
             providerCode: $providerCode,
             previous: $previous,
         );
+    }
+
+    /**
+     * The provider's own explanation, for showing to a person. An HTTP error
+     * from the provider carries its JSON body, whose `message` (for Paystack,
+     * "Transfer is not currently awaiting OTP" and the like) reads far better
+     * than the exception text, which embeds the raw body and is truncated.
+     * Falls back to the exception message when there is no such field.
+     */
+    public function providerMessage(): string
+    {
+        $previous = $this->getPrevious();
+
+        if ($previous instanceof RequestException) {
+            $message = $previous->response->json('message');
+
+            if (is_string($message) && mb_trim($message) !== '') {
+                return mb_trim($message);
+            }
+        }
+
+        return $this->getMessage();
     }
 }

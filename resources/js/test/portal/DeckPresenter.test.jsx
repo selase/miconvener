@@ -59,7 +59,9 @@ describe('the presenter screen', () => {
 
         fireEvent.keyDown(window, { key: 'PageDown' });
 
-        await waitFor(() => expect(csrfFetch).toHaveBeenCalledWith('/present/tok/advance', expect.anything()));
+        await waitFor(() =>
+            expect(csrfFetch).toHaveBeenCalledWith('/present/tok/advance', expect.anything())
+        );
         await screen.findByText('Question 2 of 3');
     });
 
@@ -107,21 +109,31 @@ describe('the presenter screen', () => {
         expect(csrfFetch).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByRole('button', { name: 'Press again to end' }));
-        await waitFor(() => expect(csrfFetch).toHaveBeenCalledWith('/present/tok/end', expect.anything()));
+        await waitFor(() =>
+            expect(csrfFetch).toHaveBeenCalledWith('/present/tok/end', expect.anything())
+        );
     });
 
     it('starts a draft deck from the keyboard', async () => {
         replyWith(live(1));
         render(
             <DeckPresenter
-                {...props({ ...live(1), status: 'draft', position: null, current: null, next: { question: 'Question 1' } })}
+                {...props({
+                    ...live(1),
+                    status: 'draft',
+                    position: null,
+                    current: null,
+                    next: { question: 'Question 1' },
+                })}
             />
         );
 
         expect(screen.getByText('Ready when you are')).toBeTruthy();
         fireEvent.keyDown(window, { key: 'ArrowRight' });
 
-        await waitFor(() => expect(csrfFetch).toHaveBeenCalledWith('/present/tok/start', expect.anything()));
+        await waitFor(() =>
+            expect(csrfFetch).toHaveBeenCalledWith('/present/tok/start', expect.anything())
+        );
     });
 
     it('says plainly when the link has been replaced', async () => {

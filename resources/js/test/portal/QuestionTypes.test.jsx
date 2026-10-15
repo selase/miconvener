@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PollChart from '@/Components/Polls/PollChart';
-import PollPanel, { isComplete, payloadFor } from '@/Pages/Public/Events/AttendeePortal/panels/PollPanel';
+import PollPanel, {
+    isComplete,
+    payloadFor,
+} from '@/Pages/Public/Events/AttendeePortal/panels/PollPanel';
 import csrfFetch from '@/lib/csrfFetch';
 
 vi.mock('@/lib/csrfFetch', () => ({ default: vi.fn() }));
@@ -48,8 +51,17 @@ describe('the wall chart for each question type', () => {
     });
 
     it('shows a rating as its average out of five', () => {
-        const options = ['1', '2', '3', '4', '5'].map((l) => ({ id: l, label: l, count: 2, percentage: 20 }));
-        render(<PollChart poll={results('rating', { options, summary: { average: 4.2, out_of: 5 } })} />);
+        const options = ['1', '2', '3', '4', '5'].map((l) => ({
+            id: l,
+            label: l,
+            count: 2,
+            percentage: 20,
+        }));
+        render(
+            <PollChart
+                poll={results('rating', { options, summary: { average: 4.2, out_of: 5 } })}
+            />
+        );
 
         expect(screen.getByText('4.2')).toBeTruthy();
         expect(screen.getByText('out of 5')).toBeTruthy();
@@ -82,7 +94,13 @@ describe('the wall chart for each question type', () => {
             <PollChart
                 poll={results('number', {
                     settings: { unit: 'beds' },
-                    summary: { average: 40, median: 30, minimum: 10, maximum: 100, histogram: [{ from: 10, to: 55, count: 4 }] },
+                    summary: {
+                        average: 40,
+                        median: 30,
+                        minimum: 10,
+                        maximum: 100,
+                        histogram: [{ from: 10, to: 55, count: 4 }],
+                    },
                 })}
             />
         );
@@ -96,7 +114,14 @@ describe('the wall chart for each question type', () => {
     it('sizes word cloud words by how many people used them', () => {
         render(
             <PollChart
-                poll={results('word_cloud', { summary: { words: [{ text: 'data', count: 9 }, { text: 'trust', count: 1 }] } })}
+                poll={results('word_cloud', {
+                    summary: {
+                        words: [
+                            { text: 'data', count: 9 },
+                            { text: 'trust', count: 1 },
+                        ],
+                    },
+                })}
             />
         );
 
@@ -105,7 +130,7 @@ describe('the wall chart for each question type', () => {
         expect(Number(big.style.opacity)).toBeGreaterThan(Number(small.style.opacity));
     });
 
-    it('lists a ranking in the room\'s order and says how many ranked it', () => {
+    it("lists a ranking in the room's order and says how many ranked it", () => {
         render(
             <PollChart
                 poll={results('ranking', {
@@ -139,15 +164,36 @@ describe('the wall chart for each question type', () => {
 });
 
 describe('what the phone sends for each type', () => {
-    const blank = { optionId: null, optionIds: [], text: '', number: '', scale: 5, scaleTouched: false, words: ['', '', ''], order: [] };
+    const blank = {
+        optionId: null,
+        optionIds: [],
+        text: '',
+        number: '',
+        scale: 5,
+        scaleTouched: false,
+        words: ['', '', ''],
+        order: [],
+    };
 
     it('sends the right field for each type', () => {
-        expect(payloadFor({ type: 'scale' }, { ...blank, scale: 7 })).toEqual({ response_number: 7 });
-        expect(payloadFor({ type: 'number' }, { ...blank, number: '12.5' })).toEqual({ response_number: 12.5 });
-        expect(payloadFor({ type: 'multi_select' }, { ...blank, optionIds: ['a', 'c'] })).toEqual({ option_ids: ['a', 'c'] });
-        expect(payloadFor({ type: 'ranking' }, { ...blank, order: ['c', 'a', 'b'] })).toEqual({ option_ids: ['c', 'a', 'b'] });
-        expect(payloadFor({ type: 'word_cloud' }, { ...blank, words: [' data ', '', 'trust'] })).toEqual({ words: ['data', 'trust'] });
-        expect(payloadFor({ type: 'rating' }, { ...blank, optionId: 'four' })).toEqual({ option_id: 'four' });
+        expect(payloadFor({ type: 'scale' }, { ...blank, scale: 7 })).toEqual({
+            response_number: 7,
+        });
+        expect(payloadFor({ type: 'number' }, { ...blank, number: '12.5' })).toEqual({
+            response_number: 12.5,
+        });
+        expect(payloadFor({ type: 'multi_select' }, { ...blank, optionIds: ['a', 'c'] })).toEqual({
+            option_ids: ['a', 'c'],
+        });
+        expect(payloadFor({ type: 'ranking' }, { ...blank, order: ['c', 'a', 'b'] })).toEqual({
+            option_ids: ['c', 'a', 'b'],
+        });
+        expect(
+            payloadFor({ type: 'word_cloud' }, { ...blank, words: [' data ', '', 'trust'] })
+        ).toEqual({ words: ['data', 'trust'] });
+        expect(payloadFor({ type: 'rating' }, { ...blank, optionId: 'four' })).toEqual({
+            option_id: 'four',
+        });
     });
 
     it('will not send a scale nobody moved, or an empty word cloud', () => {
@@ -163,7 +209,9 @@ describe('what the phone sends for each type', () => {
 describe('answering on the phone', () => {
     const livePoll = (poll) => ({
         ok: true,
-        json: async () => ({ poll: { id: 'p1', question: 'Ready?', total_votes: 0, settings: {}, ...poll } }),
+        json: async () => ({
+            poll: { id: 'p1', question: 'Ready?', total_votes: 0, settings: {}, ...poll },
+        }),
     });
 
     beforeEach(() => {
@@ -172,7 +220,15 @@ describe('answering on the phone', () => {
     });
 
     it('sends the tapped option at once for yes/no, not an empty answer', async () => {
-        global.fetch.mockResolvedValue(livePoll({ type: 'yes_no', options: [{ id: 'yes-id', label: 'Yes' }, { id: 'no-id', label: 'No' }] }));
+        global.fetch.mockResolvedValue(
+            livePoll({
+                type: 'yes_no',
+                options: [
+                    { id: 'yes-id', label: 'Yes' },
+                    { id: 'no-id', label: 'No' },
+                ],
+            })
+        );
         csrfFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
 
         render(<PollPanel registration={{ id: 'r1' }} />);
@@ -185,9 +241,19 @@ describe('answering on the phone', () => {
     });
 
     it('sends one answer when a star is tapped twice in quick succession', async () => {
-        global.fetch.mockResolvedValue(livePoll({ type: 'rating', options: ['1', '2', '3', '4', '5'].map((l) => ({ id: `s${l}`, label: l })) }));
+        global.fetch.mockResolvedValue(
+            livePoll({
+                type: 'rating',
+                options: ['1', '2', '3', '4', '5'].map((l) => ({ id: `s${l}`, label: l })),
+            })
+        );
         let release;
-        csrfFetch.mockImplementation(() => new Promise((resolve) => (release = () => resolve({ ok: true, json: async () => ({}) }))));
+        csrfFetch.mockImplementation(
+            () =>
+                new Promise(
+                    (resolve) => (release = () => resolve({ ok: true, json: async () => ({}) }))
+                )
+        );
 
         render(<PollPanel registration={{ id: 'r1' }} />);
         const four = await screen.findByRole('button', { name: '4 out of 5' });
@@ -200,7 +266,13 @@ describe('answering on the phone', () => {
 
     it('lets a ranking be reordered before it is sent', async () => {
         global.fetch.mockResolvedValue(
-            livePoll({ type: 'ranking', options: [{ id: 'a', label: 'Staffing' }, { id: 'b', label: 'Funding' }] })
+            livePoll({
+                type: 'ranking',
+                options: [
+                    { id: 'a', label: 'Staffing' },
+                    { id: 'b', label: 'Funding' },
+                ],
+            })
         );
         csrfFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
 

@@ -44,6 +44,7 @@ final class EventPayout extends Model
         'category',
         'payout_account_id',
         'amount',
+        'currency',
         'transfer_fee_amount',
         'net_paid_amount',
         'status',

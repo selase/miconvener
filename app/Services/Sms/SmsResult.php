@@ -10,12 +10,14 @@ final readonly class SmsResult
      * @param  ?int  $retryAfter  Seconds the provider asked us to wait when it
      *                            turned the request away for volume; the
      *                            message was not refused and should be retried.
+     * @param  bool  $uncertain  The provider may have queued it; do not refund or blindly retry.
      */
     public function __construct(
         public bool $accepted,
         public ?string $providerReference = null,
         public ?string $error = null,
         public ?int $retryAfter = null,
+        public bool $uncertain = false,
     ) {}
 
     public static function throttled(int $retryAfter): self
@@ -31,6 +33,11 @@ final readonly class SmsResult
     public static function refused(string $error): self
     {
         return new self(false, error: $error);
+    }
+
+    public static function unknown(string $error): self
+    {
+        return new self(false, error: $error, uncertain: true);
     }
 
     public function isThrottled(): bool

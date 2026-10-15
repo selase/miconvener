@@ -43,6 +43,7 @@ final class Kernel extends ConsoleKernel
          * leaving it to whoever remembers.
          */
         $schedule->command('tenants:sync-features')->dailyAt('03:45')->withoutOverlapping();
+        $schedule->command('dues:process')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('usage:process-rollups --period=hour')->hourly();
         $schedule->command('usage:process-rollups --period=day')->daily();
         $schedule->command('usage:prune')->dailyAt('04:00');

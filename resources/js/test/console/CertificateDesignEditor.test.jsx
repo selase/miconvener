@@ -4,9 +4,14 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import csrfFetch from '@/lib/csrfFetch';
 import CertificateDesignEditor from '@/Pages/Tenant/Events/Certificates/CertificateDesignEditor';
 
-vi.mock('@/lib/csrfFetch', async (importOriginal) => ({ ...(await importOriginal()), default: vi.fn() }));
+vi.mock('@/lib/csrfFetch', async (importOriginal) => ({
+    ...(await importOriginal()),
+    default: vi.fn(),
+}));
 
-beforeEach(() => { csrfFetch.mockResolvedValue({ ok: true, json: async () => ({ fonts: undefined }) }); });
+beforeEach(() => {
+    csrfFetch.mockResolvedValue({ ok: true, json: async () => ({ fonts: undefined }) });
+});
 
 const element = {
     x: 0.15,
@@ -186,7 +191,11 @@ it('retains a generated PDF link and releases its blob when the editor closes', 
     vi.stubGlobal('route', (name) => name);
     vi.stubGlobal(
         'fetch',
-        vi.fn().mockResolvedValue({ ok: true, headers: { get: () => 'application/pdf' }, blob: async () => new Blob(['%PDF']) })
+        vi.fn().mockResolvedValue({
+            ok: true,
+            headers: { get: () => 'application/pdf' },
+            blob: async () => new Blob(['%PDF']),
+        })
     );
     const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pdf');
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
@@ -308,18 +317,16 @@ it.each([
 it('announces a fallback warning when preview artwork is unavailable', async () => {
     vi.stubGlobal(
         'fetch',
-        vi
-            .fn()
-            .mockResolvedValue({
-                ok: true,
-                headers: {
-                    get: (name) =>
-                        name === 'X-Certificate-Preview-Warning'
-                            ? 'Background unavailable; the default design is shown.'
-                            : 'application/pdf',
-                },
-                blob: async () => new Blob(['%PDF']),
-            })
+        vi.fn().mockResolvedValue({
+            ok: true,
+            headers: {
+                get: (name) =>
+                    name === 'X-Certificate-Preview-Warning'
+                        ? 'Background unavailable; the default design is shown.'
+                        : 'application/pdf',
+            },
+            blob: async () => new Blob(['%PDF']),
+        })
     );
     vi.spyOn(window, 'open').mockReturnValue(null);
     URL.createObjectURL = vi.fn(() => 'blob:preview');

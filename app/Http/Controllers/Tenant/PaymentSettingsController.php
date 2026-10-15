@@ -35,10 +35,9 @@ final class PaymentSettingsController extends Controller
         $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
-        // The same check that lets a tenant sell paid tickets: whoever can take
-        // payment can configure how they are paid, and no one else.
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        // Finance eligibility includes dues-only organisations and retained history.
+        if (! $tenant->showsFinance()) {
+            abort(403, 'Payment settings are not available for this organisation.');
         }
 
         $gateways = TenantPaymentGateway::where('tenant_id', $tenant->id)->get()->keyBy('provider');
@@ -46,6 +45,7 @@ final class PaymentSettingsController extends Controller
         $canSetPlatformFee = Gate::allows('access-superadmin-dashboard');
 
         return Inertia::render('Tenant/Settings/Payments', [
+            'ticketPaymentsAvailable' => $tenant->handlesTicketMoney(),
             'settlementMode' => $tenant->settlement_mode,
             'platformSettlementAvailable' => (bool) config('services.settlement.paystack.secret_key'),
             'gateways' => [
@@ -83,8 +83,8 @@ final class PaymentSettingsController extends Controller
     {
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        if (! $tenant->showsFinance()) {
+            abort(403, 'Payment settings are not available for this organisation.');
         }
 
         $validated = $request->validated();

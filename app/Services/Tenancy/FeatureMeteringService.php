@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Tenancy;
 
 use App\Models\Tenant;
+use App\Services\Billing\EmailAllowance;
+use App\Services\Sms\SmsAllowance;
 
 final class FeatureMeteringService
 {
@@ -52,14 +54,22 @@ final class FeatureMeteringService
      */
     public function resetUsage(Tenant $tenant, ?string $featureSlug = null): void
     {
-        $query = $tenant->usage();
+        $reset = function () use ($tenant, $featureSlug): void {
+            $query = $tenant->usage();
+            if ($featureSlug) {
+                $query->where('feature_slug', $featureSlug);
+            }
+            $query->delete();
+        };
 
-        if ($featureSlug) {
-            $query->where('feature_slug', $featureSlug);
+        if ($featureSlug === null) {
+            app(SmsAllowance::class)->withLock($tenant, fn () => app(EmailAllowance::class)->withLock($tenant, $reset));
+        } elseif ($featureSlug === SmsAllowance::FEATURE) {
+            app(SmsAllowance::class)->withLock($tenant, $reset);
+        } elseif ($featureSlug === EmailAllowance::FEATURE) {
+            app(EmailAllowance::class)->withLock($tenant, $reset);
+        } else {
+            $reset();
         }
-
-        // For simple implementations, we assume deleting usage records resets the counter.
-        // A more advanced system would archive them with 'period_end' set to now.
-        $query->delete();
     }
 }

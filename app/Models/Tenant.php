@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Enum\TenantStatusEnum;
 use App\Libraries\Helper;
 use App\Traits\HasUuid;
@@ -23,6 +24,7 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * @property string|null $package_id Null until a plan is assigned; self-signups
  *                                   on a paid plan have none until they pay.
+ * @property-read string|null $logo_url The stored logo's public URL, or null when there is none.
  */
 final class Tenant extends Model
 {
@@ -263,6 +265,35 @@ final class Tenant extends Model
     public function featureEnabled(string $key): bool
     {
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();
+    }
+
+    /**
+     * The Community rollout switch (`php artisan community:enable`).
+     */
+    public function communityEnabled(): bool
+    {
+        return $this->featureEnabled('community');
+    }
+
+    /**
+     * Whether the tenant has dues history: a paid charge (including cash),
+     * dues ledger account or dues payout exists. Payouts and reports stay reachable on
+     * this alone, so turning Community off never strands collected money.
+     */
+    public function hasDuesMoney(): bool
+    {
+        return LedgerAccount::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists()
+            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists()
+            || DuesCharge::query()->where('tenant_id', $this->id)->where('status', \App\Enum\DuesChargeStatusEnum::Paid)->exists();
+    }
+
+    /**
+     * Whether the Finance section shows: ticket money, Community, or dues
+     * money still held. The menu and the page both use this.
+     */
+    public function showsFinance(): bool
+    {
+        return $this->handlesTicketMoney() || $this->communityEnabled() || $this->hasDuesMoney();
     }
 
     public function paymentGateways(): HasMany

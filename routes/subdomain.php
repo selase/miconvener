@@ -15,6 +15,8 @@ use App\Http\Controllers\Public\SpeakerPortalController;
 use App\Http\Controllers\Tenant\AccountController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DesignSystemController;
+use App\Http\Controllers\Tenant\DuesChargeController;
+use App\Http\Controllers\Tenant\DuesPayoutController;
 use App\Http\Controllers\Tenant\EventBadgeController;
 use App\Http\Controllers\Tenant\EventBlastController;
 use App\Http\Controllers\Tenant\EventCheckInController;
@@ -33,6 +35,9 @@ use App\Http\Controllers\Tenant\EventSpeakerController;
 use App\Http\Controllers\Tenant\EventSponsorController;
 use App\Http\Controllers\Tenant\EventTicketTypeController;
 use App\Http\Controllers\Tenant\EventVenueController;
+use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\MemberImportController;
+use App\Http\Controllers\Tenant\MembershipTypeController;
 use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\OrgSettingsController;
 use App\Http\Controllers\Tenant\RoleController;
@@ -141,6 +146,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     // Merchant Finance & Sales
     Route::get('/finance', [App\Http\Controllers\Tenant\FinanceController::class, 'index'])->name('tenant.finance.index');
+    Route::get('/finance/dues/collections/export', [App\Http\Controllers\Tenant\FinanceController::class, 'exportDuesCollections'])->name('tenant.finance.dues.collections.export');
+    Route::get('/finance/dues/arrears/export', [App\Http\Controllers\Tenant\FinanceController::class, 'exportDuesArrears'])->name('tenant.finance.dues.arrears.export');
     Route::post('/finance/refund/{transaction}', [App\Http\Controllers\Tenant\FinanceController::class, 'refund'])->name('tenant.finance.refund');
 
     Route::prefix('llm-config')->name('tenant.llm-config.')->group(function () {
@@ -299,6 +306,49 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::get('payout-accounts/banks', [TenantPayoutAccountController::class, 'banks'])->name('tenant.payout-accounts.banks');
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
+
+    Route::middleware('community.enabled')->group(function (): void {
+        Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::patch('settings/reminders', [App\Http\Controllers\Tenant\DuesReminderController::class, 'updateSettings'])->name('settings.update');
+            Route::get('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'preview'])->name('money.dues.remind-arrears.preview');
+            Route::post('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'send'])->name('money.dues.remind-arrears');
+            Route::get('/', [App\Http\Controllers\Tenant\CommunityOverviewController::class, 'index'])->name('overview');
+            Route::get('people', [MemberController::class, 'index'])->name('people.index');
+            Route::get('people/import', [MemberImportController::class, 'show'])->name('people.import.show');
+            Route::get('people/import/template', [MemberImportController::class, 'template'])->name('people.import.template');
+            Route::post('people/import/preview', [MemberImportController::class, 'preview'])->name('people.import.preview');
+            Route::post('people/import/confirm', [MemberImportController::class, 'confirm'])->name('people.import.confirm');
+            Route::post('people/members', [MemberController::class, 'store'])->name('members.store');
+            Route::patch('people/members/{member}', [MemberController::class, 'update'])->name('members.update');
+            Route::post('people/members/{member}/exit', [MemberController::class, 'exit'])->name('members.exit');
+            Route::post('people/members/{member}/rejoin', [MemberController::class, 'rejoin'])->name('members.rejoin');
+            Route::post('people/members/{member}/rotate-link', [MemberController::class, 'rotateLink'])->name('members.rotate-link');
+
+            Route::get('money/dues', [MembershipTypeController::class, 'index'])->name('money.dues.index');
+            Route::post('money/dues/types', [MembershipTypeController::class, 'store'])->name('money.dues.store');
+            Route::patch('money/dues/types/{type}', [MembershipTypeController::class, 'update'])->name('money.dues.update');
+            Route::post('money/dues/charges', [DuesChargeController::class, 'store'])->name('charges.store');
+            Route::post('money/dues/charges/{charge}/waive', [DuesChargeController::class, 'waive'])->name('charges.waive');
+            Route::post('money/dues/charges/{charge}/void', [DuesChargeController::class, 'void'])->name('charges.void');
+            Route::post('money/dues/charges/{charge}/record-offline', [DuesChargeController::class, 'recordOffline'])->name('charges.record-offline');
+        });
+
+        Route::permanentRedirect('dues/members', '/community/people');
+        Route::permanentRedirect('dues/classes', '/community/money/dues');
+    });
+
+    // Payouts stay reachable while the tenant holds dues money, even with the
+    // Community switch off: the switch stops new activity, never settlement.
+    Route::middleware('dues.money')->group(function (): void {
+        Route::prefix('finance/payouts')->name('tenant.finance.payouts.')->group(function (): void {
+            Route::get('/', [DuesPayoutController::class, 'index'])->name('index');
+            Route::post('/', [DuesPayoutController::class, 'store'])->name('store');
+            Route::post('{payout}/send', [DuesPayoutController::class, 'send'])->name('send');
+            Route::post('{payout}/finalize', [DuesPayoutController::class, 'finalize'])->name('finalize');
+        });
+
+        Route::permanentRedirect('dues/payouts', '/finance/payouts');
+    });
 
     Route::prefix('venue')->name('tenant.venue.')->group(function (): void {
         Route::get('profile', [App\Http\Controllers\Tenant\Venue\VenueProfileController::class, 'show'])->name('profile');
@@ -473,6 +523,17 @@ Route::post('/e/{event}/forum', [PublicForumController::class, 'store'])->name('
 Route::post('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'vote'])->name('public.events.forum.vote');
 Route::delete('/e/{event}/forum/{thread}/vote', [PublicForumController::class, 'unvote'])->name('public.events.forum.unvote');
 Route::post('/e/{event}/forum/{thread}/report', [PublicForumController::class, 'report'])->name('public.events.forum.report');
+
+// Member dues: the pay link a member is sent. The token is the only
+// credential, so every page is loosely rate limited per address and checkout
+// more tightly. A new payment can only be started while dues are switched on;
+// a payment already made still returns to its callback and receipt.
+Route::prefix('pay/{token}')->name('public.dues.')->group(function (): void {
+    Route::get('/', [App\Http\Controllers\Public\MemberPayController::class, 'show'])->middleware(['community.enabled', 'throttle:dues-view'])->name('show');
+    Route::post('/checkout', [App\Http\Controllers\Public\MemberPayController::class, 'checkout'])->middleware(['community.enabled', 'throttle:dues-pay'])->name('checkout');
+    Route::get('/callback', [App\Http\Controllers\Public\MemberPayController::class, 'callback'])->middleware('throttle:dues-view')->name('callback');
+    Route::get('/receipt', [App\Http\Controllers\Public\MemberPayController::class, 'receipt'])->middleware('throttle:dues-view')->name('receipt');
+});
 
 // Staff links: ushers and floor crew scan tickets and answer attendee requests
 // from their own phones, reached by the link's token rather than an account.

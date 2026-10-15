@@ -58,6 +58,7 @@ final class HandleInertiaRequests extends Middleware
                     'read_finance' => fn (): bool => (bool) $request->user()?->can('read finance'),
                     'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),
                     'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
+                    'manage_members' => fn (): bool => (bool) $request->user()?->can('manage members'),
                     'manage_payment_settings' => fn (): bool => (bool) $request->user()?->can('manage payment settings'),
                     'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
                     'update_user' => fn (): bool => (bool) $request->user()?->can('update user'),
@@ -72,15 +73,19 @@ final class HandleInertiaRequests extends Middleware
                 'slug' => $tenant->slug,
                 'features' => [
                     'paid_tickets' => $tenant->planAllows('paid_tickets'),
-                    // Gates the Finance link: selling paid tickets now, or money
-                    // from tickets sold before a lapse still to refund or pay out.
-                    'finance' => $tenant->handlesTicketMoney(),
+                    // Gates the Finance link: ticket money (selling now, or still to
+                    // refund or pay out), Community, or dues money still held.
+                    'finance' => $tenant->showsFinance(),
                     'llm_byok' => $tenant->featureEnabled('llm_byok'),
+                    'community' => $tenant->communityEnabled(),
+                    // Payouts stay in the menu while dues money is held, even with Community off.
+                    'dues_payouts' => $tenant->communityEnabled() || $tenant->hasDuesMoney(),
                 ],
             ] : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                'info' => fn () => $request->session()->get('info'),
                 'plainKey' => fn () => $request->session()->get('plainKey'),
                 // Two-factor recovery codes are shown on exactly the response
                 // that generated them; they are not readable afterwards.

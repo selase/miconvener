@@ -5,6 +5,50 @@
 @section('content')
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
+        @can('access-superadmin-dashboard')
+            <div class="card card-flush mb-6">
+                <div class="card-header"><h2 class="card-title">Commercial terms</h2></div>
+                <div class="card-body">
+                    @if (session('success'))
+                        <div class="alert alert-success d-flex align-items-center">{{ session('success') }}</div>
+                    @endif
+                    @if ($errors->any())
+                        <div class="alert alert-danger d-flex align-items-center" role="alert">{{ $errors->first() }}</div>
+                    @endif
+                    <p class="text-muted">Rates are percentages. Caps are in minor units. Zero is a waiver; leave the rate blank to remove an override. Existing checkouts keep their frozen terms.</p>
+                    @foreach ($commercialTerms as $stream => $terms)
+                        @if ($stream === 'tickets')
+                            <p>Tickets: {{ $terms->rate }}% ({{ $terms->source }}). Managed through existing ticket terms.</p>
+                        @else
+                            @php($override = $commercialOverrides->get($stream))
+                            <form method="POST" action="{{ route('tenants.commercial-terms.update', $tenant->uuid) }}" class="border-bottom pb-5 mb-5">
+                                @csrf
+                                <input type="hidden" name="stream" value="{{ $stream }}">
+                                <h3 class="fs-5">{{ ucfirst($stream) }} <span class="badge badge-light">{{ $terms->rate }}% · {{ $terms->source }}{{ $terms->isWaiver ? ' · waiver' : '' }}</span></h3>
+                                @if ($stream !== 'dues')
+                                    <p class="text-muted">Future configuration only: these terms do not change existing contribution payments or enable giving.</p>
+                                @endif
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="terms-rate-{{ $stream }}">Override rate (%)</label>
+                                        <input id="terms-rate-{{ $stream }}" class="form-control form-control-solid" name="rate" type="number" min="0" max="100" step="0.01" value="{{ old('stream') === $stream ? old('rate') : $override?->rate }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="terms-cap-{{ $stream }}">Cap (minor units)</label>
+                                        <input id="terms-cap-{{ $stream }}" class="form-control form-control-solid" name="cap_amount" type="number" min="0" step="1" value="{{ old('stream') === $stream ? old('cap_amount') : $override?->cap_amount }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="terms-reason-{{ $stream }}">Reason</label>
+                                        <input id="terms-reason-{{ $stream }}" class="form-control form-control-solid" name="reason" required maxlength="2000" value="{{ old('stream') === $stream ? old('reason') : '' }}">
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-3 mt-4"><button class="btn btn-primary" type="submit">Save {{ $stream }} terms</button></div>
+                            </form>
+                        @endif
+                    @endforeach
+                </div>
+            </div>
+        @endcan
         <div class="row">
             <div class="col-md-4">
                 <div class="card">

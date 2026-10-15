@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
  * recorded:
  *
  * - the ledger's Platform Commission Revenue account (4000): commission on
- *   ticket sales and contributions, marketplace commission and buyer fees.
+ *   ticket sales, contributions and dues, marketplace commission and buyer fees.
  *   Credits are earnings; debits (refunds, reversed commission) take them back.
  * - successful billing payments (transactions): plans, renewals, add-ons,
  *   marketplace promotions and AI tokens paid to us.
@@ -34,6 +34,7 @@ final class PlatformEarnings
         LedgerTransaction::TYPE_TICKET_SALE => 'Ticket commission',
         LedgerTransaction::TYPE_OFFLINE_TICKET_SALE => 'Ticket commission (paid at the door)',
         LedgerTransaction::TYPE_CONTRIBUTION => 'Contribution fees',
+        LedgerTransaction::TYPE_DUES_PAYMENT => 'Dues commission',
         LedgerTransaction::TYPE_COMMISSION_RECEIVABLE => 'Commission not yet collected (own gateway)',
         'marketplace_booking' => 'Marketplace commission and buyer fees',
         LedgerTransaction::TYPE_REFUND => 'Refunded commission',

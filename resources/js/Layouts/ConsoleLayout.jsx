@@ -3,13 +3,18 @@ import { Link, usePage } from '@inertiajs/react';
 import { useToast } from '@/Components/Console/Toast';
 import {
     LayoutDashboard,
+    LayoutGrid,
     LogOut,
     Calendar,
+    ChevronDown,
+    Coins,
     Users,
     ShieldCheck,
     KeyRound,
     CreditCard,
     Wallet,
+    UsersRound,
+    HandCoins,
     Sparkles,
     SlidersHorizontal,
     Settings,
@@ -23,61 +28,53 @@ import {
     X,
 } from 'lucide-react';
 import ThemeToggle from '@/Components/Console/ThemeToggle';
+import { NAV_GROUPS, isGroupCollapsed, visibleGroups } from '@/Layouts/consoleNav';
 
-const NAV_ITEMS = [
-    { label: 'Dashboard', href: 'tenant.dashboard', icon: LayoutDashboard },
-    { label: 'Events', href: 'tenant.events.index', icon: Calendar },
-    {
-        label: 'Facility Operations',
-        href: 'tenant.venue.operations.index',
-        icon: ClipboardCheck,
-        permission: 'manage_venue',
-    },
-    {
-        label: 'Venue Spaces',
-        href: 'tenant.venue.spaces.index',
-        icon: Building2,
-        permission: 'manage_venue',
-    },
-    {
-        label: 'Venue Calendar',
-        href: 'tenant.venue.calendar.index',
-        icon: CalendarDays,
-        permission: 'manage_venue',
-    },
-    {
-        label: 'Inquiries & Leads',
-        href: 'tenant.venue.inquiries.index',
-        icon: Inbox,
-        permission: 'manage_venue',
-    },
-    {
-        label: 'RFQs & Proposals',
-        href: 'tenant.venue.quotes.index',
-        icon: FileText,
-        permission: 'manage_venue',
-    },
-    { label: 'Team', href: 'tenant.users.index', icon: Users },
-    { label: 'Roles', href: 'tenant.roles.index', icon: ShieldCheck },
-    { label: 'API Keys', href: 'tenant.api-keys.index', icon: KeyRound },
-    { label: 'Billing', href: 'billing.index', icon: CreditCard, permission: 'manage_billing' },
-    {
-        label: 'Finance',
-        href: 'tenant.finance.index',
-        icon: Wallet,
-        feature: 'finance',
-        permission: 'read_finance',
-    },
-    { label: 'LLM Usage', href: 'tenant.llm-usage.index', icon: Sparkles },
-    {
-        label: 'LLM Config',
-        href: 'tenant.llm-config.index',
-        icon: SlidersHorizontal,
-        feature: 'llm_byok',
-    },
-    { label: 'Settings', href: 'tenant.settings.index', icon: Settings },
-    { label: 'My account', href: 'tenant.account', icon: UserRound },
-];
+const ICONS = {
+    LayoutDashboard,
+    LayoutGrid,
+    Calendar,
+    Coins,
+    Users,
+    ShieldCheck,
+    KeyRound,
+    CreditCard,
+    Wallet,
+    UsersRound,
+    HandCoins,
+    Sparkles,
+    SlidersHorizontal,
+    Settings,
+    UserRound,
+    Building2,
+    CalendarDays,
+    Inbox,
+    ClipboardCheck,
+    FileText,
+};
+
+const COLLAPSE_KEY = (key) => `console.nav.collapsed.${key}`;
+
+/** Storage can throw (private windows, blocked site data); the menu then stays expanded. */
+function readCollapsed(key) {
+    try {
+        return window.localStorage.getItem(COLLAPSE_KEY(key)) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function writeCollapsed(key, collapsed) {
+    try {
+        window.localStorage.setItem(COLLAPSE_KEY(key), collapsed ? '1' : '0');
+    } catch {
+        // Not remembering the choice is fine.
+    }
+}
+
+function pathOf(href) {
+    return new URL(href).pathname;
+}
 
 function initials(name) {
     return name
@@ -101,6 +98,29 @@ export default function ConsoleLayout({ children, compact = false }) {
     // phone about 165px of content: too little to reach a registration's
     // approve button or read the check-in station names.
     const [navOpen, setNavOpen] = useState(false);
+    const groups = visibleGroups(NAV_GROUPS, {
+        features: tenant?.features ?? {},
+        can: auth?.can ?? {},
+    });
+    const [collapsed, setCollapsed] = useState(() =>
+        typeof window === 'undefined'
+            ? {}
+            : Object.fromEntries(NAV_GROUPS.map((group) => [group.key, readCollapsed(group.key)]))
+    );
+    const toggleGroup = (key) =>
+        setCollapsed((current) => {
+            const next = { ...current, [key]: !current[key] };
+            writeCollapsed(key, next[key]);
+            return next;
+        });
+    // The item whose path is the longest prefix of the current page is the
+    // active one, so Community > Overview (/community) is not lit on
+    // /community/people, and Events stays lit inside /events/{id}.
+    const activeHref = groups
+        .flatMap((group) => group.items)
+        .map((item) => ({ href: item.href, path: pathOf(route(item.href)) }))
+        .filter(({ path }) => currentPath === path || currentPath.startsWith(`${path}/`))
+        .sort((a, b) => b.path.length - a.path.length)[0]?.href;
 
     useEffect(() => {
         if (!navOpen) return undefined;
@@ -161,38 +181,74 @@ export default function ConsoleLayout({ children, compact = false }) {
                 </div>
 
                 <nav className="flex flex-col py-2">
-                    {NAV_ITEMS.filter(
-                        (item) =>
-                            (!item.feature || tenant?.features?.[item.feature]) &&
-                            (!item.permission || auth?.can?.[item.permission])
-                    ).map((item) => {
-                        const href = route(item.href);
-                        const itemPath = new URL(href).pathname;
-                        // Inside an event, Events stays lit: /events/{id} is still Events.
-                        const isActive =
-                            currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
-                        const Icon = item.icon;
+                    {groups.map((group, index) => {
+                        const containsActive = group.items.some((item) => item.href === activeHref);
+                        const isCollapsed = isGroupCollapsed({
+                            hasLabel: Boolean(group.label),
+                            collapsed: collapsed[group.key],
+                            containsActive,
+                            compact,
+                        });
 
                         return (
-                            <Link
-                                key={item.href}
-                                href={href}
-                                aria-current={isActive ? 'page' : undefined}
-                                onClick={() => setNavOpen(false)}
-                                title={compact ? item.label : undefined}
-                                className={`flex items-center gap-2.5 px-4.5 py-1.75 text-[13px] transition-colors duration-120 ease-out ${
-                                    compact ? 'md:justify-center md:px-0 md:py-2.5' : ''
-                                } ${
-                                    isActive
-                                        ? 'bg-surface-hover text-ink shadow-[inset_2px_0_0_var(--color-accent)]'
-                                        : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
-                                }`}
-                            >
-                                <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-                                <span className={compact ? 'md:sr-only' : undefined}>
-                                    {item.label}
-                                </span>
-                            </Link>
+                            <div key={group.key} className={index > 0 ? 'mt-1' : undefined}>
+                                {group.label && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleGroup(group.key)}
+                                            aria-expanded={!isCollapsed}
+                                            className={`flex w-full items-center justify-between px-4.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary hover:text-ink ${
+                                                compact ? 'md:hidden' : ''
+                                            }`}
+                                        >
+                                            {group.label}
+                                            <ChevronDown
+                                                className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${isCollapsed ? '-rotate-90' : ''}`}
+                                                strokeWidth={1.75}
+                                            />
+                                        </button>
+                                        {compact && (
+                                            <div className="mx-3 my-1.5 hidden border-t border-border md:block" />
+                                        )}
+                                    </>
+                                )}
+                                {!isCollapsed &&
+                                    group.items.map((item) => {
+                                        const href = route(item.href);
+                                        const isActive = item.href === activeHref;
+                                        const Icon = ICONS[item.icon] ?? LayoutGrid;
+
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                href={href}
+                                                aria-current={isActive ? 'page' : undefined}
+                                                onClick={() => setNavOpen(false)}
+                                                title={compact ? item.label : undefined}
+                                                className={`flex items-center gap-2.5 px-4.5 py-1.75 text-[13px] transition-colors duration-120 ease-out ${
+                                                    compact
+                                                        ? 'md:justify-center md:px-0 md:py-2.5'
+                                                        : ''
+                                                } ${
+                                                    isActive
+                                                        ? 'bg-surface-hover text-ink shadow-[inset_2px_0_0_var(--color-accent)]'
+                                                        : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
+                                                }`}
+                                            >
+                                                <Icon
+                                                    className="h-4 w-4 shrink-0"
+                                                    strokeWidth={1.75}
+                                                />
+                                                <span
+                                                    className={compact ? 'md:sr-only' : undefined}
+                                                >
+                                                    {item.label}
+                                                </span>
+                                            </Link>
+                                        );
+                                    })}
+                            </div>
                         );
                     })}
                 </nav>

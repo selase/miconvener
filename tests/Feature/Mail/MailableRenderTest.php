@@ -11,6 +11,8 @@ use App\Mail\Billing\PaymentReceiptMail;
 use App\Mail\Billing\RenewalReminderMail;
 use App\Mail\Billing\SubscriptionEndedMail;
 use App\Mail\Billing\SubscriptionEndingMail;
+use App\Mail\DuesReceipt;
+use App\Mail\DuesReminder;
 use App\Mail\Events\AbstractDecisionNotificationMail;
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Mail\Events\EventBlastMail;
@@ -114,6 +116,16 @@ test('every mailable renders', function (): void {
         'event_id' => $event->id,
         'speaker_id' => $speaker->id,
         'portal_token' => 'sample-test-token-123456',
+    ]);
+
+    $duesMember = App\Models\Member::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Ama Mensah']);
+    $duesCharge = App\Models\DuesCharge::factory()->create([
+        'tenant_id' => $tenant->id,
+        'member_id' => $duesMember->id,
+        'membership_type_id' => $duesMember->membership_type_id,
+        'status' => App\Enum\DuesChargeStatusEnum::Paid,
+        'paid_at' => now(),
+        'payment_reference' => 'ref_render_dues',
     ]);
 
     // Every real send happens with a tenant resolved, so the templates are
@@ -267,6 +279,8 @@ test('every mailable renders', function (): void {
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),
         'WelcomeMail' => fn () => new WelcomeMail($user),
+        'DuesReminder' => fn () => new DuesReminder($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge])),
+        'DuesReceipt' => fn () => new DuesReceipt($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge]), 'ref_render_dues'),
         'BookingConfirmationGuest' => fn () => new BookingConfirmationGuest($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
         'NewVenueBookingNotification' => fn () => new NewVenueBookingNotification($booking, 'https://acme.test/console/venue/inquiries/BK-RENDER-001'),
         'QuoteSentNotification' => fn () => new QuoteSentNotification($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001/checkout'),
