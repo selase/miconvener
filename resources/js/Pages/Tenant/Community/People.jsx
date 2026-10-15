@@ -20,20 +20,20 @@ const CHARGE_PILL = { open: 'pending', paid: 'success', waived: 'neutral', void:
 
 const CHARGE_ACTIONS = {
     waive: {
-        route: 'tenant.dues.charges.waive',
+        route: 'tenant.community.charges.waive',
         title: 'Waive charge',
         description:
             'The member will no longer owe this charge. This is recorded and cannot be undone.',
         label: 'Waive',
     },
     void: {
-        route: 'tenant.dues.charges.void',
+        route: 'tenant.community.charges.void',
         title: 'Void charge',
         description: 'Cancel this charge because it was raised by mistake. It cannot be undone.',
         label: 'Void',
     },
     'record-offline': {
-        route: 'tenant.dues.charges.record-offline',
+        route: 'tenant.community.charges.record-offline',
         title: 'Record cash payment',
         description:
             'Record that the member paid this charge in cash or by transfer. No money moves through MiConvener.',
@@ -79,7 +79,7 @@ function CreateChargeModal({ member, onClose, onDone }) {
     const submit = async (event) => {
         event.preventDefault();
         setProcessing(true);
-        const result = await sendJson('POST', route('tenant.dues.charges.store'), {
+        const result = await sendJson('POST', route('tenant.community.charges.store'), {
             member_id: member.id,
             period_start: periodStart,
         });
@@ -130,7 +130,7 @@ function paidLabel(charge) {
     return ['Paid' + (via ? ` ${via}` : ''), date].filter(Boolean).join(' · ');
 }
 
-export default function Members({ members, classes }) {
+export default function People({ members, membershipTypes }) {
     const showToast = useToast();
     const [selectedId, setSelectedId] = useState(null);
     const [modal, setModal] = useState(null);
@@ -138,7 +138,8 @@ export default function Members({ members, classes }) {
     const [busy, setBusy] = useState(false);
 
     const selected = members.data.find((member) => member.id === selectedId) ?? null;
-    const refresh = () => router.reload({ only: ['members', 'classes'], preserveScroll: true });
+    const refresh = () =>
+        router.reload({ only: ['members', 'membershipTypes'], preserveScroll: true });
 
     const run = async (request, success) => {
         setBusy(true);
@@ -163,7 +164,7 @@ export default function Members({ members, classes }) {
                 () =>
                     sendJson(
                         'POST',
-                        route('tenant.dues.members.exit', { member: confirm.member.id })
+                        route('tenant.community.members.exit', { member: confirm.member.id })
                     ),
                 'Member marked as exited'
             );
@@ -174,7 +175,7 @@ export default function Members({ members, classes }) {
                 () =>
                     sendJson(
                         'POST',
-                        route('tenant.dues.members.rotate-link', { member: confirm.member.id })
+                        route('tenant.community.members.rotate-link', { member: confirm.member.id })
                     ),
                 'Pay link replaced'
             );
@@ -225,11 +226,19 @@ export default function Members({ members, classes }) {
     return (
         <ConsoleLayout>
             <PageHeader
-                title="Members"
+                title="People"
+                tabs={[
+                    {
+                        key: 'members',
+                        label: 'Members',
+                        href: route('tenant.community.people.index'),
+                    },
+                ]}
+                activeTab="members"
                 actions={
                     <>
-                        <Button href={route('tenant.dues.classes.index')} icon={Layers}>
-                            Classes
+                        <Button href={route('tenant.community.money.dues.index')} icon={Layers}>
+                            Membership types
                         </Button>
                         <Button
                             icon={Plus}
@@ -247,7 +256,7 @@ export default function Members({ members, classes }) {
                     <Table>
                         <Thead>
                             <Th>Name</Th>
-                            <Th>Class</Th>
+                            <Th>Membership type</Th>
                             <Th>Amount</Th>
                             <Th>Owes</Th>
                             <Th>Status</Th>
@@ -288,8 +297,8 @@ export default function Members({ members, classes }) {
                                         <TableEmpty
                                             title="No members yet"
                                             description={
-                                                classes.length === 0
-                                                    ? 'Add a class first, then add your members.'
+                                                membershipTypes.length === 0
+                                                    ? 'Add a membership type first (Community > Money), then add your members.'
                                                     : 'Add your first member to start collecting dues.'
                                             }
                                         />
@@ -338,7 +347,10 @@ export default function Members({ members, classes }) {
                                 <DetailCard title="Contact">
                                     <CopyField label="Phone" value={selected.phone ?? '—'} />
                                     <CopyField label="Email" value={selected.email ?? '—'} />
-                                    <CopyField label="Class" value={selected.class_name} />
+                                    <CopyField
+                                        label="Membership type"
+                                        value={selected.class_name}
+                                    />
                                 </DetailCard>
 
                                 <DetailCard title="Pay link">
@@ -471,7 +483,7 @@ export default function Members({ members, classes }) {
             {modal?.kind === 'form' && (
                 <MemberFormModal
                     member={modal.member}
-                    classes={classes}
+                    membershipTypes={membershipTypes}
                     onClose={() => setModal(null)}
                     onSaved={() => {
                         setModal(null);

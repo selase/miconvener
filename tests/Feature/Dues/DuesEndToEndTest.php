@@ -48,17 +48,17 @@ if (! function_exists('duesE2eConsole')) {
         $console = fn () => test()->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost($slug)]);
 
         $classId = $console()
-            ->postJson(route('tenant.dues.classes.store', ['subdomain' => $slug]), ['name' => 'Full member', 'amount' => $classAmount, 'currency' => 'GHS', 'period' => 'monthly'])
+            ->postJson(route('tenant.community.money.dues.store', ['subdomain' => $slug]), ['name' => 'Full member', 'amount' => $classAmount, 'currency' => 'GHS', 'period' => 'monthly'])
             ->assertCreated()
             ->json('id');
 
         $memberId = $console()
-            ->postJson(route('tenant.dues.members.store', ['subdomain' => $slug]), ['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0244000001', 'membership_type_id' => $classId])
+            ->postJson(route('tenant.community.members.store', ['subdomain' => $slug]), ['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0244000001', 'membership_type_id' => $classId])
             ->assertCreated()
             ->json('id');
 
         $chargeId = $console()
-            ->postJson(route('tenant.dues.charges.store', ['subdomain' => $slug]), ['member_id' => $memberId, 'period_start' => '2026-09-01'])
+            ->postJson(route('tenant.community.charges.store', ['subdomain' => $slug]), ['member_id' => $memberId, 'period_start' => '2026-09-01'])
             ->assertCreated()
             ->json('id');
 
@@ -190,11 +190,11 @@ test('a platform-default organisation collects a member\'s dues and pays the bal
 
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true, 'recipient_code' => 'RCP_dues_e2e']);
     $payoutId = $console()
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => $payable, 'currency' => 'GHS'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => $payable, 'currency' => 'GHS'])
         ->assertCreated()
         ->json('id');
     $console()
-        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $payoutId]))
+        ->postJson(route('tenant.finance.payouts.send', ['subdomain' => 'acme', 'payout' => $payoutId]))
         ->assertOk();
 
     $payout = EventPayout::query()->findOrFail($payoutId);

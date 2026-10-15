@@ -84,7 +84,7 @@ test('a payout request creates a dues payout with no event', function () {
     [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 5000, 'currency' => 'GHS'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 5000, 'currency' => 'GHS'])
         ->assertCreated()
         ->assertJsonStructure(['id']);
 
@@ -99,7 +99,7 @@ test('a payout above the available balance is refused', function () {
     [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 9901, 'currency' => 'GHS'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 9901, 'currency' => 'GHS'])
         ->assertStatus(422)
         ->assertJsonPath('message', 'Requested amount (9901) exceeds the available dues balance (9900).');
 
@@ -109,7 +109,7 @@ test('a payout above the available balance is refused', function () {
 test('a second request cannot spend what the first one reserved', function () {
     [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
     $post = fn (int $amount) => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => $amount, 'currency' => 'GHS']);
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => $amount, 'currency' => 'GHS']);
 
     $post(6000)->assertCreated();
     $post(6000)->assertStatus(422);
@@ -127,7 +127,7 @@ test('a payout request locks the dues payable account so concurrent requests que
     });
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 1000, 'currency' => 'ghs'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 1000, 'currency' => 'ghs'])
         ->assertCreated();
 
     expect($lockingQueries)->toHaveCount(1);
@@ -138,7 +138,7 @@ test("another tenant's payout account cannot be used", function () {
     $foreign = TenantPayoutAccount::factory()->create(['is_verified' => true]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $foreign->id, 'amount' => 1000, 'currency' => 'GHS'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $foreign->id, 'amount' => 1000, 'currency' => 'GHS'])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['payout_account_id']);
 });
@@ -147,7 +147,7 @@ test('a payout request validates amount and currency', function () {
     [, $user, $account] = duesPayoutTenantWithBalance(10000);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 0, 'currency' => 'GH'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 0, 'currency' => 'GH'])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['amount', 'currency']);
 });
@@ -158,7 +158,7 @@ test('a user without manage payouts cannot request one', function () {
     $tenant->users()->attach($viewer->id);
 
     $this->actingAs($viewer)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 1000, 'currency' => 'GHS'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 1000, 'currency' => 'GHS'])
         ->assertForbidden();
 });
 
@@ -166,7 +166,7 @@ test('a tenant without dues gets 404 on the dues payout pages', function () {
     [$tenant, $user] = eventHost('acme');
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->get(route('tenant.dues.payouts.index', ['subdomain' => 'acme']))
+        ->get(route('tenant.finance.payouts.index', ['subdomain' => 'acme']))
         ->assertNotFound();
 });
 
@@ -176,10 +176,10 @@ test('the dues payouts page lists balances, accounts and dues payouts only', fun
     EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => Event::factory()->create(['tenant_id' => $tenant->id])->id, 'payout_account_id' => $account->id]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->get(route('tenant.dues.payouts.index', ['subdomain' => 'acme']))
+        ->get(route('tenant.finance.payouts.index', ['subdomain' => 'acme']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('Tenant/Dues/Payouts')
+            ->component('Tenant/Finance/Payouts')
             ->where('balances.0.currency', 'GHS')
             ->where('balances.0.payable', 9900)
             ->where('balances.0.available', 6900)
@@ -198,7 +198,7 @@ test('a dues payout is sent through the shared payout sender', function () {
     ]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
+        ->postJson(route('tenant.finance.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
         ->assertOk()
         ->assertExactJson(['message' => 'Payout sent.', 'transfer_code' => 'TRF_dues_1']);
 
@@ -217,7 +217,7 @@ test('a failed dues payout cannot be re-sent once its money has been reserved by
     Http::fake();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $failed->id]))
+        ->postJson(route('tenant.finance.payouts.send', ['subdomain' => 'acme', 'payout' => $failed->id]))
         ->assertStatus(422)
         ->assertExactJson(['message' => 'This payout (9900) is more than the available dues balance (0), so it cannot be sent again.']);
 
@@ -233,7 +233,7 @@ test('a failed dues payout the balance still covers can be re-sent', function ()
     ]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $failed->id]))
+        ->postJson(route('tenant.finance.payouts.send', ['subdomain' => 'acme', 'payout' => $failed->id]))
         ->assertOk()
         ->assertExactJson(['message' => 'Payout sent.', 'transfer_code' => 'TRF_dues_retry']);
 
@@ -244,7 +244,7 @@ test('a payout cannot be requested in a currency the organisation holds no dues 
     [$tenant, $user, $account] = duesPayoutTenantWithBalance(10000);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 1000, 'currency' => 'XYZ'])
+        ->postJson(route('tenant.finance.payouts.store', ['subdomain' => 'acme']), ['payout_account_id' => $account->id, 'amount' => 1000, 'currency' => 'XYZ'])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['currency' => 'No dues have been collected in that currency.']);
 
@@ -257,7 +257,7 @@ test('an event payout cannot be sent through the dues route', function () {
     Http::fake();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $eventPayout->id]))
+        ->postJson(route('tenant.finance.payouts.send', ['subdomain' => 'acme', 'payout' => $eventPayout->id]))
         ->assertNotFound();
 
     Http::assertNothingSent();
@@ -273,7 +273,7 @@ test('a dues payout held for a one-time code is released through finalize', func
     ]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.finalize', ['subdomain' => 'acme', 'payout' => $payout->id]), ['otp' => '123456'])
+        ->postJson(route('tenant.finance.payouts.finalize', ['subdomain' => 'acme', 'payout' => $payout->id]), ['otp' => '123456'])
         ->assertOk()
         ->assertExactJson(['message' => 'Payout released.', 'status' => EventPayout::STATUS_PROCESSING]);
 
@@ -323,7 +323,7 @@ test('the payouts page tells the client whether the user may request and send pa
     $tenant->users()->attach($reader->id);
     $reader->givePermissionTo('read finance');
     $page = fn (User $user) => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->get(route('tenant.dues.payouts.index', ['subdomain' => 'acme']));
+        ->get(route('tenant.finance.payouts.index', ['subdomain' => 'acme']));
 
     $page($admin)->assertOk()->assertInertia(fn (Assert $p) => $p->where('canManagePayouts', true)->etc());
     $page($reader)->assertOk()->assertInertia(fn (Assert $p) => $p->where('canManagePayouts', false)->etc());
@@ -345,7 +345,7 @@ test('a dues-only tenant with no events can add a payout account and then see it
     expect(Event::query()->where('tenant_id', $tenant->id)->exists())->toBeFalse();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
-        ->get(route('tenant.dues.payouts.index', ['subdomain' => 'acme']))
+        ->get(route('tenant.finance.payouts.index', ['subdomain' => 'acme']))
         ->assertInertia(fn (Assert $page) => $page->has('accounts', 1)->where('accounts.0.label', 'Union current'));
 });
 
@@ -362,14 +362,14 @@ test('a dues payout whose code expired is failed, frees the balance and can be s
     ]);
     $console = fn () => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')]);
 
-    $console()->postJson(route('tenant.dues.payouts.finalize', ['subdomain' => 'acme', 'payout' => $payout->id]), ['otp' => '123456'])
+    $console()->postJson(route('tenant.finance.payouts.finalize', ['subdomain' => 'acme', 'payout' => $payout->id]), ['otp' => '123456'])
         ->assertStatus(422)
         ->assertExactJson(['message' => 'The one-time code expired before it was entered. Send the payout again.']);
 
     expect($payout->fresh()->status)->toBe(EventPayout::STATUS_FAILED)
         ->and(app(DuesBalance::class)->available($tenant, 'GHS'))->toBe(9900);
 
-    $console()->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
+    $console()->postJson(route('tenant.finance.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
         ->assertOk()
         ->assertJsonPath('transfer_code', 'TRF_dues_again');
     expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PROCESSING);
@@ -383,7 +383,7 @@ test('a payout the provider refuses to send shows the provider\'s own message', 
     ]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
+        ->postJson(route('tenant.finance.payouts.send', ['subdomain' => 'acme', 'payout' => $payout->id]))
         ->assertStatus(502)
         ->assertExactJson(['message' => 'Could not send payout: Velocity alarm triggered. Please try again']);
 });

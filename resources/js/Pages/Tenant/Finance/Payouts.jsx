@@ -51,7 +51,7 @@ function RequestPayoutModal({ balances, accounts, onClose, onDone, onAddAccount 
         }
 
         setProcessing(true);
-        const result = await sendJson('POST', route('tenant.dues.payouts.store'), {
+        const result = await sendJson('POST', route('tenant.finance.payouts.store'), {
             ...form,
             amount,
         });
@@ -231,7 +231,7 @@ function OtpModal({ payout, onClose, onDone }) {
         setProcessing(true);
         const result = await sendJson(
             'POST',
-            route('tenant.dues.payouts.finalize', { payout: payout.id }),
+            route('tenant.finance.payouts.finalize', { payout: payout.id }),
             { otp }
         );
         setProcessing(false);
@@ -286,7 +286,7 @@ export default function Payouts({
         setSending(payout.id);
         const result = await sendJson(
             'POST',
-            route('tenant.dues.payouts.send', { payout: payout.id })
+            route('tenant.finance.payouts.send', { payout: payout.id })
         );
         setSending(null);
 
@@ -308,7 +308,7 @@ export default function Payouts({
     return (
         <ConsoleLayout>
             <PageHeader
-                title="Dues payouts"
+                title="Payouts"
                 actions={
                     canManagePayouts && (
                         <Button
@@ -324,6 +324,9 @@ export default function Payouts({
             />
 
             <div className="space-y-8 px-8 py-6">
+                <p className="text-sm text-ink-secondary">
+                    Payouts of membership dues. Event payouts stay in each event&apos;s Finance tab.
+                </p>
                 {balances.length === 0 ? (
                     <p className="text-sm text-ink-secondary">
                         No dues have been collected yet. Collected dues appear here, ready to pay

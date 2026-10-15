@@ -214,7 +214,7 @@ Route::middleware('dues.money')->group(function (): void {
 - Pages: `Tenant/Community/Overview` (props: `counts: {members, activeMembers, openCharges, overdueCharges}`, `collectedThisMonth: [{currency, amount}]` from paid online dues charges, `links`), `Tenant/Community/People` (the old Members page with a `CommunityTabs` header showing only **Members**), `Tenant/Community/MoneyDues` (the old Classes page, titled "Dues", tab header showing only **Dues**), `Tenant/Finance/Payouts` (the old Payouts page, titled "Payouts", copy says these are dues payouts for now; event payouts stay inside each event's Finance tab).
 - The member drawer's charge list and the dues pages keep every existing action.
 
-- [ ] **Step 1: Write the failing tests** in `tests/Feature/Community/CommunityRoutesTest.php`:
+- [x] **Step 1: Write the failing tests** in `tests/Feature/Community/CommunityRoutesTest.php`:
 
 ```php
 test('every community and payouts page renders for an enabled organisation', function () {
@@ -243,10 +243,13 @@ test('the overview counts only this organisation', function () { /* two tenants;
 
 Write each in full following `tests/Feature/Dues/DuesEndToEndTest.php` and `DuesPagesRenderTest.php`.
 
-- [ ] **Step 2: Run, see them fail.** Expected: FAIL (route names not defined).
-- [ ] **Step 3: Implement** routes, controller renders, page moves, `CommunityTabs` (a row of tab links; receives `tabs: [{label, href, active}]`; a single tab still renders, as the section label, so the layout does not jump when more tabs arrive), Overview page (console `PageHeader`, three stat cards, links to People, Dues and Payouts). Update every renamed route name in controllers, JSX `route(...)` calls and tests.
-- [ ] **Step 4: Run** `"$PHP" artisan test --compact tests/Feature/Community tests/Feature/Dues tests/Feature/RoutesResolveTest.php` and `npm run test`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(community): community section routes and pages; payouts under Finance`.
+- [x] **Step 2: Run, see them fail.** Expected: FAIL (route names not defined).
+- [x] **Step 3: Implement** routes, controller renders, page moves, `CommunityTabs` (a row of tab links; receives `tabs: [{label, href, active}]`; a single tab still renders, as the section label, so the layout does not jump when more tabs arrive), Overview page (console `PageHeader`, three stat cards, links to People, Dues and Payouts). Update every renamed route name in controllers, JSX `route(...)` calls and tests.
+- [x] **Step 4: Run** `"$PHP" artisan test --compact tests/Feature/Community tests/Feature/Dues tests/Feature/RoutesResolveTest.php` and `npm run test`. Expected: PASS.
+- [x] **Step 5: Commit**
+
+  Ruling: no `CommunityTabs` component; `PageHeader` already takes `tabs`/`activeTab`, so the pages use it. Ruling: the pay-link test opens the page and receipt; the full checkout-and-webhook path for a pay link is already covered end to end by `DuesEndToEndTest` after the renames. Ruling: the dues-only Finance test lives in `CommunityGateTest` (Task 2). Ruling: member payload key `class_name` kept (UI label changed) to limit churn.
+ `feat(community): community section routes and pages; payouts under Finance`.
 
 ---
 

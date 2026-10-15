@@ -107,7 +107,7 @@ test('an admin creates a charge over the route', function () {
     [$tenant, $user, $member] = duesChargeTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-10'])
+        ->postJson(route('tenant.community.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-10'])
         ->assertCreated();
 
     $charge = DuesCharge::query()->where('tenant_id', $tenant->id)->firstOrFail();
@@ -122,10 +122,10 @@ test('the charge route turns an exited member into a 422 and rejects a foreign m
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-01'])
+        ->postJson(route('tenant.community.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-01'])
         ->assertUnprocessable()->assertJsonPath('message', 'This member has left and cannot be charged.');
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => $foreign->id, 'period_start' => '2026-04-01'])
+        ->postJson(route('tenant.community.charges.store', ['subdomain' => 'acme']), ['member_id' => $foreign->id, 'period_start' => '2026-04-01'])
         ->assertUnprocessable()->assertJsonValidationErrors(['member_id']);
     expect(DuesCharge::query()->count())->toBe(0);
 });
@@ -137,9 +137,9 @@ test('an admin waives and voids open charges with a note', function () {
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.charges.waive', ['subdomain' => 'acme', 'charge' => $toWaive->id]), ['note' => 'Hardship'])->assertOk();
+        ->postJson(route('tenant.community.charges.waive', ['subdomain' => 'acme', 'charge' => $toWaive->id]), ['note' => 'Hardship'])->assertOk();
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.charges.void', ['subdomain' => 'acme', 'charge' => $toVoid->id]), ['note' => 'Raised in error'])->assertOk();
+        ->postJson(route('tenant.community.charges.void', ['subdomain' => 'acme', 'charge' => $toVoid->id]), ['note' => 'Raised in error'])->assertOk();
 
     expect($toWaive->fresh()->status)->toBe(DuesChargeStatusEnum::Waived)
         ->and($toWaive->fresh()->note)->toBe('Hardship')
@@ -153,7 +153,7 @@ test('recording an offline payment marks paid, posts no ledger entry and takes n
     $before = LedgerTransaction::query()->count();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.charges.record-offline', ['subdomain' => 'acme', 'charge' => $charge->id]), ['note' => 'Cash at meeting'])
+        ->postJson(route('tenant.community.charges.record-offline', ['subdomain' => 'acme', 'charge' => $charge->id]), ['note' => 'Cash at meeting'])
         ->assertOk();
 
     $charge->refresh();
@@ -173,7 +173,7 @@ test('only an open charge can be waived, voided or recorded', function () {
 
     foreach (['waive', 'void', 'record-offline'] as $action) {
         $this->actingAs($user)->withServerVariables($host)
-            ->postJson(route("tenant.dues.charges.{$action}", ['subdomain' => 'acme', 'charge' => $paid->id]))
+            ->postJson(route("tenant.community.charges.{$action}", ['subdomain' => 'acme', 'charge' => $paid->id]))
             ->assertUnprocessable();
     }
 
@@ -188,9 +188,9 @@ test('an exited member can still have existing open charges waived, voided or re
     $member->update(['status' => MemberStatusEnum::Exited]);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
-    $this->actingAs($user)->withServerVariables($host)->postJson(route('tenant.dues.charges.waive', ['subdomain' => 'acme', 'charge' => $a->id]))->assertOk();
-    $this->actingAs($user)->withServerVariables($host)->postJson(route('tenant.dues.charges.void', ['subdomain' => 'acme', 'charge' => $b->id]))->assertOk();
-    $this->actingAs($user)->withServerVariables($host)->postJson(route('tenant.dues.charges.record-offline', ['subdomain' => 'acme', 'charge' => $c->id]))->assertOk();
+    $this->actingAs($user)->withServerVariables($host)->postJson(route('tenant.community.charges.waive', ['subdomain' => 'acme', 'charge' => $a->id]))->assertOk();
+    $this->actingAs($user)->withServerVariables($host)->postJson(route('tenant.community.charges.void', ['subdomain' => 'acme', 'charge' => $b->id]))->assertOk();
+    $this->actingAs($user)->withServerVariables($host)->postJson(route('tenant.community.charges.record-offline', ['subdomain' => 'acme', 'charge' => $c->id]))->assertOk();
 });
 
 test('a charge of another tenant cannot be acted on', function () {
@@ -202,7 +202,7 @@ test('a charge of another tenant cannot be acted on', function () {
 
     foreach (['waive', 'void', 'record-offline'] as $action) {
         $this->actingAs($user)->withServerVariables($host)
-            ->postJson(route("tenant.dues.charges.{$action}", ['subdomain' => 'acme', 'charge' => $betaCharge->id]))
+            ->postJson(route("tenant.community.charges.{$action}", ['subdomain' => 'acme', 'charge' => $betaCharge->id]))
             ->assertNotFound();
     }
 
@@ -217,10 +217,10 @@ test('a user without manage members is forbidden on every charge action', functi
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($viewer)->withServerVariables($host)
-        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-01'])->assertForbidden();
+        ->postJson(route('tenant.community.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-01'])->assertForbidden();
     foreach (['waive', 'void', 'record-offline'] as $action) {
         $this->actingAs($viewer)->withServerVariables($host)
-            ->postJson(route("tenant.dues.charges.{$action}", ['subdomain' => 'acme', 'charge' => $charge->id]))->assertForbidden();
+            ->postJson(route("tenant.community.charges.{$action}", ['subdomain' => 'acme', 'charge' => $charge->id]))->assertForbidden();
     }
 });
 
@@ -228,7 +228,7 @@ test('a tenant without dues gets 404 on charge store', function () {
     [, $user] = eventHost('acme');
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => 'x', 'period_start' => '2026-04-01'])
+        ->postJson(route('tenant.community.charges.store', ['subdomain' => 'acme']), ['member_id' => 'x', 'period_start' => '2026-04-01'])
         ->assertNotFound();
 });
 
@@ -240,7 +240,7 @@ test('a charge below the minimum is refused, and the route says so', function ()
         ->toThrow(DomainException::class, 'A charge must be at least 100 minor units (1.00).');
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-01'])
+        ->postJson(route('tenant.community.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-04-01'])
         ->assertUnprocessable()
         ->assertJson(['message' => 'A charge must be at least 100 minor units (1.00).']);
 

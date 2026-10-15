@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
@@ -15,11 +15,12 @@ import { formatDuesMoney, sendJson, toMajorUnits, toMinorUnits } from '@/lib/due
 
 const PERIODS = { monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' };
 
-function ClassFormModal({ membershipType, onClose, onSaved }) {
+function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
     const editing = membershipType !== null;
     const locked = editing && membershipType.has_charges;
     const [form, setForm] = useState({
         name: membershipType?.name ?? '',
+        hasDues: membershipType ? membershipType.amount !== null : true,
         amount: toMajorUnits(membershipType?.amount),
         currency: membershipType?.currency ?? 'GHS',
         period: membershipType?.period ?? 'monthly',
@@ -30,22 +31,27 @@ function ClassFormModal({ membershipType, onClose, onSaved }) {
 
     const submit = async (event) => {
         event.preventDefault();
-        const amount = toMinorUnits(form.amount);
+        const amount = form.hasDues ? toMinorUnits(form.amount) : null;
 
-        if (amount === null || Number.isNaN(amount) || amount < 100) {
+        if (form.hasDues && (amount === null || Number.isNaN(amount) || amount < 100)) {
             setErrors({ amount: 'Enter an amount of at least 1.00, such as 50 or 49.99.' });
             return;
         }
 
         setProcessing(true);
-        const payload = { ...form, amount };
+        const payload = {
+            name: form.name,
+            currency: form.currency,
+            amount,
+            period: form.hasDues ? form.period : null,
+        };
         const result = editing
             ? await sendJson(
                   'PATCH',
-                  route('tenant.dues.classes.update', { class: membershipType.id }),
+                  route('tenant.community.money.dues.update', { type: membershipType.id }),
                   { ...payload, is_active: membershipType.is_active }
               )
-            : await sendJson('POST', route('tenant.dues.classes.store'), payload);
+            : await sendJson('POST', route('tenant.community.money.dues.store'), payload);
         setProcessing(false);
 
         if (!result.ok) {
@@ -60,7 +66,11 @@ function ClassFormModal({ membershipType, onClose, onSaved }) {
     };
 
     return (
-        <Modal open onClose={onClose} title={editing ? 'Edit class' : 'Add class'}>
+        <Modal
+            open
+            onClose={onClose}
+            title={editing ? 'Edit membership type' : 'Add membership type'}
+        >
             <form onSubmit={submit} className="space-y-4">
                 <Input
                     label="Name"
@@ -69,68 +79,81 @@ function ClassFormModal({ membershipType, onClose, onSaved }) {
                     error={errors.name}
                     required
                 />
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2">
+                <Select
+                    label="Dues"
+                    value={form.hasDues ? 'yes' : 'no'}
+                    onChange={(e) => setForm({ ...form, hasDues: e.target.value === 'yes' })}
+                    disabled={locked}
+                >
+                    <option value="yes">Members of this type pay dues</option>
+                    <option value="no">No dues (for example honorary members)</option>
+                </Select>
+                {form.hasDues && (
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-2">
+                            <Input
+                                label="Amount each period"
+                                inputMode="decimal"
+                                value={form.amount}
+                                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                                error={errors.amount}
+                                hint="In whole currency units, for example 50.00."
+                                required
+                            />
+                        </div>
                         <Input
-                            label="Amount each period"
-                            inputMode="decimal"
-                            value={form.amount}
-                            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                            error={errors.amount}
-                            hint="In whole currency units, for example 50.00."
+                            label="Currency"
+                            value={form.currency}
+                            maxLength={3}
+                            onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                            error={errors.currency}
+                            disabled={locked}
                             required
                         />
                     </div>
-                    <Input
-                        label="Currency"
-                        value={form.currency}
-                        maxLength={3}
-                        onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                        error={errors.currency}
+                )}
+                {form.hasDues && (
+                    <Select
+                        label="Billed"
+                        value={form.period}
+                        onChange={(e) => setForm({ ...form, period: e.target.value })}
+                        error={errors.period}
                         disabled={locked}
-                        required
-                    />
-                </div>
-                <Select
-                    label="Billed"
-                    value={form.period}
-                    onChange={(e) => setForm({ ...form, period: e.target.value })}
-                    error={errors.period}
-                    disabled={locked}
-                >
-                    {Object.entries(PERIODS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                            {label}
-                        </option>
-                    ))}
-                </Select>
+                    >
+                        {Object.entries(PERIODS).map(([value, label]) => (
+                            <option key={value} value={value}>
+                                {label}
+                            </option>
+                        ))}
+                    </Select>
+                )}
                 {locked && (
                     <p className="text-sm text-ink-secondary">
-                        This class already has charges, so its currency and billing period are
-                        fixed. Create a new class to bill differently.
+                        This type already has charges, so its dues, currency and billing period are
+                        fixed. Create a new type to bill differently.
                     </p>
                 )}
                 <Button type="submit" variant="primary" disabled={processing}>
-                    {editing ? 'Save changes' : 'Add class'}
+                    {editing ? 'Save changes' : 'Add membership type'}
                 </Button>
             </form>
         </Modal>
     );
 }
 
-export default function Classes({ classes }) {
+export default function MoneyDues({ membershipTypes }) {
     const showToast = useToast();
     const [modal, setModal] = useState(null);
     const [toggling, setToggling] = useState(null);
     const [busy, setBusy] = useState(false);
 
-    const refresh = () => router.reload({ only: ['classes'], preserveScroll: true });
+    const refresh = () => router.reload({ only: ['membershipTypes'], preserveScroll: true });
 
     const toggleActive = async (membershipType) => {
         setBusy(true);
         const result = await sendJson(
             'PATCH',
-            route('tenant.dues.classes.update', { class: membershipType.id }),
+            route('tenant.community.money.dues.update', { type: membershipType.id }),
             {
                 name: membershipType.name,
                 amount: membershipType.amount,
@@ -153,16 +176,19 @@ export default function Classes({ classes }) {
     return (
         <ConsoleLayout>
             <PageHeader
-                title="Dues classes"
+                title="Money"
+                tabs={[
+                    {
+                        key: 'dues',
+                        label: 'Dues',
+                        href: route('tenant.community.money.dues.index'),
+                    },
+                ]}
+                activeTab="dues"
                 actions={
-                    <>
-                        <Button href={route('tenant.dues.members.index')} icon={ArrowLeft}>
-                            Members
-                        </Button>
-                        <Button icon={Plus} onClick={() => setModal({ membershipType: null })}>
-                            Add class
-                        </Button>
-                    </>
+                    <Button icon={Plus} onClick={() => setModal({ membershipType: null })}>
+                        Add membership type
+                    </Button>
                 }
             />
 
@@ -179,15 +205,26 @@ export default function Classes({ classes }) {
                         </Th>
                     </Thead>
                     <tbody>
-                        {classes.map((membershipType) => (
+                        {membershipTypes.map((membershipType) => (
                             <Tr key={membershipType.id}>
                                 <Td>
-                                    <span className="font-medium text-ink">{membershipType.name}</span>
+                                    <span className="font-medium text-ink">
+                                        {membershipType.name}
+                                    </span>
                                 </Td>
                                 <Td numeric>
-                                    {formatDuesMoney(membershipType.amount, membershipType.currency)}
+                                    {membershipType.amount === null
+                                        ? 'No dues'
+                                        : formatDuesMoney(
+                                              membershipType.amount,
+                                              membershipType.currency
+                                          )}
                                 </Td>
-                                <Td muted>{PERIODS[membershipType.period] ?? membershipType.period}</Td>
+                                <Td muted>
+                                    {membershipType.period === null
+                                        ? '—'
+                                        : (PERIODS[membershipType.period] ?? membershipType.period)}
+                                </Td>
                                 <Td muted numeric>
                                     {membershipType.member_count}
                                 </Td>
@@ -217,12 +254,12 @@ export default function Classes({ classes }) {
                                 </Td>
                             </Tr>
                         ))}
-                        {classes.length === 0 && (
+                        {membershipTypes.length === 0 && (
                             <tr>
                                 <td colSpan={6}>
                                     <TableEmpty
-                                        title="No classes yet"
-                                        description="A class sets what members pay and how often. Add one before adding members."
+                                        title="No membership types yet"
+                                        description="A membership type sets whether members pay dues, how much and how often. Add one before adding members."
                                     />
                                 </td>
                             </tr>
@@ -232,7 +269,7 @@ export default function Classes({ classes }) {
             </div>
 
             {modal && (
-                <ClassFormModal
+                <MembershipTypeFormModal
                     membershipType={modal.membershipType}
                     onClose={() => setModal(null)}
                     onSaved={() => {
@@ -247,7 +284,7 @@ export default function Classes({ classes }) {
                 onClose={() => setToggling(null)}
                 onConfirm={() => toggleActive(toggling)}
                 processing={busy}
-                title="Deactivate class"
+                title="Deactivate membership type"
                 description={
                     toggling &&
                     `${toggling.name} will no longer be offered when adding members. Existing members and their charges are kept.`

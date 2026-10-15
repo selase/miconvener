@@ -6,14 +6,14 @@ import Select from '@/Components/Console/Select';
 import { useToast } from '@/Components/Console/Toast';
 import { formatDuesMoney, sendJson, toMajorUnits, toMinorUnits } from '@/lib/dues';
 
-export default function MemberFormModal({ member, classes, onClose, onSaved }) {
+export default function MemberFormModal({ member, membershipTypes, onClose, onSaved }) {
     const editing = member !== null;
     const showToast = useToast();
     const [form, setForm] = useState({
         name: member?.name ?? '',
         phone: member?.phone ?? '',
         email: member?.email ?? '',
-        membership_type_id: member?.membership_type_id ?? classes[0]?.id ?? '',
+        membership_type_id: member?.membership_type_id ?? membershipTypes[0]?.id ?? '',
         amount_override: toMajorUnits(member?.amount_override),
         joined_on: member?.joined_on ?? '',
     });
@@ -24,9 +24,12 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
 
     // A class deactivated after the member joined is still theirs to keep.
     const options =
-        member && !classes.some((c) => c.id === member.membership_type_id)
-            ? [{ id: member.membership_type_id, name: `${member.class_name} (inactive)` }, ...classes]
-            : classes;
+        member && !membershipTypes.some((c) => c.id === member.membership_type_id)
+            ? [
+                  { id: member.membership_type_id, name: `${member.class_name} (inactive)` },
+                  ...membershipTypes,
+              ]
+            : membershipTypes;
 
     const submit = async (event) => {
         event.preventDefault();
@@ -57,10 +60,10 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
         const result = editing
             ? await sendJson(
                   'PATCH',
-                  route('tenant.dues.members.update', { member: member.id }),
+                  route('tenant.community.members.update', { member: member.id }),
                   payload
               )
-            : await sendJson('POST', route('tenant.dues.members.store'), payload);
+            : await sendJson('POST', route('tenant.community.members.store'), payload);
         setProcessing(false);
 
         if (!result.ok) {
@@ -106,7 +109,7 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
                     Add a phone number, an email, or both, so we can reach this member.
                 </p>
                 <Select
-                    label="Class"
+                    label="Membership type"
                     value={form.membership_type_id}
                     onChange={set('membership_type_id')}
                     error={errors.membership_type_id}

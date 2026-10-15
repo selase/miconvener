@@ -45,7 +45,7 @@ test('an admin adds a member who gets a pay token', function () {
     [$tenant, $user, $class] = duesMembersTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['joined_on' => '2026-01-15']))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['joined_on' => '2026-01-15']))
         ->assertCreated()
         ->assertJsonMissingPath('pay_token');
 
@@ -60,7 +60,7 @@ test('a member with neither email nor phone is rejected', function () {
     [, $user, $class] = duesMembersTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => null, 'phone' => null]))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => null, 'phone' => null]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['email', 'phone']);
 });
@@ -73,10 +73,10 @@ test('a member needs an active class of the same organisation', function () {
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($foreign))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($foreign))
         ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($inactive))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($inactive))
         ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
 });
 
@@ -88,10 +88,10 @@ test('a duplicate phone in the same organisation is rejected, the same phone in 
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['phone' => '0244000002']))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['phone' => '0244000002']))
         ->assertUnprocessable()->assertJsonValidationErrors(['phone']);
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['phone' => '0244000001']))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['phone' => '0244000001']))
         ->assertCreated();
 });
 
@@ -102,10 +102,10 @@ test('an email already used by a member without a phone is rejected, but is fine
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => 'taken@example.com', 'phone' => null]))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => 'taken@example.com', 'phone' => null]))
         ->assertUnprocessable()->assertJsonValidationErrors(['email']);
     $this->actingAs($user)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => 'shared@example.com', 'phone' => '0244000010']))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => 'shared@example.com', 'phone' => '0244000010']))
         ->assertCreated();
 });
 
@@ -114,7 +114,7 @@ test('an admin updates a member, keeping their own phone and email', function ()
     $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000002', 'email' => 'm@example.com']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $member->id]), duesMemberPayload($class, ['name' => 'Renamed', 'phone' => '0244000002', 'email' => 'm@example.com', 'amount_override' => 0]))
+        ->patchJson(route('tenant.community.members.update', ['subdomain' => 'acme', 'member' => $member->id]), duesMemberPayload($class, ['name' => 'Renamed', 'phone' => '0244000002', 'email' => 'm@example.com', 'amount_override' => 0]))
         ->assertOk();
 
     $member->refresh();
@@ -130,9 +130,9 @@ test('the member list is paginated and shows effective amount and open totals', 
     Member::factory()->create(['tenant_id' => $beta->id]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))
+        ->get(route('tenant.community.people.index', ['subdomain' => 'acme']))
         ->assertInertia(fn (Assert $page) => $page
-            ->component('Tenant/Dues/Members')
+            ->component('Tenant/Community/People')
             ->has('members.data', 1)
             ->where('members.data.0.id', $member->id)
             ->where('members.data.0.class_name', $class->name)
@@ -149,7 +149,7 @@ test('rotating the pay link changes the token', function () {
     $old = $member->pay_token;
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.rotate-link', ['subdomain' => 'acme', 'member' => $member->id]))
+        ->postJson(route('tenant.community.members.rotate-link', ['subdomain' => 'acme', 'member' => $member->id]))
         ->assertOk()->assertExactJson(['rotated' => true]);
 
     expect($member->fresh()->pay_token)->not->toBe($old)->toHaveLength(40);
@@ -161,7 +161,7 @@ test('exiting a member sets status and exit date and keeps their charges', funct
     $charge = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.exit', ['subdomain' => 'acme', 'member' => $member->id]))
+        ->postJson(route('tenant.community.members.exit', ['subdomain' => 'acme', 'member' => $member->id]))
         ->assertOk();
 
     $member->refresh();
@@ -178,12 +178,12 @@ test('another tenant\'s member cannot be updated, exited or rotated', function (
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($acmeAdmin)->withServerVariables($host)
-        ->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $betaMember->id]), ['name' => 'Hacked', 'email' => 'h@example.com', 'membership_type_id' => $acmeClass->id])
+        ->patchJson(route('tenant.community.members.update', ['subdomain' => 'acme', 'member' => $betaMember->id]), ['name' => 'Hacked', 'email' => 'h@example.com', 'membership_type_id' => $acmeClass->id])
         ->assertNotFound();
     $this->actingAs($acmeAdmin)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.exit', ['subdomain' => 'acme', 'member' => $betaMember->id]))->assertNotFound();
+        ->postJson(route('tenant.community.members.exit', ['subdomain' => 'acme', 'member' => $betaMember->id]))->assertNotFound();
     $this->actingAs($acmeAdmin)->withServerVariables($host)
-        ->postJson(route('tenant.dues.members.rotate-link', ['subdomain' => 'acme', 'member' => $betaMember->id]))->assertNotFound();
+        ->postJson(route('tenant.community.members.rotate-link', ['subdomain' => 'acme', 'member' => $betaMember->id]))->assertNotFound();
 
     $betaMember->refresh();
     expect($betaMember->name)->toBe('Beta person')
@@ -199,11 +199,11 @@ test('a user without manage members is forbidden on every member action', functi
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
     $params = ['subdomain' => 'acme', 'member' => $member->id];
 
-    $this->actingAs($viewer)->withServerVariables($host)->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))->assertForbidden();
-    $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class))->assertForbidden();
-    $this->actingAs($viewer)->withServerVariables($host)->patchJson(route('tenant.dues.members.update', $params), duesMemberPayload($class))->assertForbidden();
-    $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.dues.members.exit', $params))->assertForbidden();
-    $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.dues.members.rotate-link', $params))->assertForbidden();
+    $this->actingAs($viewer)->withServerVariables($host)->get(route('tenant.community.people.index', ['subdomain' => 'acme']))->assertForbidden();
+    $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class))->assertForbidden();
+    $this->actingAs($viewer)->withServerVariables($host)->patchJson(route('tenant.community.members.update', $params), duesMemberPayload($class))->assertForbidden();
+    $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.community.members.exit', $params))->assertForbidden();
+    $this->actingAs($viewer)->withServerVariables($host)->postJson(route('tenant.community.members.rotate-link', $params))->assertForbidden();
 });
 
 test('a member of a deactivated class can still be edited, but cannot be moved into another inactive class', function () {
@@ -215,10 +215,10 @@ test('a member of a deactivated class can still be edited, but cannot be moved i
     $params = ['subdomain' => 'acme', 'member' => $member->id];
 
     $this->actingAs($user)->withServerVariables($host)
-        ->patchJson(route('tenant.dues.members.update', $params), duesMemberPayload($class, ['name' => 'Still here', 'phone' => '0244000002', 'amount_override' => 100]))
+        ->patchJson(route('tenant.community.members.update', $params), duesMemberPayload($class, ['name' => 'Still here', 'phone' => '0244000002', 'amount_override' => 100]))
         ->assertOk();
     $this->actingAs($user)->withServerVariables($host)
-        ->patchJson(route('tenant.dues.members.update', $params), duesMemberPayload($other, ['phone' => '0244000002']))
+        ->patchJson(route('tenant.community.members.update', $params), duesMemberPayload($other, ['phone' => '0244000002']))
         ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
 
     expect($member->fresh()->name)->toBe('Still here')->and($member->fresh()->membership_type_id)->toBe($class->id);
@@ -229,7 +229,7 @@ test('exiting an already exited member keeps the original exit date', function (
     $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'status' => MemberStatusEnum::Exited, 'exited_on' => '2026-01-10']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.exit', ['subdomain' => 'acme', 'member' => $member->id]))
+        ->postJson(route('tenant.community.members.exit', ['subdomain' => 'acme', 'member' => $member->id]))
         ->assertOk();
 
     expect($member->fresh()->exited_on->toDateString())->toBe('2026-01-10');
@@ -239,7 +239,7 @@ test('a tenant without dues gets 404 on member store', function () {
     [, $user] = eventHost('acme');
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), ['name' => 'X', 'email' => 'x@example.com', 'membership_type_id' => 'x'])
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), ['name' => 'X', 'email' => 'x@example.com', 'membership_type_id' => 'x'])
         ->assertNotFound();
 });
 
@@ -247,12 +247,12 @@ test('an override between zero and the minimum charge is rejected', function () 
     [, $user, $class] = duesMembersTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 50]))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 50]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['amount_override' => 'The amount must be 0 (waived) or at least 100 minor units (1.00).']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 100]))
+        ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 100]))
         ->assertCreated();
 });
 
@@ -260,14 +260,14 @@ test('an override of zero waives the member\'s dues and is accepted on create an
     [$tenant, $user, $class] = duesMembersTenant();
     $console = fn () => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')]);
 
-    $id = $console()->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 0]))
+    $id = $console()->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['amount_override' => 0]))
         ->assertCreated()
         ->json('id');
 
     expect(Member::query()->findOrFail($id)->amount_override)->toBe(0);
 
     $other = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000099', 'amount_override' => 3000]);
-    $console()->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $other->id]), duesMemberPayload($class, ['phone' => '0244000099', 'email' => null, 'amount_override' => 0]))
+    $console()->patchJson(route('tenant.community.members.update', ['subdomain' => 'acme', 'member' => $other->id]), duesMemberPayload($class, ['phone' => '0244000099', 'email' => null, 'amount_override' => 0]))
         ->assertOk();
 
     expect($other->fresh()->amount_override)->toBe(0)->and($other->fresh()->effectiveAmount())->toBe(0);

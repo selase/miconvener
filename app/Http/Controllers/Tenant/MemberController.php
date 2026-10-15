@@ -63,9 +63,9 @@ final class MemberController extends Controller
                 'overdue' => (bool) $member->getAttribute('overdue'),
             ]);
 
-        return Inertia::render('Tenant/Dues/Members', [
+        return Inertia::render('Tenant/Community/People', [
             'members' => $members,
-            'classes' => MembershipType::query()
+            'membershipTypes' => MembershipType::query()
                 ->where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->orderBy('name')

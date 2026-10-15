@@ -304,26 +304,39 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
 
-    Route::middleware('community.enabled')->prefix('dues')->name('tenant.dues.')->group(function (): void {
-        Route::get('payouts', [DuesPayoutController::class, 'index'])->name('payouts.index');
-        Route::post('payouts', [DuesPayoutController::class, 'store'])->name('payouts.store');
-        Route::post('payouts/{payout}/send', [DuesPayoutController::class, 'send'])->name('payouts.send');
-        Route::post('payouts/{payout}/finalize', [DuesPayoutController::class, 'finalize'])->name('payouts.finalize');
+    Route::middleware('community.enabled')->group(function (): void {
+        Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::get('/', [App\Http\Controllers\Tenant\CommunityOverviewController::class, 'index'])->name('overview');
+            Route::get('people', [MemberController::class, 'index'])->name('people.index');
+            Route::post('people/members', [MemberController::class, 'store'])->name('members.store');
+            Route::patch('people/members/{member}', [MemberController::class, 'update'])->name('members.update');
+            Route::post('people/members/{member}/exit', [MemberController::class, 'exit'])->name('members.exit');
+            Route::post('people/members/{member}/rotate-link', [MemberController::class, 'rotateLink'])->name('members.rotate-link');
 
-        Route::get('classes', [MembershipTypeController::class, 'index'])->name('classes.index');
-        Route::post('classes', [MembershipTypeController::class, 'store'])->name('classes.store');
-        Route::patch('classes/{class}', [MembershipTypeController::class, 'update'])->name('classes.update');
+            Route::get('money/dues', [MembershipTypeController::class, 'index'])->name('money.dues.index');
+            Route::post('money/dues/types', [MembershipTypeController::class, 'store'])->name('money.dues.store');
+            Route::patch('money/dues/types/{type}', [MembershipTypeController::class, 'update'])->name('money.dues.update');
+            Route::post('money/dues/charges', [DuesChargeController::class, 'store'])->name('charges.store');
+            Route::post('money/dues/charges/{charge}/waive', [DuesChargeController::class, 'waive'])->name('charges.waive');
+            Route::post('money/dues/charges/{charge}/void', [DuesChargeController::class, 'void'])->name('charges.void');
+            Route::post('money/dues/charges/{charge}/record-offline', [DuesChargeController::class, 'recordOffline'])->name('charges.record-offline');
+        });
 
-        Route::get('members', [MemberController::class, 'index'])->name('members.index');
-        Route::post('members', [MemberController::class, 'store'])->name('members.store');
-        Route::patch('members/{member}', [MemberController::class, 'update'])->name('members.update');
-        Route::post('members/{member}/exit', [MemberController::class, 'exit'])->name('members.exit');
-        Route::post('members/{member}/rotate-link', [MemberController::class, 'rotateLink'])->name('members.rotate-link');
+        Route::permanentRedirect('dues/members', '/community/people');
+        Route::permanentRedirect('dues/classes', '/community/money/dues');
+    });
 
-        Route::post('charges', [DuesChargeController::class, 'store'])->name('charges.store');
-        Route::post('charges/{charge}/waive', [DuesChargeController::class, 'waive'])->name('charges.waive');
-        Route::post('charges/{charge}/void', [DuesChargeController::class, 'void'])->name('charges.void');
-        Route::post('charges/{charge}/record-offline', [DuesChargeController::class, 'recordOffline'])->name('charges.record-offline');
+    // Payouts stay reachable while the tenant holds dues money, even with the
+    // Community switch off: the switch stops new activity, never settlement.
+    Route::middleware('dues.money')->group(function (): void {
+        Route::prefix('finance/payouts')->name('tenant.finance.payouts.')->group(function (): void {
+            Route::get('/', [DuesPayoutController::class, 'index'])->name('index');
+            Route::post('/', [DuesPayoutController::class, 'store'])->name('store');
+            Route::post('{payout}/send', [DuesPayoutController::class, 'send'])->name('send');
+            Route::post('{payout}/finalize', [DuesPayoutController::class, 'finalize'])->name('finalize');
+        });
+
+        Route::permanentRedirect('dues/payouts', '/finance/payouts');
     });
 
     Route::prefix('venue')->name('tenant.venue.')->group(function (): void {

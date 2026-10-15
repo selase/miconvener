@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import Payouts from '@/Pages/Tenant/Dues/Payouts';
+import Payouts from '@/Pages/Tenant/Finance/Payouts';
 import MemberPay from '@/Pages/Public/MemberPay';
-import { memberPill } from '@/Pages/Tenant/Dues/Members';
+import { memberPill } from '@/Pages/Tenant/Community/People';
 
 const page = vi.hoisted(() => ({ props: {} }));
 vi.mock('@inertiajs/react', () => ({

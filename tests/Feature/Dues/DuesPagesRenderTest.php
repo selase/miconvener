@@ -37,12 +37,12 @@ test('the members page sends the members, the active classes and each member\'s 
     DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $first->id, 'membership_type_id' => $class->id, 'amount' => 5000]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
-        ->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))
+        ->get(route('tenant.community.people.index', ['subdomain' => 'acme']))
         ->assertInertia(fn (Assert $page) => $page
-            ->component('Tenant/Dues/Members')
+            ->component('Tenant/Community/People')
             ->has('members.data', 2)
-            ->has('classes', 1)
-            ->where('classes.0.id', $class->id)
+            ->has('membershipTypes', 1)
+            ->where('membershipTypes.0.id', $class->id)
             ->where('members.data.0.id', $first->id)
             ->has('members.data.0.charges', 1)
             ->where('members.data.0.charges.0.status', 'open')
@@ -61,7 +61,7 @@ test('a paid charge reports how and when it was paid', function () {
     ]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
-        ->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))
+        ->get(route('tenant.community.people.index', ['subdomain' => 'acme']))
         ->assertInertia(fn (Assert $page) => $page
             ->where('members.data.0.charges.0.payment_method', 'offline')
             ->where('members.data.0.charges.0.paid_at', fn ($value) => str_starts_with((string) $value, '2026-10-14')));
@@ -72,7 +72,7 @@ test('a member\'s pay link opens that member\'s own pay page', function () {
     $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
 
     $page = $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
-        ->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))
+        ->get(route('tenant.community.people.index', ['subdomain' => 'acme']))
         ->viewData('page');
     $payUrl = $page['props']['members']['data'][0]['pay_url'];
 
@@ -86,7 +86,7 @@ test('the members, classes and payouts pages are 404 while dues are off', functi
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
         ->get(route($routeName, ['subdomain' => 'acme']))
         ->assertNotFound();
-})->with(['tenant.dues.members.index', 'tenant.dues.classes.index', 'tenant.dues.payouts.index']);
+})->with(['tenant.community.people.index', 'tenant.community.money.dues.index', 'tenant.finance.payouts.index']);
 
 test('the pay page props hold only that member\'s open charges', function () {
     [$tenant, , $class, $host] = duesPagesFixture();

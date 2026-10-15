@@ -22,7 +22,7 @@ final class UpdateMembershipTypeRequest extends MembershipTypeRequest
     public function rules(): array
     {
         return [
-            ...$this->classRules((string) $this->route('class')),
+            ...$this->classRules((string) $this->route('type')),
             'is_active' => ['required', 'boolean'],
         ];
     }
@@ -36,7 +36,7 @@ final class UpdateMembershipTypeRequest extends MembershipTypeRequest
             function (Validator $validator): void {
                 $class = MembershipType::query()
                     ->where('tenant_id', app(TenantContext::class)->getTenant()?->id)
-                    ->find((string) $this->route('class'));
+                    ->find((string) $this->route('type'));
 
                 if (! $class instanceof MembershipType || ! $class->charges()->exists()) {
                     return;

@@ -54,7 +54,7 @@ final class DuesPayoutController extends Controller
             ->limit(100)
             ->get();
 
-        return Inertia::render('Tenant/Dues/Payouts', [
+        return Inertia::render('Tenant/Finance/Payouts', [
             'balances' => $currencies->map(fn (string $currency): array => [
                 'currency' => $currency,
                 'payable' => $duesBalance->payable($tenant, $currency),

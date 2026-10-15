@@ -32,8 +32,8 @@ final class MembershipTypeController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Tenant/Dues/Classes', [
-            'classes' => $classes->map(fn (MembershipType $class): array => $this->payload($class))->values(),
+        return Inertia::render('Tenant/Community/MoneyDues', [
+            'membershipTypes' => $classes->map(fn (MembershipType $class): array => $this->payload($class))->values(),
         ]);
     }
 
@@ -50,9 +50,9 @@ final class MembershipTypeController extends Controller
         return response()->json($this->payload($class->loadCount('members')->loadExists('charges')), 201);
     }
 
-    public function update(UpdateMembershipTypeRequest $request, string $subdomain, string $class): JsonResponse
+    public function update(UpdateMembershipTypeRequest $request, string $subdomain, string $type): JsonResponse
     {
-        $model = MembershipType::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($class);
+        $model = MembershipType::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($type);
         $model->update($request->validated());
 
         return response()->json($this->payload($model->loadCount('members')->loadExists('charges')));

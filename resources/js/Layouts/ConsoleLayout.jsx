@@ -72,14 +72,14 @@ const NAV_ITEMS = [
     },
     {
         label: 'Members',
-        href: 'tenant.dues.members.index',
+        href: 'tenant.community.people.index',
         icon: UsersRound,
         feature: 'community',
         permission: 'manage_members',
     },
     {
         label: 'Dues payouts',
-        href: 'tenant.dues.payouts.index',
+        href: 'tenant.finance.payouts.index',
         icon: HandCoins,
         feature: 'community',
         permission: 'manage_payouts',
