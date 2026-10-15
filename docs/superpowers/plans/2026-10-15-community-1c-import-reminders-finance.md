@@ -106,7 +106,7 @@ Ruling: Task 3 supplies the cap and shared advisory lock first. Task 1 will wire
 - Collections CSV: one row per paid charge in the range (member, phone, email, type, period, amount, method, paid at, reference, gateway fee, commission, net). Arrears CSV: one row per member in arrears (member, contacts, type, open charges, total, oldest due date).
 
 - [x] **Step 1: Failing tests:** a dues-only tenant (no ticket money) can open Finance; a ticket tenant without Community sees exactly what it saw before (snapshot of the existing props); recorded cash in collections and never in available; own-gateway tenant: collections from charges, available 0; date range and currency grouping; CSV headers and rows; `read finance` required; tenant isolation.
-- [ ] **Step 2–4:** fail, implement, pass (`tests/Feature/Community tests/Feature/Finance`). Focused Task 4 PHP 22/22 (189 assertions), JS 35/35, scoped PHPStan 0, Pint/lint/build green; broader Community/Finance/Dues/Payments regression pass is running and remains pending. Implementation committed for independent review; Task 4 is not yet marked complete.
+- [x] **Step 2–4:** fail, implement, pass (`tests/Feature/Community tests/Feature/Finance`). Focused Task 4 PHP 22/22 (189 assertions), JS 35/35, scoped PHPStan 0, Pint/lint/build green. Broader Community/Finance/Dues/Payments regression: 547/547 passed (2,960 assertions, 1,159.571s under system CPU contention). Implementation is ready for independent task review; final milestone-wide verification remains Task 5.
 - [x] **Step 5: Commit** `feat(finance): dues collections, cash, arrears and payable in Finance`.
 
 **Task 4 integration rulings (approved by parent):**
