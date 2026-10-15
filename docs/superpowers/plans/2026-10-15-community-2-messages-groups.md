@@ -104,7 +104,7 @@ interface AudienceSource {
 
 Allowed Community selectors are all_members, status and group_ids; arrears adds an open-overdue-charge intersection and finance permission. Reject unknown keys and foreign groups, no arbitrary model names/query fragments. Resolve channels separately; invalid addresses are counted/skipped, never sent raw. Use bounded source paging and persistent unique delivery-address keys rather than an unbounded in-memory set.
 
-- [ ] Add failing cases: same Ghana number in local/+233 format, case/space email variants, shared family phone, identical address in another tenant, empty/invalid address, group/status intersection, arrears without finance permission; member+fake follower overlap yields one address. Preference GET causes no write; wrong/tampered token rejects; repeated POST is harmless; opt-out affects marketing only.
+- [x] Add failing cases: same Ghana number in local/+233 format, case/space email variants, shared family phone, identical address in another tenant, empty/invalid address, group/status intersection, arrears without finance permission; member+fake follower overlap yields one address. Preference GET causes no write; wrong/tampered token rejects; repeated POST is harmless; opt-out affects marketing only.
 
 ```php
 it('deduplicates normalized email only inside the selected tenant', function () {
@@ -116,8 +116,8 @@ it('deduplicates normalized email only inside the selected tenant', function () 
 });
 ```
 
-- [ ] Run those files red, implement normalization/preference schema/token flow/source adapters, then green. Anonymous opt-out pages reveal no financial data and no other organisation's subscriptions.
-- [ ] Commit `feat(community): resolve audiences and honor channel preferences`, tick steps. Production follower integration remains explicitly milestone 3.
+- [x] Run those files red, implement normalization/preference schema/token flow/source adapters, then green. Anonymous opt-out pages reveal no financial data and no other organisation's subscriptions.
+- [x] Commit `feat(community): resolve audiences and honor channel preferences`, tick steps. Production follower integration remains explicitly milestone 3.
 
 ## Task 3: One monthly SMS budget and auditable reservations
 
@@ -211,3 +211,5 @@ it('honors an opt-out made after scheduling', function () {
 
 - Prerequisite browser fixes `eb4feb4`: shared Input/Select label and description associations; header wraps. Focused JS13/13, lint/build; compiled isolated-QA browser width390/scroll390, label count1, Add member visible. No live changes.
 - Task1:13 focused tests/43 assertions and11 permission/package regression tests/39 assertions pass on dedicated `miconvener_community_2_testing`; Pint applied.
+
+- Task2:10 focused tests/27 assertions pass. Temporary encrypted run-address rows provide bounded deduplication and hourly expiry cleanup. Multiple hashed opt-out tokens retain old links. These implementation refinements preserve the approved no-person model.
