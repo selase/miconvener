@@ -187,6 +187,7 @@ Before high-volume SMS rollout, assign an application operator with the organisa
 12. Do not copy the earlier Claude co-author trailer onto Codex commits. Cost: commit metadata differs from the earlier Claude-specific convention; authorship remains accurate.
 
 13. Use a draft PR and the existing clean CI runner for the final full suite after the observed local PostgreSQL I/O/setup failures, keeping status in progress until green. Cost: a draft PR/remote branch exists before final verification; it can be closed without merging or deploying. This changes the push order, not the integration prohibition.
+14. Sync approved main into the isolated feature branch to resolve its generated asset conflict and run draft CI; never integrate Community into main or deploy. Cost: released use-case changes and rebuilt assets add integration review/test surface; both histories remain in a reversible feature-branch merge.
 
 ### Full-suite verification investigation
 
