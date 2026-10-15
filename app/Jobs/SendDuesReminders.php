@@ -7,20 +7,24 @@ namespace App\Jobs;
 use App\Models\CommunitySettings;
 use App\Models\Tenant;
 use App\Services\Dues\DuesReminders;
-use App\Services\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
+/** Dispatch only: transport work and later pages are independent queued jobs. */
 final class SendDuesReminders implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    public const int PAGE_SIZE = 100;
 
-    public int $timeout = 300;
+    public int $tries = 3;
 
-    public function __construct(public string $tenantId, public ?int $userId = null, public ?string $localDate = null) {}
+    public int $timeout = 30;
+
+    public int $backoff = 10;
+
+    public function __construct(public string $tenantId, public ?int $userId = null, public ?string $localDate = null, public ?string $afterMemberId = null) {}
 
     public function handle(DuesReminders $reminders): void
     {
@@ -28,21 +32,16 @@ final class SendDuesReminders implements ShouldQueue
         if ($tenant === null) {
             return;
         }
-        $context = app(TenantContext::class);
-        $previous = $context->getTenant();
-        try {
-            $context->setTenant($tenant);
-            if ($this->userId !== null) {
-                $reminders->remindArrears($tenant, $this->userId);
-            } else {
-                $today = CarbonImmutable::now(CommunitySettings::for($tenant)->timezone)->startOfDay();
-                if ($this->localDate !== null && $this->localDate !== $today->toDateString()) {
-                    return;
-                }
-                $reminders->sendDue($tenant, $today);
-            }
-        } finally {
-            $previous === null ? $context->clear() : $context->setTenant($previous);
+        $localDate = $this->localDate ?? CarbonImmutable::now(CommunitySettings::for($tenant)->timezone)->toDateString();
+        $ids = $reminders->queuedRecipientIds($tenant, $this->userId, $localDate, $this->afterMemberId, self::PAGE_SIZE);
+        foreach (array_chunk($ids, DuesReminders::SMS_BATCH_SIZE) as $batch) {
+            DeliverDuesReminders::dispatch($this->tenantId, $batch, 'sms', $this->userId, $localDate)->afterCommit();
+        }
+        foreach ($ids as $id) {
+            DeliverDuesReminders::dispatch($this->tenantId, [$id], 'email', $this->userId, $localDate)->afterCommit();
+        }
+        if (count($ids) === self::PAGE_SIZE) {
+            self::dispatch($this->tenantId, $this->userId, $localDate, $ids[array_key_last($ids)])->afterCommit();
         }
     }
 }

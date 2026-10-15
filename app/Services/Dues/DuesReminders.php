@@ -26,10 +26,13 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use InvalidArgumentException;
 use Throwable;
 
 final class DuesReminders
 {
+    public const int SMS_BATCH_SIZE = 50;
+
     public function __construct(private readonly SmsAllowance $allowance, private readonly SmsGateway $gateway) {}
 
     /** @return array{sent: int, skipped: int} */
@@ -44,6 +47,35 @@ final class DuesReminders
         $this->authorizeArrears($tenant, $userId);
 
         return $this->send($tenant, CarbonImmutable::now(CommunitySettings::for($tenant)->timezone)->startOfDay(), true);
+    }
+
+    /** @return list<string> */
+    public function queuedRecipientIds(Tenant $tenant, ?int $userId, ?string $localDate, ?string $afterMemberId, int $limit): array
+    {
+        $today = $this->executionDate($tenant, $userId, $localDate);
+        if ($today === null) {
+            return [];
+        }
+
+        return $this->members($tenant, $today, $userId !== null)->withoutEagerLoads()
+            ->when($afterMemberId !== null, fn (Builder $query) => $query->where('id', '>', $afterMemberId))
+            ->orderBy('id')->limit($limit)->pluck('id')->all();
+    }
+
+    /**
+     * Each queued unit resolves current charges/settings before claiming any channel.
+     *
+     * @param  list<string>  $memberIds
+     * @return array{sent: int, skipped: int}
+     */
+    public function deliverUnit(Tenant $tenant, array $memberIds, string $channel, ?int $userId, ?string $localDate): array
+    {
+        if (! in_array($channel, ['email', 'sms'], true) || count($memberIds) > ($channel === 'email' ? 1 : self::SMS_BATCH_SIZE)) {
+            throw new InvalidArgumentException('Reminder delivery units must be bounded by channel.');
+        }
+        $today = $this->executionDate($tenant, $userId, $localDate);
+
+        return $today === null ? ['sent' => 0, 'skipped' => 0] : $this->send($tenant, $today, $userId !== null, $memberIds, $channel);
     }
 
     public function authorizeArrears(Tenant $tenant, int $userId): void
@@ -84,6 +116,20 @@ final class DuesReminders
         ];
     }
 
+    private function executionDate(Tenant $tenant, ?int $userId, ?string $localDate): ?CarbonImmutable
+    {
+        if ($userId !== null) {
+            $this->authorizeArrears($tenant, $userId);
+        }
+        $settings = CommunitySettings::for($tenant);
+        if (! $tenant->communityEnabled() || $tenant->status !== TenantStatusEnum::ACTIVE || ! $settings->reminders_enabled) {
+            return null;
+        }
+        $today = CarbonImmutable::now($settings->timezone)->startOfDay();
+
+        return $userId === null && $localDate !== null && $localDate !== $today->toDateString() ? null : $today;
+    }
+
     /** @return Builder<Member> */
     private function members(Tenant $tenant, CarbonImmutable $today, bool $arrears): Builder
     {
@@ -93,30 +139,60 @@ final class DuesReminders
                 'charges.membershipType' => fn ($query) => $query->withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)]);
     }
 
-    /** @return array{sent: int, skipped: int} */
-    private function send(Tenant $tenant, CarbonImmutable $today, bool $arrears): array
+    /**
+     * @param  list<string>|null  $memberIds
+     * @return array{sent: int, skipped: int}
+     */
+    private function send(Tenant $tenant, CarbonImmutable $today, bool $arrears, ?array $memberIds = null, ?string $channel = null): array
     {
         $counts = ['sent' => 0, 'skipped' => 0];
         if (! $tenant->communityEnabled() || $tenant->status !== TenantStatusEnum::ACTIVE || ! CommunitySettings::for($tenant)->reminders_enabled) {
             return $counts;
         }
-        $this->members($tenant, $today, $arrears)->chunkById(200, function (Collection $members) use ($tenant, $today, $arrears, &$counts): void {
-            $messages = [];
-            $rows = [];
-            foreach ($members as $member) {
-                if ($member->charges->isEmpty()) {
-                    continue;
+        $this->members($tenant, $today, $arrears)->when($memberIds !== null, fn (Builder $query) => $query->whereIn('id', $memberIds))
+            ->chunkById(self::SMS_BATCH_SIZE, function (Collection $members) use ($tenant, $today, $arrears, $channel, &$counts): void {
+                $messages = [];
+                $rows = [];
+                $emails = [];
+                foreach ($members as $member) {
+                    if ($member->charges->isEmpty()) {
+                        continue;
+                    }
+                    $member->setRelation('tenant', $tenant);
+                    $settings = CommunitySettings::for($tenant);
+                    if (! $settings->reminders_enabled) {
+                        break;
+                    }
+                    $step = $arrears ? 'manual' : $this->step($member->charges, $settings, $today);
+                    if ($step === null) {
+                        continue;
+                    }
+                    if ($channel !== 'sms' && filled($member->email)) {
+                        $emails[] = [$member, $step];
+                    }
+                    if ($channel !== 'email' && filled($member->phone)) {
+                        $text = $this->smsText($member);
+                        $row = $this->reserve($tenant, $member, $today, $step, 'sms', $text);
+                        if ($row?->status === 'reserved') {
+                            $messages[] = new SmsMessage($member->phone, $text, $row->id);
+                            $rows[$row->id] = $row;
+                        } else {
+                            $counts['skipped']++;
+                        }
+                    }
                 }
-                $member->setRelation('tenant', $tenant);
-                $settings = CommunitySettings::for($tenant);
-                if (! $settings->reminders_enabled) {
-                    break;
+                try {
+                    $results = $messages === [] ? [] : $this->gateway->send($messages);
+                } catch (Throwable $exception) {
+                    report($exception);
+                    $results = [];
                 }
-                $step = $arrears ? 'manual' : $this->step($member->charges, $settings, $today);
-                if ($step === null) {
-                    continue;
+                foreach ($rows as $id => $row) {
+                    $result = $results[$id] ?? SmsResult::unknown('No result returned.');
+                    $this->finishSms($tenant, $row, $result);
+                    $counts[$result->accepted ? 'sent' : 'skipped']++;
                 }
-                if (filled($member->email)) {
+                foreach ($emails as [$member, $step]) {
                     $row = $this->reserve($tenant, $member, $today, $step, 'email');
                     if ($row?->status === 'reserved') {
                         try {
@@ -132,32 +208,8 @@ final class DuesReminders
                         $counts['skipped']++;
                     }
                 }
-                if (filled($member->phone)) {
-                    $text = $this->smsText($member);
-                    $row = $this->reserve($tenant, $member, $today, $step, 'sms', $text);
-                    if ($row?->status === 'reserved') {
-                        $messages[] = new SmsMessage($member->phone, $text, $row->id);
-                        $rows[$row->id] = $row;
-                    } else {
-                        $counts['skipped']++;
-                    }
-                }
-            }
-            if ($messages === []) {
-                return;
-            }
-            try {
-                $results = $this->gateway->send($messages);
-            } catch (Throwable $exception) {
-                report($exception);
-                $results = [];
-            }
-            foreach ($rows as $id => $row) {
-                $result = $results[$id] ?? SmsResult::unknown('No result returned.');
-                $this->finishSms($tenant, $row, $result);
-                $counts[$result->accepted ? 'sent' : 'skipped']++;
-            }
-        });
+
+            });
 
         return $counts;
     }

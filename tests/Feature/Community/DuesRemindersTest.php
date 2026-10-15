@@ -275,3 +275,94 @@ test('arrears preview and sending also refuse staff with finance but no member m
     $this->postJson(route('tenant.community.money.dues.remind-arrears', ['subdomain' => 'reminders']))->assertForbidden();
     $this->patchJson(route('tenant.community.settings.update', ['subdomain' => 'reminders']), [])->assertForbidden();
 });
+
+test('queued audiences continue independently after a delivery unit fails', function () {
+    Queue::fake();
+    $this->pack->update(['quantity' => 200]);
+    foreach (range(1, 100) as $number) {
+        $member = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'phone' => '0241234567', 'email' => 'member'.$number.'@example.test']);
+        DuesCharge::query()->create(['tenant_id' => $this->tenant->id, 'member_id' => $member->id, 'membership_type_id' => $this->type->id, 'period_start' => '2026-10-01', 'period_end' => '2026-10-31', 'due_on' => '2026-10-08', 'amount' => 100, 'currency' => 'GHS', 'status' => 'open']);
+    }
+    (new SendDuesReminders($this->tenant->id, (int) $this->owner->id))->handle(app(DuesReminders::class));
+    Mail::assertNothingSent();
+    Http::assertNothingSent();
+    expect(Reminder::query()->count())->toBe(0);
+    $units = Queue::pushed(App\Jobs\DeliverDuesReminders::class);
+    $emails = $units->filter(fn ($job) => $job->channel === 'email');
+    expect($emails)->toHaveCount(100);
+    foreach ($units->filter(fn ($job) => $job->channel === 'sms') as $job) {
+        expect(count($job->memberIds))->toBeLessThanOrEqual(50)->and($job->timeout)->toBeLessThan(90);
+    }
+    $continuation = Queue::pushed(SendDuesReminders::class)->sole();
+    $fail = true;
+    Reminder::creating(function () use (&$fail): void {
+        if ($fail) {
+            $fail = false;
+            throw new RuntimeException('Unit interrupted before claiming a recipient.');
+        }
+    });
+    expect(fn () => $emails->first()->handle(app(DuesReminders::class)))->toThrow(RuntimeException::class);
+    $continuation->handle(app(DuesReminders::class));
+    $allEmails = Queue::pushed(App\Jobs\DeliverDuesReminders::class)->filter(fn ($job) => $job->channel === 'email');
+    expect($allEmails)->toHaveCount(101);
+    foreach ($allEmails as $job) {
+        expect($job->memberIds)->toHaveCount(1)->and($job->timeout)->toBeLessThan(90);
+        $job->handle(app(DuesReminders::class));
+    }
+    Mail::assertSent(DuesReminder::class, 101);
+    Http::assertNothingSent();
+});
+
+test('queued SMS is submitted independently without waiting on email transport', function () {
+    Queue::fake();
+    (new SendDuesReminders($this->tenant->id, (int) $this->owner->id))->handle(app(DuesReminders::class));
+    Mail::assertNothingSent();
+    $units = Queue::pushed(App\Jobs\DeliverDuesReminders::class);
+    expect($units->first()->channel)->toBe('sms');
+    $units->first()->handle(app(DuesReminders::class));
+    Http::assertSentCount(1);
+    Mail::assertNothingSent();
+    expect(Reminder::query()->where('channel', 'sms')->sole()->status)->toBe('sent');
+    $units->last()->handle(app(DuesReminders::class));
+    Mail::assertSent(DuesReminder::class, 1);
+});
+
+test('delivery units recheck permissions settings date and current charges', function () {
+    Queue::fake();
+    (new SendDuesReminders($this->tenant->id, (int) $this->owner->id))->handle(app(DuesReminders::class));
+    $unit = Queue::pushed(App\Jobs\DeliverDuesReminders::class)->first();
+    $this->owner->syncRoles([]);
+    expect(fn () => $unit->handle(app(DuesReminders::class)))->toThrow(Illuminate\Auth\Access\AuthorizationException::class);
+    $this->owner->assignRole('Org Superadmin');
+    reminderSettings($this, ['reminders_enabled' => false]);
+    $unit->handle(app(DuesReminders::class));
+    expect(Reminder::query()->count())->toBe(0);
+    reminderSettings($this, ['reminders_enabled' => true]);
+    $this->charge->update(['status' => 'paid']);
+    $unit->handle(app(DuesReminders::class));
+    expect(Reminder::query()->count())->toBe(0);
+    $this->charge->update(['status' => 'open']);
+    (new App\Jobs\DeliverDuesReminders($this->tenant->id, [$this->member->id], 'sms', localDate: '2026-10-14'))->handle(app(DuesReminders::class));
+    Http::assertNothingSent();
+});
+
+test('retried SMS units retain unknown claims and deliver only untouched recipients', function () {
+    $other = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'phone' => '0241234567']);
+    DuesCharge::factory()->create(['tenant_id' => $this->tenant->id, 'member_id' => $other->id, 'membership_type_id' => $this->type->id, 'due_on' => '2026-10-08']);
+    Http::swap(new Illuminate\Http\Client\Factory);
+    Http::preventStrayRequests();
+    Http::fake(['messaging.test/*' => Http::response([], 500)]);
+    $first = new App\Jobs\DeliverDuesReminders($this->tenant->id, [$this->member->id], 'sms', (int) $this->owner->id);
+    $first->handle(app(DuesReminders::class));
+    $first->handle(app(DuesReminders::class));
+    Http::assertSentCount(1);
+    expect(Reminder::query()->sole()->status)->toBe('reserved')->and($this->pack->fresh()->meta['remaining'])->toBe(9);
+    Http::swap(new Illuminate\Http\Client\Factory);
+    Http::preventStrayRequests();
+    Http::fake(['messaging.test/*' => Http::response(['data' => ['campaign_id' => 'second']], 202)]);
+    (new App\Jobs\DeliverDuesReminders($this->tenant->id, [$this->member->id, $other->id], 'sms', (int) $this->owner->id))->handle(app(DuesReminders::class));
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request) => count($request->data()[0]['users']) === 1);
+    expect(Reminder::query()->where('member_id', $other->id)->sole()->status)->toBe('sent')->and($this->pack->fresh()->meta['remaining'])->toBe(8);
+    Mail::assertNothingSent();
+});

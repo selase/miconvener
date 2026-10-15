@@ -43,12 +43,10 @@ it('hides arrears action without finance permission', () => {
 });
 
 it('disabled reminders and empty arrears cannot be queued', async () => {
-    const fetch = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue({
-            ok: true,
-            json: async () => ({ members: 0, sms_credits_needed: 0, reminders_enabled: false }),
-        });
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ members: 0, sms_credits_needed: 0, reminders_enabled: false }),
+    });
     render(<MoneyDues membershipTypes={[]} canRemindArrears />);
     fireEvent.click(screen.getByRole('button', { name: 'Remind everyone in arrears' }));
     await screen.findByRole('dialog');
@@ -91,5 +89,90 @@ it('settings tab edits and saves validated reminder preferences', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save reminder settings' }));
     await waitFor(() => expect(toast).toHaveBeenCalledWith('Reminder settings saved.'));
     expect(JSON.parse(fetch.mock.calls[1][1].body).sms_monthly_limit).toBe('10');
+    fetch.mockRestore();
+});
+
+it('keeps saved reminder choices after returning to Settings and an unrelated save', async () => {
+    const fetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue({
+            ok: true,
+            json: async () => ({ message: 'Reminder settings saved.' }),
+        });
+    render(
+        <Overview
+            counts={{ members: 0, activeMembers: 0, openCharges: 0, overdueCharges: 0 }}
+            collectedThisMonth={[]}
+            reminderSettings={{
+                reminders_enabled: true,
+                reminder_offsets: { before: 7, on_day: 0, after_7: 7, after_30: 30 },
+                frequent_digest: 'daily',
+                sms_monthly_limit: null,
+                week_starts_on: 1,
+            }}
+        />
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Dues reminders' }), {
+        target: { value: 'off' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Days before due' }), {
+        target: { value: '9' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save reminder settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Save reminder settings' }).disabled).toBe(false)
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    expect(screen.getByRole('combobox', { name: 'Dues reminders' }).value).toBe('off');
+    expect(screen.getByRole('spinbutton', { name: 'Days before due' }).value).toBe('9');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Monthly Community SMS limit' }), {
+        target: { value: '20' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save reminder settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({
+        reminders_enabled: false,
+        reminder_offsets: { before: '9' },
+        sms_monthly_limit: '20',
+    });
+    fetch.mockRestore();
+});
+
+it('preserves unsaved reminder inputs and validation errors across tab changes', async () => {
+    const fetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue({
+            ok: false,
+            status: 422,
+            json: async () => ({ errors: { sms_monthly_limit: ['Use a whole number.'] } }),
+        });
+    render(
+        <Overview
+            counts={{ members: 0, activeMembers: 0, openCharges: 0, overdueCharges: 0 }}
+            collectedThisMonth={[]}
+            reminderSettings={{
+                reminders_enabled: true,
+                reminder_offsets: { before: 7, on_day: 0, after_7: 7, after_30: 30 },
+                frequent_digest: 'daily',
+                sms_monthly_limit: null,
+                week_starts_on: 1,
+            }}
+        />
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Monthly Community SMS limit' }), {
+        target: { value: '10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save reminder settings' }));
+    await screen.findByText('Use a whole number.');
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    expect(screen.getByRole('spinbutton', { name: 'Monthly Community SMS limit' }).value).toBe(
+        '10'
+    );
+    expect(screen.getByText('Use a whole number.')).toBeTruthy();
     fetch.mockRestore();
 });

@@ -18,9 +18,7 @@ function Stat({ label, value, href, hint }) {
     );
 }
 
-function ReminderSettings({ settings }) {
-    const [form, setForm] = useState(settings);
-    const [errors, setErrors] = useState({});
+function ReminderSettings({ settings, form, setForm, errors, setErrors }) {
     const [saving, setSaving] = useState(false);
     const showToast = useToast();
     const submit = async (event) => {
@@ -127,6 +125,8 @@ function ReminderSettings({ settings }) {
 
 export default function Overview({ counts, collectedThisMonth, reminderSettings }) {
     const [tab, setTab] = useState('overview');
+    const [settingsForm, setSettingsForm] = useState(reminderSettings);
+    const [settingsErrors, setSettingsErrors] = useState({});
     const collected =
         collectedThisMonth.length === 0
             ? formatDuesMoney(0, 'GHS')
@@ -175,7 +175,13 @@ export default function Overview({ counts, collectedThisMonth, reminderSettings 
             </div>
             <div role="tabpanel" id="community-tab-panel" aria-labelledby={`community-tab-${tab}`}>
                 {tab === 'settings' ? (
-                    <ReminderSettings settings={reminderSettings} />
+                    <ReminderSettings
+                        settings={reminderSettings}
+                        form={settingsForm}
+                        setForm={setSettingsForm}
+                        errors={settingsErrors}
+                        setErrors={setSettingsErrors}
+                    />
                 ) : (
                     <div className="grid gap-4 px-4 py-6 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
                         <Stat
