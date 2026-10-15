@@ -121,7 +121,7 @@ test('every mailable renders', function (): void {
     $duesCharge = App\Models\DuesCharge::factory()->create([
         'tenant_id' => $tenant->id,
         'member_id' => $duesMember->id,
-        'dues_class_id' => $duesMember->dues_class_id,
+        'membership_type_id' => $duesMember->membership_type_id,
         'status' => App\Enum\DuesChargeStatusEnum::Paid,
         'paid_at' => now(),
         'payment_reference' => 'ref_render_dues',

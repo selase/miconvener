@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Enum\DuesChargeStatusEnum;
 use App\Models\DuesCharge;
-use App\Models\DuesClass;
 use App\Models\Member;
+use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -18,23 +18,23 @@ beforeEach(function () {
 });
 
 /**
- * @return array{0: Tenant, 1: User, 2: DuesClass, 3: string}
+ * @return array{0: Tenant, 1: User, 2: MembershipType, 3: string}
  */
 function duesPagesFixture(string $slug = 'acme'): array
 {
     [$tenant, $user] = eventHost($slug);
     Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
 
     return [$tenant->fresh(), $user, $class, eventSubdomainHost($slug)];
 }
 
 test('the members page sends the members, the active classes and each member\'s pay link and charges', function () {
     [$tenant, $user, $class, $host] = duesPagesFixture();
-    DuesClass::factory()->create(['tenant_id' => $tenant->id, 'is_active' => false]);
-    $members = Member::factory()->count(2)->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    MembershipType::factory()->create(['tenant_id' => $tenant->id, 'is_active' => false]);
+    $members = Member::factory()->count(2)->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
     $first = $members->sortBy('name')->first();
-    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $first->id, 'dues_class_id' => $class->id, 'amount' => 5000]);
+    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $first->id, 'membership_type_id' => $class->id, 'amount' => 5000]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
         ->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))
@@ -54,9 +54,9 @@ test('the members page sends the members, the active classes and each member\'s 
 
 test('a paid charge reports how and when it was paid', function () {
     [$tenant, $user, $class, $host] = duesPagesFixture();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
     DuesCharge::factory()->create([
-        'tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id, 'amount' => 5000,
+        'tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 5000,
         'status' => DuesChargeStatusEnum::Paid, 'payment_method' => 'offline', 'paid_at' => '2026-10-14 09:30:00',
     ]);
 
@@ -69,7 +69,7 @@ test('a paid charge reports how and when it was paid', function () {
 
 test('a member\'s pay link opens that member\'s own pay page', function () {
     [$tenant, $user, $class, $host] = duesPagesFixture();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
 
     $page = $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
         ->get(route('tenant.dues.members.index', ['subdomain' => 'acme']))
@@ -90,11 +90,11 @@ test('the members, classes and payouts pages are 404 while dues are off', functi
 
 test('the pay page props hold only that member\'s open charges', function () {
     [$tenant, , $class, $host] = duesPagesFixture();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'name' => 'Ama Mensah']);
-    $other = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
-    $mine = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id, 'amount' => 5000]);
-    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonths(2)->startOfMonth()->toDateString()]);
-    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $other->id, 'dues_class_id' => $class->id]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'name' => 'Ama Mensah']);
+    $other = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
+    $mine = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 5000]);
+    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonths(2)->startOfMonth()->toDateString()]);
+    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $other->id, 'membership_type_id' => $class->id]);
 
     $this->get("http://{$host}/pay/{$member->pay_token}")
         ->assertInertia(fn (Assert $page) => $page
@@ -118,7 +118,7 @@ test('member_dues is a shared feature only while dues are enabled', function () 
 
 test('the info flash from the pay callback is shared so the pay page can show it', function () {
     [$tenant, , $class, $host] = duesPagesFixture();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
 
     $this->withSession(['info' => 'We are finalising your payment.'])
         ->get("http://{$host}/pay/{$member->pay_token}")

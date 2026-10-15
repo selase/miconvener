@@ -5,9 +5,9 @@ declare(strict_types=1);
 use App\Enum\DuesChargeStatusEnum;
 use App\Enum\DuesPeriodEnum;
 use App\Models\DuesCharge;
-use App\Models\DuesClass;
 use App\Models\EventPayout;
 use App\Models\Member;
+use App\Models\MembershipType;
 use App\Models\Tenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -16,11 +16,11 @@ beforeEach(fn () => refreshTenantDatabases());
 
 test('a member takes the class amount unless overridden, and a zero override is a waiver', function () {
     $tenant = Tenant::factory()->create();
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
 
-    $plain = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
-    $discounted = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'amount_override' => 2000]);
-    $waived = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'amount_override' => 0]);
+    $plain = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
+    $discounted = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'amount_override' => 2000]);
+    $waived = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'amount_override' => 0]);
 
     expect($plain->effectiveAmount())->toBe(5000)
         ->and($discounted->effectiveAmount())->toBe(2000)
@@ -38,23 +38,23 @@ test('every member gets a unique 40 character pay token, and rotating changes it
 
 test('a charge is unique per member and period start', function () {
     $member = Member::factory()->create();
-    DuesCharge::factory()->create(['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'dues_class_id' => $member->dues_class_id, 'period_start' => '2026-11-01']);
+    DuesCharge::factory()->create(['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'membership_type_id' => $member->membership_type_id, 'period_start' => '2026-11-01']);
 
-    expect(fn () => DuesCharge::factory()->create(['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'dues_class_id' => $member->dues_class_id, 'period_start' => '2026-11-01']))
+    expect(fn () => DuesCharge::factory()->create(['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'membership_type_id' => $member->membership_type_id, 'period_start' => '2026-11-01']))
         ->toThrow(QueryException::class);
 });
 
 test('class names are unique per tenant', function () {
     $tenant = Tenant::factory()->create();
-    DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
+    MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
 
-    expect(fn () => DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']))
+    expect(fn () => MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']))
         ->toThrow(QueryException::class);
 });
 
 test('overdue scope returns only open charges past their due date', function () {
     $member = Member::factory()->create();
-    $base = ['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'dues_class_id' => $member->dues_class_id];
+    $base = ['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'membership_type_id' => $member->membership_type_id];
     DuesCharge::factory()->create($base + ['period_start' => '2026-01-01', 'due_on' => now()->subDay()->toDateString()]);
     DuesCharge::factory()->create($base + ['period_start' => '2026-02-01', 'due_on' => now()->addDay()->toDateString()]);
     DuesCharge::factory()->create($base + ['period_start' => '2026-03-01', 'due_on' => now()->subDay()->toDateString(), 'status' => DuesChargeStatusEnum::Paid]);
@@ -85,9 +85,9 @@ test('dues periods compute the next start and the period end', function () {
 test('a dues class lists its members and a member lists its charges', function () {
     $charge = DuesCharge::factory()->create();
 
-    expect($charge->member->duesClass->members)->toHaveCount(1)
+    expect($charge->member->membershipType->members)->toHaveCount(1)
         ->and($charge->member->charges)->toHaveCount(1)
-        ->and($charge->duesClass->is($charge->member->duesClass))->toBeTrue();
+        ->and($charge->membershipType->is($charge->member->membershipType))->toBeTrue();
 });
 
 test('a charge can be recorded by a real user', function () {

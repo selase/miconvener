@@ -22,7 +22,7 @@ if (! function_exists('duesTestCharge')) {
 
         return DuesCharge::factory()->create([
             'tenant_id' => $member->tenant_id, 'member_id' => $member->id,
-            'dues_class_id' => $member->dues_class_id, 'amount' => $amount,
+            'membership_type_id' => $member->membership_type_id, 'amount' => $amount,
         ]);
     }
 }

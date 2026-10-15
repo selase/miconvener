@@ -13,7 +13,7 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
         name: member?.name ?? '',
         phone: member?.phone ?? '',
         email: member?.email ?? '',
-        dues_class_id: member?.dues_class_id ?? classes[0]?.id ?? '',
+        membership_type_id: member?.membership_type_id ?? classes[0]?.id ?? '',
         amount_override: toMajorUnits(member?.amount_override),
         joined_on: member?.joined_on ?? '',
     });
@@ -24,8 +24,8 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
 
     // A class deactivated after the member joined is still theirs to keep.
     const options =
-        member && !classes.some((c) => c.id === member.dues_class_id)
-            ? [{ id: member.dues_class_id, name: `${member.class_name} (inactive)` }, ...classes]
+        member && !classes.some((c) => c.id === member.membership_type_id)
+            ? [{ id: member.membership_type_id, name: `${member.class_name} (inactive)` }, ...classes]
             : classes;
 
     const submit = async (event) => {
@@ -43,7 +43,7 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
             name: form.name,
             phone: form.phone || null,
             email: form.email || null,
-            dues_class_id: form.dues_class_id,
+            membership_type_id: form.membership_type_id,
             amount_override: override,
         };
 
@@ -74,7 +74,7 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
         onSaved();
     };
 
-    const chosen = options.find((c) => c.id === form.dues_class_id);
+    const chosen = options.find((c) => c.id === form.membership_type_id);
 
     return (
         <Modal open onClose={onClose} title={editing ? 'Edit member' : 'Add member'}>
@@ -107,9 +107,9 @@ export default function MemberFormModal({ member, classes, onClose, onSaved }) {
                 </p>
                 <Select
                     label="Class"
-                    value={form.dues_class_id}
-                    onChange={set('dues_class_id')}
-                    error={errors.dues_class_id}
+                    value={form.membership_type_id}
+                    onChange={set('membership_type_id')}
+                    error={errors.membership_type_id}
                 >
                     {options.map((c) => (
                         <option key={c.id} value={c.id}>

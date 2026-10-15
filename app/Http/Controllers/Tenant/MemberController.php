@@ -10,8 +10,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Dues\StoreMemberRequest;
 use App\Http\Requests\Tenant\Dues\UpdateMemberRequest;
 use App\Models\DuesCharge;
-use App\Models\DuesClass;
 use App\Models\Member;
+use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +37,7 @@ final class MemberController extends Controller
         $members = Member::query()
             ->where('tenant_id', $tenant->id)
             ->with([
-                'duesClass',
+                'membershipType',
                 'charges' => fn ($query) => $query->orderByDesc('period_start')->limit(self::CHARGES_SHOWN),
             ])
             ->withSum(['charges as open_total' => fn ($query) => $query->open()], 'amount')
@@ -50,11 +50,11 @@ final class MemberController extends Controller
                 'email' => $member->email,
                 'phone' => $member->phone,
                 'status' => $member->status->value,
-                'class_name' => $member->duesClass->name,
+                'class_name' => $member->membershipType->name,
                 'effective_amount' => $member->effectiveAmount(),
-                'currency' => $member->duesClass->currency,
+                'currency' => $member->membershipType->currency,
                 'amount_override' => $member->amount_override,
-                'dues_class_id' => $member->dues_class_id,
+                'membership_type_id' => $member->membership_type_id,
                 'joined_on' => $member->joined_on?->toDateString(),
                 'notes' => $member->notes,
                 'pay_url' => route('public.dues.show', ['subdomain' => $tenant->slug, 'token' => $member->pay_token]),
@@ -65,17 +65,17 @@ final class MemberController extends Controller
 
         return Inertia::render('Tenant/Dues/Members', [
             'members' => $members,
-            'classes' => DuesClass::query()
+            'classes' => MembershipType::query()
                 ->where('tenant_id', $tenant->id)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get()
-                ->map(fn (DuesClass $class): array => [
+                ->map(fn (MembershipType $class): array => [
                     'id' => $class->id,
                     'name' => $class->name,
                     'amount' => $class->amount,
                     'currency' => $class->currency,
-                    'period' => $class->period->value,
+                    'period' => $class->period?->value,
                 ])->values(),
         ]);
     }

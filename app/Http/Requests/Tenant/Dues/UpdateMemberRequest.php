@@ -20,7 +20,7 @@ final class UpdateMemberRequest extends MemberRequest
     {
         $memberId = (string) $this->route('member');
         $tenantId = app(TenantContext::class)->getTenant()?->id;
-        $currentClassId = Member::query()->where('tenant_id', $tenantId)->whereKey($memberId)->value('dues_class_id');
+        $currentClassId = Member::query()->where('tenant_id', $tenantId)->whereKey($memberId)->value('membership_type_id');
 
         return $this->memberRules($memberId, $currentClassId);
     }

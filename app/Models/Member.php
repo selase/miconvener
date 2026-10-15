@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 /**
  * @property int|null $amount_override Minor currency units; 0 waives the dues.
  * @property MemberStatusEnum $status
+ * @property string $membership_type_id Renamed from dues_class_id; static analysis cannot follow the rename.
  */
 final class Member extends Model
 {
@@ -30,7 +31,7 @@ final class Member extends Model
 
     protected $fillable = [
         'tenant_id',
-        'dues_class_id',
+        'membership_type_id',
         'name',
         'email',
         'phone',
@@ -54,11 +55,11 @@ final class Member extends Model
     ];
 
     /**
-     * @return BelongsTo<DuesClass, $this>
+     * @return BelongsTo<MembershipType, $this>
      */
-    public function duesClass(): BelongsTo
+    public function membershipType(): BelongsTo
     {
-        return $this->belongsTo(DuesClass::class);
+        return $this->belongsTo(MembershipType::class);
     }
 
     /**
@@ -71,11 +72,16 @@ final class Member extends Model
 
     /**
      * What this member owes each period: their own amount if set (zero is a
-     * waiver), otherwise the amount of their class.
+     * waiver), otherwise the amount of their membership type. Null when the
+     * type carries no dues, whatever the override says.
      */
-    public function effectiveAmount(): int
+    public function effectiveAmount(): ?int
     {
-        return $this->amount_override ?? $this->duesClass->amount;
+        if (! $this->membershipType->hasDues()) {
+            return null;
+        }
+
+        return $this->amount_override ?? $this->membershipType->amount;
     }
 
     /**

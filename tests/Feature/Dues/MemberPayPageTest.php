@@ -54,7 +54,7 @@ if (! function_exists('payPageCharge')) {
         return DuesCharge::factory()->create([
             'tenant_id' => $member->tenant_id,
             'member_id' => $member->id,
-            'dues_class_id' => $member->dues_class_id,
+            'membership_type_id' => $member->membership_type_id,
             'period_start' => $start->toDateString(),
             'period_end' => $start->endOfMonth()->toDateString(),
             'due_on' => $start->toDateString(),

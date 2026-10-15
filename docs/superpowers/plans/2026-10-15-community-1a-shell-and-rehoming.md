@@ -47,7 +47,7 @@
 **Interfaces:**
 - Produces: `App\Models\MembershipType` (table `membership_types`, fillable `tenant_id, name, amount, currency, period, is_active`; `amount` and `period` nullable; `hasDues(): bool` = `amount !== null`); `Member::membershipType(): BelongsTo` (column `membership_type_id`); `DuesCharge::membershipType()` (column `membership_type_id`); `DuesCharges::createFor()` throws `DomainException('This membership type has no dues.')` when `! hasDues()`.
 
-- [ ] **Step 1: Write the failing tests** in `tests/Feature/Dues/MembershipTypesTest.php` (renamed from `DuesClassesTest.php`, keeping its existing cases with renamed identifiers) and add:
+- [x] **Step 1: Write the failing tests** in `tests/Feature/Dues/MembershipTypesTest.php` (renamed from `DuesClassesTest.php`, keeping its existing cases with renamed identifiers) and add:
 
 ```php
 test('the rename keeps rows created under the old schema', function () {
@@ -89,12 +89,12 @@ test('a member of a type without dues cannot be charged', function () {
 
 Write the three commented tests in full using the request pattern already used in `DuesClassesTest.php` (eventHost, enable the switch, actingAs, subdomain host). Until Task 3 lands, call the existing route names; Task 3 renames them.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `"$PHP" artisan test --compact tests/Feature/Dues/MembershipTypesTest.php`
 Expected: FAIL (class `MembershipType` not found).
 
-- [ ] **Step 3: Migration**
+- [x] **Step 3: Migration**
 
 ```php
 public function up(): void
@@ -115,14 +115,17 @@ public function up(): void
 
 `down()` reverses it in the opposite order (drop the check, rename columns back, set amount and period NOT NULL only if no nulls exist, otherwise throw a clear exception, rename the table back). Postgres keeps foreign keys and indexes through renames; the existing index and constraint names stay as they are (cosmetic).
 
-- [ ] **Step 4: Rename the code** (models, factory, controller, requests, relations, columns, JSX props `classes` → `membershipTypes`, copy "Class" → "Membership type"), make the request rules `amount` `nullable|integer|min:100|required_with:period` and `period` `nullable|required_with:amount` (keep the existing currency and period lock rules, applied only when the type has dues), and make `DuesCharges::createFor()` refuse types without dues.
+- [x] **Step 4: Rename the code** (models, factory, controller, requests, relations, columns, JSX props `classes` → `membershipTypes`, copy "Class" → "Membership type"), make the request rules `amount` `nullable|integer|min:100|required_with:period` and `period` `nullable|required_with:amount` (keep the existing currency and period lock rules, applied only when the type has dues), and make `DuesCharges::createFor()` refuse types without dues.
 
-- [ ] **Step 5: Run the dues suite**
+- [x] **Step 5: Run the dues suite**
 
 Run: `"$PHP" artisan test --compact tests/Feature/Dues`
 Expected: all pass (existing cases renamed, new cases green).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
+
+  Ruling: the old-schema test leaves out the dues payout (payouts never reference membership types, so the rename cannot affect them). Ruling: JSX copy and the optional-amount form move to Task 3, where the pages are moved and rewritten anyway. Ruling: `@property` docblocks on `MembershipType` and `Member` because Larastan cannot follow `Schema::rename`/`renameColumn`.
+
 
 ```bash
 "$PHP" vendor/bin/pint --dirty

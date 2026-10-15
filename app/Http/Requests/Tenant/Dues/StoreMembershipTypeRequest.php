@@ -7,7 +7,7 @@ namespace App\Http\Requests\Tenant\Dues;
 /**
  * A new dues class for the organisation.
  */
-final class StoreDuesClassRequest extends DuesClassRequest
+final class StoreMembershipTypeRequest extends MembershipTypeRequest
 {
     /**
      * @return array<string, mixed>

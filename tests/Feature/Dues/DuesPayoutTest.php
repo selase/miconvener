@@ -37,7 +37,7 @@ function duesPayoutTenantWithBalance(int $gross = 10000): array
     Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
 
     $member = Member::factory()->create(['tenant_id' => $tenant->id]);
-    $charge = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $member->dues_class_id, 'amount' => $gross]);
+    $charge = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $member->membership_type_id, 'amount' => $gross]);
     app(LedgerService::class)->recordDuesPayment($tenant, $charge, $gross, 100, 'ref_seed');
     $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true, 'recipient_code' => 'RCP_dues_1']);
 

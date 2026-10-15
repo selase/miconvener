@@ -36,7 +36,7 @@ final class DuesCharge extends Model
     protected $fillable = [
         'tenant_id',
         'member_id',
-        'dues_class_id',
+        'membership_type_id',
         'period_start',
         'period_end',
         'due_on',
@@ -75,11 +75,11 @@ final class DuesCharge extends Model
     }
 
     /**
-     * @return BelongsTo<DuesClass, $this>
+     * @return BelongsTo<MembershipType, $this>
      */
-    public function duesClass(): BelongsTo
+    public function membershipType(): BelongsTo
     {
-        return $this->belongsTo(DuesClass::class);
+        return $this->belongsTo(MembershipType::class);
     }
 
     /**

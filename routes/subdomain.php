@@ -16,7 +16,6 @@ use App\Http\Controllers\Tenant\AccountController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DesignSystemController;
 use App\Http\Controllers\Tenant\DuesChargeController;
-use App\Http\Controllers\Tenant\DuesClassController;
 use App\Http\Controllers\Tenant\DuesPayoutController;
 use App\Http\Controllers\Tenant\EventBadgeController;
 use App\Http\Controllers\Tenant\EventBlastController;
@@ -37,6 +36,7 @@ use App\Http\Controllers\Tenant\EventSponsorController;
 use App\Http\Controllers\Tenant\EventTicketTypeController;
 use App\Http\Controllers\Tenant\EventVenueController;
 use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\MembershipTypeController;
 use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\OrgSettingsController;
 use App\Http\Controllers\Tenant\RoleController;
@@ -310,9 +310,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::post('payouts/{payout}/send', [DuesPayoutController::class, 'send'])->name('payouts.send');
         Route::post('payouts/{payout}/finalize', [DuesPayoutController::class, 'finalize'])->name('payouts.finalize');
 
-        Route::get('classes', [DuesClassController::class, 'index'])->name('classes.index');
-        Route::post('classes', [DuesClassController::class, 'store'])->name('classes.store');
-        Route::patch('classes/{class}', [DuesClassController::class, 'update'])->name('classes.update');
+        Route::get('classes', [MembershipTypeController::class, 'index'])->name('classes.index');
+        Route::post('classes', [MembershipTypeController::class, 'store'])->name('classes.store');
+        Route::patch('classes/{class}', [MembershipTypeController::class, 'update'])->name('classes.update');
 
         Route::get('members', [MemberController::class, 'index'])->name('members.index');
         Route::post('members', [MemberController::class, 'store'])->name('members.store');

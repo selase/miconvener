@@ -53,7 +53,7 @@ if (! function_exists('duesE2eConsole')) {
             ->json('id');
 
         $memberId = $console()
-            ->postJson(route('tenant.dues.members.store', ['subdomain' => $slug]), ['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0244000001', 'dues_class_id' => $classId])
+            ->postJson(route('tenant.dues.members.store', ['subdomain' => $slug]), ['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0244000001', 'membership_type_id' => $classId])
             ->assertCreated()
             ->json('id');
 

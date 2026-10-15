@@ -36,9 +36,14 @@ final class DuesCharges
             throw new DomainException('This member has left and cannot be charged.');
         }
 
-        $class = $member->duesClass;
+        $class = $member->membershipType;
+
+        if (! $class->hasDues() || $class->period === null) {
+            throw new DomainException('This membership type has no dues.');
+        }
+
         $start = $periodStart->startOfMonth();
-        $amount = $member->effectiveAmount();
+        $amount = (int) $member->effectiveAmount();
 
         if ($amount > 0 && $amount < DuesCharge::MINIMUM_AMOUNT) {
             throw new DomainException('A charge must be at least '.DuesCharge::MINIMUM_AMOUNT.' minor units ('.number_format(DuesCharge::MINIMUM_AMOUNT / 100, 2).').');
@@ -48,7 +53,7 @@ final class DuesCharges
             ['member_id' => $member->id, 'period_start' => $start->toDateString()],
             [
                 'tenant_id' => $member->tenant_id,
-                'dues_class_id' => $class->id,
+                'membership_type_id' => $class->id,
                 'period_end' => $class->period->periodEnd($start)->toDateString(),
                 'due_on' => $start->toDateString(),
                 'amount' => $amount,

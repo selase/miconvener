@@ -12,15 +12,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * @property int $amount Minor currency units.
- * @property DuesPeriodEnum $period
+ * Columns come from a renamed table (dues_classes → membership_types), which
+ * static analysis cannot follow through the migrations, so they are listed here.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $name
+ * @property string $currency
+ * @property bool $is_active
+ * @property int|null $amount Minor currency units; null when the type carries no dues.
+ * @property DuesPeriodEnum|null $period Null exactly when the amount is null.
  * @property-read bool|null $charges_exists Set by withExists('charges') or loadExists('charges').
  */
-final class DuesClass extends Model
+final class MembershipType extends Model
 {
     use BelongsToTenant;
 
-    /** @use HasFactory<\Database\Factories\DuesClassFactory> */
+    /** @use HasFactory<\Database\Factories\MembershipTypeFactory> */
     use HasFactory;
 
     use HasUuids;
@@ -41,6 +49,15 @@ final class DuesClass extends Model
         'period' => DuesPeriodEnum::class,
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Whether members of this type owe dues. A type without an amount
+     * (honorary members, a church register) never raises charges.
+     */
+    public function hasDues(): bool
+    {
+        return $this->amount !== null;
+    }
 
     /**
      * @return HasMany<Member, $this>

@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enum\DuesPeriodEnum;
-use App\Models\DuesClass;
+use App\Models\MembershipType;
 use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/** @extends Factory<DuesClass> */
-final class DuesClassFactory extends Factory
+/** @extends Factory<MembershipType> */
+final class MembershipTypeFactory extends Factory
 {
-    protected $model = DuesClass::class;
+    protected $model = MembershipType::class;
 
     public function definition(): array
     {

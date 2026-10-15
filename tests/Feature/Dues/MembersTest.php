@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Enum\DuesChargeStatusEnum;
 use App\Enum\MemberStatusEnum;
 use App\Models\DuesCharge;
-use App\Models\DuesClass;
 use App\Models\Member;
+use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -21,13 +21,13 @@ beforeEach(function () {
 /**
  * A tenant with dues switched on, its admin and one active class.
  *
- * @return array{0: Tenant, 1: User, 2: DuesClass}
+ * @return array{0: Tenant, 1: User, 2: MembershipType}
  */
 function duesMembersTenant(string $slug = 'acme'): array
 {
     [$tenant, $user] = eventHost($slug);
     Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
 
     return [$tenant->fresh(), $user, $class];
 }
@@ -36,9 +36,9 @@ function duesMembersTenant(string $slug = 'acme'): array
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
-function duesMemberPayload(DuesClass $class, array $overrides = []): array
+function duesMemberPayload(MembershipType $class, array $overrides = []): array
 {
-    return array_merge(['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0244000001', 'dues_class_id' => $class->id], $overrides);
+    return array_merge(['name' => 'Ama Mensah', 'email' => 'ama@example.com', 'phone' => '0244000001', 'membership_type_id' => $class->id], $overrides);
 }
 
 test('an admin adds a member who gets a pay token', function () {
@@ -68,23 +68,23 @@ test('a member with neither email nor phone is rejected', function () {
 test('a member needs an active class of the same organisation', function () {
     [$tenant, $user, $class] = duesMembersTenant();
     $beta = Tenant::factory()->create(['slug' => 'beta']);
-    $foreign = DuesClass::factory()->create(['tenant_id' => $beta->id]);
-    $inactive = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'is_active' => false]);
+    $foreign = MembershipType::factory()->create(['tenant_id' => $beta->id]);
+    $inactive = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'is_active' => false]);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
         ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($foreign))
-        ->assertUnprocessable()->assertJsonValidationErrors(['dues_class_id']);
+        ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
     $this->actingAs($user)->withServerVariables($host)
         ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), duesMemberPayload($inactive))
-        ->assertUnprocessable()->assertJsonValidationErrors(['dues_class_id']);
+        ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
 });
 
 test('a duplicate phone in the same organisation is rejected, the same phone in another is fine', function () {
     [$tenant, $user, $class] = duesMembersTenant();
     $beta = Tenant::factory()->create(['slug' => 'beta']);
     Member::factory()->create(['tenant_id' => $beta->id, 'phone' => '0244000001']);
-    Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'phone' => '0244000002']);
+    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000002']);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
@@ -97,8 +97,8 @@ test('a duplicate phone in the same organisation is rejected, the same phone in 
 
 test('an email already used by a member without a phone is rejected, but is fine next to a phone', function () {
     [$tenant, $user, $class] = duesMembersTenant();
-    Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'email' => 'taken@example.com', 'phone' => null]);
-    Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'email' => 'shared@example.com', 'phone' => '0244000009']);
+    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'email' => 'taken@example.com', 'phone' => null]);
+    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'email' => 'shared@example.com', 'phone' => '0244000009']);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
@@ -111,7 +111,7 @@ test('an email already used by a member without a phone is rejected, but is fine
 
 test('an admin updates a member, keeping their own phone and email', function () {
     [$tenant, $user, $class] = duesMembersTenant();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'phone' => '0244000002', 'email' => 'm@example.com']);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000002', 'email' => 'm@example.com']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $member->id]), duesMemberPayload($class, ['name' => 'Renamed', 'phone' => '0244000002', 'email' => 'm@example.com', 'amount_override' => 0]))
@@ -123,9 +123,9 @@ test('an admin updates a member, keeping their own phone and email', function ()
 
 test('the member list is paginated and shows effective amount and open totals', function () {
     [$tenant, $user, $class] = duesMembersTenant();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'amount_override' => 3000]);
-    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id, 'amount' => 3000, 'due_on' => now()->subDays(3)->toDateString()]);
-    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id, 'amount' => 3000, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonth()->startOfMonth()->toDateString()]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'amount_override' => 3000]);
+    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'due_on' => now()->subDays(3)->toDateString()]);
+    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonth()->startOfMonth()->toDateString()]);
     $beta = Tenant::factory()->create(['slug' => 'beta']);
     Member::factory()->create(['tenant_id' => $beta->id]);
 
@@ -145,7 +145,7 @@ test('the member list is paginated and shows effective amount and open totals', 
 
 test('rotating the pay link changes the token', function () {
     [$tenant, $user, $class] = duesMembersTenant();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
     $old = $member->pay_token;
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
@@ -157,8 +157,8 @@ test('rotating the pay link changes the token', function () {
 
 test('exiting a member sets status and exit date and keeps their charges', function () {
     [$tenant, $user, $class] = duesMembersTenant();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
-    $charge = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
+    $charge = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->postJson(route('tenant.dues.members.exit', ['subdomain' => 'acme', 'member' => $member->id]))
@@ -178,7 +178,7 @@ test('another tenant\'s member cannot be updated, exited or rotated', function (
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($acmeAdmin)->withServerVariables($host)
-        ->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $betaMember->id]), ['name' => 'Hacked', 'email' => 'h@example.com', 'dues_class_id' => $acmeClass->id])
+        ->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $betaMember->id]), ['name' => 'Hacked', 'email' => 'h@example.com', 'membership_type_id' => $acmeClass->id])
         ->assertNotFound();
     $this->actingAs($acmeAdmin)->withServerVariables($host)
         ->postJson(route('tenant.dues.members.exit', ['subdomain' => 'acme', 'member' => $betaMember->id]))->assertNotFound();
@@ -195,7 +195,7 @@ test('a user without manage members is forbidden on every member action', functi
     [$tenant, , $class] = duesMembersTenant();
     $viewer = User::factory()->create(['tenant_id' => $tenant->id]);
     $tenant->users()->attach($viewer->id);
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
     $params = ['subdomain' => 'acme', 'member' => $member->id];
 
@@ -208,9 +208,9 @@ test('a user without manage members is forbidden on every member action', functi
 
 test('a member of a deactivated class can still be edited, but cannot be moved into another inactive class', function () {
     [$tenant, $user, $class] = duesMembersTenant();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'phone' => '0244000002']);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000002']);
     $class->update(['is_active' => false]);
-    $other = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'is_active' => false]);
+    $other = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'is_active' => false]);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
     $params = ['subdomain' => 'acme', 'member' => $member->id];
 
@@ -219,14 +219,14 @@ test('a member of a deactivated class can still be edited, but cannot be moved i
         ->assertOk();
     $this->actingAs($user)->withServerVariables($host)
         ->patchJson(route('tenant.dues.members.update', $params), duesMemberPayload($other, ['phone' => '0244000002']))
-        ->assertUnprocessable()->assertJsonValidationErrors(['dues_class_id']);
+        ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
 
-    expect($member->fresh()->name)->toBe('Still here')->and($member->fresh()->dues_class_id)->toBe($class->id);
+    expect($member->fresh()->name)->toBe('Still here')->and($member->fresh()->membership_type_id)->toBe($class->id);
 });
 
 test('exiting an already exited member keeps the original exit date', function () {
     [$tenant, $user, $class] = duesMembersTenant();
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'status' => MemberStatusEnum::Exited, 'exited_on' => '2026-01-10']);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'status' => MemberStatusEnum::Exited, 'exited_on' => '2026-01-10']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->postJson(route('tenant.dues.members.exit', ['subdomain' => 'acme', 'member' => $member->id]))
@@ -239,7 +239,7 @@ test('a tenant without dues gets 404 on member store', function () {
     [, $user] = eventHost('acme');
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), ['name' => 'X', 'email' => 'x@example.com', 'dues_class_id' => 'x'])
+        ->postJson(route('tenant.dues.members.store', ['subdomain' => 'acme']), ['name' => 'X', 'email' => 'x@example.com', 'membership_type_id' => 'x'])
         ->assertNotFound();
 });
 
@@ -266,7 +266,7 @@ test('an override of zero waives the member\'s dues and is accepted on create an
 
     expect(Member::query()->findOrFail($id)->amount_override)->toBe(0);
 
-    $other = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id, 'phone' => '0244000099', 'amount_override' => 3000]);
+    $other = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000099', 'amount_override' => 3000]);
     $console()->patchJson(route('tenant.dues.members.update', ['subdomain' => 'acme', 'member' => $other->id]), duesMemberPayload($class, ['phone' => '0244000099', 'email' => null, 'amount_override' => 0]))
         ->assertOk();
 

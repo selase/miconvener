@@ -21,7 +21,7 @@ final class DuesChargeFactory extends Factory
         return [
             'tenant_id' => $member->tenant_id,
             'member_id' => $member->id,
-            'dues_class_id' => $member->dues_class_id,
+            'membership_type_id' => $member->membership_type_id,
             'period_start' => now()->startOfMonth()->toDateString(),
             'period_end' => now()->endOfMonth()->toDateString(),
             'due_on' => now()->startOfMonth()->toDateString(),

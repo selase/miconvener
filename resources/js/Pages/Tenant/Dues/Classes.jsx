@@ -15,14 +15,14 @@ import { formatDuesMoney, sendJson, toMajorUnits, toMinorUnits } from '@/lib/due
 
 const PERIODS = { monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' };
 
-function ClassFormModal({ duesClass, onClose, onSaved }) {
-    const editing = duesClass !== null;
-    const locked = editing && duesClass.has_charges;
+function ClassFormModal({ membershipType, onClose, onSaved }) {
+    const editing = membershipType !== null;
+    const locked = editing && membershipType.has_charges;
     const [form, setForm] = useState({
-        name: duesClass?.name ?? '',
-        amount: toMajorUnits(duesClass?.amount),
-        currency: duesClass?.currency ?? 'GHS',
-        period: duesClass?.period ?? 'monthly',
+        name: membershipType?.name ?? '',
+        amount: toMajorUnits(membershipType?.amount),
+        currency: membershipType?.currency ?? 'GHS',
+        period: membershipType?.period ?? 'monthly',
     });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
@@ -42,8 +42,8 @@ function ClassFormModal({ duesClass, onClose, onSaved }) {
         const result = editing
             ? await sendJson(
                   'PATCH',
-                  route('tenant.dues.classes.update', { class: duesClass.id }),
-                  { ...payload, is_active: duesClass.is_active }
+                  route('tenant.dues.classes.update', { class: membershipType.id }),
+                  { ...payload, is_active: membershipType.is_active }
               )
             : await sendJson('POST', route('tenant.dues.classes.store'), payload);
         setProcessing(false);
@@ -126,17 +126,17 @@ export default function Classes({ classes }) {
 
     const refresh = () => router.reload({ only: ['classes'], preserveScroll: true });
 
-    const toggleActive = async (duesClass) => {
+    const toggleActive = async (membershipType) => {
         setBusy(true);
         const result = await sendJson(
             'PATCH',
-            route('tenant.dues.classes.update', { class: duesClass.id }),
+            route('tenant.dues.classes.update', { class: membershipType.id }),
             {
-                name: duesClass.name,
-                amount: duesClass.amount,
-                currency: duesClass.currency,
-                period: duesClass.period,
-                is_active: !duesClass.is_active,
+                name: membershipType.name,
+                amount: membershipType.amount,
+                currency: membershipType.currency,
+                period: membershipType.period,
+                is_active: !membershipType.is_active,
             }
         );
         setBusy(false);
@@ -159,7 +159,7 @@ export default function Classes({ classes }) {
                         <Button href={route('tenant.dues.members.index')} icon={ArrowLeft}>
                             Members
                         </Button>
-                        <Button icon={Plus} onClick={() => setModal({ duesClass: null })}>
+                        <Button icon={Plus} onClick={() => setModal({ membershipType: null })}>
                             Add class
                         </Button>
                     </>
@@ -179,39 +179,39 @@ export default function Classes({ classes }) {
                         </Th>
                     </Thead>
                     <tbody>
-                        {classes.map((duesClass) => (
-                            <Tr key={duesClass.id}>
+                        {classes.map((membershipType) => (
+                            <Tr key={membershipType.id}>
                                 <Td>
-                                    <span className="font-medium text-ink">{duesClass.name}</span>
+                                    <span className="font-medium text-ink">{membershipType.name}</span>
                                 </Td>
                                 <Td numeric>
-                                    {formatDuesMoney(duesClass.amount, duesClass.currency)}
+                                    {formatDuesMoney(membershipType.amount, membershipType.currency)}
                                 </Td>
-                                <Td muted>{PERIODS[duesClass.period] ?? duesClass.period}</Td>
+                                <Td muted>{PERIODS[membershipType.period] ?? membershipType.period}</Td>
                                 <Td muted numeric>
-                                    {duesClass.member_count}
+                                    {membershipType.member_count}
                                 </Td>
                                 <Td>
                                     <StatusPill
-                                        status={duesClass.is_active ? 'success' : 'neutral'}
+                                        status={membershipType.is_active ? 'success' : 'neutral'}
                                     >
-                                        {duesClass.is_active ? 'Active' : 'Inactive'}
+                                        {membershipType.is_active ? 'Active' : 'Inactive'}
                                     </StatusPill>
                                 </Td>
                                 <Td>
                                     <div className="flex justify-end gap-2">
-                                        <Button onClick={() => setModal({ duesClass })}>
+                                        <Button onClick={() => setModal({ membershipType })}>
                                             Edit
                                         </Button>
                                         <Button
                                             onClick={() =>
-                                                duesClass.is_active
-                                                    ? setToggling(duesClass)
-                                                    : toggleActive(duesClass)
+                                                membershipType.is_active
+                                                    ? setToggling(membershipType)
+                                                    : toggleActive(membershipType)
                                             }
                                             disabled={busy}
                                         >
-                                            {duesClass.is_active ? 'Deactivate' : 'Activate'}
+                                            {membershipType.is_active ? 'Deactivate' : 'Activate'}
                                         </Button>
                                     </div>
                                 </Td>
@@ -233,7 +233,7 @@ export default function Classes({ classes }) {
 
             {modal && (
                 <ClassFormModal
-                    duesClass={modal.duesClass}
+                    membershipType={modal.membershipType}
                     onClose={() => setModal(null)}
                     onSaved={() => {
                         setModal(null);

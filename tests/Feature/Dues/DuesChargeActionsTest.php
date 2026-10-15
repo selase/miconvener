@@ -5,9 +5,9 @@ declare(strict_types=1);
 use App\Enum\DuesChargeStatusEnum;
 use App\Enum\MemberStatusEnum;
 use App\Models\DuesCharge;
-use App\Models\DuesClass;
 use App\Models\LedgerTransaction;
 use App\Models\Member;
+use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Dues\DuesCharges;
@@ -29,22 +29,22 @@ function duesChargeTenant(string $slug = 'acme'): array
 {
     [$tenant, $user] = eventHost($slug);
     Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
 
     return [$tenant->fresh(), $user, $member];
 }
 
 function duesOpenCharge(Member $member, array $attributes = []): DuesCharge
 {
-    return DuesCharge::factory()->create(array_merge(['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'dues_class_id' => $member->dues_class_id], $attributes));
+    return DuesCharge::factory()->create(array_merge(['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'membership_type_id' => $member->membership_type_id], $attributes));
 }
 
 test('creating a charge freezes the amount at the time', function () {
     [, , $member] = duesChargeTenant();
     $charge = app(DuesCharges::class)->createFor($member, CarbonImmutable::parse('2026-03-01'));
 
-    $member->duesClass->update(['amount' => 9000]);
+    $member->membershipType->update(['amount' => 9000]);
 
     expect($charge->amount)->toBe(5000)
         ->and($charge->fresh()->amount)->toBe(5000)
@@ -57,11 +57,11 @@ test('creating a charge freezes the amount at the time', function () {
 
 test('a quarterly and a yearly class compute their period end', function () {
     [$tenant, , $member] = duesChargeTenant();
-    $quarterly = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'period' => 'quarterly']);
-    $yearly = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'period' => 'yearly']);
+    $quarterly = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'period' => 'quarterly']);
+    $yearly = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'period' => 'yearly']);
 
-    $q = app(DuesCharges::class)->createFor(Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $quarterly->id]), CarbonImmutable::parse('2026-01-01'));
-    $y = app(DuesCharges::class)->createFor(Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $yearly->id]), CarbonImmutable::parse('2026-01-01'));
+    $q = app(DuesCharges::class)->createFor(Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $quarterly->id]), CarbonImmutable::parse('2026-01-01'));
+    $y = app(DuesCharges::class)->createFor(Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $yearly->id]), CarbonImmutable::parse('2026-01-01'));
 
     expect($q->period_end->toDateString())->toBe('2026-03-31')
         ->and($y->period_end->toDateString())->toBe('2026-12-31');

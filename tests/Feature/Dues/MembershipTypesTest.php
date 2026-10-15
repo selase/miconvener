@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enum\DuesPeriodEnum;
-use App\Models\DuesClass;
+use App\Models\MembershipType;
 use App\Models\Member;
 use App\Models\Tenant;
 use App\Models\User;
@@ -22,7 +22,7 @@ beforeEach(function () {
  *
  * @return array{0: Tenant, 1: User}
  */
-function duesClassesTenant(string $slug = 'acme'): array
+function membershipTypesTenant(string $slug = 'acme'): array
 {
     [$tenant, $user] = eventHost($slug);
     Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
@@ -31,13 +31,13 @@ function duesClassesTenant(string $slug = 'acme'): array
 }
 
 test('an admin creates a class and sees it listed', function () {
-    [$tenant, $user] = duesClassesTenant();
+    [$tenant, $user] = membershipTypesTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Full member', 'amount' => 5000, 'currency' => 'ghs', 'period' => 'monthly'])
         ->assertCreated();
 
-    $class = DuesClass::query()->where('tenant_id', $tenant->id)->firstOrFail();
+    $class = MembershipType::query()->where('tenant_id', $tenant->id)->firstOrFail();
     expect($class->name)->toBe('Full member')
         ->and($class->amount)->toBe(5000)
         ->and($class->currency)->toBe('GHS')
@@ -54,8 +54,8 @@ test('an admin creates a class and sees it listed', function () {
 });
 
 test('a class name already used in the organisation is rejected', function () {
-    [$tenant, $user] = duesClassesTenant();
-    DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
+    [$tenant, $user] = membershipTypesTenant();
+    MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Full member', 'amount' => 5000, 'currency' => 'GHS', 'period' => 'monthly'])
@@ -64,9 +64,9 @@ test('a class name already used in the organisation is rejected', function () {
 });
 
 test('the same class name is fine in another organisation', function () {
-    [, $user] = duesClassesTenant();
+    [, $user] = membershipTypesTenant();
     $other = Tenant::factory()->create(['slug' => 'beta']);
-    DuesClass::factory()->create(['tenant_id' => $other->id, 'name' => 'Full member']);
+    MembershipType::factory()->create(['tenant_id' => $other->id, 'name' => 'Full member']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Full member', 'amount' => 5000, 'currency' => 'GHS', 'period' => 'yearly'])
@@ -74,7 +74,7 @@ test('the same class name is fine in another organisation', function () {
 });
 
 test('invalid class input is rejected', function () {
-    [, $user] = duesClassesTenant();
+    [, $user] = membershipTypesTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => '', 'amount' => 0, 'currency' => 'GH', 'period' => 'weekly'])
@@ -83,8 +83,8 @@ test('invalid class input is rejected', function () {
 });
 
 test('an admin renames, reprices and deactivates a class and keeps its own name on save', function () {
-    [$tenant, $user] = duesClassesTenant();
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
+    [$tenant, $user] = membershipTypesTenant();
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $class->id]), ['name' => 'Full member', 'amount' => 9000, 'currency' => 'GHS', 'period' => 'quarterly', 'is_active' => false])
@@ -97,9 +97,9 @@ test('an admin renames, reprices and deactivates a class and keeps its own name 
 });
 
 test('a class with members can be deactivated and there is no delete route', function () {
-    [$tenant, $user] = duesClassesTenant();
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id]);
-    Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
+    [$tenant, $user] = membershipTypesTenant();
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id]);
+    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $class->id]), ['name' => $class->name, 'amount' => $class->amount, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => false])
@@ -113,9 +113,9 @@ test('a class with members can be deactivated and there is no delete route', fun
 });
 
 test('another tenant cannot edit this tenant\'s class', function () {
-    [, $acmeAdmin] = duesClassesTenant('acme');
+    [, $acmeAdmin] = membershipTypesTenant('acme');
     $beta = Tenant::factory()->create(['slug' => 'beta']);
-    $betaClass = DuesClass::factory()->create(['tenant_id' => $beta->id, 'name' => 'Beta class', 'amount' => 1000]);
+    $betaClass = MembershipType::factory()->create(['tenant_id' => $beta->id, 'name' => 'Beta class', 'amount' => 1000]);
 
     $this->actingAs($acmeAdmin)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $betaClass->id]), ['name' => 'Hacked', 'amount' => 1000, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true])
@@ -125,10 +125,10 @@ test('another tenant cannot edit this tenant\'s class', function () {
 });
 
 test('the class list shows only this tenant\'s classes', function () {
-    [$tenant, $user] = duesClassesTenant();
-    DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Mine']);
+    [$tenant, $user] = membershipTypesTenant();
+    MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Mine']);
     $beta = Tenant::factory()->create(['slug' => 'beta']);
-    DuesClass::factory()->create(['tenant_id' => $beta->id, 'name' => 'Theirs']);
+    MembershipType::factory()->create(['tenant_id' => $beta->id, 'name' => 'Theirs']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->get(route('tenant.dues.classes.index', ['subdomain' => 'acme']))
@@ -136,10 +136,10 @@ test('the class list shows only this tenant\'s classes', function () {
 });
 
 test('a user without manage members is forbidden', function () {
-    [$tenant] = duesClassesTenant();
+    [$tenant] = membershipTypesTenant();
     $viewer = User::factory()->create(['tenant_id' => $tenant->id]);
     $tenant->users()->attach($viewer->id);
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id]);
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id]);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($viewer)->withServerVariables($host)
@@ -159,8 +159,8 @@ test('a tenant without dues gets 404 on the class pages', function () {
 });
 
 test('a class amount below the minimum charge is rejected on create and edit', function () {
-    [$tenant, $user] = duesClassesTenant();
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
+    [$tenant, $user] = membershipTypesTenant();
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
@@ -179,10 +179,10 @@ test('a class amount below the minimum charge is rejected on create and edit', f
 });
 
 test('a class with charges keeps its currency and period but can still be renamed and repriced', function () {
-    [$tenant, $user] = duesClassesTenant();
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member', 'currency' => 'GHS', 'period' => 'monthly']);
-    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'dues_class_id' => $class->id]);
-    App\Models\DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'dues_class_id' => $class->id]);
+    [$tenant, $user] = membershipTypesTenant();
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member', 'currency' => 'GHS', 'period' => 'monthly']);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id]);
+    App\Models\DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id]);
     $update = fn (array $changes) => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $class->id]), [
             'name' => 'Full member', 'amount' => 5000, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true, ...$changes,
@@ -202,8 +202,8 @@ test('a class with charges keeps its currency and period but can still be rename
 });
 
 test('a class without charges can change its currency and period', function () {
-    [$tenant, $user] = duesClassesTenant();
-    $class = DuesClass::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
+    [$tenant, $user] = membershipTypesTenant();
+    $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
         ->patchJson(route('tenant.dues.classes.update', ['subdomain' => 'acme', 'class' => $class->id]), ['name' => 'Full member', 'amount' => 5000, 'currency' => 'NGN', 'period' => 'yearly', 'is_active' => true])
@@ -211,4 +211,73 @@ test('a class without charges can change its currency and period', function () {
         ->assertJsonPath('has_charges', false);
 
     expect($class->fresh()->currency)->toBe('NGN');
+});
+
+test('the rename keeps rows created under the old schema', function () {
+    [$tenant] = membershipTypesTenant();
+    $migration = require database_path('migrations/landlord/2026_10_15_100000_rename_dues_classes_to_membership_types.php');
+    $migration->down();
+
+    $db = Illuminate\Support\Facades\DB::connection('landlord');
+    $typeId = (string) Illuminate\Support\Str::uuid7();
+    $memberId = (string) Illuminate\Support\Str::uuid7();
+    $chargeId = (string) Illuminate\Support\Str::uuid7();
+    $token = Illuminate\Support\Str::random(40);
+    $db->table('dues_classes')->insert(['id' => $typeId, 'tenant_id' => $tenant->id, 'name' => 'Full member', 'amount' => 5000, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+    $db->table('members')->insert(['id' => $memberId, 'tenant_id' => $tenant->id, 'dues_class_id' => $typeId, 'name' => 'Ama Mensah', 'phone' => '0244000001', 'status' => 'active', 'pay_token' => $token, 'created_at' => now(), 'updated_at' => now()]);
+    $db->table('dues_charges')->insert(['id' => $chargeId, 'tenant_id' => $tenant->id, 'member_id' => $memberId, 'dues_class_id' => $typeId, 'period_start' => '2026-10-01', 'period_end' => '2026-10-31', 'due_on' => '2026-10-01', 'amount' => 5000, 'currency' => 'GHS', 'status' => 'paid', 'payment_method' => 'online', 'payment_reference' => 'ref_old_1', 'paid_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+
+    $migration->up();
+
+    expect(Illuminate\Support\Facades\Schema::connection('landlord')->hasTable('dues_classes'))->toBeFalse();
+    $type = MembershipType::query()->findOrFail($typeId);
+    $member = Member::query()->findOrFail($memberId);
+    $charge = App\Models\DuesCharge::query()->findOrFail($chargeId);
+    expect($type->name)->toBe('Full member')
+        ->and($member->membership_type_id)->toBe($typeId)
+        ->and($member->pay_token)->toBe($token)
+        ->and($charge->membership_type_id)->toBe($typeId)
+        ->and($charge->status->value)->toBe('paid')
+        ->and($charge->payment_reference)->toBe('ref_old_1');
+
+    $this->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->get(route('public.dues.receipt', ['subdomain' => 'acme', 'token' => $token]))
+        ->assertOk();
+
+    expect(fn () => MembershipType::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Full member']))
+        ->toThrow(Illuminate\Database\QueryException::class);
+});
+
+test('a membership type can have no dues', function () {
+    [$tenant, $user] = membershipTypesTenant();
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Honorary', 'currency' => 'GHS'])
+        ->assertCreated();
+
+    $type = MembershipType::query()->where('tenant_id', $tenant->id)->firstOrFail();
+    expect($type->amount)->toBeNull()->and($type->period)->toBeNull()->and($type->hasDues())->toBeFalse();
+});
+
+test('amount and period come together', function () {
+    [, $user] = membershipTypesTenant();
+    $post = fn (array $body) => $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.classes.store', ['subdomain' => 'acme']), ['name' => 'Full member', 'currency' => 'GHS', ...$body]);
+
+    $post(['amount' => 5000])->assertUnprocessable()->assertJsonValidationErrors(['period']);
+    $post(['period' => 'monthly'])->assertUnprocessable()->assertJsonValidationErrors(['amount']);
+});
+
+test('a member of a type without dues cannot be charged', function () {
+    [$tenant, $user] = membershipTypesTenant();
+    $type = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => null, 'period' => null]);
+    $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $type->id]);
+
+    expect(fn () => app(App\Services\Dues\DuesCharges::class)->createFor($member, Carbon\CarbonImmutable::parse('2026-10-01')))
+        ->toThrow(DomainException::class, 'This membership type has no dues.');
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.dues.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-10-01'])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'This membership type has no dues.');
 });

@@ -29,7 +29,7 @@ final class DuesChargeController extends Controller
     {
         $member = Member::query()
             ->where('tenant_id', $this->getTenant()->id)
-            ->with('duesClass')
+            ->with('membershipType')
             ->findOrFail($request->validated('member_id'));
 
         return $this->guard(function () use ($duesCharges, $member, $request): JsonResponse {
