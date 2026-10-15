@@ -13,6 +13,10 @@ use Symfony\Component\Process\Process;
 
 uses(DatabaseTruncation::class);
 
+afterEach(function (): void {
+    $this->truncateDatabaseTables();
+});
+
 test('concurrent confirmations and manual additions serialize identity and cap checks', function (string $race) {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);

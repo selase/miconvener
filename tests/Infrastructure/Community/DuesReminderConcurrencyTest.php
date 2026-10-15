@@ -16,6 +16,10 @@ use Symfony\Component\Process\Process;
 
 uses(DatabaseTruncation::class);
 
+afterEach(function (): void {
+    $this->truncateDatabaseTables();
+});
+
 test('concurrent automatic and manual reminders respect daily credit and monthly reservations', function (string $constraint) {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
