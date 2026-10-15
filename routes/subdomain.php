@@ -311,6 +311,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
             Route::post('people/members', [MemberController::class, 'store'])->name('members.store');
             Route::patch('people/members/{member}', [MemberController::class, 'update'])->name('members.update');
             Route::post('people/members/{member}/exit', [MemberController::class, 'exit'])->name('members.exit');
+            Route::post('people/members/{member}/rejoin', [MemberController::class, 'rejoin'])->name('members.rejoin');
             Route::post('people/members/{member}/rotate-link', [MemberController::class, 'rotateLink'])->name('members.rotate-link');
 
             Route::get('money/dues', [MembershipTypeController::class, 'index'])->name('money.dues.index');

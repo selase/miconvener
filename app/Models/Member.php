@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enum\MemberStatusEnum;
 use App\Traits\BelongsToTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +40,9 @@ final class Member extends Model
         'status',
         'joined_on',
         'exited_on',
+        'active_since',
+        'lapsed_on',
+        'rejoined_on',
         'pay_token',
         'notes',
     ];
@@ -52,6 +56,9 @@ final class Member extends Model
         'status' => MemberStatusEnum::class,
         'joined_on' => 'date',
         'exited_on' => 'date',
+        'active_since' => 'date',
+        'lapsed_on' => 'date',
+        'rejoined_on' => 'date',
     ];
 
     /**
@@ -99,6 +106,27 @@ final class Member extends Model
         self::creating(function (Member $member): void {
             if (blank($member->pay_token)) {
                 $member->pay_token = Str::random(40);
+            }
+            $member->active_since ??= $member->joined_on ?? CarbonImmutable::now(CommunitySettings::for($member->tenant)->timezone)->toDateString();
+        });
+
+        self::updating(function (Member $member): void {
+            if (! $member->isDirty('status')) {
+                return;
+            }
+            $today = CarbonImmutable::now(CommunitySettings::for($member->tenant)->timezone)->startOfDay();
+            if ($member->status === MemberStatusEnum::Active) {
+                $member->active_since = $today;
+            } elseif ($member->status === MemberStatusEnum::Lapsed) {
+                $member->lapsed_on = $today;
+            } elseif ($member->status === MemberStatusEnum::Exited && ! $member->isDirty('exited_on')) {
+                $member->exited_on = $today;
+            }
+        });
+
+        self::updated(function (Member $member): void {
+            if ($member->wasChanged('status') && in_array($member->status, [MemberStatusEnum::Exited, MemberStatusEnum::Lapsed], true)) {
+                app(\App\Services\Dues\DuesCharges::class)->cancelAdvanceFor($member);
             }
         });
     }

@@ -9,12 +9,15 @@ use App\Enum\MemberStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Dues\StoreMemberRequest;
 use App\Http\Requests\Tenant\Dues\UpdateMemberRequest;
+use App\Models\CommunitySettings;
 use App\Models\DuesCharge;
 use App\Models\Member;
 use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Services\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -55,6 +58,7 @@ final class MemberController extends Controller
                 'currency' => $member->membershipType->currency,
                 'amount_override' => $member->amount_override,
                 'membership_type_id' => $member->membership_type_id,
+                'membership_type_active' => $member->membershipType->is_active,
                 'joined_on' => $member->joined_on?->toDateString(),
                 'notes' => $member->notes,
                 'pay_url' => route('public.dues.show', ['subdomain' => $tenant->slug, 'token' => $member->pay_token]),
@@ -94,24 +98,37 @@ final class MemberController extends Controller
     public function update(UpdateMemberRequest $request, string $subdomain, string $member): JsonResponse
     {
         $model = $this->findMember($member);
-        $model->update($request->validated());
+        DB::connection('landlord')->transaction(fn (): bool => $model->update($request->validated()));
 
         return response()->json(['id' => $model->id]);
     }
 
     /**
-     * Marks the member as having left. Their charges are kept: open ones can
-     * still be waived, voided or recorded.
+     * Marks the member as having left. Past and paid charges are retained;
+     * unpaid advance periods are voided when eligibility ends.
      */
     public function exit(string $subdomain, string $member): JsonResponse
     {
         $this->authorize('manage members');
         $model = $this->findMember($member);
         if ($model->status !== MemberStatusEnum::Exited) {
-            $model->update(['status' => MemberStatusEnum::Exited, 'exited_on' => today()]);
+            DB::connection('landlord')->transaction(fn (): bool => $model->update(['status' => MemberStatusEnum::Exited]));
         }
 
         return response()->json(['id' => $model->id, 'status' => MemberStatusEnum::Exited->value]);
+    }
+
+    public function rejoin(string $subdomain, string $member): JsonResponse
+    {
+        $this->authorize('manage members');
+        $model = $this->findMember($member);
+        if ($model->status !== MemberStatusEnum::Exited) {
+            return response()->json(['message' => 'Only an exited member can rejoin.'], 422);
+        }
+        $date = CarbonImmutable::now(CommunitySettings::for($this->getTenant())->timezone)->toDateString();
+        DB::connection('landlord')->transaction(fn (): bool => $model->update(['status' => MemberStatusEnum::Active, 'rejoined_on' => $date, 'exited_on' => null]));
+
+        return response()->json(['id' => $model->id, 'status' => MemberStatusEnum::Active->value]);
     }
 
     /**

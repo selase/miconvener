@@ -148,6 +148,10 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
 }
 
 export default function MoneyDues({ membershipTypes }) {
+    const inactiveMembers = membershipTypes.reduce(
+        (sum, type) => sum + (!type.is_active ? type.member_count : 0),
+        0
+    );
     const showToast = useToast();
     const [modal, setModal] = useState(null);
     const [toggling, setToggling] = useState(null);
@@ -199,6 +203,24 @@ export default function MoneyDues({ membershipTypes }) {
             />
 
             <div className="px-8 py-6">
+                {inactiveMembers > 0 && (
+                    <div
+                        role="status"
+                        className="mb-5 border border-border bg-surface-sunken p-4 text-sm text-ink-secondary"
+                    >
+                        <p>
+                            {inactiveMembers}{' '}
+                            {inactiveMembers === 1 ? 'member belongs' : 'members belong'} to
+                            inactive membership types. No new dues will be generated for them.
+                        </p>
+                        <a
+                            className="mt-2 inline-block font-medium text-accent underline"
+                            href={route('tenant.community.people.index')}
+                        >
+                            Review members
+                        </a>
+                    </div>
+                )}
                 <Table>
                     <Thead>
                         <Th>Name</Th>

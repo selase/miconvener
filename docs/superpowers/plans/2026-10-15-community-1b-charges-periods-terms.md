@@ -139,11 +139,13 @@ Ruling: Free-plan dues defaults include organisations without a package (2%); on
 - Members `pending`, `lapsed`, `exited` get none. Types without dues or inactive get none; inactive types' members are listed on Money > Dues (a notice with a count).
 - `members.rejoin`: `exited` → `active`, sets `rejoined_on` (new nullable date column on `members`) and clears `exited_on`.
 
-- [ ] **Step 1: Failing tests** covering: weekly and daily generation; a gap before an existing later charge is filled; nothing charged while lapsed; catch-up after missed runs (three missing days created once; a second run creates none); join mid-period both settings; exit stops charges from the exit date; rejoin resumes from the next period with no back-charges; type change affects only new charges; override 0 → waived; pending/lapsed/exited and types without dues or inactive → none; per-tenant local midnight (server clock UTC, `--date`); the 400 cap; two tenants processed independently.
-- [ ] **Step 2: Run, see them fail.**
-- [ ] **Step 3: Implement.** Idempotency rests on the existing unique `(member_id, period_start)` plus `firstOrCreate`.
-- [ ] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(community): dues:process raises charges for every period type`.
+- [x] **Step 1: Failing tests** covering: weekly and daily generation; a gap before an existing later charge is filled; nothing charged while lapsed; catch-up after missed runs (three missing days created once; a second run creates none); join mid-period both settings; exit stops charges from the exit date; rejoin resumes from the next period with no back-charges; type change affects only new charges; override 0 → waived; pending/lapsed/exited and types without dues or inactive → none; per-tenant local midnight (server clock UTC, `--date`); the 400 cap; two tenants processed independently.
+- [x] **Step 2: Run, see them fail.**
+- [x] **Step 3: Implement.** Idempotency rests on the existing unique `(member_id, period_start)` plus `firstOrCreate`.
+- [x] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(community): dues:process raises charges for every period type`.
+
+Ruling: a void is a tombstone, never automatic permission to bill again. Status changes cancel only open advance periods; past/paid history is preserved. Rejoin/reactivation always starts next period. Existing non-void periods block overlapping replacement periods, preventing double billing after a frequency change. Member-first locks coordinate generation, manual charges, payment confirmation and cancellation. Cost if an organisation needs replacement levies: a future explicit adjustment workflow rather than automatic resurrection.
 
 ### Task 4: Shared phone numbers
 

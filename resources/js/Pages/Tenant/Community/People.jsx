@@ -50,6 +50,10 @@ export function memberPill(member) {
         return <StatusPill status="pending">Lapsed</StatusPill>;
     }
 
+    if (member.status === 'pending') {
+        return <StatusPill status="pending">Pending</StatusPill>;
+    }
+
     if (member.overdue) {
         return <StatusPill status="failed">Overdue</StatusPill>;
     }
@@ -131,11 +135,14 @@ function paidLabel(charge) {
 }
 
 /**
- * Whether the drawer offers "Create charge": not for a member who has left,
- * and not when their membership type carries no dues.
+ * Only active members whose membership type carries dues can be charged.
  */
 export function canCreateCharge(member) {
-    return member.status !== 'exited' && member.effective_amount !== null;
+    return (
+        member.status === 'active' &&
+        member.effective_amount !== null &&
+        member.membership_type_active !== false
+    );
 }
 
 export default function People({ members, membershipTypes }) {
@@ -167,6 +174,16 @@ export default function People({ members, membershipTypes }) {
     };
 
     const confirmAction = () => {
+        if (confirm.kind === 'rejoin') {
+            return run(
+                () =>
+                    sendJson(
+                        'POST',
+                        route('tenant.community.members.rejoin', { member: confirm.member.id })
+                    ),
+                'Member reactivated'
+            );
+        }
         if (confirm.kind === 'exit') {
             return run(
                 () =>
@@ -198,10 +215,18 @@ export default function People({ members, membershipTypes }) {
     };
 
     const confirmCopy = () => {
+        if (confirm?.kind === 'rejoin') {
+            return {
+                title: 'Rejoin member',
+                description: `${confirm.member.name} will become active again. Automatic dues resume from the next eligible period, without charges for the time away.`,
+                label: 'Rejoin',
+                danger: false,
+            };
+        }
         if (confirm?.kind === 'exit') {
             return {
                 title: 'Mark as exited',
-                description: `${confirm.member.name} will stop being charged. Their existing charges are kept and can still be settled.`,
+                description: `${confirm.member.name} will stop being charged. Unpaid periods starting today or later are cancelled. Past and paid charges are kept.`,
                 label: 'Mark as exited',
                 danger: true,
             };
@@ -481,6 +506,16 @@ export default function People({ members, membershipTypes }) {
                                     >
                                         Mark as exited
                                     </button>
+                                )}
+                                {selected.status === 'exited' && (
+                                    <Button
+                                        onClick={() =>
+                                            setConfirm({ kind: 'rejoin', member: selected })
+                                        }
+                                        disabled={busy}
+                                    >
+                                        Rejoin member
+                                    </Button>
                                 )}
                             </div>
                         </div>
