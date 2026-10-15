@@ -51,6 +51,10 @@ Route::get('/sample-product', fn (): Factory|View => view('sample-product-page')
 // redirect so old links and search results land on the real homepage.
 Route::permanentRedirect('/product-template', '/')->name('product.template');
 Route::get('/product-enterprise', fn (): Factory|View => view('product.enterprise'))->name('product.enterprise');
+Route::get('/use-cases', [App\Http\Controllers\Marketing\UseCaseController::class, 'index'])->name('use-cases.index');
+Route::get('/use-cases/{slug}', [App\Http\Controllers\Marketing\UseCaseController::class, 'show'])
+    ->where('slug', '[a-z-]+')
+    ->name('use-cases.show');
 Route::get('/terms', fn (): Factory|View => view('product.terms'))->name('terms');
 
 // The staff links' offline worker. Served by the app rather than as a static

@@ -62,6 +62,7 @@ test('available proposals retain their payment action', () => {
 
 test('marketplace copy invites browsing and enquiries without promising bookings', () => {
     render(<MarketplaceIndex />);
+    expect(screen.queryByText('MiConvener Marketplace: Venues & Event Spaces')).toBeNull();
     expect(
         screen.getByRole('heading', { name: 'Discover event spaces across Ghana.' })
     ).toBeTruthy();
