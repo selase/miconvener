@@ -48,6 +48,8 @@ Success looks like this:
 | Followers and SMS | Followers may be messaged by SMS; the organisation pays for its SMS. |
 | `/my` visibility | A person sees every organisation that holds their verified email or phone, including ones that added them as a member without a follow. |
 | Periods | Daily, weekly, monthly, quarterly and yearly. |
+| Campaign progress | A campaign fund shows its target, amount raised, amount left and percentage, to admins and (optionally) on its public page. |
+| Console navigation | Menus are grouped: venue and facility items sit in one Venue group (section 14). |
 
 ## 4. Community sub-menus
 
@@ -85,6 +87,8 @@ Cash and transfer payments recorded by an admin carry no commission and post no 
 
 **Reports read the domain records, not the ledger.** For an own-gateway organisation the ledger books only the commission, because the money never passes through the platform; gross collections live on the charges, gifts and registrations. Reports therefore sum those records (gross, fees, commission, net) and use the ledger only for balances and payouts. This is already how the event finance page works (it reads event ledger entries or merchant transactions depending on the settlement mode).
 
+**Campaign progress.** A campaign fund has a target (for example GHS 100,000 for a building project) and optionally a deadline. Everywhere the fund appears (Money > Giving, the public give page, `/my`, Finance reports) it shows **raised**, **left to raise** (target minus raised, never below zero), a **percentage** and a progress bar, plus the number of givers. "Raised" counts what givers gave (gross), including cash recorded by an admin and bulk cash entries; fees and commission are shown separately in Finance. When the target is reached the campaign stays open by default and shows "Target reached" with any amount over it; the organisation can instead choose to close it automatically. The organisation can hide the amounts on the public page and show only the percentage. Pledges, when they come, will show as "promised" beside "raised".
+
 **Giving specifics:** anyone can give, not only members (visitors at a church); gifts can be anonymous; recurring giving is a reminder with a pay link, because mobile money cannot be auto-charged; cash collected in bulk is entered as one sum with no donor and appears in collections but not on any member statement.
 
 The tenant Finance page currently returns 403 unless the plan handles ticket money; it must open for any organisation that collects dues or giving.
@@ -92,6 +96,11 @@ The tenant Finance page currently returns 403 unless the plan handles ticket mon
 ## 6. People and `/my`
 
 - **There is no person table, and none is added.** `/my` today has no accounts: a person proves an email address with a code, and `/my` finds their registrations and contributions in every organisation by that normalised email. Community follows the same rule: "me" is a verified email **or a verified phone number**, and `/my` finds the follows, memberships, charges and gifts that carry it. Members and followers keep their own name, email and phone, as milestone 2's members already do. This avoids identity merging, keeps phone-only members first-class, and matches how `/my` already works.
+- **`/my` is the person's app.** It is a PWA that must look and behave like a native phone app and adapt gracefully on desktop (owner's reference designs, 2026-10-15: event-discovery and ticket apps with a greeting header, card lists with large imagery, pill filters, a ticket "pass" with QR code and download/share actions, and a bottom tab bar):
+  - **Phone:** a bottom tab bar with five tabs: **Home** (greeting, what needs attention today: dues due, next event, unread messages), **Tickets** (passes with QR, wallet style), **Communities** (organisations I follow or belong to), **Money** (dues to pay, giving, receipts and statements), **Me** (profile, phone and email, notifications, sign out). Full-bleed cards, large touch targets, pill filters, sheet-style dialogs, safe-area insets, installable with an icon and splash, works offline for tickets.
+  - **Desktop:** the same five sections as a left rail with a wider, two-column layout (list and detail side by side); nothing hides that exists on the phone.
+  - Uses MiConvener's design tokens and dark mode; the reference images guide layout and feel, not colours or branding.
+  - Each organisation page inside `/my` carries that organisation's name and logo, so members recognise their union or church.
 - `/my` gains **Communities**: for each organisation I follow or belong to, my dues and a pay button, my giving history and statements, messages, the library and open polls.
 - **Phone sign-in.** `/my` signs in by an email code today. Many drivers and church members have only a phone, so `/my` needs an SMS code sign-in. The SMS integration exists.
 - Pay links in reminders keep working without sign-in.
@@ -174,3 +183,19 @@ Principles: Following is the growth engine for events, so it is free on every pl
 - Add-on: extra members in blocks (for example +1,000 members for GHS 50 a month) so a growing union upgrades smoothly instead of hitting a wall.
 - SMS packs (already on sale once a provider token is set) are the main usage revenue for reminders and messages.
 - Annual billing discount as for existing plans.
+
+## 14. Console navigation groups
+
+The console's flat menu is grouped so each section is easy to find. Groups collapse, remember their state, and hide when the organisation does not use them.
+
+| Group | Items |
+|---|---|
+| (top) | Dashboard |
+| **Events** | Events |
+| **Community** | Overview, People, Money, Messages, Library, Polls |
+| **Venue** (venue and facility hosts only) | Facility operations, Spaces, Calendar, Inquiries & leads, RFQs & proposals |
+| **Finance** | Overview and reports, Payouts, Refunds |
+| **Organisation** | Team, Roles, Billing, Settings, API keys, AI usage and configuration |
+| (bottom) | My account |
+
+Today the venue items (Facility Operations, Venue Spaces, Venue Calendar, Inquiries & Leads, RFQs & Proposals) sit loose between Events and Team; this grouping is part of Community milestone 1 because that milestone adds the Community group to the same menu.
