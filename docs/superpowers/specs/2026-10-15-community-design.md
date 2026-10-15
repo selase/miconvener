@@ -1,6 +1,6 @@
 # Community: design
 
-Date: 2026-10-15. Status: draft for review. Path: architectural (new console section, changes the people model, generalises event-only tools).
+Date: 2026-10-15 (revised after the owner's review and a second review by Codex). Status: ready for planning, milestone by milestone. Path: architectural (new console section, changes how people are identified in `/my`, generalises event-only tools).
 
 Supersedes the scope of `2026-10-13-member-dues-design.md` from its milestone 3 onward. The dues engine built in milestone 2 (branch `member-dues-m2`, not merged) is kept and re-homed here; section 9 lists what changes.
 
@@ -11,182 +11,224 @@ Organisations of every kind (unions, drivers' and teachers' associations, alumni
 Success looks like this:
 
 - An organisation can run its whole community from one console section without learning a second set of tools.
-- A person sees everything they have with any organisation (events, dues, giving, messages, documents, polls) in one place, `/my`.
+- A person sees everything they have with any organisation (events, dues, giving, messages, documents, polls) in one place, `/my`, which feels like a native phone app.
 - Every cedi is reported in one Finance section, by category, with statements an organisation can hand to its members.
-- Nothing about the app becomes harder to reason about. Every entry point has one obvious job.
+- Every entry point has one obvious job. Simplicity guides the design but never blocks a needed expansion.
 
-## 2. The model (the rule everything else follows)
+## 2. The model
 
 | Who | Where | What lives there |
 |---|---|---|
 | Organisation admin | **Events** | Things that happen on a date: tickets, agenda, check-in, live polls. Unchanged. |
 | | **Community** | People and the ongoing relationship: followers, members, groups, dues, giving, messages, library, polls and surveys. New. |
+| | **Venue** | Facility and venue management, for venue hosts. Existing items, grouped (section 14). |
 | | **Finance** | All money in one place: events, dues and giving; reports; every payout. Extended. |
-| Member, attendee, follower | **`/my`** | Everything about me across every organisation. Extended. |
+| Member, attendee, follower | **`/my`** | Everything about me across every organisation. Rebuilt as an app (section 6). |
 | Anyone | Organisation page, event pages | Follow, Join, Give, Register. Extended. |
 
-**One engine per tool.** Messages, library (documents), polls and surveys, and reports are each built once. Used inside an event, the audience is that event's attendees. Used in Community, the audience is followers, all members, a group, members in arrears, or an event's attendees. An admin learns each tool once.
+**Shared services, not shared tables.** Messages, library, polls and reports reuse the same delivery, storage and audience services wherever possible. Event tools keep their own records and event-specific rules (material release times and speaker/session rules, live poll eligibility and presentation). Organisation-level tools get their own records. Event models are never made organisation-wide by making `event_id` nullable. Extraction is incremental: one service at a time, each with the existing event tests green.
 
-**No second events place.** Community does not get its own events. It connects to Events: a new event can be announced to followers and members; an event can be members-only or have a member price; Community's overview lists upcoming events and links into Events.
+**No second events place.** Community does not get its own events. It connects to Events: a new event can be announced to followers and members; an event can be members-only or have a member price (milestone 6); Community's overview lists upcoming events and links into Events.
 
-## 3. Decisions made (2026-10-15, with the owner)
+## 3. Decisions (owner, 2026-10-15)
 
 | Topic | Decision |
 |---|---|
-| Name | The console section is **Community**, with its own sub-menus like Events (six items, section 4). |
-| Following | Luma-style: anyone can follow an organisation from its page or any of its events. Followers hear about new events and can be messaged. |
-| Membership | A register on top of people. A member is a person with a membership type, a status and groups. |
-| Dues | Optional per membership type, so churches and free alumni groups fit. Dues engine from milestone 2 is reused. |
-| Giving | Voluntary money goes to **funds**. A fund is open-ended (Tithes, Offerings) or a **campaign** with a target and deadline (Funeral support, New roof). Event contributions become a fund linked to an event. |
-| Finance | One section for all money, reported by category; the separate "Dues payouts" menu from milestone 2 moves into Finance. |
-| Person's base | `/my` gains a Communities tab. Pay links keep working without sign-in. |
-| Polls and surveys | Live polls stay in Events. Community gets polls and surveys sent to an audience, answered in `/my` or from a link. Votes with eligibility rules come later. |
-| Simplicity | Every entry point must be simple to reason about and never confusing. Simplicity guides the design but never blocks a needed expansion (owner, 2026-10-15). |
-| `/my` look | Must feel gorgeous on mobile (app-like) and gorgeous on desktop; designed mobile-first. |
-| Commission | Base 1% for dues and giving, **negotiable per organisation**, and can be set higher; superadmin sets it per organisation and per stream. |
-| Event contributions | Become **funds linked to an event** (all current tenants are testing, so the data can be converted). |
-| Followers and SMS | Followers may be messaged by SMS; the organisation pays for its SMS. |
-| `/my` visibility | A person sees every organisation that holds their verified email or phone, including ones that added them as a member without a follow. |
-| Periods | Daily, weekly, monthly, quarterly and yearly. |
-| Campaign progress | A campaign fund shows its target, amount raised, amount left and percentage, to admins and (optionally) on its public page. |
-| Console navigation | Menus are grouped: venue and facility items sit in one Venue group (section 14). |
+| Name | The console section is **Community**, with its own sub-menus (section 4). |
+| Following | Luma-style: anyone can follow an organisation from its page or any of its events. Free on every plan. |
+| Membership | A register. A member has a membership type, a status and groups. |
+| Dues | Optional per membership type. The milestone 2 dues engine is reused. |
+| Periods | Daily, weekly, monthly, quarterly and yearly (section 7). |
+| Giving | Voluntary money goes to **funds**: open-ended (Tithes, Offerings) or a **campaign** with a target and optional deadline. |
+| Campaign progress | Target, raised, left to raise, percentage and givers, to admins and optionally on the public page. |
+| Event contributions | Associated with funds without rewriting history (section 5.4). |
+| Commission | Base 1% for dues and giving, negotiable per organisation and per stream, possibly higher; superadmin only (section 5.2). |
+| Finance | One section for all money; the separate "Dues payouts" menu moves into Finance. |
+| `/my` | The person's home: a native-feeling PWA on phones, a left-rail layout on desktop (section 6). |
+| `/my` visibility | A person sees every organisation that holds one of their verified identifiers (section 6.1). |
+| Followers and SMS | Followers may be messaged by SMS; the organisation pays for it. |
+| Polls and surveys | Live polls stay in Events. Community polls and surveys go to an audience. Votes come later. |
+| Console navigation | Grouped: Events, Community, Venue, Finance, Organisation (section 14). |
+| Pricing | Section 13, confirmed. |
+| Milestone 2 | Re-homed under Community on its branch, then merged. |
 
 ## 4. Community sub-menus
 
-Six items, so the section stays as easy to scan as Events: **Overview · People · Money · Messages · Library · Polls**. Settings live in a tab on Overview. An item the organisation has not switched on (for example Money for a church that collects nothing online) is hidden.
+**Overview · People · Money · Messages · Library · Polls.** Settings are a tab on Overview. An item the organisation has not switched on is hidden; nothing is hidden that the organisation has paid for or holds records in.
 
-- **Overview:** members, followers, collections this month, arrears, upcoming events (links to Events), recent messages; settings tab (follow/join options, reminder schedule, branding).
-- **People:** one list with tabs **Members · Followers · Groups**. Members is the register (milestone 2 screens, re-homed). Groups are branches, chapters, stations, ministries; a person can be in many; groups are audiences everywhere. Named "People", never "Team" (Team stays the organisation's staff).
-- **Money:** tabs **Dues · Giving**. Dues: membership types with an optional amount and period, charges, waive, void, record cash. Giving: funds and campaigns, a public give page per fund, gifts, and **bulk cash entry** (a Sunday collection counted in one sum with no donor). Reports and payouts are in Finance, linked from here.
-- **Messages:** compose to an audience by email and SMS, send now or schedule, using the organisation's credits (generalised from event blasts).
-- **Library:** documents for an audience (constitution, minutes, notices), generalised from event materials.
+- **Overview:** members, followers, collections this month, arrears, upcoming events (links to Events), recent messages; settings tab (follow and join options, reminder schedule, timezone, branding, SMS spending limit).
+- **People:** tabs **Members · Followers · Groups**. Groups are branches, chapters, stations, ministries; a person can be in many; groups are audiences everywhere. Never named "Team", "Leads" or "Contacts" (those exist for staff and venue enquiries).
+- **Money:** tabs **Dues · Giving**. Dues: membership types, charges, waive, void, record cash. Giving: funds and campaigns, give pages, gifts, bulk cash entry. Reports and payouts are in Finance, linked from here.
+- **Messages:** compose to an audience by email and SMS, send now or schedule (section 8).
+- **Library:** documents for an audience (constitution, minutes, notices).
 - **Polls:** polls and surveys to an audience, results and export.
 
 ## 5. Money
 
-Every cedi coming in through Community is either **owed** or **given**.
+### 5.1 Two kinds
 
 | | Dues (owed) | Giving (voluntary) |
 |---|---|---|
 | Examples | Union and association dues | Tithes, offerings, donations, building fund, funeral support, a project |
-| Shape | A member owes an amount per period | A gift to a fund; a campaign fund has a target and a deadline |
-| Arrears | Yes | No (pledges may come later) |
+| Shape | A member owes an amount per period | A gift to a fund |
+| Arrears | Yes | No (pledges later) |
 | Ledger category | `dues` (exists) | `giving` (new, carries the fund) |
-| Commission | Base 1%, uncapped, borne by the organisation; negotiable per organisation | Base 1%; negotiable per organisation |
+| Commission | Resolved per section 5.2 | Resolved per section 5.2 |
 
-Cash and transfer payments recorded by an admin carry no commission and post no ledger entry, as for dues today.
+### 5.2 Commercial terms
 
-**Reporting, all under Finance:**
+One resolver, `CommercialTerms::for(Tenant, Stream)`, answers rate, cap and bearer for each stream: `tickets`, `contributions` (until cut over to giving), `giving`, `dues`.
 
-- Collections: money in by category (events, dues, giving), by fund and by period; gross, fees, commission, net.
-- Arrears: who owes what, per group or membership type.
-- Member statement: a person's dues paid and gifts for a period, downloadable (churches issue annual giving statements).
-- Donors per fund, respecting anonymity.
-- Payouts: every payout with its category.
-- CSV export of each.
+- **Precedence:** a superadmin override for this organisation and stream, then the plan's default for the stream, then the platform default in config.
+- **Defaults:** 1% on paid plans, 2% on Free, uncapped; bearer is the organisation for dues and giving (tickets keep their existing bearer and cap rules, through the existing `PlatformFeeResolver`, which becomes the tickets branch of the resolver).
+- **Waivers:** an override of exactly 0 is an explicit waiver and is recorded as such; "no override" is different from "0".
+- **Who sets it:** superadmin only, through a platform permission `manage commercial terms`; every change is audited (who, when, old, new, reason).
+- **Frozen at checkout:** when a checkout starts, the rate, cap and bearer are stored on the payment attempt; confirmation uses the stored terms, so a plan or rate change cannot alter an in-flight payment. The commission amount is stored on the charge or gift.
+- **Reports use recorded amounts**, never today's rate.
+- Milestone 2 currently computes the dues fee from config at confirmation; milestone 1b replaces that with the resolver and frozen terms.
 
-**Reports read the domain records, not the ledger.** For an own-gateway organisation the ledger books only the commission, because the money never passes through the platform; gross collections live on the charges, gifts and registrations. Reports therefore sum those records (gross, fees, commission, net) and use the ledger only for balances and payouts. This is already how the event finance page works (it reads event ledger entries or merchant transactions depending on the settlement mode).
+### 5.3 Collections, balances and cash
 
-**Campaign progress.** A campaign fund has a target (for example GHS 100,000 for a building project) and optionally a deadline. Everywhere the fund appears (Money > Giving, the public give page, `/my`, Finance reports) it shows **raised**, **left to raise** (target minus raised, never below zero), a **percentage** and a progress bar, plus the number of givers. "Raised" counts what givers gave (gross), including cash recorded by an admin and bulk cash entries; fees and commission are shown separately in Finance. When the target is reached the campaign stays open by default and shows "Target reached" with any amount over it; the organisation can instead choose to close it automatically. The organisation can hide the amounts on the public page and show only the percentage. Pledges, when they come, will show as "promised" beside "raised".
+Three different numbers, never mixed:
 
-**Giving specifics:** anyone can give, not only members (visitors at a church); gifts can be anonymous; recurring giving is a reminder with a pay link, because mobile money cannot be auto-charged; cash collected in bulk is entered as one sum with no donor and appears in collections but not on any member statement.
+| Number | Means | Includes recorded cash? |
+|---|---|---|
+| **Collected** (reports, campaign progress) | Confirmed money in, by category, fund, period | Yes, shown as its own line |
+| **Collected online** | Money paid through MiConvener checkout (platform or own gateway) | No |
+| **Available to pay out** | Platform-collected money held for the organisation, less payouts in flight | No, never |
 
-The tenant Finance page currently returns 403 unless the plan handles ticket money; it must open for any organisation that collects dues or giving.
+- Recorded cash and bulk cash never increase the payable balance and post no ledger entry (as for dues today).
+- Reports read the domain records (charges, gifts, registrations) for gross, fees, commission and net, because for own-gateway organisations the ledger holds only the commission. The ledger is used for balances and payouts.
+- Refunds, reversals, voids and corrections reduce collected amounts in the period they happen and are shown as their own lines.
+- The tenant Finance page (today 403 unless the plan handles ticket money) opens for any organisation that collects dues or giving.
 
-## 6. People and `/my`
+### 5.4 Giving, campaigns and event contributions
 
-- **There is no person table, and none is added.** `/my` today has no accounts: a person proves an email address with a code, and `/my` finds their registrations and contributions in every organisation by that normalised email. Community follows the same rule: "me" is a verified email **or a verified phone number**, and `/my` finds the follows, memberships, charges and gifts that carry it. Members and followers keep their own name, email and phone, as milestone 2's members already do. This avoids identity merging, keeps phone-only members first-class, and matches how `/my` already works.
-- **`/my` is the person's app.** It is a PWA that must look and behave like a native phone app and adapt gracefully on desktop (owner's reference designs, 2026-10-15: event-discovery and ticket apps with a greeting header, card lists with large imagery, pill filters, a ticket "pass" with QR code and download/share actions, and a bottom tab bar):
-  - **Phone:** a bottom tab bar with five tabs: **Home** (greeting, what needs attention today: dues due, next event, unread messages), **Tickets** (passes with QR, wallet style), **Communities** (organisations I follow or belong to), **Money** (dues to pay, giving, receipts and statements), **Me** (profile, phone and email, notifications, sign out). Full-bleed cards, large touch targets, pill filters, sheet-style dialogs, safe-area insets, installable with an icon and splash, works offline for tickets.
-  - **Desktop:** the same five sections as a left rail with a wider, two-column layout (list and detail side by side); nothing hides that exists on the phone.
-  - Uses MiConvener's design tokens and dark mode; the reference images guide layout and feel, not colours or branding.
-  - Each organisation page inside `/my` carries that organisation's name and logo, so members recognise their union or church.
-- `/my` gains **Communities**: for each organisation I follow or belong to, my dues and a pay button, my giving history and statements, messages, the library and open polls.
-- **Phone sign-in.** `/my` signs in by an email code today. Many drivers and church members have only a phone, so `/my` needs an SMS code sign-in. The SMS integration exists.
-- Pay links in reminders keep working without sign-in.
-- Following is consent: messaging followers is opt-in and every message carries an unfollow link.
+- **Campaign progress:** raised = confirmed gifts (online and recorded cash, including bulk cash) minus refunds, reversals and corrections; left to raise = target minus raised, never below zero; percentage; progress bar.
+- **Givers** means distinct identified givers (by verified email or phone, or the admin-entered giver), not transactions. Bulk cash counts toward raised but adds no giver.
+- **At the target** the campaign stays open and shows "Target reached" and any amount over it, unless the organisation chose to close it automatically.
+- **Public page** can show amounts or only the percentage.
+- **Anonymity:** an anonymous gift hides the giver's name on public pages and from staff without `read finance`; staff with `read finance` see it, because statements and audits need it. The giver still sees it in `/my`.
+- **Anyone can give,** members or not. Recurring giving is a reminder with a pay link (mobile money cannot be auto-charged).
+- **Event contributions:** real settled money exists (the probe tenant holds live charges), and historical event payouts may already combine ticket and contribution money. So history is not rewritten: existing contributions keep their records, references, receipts, tributes, links, ledger category (`event`) and payouts; each is associated with a fund linked to its event so it appears in giving reports and `/my`. A **cutover date** is set: contributions made after it are giving transactions in the `giving` category. A before-and-after reconciliation (balances, payouts, `/my` histories, receipts) runs in tests and on production, with a documented rollback (drop the associations; no balances move).
 
-## 7. Polls, surveys and votes
+## 6. People, identity and `/my`
 
-- Live polls and poll decks stay in Events (they need a live session).
-- Community polls and surveys go to an audience and are answered in `/my` or from a link, built on the existing poll and form engines lifted to organisation level.
-- Votes (for example AGM elections) need one member one vote and eligibility rules such as paid-up members only. Later milestone; needs its own design.
+### 6.1 Identity and access
 
-## 8. Out of scope for now
+- **No person table.** "Me" is a set of identifiers I have proven in this session: a verified email and/or a verified phone number. `/my` shows only records that carry **exactly** one of those normalised identifiers.
+- **Each identifier is verified independently.** A record holding email A and phone B is visible to someone who verified A or B. Verifying A never reveals other records that hold B, and never links histories across organisations because one organisation typed A beside B.
+- **Adding a second identifier** to a session requires verifying it too.
+- **Contact changes:** when an admin changes a member's phone or email, access follows the new value immediately; the old value loses access; the member is notified on both old and new channels where possible.
+- **Shared family numbers:** several members may share a phone (milestone 2's unique `(tenant_id, phone)` constraint is dropped; imports deduplicate on name plus phone). Whoever verifies the number sees each member that holds it, clearly separated.
+- **Recycled numbers:** sessions expire (30 days, re-verify); organisations can mark a number as no longer belonging to a member; `/my` shows a member record's name so a new holder of a number can report "this is not me", which notifies the organisation.
+- **Pay links** authorise only that member's open charges and receipts at that organisation. They never open `/my` and never reveal other records.
+- **Sign-in codes:** email and SMS codes are throttled per identifier and per IP; SMS sign-in codes are paid by the platform and capped per number per day.
 
-Payroll check-off for unions, recurring card auto-charge for dues, partial and advance dues payments, pledges, votes, a chat or forum for communities, multi-level chapter hierarchies (groups are flat).
+### 6.2 `/my` as an app
+
+Owner's reference designs (2026-10-15): event and ticket apps with a greeting header, card lists with large imagery, pill filters, wallet-style ticket passes with QR codes and download/share actions, and a bottom tab bar. They guide layout and feel, not colours; `/my` uses MiConvener's tokens and dark mode.
+
+- **Phone:** bottom tab bar: **Home** (greeting; what needs attention: dues due, next event, unread messages), **Tickets** (passes with QR), **Communities** (organisations I follow or belong to, each with its name and logo), **Money** (dues to pay, giving, receipts and statements), **Me** (identifiers, notifications and preferences, sign out). Full-bleed cards, large touch targets, sheet dialogs, safe-area insets, installable with icon and splash.
+- **Desktop:** the same five sections as a left rail with a two-column layout (list and detail). Nothing on the phone is missing on desktop.
+- **Accessibility:** WCAG 2.2 AA; keyboard and screen-reader navigation; text scales without breaking layouts.
+- **States:** skeleton loading, empty states, clear error states with retry, offline banner.
+- **Offline boundary:** only ticket passes are cached for offline use. Financial histories, membership lists, messages and private documents are never cached by the service worker. All personal caches are cleared on sign-out and when the session's identifiers change.
+
+### 6.3 Following and joining
+
+- **Follow:** one tap from an organisation or event page after verifying an email or phone. Following is consent to hear from the organisation; every non-service message carries an unfollow link.
+- **Join** (milestone 3): the organisation chooses **approval required** (default), **immediate**, or **invitation only** (admin adds members). A join request creates a member with status `pending`.
+- **Member statuses:** `pending` (requested, not approved; no charges), `active` (charged and eligible for member benefits), `lapsed` (set by an admin; no new charges; not eligible for member-only benefits), `exited` (left; no charges; history kept).
+
+## 7. Dues schedules
+
+Adding enum values is not enough; generation is redesigned in milestone 1b.
+
+- **Anchors, in the organisation's timezone:** daily = each calendar day; weekly = the organisation's chosen weekday (default Monday); monthly = day 1; quarterly = 1 January, April, July, October; yearly = 1 January or the organisation's financial-year start month.
+- **Joining mid-period:** the first charge is the next full period, unless the admin chooses to charge the current one.
+- **Missed scheduler runs:** each run generates every period that should exist up to `generate_days_ahead`, so a missed day is caught up; the unique `(member_id, period_start)` index keeps it idempotent.
+- **Type changes:** affect future charges only; existing charges keep their amount, currency and period.
+- **Exit and rejoin:** no charges from the exit date; rejoining resumes from the next period, with no back-charges for the gap.
+- **Three different "no charge" cases:** a membership type **without an amount** raises no charges at all; a member **override of 0** raises charges marked `waived` (the record shows the waiver); an **inactive** membership type raises no new charges and its members are listed for the admin to move.
+- **Reminders aggregate per member,** not per charge, so a daily payer gets at most one reminder a day (configurable to weekly) listing everything open.
+
+## 8. Audiences, messages and consent
+
+- **Audience resolver** (shared by events and Community): resolves recipients inside one organisation only; deduplicates by normalised channel address (a person who is both member and follower gets one message).
+- **Re-evaluated at send time:** a scheduled message's audience (group membership, opt-outs, statuses) is resolved when it is sent; scheduling shows an estimate.
+- **Preferences** per organisation and identifier: marketing (announcements, newsletters) can be switched off; **service messages** (receipts, payment notices, dues reminders) and **sign-in codes** cannot. An unsubscribe made before a scheduled send is honoured.
+- **Permissions:** sending requires a staff permission (`send community messages`); audiences that reveal money status (in arrears) also require `read finance`.
+- **SMS spending limit:** a monthly organisation-level cap on SMS credits for messages and reminders, plus per-number and per-IP throttles for sign-in codes.
 
 ## 9. What changes in milestone 2's code
 
-Milestone 2 (`member-dues-m2`, 8 tasks plus fixes, 2377 tests green, clicked through end to end in Paystack test mode) is kept. Changes, cheap because nothing is deployed:
+Milestone 2 (`member-dues-m2` at `61224d2`; 2377 tests green; clicked through end to end in Paystack test mode) is kept. Changes:
 
-- `members` keeps its own name, email and phone (no person table, see section 6); phone and email are normalised so `/my` can find them.
-- `dues_classes` becomes **membership types** with an optional amount and period; a type without an amount raises no charges.
-- "Dues payouts" nav moves into Finance as a payouts view filtered by category.
-- Console routes move under Community (`tenant.community.*`), and the `member_dues` gate becomes a `community` gate.
-- The weekly period (drivers' associations often collect weekly) is added to the period enum.
+- `dues_classes` becomes **membership types** with an optional amount and period, all five periods, anchors per section 7.
+- Drop the unique `(tenant_id, phone)` on members (shared numbers); normalise email and phone.
+- Fee computation moves to the commercial terms resolver with frozen terms (section 5.2).
+- Console routes move under `tenant.community.*`; **public URLs do not change** (`/pay/{token}` and its callback and receipt keep working, including links already sent).
+- "Dues payouts" moves into Finance > Payouts (filtered by category).
+- The single `member_dues` gate splits into three layers (section 13.1).
 
-## 10. Milestones (re-cut; each deployable and dark-launched)
+## 10. Milestones
 
-Ordered by what makes the product usable for a paying association soonest; Following comes once there is something to follow for.
+Each is deployable, dark-launched behind its rollout switch, and independently reviewable.
 
-1. **Community shell and usable dues.** Re-home milestone 2 under Community (section, gate, routes, membership types with optional amount, weekly period); `dues:process` charge generation; reminders and the arrears button; CSV import; payouts moved into Finance; Finance page open to non-ticket organisations with a dues collections and arrears report.
-2. **Messages and groups.** Organisation-level messages (generalised blasts) with audiences (all members, group, arrears) and scheduling; groups.
-3. **People and Following.** Follow button on organisation and event pages (opt-in), followers tab, announcing new events to followers, `/my` Communities tab, SMS sign-in for `/my`.
-4. **Giving.** Funds and campaigns, give pages, bulk cash entry, giving reports and member statements. Event contributions are converted into funds linked to their event (current tenants are all testing, so a one-time data conversion is acceptable); receipts, tributes and `/my` history move with them.
-5. **Library and polls.** Organisation-level library and polls/surveys, answered in `/my`.
+1. **1a Community shell and re-homing.** Grouped console navigation (section 14); Community section; membership types (optional amount, no generation changes yet); routes re-homed with public URLs preserved; Dues payouts moved into Finance; gates split. No money logic changes.
+2. **1b Charges and periods.** Commercial terms resolver with frozen terms; all five periods with anchors and timezone; `dues:process` generation with catch-up; joining, type change, exit/rejoin and the three no-charge cases; shared numbers.
+3. **1c Import, reminders and Finance.** CSV import with preview, per-row errors and dedupe; aggregated reminders and the arrears button; Finance opened to non-ticket organisations; collections vs available-to-pay-out; dues collections and arrears reports and CSV.
+4. **2 Messages and groups.** Groups; audience resolver; organisation-level messages with scheduling and preferences; SMS spending limit.
+5. **3 People, Following and Join.** Identity rules (section 6.1) and SMS sign-in; follow; join with approval; followers tab; announcing new events to followers; `/my` Communities data.
+6. **4 `/my` app.** The app shell and redesign (section 6.2) across Home, Tickets, Communities, Money, Me.
+7. **5 Giving.** Funds, campaigns, give pages, bulk cash, giving reports and statements; contribution association and cutover (section 5.4).
+8. **6 Member benefits in Events.** Members-only events and member pricing; eligibility (an `active` member matching a verified identifier) checked at checkout and again at confirmation.
+9. **7 Library and polls.** Organisation-level library and polls/surveys answered in `/my`.
 
 Votes, pledges and chapter hierarchies come after, each with its own design.
 
-## 11. Decisions on the former open questions (2026-10-15)
+## 11. Out of scope for now
 
-1. Commission: base 1% for dues and giving, negotiable and possibly higher per organisation; set by the superadmin per organisation and per stream (tickets, contributions/giving, dues).
-2. Milestone 2 is re-homed under Community on its own branch, then merged.
-3. Followers may be messaged by SMS; the organisation pays for it.
-4. A person sees in `/my` every organisation that holds their verified email or phone.
-5. Plans and pricing: section 13, confirmed by the owner.
-6. Daily periods are included alongside weekly.
-
-## 11. Open decisions
-
-1. Commission on giving (1% like contributions, or different).
-2. Whether milestone 2 merges dark before milestone 1 of this plan, or the re-homing happens on its branch first. Recommendation: re-home on the branch, then merge.
-3. Whether followers who never attended an event can be messaged by SMS (cost and consent).
-4. Whether a person may see, in `/my`, organisations they were added to as a member but never followed.
-5. Plans and pricing for Community: which plan includes it, member cap (the dues design said Starter 200, Growth 2,000, Enterprise unlimited), any follower cap, and whether giving needs a higher plan.
-6. Daily dues periods (some drivers' unions collect daily at stations) in addition to weekly.
+Payroll check-off, recurring card auto-charge for dues, partial and advance dues payments, pledges, votes, a community chat or forum, multi-level chapter hierarchies (groups are flat), automatic lapsing of members.
 
 ## 12. Risks
 
-- **Confusion between People, Members and Followers.** Mitigation: one People list with clear filters; a member is always a person; a follower is a person who opted in.
-- **Generalising event tools could break events.** Mitigation: the event tools become callers of the shared engine with the audience fixed to the event; every existing event test must stay green.
-- **Consent and data protection.** Members are added by the organisation, not by themselves. Dues reminders and receipts are service messages; anything else (announcements, newsletters) to members or followers needs an opt-out link, and the privacy page names the organisation as controller and MiConvener as processor.
-- **SMS sign-in cost and abuse.** Each `/my` sign-in code by SMS costs the platform a credit; it needs per-number and per-IP throttles.
-- **Name clashes.** The console already has "Inquiries & Leads" (venue enquiries) and "Team" (staff). Community must not reuse "leads", "contacts" or "team".
-- **Payment-processor classification** for dues and giving (Paystack): confirm before enabling for real organisations (carried from the dues design).
+- **Identity leakage across organisations.** Mitigation: section 6.1; tests that verifying one identifier never reveals records holding another.
+- **Breaking events while extracting shared services.** Mitigation: section 2; every event suite green per extraction.
+- **Misstated balances from cash or history rewrites.** Mitigation: sections 5.3 and 5.4; reconciliation before and after.
+- **Consent and data protection.** Members are added by organisations; service versus marketing messages are separated; privacy page names the organisation as controller and MiConvener as processor.
+- **SMS cost.** Organisation spending cap; platform caps on sign-in codes.
+- **Payment-processor classification** for dues and giving (Paystack): confirm before enabling for real organisations.
 
 ## 13. Plans and pricing (confirmed by the owner, 2026-10-15)
 
-Principles: Following is the growth engine for events, so it is free on every plan; Community revenue comes mainly from the plan (priced by member count) and SMS packs, because commission on small, frequent dues (for example a GHS 2 daily driver's due earns GHS 0.02 at 1%) is too small to carry the product.
+Following is free on every plan; Community revenue comes mainly from the plan (priced by member count) and SMS packs, because commission on small, frequent dues is too small to carry the product (a GHS 2 daily due earns GHS 0.02 at 1%).
 
 | | Free | Starter (GHS 249) | Growth (GHS 499) | Enterprise |
 |---|---|---|---|---|
 | Followers and announcing events | Yes | Yes | Yes | Yes |
-| Members | 50 | 500 | 5,000 | Unlimited / negotiated |
-| Dues and giving online | Yes, at 2% | Yes | Yes | Yes |
-| Messages (email; SMS from packs) | Send now | Send now and schedule | Schedule, groups | All |
+| Members | 50 | 500 | 5,000 | Negotiated |
+| Groups | Yes | Yes | Yes | Yes |
+| Dues and giving online | Yes, 2% | Yes, 1% | Yes, 1% | Negotiated |
+| Messages (email; SMS from packs) | Send now | Send now and schedule | Schedule, and send to groups | All |
 | Library | No | Yes | Yes | Yes |
 | Polls and surveys | No | No | Yes (with live polling) | Yes |
 | Reports and statements | Basic | Full | Full | Full |
 
-- Commission default 1% on paid plans, 2% on Free, overridable per organisation (higher or lower).
-- Add-on: extra members in blocks (for example +1,000 members for GHS 50 a month) so a growing union upgrades smoothly instead of hitting a wall.
-- SMS packs (already on sale once a provider token is set) are the main usage revenue for reminders and messages.
-- Annual billing discount as for existing plans.
+- Add-on: extra members in blocks (for example +1,000 for GHS 50 a month).
+- SMS packs are the main usage revenue for reminders and messages. Annual discount as for existing plans.
+
+### 13.1 Gates, limits and downgrades
+
+- **Three separate layers:** a **rollout switch** per milestone (admin-override feature rows, as `dues:enable` does today, then removed when generally available); **plan entitlements** (member cap, scheduling, group messaging, library, polls); **staff permissions** (`manage members`, `send community messages`, `read finance`, `manage payouts`). Following has its own rollout switch and no plan gate, so no Community gate can hide it.
+- **Members counted toward the cap:** `pending`, `active` and `lapsed`; `exited` do not count.
+- **Over the cap** (after a downgrade or cap change): nothing is deleted; existing members keep being charged and can pay; adding, importing and approving new members is blocked with a message naming the plan and the number.
+- **Downgrades never remove** payment history, receipts, statements, existing liabilities, balances or payouts. Paid-for features turn read-only rather than disappearing (for example scheduled messages stay listed but cannot be created).
 
 ## 14. Console navigation groups
 
-The console's flat menu is grouped so each section is easy to find. Groups collapse, remember their state, and hide when the organisation does not use them.
+Groups collapse, remember their state, and hide when the organisation does not use them.
 
 | Group | Items |
 |---|---|
@@ -198,4 +240,15 @@ The console's flat menu is grouped so each section is easy to find. Groups colla
 | **Organisation** | Team, Roles, Billing, Settings, API keys, AI usage and configuration |
 | (bottom) | My account |
 
-Today the venue items (Facility Operations, Venue Spaces, Venue Calendar, Inquiries & Leads, RFQs & Proposals) sit loose between Events and Team; this grouping is part of Community milestone 1 because that milestone adds the Community group to the same menu.
+## 15. Implementation handoff
+
+For Claude, Codex or a person continuing this work.
+
+- **Baselines:** `main` at `c9da26e` (milestone 1 of the dues design deployed); `member-dues-m2` at `61224d2` (milestone 2 built, unmerged, dark); this spec on `community-design`.
+- **Decisions:** section 3. **Unresolved:** none blocking milestone 1a. To confirm when their milestones are planned: the default reminder cadence for daily payers (daily or weekly digest); whether lapsed members may buy at member prices.
+- **Compatibility requirements:** existing `/pay/{token}` links, callbacks and receipts keep working; Paystack metadata `type = member_dues` keeps being accepted; existing event contributions, receipts and `/my` history unchanged by any migration; the probe tenant's live records untouched.
+- **Per milestone, acceptance criteria and regression tests** are written into its implementation plan. Always green: Finance, Payments, Dues, Events and attendee-portal suites; `PayoutOtpFlowTest`; `finance:verify-categories` exits 0.
+- **Rollout:** each milestone behind its own switch, enabled first for an internal tenant, then per organisation.
+- **Operational checks after each deploy:** `finance:verify-categories`; `payouts:reconcile` runs cleanly; scheduler health; a test checkout in Paystack test mode.
+- **Recovery:** switch the milestone off (no data loss); migrations reversible; money migrations come with a reconciliation report and a documented rollback.
+- **Local test state on the owner's machine** (from the milestone 2 click-through): see the project memory file `member_dues_design_decisions.md`.
