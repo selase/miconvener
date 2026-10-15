@@ -23,7 +23,7 @@ beforeEach(function () {
 function duesPagesFixture(string $slug = 'acme'): array
 {
     [$tenant, $user] = eventHost($slug);
-    Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+    Artisan::call('community:enable', ['tenant' => $tenant->slug]);
     $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
 
     return [$tenant->fresh(), $user, $class, eventSubdomainHost($slug)];
@@ -81,7 +81,7 @@ test('a member\'s pay link opens that member\'s own pay page', function () {
 
 test('the members, classes and payouts pages are 404 while dues are off', function (string $routeName) {
     [$tenant, $user, , $host] = duesPagesFixture();
-    $tenant->features()->where('feature_key', 'member_dues')->update(['enabled' => false]);
+    $tenant->features()->where('feature_key', 'community')->update(['enabled' => false]);
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
         ->get(route($routeName, ['subdomain' => 'acme']))
@@ -108,12 +108,12 @@ test('member_dues is a shared feature only while dues are enabled', function () 
     [$tenant, $user, , $host] = duesPagesFixture();
 
     $this->actingAs($user)->get("http://{$host}/settings/webhooks", ['HTTP_HOST' => $host])
-        ->assertInertia(fn (Assert $page) => $page->where('tenant.features.member_dues', true));
+        ->assertInertia(fn (Assert $page) => $page->where('tenant.features.community', true));
 
-    $tenant->features()->where('feature_key', 'member_dues')->update(['enabled' => false]);
+    $tenant->features()->where('feature_key', 'community')->update(['enabled' => false]);
 
     $this->actingAs($user)->get("http://{$host}/settings/webhooks", ['HTTP_HOST' => $host])
-        ->assertInertia(fn (Assert $page) => $page->where('tenant.features.member_dues', false));
+        ->assertInertia(fn (Assert $page) => $page->where('tenant.features.community', false));
 });
 
 test('the info flash from the pay callback is shared so the pay page can show it', function () {

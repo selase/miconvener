@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enum\LedgerCategoryEnum;
 use App\Enum\TenantStatusEnum;
 use App\Libraries\Helper;
 use App\Traits\HasUuid;
@@ -266,9 +267,32 @@ final class Tenant extends Model
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();
     }
 
-    public function duesEnabled(): bool
+    /**
+     * The Community rollout switch (`php artisan community:enable`).
+     */
+    public function communityEnabled(): bool
     {
-        return $this->featureEnabled('member_dues');
+        return $this->featureEnabled('community');
+    }
+
+    /**
+     * Whether the tenant holds or has paid out dues money: a dues ledger
+     * account or a dues payout exists. Payouts and reports stay reachable on
+     * this alone, so turning Community off never strands collected money.
+     */
+    public function hasDuesMoney(): bool
+    {
+        return LedgerAccount::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists()
+            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists();
+    }
+
+    /**
+     * Whether the Finance section shows: ticket money, Community, or dues
+     * money still held. The menu and the page both use this.
+     */
+    public function showsFinance(): bool
+    {
+        return $this->handlesTicketMoney() || $this->communityEnabled() || $this->hasDuesMoney();
     }
 
     public function paymentGateways(): HasMany

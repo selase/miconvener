@@ -113,7 +113,8 @@ final class Kernel extends HttpKernel
         '2fa_challenge' => Middleware\TwoFactorChallenge::class,
         'mcp_tier' => Middleware\IdentifyMarketplaceMcpPartner::class,
         'event_staff_scope' => Middleware\RestrictEventStaffToAssignedEvents::class,
-        'dues.enabled' => Middleware\EnsureDuesEnabled::class,
+        'community.enabled' => Middleware\EnsureCommunityEnabled::class,
+        'dues.money' => Middleware\EnsureDuesMoneyOrCommunity::class,
     ];
 
     /**

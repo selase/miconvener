@@ -304,7 +304,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
 
-    Route::middleware('dues.enabled')->prefix('dues')->name('tenant.dues.')->group(function (): void {
+    Route::middleware('community.enabled')->prefix('dues')->name('tenant.dues.')->group(function (): void {
         Route::get('payouts', [DuesPayoutController::class, 'index'])->name('payouts.index');
         Route::post('payouts', [DuesPayoutController::class, 'store'])->name('payouts.store');
         Route::post('payouts/{payout}/send', [DuesPayoutController::class, 'send'])->name('payouts.send');
@@ -505,8 +505,8 @@ Route::post('/e/{event}/forum/{thread}/report', [PublicForumController::class, '
 // more tightly. A new payment can only be started while dues are switched on;
 // a payment already made still returns to its callback and receipt.
 Route::prefix('pay/{token}')->name('public.dues.')->group(function (): void {
-    Route::get('/', [App\Http\Controllers\Public\MemberPayController::class, 'show'])->middleware(['dues.enabled', 'throttle:dues-view'])->name('show');
-    Route::post('/checkout', [App\Http\Controllers\Public\MemberPayController::class, 'checkout'])->middleware(['dues.enabled', 'throttle:dues-pay'])->name('checkout');
+    Route::get('/', [App\Http\Controllers\Public\MemberPayController::class, 'show'])->middleware(['community.enabled', 'throttle:dues-view'])->name('show');
+    Route::post('/checkout', [App\Http\Controllers\Public\MemberPayController::class, 'checkout'])->middleware(['community.enabled', 'throttle:dues-pay'])->name('checkout');
     Route::get('/callback', [App\Http\Controllers\Public\MemberPayController::class, 'callback'])->middleware('throttle:dues-view')->name('callback');
     Route::get('/receipt', [App\Http\Controllers\Public\MemberPayController::class, 'receipt'])->middleware('throttle:dues-view')->name('receipt');
 });

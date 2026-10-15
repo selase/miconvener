@@ -35,7 +35,7 @@ if (! function_exists('payPageFixture')) {
     {
         [$tenant] = eventHost($slug);
         $tenant->update($tenantAttributes);
-        Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+        Artisan::call('community:enable', ['tenant' => $tenant->slug]);
 
         $member = Member::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Ama Mensah', 'email' => 'ama@example.com']);
 
@@ -145,7 +145,7 @@ test('a token from another organisation\'s domain returns 404', function () {
 test('a pay link of an organisation without dues switched on returns the same 404', function () {
     [$tenant, $member, $host] = payPageFixture();
     $charge = payPageCharge($member, 10000);
-    $tenant->features()->where('feature_key', 'member_dues')->update(['enabled' => false]);
+    $tenant->features()->where('feature_key', 'community')->update(['enabled' => false]);
     payPageFakePaystack();
 
     $disabled = $this->get("http://{$host}/pay/{$member->pay_token}");

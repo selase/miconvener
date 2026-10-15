@@ -27,8 +27,8 @@ final class FinanceController extends Controller
         $this->authorize('read finance');
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        if (! $tenant->showsFinance()) {
+            abort(403, 'Finance is not available for this organisation.');
         }
 
         // A platform_default tenant's charges are collected on the platform's own

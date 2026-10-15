@@ -26,7 +26,7 @@ beforeEach(function () {
 function duesMembersTenant(string $slug = 'acme'): array
 {
     [$tenant, $user] = eventHost($slug);
-    Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+    Artisan::call('community:enable', ['tenant' => $tenant->slug]);
     $class = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => 5000]);
 
     return [$tenant->fresh(), $user, $class];

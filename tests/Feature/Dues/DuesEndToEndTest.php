@@ -44,7 +44,7 @@ if (! function_exists('duesE2eConsole')) {
     {
         [$tenant, $user] = eventHost($slug);
         $tenant->update(['settlement_mode' => $settlementMode]);
-        expect(Artisan::call('dues:enable', ['tenant' => $tenant->slug]))->toBe(0);
+        expect(Artisan::call('community:enable', ['tenant' => $tenant->slug]))->toBe(0);
         $console = fn () => test()->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost($slug)]);
 
         $classId = $console()

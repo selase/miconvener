@@ -37,7 +37,7 @@ if (! function_exists('duesConfirmFixture')) {
     {
         [$tenant] = eventHost($slug);
         $tenant->update($tenantAttributes);
-        Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+        Artisan::call('community:enable', ['tenant' => $tenant->slug]);
 
         $member = Member::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Ama Mensah', 'email' => 'ama@example.com']);
 

@@ -146,7 +146,7 @@ git commit -m "refactor(community): membership types replace dues classes, dues 
 - Produces: `Tenant::communityEnabled(): bool`; `Tenant::hasDuesMoney(): bool`; `tenant.features.finance` and `FinanceController` both use `handlesTicketMoney() || communityEnabled() || hasDuesMoney()`; middleware alias `community.enabled`; command `community:enable`; shared prop `tenant.features.community`.
 - Keeps: Paystack metadata `type = member_dues` (that string is a payment type, not the switch; do not rename it).
 
-- [ ] **Step 1: Write the failing tests** (move and rename the existing gate tests, then add):
+- [x] **Step 1: Write the failing tests** (move and rename the existing gate tests, then add):
 
 ```php
 test('community:enable writes the community switch as an admin override that survives a feature sync', function () { /* as the old dues:enable test, with 'community' */ });
@@ -157,10 +157,13 @@ test('an existing member_dues row becomes a community row', function () {
 test('the shared props expose tenant.features.community', function () { /* Inertia assertion */ });
 ```
 
-- [ ] **Step 2: Run, see them fail.** Run: `"$PHP" artisan test --compact tests/Feature/Community/CommunityGateTest.php`. Expected: FAIL (command not found).
-- [ ] **Step 3: Implement** the renames and the data migration.
-- [ ] **Step 4: Run** `"$PHP" artisan test --compact tests/Feature/Community tests/Feature/Dues`. Expected: PASS.
-- [ ] **Step 5: Commit** `refactor(community): one community rollout switch replaces member_dues`.
+- [x] **Step 2: Run, see them fail.** Run: `"$PHP" artisan test --compact tests/Feature/Community/CommunityGateTest.php`. Expected: FAIL (command not found).
+- [x] **Step 3: Implement** the renames and the data migration.
+- [x] **Step 4: Run** `"$PHP" artisan test --compact tests/Feature/Community tests/Feature/Dues`. Expected: PASS.
+- [x] **Step 5: Commit**
+
+  Ruling: `hasDuesMoney()`, `showsFinance()` and the `dues.money` middleware were built here (the plan listed them under Task 2's interfaces and Task 3's files); the Finance page and menu both use `showsFinance()`; refunds keep `handlesTicketMoney()`.
+ `refactor(community): one community rollout switch replaces member_dues`.
 
 ---
 

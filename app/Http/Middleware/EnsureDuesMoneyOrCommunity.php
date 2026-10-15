@@ -10,11 +10,11 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Hides every dues console URL from a tenant that does not have member dues
- * switched on. A 404 rather than a 403, so a dark-launched feature does not
- * announce itself.
+ * Keeps dues payouts reachable while a tenant holds dues money, even after the
+ * Community switch is turned off: the switch stops new activity, never the
+ * settlement of money already collected.
  */
-final readonly class EnsureDuesEnabled
+final readonly class EnsureDuesMoneyOrCommunity
 {
     public function __construct(private TenantContext $tenantContext) {}
 
@@ -23,7 +23,9 @@ final readonly class EnsureDuesEnabled
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $this->tenantContext->getTenant()?->duesEnabled()) {
+        $tenant = $this->tenantContext->getTenant();
+
+        if (! $tenant || (! $tenant->communityEnabled() && ! $tenant->hasDuesMoney())) {
             abort(404);
         }
 

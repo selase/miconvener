@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Enum\DuesPeriodEnum;
-use App\Models\MembershipType;
 use App\Models\Member;
+use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -25,7 +25,7 @@ beforeEach(function () {
 function membershipTypesTenant(string $slug = 'acme'): array
 {
     [$tenant, $user] = eventHost($slug);
-    Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+    Artisan::call('community:enable', ['tenant' => $tenant->slug]);
 
     return [$tenant->fresh(), $user];
 }

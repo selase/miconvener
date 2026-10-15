@@ -34,7 +34,7 @@ beforeEach(function () {
 function duesPayoutTenantWithBalance(int $gross = 10000): array
 {
     [$tenant, $user] = eventHost('acme');
-    Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+    Artisan::call('community:enable', ['tenant' => $tenant->slug]);
 
     $member = Member::factory()->create(['tenant_id' => $tenant->id]);
     $charge = DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $member->membership_type_id, 'amount' => $gross]);
@@ -332,7 +332,7 @@ test('the payouts page tells the client whether the user may request and send pa
 test('a dues-only tenant with no events can add a payout account and then see it on the payouts page', function () {
     Http::fake(['api.paystack.co/bank/resolve*' => Http::response(['status' => true, 'data' => ['account_name' => 'Union Treasurer']])]);
     [$tenant, $user] = eventHost('acme');
-    Artisan::call('dues:enable', ['tenant' => $tenant->slug]);
+    Artisan::call('community:enable', ['tenant' => $tenant->slug]);
     $host = eventSubdomainHost('acme');
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])
