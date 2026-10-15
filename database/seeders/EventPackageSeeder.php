@@ -14,6 +14,8 @@ final class EventPackageSeeder extends Seeder
      * @var array<string, array{name: string, type: string, description: string}>
      */
     private array $features = [
+        'community_message_scheduling' => ['name' => 'Scheduled Community Messages', 'type' => 'boolean', 'description' => 'Schedule Community announcements.'],
+        'community_group_messaging' => ['name' => 'Group Community Messages', 'type' => 'boolean', 'description' => 'Send Community announcements to member groups.'],
         'events_in_flight' => ['name' => 'Concurrent Live Events', 'type' => 'limit', 'description' => 'Maximum non-archived events at a time.'],
         'event_registrations' => ['name' => 'Registrations Per Month', 'type' => 'limit', 'description' => 'Maximum confirmed registrations across all events per month.'],
         'community_members' => ['name' => 'Community Members', 'type' => 'limit', 'description' => 'Maximum pending, active and lapsed community members. Exited members do not count.'],
@@ -47,6 +49,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => 2000,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_message_scheduling' => false,
+                'community_group_messaging' => false,
                 'events_in_flight' => 1,
                 'event_registrations' => 50,
                 'community_members' => 50,
@@ -76,6 +80,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => 2500,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_message_scheduling' => true,
+                'community_group_messaging' => false,
                 'events_in_flight' => 3,
                 'event_registrations' => 500,
                 'community_members' => 500,
@@ -105,6 +111,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => 2000,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_message_scheduling' => true,
+                'community_group_messaging' => true,
                 'events_in_flight' => 15,
                 'event_registrations' => 3000,
                 'community_members' => 5000,
@@ -134,6 +142,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_message_scheduling' => true,
+                'community_group_messaging' => true,
                 'events_in_flight' => -1,
                 'event_registrations' => -1,
                 'community_members' => -1,

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -75,6 +76,12 @@ final class Member extends Model
     public function charges(): HasMany
     {
         return $this->hasMany(DuesCharge::class);
+    }
+
+    /** @return BelongsToMany<CommunityGroup, $this> */
+    public function groups(): BelongsToMany
+    {
+        return $this->belongsToMany(CommunityGroup::class, 'community_group_members', 'member_id', 'group_id')->withPivot('tenant_id')->withTimestamps();
     }
 
     /**

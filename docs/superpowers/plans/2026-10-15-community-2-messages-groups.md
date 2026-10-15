@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md`, sections 2, 4, 8, 10, 13 and 13.1. Roadmap milestone 2. Baseline `a3880c2` on main, deployed; original Claude checkout remains on `community-1a`.
 
-**Status:** Proposed for owner review. Nothing in this plan is implemented. Planning branch `codex/community-2-plan`; do not merge or push to main (main auto-deploys).
+**Status:** Owner approved via Proceed. Inline implementation on `codex/community-2`; no merge/deployment approval for this milestone. Task checkboxes record progress. Main auto-deploys.
 
 ## Global Constraints
 
@@ -65,7 +65,7 @@
 
 **Interfaces:** `MessageEntitlements::canSchedule(Tenant): bool`, `canMessageGroups(Tenant): bool`; resolve explicit feature overrides first, otherwise standard plan fallback. Unknown/custom plans default off unless explicitly entitled; never fail open. `CommunityGroup::members(): BelongsToMany`; group management requires Community + `manage members`.
 
-- [ ] Write failing cross-tenant, duplicate-name, repeat attach, missing member, archive, authorization and Free/Starter/Growth/Enterprise matrix tests. Example:
+- [x] Write failing cross-tenant, duplicate-name, repeat attach, missing member, archive, authorization and Free/Starter/Growth/Enterprise matrix tests. Example:
 
 ```php
 it('rejects another tenant member in a group', function () {
@@ -80,9 +80,9 @@ it('rejects another tenant member in a group', function () {
 });
 ```
 
-- [ ] Run `php artisan test --compact tests/Feature/Community/GroupsTest.php tests/Feature/Community/MessageEntitlementsTest.php`; confirm meaningful failure before implementation.
-- [ ] Generate classes/migration using discovered Artisan signatures; implement schema, scoped requests/routes and relationships. Add `send community messages` to seeder and built-in owner/admin role lists; do not grant to unrelated read-only roles. Add explicit scheduling/group-send feature metadata to standard package definitions using existing seeding patterns; deployment must add only these feature records/pivots, not reset live prices or commercial terms.
-- [ ] Pass focused tests and permission contract tests; run Pint. Commit `feat(community): add flat groups and message entitlements`, tick steps.
+- [x] Run `php artisan test --compact tests/Feature/Community/GroupsTest.php tests/Feature/Community/MessageEntitlementsTest.php`; confirm meaningful failure before implementation.
+- [x] Generate classes/migration using discovered Artisan signatures; implement schema, scoped requests/routes and relationships. Add `send community messages` to seeder and built-in owner/admin role lists; do not grant to unrelated read-only roles. Add explicit scheduling/group-send feature metadata to standard package definitions using existing seeding patterns; deployment must add only these feature records/pivots, not reset live prices or commercial terms.
+- [x] Pass focused tests and permission contract tests; run Pint. Commit `feat(community): add flat groups and message entitlements`, tick steps.
 
 ## Task 2: Preferences and normalized audiences
 
@@ -206,3 +206,8 @@ it('honors an opt-out made after scheduling', function () {
 - Outstanding owner review: proposed defaults/status audiences and marketing-preference policy above; scheduling behavior after downgrade; native versus per-task independent implementation/review. These are visible choices, not hidden implementation assumptions.
 - Live authenticated smoke testing completed after owner sign-in: Overview, People/Money empty states, member/type dialogs, reminder preview (zero recipients, queue disabled), CSV import preview with two invalid rows and no confirmation, Finance date filtering and both actual CSV downloads (headers only, no dues records), light/dark field contrast, unsaved settings draft retention and Escape dismissal. No persistent member, type, charge, payment or reminder-setting changes; no sends. Purpledot still has zero members. This is not a live payment or outbound-delivery test.
 - Live findings to fix before milestone2 implementation: People header action toolbar overflows at390px (main scrollWidth505 versus390); MemberFormModal controls lack associated labels (Name input labels=[]). Keep this a small UI follow-up with focused regression tests, not a broad suite/debugging exercise. Screenshot is private under storage/app/private/community-live-people-mobile.png. No browser console errors on the tested Community pages.
+
+### Implementation notes
+
+- Prerequisite browser fixes `eb4feb4`: shared Input/Select label and description associations; header wraps. Focused JS13/13, lint/build; compiled isolated-QA browser width390/scroll390, label count1, Add member visible. No live changes.
+- Task1:13 focused tests/43 assertions and11 permission/package regression tests/39 assertions pass on dedicated `miconvener_community_2_testing`; Pint applied.
