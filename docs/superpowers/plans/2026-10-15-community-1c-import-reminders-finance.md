@@ -30,6 +30,15 @@
 
 ---
 
+## Pre-flight rulings (2026-10-15)
+
+- Execute Task 3's cap and advisory-lock foundation before Task 1 because confirming an import requires that interface. Task 1 then integrates it; Task 2 and Task 4 follow. Review each task before proceeding.
+- All additions, including rejoining an exited member, enforce the cap under the same per-tenant advisory transaction lock. Pending and lapsed members already count.
+- Preserve the existing stricter email-only duplicate guard while name + phone permits shared family numbers. A single normalizer applies that rule consistently to import and manual writes; existing records are not rewritten.
+- Arrears audiences require both `manage members` and `read finance`, following spec section 8.
+- Reserve SMS credits and a reminder row before sending, then refund the exact reservation on confirmed provider failure. Persist a distinct reserved state rather than reporting an unsent message as sent. Unknown/interrupted outcomes require reconciliation and never a blind retry.
+- Browser acceptance uses a separate QA database, email log and null SMS gateway; the owner's existing Purpledot data and settlement settings remain unchanged.
+
 ### Task 1: Spreadsheet import
 
 **Files:**
@@ -69,9 +78,11 @@
 **Interfaces:**
 - `MemberCap::limit(Tenant): ?int`, `MemberCap::counted(Tenant): int` (`pending` + `active` + `lapsed`), `MemberCap::assertRoomFor(Tenant, int $adding): void` (throws `DomainException` "Your {Plan} plan includes {n} members. …").
 
-- [ ] **Step 1: Failing tests:** add refused at the cap with the plan name and number; exited members do not count; a downgrade below the count keeps everyone, charges keep generating, adding is blocked; enterprise unlimited; the package feature reaches existing tenants through `tenants:sync-features`.
-- [ ] **Step 2–4:** fail, implement, pass.
-- [ ] **Step 5: Commit** `feat(community): member caps by plan`.
+- [x] **Step 1: Failing tests:** add refused at the cap with the plan name and number; exited members do not count; a downgrade below the count keeps everyone, charges keep generating, adding is blocked; enterprise unlimited; the package feature reaches existing tenants through `tenants:sync-features`.
+- [x] **Step 2–4:** fail, implement, pass.
+- [x] **Step 5: Commit** `feat(community): member caps by plan`.
+
+Ruling: Task 3 supplies the cap and shared advisory lock first. Task 1 will wire the real importer to `MemberCap::withLock`; no import or approval stubs were added. Rejoin is covered now because it increases the counted register. Focused cap tests: 16 green, including a real Starter-to-Free downgrade preserving 51 members, paid history and charge generation.
 
 ### Task 4: Finance for dues
 

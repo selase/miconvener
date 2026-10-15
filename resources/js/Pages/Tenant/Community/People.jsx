@@ -145,16 +145,20 @@ export function canCreateCharge(member) {
     );
 }
 
-export default function People({ members, membershipTypes }) {
+export default function People({ members, membershipTypes, memberUsage }) {
     const showToast = useToast();
     const [selectedId, setSelectedId] = useState(null);
     const [modal, setModal] = useState(null);
     const [confirm, setConfirm] = useState(null);
     const [busy, setBusy] = useState(false);
 
+    const atCap = memberUsage?.limit !== null && memberUsage?.count >= memberUsage?.limit;
     const selected = members.data.find((member) => member.id === selectedId) ?? null;
     const refresh = () =>
-        router.reload({ only: ['members', 'membershipTypes'], preserveScroll: true });
+        router.reload({
+            only: ['members', 'membershipTypes', 'memberUsage'],
+            preserveScroll: true,
+        });
 
     const run = async (request, success) => {
         setBusy(true);
@@ -276,6 +280,7 @@ export default function People({ members, membershipTypes }) {
                         <Button
                             icon={Plus}
                             variant="primary"
+                            disabled={atCap}
                             onClick={() => setModal({ kind: 'form', member: null })}
                         >
                             Add member
@@ -286,6 +291,24 @@ export default function People({ members, membershipTypes }) {
 
             <div className="flex">
                 <div className="min-w-0 flex-1 px-8 py-6">
+                    {memberUsage && (
+                        <p className="mb-4 text-sm text-ink-secondary">
+                            {memberUsage.limit === null
+                                ? `${memberUsage.count.toLocaleString()} members · Unlimited`
+                                : `${memberUsage.count.toLocaleString()} of ${memberUsage.limit.toLocaleString()} members`}
+                        </p>
+                    )}
+                    {atCap && (
+                        <div
+                            role="alert"
+                            className="mb-5 rounded-md border border-border bg-surface-hover p-4 text-sm text-ink"
+                        >
+                            Your {memberUsage.plan} plan includes{' '}
+                            {memberUsage.limit.toLocaleString()} members. Upgrade your plan or mark
+                            members who have left as exited before adding more. Existing members can
+                            still pay and their dues continue as usual.
+                        </div>
+                    )}
                     <Table>
                         <Thead>
                             <Th>Name</Th>

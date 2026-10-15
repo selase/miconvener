@@ -64,3 +64,30 @@ describe('rejoining an exited member', () => {
         expect(screen.getByRole('button', { name: 'Rejoin' })).toBeTruthy();
     });
 });
+
+it('shows member usage and explains preservation when over the plan cap', () => {
+    render(
+        <People
+            members={{ data: [], links: [] }}
+            membershipTypes={[]}
+            memberUsage={{ count: 312, limit: 50, plan: 'Free', over_cap: true }}
+        />
+    );
+    expect(screen.getByText('312 of 50 members')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('Free plan includes 50 members');
+    expect(screen.getByRole('alert').textContent).toContain('Existing members can still pay');
+    expect(screen.getByRole('button', { name: 'Add member' }).disabled).toBe(true);
+});
+
+it('shows unlimited membership without a cap warning', () => {
+    render(
+        <People
+            members={{ data: [], links: [] }}
+            membershipTypes={[]}
+            memberUsage={{ count: 7000, limit: null, plan: 'Enterprise', over_cap: false }}
+        />
+    );
+    expect(screen.getByText('7,000 members · Unlimited')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add member' }).disabled).toBe(false);
+});

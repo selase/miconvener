@@ -14,8 +14,10 @@ use App\Models\DuesCharge;
 use App\Models\Member;
 use App\Models\MembershipType;
 use App\Models\Tenant;
+use App\Services\Community\MemberCap;
 use App\Services\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -67,7 +69,12 @@ final class MemberController extends Controller
                 'overdue' => (bool) $member->getAttribute('overdue'),
             ]);
 
+        $cap = app(MemberCap::class);
+        $count = $cap->counted($tenant);
+        $limit = $cap->limit($tenant);
+
         return Inertia::render('Tenant/Community/People', [
+            'memberUsage' => ['count' => $count, 'limit' => $limit, 'plan' => $tenant->package->name ?? 'Free', 'over_cap' => $limit !== null && $count > $limit],
             'members' => $members,
             'membershipTypes' => MembershipType::query()
                 ->where('tenant_id', $tenant->id)
@@ -86,11 +93,21 @@ final class MemberController extends Controller
 
     public function store(StoreMemberRequest $request): JsonResponse
     {
-        $member = Member::query()->create([
-            ...$request->validated(),
-            'tenant_id' => $this->getTenant()->id,
-            'status' => MemberStatusEnum::Active,
-        ]);
+        $tenant = $this->getTenant();
+        $cap = app(MemberCap::class);
+        try {
+            $member = $cap->withLock($tenant, function () use ($request, $tenant, $cap): Member {
+                $cap->assertRoomFor($tenant, 1);
+
+                return Member::query()->create([
+                    ...$request->validated(),
+                    'tenant_id' => $tenant->id,
+                    'status' => MemberStatusEnum::Active,
+                ]);
+            });
+        } catch (DomainException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
 
         return response()->json(['id' => $member->id], 201);
     }
@@ -121,12 +138,23 @@ final class MemberController extends Controller
     public function rejoin(string $subdomain, string $member): JsonResponse
     {
         $this->authorize('manage members');
-        $model = $this->findMember($member);
-        if ($model->status !== MemberStatusEnum::Exited) {
-            return response()->json(['message' => 'Only an exited member can rejoin.'], 422);
+        $tenant = $this->getTenant();
+        $cap = app(MemberCap::class);
+        try {
+            $model = $cap->withLock($tenant, function () use ($member, $tenant, $cap): Member {
+                $model = $this->findMember($member);
+                if ($model->status !== MemberStatusEnum::Exited) {
+                    throw new DomainException('Only an exited member can rejoin.');
+                }
+                $cap->assertRoomFor($tenant, 1);
+                $date = CarbonImmutable::now(CommunitySettings::for($tenant)->timezone)->toDateString();
+                $model->update(['status' => MemberStatusEnum::Active, 'rejoined_on' => $date, 'exited_on' => null]);
+
+                return $model;
+            });
+        } catch (DomainException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
-        $date = CarbonImmutable::now(CommunitySettings::for($this->getTenant())->timezone)->toDateString();
-        DB::connection('landlord')->transaction(fn (): bool => $model->update(['status' => MemberStatusEnum::Active, 'rejoined_on' => $date, 'exited_on' => null]));
 
         return response()->json(['id' => $model->id, 'status' => MemberStatusEnum::Active->value]);
     }
