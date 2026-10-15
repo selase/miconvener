@@ -16,6 +16,9 @@
 - **Public URLs do not change:** `/pay/{token}`, `/pay/{token}/checkout`, `/pay/{token}/callback`, `/pay/{token}/receipt`. Paystack metadata `type = member_dues` stays accepted. Route names `public.dues.*` stay.
 - **Old console URLs redirect** (`/dues/members` → `/community/people`, `/dues/classes` → `/community/money/dues`, `/dues/payouts` → `/finance/payouts`) with 301 for GET; old POST/PATCH console endpoints are removed (only the console calls them).
 - **Rollout switch:** feature key `community`, admin-override row, command `php artisan community:enable {tenant} {--off}`. Permissions unchanged: `manage members`, `read finance`, `manage payouts`.
+- **The switch stops new activity, never old money.** With the switch off: Community pages, adding members, raising charges and starting checkouts are unavailable. Still available: `/pay/{token}` callback and receipt (already ungated), Finance > Payouts for any tenant with dues money (so in-flight payouts can be sent, released and reconciled), and every report of existing records. `Tenant::hasDuesMoney()` = a dues-category ledger account or a dues payout exists. Payouts are gated by `hasDuesMoney() || communityEnabled()` (middleware alias `dues.money`), not by the switch alone.
+- **Finance visibility:** the shared prop `tenant.features.finance` becomes `handlesTicketMoney() || communityEnabled() || hasDuesMoney()`, and `FinanceController` uses the same rule, so the menu and the page never disagree. Ticket figures on the page are unchanged.
+- **Built assets are tracked in git** (`public/build`). Any commit that changes `resources/js` or `resources/css` runs `npm run build` and commits the new `public/build` in the same commit. Never revert build output to an older state.
 - **Renames use a new migration**, never an edit of `2026_10_14_100000_create_dues_tables.php` (the owner's local database has already run it).
 - Naming: "Membership type" in UI and code (`MembershipType`, `membership_types`, `membership_type_id`). Never "class" in new UI copy.
 - Hidden, not "coming soon": Community items not built yet (Messages, Library, Polls; Followers and Groups tabs) do not appear.
@@ -27,7 +30,8 @@
 
 1. **A pay link sent before this change** still opens, checks out, confirms by webhook and shows its receipt (Task 3 test).
 2. **Renamed foreign keys** on existing local data: the rename migration keeps rows, constraints and the unique `(tenant_id, name)` rule (Task 1 test).
-3. **A tenant without the community switch** sees no Community or Payouts menu and gets 404 on every `/community/*` and `/finance/payouts` URL, while `/pay/{token}` behaves as before (Task 2 and 3 tests).
+3. **A tenant without the community switch** sees no Community menu and gets 404 on `/community/*`; a tenant with dues money but the switch off still reaches Finance and Payouts and can finish an in-flight payout; `/pay/{token}` callback and receipt behave as before (Task 2 and 3 tests).
+6. **Finance menu and page agree:** a dues-only tenant (no ticket money) sees the Finance menu and can open the page (Task 3 test).
 4. **Menu groups with no visible items disappear**, including in the compact icon rail inside an event (Task 4 tests).
 5. **A membership type without an amount** can be created and members added to it, and creating a charge for such a member is refused with a clear message (Task 1 test).
 
@@ -46,12 +50,20 @@
 - [ ] **Step 1: Write the failing tests** in `tests/Feature/Dues/MembershipTypesTest.php` (renamed from `DuesClassesTest.php`, keeping its existing cases with renamed identifiers) and add:
 
 ```php
-test('the rename keeps existing types, members and charges', function () {
-    $type = App\Models\MembershipType::factory()->create(['name' => 'Full member', 'amount' => 5000, 'period' => 'monthly']);
-    $member = App\Models\Member::factory()->create(['tenant_id' => $type->tenant_id, 'membership_type_id' => $type->id]);
+test('the rename keeps rows created under the old schema', function () {
+    $migration = require database_path('migrations/landlord/2026_10_15_100000_rename_dues_classes_to_membership_types.php');
+    $migration->down(); // back to dues_classes / dues_class_id
 
-    expect($member->membershipType->is($type))->toBeTrue()
-        ->and(Illuminate\Support\Facades\Schema::connection('landlord')->hasTable('dues_classes'))->toBeFalse();
+    // Insert with the OLD schema through the query builder (models already use the new names):
+    // a tenant, a dues_classes row, a members row (dues_class_id, pay_token), a dues_charges row
+    // (dues_class_id, status paid, payment_reference 'ref_old_1'), and a dues-category payout. Keep every id.
+
+    $migration->up();
+
+    // Assert: membership_types has the same id and name; members.membership_type_id equals the old
+    // dues_class_id; the member's id and pay_token are unchanged; the charge's id, membership_type_id,
+    // status and payment_reference are unchanged; the payout is unchanged; GET /pay/{old pay_token} renders;
+    // dues_classes no longer exists; the unique (tenant_id, name) rule still rejects a duplicate name.
 });
 
 test('type names stay unique per organisation after the rename', function () {
@@ -128,7 +140,7 @@ git commit -m "refactor(community): membership types replace dues classes, dues 
 - Modify: `app/Models/Tenant.php` (`duesEnabled()` → `communityEnabled()`), `app/Http/Middleware/HandleInertiaRequests.php` (`tenant.features.community`), every caller (`grep -rn "duesEnabled\|member_dues\|dues.enabled\|dues:enable" app routes tests resources`).
 
 **Interfaces:**
-- Produces: `Tenant::communityEnabled(): bool`; middleware alias `community.enabled`; command `community:enable`; shared prop `tenant.features.community`.
+- Produces: `Tenant::communityEnabled(): bool`; `Tenant::hasDuesMoney(): bool`; `tenant.features.finance` and `FinanceController` both use `handlesTicketMoney() || communityEnabled() || hasDuesMoney()`; middleware alias `community.enabled`; command `community:enable`; shared prop `tenant.features.community`.
 - Keeps: Paystack metadata `type = member_dues` (that string is a payment type, not the switch; do not rename it).
 
 - [ ] **Step 1: Write the failing tests** (move and rename the existing gate tests, then add):
@@ -154,7 +166,7 @@ test('the shared props expose tenant.features.community', function () { /* Inert
 **Files:**
 - Modify: `routes/subdomain.php` (replace the `dues` console group with the groups below; keep the `pay/{token}` group as is apart from the middleware alias)
 - Rename pages: `resources/js/Pages/Tenant/Dues/Members.jsx` → `resources/js/Pages/Tenant/Community/People.jsx`; `MemberFormModal.jsx` → `Tenant/Community/MemberFormModal.jsx`; `Classes.jsx` → `Tenant/Community/MoneyDues.jsx`; `Payouts.jsx` → `Tenant/Finance/Payouts.jsx`
-- Create: `app/Http/Controllers/Tenant/CommunityOverviewController.php`, `resources/js/Pages/Tenant/Community/Overview.jsx`, `resources/js/Components/Community/CommunityTabs.jsx`
+- Create: `app/Http/Middleware/EnsureDuesMoneyOrCommunity.php` (alias `dues.money` in `app/Http/Kernel.php`), `app/Http/Controllers/Tenant/CommunityOverviewController.php`, `resources/js/Pages/Tenant/Community/Overview.jsx`, `resources/js/Components/Community/CommunityTabs.jsx`
 - Modify: controllers' `Inertia::render` names and route names; `tests/Feature/Dues/*` route names; `tests/Feature/RoutesResolveTest.php` expectations if it lists pages; JS tests under `resources/js/test` that import the moved pages.
 
 **Interfaces:**
@@ -177,6 +189,9 @@ Route::middleware('community.enabled')->group(function (): void {
         Route::post('money/dues/charges/{charge}/void', [DuesChargeController::class, 'void'])->name('charges.void');
         Route::post('money/dues/charges/{charge}/record-offline', [DuesChargeController::class, 'recordOffline'])->name('charges.record-offline');
     });
+});
+// Payouts stay reachable while the tenant holds dues money, even with the switch off.
+Route::middleware('dues.money')->group(function (): void {
     Route::prefix('finance/payouts')->name('tenant.finance.payouts.')->group(function (): void {
         Route::get('/', [DuesPayoutController::class, 'index'])->name('index');
         Route::post('/', [DuesPayoutController::class, 'store'])->name('store');
@@ -202,7 +217,14 @@ test('every community and payouts page renders for an enabled organisation', fun
     // tenant.community.money.dues.index → Tenant/Community/MoneyDues with membershipTypes;
     // tenant.finance.payouts.index → Tenant/Finance/Payouts.
 });
-test('every community and payouts URL is a 404 while the switch is off', function () {});
+test('every community URL is a 404 while the switch is off', function () {});
+test('payouts stay reachable for a tenant with dues money after the switch is turned off', function () {
+    // tenant with a dues payable account and an awaiting_otp dues payout; community:enable --off;
+    // GET tenant.finance.payouts.index → 200; finalize still works; GET /community/people → 404.
+});
+test('a dues-only tenant sees the Finance menu and can open Finance', function () {
+    // tenant without paid tickets, community enabled → shared prop tenant.features.finance true; GET tenant.finance.index → 200.
+});
 test('old console URLs redirect permanently to their new homes', function () {
     // GET /dues/members → 301 to /community/people; /dues/classes → /community/money/dues; /dues/payouts → /finance/payouts.
 });
@@ -321,7 +343,7 @@ describe('visibleGroups', () => {
 
 - [ ] **Step 2: Run, see them fail.** Run: `npx vitest run resources/js/test/console/consoleNav.test.js`. Expected: FAIL (module not found).
 - [ ] **Step 3: Implement** the module and the layout change. Keep the active-item logic as it is (Events stays lit inside an event).
-- [ ] **Step 4: Run** `npm run test`, `npm run lint`, `npm run build`. Expected: all pass. Revert `public/build` changes if the build artifacts are tracked and you are not meant to commit them (check `git status`; follow what recent commits on this branch did).
+- [ ] **Step 4: Run** `npm run test`, `npm run lint`, `npm run build`. Expected: all pass. Commit the rebuilt `public/build` with the task (built assets are tracked; see Global Constraints).
 - [ ] **Step 5: Commit** `feat(console): grouped navigation with Community, Venue, Finance and Organisation`.
 
 ---
@@ -329,7 +351,7 @@ describe('visibleGroups', () => {
 ### Task 5: Verification and handoff
 
 - [ ] **Step 1:** Full suite: `"$PHP" artisan test --parallel --processes=4 --compact`. Expected: all pass; name every failure.
-- [ ] **Step 2:** `"$PHP" vendor/bin/pint --test` (clean), phpstan (0 errors, baseline not grown), `npm run lint`, `npm run test`, `npm run build`.
+- [ ] **Step 2:** `"$PHP" vendor/bin/pint --dirty` (clean), phpstan (0 errors, baseline not grown), `npm run lint`, `npm run test`, `npm run build`.
 - [ ] **Step 3:** On the owner's local database: `"$PHP" artisan migrate --database=landlord` (applies the two new migrations), `"$PHP" artisan community:enable purpledot`, and confirm the existing local member, charges and payouts still show under the new pages (database query check is enough; the owner will click through).
 - [ ] **Step 4:** Update `docs/superpowers/community-roadmap.md` (1a status `built`, evidence commit) and the project memory file `member_dues_design_decisions.md` (1a done, new command name).
 - [ ] **Step 5:** Commit any remaining changes and push `community-1a`.

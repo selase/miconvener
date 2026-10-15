@@ -31,9 +31,11 @@ Merge policy (owner's decision): D2 is not merged on its own. 1a, 1b and 1c land
 1. Read the spec, then the next milestone's plan (or brief).
 2. Work on that milestone's branch. Never on `main`.
 3. Follow the plan's tasks in order. **Tick each `- [ ]` step in the plan file in the same commit as the work**, so progress is visible in git to every agent. Add a short `Ruling:` line under a step when you deviate from the plan, with why.
-4. Before marking a milestone `built`: full suite (`php artisan test --parallel --processes=4 --compact`), `vendor/bin/pint --test`, phpstan (0 errors, baseline must not grow), `npm run lint`, `npm run test`, `npm run build`, and one review of the whole branch by a fresh reviewer.
+4. Before marking a milestone `built`: full suite (`php artisan test --parallel --processes=4 --compact`), `vendor/bin/pint --dirty`, phpstan (0 errors, baseline must not grow), `npm run lint`, `npm run test`, `npm run build`, and one review of the whole branch by a fresh reviewer.
 5. Update the status table here, with the commit as evidence.
 6. For a milestone that only has a brief: write its plan first (superpowers writing-plans format: header, Global Constraints, Review Focus, tasks with failing tests first), save it under `plans/`, link it here, set status `planned`, and get the owner's review before building.
+
+**Built assets are tracked** (`public/build`). Any commit that changes `resources/js` or `resources/css` runs `npm run build` and commits the new `public/build` in the same commit; never revert build output to an older state (it leaves stale or blank screens).
 
 Always green: Finance, Payments, Dues, Community, Events and attendee-portal suites; `PayoutOtpFlowTest`; `php artisan finance:verify-categories` exits 0. Read `AGENTS.md` "MiConvener finance invariants" before touching money.
 
@@ -60,6 +62,7 @@ Each brief is enough to write the plan from. Write the plan against the code as 
 - **Builds:** SMS sign-in for `/my` (throttled per number and IP, platform-paid, daily cap); identifier-exact access rules; follow from organisation and event pages; join with approval (default), immediate, or invitation only; `pending` status; followers tab; announcing a new event to followers; `/my` Communities data endpoints (the app UI is milestone 4).
 - **Done when:** verifying one identifier never reveals records holding another (tests across two organisations); contact changes move access; shared numbers show each member separately; a pay link never opens `/my`.
 - **Risks:** identity leakage across organisations; SMS sign-in abuse.
+- **Decisions needed from the owner before planning:** protection for recycled and shared phone numbers beyond spec 6.1 (for example, whether a newly verified number sees member records older than a set age, and how members sharing a number are told apart).
 
 ### 4. The `/my` app
 
@@ -86,7 +89,7 @@ Each brief is enough to write the plan from. Write the plan against the code as 
 - **Depends on:** 3 (verified identifiers and active members).
 - **Builds:** an event setting for members-only and member ticket prices; eligibility = an `active` member holding a verified identifier, checked at checkout and again at confirmation.
 - **Done when:** a non-member cannot buy a member price by editing a request; a member who lapses between checkout and confirmation is handled by a stated rule (decide with the owner: honour or refuse); all event checkout suites green.
-- **Open question for the owner:** do lapsed members get member prices?
+- **Decisions needed from the owner before planning:** do lapsed members get member prices; what happens when membership changes (lapse, exit, type change) between checkout and confirmation: honour the started price or refuse.
 
 ### 7. Library and polls
 

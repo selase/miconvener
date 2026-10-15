@@ -17,7 +17,7 @@
 - Every reminder carries the member's pay link (`route('public.dues.show', …)`), the organisation's name, the total open and the oldest due date.
 - Member caps (spec 13): Free 50, Starter 500, Growth 5,000, Enterprise unlimited. Counted: `pending`, `active`, `lapsed`. Over the cap nothing is deleted and existing members keep being charged; adding, importing and approving are refused with a message naming the plan and the number.
 - Finance figures: **collected** (paid charges by `paid_at`, gross, with recorded cash as its own line), **collected online** (excludes recorded cash), **available to pay out** (`DuesBalance::available`, never includes cash). Never mix them.
-- The tenant Finance page opens when `handlesTicketMoney()` **or** `communityEnabled()`; existing ticket figures are unchanged.
+- The tenant Finance page and menu follow the 1a rule `handlesTicketMoney() || communityEnabled() || hasDuesMoney()`; existing ticket figures are unchanged.
 - PHP style, toolchain, PostgreSQL, Pint, phpstan and commit trailer as in the 1a plan.
 
 ## Review Focus
@@ -38,31 +38,33 @@
 
 **Interfaces:**
 - `MemberImport::preview(Tenant, UploadedFile): ImportPreview` with `rows` (`line`, `name`, `phone`, `email`, `membership_type`, `joined_on`, `status` one of `new|duplicate|existing|error`, `errors`), summary counts, and a `token` (preview stored in cache 30 minutes, tenant-scoped). Max 10,000 rows, 5 MB, CSV or XLSX.
-- `MemberImport::confirm(Tenant, string $token, string $existingPolicy /* skip|update */, int $userId): ImportResult` inside one transaction; respects the member cap (refuses the whole import with a clear message if the new rows would exceed it).
+- `MemberImport::confirm(Tenant, string $token, string $existingPolicy /* skip|update */, int $userId): ImportResult` inside one transaction that consumes the preview atomically (`Cache::pull` under a lock keyed by the token, so a second confirm gets 410), takes the same per-tenant advisory lock as manual member creation, **revalidates every row against the register as it is now** (rows that became duplicates since the preview are skipped and reported), then enforces the member cap under that lock (refuses the whole import with a clear message if the new rows would exceed it).
+- **One normaliser for import and manual entry:** `App\Services\Community\MemberIdentity` (`normalisePhone()`, `normaliseEmail()`, `isDuplicate()`) is used by `MemberRequest`, `MemberController` and `MemberImport`.
 - Row rules: name required; phone or email required; phone normalised (Ghana local `0XXXXXXXXX` and `+233…` to E.164); membership type matched by name case-insensitively within the tenant and must be active; duplicate inside the file = same name + phone (or name + email when no phone); existing = same rule against the register.
 
-- [ ] **Step 1: Failing tests:** preview saves nothing; per-row errors with line numbers (missing contact, unknown type, inactive type, bad date, bad phone); in-file duplicates; existing members skipped or updated by policy; XLSX works; confirm creates exactly the good rows once (second confirm with the same token → 410 "This import has already been used"); a token from another tenant → 404; over-cap import refused whole; permission `manage members` required; switch off → 404.
+- [ ] **Step 1: Failing tests:** two simultaneous confirms of one preview create the rows once; an import racing a manual add of the same person creates one member; imports and manual adds together cannot exceed the cap; manual entry and import reject the same duplicate; preview saves nothing; per-row errors with line numbers (missing contact, unknown type, inactive type, bad date, bad phone); in-file duplicates; existing members skipped or updated by policy; XLSX works; confirm creates exactly the good rows once (second confirm with the same token → 410 "This import has already been used"); a token from another tenant → 404; over-cap import refused whole; permission `manage members` required; switch off → 404.
 - [ ] **Step 2: Run, see them fail.** **Step 3: Implement** (page: upload, preview table with filters for errors, policy choice, confirm). **Step 4: Run** `tests/Feature/Community`.
 - [ ] **Step 5: Commit** `feat(community): import members from a spreadsheet with preview`.
 
 ### Task 2: Reminders and the arrears button
 
 **Files:**
-- Create: migration (`dues_reminders`: `id`, `tenant_id`, `member_id`, `step` one of `before|on_day|after_7|after_30|digest|manual`, `channel` `email|sms`, `charge_ids` json, `status` `sent|skipped|failed`, `reason` nullable, `sent_for_date` date, `created_at`; unique `(member_id, step, channel, sent_for_date)`), add to `community_settings`: `reminders_enabled` (true), `reminder_offsets` json (default `{"before":7,"on_day":0,"after_7":7,"after_30":30}`), `frequent_digest` (`daily|weekly`, default `daily`, applies to daily and weekly periods), `sms_monthly_limit` (nullable int); `app/Services/Dues/DuesReminders.php`, `app/Mail/DuesReminder.php` + view, `tests/Feature/Community/DuesRemindersTest.php`
+- Create: migration (`dues_reminders`: `id`, `tenant_id`, `member_id`, `step` one of `before|on_day|after_7|after_30|digest|manual`, `channel` `email|sms`, `charge_ids` json, `status` `sent|skipped|failed`, `reason` nullable, `sent_for_date` date (the organisation-local day), `created_at`; unique `(member_id, channel, sent_for_date)`, so automatic and manual reminders together send at most one per member, per channel, per local day), add to `community_settings`: `reminders_enabled` (true), `reminder_offsets` json (default `{"before":7,"on_day":0,"after_7":7,"after_30":30}`), `frequent_digest` (`daily|weekly`, default `daily`, applies to daily and weekly periods), `sms_monthly_limit` (nullable int); `app/Services/Dues/DuesReminders.php`, `app/Mail/DuesReminder.php` + view, `tests/Feature/Community/DuesRemindersTest.php`
 - Modify: `ProcessDuesCommand` (phase 2 after generation), routes `tenant.community.money.dues.remind-arrears`, Overview settings tab (reminders on/off, offsets, digest, SMS monthly limit) with a Form Request, `MoneyDues.jsx` ("Remind everyone in arrears" with a confirm showing the count and SMS credits needed).
 
 **Interfaces:**
 - `DuesReminders::sendDue(Tenant, CarbonImmutable $localToday): array{sent: int, skipped: int}`: for each member with open charges, decide today's step: monthly, quarterly and yearly charges use the offsets per charge (but one message per member per day lists all open charges); daily and weekly charges use the digest (daily: one per day while anything is open; weekly: on `week_starts_on`). Email when the member has an email; SMS when they have a phone, SMS is enabled for the tenant, credits remain and the monthly limit is not reached.
-- `DuesReminders::remindArrears(Tenant, int $userId): array{sent: int, skipped: int}`: step `manual`, at most once per member per local day.
+- `DuesReminders::remindArrears(Tenant, int $userId): array{sent: int, skipped: int}`: step `manual`; shares the per-member, per-channel, per-day limit with automatic reminders.
+- **Reserve before sending:** inside a transaction holding a per-tenant advisory lock (`pg_advisory_xact_lock`), check the monthly SMS limit (this month's sent SMS reminders) and `SmsAllowance::canSend`, `consume` the credit and insert the `dues_reminders` row; commit; then send. On a provider failure mark the row `failed` and return the credit. Concurrent workers can never overspend credits or the monthly limit. Email uses the same row-first pattern for its daily limit.
 
-- [ ] **Step 1: Failing tests:** the four offsets for a monthly charge; one message listing several open charges; daily digest once per day; weekly digest only on the week start; reminders off → none; no credit → email sent, SMS skipped with reason; monthly SMS limit reached → skipped; arrears button sends once per day per member and needs `manage members`; message content has pay link, organisation name, total and oldest due date; white-label from/reply-to; tenant isolation.
+- [ ] **Step 1: Failing tests:** automatic plus manual on one day sends one per channel; concurrent reminder runs never exceed the remaining credits or the monthly limit; a provider failure returns the credit; the four offsets for a monthly charge; one message listing several open charges; daily digest once per day; weekly digest only on the week start; reminders off → none; no credit → email sent, SMS skipped with reason; monthly SMS limit reached → skipped; arrears button sends once per day per member and needs `manage members`; message content has pay link, organisation name, total and oldest due date; white-label from/reply-to; tenant isolation.
 - [ ] **Step 2–4:** fail, implement, pass (`tests/Feature/Community tests/Feature/Dues tests/Feature/Mail`).
 - [ ] **Step 5: Commit** `feat(community): automatic dues reminders and the arrears button`.
 
 ### Task 3: Member caps by plan
 
 **Files:**
-- Modify: `database/seeders/EventPackageSeeder.php` (feature `community_members`: free 50, starter 500, growth 5000, enterprise unlimited, following the seeder's existing limit-feature convention), `app/Services/Community/MemberCap.php` (create), `MemberController` (store, and approve when it exists), `MemberImport::confirm`, `People.jsx` (usage "312 of 500 members" and the over-cap banner); `tests/Feature/Community/MemberCapTest.php`
+- Modify: `database/seeders/EventPackageSeeder.php` (feature `community_members`: free 50, starter 500, growth 5000, enterprise unlimited, following the seeder's existing limit-feature convention), `app/Services/Community/MemberCap.php` (create), `MemberController` (store, and approve when it exists; both take the per-tenant advisory lock before the cap check), `MemberImport::confirm`, `People.jsx` (usage "312 of 500 members" and the over-cap banner); `tests/Feature/Community/MemberCapTest.php`
 
 **Interfaces:**
 - `MemberCap::limit(Tenant): ?int`, `MemberCap::counted(Tenant): int` (`pending` + `active` + `lapsed`), `MemberCap::assertRoomFor(Tenant, int $adding): void` (throws `DomainException` "Your {Plan} plan includes {n} members. …").
@@ -74,7 +76,7 @@
 ### Task 4: Finance for dues
 
 **Files:**
-- Modify: `app/Http/Controllers/Tenant/FinanceController.php` (open for `communityEnabled()`; add a dues section), its page under `resources/js/Pages/Tenant/Finance/Index.jsx`; create `app/Services/Dues/DuesReport.php`, export routes `tenant.finance.dues.collections.export` and `tenant.finance.dues.arrears.export`; `tests/Feature/Community/DuesFinanceTest.php`
+- Modify: `app/Http/Controllers/Tenant/FinanceController.php` (already opened in 1a by `handlesTicketMoney() || communityEnabled() || hasDuesMoney()`; add a dues section), its page under `resources/js/Pages/Tenant/Finance/Index.jsx`; create `app/Services/Dues/DuesReport.php`, export routes `tenant.finance.dues.collections.export` and `tenant.finance.dues.arrears.export`; `tests/Feature/Community/DuesFinanceTest.php`
 
 **Interfaces:**
 - `DuesReport::summary(Tenant, CarbonImmutable $from, CarbonImmutable $to): array` per currency: `collected_online_gross`, `gateway_fees`, `commission`, `net_online`, `recorded_cash`, `collected_total` (online gross + cash), `available_to_pay_out` (from `DuesBalance`), `in_flight`, `arrears_total`, `members_in_arrears`.
@@ -86,7 +88,7 @@
 
 ### Task 5: Verification
 
-- [ ] Full suite, Pint, phpstan, lint, JS tests, build.
+- [ ] Full suite, `pint --dirty`, phpstan, lint, JS tests, build (commit rebuilt `public/build` if JSX or CSS changed).
 - [ ] Local: import the owner's sample sheet (ask for one, or use the fixture), run `dues:process` with reminders, check the Finance page.
 - [ ] One whole-branch review by a fresh reviewer; fix Critical and Important findings with tests.
 - [ ] Update `docs/superpowers/community-roadmap.md` (status `built`, evidence) and push.

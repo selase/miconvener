@@ -77,8 +77,8 @@ test('settings default when an organisation has none', function () { /* Communit
 ### Task 2: Commercial terms and frozen checkout terms
 
 **Files:**
-- Create: `app/Enum/CommercialStreamEnum.php` (`Tickets`, `Contributions`, `Giving`, `Dues`), `app/Services/Finance/CommercialTerms.php`, `app/Services/Finance/ResolvedTerms.php` (readonly value: `rate`, `capAmount`, `bearer`, `source` one of `override|plan|platform`, `isWaiver`), migrations `commercial_terms_overrides` (`tenant_id`, `stream`, `rate` decimal(5,2) not null, `cap_amount` nullable, `reason`, `set_by` user id, timestamps, unique `(tenant_id, stream)`) and `commercial_terms_changes` (audit: `tenant_id`, `stream`, `old_rate`, `new_rate`, `old_cap`, `new_cap`, `reason`, `changed_by`, `created_at`), and `dues_payment_attempts` (`id` uuid, `tenant_id`, `member_id`, `charge_ids` json, `rate` decimal(5,2), `commissions` json map charge id → minor units, `terms_source`, `created_at`); models for each; `tests/Feature/Community/CommercialTermsTest.php`, `tests/Feature/Community/FrozenTermsTest.php`
-- Modify: `app/Services/Dues/DuesCheckout.php` (create the attempt; metadata `dues_attempt_id`; platform share = sum of the attempt's commissions), `app/Services/Dues/DuesPaymentConfirmer.php` (load the attempt by id and tenant; use its commissions; fallback for no attempt id), delete `app/Services/Dues/DuesFee.php` and its usages, superadmin tenant page (Blade, `Admin\TenantController` + its view) to view and set per-stream overrides with a reason, `config/services.php` (`dues.free_plan_fee_percentage`).
+- Create: `app/Enum/CommercialStreamEnum.php` (`Tickets`, `Contributions`, `Giving`, `Dues`), `app/Services/Finance/CommercialTerms.php`, `app/Services/Finance/ResolvedTerms.php` (readonly value: `rate`, `capAmount`, `bearer`, `source` one of `override|plan|platform`, `isWaiver`), migrations `commercial_terms_overrides` (`tenant_id`, `stream`, `rate` decimal(5,2) not null, `cap_amount` nullable, `reason`, `set_by` user id, timestamps, unique `(tenant_id, stream)`) and `commercial_terms_changes` (audit: `tenant_id`, `stream`, `old_rate`, `new_rate`, `old_cap`, `new_cap`, `reason`, `changed_by`, `created_at`), and `dues_payment_attempts` (`id` uuid, `reference` unique — our own Paystack reference passed to `transaction/initialize`, `tenant_id`, `member_id`, `charge_ids` json (sorted), `currency`, `expected_amount`, `rate` decimal(5,2), `commissions` json map charge id → minor units, `terms_source`, `status` `open|confirmed|superseded`, `confirmed_at`, `created_at`); models for each; `tests/Feature/Community/CommercialTermsTest.php`, `tests/Feature/Community/FrozenTermsTest.php`
+- Modify: `app/Services/Payment/PaystackGateway.php` (`createOneTimeCheckoutSession` accepts an optional reference, sent to Paystack as `reference`), `app/Services/Dues/DuesCheckout.php` (create the attempt with its reference; metadata `dues_attempt_id`; platform share = sum of the attempt's commissions), `app/Services/Dues/DuesPaymentConfirmer.php` (resolve the attempt and require **all** of: gateway reference = attempt reference, tenant, member, exact charge set, currency, and paid amount ≥ expected amount; on any mismatch log `dues.payment.attempt_mismatch`, note the charges and book nothing; a confirmed attempt makes redelivery a no-op; fallback for payments with no attempt id), delete `app/Services/Dues/DuesFee.php` and its usages, superadmin tenant page (Blade, `Admin\TenantController` + its view) to view and set per-stream overrides with a reason, `config/services.php` (`dues.free_plan_fee_percentage`).
 
 **Interfaces:**
 - `CommercialTerms::for(Tenant $tenant, CommercialStreamEnum $stream): ResolvedTerms`; `CommercialTerms::commission(ResolvedTerms $terms, int $amount): int` (rounding half up, cap applied, never negative). Precedence: override row → plan default (Free 2%, otherwise 1% for dues) → platform config.
@@ -110,6 +110,10 @@ test('a rate change after checkout does not change what is booked', function () 
 });
 test('a webhook without an attempt id books the legacy 1% rate', function () {});
 test('an attempt from another tenant is ignored', function () { /* forged dues_attempt_id → flagged, nothing booked */ });
+test('an attempt from the same organisation but another member or charge set is refused', function () {});
+test('an attempt whose reference, currency or amount does not match the payment is refused', function () {});
+test('a retried checkout supersedes the earlier open attempt for the same charges', function () {});
+test('the callback and the webhook for one payment book it once, in either order', function () {});
 ```
 
 - [ ] **Step 2: Run, see them fail.**
@@ -124,11 +128,16 @@ test('an attempt from another tenant is ignored', function () { /* forged dues_a
 - Modify: `app/Services/Dues/DuesCharges.php` (`createFor` uses the anchored periods and settings), `app/Console/Kernel.php` (schedule `dues:process` hourly `withoutOverlapping`; each tenant is processed when its local time has passed 00:30 and it has not been processed for that local date), `MemberController` + routes (`members.rejoin`), `People.jsx` (Rejoin action for exited members).
 
 **Interfaces:**
-- `DuesScheduler::generateFor(Tenant $tenant, CarbonImmutable $localToday): int` (number created). For each member that is `active`, whose type `hasDues()` and `is_active`: the first period is the period containing `joined_on` when `charge_current_period_on_join`, otherwise the next period after `joined_on` (or after `created_at` when no `joined_on`); after a rejoin, the next period after the rejoin date. Create every missing period start from the later of that first period and the period after the member's latest charge, up to `localToday + generate_days_ahead`, at most 400 per member per run (logs when the cap is hit). Override of 0 → charge created as `waived`.
+- New member columns: `active_since` (date; backfilled from `joined_on` or the creation date; set again on rejoin and when a lapsed member is made active) and `lapsed_on` (nullable).
+- `DuesScheduler::generateFor(Tenant $tenant, CarbonImmutable $localToday): int` (number created). For each member that is `active`, whose type `hasDues()` and `is_active`:
+  - **Eligible window:** from the first eligible period (the period containing `active_since` when `charge_current_period_on_join`, otherwise the next period after `active_since`) to `localToday + generate_days_ahead`.
+  - **Bounded search for gaps, not "after the latest charge":** walk every period start in the window and create each one that has no charge (any status), oldest first, so an earlier gap is filled even when a later charge exists. The window is capped at the most recent 400 periods (logged when hit).
+  - Override of 0 → the charge is created as `waived`.
+  - **Effective-date rules:** a membership type or override change applies to periods with no charge yet; charges already generated (including future ones inside the horizon) keep their amount; an admin can void an open future charge to have it regenerated with the new terms. Exit ends eligibility from `exited_on`; rejoin opens a new window at the rejoin date; periods between exit and rejoin, or while lapsed, are never charged.
 - Members `pending`, `lapsed`, `exited` get none. Types without dues or inactive get none; inactive types' members are listed on Money > Dues (a notice with a count).
 - `members.rejoin`: `exited` → `active`, sets `rejoined_on` (new nullable date column on `members`) and clears `exited_on`.
 
-- [ ] **Step 1: Failing tests** covering: weekly and daily generation; catch-up after missed runs (three missing days created once; a second run creates none); join mid-period both settings; exit stops charges from the exit date; rejoin resumes from the next period with no back-charges; type change affects only new charges; override 0 → waived; pending/lapsed/exited and types without dues or inactive → none; per-tenant local midnight (server clock UTC, `--date`); the 400 cap; two tenants processed independently.
+- [ ] **Step 1: Failing tests** covering: weekly and daily generation; a gap before an existing later charge is filled; nothing charged while lapsed; catch-up after missed runs (three missing days created once; a second run creates none); join mid-period both settings; exit stops charges from the exit date; rejoin resumes from the next period with no back-charges; type change affects only new charges; override 0 → waived; pending/lapsed/exited and types without dues or inactive → none; per-tenant local midnight (server clock UTC, `--date`); the 400 cap; two tenants processed independently.
 - [ ] **Step 2: Run, see them fail.**
 - [ ] **Step 3: Implement.** Idempotency rests on the existing unique `(member_id, period_start)` plus `firstOrCreate`.
 - [ ] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`. Expected: PASS.
@@ -146,7 +155,7 @@ test('an attempt from another tenant is ignored', function () { /* forged dues_a
 
 ### Task 5: Verification
 
-- [ ] Full suite, Pint, phpstan, lint, JS tests, build (as in the roadmap).
+- [ ] Full suite, `pint --dirty`, phpstan, lint, JS tests, build (commit rebuilt `public/build` if JSX or CSS changed).
 - [ ] Local: migrate, run `"$PHP" artisan dues:process --tenant=purpledot`, check charges appear for the local member.
 - [ ] One whole-branch review by a fresh reviewer; fix Critical and Important findings with tests.
 - [ ] Update `docs/superpowers/community-roadmap.md` (status `built`, evidence) and push.
