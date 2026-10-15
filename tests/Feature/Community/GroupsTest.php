@@ -13,6 +13,7 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
     [$this->tenant, $this->owner] = eventHost('group-qa');
     Artisan::call('community:enable', ['tenant' => $this->tenant->slug]);
+    $this->tenant->features()->create(['feature_key' => 'community_messages', 'enabled' => true]);
     $this->actingAs($this->owner)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('group-qa')]);
 });
 

@@ -146,7 +146,7 @@ expect(app(SmsAllowance::class)->remaining($tenant))->toBe($before - 1);
 
 **Interfaces:** `preview(Tenant, User, array $input): array`, `queue(Tenant, User, array $input): CommunityMessage`, `cancel(Tenant, User, CommunityMessage): void`; preview returns per-channel eligible/skipped/estimated-credit counts. POST send carries a UUID idempotency key unique per tenant, so double-click/request retry returns the same message. Save drafts without sending. Immutable content/selector once queued; edits require a new draft.
 
-- [ ] Write tests red for missing/revoked send permission; hidden arrears count without finance; zero audience; SMS disabled/provider missing/no credits; Free scheduling/group restrictions; invalid DST time; duplicate submission; cancel-before-send; downgrade pause; contact/group/status change; unsubscribe after estimate and after job claim; two workers/retry after timeout; email+SMS channels independently counted.
+- [x] Write tests red for missing/revoked send permission; hidden arrears count without finance; zero audience; SMS disabled/provider missing/no credits; Free scheduling/group restrictions; invalid DST time; duplicate submission; cancel-before-send; downgrade pause; contact/group/status change; unsubscribe after estimate and after job claim; two workers/retry after timeout; email+SMS channels independently counted.
 
 ```php
 it('honors an opt-out made after scheduling', function () {
@@ -159,11 +159,11 @@ it('honors an opt-out made after scheduling', function () {
 });
 ```
 
-- [ ] Implement requests with subject max255/body max10000, validated selectors/channels/timezone; compose only marketing. Include unsubscribe action/link in email and SMS, within SMS459-character bound. Escape text in email templates, no arbitrary HTML/script rendering.
-- [ ] Due dispatcher uses DB lock/status compare-and-swap and bounded cursor continuation, not long queue delays alone. Maximum100 recipients/page; one email per delivery job and at most50 SMS entries/batch, timeouts30/60sec below retry_after90. Resolve current audience when due, persist unique address claims, and recheck each address before submission. Restore TenantContext and permission team context in finally. A cancellation stops untouched recipients, never promises to recall submissions.
-- [ ] Reserve email allowance atomically too; existing EmailAllowance uses the same prepaid base. Accepted email is metered once; definite pre-submission failure can refund; ambiguous email outcome is held with no automatic replay. Cancellation/suppression before transport refunds any confirmed unused reservation.
-- [ ] Return accurate partial/paused/skipped outcomes; jobs cannot mark a send fully complete while unclaimed/unknown recipients exist. Completion means processing finished, with channel counts and warnings, not delivery/read proof.
-- [ ] Pass focused tests; commit `feat(community): queue consent-aware messages with scheduling`.
+- [x] Implement requests with subject max255/body max10000, validated selectors/channels/timezone; compose only marketing. Include unsubscribe action/link in email and SMS, within SMS459-character bound. Escape text in email templates, no arbitrary HTML/script rendering.
+- [x] Due dispatcher uses DB lock/status compare-and-swap and bounded cursor continuation, not long queue delays alone. Maximum100 recipients/page; one email per delivery job and at most50 SMS entries/batch, timeouts30/60sec below retry_after90. Resolve current audience when due, persist unique address claims, and recheck each address before submission. Restore TenantContext and permission team context in finally. A cancellation stops untouched recipients, never promises to recall submissions.
+- [x] Reserve email allowance atomically too; existing EmailAllowance uses the same prepaid base. Accepted email is metered once; definite pre-submission failure can refund; ambiguous email outcome is held with no automatic replay. Cancellation/suppression before transport refunds any confirmed unused reservation.
+- [x] Return accurate partial/paused/skipped outcomes; jobs cannot mark a send fully complete while unclaimed/unknown recipients exist. Completion means processing finished, with channel counts and warnings, not delivery/read proof.
+- [x] Pass focused tests; commit `feat(community): queue consent-aware messages with scheduling`.
 
 ## Task 5: Incremental Events reuse without history changes
 
@@ -215,3 +215,5 @@ it('honors an opt-out made after scheduling', function () {
 - Task2:10 focused tests/27 assertions pass. Temporary encrypted run-address rows provide bounded deduplication and hourly expiry cleanup. Multiple hashed opt-out tokens retain old links. These implementation refinements preserve the approved no-person model.
 
 - Task3: shared budget/reminder53 tests and six real-worker race tests pass; plan reset/refund and legacy-reservation counting covered. No production activity. Tests use separate feature and infrastructure databases after correcting a local overlap.
+
+- Task4: durable delivery/scheduling implemented with own `community_messages` rollout switch (off by default); group routes share that milestone switch.35 focused feature checks across separate runs plus2 actual competing email/SMS workers pass. Invalid DST offsets, replay, cancellation, changed consent/contacts/groups/permissions, low credits and interrupted claims covered. Due jobs are delayed to their UTC time with a15-minute recovery sweep, preserving existing scale-to-zero scheduling policy.

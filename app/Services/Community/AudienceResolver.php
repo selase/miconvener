@@ -24,7 +24,7 @@ final class AudienceResolver
      */
     public function resolve(Tenant $tenant, array $selector, string $channel, ?User $actor = null): iterable
     {
-        $this->validate($tenant, $selector, $channel, $actor);
+        $this->assertValid($tenant, $selector, $channel, $actor);
         $run = (string) Str::uuid();
         try {
             $sources = ($selector['kind'] ?? '') === 'event' ? [app(EventAudienceSource::class)] : [$this->members, ...$this->additionalSources];
@@ -56,11 +56,11 @@ final class AudienceResolver
     }
 
     /** @param array<string, mixed> $selector */
-    private function validate(Tenant $tenant, array $selector, string $channel, ?User $actor): void
+    public function assertValid(Tenant $tenant, array $selector, string $channel, ?User $actor): void
     {
         $kind = $selector['kind'] ?? '';
         if (! in_array($channel, ['email', 'sms'], true) || ! in_array($kind, ['all_members', 'status', 'groups', 'arrears', 'event'], true)
-            || array_diff(array_keys($selector), ['kind', 'status', 'group_ids', 'event_id', 'event_audience']) !== []
+            || array_diff(array_keys($selector), ['kind', 'status', 'group_ids', 'event_id', 'event_audience', 'member_ids', 'as_of']) !== []
             || (isset($selector['status']) && ! in_array($selector['status'], array_column(MemberStatusEnum::cases(), 'value'), true))) {
             throw ValidationException::withMessages(['audience' => 'Choose a valid audience and channel.']);
         }
