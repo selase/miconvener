@@ -70,13 +70,13 @@ final class MembershipJoining
         });
     }
 
-    public function approve(CommunityJoinRequest $request, User $actor, bool $createDistinct = false, ?string $reason = null): Member
+    public function approve(CommunityJoinRequest $request, User $actor, bool $createDistinct = false, ?string $reason = null, ?string $membershipTypeId = null): Member
     {
         $tenant = Tenant::findOrFail($request->tenant_id);
         $this->access->authorizeStaff($tenant, $actor);
         abort_unless($tenant->communityEnabled(), 404);
 
-        return $this->cap->withLock($tenant, function () use ($tenant, $request, $actor, $createDistinct, $reason): Member {
+        return $this->cap->withLock($tenant, function () use ($tenant, $request, $actor, $createDistinct, $reason, $membershipTypeId): Member {
             $row = CommunityJoinRequest::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($request->id);
             if ($row->status === 'rejected') {
                 throw new DomainException('This application was rejected.');
@@ -85,7 +85,7 @@ final class MembershipJoining
             if ($row->status === 'approved' && $member !== null) {
                 return $member;
             }
-            $type = MembershipType::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->where('is_active', true)->find($row->membership_type_id);
+            $type = MembershipType::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->where('is_active', true)->find($membershipTypeId ?? $row->membership_type_id);
             if ($type === null) {
                 throw new DomainException('The selected membership type is no longer active.');
             }
@@ -105,10 +105,10 @@ final class MembershipJoining
                 if ($member->status !== MemberStatusEnum::Pending) {
                     throw new DomainException('This member is no longer awaiting approval.');
                 }
-                $member->update(['status' => MemberStatusEnum::Active]);
+                $member->update(['membership_type_id' => $type->id, 'status' => MemberStatusEnum::Active]);
             }
             $row->update(['member_id' => $member->id, 'status' => 'approved', 'reviewed_by' => $actor->id, 'review_reason' => $reason, 'reviewed_at' => now()]);
-            CommunityAccessAudit::query()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'actor_id' => $actor->id, 'action' => 'joining_approved', 'method' => $createDistinct ? 'create_distinct' : 'staff_review', 'reason' => $reason]);
+            CommunityAccessAudit::query()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'actor_id' => $actor->id, 'action' => 'joining_approved', 'method' => $createDistinct ? 'create_distinct' : 'staff_review', 'reason' => $reason.($type->id !== $row->membership_type_id ? ' Requested type '.$row->membership_type_id.'; approved type '.$type->id.'.' : '')]);
 
             return $member;
         });

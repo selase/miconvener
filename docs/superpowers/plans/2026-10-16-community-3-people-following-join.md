@@ -315,7 +315,7 @@ it('keeps every candidate when family names and phones collide', function (): vo
 
 **UI contract:** Email is the default tab, “Use a phone number instead” is secondary. Offer a basic Communities panel after existing verification, without replacing current ticket/history UI or introducing milestone 4 navigation. Add Follow/Unfollow on public organisation and published event pages; Follow never silently joins. Phone-only claimant sees “Verify your membership” and their submitted request status, not matching member cards. Credential display is a dedicated no-store page with copy/print/download controls and a warning to keep it private; not a toast that disappears or an Inertia prop retained in history. After leaving the page, retrieve only status, never the secret again.
 
-- [ ] Write failing interaction tests for email-first focus, optional phone, code cooldown/retry, claim-required empty state, distinct family member cards after approval, role labels, explicit re-follow consent, disabled join/no type, approval/rejection controls, unsaved dismissal and stale preview. Example:
+- [x] Write failing interaction tests for email-first focus, optional phone, code cooldown/retry, claim-required empty state, distinct family member cards after approval, role labels, explicit re-follow consent, disabled join/no type, approval/rejection controls, unsaved dismissal and stale preview. Example:
 
 ```jsx
 it('offers email before phone', () => {
@@ -328,10 +328,10 @@ it('offers email before phone', () => {
 
 Use the existing VerifyPrompt test setup/actual props and mocked Inertia routing. Test the user interaction rather than snapshotting implementation classes. When registrationId is supplied, preserve its existing email-specific confirmation flow and do not offer phone verification as a substitute for ticket ownership. Add an explicit regression test for that mode.
 
-- [ ] Run focused JS files and the public-pages PHP file; confirm meaningful failures. Implement against Tasks 2–8's endpoints. Staff People shows Members/Groups/Followers when independently allowed; when Community is off, navigation links directly to Followers with event-announcement history, not a gated People route. Overview exposes pending join/claim/report queues only to manage-members staff; financial data remains permission-gated.
-- [ ] Public organisation page `/{tenant host}/community/about` shows public branding, upcoming published events, follow and configured join options. Never render membership counts/status or private contacts from an unclaimed number. Disable duplicate submit, retain errors, label all fields, use explicit button types and supported Modal props. Handle 401 expiry, 403 rollout/permission, 409 stale preview, 410 consumed claim, 422 validation and 429 budget/cooldown with useful recovery copy.
-- [ ] Add staff claim approval/denial, credential revocation/representative review, wrong-number review and join settings. Require independent-check method/reason; hide credential secret from staff. For explicit event announcements show audience/channel estimate, current consent exclusions, published event link and confirm action; never send on page load or publish.
-- [ ] Browser acceptance on isolated fake-data QA: email-only, phone-only new applicant, historic claim, family representative, revoked credential, follow with Community off, Free event announcement, unsubscribed overlap, light/dark, keyboard, 390px and desktop. Verify native dropdown expansion and modal geometry visually; do not rely on selectOption alone after the test-browser popup issue. No real phone, email, payment or production record creation. Pass focused tests/lint/build/Pint; commit `feat(community): complete email-first follow join and claim screens` with rebuilt assets.
+- [x] Run focused JS files and the public-pages PHP file; confirm meaningful failures. Implement against Tasks 2–8's endpoints. Staff People shows Members/Groups/Followers when independently allowed; when Community is off, navigation links directly to Followers with event-announcement history, not a gated People route. Overview exposes pending join/claim/report queues only to manage-members staff; financial data remains permission-gated.
+- [x] Public organisation page `/{tenant host}/community/about` shows public branding, upcoming published events, follow and configured join options. Never render membership counts/status or private contacts from an unclaimed number. Disable duplicate submit, retain errors, label all fields, use explicit button types and supported Modal props. Handle 401 expiry, 403 rollout/permission, 409 stale preview, 410 consumed claim, 422 validation and 429 budget/cooldown with useful recovery copy.
+- [x] Add staff claim approval/denial, credential revocation/representative review, wrong-number review and join settings. Require independent-check method/reason; hide credential secret from staff. For explicit event announcements show audience/channel estimate, current consent exclusions, published event link and confirm action; never send on page load or publish.
+- [x] Browser acceptance on isolated fake-data QA: email-only, phone-only new applicant, historic claim, family representative, revoked credential, follow with Community off, Free event announcement, unsubscribed overlap, light/dark, keyboard, 390px and desktop. Verify native dropdown expansion and modal geometry visually; do not rely on selectOption alone after the test-browser popup issue. No real phone, email, payment or production record creation. Pass focused tests/lint/build/Pint; commit `feat(community): complete email-first follow join and claim screens` with rebuilt assets.
 
 ## Task 11: Final review, evidence and controlled release handover
 
@@ -352,3 +352,43 @@ Use the existing VerifyPrompt test setup/actual props and mocked Inertia routing
 - Remaining limits disclosed for review: email remains the existing mailbox-control trust model, not proof of legal identity; administrator-assisted checks rely on documented staff judgement; no carrier-reassignment detection; shared phone holders can receive each other's OTPs, so private recovery credentials must remain separate. A compromised recovery credential plus control of the shared number compromises that one grant. Lost credentials require assisted recovery, not SMS-only reset.
 - Existing pay links remain intentionally scoped bearer credentials. Legacy service messages can contain personal dues information/pay links; phone-claim safeguards protect portal access and do not retroactively prove ownership of every stored service contact. Task 4 suppresses known disputed destinations and stale queued contacts; completely replacing the service-message contact trust model is outside this milestone and must not be claimed as solved.
 - Scope recommendation: implement natively in this session with focused tests and one final independent review. These tasks share tightly coupled access and consent contracts; repeating full contexts/reviews per task would add cost without removing the need for the whole-branch security review. Do not begin before the owner's plan review.
+
+
+## Implementation self-review (pre-merge, 2026-10-16)
+
+“Is there anything I have overlooked? Is the solution optimal? Let me take a step back.”
+
+### Touchpoints updated
+
+- Navigation: independent Followers/announcements, People access-review queues and Overview join settings; public organisation and event links; basic My Communities panel alongside existing Events.
+- Permissions/seeders: reuse existing manage-members and send-community-message permissions. No new permission or role is required; independent Following remains outside Community/package gating. Existing deployment permission propagation retained.
+- Configuration: platform phone enable/caps documented in `.env.example`; phone entry defaults off, no new dependency. Sign-in uses platform allowance, never tenant credits.
+- Documentation: spec/plan/roadmap carry the approved email-first model and progress. No separate memory file is required. Existing AGENTS finance invariants retained.
+- Tests: per-task RED→GREEN, private endpoint and receipt authorization, real-worker concurrency, consent/credits and import review, React interactions. Final whole-branch gate/reviewer below remain pending.
+
+### UI gap analysis
+
+- Discoverability, empty states, permission gates, duplicate-submit protection, loading/error recovery: present in public/staff flows. Milestone 4 navigation redesign remains out of scope.
+- Dark/light desktop and 390px browser checks: readable fields, modal fits viewport, no horizontal overflow. Keyboard controls exercised. Native select controls were clicked and screenshots inspected; the browser screenshot captures the page, not the OS-native popup itself. Popup rendering across external browsers therefore remains a manual visual limitation, not a claimed screenshot pass.
+- Browser QA: email-only exact membership access; phone-only no historical candidates before review; two independent representative approvals yield two labelled cards; one credential revoked removes only its card on refresh; pending join status survives refresh; Following works with Community off; explicit re-follow consent; Free scheduling disabled; opted-out address excluded from event-preview audience. Announcement was previewed, not sent. No production records, real emails, SMS or payments created. Prepared local hashed codes + mocked send responses tested real confirmation without transport; transport/budget paths are covered by fake-provider PHP tests.
+
+### Solved during self-review
+
+- Standard Laravel Resource collection constructor restored; contact-version/held-number checks, reviewed import stale snapshots and join exact-email collision safeguarded.
+- Existing key recovery and wrong-number reporting survive rollout pause; new claims/enrollment remain gated. Confirmed wrong-number reports stop marketing, independent resolution does not revive old keys or consent.
+- Scheduled event invitation cannot follow event end; permanently removing source event retains announcement history and pauses unsent work.
+- Challenge widget cleanup, generic wrong-number report UI, accurate 12-hour key warning, private key page cleanup, dark form contrast and portal document title.
+- Static analysis contracts corrected without baseline growth. Race-test worker host inherits configured database host for CI portability.
+
+### Recommended for owner decision
+
+- Before live phone enablement: confirm platform SMS sender and operating cap (proposed 500/day; five per number/day), recipient-authorised live transport test, and independent staff verification process. Keep phone entry off until then; email remains primary. No production enablement has occurred.
+- Key loss requires fresh independent staff review. No carrier reassignment detection exists. Email mailbox control remains the existing ownership assumption; shared/reassigned email is not a universal person identifier.
+- After an organisation pauses all phone-capable entry, new phone code requests remain unavailable; an existing key does not bypass SMS operational availability. Retained verified sessions and email access still work.
+
+### Not gaps
+
+- Pending new membership does not grant historical access or charge dues. Marketing consent remains a separate explicit action.
+- Representative authority is per member; it grants no contact editing, delegation or ticket transfer. Existing bearer pay-link rules remain unchanged.
+- Already accepted/in-flight provider messages cannot be recalled. Eligibility is rechecked immediately before transport; unknown submissions retain budget/credit claims for reconciliation.
+- No merge, deployment, production migrations or real recipient tests are included in this authorization.

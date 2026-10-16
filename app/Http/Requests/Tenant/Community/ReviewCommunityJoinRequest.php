@@ -13,9 +13,10 @@ final class ReviewCommunityJoinRequest extends FormRequest
         return $this->user()?->can('manage members') ?? false;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
-        return ['create_distinct' => ['sometimes', 'boolean'], 'reason' => [$this->routeIs('tenant.community.joins.reject') || $this->boolean('create_distinct') ? 'required' : 'nullable', 'string', 'min:10', 'max:1000']];
+        return ['membership_type_id' => ['nullable', 'uuid'], 'create_distinct' => ['sometimes', 'boolean'], 'reason' => [$this->routeIs('tenant.community.joins.reject') || $this->boolean('create_distinct') ? 'required' : 'nullable', 'string', 'min:10', 'max:1000']];
     }
 
     public function messages(): array

@@ -70,3 +70,11 @@ it('validates join settings and exposes review endpoints only to this organisati
     $this->tenant->users()->attach($reader->id);
     $this->actingAs($reader)->getJson($url)->assertForbidden();
 });
+
+it('lets staff explicitly select an active replacement type when the requested type was retired', function (): void {
+    $this->type->update(['is_active' => false]);
+    $replacement = MembershipType::factory()->create(['tenant_id' => $this->tenant->id]);
+    $member = app(MembershipJoining::class)->approve($this->join, $this->owner, false, 'Reviewed the replacement membership type with the applicant.', $replacement->id);
+    expect($member->status)->toBe(MemberStatusEnum::Active)->and($member->membership_type_id)->toBe($replacement->id)
+        ->and($this->join->fresh()->membership_type_id)->toBe($this->type->id);
+});

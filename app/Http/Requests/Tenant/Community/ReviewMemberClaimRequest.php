@@ -15,6 +15,7 @@ final class ReviewMemberClaimRequest extends FormRequest
         return $this->user()?->can('manage members') ?? false;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         $approval = $this->routeIs('tenant.community.claims.approve');

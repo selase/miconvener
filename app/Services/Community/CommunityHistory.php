@@ -11,9 +11,9 @@ use App\Models\Member;
 use App\Models\Tenant;
 use App\Scopes\TenantScope;
 use App\Services\Events\PlatformAttendeeVerification;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 final class CommunityHistory
 {
@@ -28,7 +28,7 @@ final class CommunityHistory
             $query->whereIn('id', $members->select('tenant_id'))->orWhereIn('id', $followers->select('tenant_id'));
         })->orderBy('name')->orderBy('id')->paginate(20);
 
-        return $rows->through(fn (Tenant $tenant): array => (new MyCommunityResource($tenant, $session))->resolve(request()))->toArray();
+        return $rows->through(fn (Tenant $tenant): array => (new MyCommunityResource($tenant))->withIdentitySession($session)->resolve(request()))->toArray();
     }
 
     /** @return LengthAwarePaginator<int,Member> */
@@ -49,6 +49,28 @@ final class CommunityHistory
         abort_unless($this->access->canView($session, $member), 404);
 
         return $member;
+    }
+
+    /** Only this browser's capability-bound submissions, never a contact-based request directory.
+     * @return array{claims:list<array<string,mixed>>,joins:list<array<string,mixed>>}
+     */
+    public function requests(Tenant $tenant, Session $session): array
+    {
+        $claimCapabilities = $session->get('community_claim_capabilities', []);
+        $joinCapabilities = $session->get('community_join_capabilities', []);
+        $claims = \App\Models\CommunityAccessClaim::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)
+            ->whereIn('id', is_array($claimCapabilities) ? array_keys($claimCapabilities) : [])->latest()->limit(50)->get()
+            ->filter(fn ($claim): bool => app(MemberClaims::class)->owns($session, $claim))
+            ->map(fn ($claim): array => ['id' => $claim->id, 'claimant_name' => $claim->claimant_name, 'role' => $claim->role,
+                'status' => $claim->expires_at->isPast() && in_array($claim->status, ['pending', 'approved'], true) ? 'expired' : $claim->status,
+                'expires_at' => $claim->expires_at->toIso8601String()])->values()->all();
+        $joins = \App\Models\CommunityJoinRequest::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)
+            ->whereIn('id', is_array($joinCapabilities) ? array_keys($joinCapabilities) : [])->latest()->limit(50)->get()
+            ->filter(fn ($join): bool => app(MembershipJoining::class)->owns($session, $join))
+            ->map(fn ($join): array => ['id' => $join->id, 'name' => $join->submitted_name, 'status' => $join->status === 'review_required' ? 'pending' : $join->status,
+                'can_save_recovery' => $join->channel === 'sms' && $join->status === 'approved' && $join->member_access_version !== null && $join->credential_issued_at === null])->values()->all();
+
+        return ['claims' => $claims, 'joins' => $joins];
     }
 
     /** Only exact email matches or independently valid member credentials enter the SQL query.

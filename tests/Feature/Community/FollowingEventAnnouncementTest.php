@@ -105,3 +105,26 @@ it('does not let the general Community endpoint repurpose or edit follower annou
     $this->patchJson(messageTestUrl('/'.$message->id), $general)->assertNotFound();
     $this->postJson(messageTestUrl('/'.$message->id.'/cancel'))->assertNotFound();
 });
+
+it('does not schedule a follower invitation after its event has ended', function (): void {
+    $this->tenant->features()->create(['feature_key' => 'community_message_scheduling', 'enabled' => true]);
+    $this->input['scheduled_at'] = now()->addDays(3)->format('Y-m-d\TH:iP');
+    $this->postJson($this->url, $this->input)->assertUnprocessable()->assertJsonValidationErrors('scheduled_at');
+});
+
+it('retains the announcement and pauses unsent work after its source event is permanently removed', function (): void {
+    $this->postJson($this->url, $this->input)->assertCreated();
+    $message = CommunityMessage::firstOrFail();
+    $this->event->forceDelete();
+    expect($message->fresh()->source_event_id)->toBeNull();
+    app(CommunityMessages::class)->dispatchDue($message->id);
+    expect($message->fresh()->status)->toBe('paused');
+    Mail::assertNothingSent();
+});
+
+it('searches only current-tenant published non-ended announcement events including private events', function (): void {
+    $this->event->update(['name' => 'Search Private', 'visibility' => Event::VISIBILITY_PRIVATE]);
+    Event::factory()->published()->create(['name' => 'Search Foreign', 'ends_at' => now()->addDay()]);
+    Event::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Search Draft', 'ends_at' => now()->addDay()]);
+    $this->getJson($this->url.'/events?search=Search')->assertOk()->assertJsonCount(1, 'events.data')->assertJsonPath('events.data.0.id', $this->event->id);
+});

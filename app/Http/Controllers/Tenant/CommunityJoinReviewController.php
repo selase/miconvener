@@ -29,7 +29,7 @@ final class CommunityJoinReviewController extends Controller
     public function approve(ReviewCommunityJoinRequest $request, string $subdomain, string $join): JsonResponse
     {
         try {
-            app(MembershipJoining::class)->approve($this->find($join), $request->user(), $request->boolean('create_distinct'), $request->validated('reason'));
+            app(MembershipJoining::class)->approve($this->find($join), $request->user(), $request->boolean('create_distinct'), $request->validated('reason'), $request->validated('membership_type_id'));
         } catch (DomainException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }

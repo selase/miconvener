@@ -31,7 +31,7 @@ it('serialises the final slot duplicate joins and duplicate approval across actu
         $session->put(PlatformAttendeeVerification::SESSION_KEY, ['email' => 'join@example.test', 'expires_at' => now()->addHour()->timestamp]);
         $key = app(MembershipJoining::class)->submit($tenant, $session, ['name' => 'Applicant', 'channel' => 'email'], $key)->id;
     }
-    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => '/tmp', 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
+    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
     $workers = [];
     foreach ([0, 1] as $index) {
         $workers[] = new Process([PHP_BINARY, base_path('tests/Fixtures/community/joining-worker.php'), $tenant->id, $mode, $mode === 'last_slot' ? 'join'.$index.'@example.test' : 'join@example.test', $mode === 'last_slot' ? (string) Str::uuid() : $key, (string) $owner->id], base_path(), $environment);

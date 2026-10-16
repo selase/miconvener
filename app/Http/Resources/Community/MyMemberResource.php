@@ -11,6 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @mixin \App\Models\Member */
 final class MyMemberResource extends JsonResource
 {
+    /** @return array<string,mixed> */
     public function toArray(Request $request): array
     {
         return ['id' => $this->id, 'name' => $this->name, 'status' => $this->status->value, 'access_role' => app(MemberAccess::class)->role($request->session(), $this->resource),

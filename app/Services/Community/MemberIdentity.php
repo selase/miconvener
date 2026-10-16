@@ -89,7 +89,7 @@ final class MemberIdentity
     }
 
     /** @param array{index:array<string,list<string>>,records:array<string,array<string,mixed>>} $register
-     * @param  array<string,mixed>  $record
+     * @param  array{id:string,name:string,phone?:?string,email?:?string,...}  $record
      */
     public function addToRegister(array &$register, array $record): void
     {

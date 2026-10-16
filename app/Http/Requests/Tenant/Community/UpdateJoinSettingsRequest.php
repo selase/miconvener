@@ -14,6 +14,7 @@ final class UpdateJoinSettingsRequest extends FormRequest
         return $this->user()?->can('manage members') ?? false;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['join_mode' => ['required', Rule::in(['approval_required', 'immediate', 'invitation_only'])], 'public_join_enabled' => ['required', 'boolean'], 'public_membership_type_id' => ['nullable', 'uuid']];

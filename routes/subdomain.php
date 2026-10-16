@@ -311,6 +311,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::get('/', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'index'])->name('index');
         Route::post('/preview', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'preview'])->name('preview');
         Route::post('/', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'store'])->name('store');
+        Route::get('/events', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'events'])->name('events');
         Route::get('/{message}', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'show'])->name('show');
         Route::post('/{message}/cancel', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'cancel'])->name('cancel');
     });
@@ -329,6 +330,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
             Route::post('access/reports/{report}/review', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'review'])->name('reports.review');
             Route::get('people/members/{member}/credentials', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'credentials'])->name('credentials.index');
             Route::post('people/members/{member}/revoke-access', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'revoke'])->name('credentials.revoke-all');
+            Route::get('access/member-options', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'memberOptions'])->name('claims.member-options');
             Route::get('access/claims', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'index'])->name('claims.index');
             Route::post('access/claims/{claim}/approve', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'approve'])->name('claims.approve');
             Route::post('access/claims/{claim}/reject', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'reject'])->name('claims.reject');
@@ -523,6 +525,14 @@ Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificate
 Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('public.certificates.download');
 
 // Public event pages (no auth — attendees register here)
+Route::get('/community/about', [App\Http\Controllers\Public\CommunityOrganisationController::class, 'show'])->name('public.community.about');
+Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+    Route::post('/community/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'store'])->name('public.community.follow.store');
+    Route::delete('/community/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'destroy'])->name('public.community.follow.destroy');
+    Route::post('/community/join', [App\Http\Controllers\Public\CommunityJoinController::class, 'store'])->name('public.community.join.store');
+    Route::get('/community/joins/{join}', [App\Http\Controllers\Public\CommunityJoinController::class, 'show'])->name('public.community.joins.show');
+});
+
 Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.events.show');
 Route::get('/e/{event}/calendar.ics', [PublicEventController::class, 'calendarFeed'])->name('public.events.calendar.ics');
 Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');

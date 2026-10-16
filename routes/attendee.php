@@ -20,6 +20,7 @@ Route::prefix('my')->group(function (): void {
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
         Route::get('/identity', [App\Http\Controllers\Public\MyCommunitiesController::class, 'identity'])->name('attendee.my.identity');
         Route::get('/communities', [App\Http\Controllers\Public\MyCommunitiesController::class, 'index'])->name('attendee.my.communities.index');
+        Route::get('/communities/{tenantSlug}/options', [App\Http\Controllers\Public\MyCommunitiesController::class, 'options'])->name('attendee.my.communities.options');
         Route::get('/communities/{tenantSlug}', [App\Http\Controllers\Public\MyCommunitiesController::class, 'show'])->name('attendee.my.communities.show');
         Route::get('/communities/{tenantSlug}/members/{member}', [App\Http\Controllers\Public\MyCommunitiesController::class, 'member'])->name('attendee.my.communities.member');
         Route::get('/communities/{tenantSlug}/members/{member}/charges', [App\Http\Controllers\Public\MyCommunitiesController::class, 'charges'])->name('attendee.my.communities.charges');

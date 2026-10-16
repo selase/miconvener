@@ -19,7 +19,6 @@ final class WrongNumberReports
 
     public function report(Tenant $tenant, Session $session, string $note, ?Member $member = null): CommunityWrongNumberReport
     {
-        abort_unless($tenant->communityEnabled() || $tenant->followingEnabled(), 404);
         if ($member !== null && ($member->tenant_id !== $tenant->id || ! $this->access->canView($session, $member))) {
             throw new AuthorizationException;
         }
@@ -54,6 +53,7 @@ final class WrongNumberReports
             abort_unless($locked->status === 'pending', 410);
             $locked->update(['status' => $confirmed ? 'confirmed' : 'dismissed', 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'reason' => $reason]);
             if ($confirmed) {
+                app(MessagingPreferences::class)->disableMarketing($locked->tenant, 'sms', $locked->phone);
                 foreach (Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $locked->tenant_id)->cursor() as $member) {
                     if ($this->identity->normalisePhone($member->phone) === $locked->phone) {
                         $this->access->revoke($member, $actor, $reason);

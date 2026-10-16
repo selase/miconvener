@@ -47,6 +47,16 @@ final class MyCommunitiesController extends Controller
             'members' => $this->history->members($tenant, $request->session())->through(fn ($member) => (new MyMemberResource($member))->resolve($request))]);
     }
 
+    public function options(Request $request, string $tenantSlug): JsonResponse
+    {
+        $tenant = $this->tenant($tenantSlug);
+        $context = app(\App\Services\Community\CommunityPublicContext::class)->for($tenant, $request->session());
+
+        return response()->json([...$context, 'requests' => $this->history->requests($tenant, $request->session()),
+            'followUrl' => route('attendee.my.follow.store', ['tenantSlug' => $tenantSlug]),
+            'joinUrl' => route('attendee.my.joins.store', ['tenantSlug' => $tenantSlug])]);
+    }
+
     public function member(Request $request, string $tenantSlug, string $member): JsonResponse
     {
         return response()->json(['member' => (new MyMemberResource($this->history->member($this->tenant($tenantSlug), $request->session(), $member)))->resolve($request)]);

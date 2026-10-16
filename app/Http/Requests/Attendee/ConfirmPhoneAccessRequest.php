@@ -13,6 +13,7 @@ final class ConfirmPhoneAccessRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return (new PhoneAccessRequest)->rules() + ['code' => ['required', 'string', 'regex:/^[0-9]{6}$/D']];

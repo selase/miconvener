@@ -52,6 +52,7 @@ final class CommunityJoinController extends Controller
         return CommunityJoinRequest::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->findOrFail($id);
     }
 
+    /** @return array<string,mixed> */
     private function payload(CommunityJoinRequest $row): array
     {
         return ['id' => $row->id, 'name' => $row->submitted_name, 'status' => $row->status === 'review_required' ? 'pending' : $row->status,

@@ -13,6 +13,7 @@ final class FollowingEventAnnouncementRequest extends FormRequest
         return $this->user()?->can('send community messages') ?? false;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         $rules = StoreMessageRequest::createFrom($this)->rules();

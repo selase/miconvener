@@ -31,6 +31,9 @@ final class Following
 
         return $connection->transaction(function () use ($connection, $tenant, $channel, $address, $hash, $resumeMarketing, $source): CommunityFollower {
             $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community-follow:'.$tenant->id.':'.$channel.':'.$hash]);
+            if ($channel === 'sms' && app(WrongNumberReports::class)->isBlocked($tenant, $channel, $address)) {
+                throw ValidationException::withMessages(['channel' => 'This number needs an independent review by the organisation before SMS announcements can resume. You may use a separately verified email.']);
+            }
             if (! $this->preferences->allowsMarketing($tenant, $channel, $address)) {
                 if (! $resumeMarketing) {
                     throw ValidationException::withMessages(['resume_marketing' => 'Confirm that you want to receive announcements at this address again.']);

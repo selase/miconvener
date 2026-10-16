@@ -42,3 +42,12 @@ it('labels separately approved representatives without exposing the members othe
     $this->withSession($this->session->all())->getJson($this->base.'/communities/'.$this->tenant->slug.'/members/'.$this->member->id)->assertOk()->assertJsonPath('member.access_role', 'representative')->assertDontSee($this->member->phone)->assertDontSee($this->member->email);
     $this->getJson($this->base.'/communities/'.$this->tenant->slug.'/members/'.$this->relative->id)->assertNotFound();
 });
+
+it('restores an existing credential with fresh phone proof even when new Community enrollment is paused', function (): void {
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => $this->member->phone, 'expires_at' => now()->addHour()->timestamp]);
+    $credential = app(MemberAccess::class)->enrolPhone($this->session, $this->member);
+    $this->session->forget([PlatformAttendeeVerification::SESSION_KEY, 'community_member_grants']);
+    expect($this->tenant->communityEnabled())->toBeFalse();
+    $this->withSession($this->session->all())->postJson($this->base.'/communities/'.$this->tenant->slug.'/access', $credential)->assertOk()->assertJsonPath('established', true);
+    $this->getJson($this->base.'/communities/'.$this->tenant->slug.'/members/'.$this->member->id)->assertOk();
+});

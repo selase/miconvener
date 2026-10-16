@@ -13,6 +13,7 @@ final class ReviewWrongNumberReportRequest extends FormRequest
         return $this->user()?->can('manage members') ?? false;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['method' => [$this->routeIs('tenant.community.reports.resolve') ? 'required' : 'nullable', \Illuminate\Validation\Rule::in(['in_person', 'known_contact'])], 'confirmed' => [$this->routeIs('tenant.community.reports.review') ? 'required' : 'nullable', 'boolean'], 'reason' => ['required', 'string', 'min:10', 'max:1000']];

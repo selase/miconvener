@@ -1,3 +1,4 @@
+import FollowControl from '@/Pages/Public/Community/FollowControl';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
 import {
@@ -346,7 +347,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
                                         <ExternalLink className="h-3.5 w-3.5 text-ink-secondary" />
                                         <span>Slide Deck</span>
                                     </a>
-                                 )}
+                                )}
                             </div>
                         </li>
                     ))}
@@ -1634,7 +1635,7 @@ function FindMyTicket({ event }) {
     );
 }
 
-export default function Show({ event, org, isPrivate = false }) {
+export default function Show({ event, org, isPrivate = false, community = null }) {
     const workshops = useMemo(
         () => event.sessions.filter((s) => s.type === 'workshop'),
         [event.sessions]
@@ -1645,7 +1646,10 @@ export default function Show({ event, org, isPrivate = false }) {
         if (event.allow_contributions) {
             list.push({
                 key: 'contributions',
-                label: event.contribution_title || event.lexicon?.contributions_tab_label || 'Contributions',
+                label:
+                    event.contribution_title ||
+                    event.lexicon?.contributions_tab_label ||
+                    'Contributions',
             });
         }
         if (event.sessions.length > 0) list.push({ key: 'schedule', label: 'Programme' });
@@ -1684,6 +1688,30 @@ export default function Show({ event, org, isPrivate = false }) {
                     {event.name}
                 </h1>
                 <p className="mt-3.5 text-[13.5px] text-ink-secondary">Hosted by {org.name}</p>
+                {community && (
+                    <details className="mt-5 max-w-xl rounded-lg border border-border bg-surface p-4">
+                        <summary className="cursor-pointer text-sm font-medium text-accent">
+                            Stay connected with {org.name}
+                        </summary>
+                        <div className="mt-4 space-y-4">
+                            {community.followingEnabled && (
+                                <FollowControl
+                                    identity={community.identity}
+                                    initialFollowing={community.following}
+                                    followUrl={community.followUrl}
+                                    signInUrl={community.signInUrl}
+                                    sourceEventId={event.id}
+                                />
+                            )}
+                            <a
+                                href={community.organisation.about_url}
+                                className="inline-block text-sm text-accent underline"
+                            >
+                                Organisation page and membership options
+                            </a>
+                        </div>
+                    </details>
+                )}
                 {event.is_recurring && event.recurrence_summary && (
                     <div className="mt-3.5 inline-flex items-center gap-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-1.5 text-xs font-medium text-ink">
                         <Repeat className="h-3.5 w-3.5 text-accent shrink-0" />
@@ -1785,7 +1813,8 @@ export default function Show({ event, org, isPrivate = false }) {
                                             <p className="text-xs text-ink-secondary mt-0.5">
                                                 {event.contributions_total_pesewas > 0
                                                     ? `${event.currency} ${(event.contributions_total_pesewas / 100).toFixed(2)} contributed so far. Mobile Money & Cards accepted.`
-                                                    : (event.lexicon?.contributions_subtitle || 'Voluntary contributions are warmly welcomed for this gathering via Mobile Money & Card.')}
+                                                    : event.lexicon?.contributions_subtitle ||
+                                                      'Voluntary contributions are warmly welcomed for this gathering via Mobile Money & Card.'}
                                             </p>
                                         </div>
                                     </div>

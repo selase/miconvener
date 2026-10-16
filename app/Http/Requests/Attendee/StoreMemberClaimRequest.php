@@ -14,6 +14,7 @@ final class StoreMemberClaimRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['name' => ['required', 'string', 'max:160'], 'role' => ['required', Rule::in(['self', 'representative'])]];

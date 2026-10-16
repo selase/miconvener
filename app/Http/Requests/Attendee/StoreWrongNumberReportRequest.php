@@ -13,6 +13,7 @@ final class StoreWrongNumberReportRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['note' => ['required', 'string', 'max:500'], 'member_id' => ['nullable', 'uuid']];

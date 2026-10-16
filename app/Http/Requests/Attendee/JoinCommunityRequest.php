@@ -14,6 +14,7 @@ final class JoinCommunityRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['name' => ['required', 'string', 'max:255'], 'channel' => ['required', Rule::in(['email', 'sms'])], 'request_key' => ['required', 'uuid']];

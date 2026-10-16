@@ -15,11 +15,16 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /** @mixin \App\Models\Tenant */
 final class MyCommunityResource extends JsonResource
 {
-    public function __construct(\App\Models\Tenant $resource, private readonly ?Session $identitySession = null)
+    private ?Session $identitySession = null;
+
+    public function withIdentitySession(Session $session): self
     {
-        parent::__construct($resource);
+        $this->identitySession = $session;
+
+        return $this;
     }
 
+    /** @return array<string,mixed> */
     public function toArray(Request $request): array
     {
         $following = app(Following::class);

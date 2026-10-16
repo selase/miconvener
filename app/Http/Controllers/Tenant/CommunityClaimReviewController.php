@@ -24,6 +24,17 @@ final class CommunityClaimReviewController extends Controller
             'phone' => $claim->phone, 'role' => $claim->role, 'status' => $claim->status, 'member_id' => $claim->member_id, 'reason' => $claim->reason, 'expires_at' => $claim->expires_at->toIso8601String()])]);
     }
 
+    public function memberOptions(\App\Http\Requests\Tenant\Community\GroupMemberOptionsRequest $request): JsonResponse
+    {
+        $this->authorize('manage members');
+        $tenant = app(TenantContext::class)->getTenant();
+        $search = $request->validated('search', '');
+
+        return response()->json(['members' => Member::query()->where('tenant_id', $tenant->id)
+            ->when($search !== '', fn ($query) => $query->where(fn ($match) => $match->where('name', 'ilike', '%'.$search.'%')->orWhere('email', 'ilike', '%'.$search.'%')->orWhere('phone', 'ilike', '%'.$search.'%')))
+            ->orderBy('name')->orderBy('id')->paginate(30, ['id', 'name', 'email', 'phone', 'status'])]);
+    }
+
     public function approve(ReviewMemberClaimRequest $request, string $subdomain, string $claim): JsonResponse
     {
         $model = $this->find($claim);

@@ -17,7 +17,7 @@ return new class extends Migration
         Schema::connection('landlord')->table('community_messages', function (Blueprint $table): void {
             $table->timestampTz('started_at', 6)->nullable()->change();
             $table->string('purpose', 30)->default('community');
-            $table->foreignUuid('source_event_id')->nullable()->constrained('events');
+            $table->foreignUuid('source_event_id')->nullable()->constrained('events')->nullOnDelete();
             $table->uuid('last_follower_id')->nullable();
             $table->index(['tenant_id', 'purpose']);
         });

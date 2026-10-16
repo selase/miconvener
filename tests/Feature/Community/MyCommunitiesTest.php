@@ -42,3 +42,10 @@ it('hides unavailable join actions and uses the supplied session when queried ou
     $history = app(App\Services\Community\CommunityHistory::class)->communities($this->session);
     expect($history['data'][0]['actions']['join'])->toBeFalse();
 });
+
+it('supports the standard resource collection contract as well as explicit service sessions', function (): void {
+    $request = Illuminate\Http\Request::create('/my/communities');
+    $request->setLaravelSession($this->session);
+    $rows = App\Http\Resources\Community\MyCommunityResource::collection(collect([$this->tenant]))->resolve($request);
+    expect($rows[0]['id'])->toBe($this->tenant->id);
+});

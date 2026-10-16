@@ -13,6 +13,7 @@ final class MemberCredentialRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['selector' => ['required', 'uuid'], 'secret' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D']];

@@ -16,12 +16,30 @@ use Illuminate\Http\Request;
 
 final class FollowingEventAnnouncementController extends Controller
 {
-    public function index(Request $request, CommunityMessages $service): JsonResponse
+    public function index(Request $request, CommunityMessages $service): JsonResponse|\Inertia\Response
     {
         $tenant = $this->tenant();
         $service->authorize($tenant, $request->user(), true);
 
-        return response()->json(['messages' => CommunityMessage::query()->where('tenant_id', $tenant->id)->where('purpose', 'following_event')->latest()->paginate(25)]);
+        $messages = CommunityMessage::query()->where('tenant_id', $tenant->id)->where('purpose', 'following_event')->latest()->paginate(25);
+        if ($request->wantsJson()) {
+            return response()->json(['messages' => $messages]);
+        }
+
+        return \Inertia\Inertia::render('Tenant/Community/Followers', [...$service->scheduleOptions($tenant), 'followers' => null, 'messages' => $messages,
+            'canManage' => $request->user()->can('manage members'), 'canSend' => true, 'communityEnabled' => $tenant->communityEnabled(), 'activeTab' => 'announcements',
+            'canSchedule' => app(\App\Services\Community\MessageEntitlements::class)->canSchedule($tenant),
+            'events' => Event::query()->where('tenant_id', $tenant->id)->published()->where('ends_at', '>=', now())->orderBy('starts_at')->limit(50)->get(['id', 'name', 'slug', 'visibility'])]);
+    }
+
+    public function events(\App\Http\Requests\Tenant\Community\GroupMemberOptionsRequest $request, CommunityMessages $service): JsonResponse
+    {
+        $tenant = $this->tenant();
+        $service->authorize($tenant, $request->user(), true);
+        $search = $request->validated('search', '');
+
+        return response()->json(['events' => Event::query()->where('tenant_id', $tenant->id)->published()->where('ends_at', '>=', now())
+            ->when($search !== '', fn ($query) => $query->where('name', 'ilike', '%'.$search.'%'))->orderBy('starts_at')->orderBy('id')->paginate(30, ['id', 'name', 'slug', 'visibility'])]);
     }
 
     public function preview(FollowingEventAnnouncementRequest $request, CommunityMessages $service): JsonResponse
@@ -30,7 +48,7 @@ final class FollowingEventAnnouncementController extends Controller
         $event = $this->event($request, $service);
         $input = $this->input($request, $event);
 
-        return response()->json([...$service->preview($tenant, $request->user(), $input, $event), 'event' => ['name' => $event->name, 'url' => $this->eventUrl($event)], 'subject' => $input['subject'], 'body' => $input['body']]);
+        return response()->json([...$service->preview($tenant, $request->user(), $input, $event), 'event' => ['name' => $event->name, 'url' => $this->eventUrl($event), 'visibility' => $event->visibility], 'subject' => $input['subject'], 'body' => $input['body']]);
     }
 
     public function store(FollowingEventAnnouncementRequest $request, CommunityMessages $service): JsonResponse
@@ -80,6 +98,7 @@ final class FollowingEventAnnouncementController extends Controller
         return route('public.events.show', ['subdomain' => $this->tenant()->slug, 'event' => $event->slug]);
     }
 
+    /** @return array<string,mixed> */
     private function input(FollowingEventAnnouncementRequest $request, Event $event): array
     {
         return [...$request->validated(), 'audience' => ['kind' => 'followers'], 'body' => $request->string('body')->toString()."\n\n".$this->eventUrl($event)];

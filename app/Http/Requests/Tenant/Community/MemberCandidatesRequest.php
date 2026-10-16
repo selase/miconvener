@@ -15,6 +15,7 @@ final class MemberCandidatesRequest extends FormRequest
         return $this->user()?->can('manage members') ?? false;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['name' => ['required', 'string', 'max:160'], 'email' => ['nullable', 'string', 'email', 'max:255'], 'phone' => ['nullable', 'string', 'max:32'],

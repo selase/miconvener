@@ -57,7 +57,6 @@ final class CommunityClaimController extends Controller
     public function recover(MemberCredentialRequest $request, string $tenantSlug): JsonResponse
     {
         $tenant = Tenant::query()->where('slug', $tenantSlug)->firstOrFail();
-        abort_unless($tenant->communityEnabled(), 404);
         $selector = $request->string('selector')->toString();
         $credential = CommunityAccessCredential::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->find($selector);
         $established = $credential !== null && app(MemberAccess::class)->establish($request->session(), $selector, $request->string('secret')->toString());
@@ -73,6 +72,7 @@ final class CommunityClaimController extends Controller
         return CommunityAccessClaim::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->findOrFail($id);
     }
 
+    /** @return array<string,mixed> */
     private function payload(CommunityAccessClaim $claim): array
     {
         return ['id' => $claim->id, 'claimant_name' => $claim->claimant_name, 'role' => $claim->role, 'status' => $claim->status,

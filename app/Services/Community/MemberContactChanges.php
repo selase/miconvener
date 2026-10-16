@@ -14,6 +14,7 @@ final class MemberContactChanges
 {
     public function __construct(private readonly MemberAccess $access, private readonly MemberIdentity $identity, private readonly MessagingPreferences $addresses) {}
 
+    /** @param array<string,mixed> $validated */
     public function update(Member $member, array $validated, User $actor): Member
     {
         $this->access->authorizeStaff($member->tenant, $actor);

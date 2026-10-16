@@ -13,6 +13,7 @@ final class PhoneAccessRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['organiser' => ['required', 'string', 'max:100'], 'phone' => ['required', 'string', 'max:32'], 'turnstile_token' => ['nullable', 'string', 'max:2048']];

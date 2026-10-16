@@ -61,6 +61,8 @@ final class PlatformAttendeeAccessController extends Controller
         }
 
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
+            'communityPhoneVerified' => app(\App\Services\Community\PhoneVerification::class)->verifiedPhone($request->session()) !== null,
+            'communityReturnUrl' => $this->communityReturnUrl($request, $organiserSlug),
             'organiser' => $organiser,
             'verifiedEmail' => $verifiedEmail !== null ? ContactMask::email($verifiedEmail) : null,
             'initialHistory' => $history,
@@ -322,5 +324,33 @@ final class PlatformAttendeeAccessController extends Controller
             'Content-Type' => 'application/manifest+json',
             'Cache-Control' => 'public, max-age=86400',
         ]);
+    }
+
+    private function communityReturnUrl(Request $request, ?string $organiserSlug): ?string
+    {
+        $value = $request->query('return_to');
+        if (! is_string($value) || $organiserSlug === null || str_contains($value, '\\') || preg_match('/[\x00-\x20]/', $value)) {
+            return null;
+        }
+        $tenant = Tenant::where('slug', $organiserSlug)->first();
+        if ($tenant === null) {
+            return null;
+        }
+        $expected = route('public.community.about', ['subdomain' => $tenant->slug]);
+        $parsed = parse_url($value);
+        $allowed = parse_url($expected);
+        if (! is_array($parsed) || isset($parsed['user']) || isset($parsed['pass']) || ($parsed['scheme'] ?? null) !== ($allowed['scheme'] ?? null)
+            || ($parsed['host'] ?? null) !== ($allowed['host'] ?? null) || ($parsed['port'] ?? null) !== ($allowed['port'] ?? null)) {
+            return null;
+        }
+        if (($parsed['path'] ?? '') === '/community/about') {
+            return $expected;
+        }
+        if (preg_match('#^/e/([a-z0-9-]+)$#D', $parsed['path'] ?? '', $matches)
+            && \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->published()->where('slug', $matches[1])->exists()) {
+            return route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $matches[1]]);
+        }
+
+        return null;
     }
 }

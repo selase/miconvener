@@ -68,6 +68,7 @@ final class DuesReminders
      * Each queued unit resolves current charges/settings before claiming any channel.
      *
      * @param  list<string>  $memberIds
+     * @param  array<string,int>|null  $contactVersions
      * @return array{sent: int, skipped: int}
      */
     public function deliverUnit(Tenant $tenant, array $memberIds, string $channel, ?int $userId, ?string $localDate, ?array $contactVersions = null): array
@@ -143,6 +144,7 @@ final class DuesReminders
 
     /**
      * @param  list<string>|null  $memberIds
+     * @param  array<string,int>|null  $contactVersions
      * @return array{sent: int, skipped: int}
      */
     private function send(Tenant $tenant, CarbonImmutable $today, bool $arrears, ?array $memberIds = null, ?string $channel = null, ?array $contactVersions = null): array

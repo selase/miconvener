@@ -14,6 +14,7 @@ final class FollowCommunityRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string,mixed> */
     public function rules(): array
     {
         return ['channel' => ['required', Rule::in(['email', 'sms'])], 'resume_marketing' => ['sometimes', 'boolean'], 'source_event_id' => ['nullable', 'uuid']];

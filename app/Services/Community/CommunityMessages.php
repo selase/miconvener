@@ -22,6 +22,7 @@ use App\Services\Sms\SmsAllowance;
 use App\Services\Sms\SmsMessage;
 use App\Services\Sms\SmsResult;
 use Carbon\CarbonImmutable;
+use DateTimeZone;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -47,6 +48,9 @@ final class CommunityMessages
         }
         $this->checkEntitlements($tenant, $input);
         $scheduled = $this->schedule($tenant, $input['scheduled_at'] ?? null);
+        if ($followingEvent !== null && $scheduled !== null && $scheduled->gt($followingEvent->ends_at)) {
+            throw ValidationException::withMessages(['scheduled_at' => 'Schedule this invitation before the event ends.']);
+        }
         $counts = [];
         foreach ($input['channels'] as $channel) {
             $counts[$channel] = iterator_count($this->audiences->resolve($tenant, $input['audience'], $channel, $actor));
@@ -312,9 +316,22 @@ final class CommunityMessages
         $message->update(['status' => $partial ? 'partial' : 'completed', 'finished_at' => now()]);
     }
 
+    /** @return array{timezone:string,offsets:list<string>} */
+    public function scheduleOptions(Tenant $tenant): array
+    {
+        $timezone = CommunitySettings::for($tenant)->timezone;
+        $zone = new DateTimeZone($timezone);
+        $now = CarbonImmutable::now();
+        $offsets = collect($zone->getTransitions($now->subYear()->timestamp, $now->addYears(2)->timestamp) ?: [])
+            ->pluck('offset')->push($zone->getOffset($now))->unique()
+            ->map(fn (int $seconds): string => sprintf('%s%02d:%02d', $seconds < 0 ? '-' : '+', intdiv(abs($seconds), 3600), intdiv(abs($seconds) % 3600, 60)))->values()->all();
+
+        return ['timezone' => $timezone, 'offsets' => $offsets];
+    }
+
     public function assertFollowingEvent(Tenant $tenant, Event $event): void
     {
-        abort_unless($tenant->followingEnabled() && $event->tenant_id === $tenant->id && $event->status === Event::STATUS_PUBLISHED && $event->ends_at !== null && $event->ends_at->gte(now()), 404);
+        abort_unless($tenant->followingEnabled() && $event->tenant_id === $tenant->id && $event->status === Event::STATUS_PUBLISHED && $event->ends_at->gte(now()), 404);
     }
 
     private function claim(Tenant $tenant, User $actor, CommunityMessage $message, string $id, string $channel): ?CommunityMessageDelivery
