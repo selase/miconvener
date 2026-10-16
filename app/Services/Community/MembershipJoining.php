@@ -56,6 +56,9 @@ final class MembershipJoining
                 $member = $this->enrollment->create($tenant, ['name' => $name, 'membership_type_id' => $configuration['type']->id,
                     $channel === 'email' ? 'email' : 'phone' => $address], $configuration['settings']->join_mode === 'immediate' ? MemberStatusEnum::Active : MemberStatusEnum::Pending);
             }
+            if ($member !== null && ! app(Following::class)->isFollowing($tenant, $session, $channel)) {
+                app(MessagingPreferences::class)->disableMarketing($tenant, $channel, $address);
+            }
             $capability = bin2hex(random_bytes(32));
             $row = CommunityJoinRequest::query()->create(['tenant_id' => $tenant->id, 'channel' => $channel, 'address' => $address, 'address_hash' => $hash, 'request_key' => $requestKey,
                 'submitted_name' => $name, 'membership_type_id' => $configuration['type']->id, 'member_id' => $member?->id, 'member_access_version' => $member?->access_version,
@@ -91,6 +94,9 @@ final class MembershipJoining
                 throw new DomainException('The organisation is over its member limit.');
             }
             if ($member === null) {
+                if ($row->channel === 'email' && app(MemberIdentity::class)->candidates($tenant, $row->submitted_name, null, $row->address) !== []) {
+                    throw ValidationException::withMessages(['create_distinct' => 'This email already identifies a membership. Review that record or correct the contact instead of creating a duplicate.']);
+                }
                 if (! $createDistinct || mb_strlen(mb_trim($reason ?? '')) < 10) {
                     throw ValidationException::withMessages(['create_distinct' => 'Review the contact ambiguity and explicitly confirm a separate new membership. Existing records need the independent claim process.']);
                 }

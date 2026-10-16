@@ -357,6 +357,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
             Route::get('people/import/template', [MemberImportController::class, 'template'])->name('people.import.template');
             Route::post('people/import/preview', [MemberImportController::class, 'preview'])->name('people.import.preview');
             Route::post('people/import/confirm', [MemberImportController::class, 'confirm'])->name('people.import.confirm');
+            Route::post('people/member-candidates', [MemberController::class, 'candidates'])->name('members.candidates');
             Route::post('people/members', [MemberController::class, 'store'])->name('members.store');
             Route::patch('people/members/{member}', [MemberController::class, 'update'])->name('members.update');
             Route::post('people/members/{member}/exit', [MemberController::class, 'exit'])->name('members.exit');

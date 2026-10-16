@@ -17,7 +17,7 @@ final class ConfirmMemberImportRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['token' => ['required', 'string', 'max:80'], 'existing_policy' => ['required', Rule::in(['skip', 'update'])]];
+        return ['token' => ['required', 'string', 'max:80'], 'existing_policy' => ['required', Rule::in(['skip', 'update'])], 'decisions' => ['sometimes', 'array', 'max:10000'], 'decisions.*' => ['array:action,member_id'], 'decisions.*.action' => ['required', Rule::in(['skip', 'update', 'create_distinct'])], 'decisions.*.member_id' => ['nullable', 'uuid']];
     }
 
     /** @return array<string, string> */

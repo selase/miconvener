@@ -21,7 +21,9 @@ beforeEach(function () {
 
 test('different people sharing a phone keep separate records pay links and charges', function () {
     $first = $this->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), $this->payload)->assertCreated()->json('id');
-    $second = $this->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), [...$this->payload, 'name' => 'Kofi Mensah'])->assertCreated()->json('id');
+    $data = [...$this->payload, 'name' => 'Kofi Mensah'];
+    $review = $this->postJson(route('tenant.community.members.candidates', ['subdomain' => 'acme']), $data)->assertOk()->json();
+    $second = $this->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), [...$data, 'confirm_distinct' => true, 'duplicate_revision' => $review['revision']])->assertCreated()->json('id');
     $ama = Member::query()->findOrFail($first);
     $kofi = Member::query()->findOrFail($second);
     expect($ama->pay_token)->not->toBe($kofi->pay_token);
@@ -40,7 +42,7 @@ test('different people sharing a phone keep separate records pay links and charg
 test('the same person cannot be added twice through spelling whitespace or phone formatting', function (string $name, string $phone) {
     Member::factory()->create(['tenant_id' => $this->organisation->id, 'membership_type_id' => $this->type->id, 'name' => ' Ama   Mensah ', 'phone' => '0244 000 001']);
     $this->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), [...$this->payload, 'name' => $name, 'phone' => $phone])
-        ->assertUnprocessable()->assertJsonValidationErrors(['phone' => 'This person is already a member.']);
+        ->assertUnprocessable()->assertJsonValidationErrors(['phone']);
 })->with([
     ['Ama Mensah', '0244000001'],
     [' ama   MENSAH ', '+233 244 000 001'],
@@ -64,6 +66,8 @@ test('rolling back shared phones refuses without changing either member or their
     $first = Member::factory()->create(['tenant_id' => $this->organisation->id, 'membership_type_id' => $this->type->id, 'name' => 'Ama', 'phone' => '0244000001']);
     $second = Member::factory()->create(['tenant_id' => $this->organisation->id, 'membership_type_id' => $this->type->id, 'name' => 'Kofi', 'phone' => '0244000001']);
     $charge = DuesCharge::factory()->create(['tenant_id' => $this->organisation->id, 'member_id' => $first->id, 'membership_type_id' => $this->type->id]);
+    $reviewed = require database_path('migrations/landlord/2026_10_19_100600_allow_reviewed_shared_member_identities.php');
+    $reviewed->down();
     $migration = require database_path('migrations/landlord/2026_10_16_100300_allow_shared_member_phones.php');
 
     expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Cannot restore unique member phones');
@@ -75,6 +79,8 @@ test('rolling back shared phones refuses without changing either member or their
 
 test('shared phone migration preserves existing members and safely reverses when numbers are unique', function () {
     $member = Member::factory()->create(['tenant_id' => $this->organisation->id, 'membership_type_id' => $this->type->id, 'name' => 'Ama', 'phone' => '0244000001']);
+    $reviewed = require database_path('migrations/landlord/2026_10_19_100600_allow_reviewed_shared_member_identities.php');
+    $reviewed->down();
     $migration = require database_path('migrations/landlord/2026_10_16_100300_allow_shared_member_phones.php');
     $migration->down();
     $migration->up();
@@ -84,7 +90,9 @@ test('shared phone migration preserves existing members and safely reverses when
     Member::factory()->create(['tenant_id' => $this->organisation->id, 'membership_type_id' => $this->type->id, 'name' => 'Kofi', 'phone' => '0244000001']);
 });
 
-test('the database rejects canonical duplicates even when validation races', function (string $phone, string $name = '  AMA   mensah  ') {
+test('the legacy database guard is restored on a safe rollback', function (string $phone, string $name = '  AMA   mensah  ') {
+    $reviewed = require database_path('migrations/landlord/2026_10_19_100600_allow_reviewed_shared_member_identities.php');
+    $reviewed->down();
     Member::factory()->create(['tenant_id' => $this->organisation->id, 'membership_type_id' => $this->type->id, 'name' => 'Ama Mensah', 'phone' => '0244000001']);
 
     expect(fn () => Member::factory()->create([
@@ -101,6 +109,8 @@ test('the database rejects canonical duplicates even when validation races', fun
 ]);
 
 test('shared phone migration refuses existing canonical duplicates without rewriting contacts', function () {
+    $reviewed = require database_path('migrations/landlord/2026_10_19_100600_allow_reviewed_shared_member_identities.php');
+    $reviewed->down();
     $migration = require database_path('migrations/landlord/2026_10_16_100300_allow_shared_member_phones.php');
     $migration->down();
     $first = Member::factory()->create(['tenant_id' => $this->organisation->id, 'membership_type_id' => $this->type->id, 'name' => 'Ama Mensah', 'phone' => '0244000001']);

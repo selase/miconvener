@@ -15,7 +15,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /** @mixin \App\Models\Tenant */
 final class MyCommunityResource extends JsonResource
 {
-    public function __construct($resource, private readonly ?Session $identitySession = null)
+    public function __construct(\App\Models\Tenant $resource, private readonly ?Session $identitySession = null)
     {
         parent::__construct($resource);
     }

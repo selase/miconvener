@@ -289,11 +289,11 @@ The host setup matches `PlatformAttendeeAccessControllerTest.php`; retain it so 
 
 ## Task 9: Import collision handling without silent merges
 
-**Files:** Modify `MemberIdentity.php`, `MemberImport.php`, `ImportPreview.php`, `ConfirmMemberImportRequest.php`, MemberRequest validation, `MemberController.php`, `resources/js/Pages/Tenant/Community/ImportMembers.jsx`. Tests: extend `MemberImportTest.php`, add `MemberIdentityCollisionTest.php` and `resources/js/test/communityImportDecisions.test.jsx`.
+**Files:** Add a migration removing raw/canonical name+phone uniqueness for explicitly reviewed distinct people (safe rollback refuses when reviewed duplicates exist), and staff candidate request/endpoint. Modify `MemberFormModal.jsx`, `MemberIdentity.php`, `MemberImport.php`, `ImportPreview.php`, `ConfirmMemberImportRequest.php`, MemberRequest validation, `MemberController.php`, `resources/js/Pages/Tenant/Community/ImportMembers.jsx`. Tests: extend `MemberImportTest.php`, add `MemberIdentityCollisionTest.php` and `resources/js/test/communityImportDecisions.test.jsx`.
 
 **Interfaces:** Add `MemberIdentity::candidates(Tenant $tenant, string $name, ?string $phone, ?string $email): array` returning all tenant-bound possible IDs/reasons to authorised staff. Do not overwrite one member ID with another in a map. Extend `MemberImport::confirm(Tenant $tenant, string $token, string $existingPolicy, int $userId, array $decisions = []): ImportResult`; decisions keyed by preview line are `{action:skip|update|create_distinct, member_id?:string}`. Preserve default skip/update for unambiguous existing-email matches; all name/phone-only and contradictory multi-match rows require explicit decisions. Create-distinct applies to family/name/phone collisions, not an override that silently duplicates an existing exact email.
 
-- [ ] Write failures for two members sharing name/phone but holding different emails, phone-only collisions, email A pointing to one row and phone/name to another, same-file duplicates, foreign member choice, stale preview and changed contact after preview. Include:
+- [x] Write failures for two members sharing name/phone but holding different emails, phone-only collisions, email A pointing to one row and phone/name to another, same-file duplicates, foreign member choice, stale preview and changed contact after preview. Include:
 
 ```php
 it('keeps every candidate when family names and phones collide', function (): void {
@@ -305,9 +305,9 @@ it('keeps every candidate when family names and phones collide', function (): vo
 });
 ```
 
-- [ ] Run the focused PHP/JS files and confirm failure. Keep import tokens tenant/user-bound, expiring, single-use. Sign the stored preview revision; re-read candidates and selected member under the existing import/tenant lock. A changed match requires a new preview, not a silent fallback. Recheck cap and type; imports use Task 4's contact change action so they cannot evade grant revocation.
-- [ ] Replace blanket name/phone uniqueness in staff add/edit with an explicit possible-duplicate confirmation for creating a distinct member. Ordinary callers cannot bypass it with arbitrary IDs. Render candidate choices only for authorised staff; no public lookup or automatic financial-history merge. Keep existing histories and give a before-confirm summary of create/update/skip actions.
-- [ ] Pass import/collision/cap regression tests, JS interactions, lint, build and Pint; commit `fix(community): require explicit decisions for ambiguous member imports` with rebuilt assets.
+- [x] Run the focused PHP/JS files and confirm failure. Keep import tokens tenant/user-bound, expiring, single-use. Sign the stored preview revision; re-read candidates and selected member under the existing import/tenant lock. A changed match requires a new preview, not a silent fallback. Recheck cap and type; imports use Task 4's contact change action so they cannot evade grant revocation.
+- [x] Replace blanket name/phone uniqueness in staff add/edit with an explicit possible-duplicate confirmation for creating a distinct member. Ordinary callers cannot bypass it with arbitrary IDs. Render candidate choices only for authorised staff; no public lookup or automatic financial-history merge. Keep existing histories and give a before-confirm summary of create/update/skip actions.
+- [x] Pass import/collision/cap regression tests, JS interactions, lint, build and Pint; commit `fix(community): require explicit decisions for ambiguous member imports` with rebuilt assets.
 
 ## Task 10: Complete public and staff flows with accessible UI
 

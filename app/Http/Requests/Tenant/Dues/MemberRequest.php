@@ -12,8 +12,8 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Members may share a phone; name plus phone guards against duplicates.
- * An email may not repeat among members without a phone.
+ * Possible shared-contact matches require a fresh staff acknowledgement.
+ * Exact emails cannot be duplicated through a distinct-person confirmation.
  */
 abstract class MemberRequest extends FormRequest
 {
@@ -52,6 +52,7 @@ abstract class MemberRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:160'],
+            'confirm_distinct' => ['sometimes', 'boolean'], 'duplicate_revision' => ['nullable', 'string', 'size:64'],
             'email' => [
                 'bail',
                 'nullable',
@@ -117,10 +118,10 @@ abstract class MemberRequest extends FormRequest
                 return;
             }
             try {
-                $identity->assertUnique($tenant, $this->only(['name', 'phone', 'email']), $ignoreId);
+                $identity->assertUnique($tenant, $this->only(['name', 'phone', 'email', 'confirm_distinct', 'duplicate_revision']), $ignoreId);
             } catch (\Illuminate\Validation\ValidationException $exception) {
                 if (isset($exception->errors()[$attribute])) {
-                    $fail('This person is already a member.');
+                    $fail($exception->errors()[$attribute][0]);
                 }
             }
         };

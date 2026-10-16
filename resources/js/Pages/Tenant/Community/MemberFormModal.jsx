@@ -19,8 +19,14 @@ export default function MemberFormModal({ member, membershipTypes, onClose, onSa
     });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
+    const [review, setReview] = useState(null);
+    const [confirmedDistinct, setConfirmedDistinct] = useState(false);
 
-    const set = (field) => (event) => setForm({ ...form, [field]: event.target.value });
+    const set = (field) => (event) => {
+        setForm({ ...form, [field]: event.target.value });
+        setReview(null);
+        setConfirmedDistinct(false);
+    };
 
     // A class deactivated after the member joined is still theirs to keep.
     const options =
@@ -57,6 +63,30 @@ export default function MemberFormModal({ member, membershipTypes, onClose, onSa
         }
 
         setProcessing(true);
+        const possible = await sendJson('POST', route('tenant.community.members.candidates'), {
+            ...payload,
+            ignore_id: member?.id ?? null,
+        });
+        if (!possible.ok) {
+            setProcessing(false);
+            setErrors(possible.errors);
+            if (Object.keys(possible.errors).length === 0) showToast?.(possible.message);
+            return;
+        }
+        if (possible.body.candidates.length > 0) {
+            if (
+                !possible.body.can_create_distinct ||
+                !confirmedDistinct ||
+                review?.revision !== possible.body.revision
+            ) {
+                setReview(possible.body);
+                setConfirmedDistinct(false);
+                setProcessing(false);
+                return;
+            }
+            payload.confirm_distinct = true;
+            payload.duplicate_revision = possible.body.revision;
+        }
         const result = editing
             ? await sendJson(
                   'PATCH',
@@ -108,6 +138,44 @@ export default function MemberFormModal({ member, membershipTypes, onClose, onSa
                 <p className="-mt-2 text-xs text-ink-secondary">
                     Add a phone number, an email, or both, so we can reach this member.
                 </p>
+                {review?.candidates.length > 0 && (
+                    <section
+                        aria-label="Possible matching members"
+                        className="space-y-3 rounded-md border border-warning-fg/30 bg-warning-bg p-4 text-sm text-ink"
+                    >
+                        <h3 className="font-semibold">Check possible matches</h3>
+                        <p>
+                            A shared phone does not identify a person. Review these records before
+                            saving a distinct member.
+                        </p>
+                        <ul className="space-y-2">
+                            {review.candidates.map((candidate) => (
+                                <li key={candidate.id}>
+                                    <strong>{candidate.name}</strong>
+                                    <span className="block text-ink-secondary">
+                                        {candidate.email ?? candidate.phone}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                        {review.can_create_distinct ? (
+                            <label className="flex items-start gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={confirmedDistinct}
+                                    onChange={(event) => setConfirmedDistinct(event.target.checked)}
+                                    className="mt-1"
+                                />
+                                I checked these records and confirm this is a distinct person.
+                            </label>
+                        ) : (
+                            <p className="font-medium">
+                                This email already belongs to another member. Review that membership
+                                or correct the email.
+                            </p>
+                        )}
+                    </section>
+                )}
                 <Select
                     label="Membership type"
                     value={form.membership_type_id}

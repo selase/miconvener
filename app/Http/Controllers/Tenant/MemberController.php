@@ -94,6 +94,19 @@ final class MemberController extends Controller
         ]);
     }
 
+    public function candidates(\App\Http\Requests\Tenant\Community\MemberCandidatesRequest $request): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $identity = app(MemberIdentity::class);
+        $data = $request->validated();
+        $ignoreId = $data['ignore_id'] ?? null;
+        $register = $identity->register($tenant, $ignoreId);
+        $candidates = $identity->candidatesIn($register, $data['name'], $data['phone'] ?? null, $data['email'] ?? null);
+
+        return response()->json(['candidates' => $candidates, 'revision' => $identity->duplicateRevision($tenant, $data, $ignoreId),
+            'can_create_distinct' => count(array_filter($candidates, fn ($candidate) => in_array('email', $candidate['reasons'], true))) === 0]);
+    }
+
     public function store(StoreMemberRequest $request): JsonResponse
     {
         $tenant = $this->getTenant();
@@ -102,7 +115,7 @@ final class MemberController extends Controller
             $member = $cap->withLock($tenant, function () use ($request, $tenant): Member {
                 app(MemberIdentity::class)->assertUnique($tenant, $request->validated());
 
-                return app(\App\Services\Community\MemberEnrollment::class)->create($tenant, $request->validated(), MemberStatusEnum::Active);
+                return app(\App\Services\Community\MemberEnrollment::class)->create($tenant, array_diff_key($request->validated(), array_flip(['confirm_distinct', 'duplicate_revision'])), MemberStatusEnum::Active);
             });
         } catch (DomainException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
@@ -117,7 +130,7 @@ final class MemberController extends Controller
         $model = app(MemberCap::class)->withLock($tenant, function () use ($request, $tenant, $member): Member {
             $model = $this->findMember($member);
             app(MemberIdentity::class)->assertUnique($tenant, $request->validated(), $model->id);
-            $model = app(\App\Services\Community\MemberContactChanges::class)->update($model, $request->validated(), $request->user());
+            $model = app(\App\Services\Community\MemberContactChanges::class)->update($model, array_diff_key($request->validated(), array_flip(['confirm_distinct', 'duplicate_revision'])), $request->user());
 
             return $model;
         });

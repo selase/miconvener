@@ -43,7 +43,7 @@ final class MemberImportController extends Controller
     public function confirm(ConfirmMemberImportRequest $request, MemberImport $import): JsonResponse
     {
         try {
-            return response()->json($import->confirm($this->tenant(), $request->validated('token'), $request->validated('existing_policy'), (int) $request->user()->id));
+            return response()->json($import->confirm($this->tenant(), $request->validated('token'), $request->validated('existing_policy'), (int) $request->user()->id, $request->validated('decisions', [])));
         } catch (DomainException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         } catch (LockTimeoutException) {

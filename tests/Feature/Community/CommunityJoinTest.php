@@ -121,3 +121,14 @@ it('clears join request capabilities on explicit removal of phone access', funct
     app(PhoneVerification::class)->forget($this->session);
     expect($this->session->has('community_join_capabilities'))->toBeFalse();
 });
+
+it('does not silently opt a newly active joining address into marketing', function (bool $alreadyFollowing): void {
+    CommunitySettings::for($this->tenant)->update(['join_mode' => 'immediate']);
+    if ($alreadyFollowing) {
+        Artisan::call('community:following-enable', ['tenant' => $this->tenant->slug]);
+        app(App\Services\Community\Following::class)->follow($this->tenant, $this->session, 'email', false);
+    }
+    app(MembershipJoining::class)->submit($this->tenant, $this->session, ['name' => 'Applicant', 'channel' => 'email'], (string) Str::uuid());
+    $addresses = iterator_to_array(app(App\Services\Community\AudienceResolver::class)->resolve($this->tenant, ['kind' => 'all_members'], 'email'));
+    expect(count($addresses))->toBe($alreadyFollowing ? 1 : 0);
+})->with([false, true]);

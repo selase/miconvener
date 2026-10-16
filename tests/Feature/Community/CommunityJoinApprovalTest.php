@@ -50,9 +50,10 @@ it('requires staff permission and a still active local type', function (): void 
 
 it('requires an explicit distinct-person decision for ambiguity and never grants historical phone access', function (): void {
     $historic = Member::findOrFail($this->join->member_id);
-    $historic->update(['status' => MemberStatusEnum::Exited]);
+    $historic->update(['status' => MemberStatusEnum::Exited, 'phone' => '+233241234567']);
+    $this->session->put(App\Services\Community\PhoneVerification::SESSION_KEY, ['phone' => $historic->phone, 'expires_at' => now()->addHour()->timestamp]);
     $service = app(MembershipJoining::class);
-    $ambiguous = $service->submit($this->tenant, $this->session, ['name' => 'Another Applicant', 'channel' => 'email'], (string) Str::uuid());
+    $ambiguous = $service->submit($this->tenant, $this->session, ['name' => 'Another Applicant', 'channel' => 'sms'], (string) Str::uuid());
     expect(fn () => $service->approve($ambiguous, $this->owner))->toThrow(Illuminate\Validation\ValidationException::class);
     $distinct = $service->approve($ambiguous, $this->owner, true, 'Confirmed a different person through independent checks.');
     expect($distinct->id)->not->toBe($historic->id)->and($historic->fresh()->status)->toBe(MemberStatusEnum::Exited)

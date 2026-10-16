@@ -10,6 +10,7 @@ use App\Models\Member;
 use App\Models\MembershipType;
 use App\Models\Tenant;
 use App\Scopes\TenantScope;
+use BackedEnum;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\UploadedFile;
@@ -50,67 +51,90 @@ final class MemberImport
             throw ValidationException::withMessages(['file' => 'Import at most 10,000 rows at a time.']);
         }
         $types = $this->types($tenant);
-        $register = $this->identity->index($tenant);
-        $seen = [];
+        $register = $this->identity->register($tenant);
+        $seen = ['index' => [], 'records' => []];
+        $fingerprints = [];
+        $candidateReferences = 0;
         $rows = [];
-        $summary = ['new' => 0, 'duplicate' => 0, 'existing' => 0, 'error' => 0];
+        $summary = ['new' => 0, 'duplicate' => 0, 'existing' => 0, 'error' => 0, 'review_required' => 0];
         foreach ($sheet as $offset => $values) {
             if (count(array_filter($values, fn (mixed $value): bool => filled($value))) === 0) {
                 continue;
             }
             $data = array_combine(self::HEADERS, array_pad(array_slice($values, 0, 5), 5, null));
-            if (Str::lower($file->getClientOriginalExtension()) === 'xlsx' && is_numeric($data['joined_on'])
-                && (float) $data['joined_on'] >= 1 && (float) $data['joined_on'] <= 2958465) {
+            if (Str::lower($file->getClientOriginalExtension()) === 'xlsx' && is_numeric($data['joined_on']) && (float) $data['joined_on'] >= 1 && (float) $data['joined_on'] <= 2958465) {
                 $data['joined_on'] = Date::excelToDateTimeObject((float) $data['joined_on'])->format('Y-m-d');
             }
             $row = $this->validateRow($data, $offset + 2, $types);
-            $this->validateIdentity($row, $register);
+            $possibleCount = count($this->identity->matchingIds($register['index'], $row['name'], $row['phone'], $row['email']))
+                + count($this->identity->matchingIds($seen['index'], $row['name'], $row['phone'], $row['email']));
+            if ($possibleCount > 25 || $candidateReferences + $possibleCount > 10000) {
+                $row['errors'][] = 'More than 25 possible matches for this row, or the preview review limit was reached. Review these contacts in People or use a smaller spreadsheet.';
+                $historic = [];
+                $sameFile = [];
+            } else {
+                $historic = $this->identity->candidatesIn($register, $row['name'], $row['phone'], $row['email']);
+                $sameFile = $this->identity->candidatesIn($seen, $row['name'], $row['phone'], $row['email']);
+                $candidateReferences += $possibleCount;
+            }
+            $row['historic_candidates'] = $historic;
+            $row['candidates'] = [...$historic, ...$sameFile];
+            $fingerprint = hash('sha256', json_encode([Str::lower(Str::squish($row['name'])), $row['phone'], $row['email']], JSON_THROW_ON_ERROR));
+            $sameEmailInFile = count(array_filter($sameFile, fn ($candidate) => in_array('email', $candidate['reasons'], true))) > 0;
+            $row['existing_id'] = null;
             if ($row['errors'] !== []) {
                 $row['status'] = 'error';
-            } elseif ($this->identity->matchingId($seen, $row['name'], $row['phone'], $row['email']) !== null) {
+            } elseif (isset($fingerprints[$fingerprint]) || $sameEmailInFile) {
                 $row['status'] = 'duplicate';
+            } elseif (count($historic) === 1 && $sameFile === [] && in_array('email', $historic[0]['reasons'], true)) {
+                $row['status'] = 'existing';
+                $row['existing_id'] = $historic[0]['id'];
             } else {
-                $id = $this->identity->matchingId($register, $row['name'], $row['phone'], $row['email']);
-                $row['status'] = $id === null ? 'new' : 'existing';
-                $row['existing_id'] = $id;
-                foreach ($this->identity->keys($row['name'], $row['phone'], $row['email']) as $key) {
-                    $seen[$key] = (string) $row['line'];
-                }
+                $row['status'] = $row['candidates'] === [] ? 'new' : 'review_required';
+            }
+            if (! in_array($row['status'], ['error', 'duplicate'], true)) {
+                $fingerprints[$fingerprint] = true;
+                $this->identity->addToRegister($seen, ['id' => 'row:'.$row['line'], 'name' => $row['name'], 'phone' => $row['phone'], 'email' => $row['email'], 'source_line' => $row['line']]);
             }
             $summary[$row['status']]++;
             $rows[] = $row;
         }
         $token = (string) Str::uuid();
-        Cache::put($this->cacheKey($token), ['tenant_id' => $tenant->id, 'user_id' => (int) auth()->id(), 'rows' => $rows], now()->addMinutes(30));
+        $preview = ['tenant_id' => $tenant->id, 'user_id' => (int) auth()->id(), 'rows' => $rows];
+        $preview['revision'] = $this->revision($preview);
+        Cache::put($this->cacheKey($token), $preview, now()->addMinutes(30));
 
         return new ImportPreview($rows, $summary, $token);
     }
 
-    public function confirm(Tenant $tenant, string $token, string $existingPolicy, int $userId): ImportResult
+    /** @param array<int|string,array{action:string,member_id?:string}> $decisions */
+    public function confirm(Tenant $tenant, string $token, string $existingPolicy, int $userId, array $decisions = []): ImportResult
     {
         abort_unless(in_array($existingPolicy, ['skip', 'update'], true), 422, 'Choose skip or update.');
 
-        return Cache::lock('community.import.lock:'.$token, 180)->block(10, function () use ($tenant, $token, $existingPolicy, $userId): ImportResult {
+        return Cache::lock('community.import.lock:'.$token, 180)->block(10, function () use ($tenant, $token, $existingPolicy, $userId, $decisions): ImportResult {
             $key = $this->cacheKey($token);
             $preview = Cache::get($key);
             abort_if($preview === null, 410, 'This import has already been used');
             abort_unless($preview['tenant_id'] === $tenant->id && $preview['user_id'] === $userId, 404);
 
-            return $this->cap->withLock($tenant, function () use ($tenant, $key, $existingPolicy): ImportResult {
+            return $this->cap->withLock($tenant, function () use ($tenant, $key, $existingPolicy, $userId, $decisions): ImportResult {
                 $preview = Cache::pull($key);
                 abort_if($preview === null, 410, 'This import has already been used');
-                $register = $this->identity->index($tenant);
+                abort_unless(is_string($preview['revision'] ?? null) && hash_equals($preview['revision'], $this->revision($preview)), 409, 'This preview changed. Preview the spreadsheet again.');
+                $register = $this->identity->register($tenant);
                 $types = $this->types($tenant);
                 $creates = [];
                 $updates = [];
                 $outcomes = [];
                 $skipped = 0;
                 $errors = 0;
+                $lines = array_column($preview['rows'], 'line');
+                foreach (array_keys($decisions) as $line) {
+                    abort_unless(in_array((int) $line, $lines, true), 422, 'Choose only rows in this preview.');
+                }
                 foreach ($preview['rows'] as $original) {
                     $row = $this->validateRow($original, $original['line'], $types);
-                    if (in_array($original['status'], ['new', 'existing'], true)) {
-                        $this->validateIdentity($row, $register);
-                    }
                     $status = 'skipped';
                     if ($original['status'] === 'error' || $row['errors'] !== []) {
                         $row['errors'] = $original['status'] === 'error' ? $original['errors'] : $row['errors'];
@@ -119,27 +143,45 @@ final class MemberImport
                     } elseif ($original['status'] === 'duplicate') {
                         $skipped++;
                     } else {
-                        $id = $this->identity->matchingId($register, $row['name'], $row['phone'], $row['email']);
-                        if ($id !== null) {
-                            if ($existingPolicy === 'update' && $original['status'] === 'existing' && $original['existing_id'] === $id && ! isset($updates[$id])) {
-                                $updates[$id] = $row;
-                                $status = 'updated';
-                            } else {
-                                $skipped++;
+                        $current = $this->identity->candidatesIn($register, $row['name'], $row['phone'], $row['email']);
+                        abort_unless($current === $original['historic_candidates'], 409, 'Member contacts or possible matches changed. Preview the spreadsheet again.');
+                        $decision = $decisions[$row['line']] ?? null;
+                        if ($original['status'] === 'review_required' && $decision === null) {
+                            throw ValidationException::withMessages(['decisions.'.$row['line'] => 'Choose skip, an existing member to update, or a distinct new person for line '.$row['line'].'.']);
+                        }
+                        $action = $decision['action'] ?? ($original['status'] === 'existing' ? $existingPolicy : 'create_distinct');
+                        abort_unless(in_array($action, ['skip', 'update', 'create_distinct'], true), 422, 'Choose a valid row decision.');
+                        if ($action === 'skip') {
+                            $skipped++;
+                        } elseif ($action === 'update') {
+                            $id = $decision['member_id'] ?? $original['existing_id'];
+                            abort_unless(is_string($id) && in_array($id, array_column($current, 'id'), true), 422, 'Choose a matching member of this organisation.');
+                            foreach ($current as $candidate) {
+                                abort_if($candidate['id'] !== $id && in_array('email', $candidate['reasons'], true), 422, 'The email belongs to a different member. Correct the spreadsheet first.');
                             }
+                            abort_if(isset($updates[$id]), 409, 'Two rows would update the same member. Review the spreadsheet again.');
+                            $updates[$id] = $row;
+                            $status = 'updated';
                         } else {
+                            foreach ($original['candidates'] as $candidate) {
+                                abort_if(in_array('email', $candidate['reasons'], true), 422, 'An existing exact email cannot be duplicated. Review that member instead.');
+                            }
                             $creates[] = $row;
                             $status = 'created';
-                        }
-                        foreach ($this->identity->keys($row['name'], $row['phone'], $row['email']) as $identityKey) {
-                            $register[$identityKey] = $id ?? 'new:'.$row['line'];
                         }
                     }
                     $outcomes[] = ['line' => $row['line'], 'status' => $status, 'errors' => $row['errors']];
                 }
                 $this->cap->assertRoomFor($tenant, count($creates));
+                $actor = \App\Models\User::findOrFail($userId);
                 foreach ($updates as $id => $row) {
-                    Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->findOrFail($id)->update($this->attributes($row));
+                    $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($id);
+                    foreach ($register['records'][$id] as $field => $expected) {
+                        $actual = $member->getAttribute($field);
+                        $actual = $actual instanceof BackedEnum ? $actual->value : $actual;
+                        abort_unless($actual === $expected, 409, 'The selected member changed during review. Preview the spreadsheet again.');
+                    }
+                    app(MemberContactChanges::class)->update($member, $this->attributes($row), $actor);
                 }
                 $today = CarbonImmutable::now(CommunitySettings::for($tenant)->timezone)->toDateString();
                 foreach ($creates as $row) {
@@ -153,15 +195,12 @@ final class MemberImport
         });
     }
 
-    /**
-     * @param  array<string, mixed>  $row
-     * @param  array<string, string>  $register
-     */
-    private function validateIdentity(array &$row, array $register): void
+    /** @param array<string,mixed> $preview */
+    private function revision(array $preview): string
     {
-        if ($row['errors'] === [] && count($this->identity->matchingIds($register, $row['name'], $row['phone'], $row['email'])) > 1) {
-            $row['errors'][] = 'The email and name/phone match different members. Correct the contacts before importing.';
-        }
+        unset($preview['revision']);
+
+        return hash_hmac('sha256', json_encode($preview, JSON_THROW_ON_ERROR), (string) config('app.key'));
     }
 
     /** @return array<int, array<array-key, mixed>> */
