@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import csrfFetch from '@/lib/csrfFetch';
+import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
 
 const RESEND_AFTER_SECONDS = 60;
 
@@ -15,7 +16,14 @@ const OFFLINE_MESSAGE = "Couldn't reach the server. Check your connection and tr
  * to that registration's own address and nothing is typed; otherwise it goes
  * to the address entered here.
  */
-export default function VerifyPrompt({ registrationId = null, sentTo = null, onVerified }) {
+export default function VerifyPrompt({
+    registrationId = null,
+    sentTo = null,
+    onVerified,
+    organiserSlug = null,
+    allowPhone = true,
+}) {
+    const [phoneMode, setPhoneMode] = useState(false);
     const [stage, setStage] = useState(registrationId ? 'ready' : 'address');
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
@@ -117,7 +125,10 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             }
 
             if (!response.ok) {
-                const errorMsg = json.errors?.email?.[0] ?? json.message ?? "Couldn't send the code. Please try again.";
+                const errorMsg =
+                    json.errors?.email?.[0] ??
+                    json.message ??
+                    "Couldn't send the code. Please try again.";
                 setMessage(errorMsg);
                 return;
             }
@@ -139,9 +150,7 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
         setBusy(true);
         setMessage(null);
 
-        const payload = registrationId
-            ? { registration: registrationId, code }
-            : { email, code };
+        const payload = registrationId ? { registration: registrationId, code } : { email, code };
 
         try {
             const response = await csrfFetch(confirmRoute, {
@@ -169,6 +178,20 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
         }
     };
 
+    const choosePhone = () => {
+        if (turnstileWidgetId.current !== null && window.turnstile?.remove) {
+            window.turnstile.remove(turnstileWidgetId.current);
+            turnstileWidgetId.current = null;
+        }
+        setChallengeRequired(false);
+        setSiteKey(null);
+        setChallengeAction(null);
+        setTurnstileToken(null);
+        setCode('');
+        setMessage(null);
+        setPhoneMode(true);
+    };
+
     const switchAddress = () => {
         setStage('address');
         setCode('');
@@ -178,14 +201,28 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
         setTurnstileToken(null);
     };
 
+    if (phoneMode && !registrationId) {
+        return (
+            <PhoneVerify
+                organiserSlug={organiserSlug}
+                onVerified={onVerified}
+                onUseEmail={() => setPhoneMode(false)}
+            />
+        );
+    }
+
     if (stage === 'address') {
         return (
             <form onSubmit={send} className="space-y-4">
                 <div>
-                    <label htmlFor="verify-email" className="block text-[13px] font-medium text-ink-secondary">
+                    <label
+                        htmlFor="verify-email"
+                        className="block text-[13px] font-medium text-ink-secondary"
+                    >
                         Your email address
                     </label>
                     <input
+                        autoFocus
                         id="verify-email"
                         type="email"
                         required
@@ -195,6 +232,16 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                         className={`mt-1.5 ${INPUT_CLASS}`}
                     />
                 </div>
+
+                {allowPhone && !registrationId && (
+                    <button
+                        type="button"
+                        onClick={choosePhone}
+                        className="block text-sm font-medium text-accent underline"
+                    >
+                        Use a phone number instead
+                    </button>
+                )}
 
                 {challengeRequired && (
                     <div className="py-2">
@@ -241,7 +288,10 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             </div>
 
             <div>
-                <label htmlFor="verify-code" className="block text-[13px] font-medium text-ink-secondary">
+                <label
+                    htmlFor="verify-code"
+                    className="block text-[13px] font-medium text-ink-secondary"
+                >
                     Verification code
                 </label>
                 <input

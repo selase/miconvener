@@ -32,6 +32,20 @@ export const NAV_GROUPS = [
                 permission: 'manage_members',
             },
             {
+                label: 'Followers',
+                href: 'tenant.community.followers.index',
+                icon: 'UsersRound',
+                feature: 'community_following',
+                permission: 'manage_members',
+            },
+            {
+                label: 'Follower announcements',
+                href: 'tenant.following.announcements.index',
+                icon: 'Inbox',
+                feature: 'community_following',
+                permission: 'send_community_messages',
+            },
+            {
                 label: 'Messages',
                 href: 'tenant.community.messages.index',
                 icon: 'Inbox',

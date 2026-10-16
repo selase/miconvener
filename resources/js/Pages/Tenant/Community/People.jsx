@@ -1,3 +1,4 @@
+import ClaimsPanel, { CredentialPanel } from './ClaimsPanel';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { Layers, Plus, Upload } from 'lucide-react';
@@ -151,6 +152,7 @@ export default function People({
     membershipTypes,
     memberUsage,
     groupsEnabled = false,
+    followingEnabled = false,
     activeTab = 'members',
 }) {
     const showToast = useToast();
@@ -277,6 +279,15 @@ export default function People({
                         label: 'Members',
                         href: route('tenant.community.people.index'),
                     },
+                    ...(followingEnabled
+                        ? [
+                              {
+                                  key: 'followers',
+                                  label: 'Followers',
+                                  href: route('tenant.community.followers.index'),
+                              },
+                          ]
+                        : []),
                     ...(groupsEnabled
                         ? [
                               {
@@ -290,6 +301,9 @@ export default function People({
                 activeTab={activeTab}
                 actions={
                     <>
+                        <Button href={`${route('tenant.community.people.index')}?tab=reviews`}>
+                            Access reviews
+                        </Button>
                         <Button href={route('tenant.community.people.import.show')} icon={Upload}>
                             Import
                         </Button>
@@ -308,7 +322,14 @@ export default function People({
                 }
             />
 
-            {activeTab === 'groups' ? (
+            {activeTab === 'reviews' ? (
+                <ClaimsPanel
+                    membershipTypes={membershipTypes}
+                    initialQueue={
+                        new URLSearchParams(window.location.search).get('queue') ?? 'claims'
+                    }
+                />
+            ) : activeTab === 'groups' ? (
                 <GroupsPanel />
             ) : (
                 <div className="flex">
@@ -316,8 +337,8 @@ export default function People({
                         {memberUsage && (
                             <p className="mb-4 text-sm text-ink-secondary">
                                 {memberUsage.limit === null
-                                    ? `${memberUsage.count.toLocaleString()} members · Unlimited`
-                                    : `${memberUsage.count.toLocaleString()} of ${memberUsage.limit.toLocaleString()} members`}
+                                    ? `${memberUsage.count.toLocaleString()} member slots · Unlimited`
+                                    : `${memberUsage.count.toLocaleString()} of ${memberUsage.limit.toLocaleString()} member slots (including pending requests)`}
                             </p>
                         )}
                         {atCap && (
@@ -439,6 +460,7 @@ export default function People({
                                         />
                                     </DetailCard>
 
+                                    <CredentialPanel key={selected.id} member={selected} />
                                     <DetailCard title="Pay link">
                                         <CopyField
                                             label="Link"

@@ -21,7 +21,11 @@ final class CommunityMessage extends Model
 
     protected $connection = 'landlord';
 
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected $guarded = [];
+
+    protected $attributes = ['purpose' => 'community'];
 
     protected $casts = ['channels' => 'array', 'audience' => 'array', 'estimate' => 'array', 'selection_complete' => 'boolean', 'scheduled_at' => 'immutable_datetime', 'started_at' => 'immutable_datetime', 'finished_at' => 'immutable_datetime', 'cancelled_at' => 'immutable_datetime'];
 

@@ -111,6 +111,8 @@ final class CommunitySmsReconciler
                 $delivery->update(['status' => $accepted ? 'accepted' : 'failed', 'reason' => 'operator_confirmed']);
                 $this->refreshMessage($delivery->message_id);
             }
+        } elseif ($row->source_type === 'member_contact_notice') {
+            \App\Models\CommunityContactNotice::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereKey($row->source_id)->update(['status' => $accepted ? 'sent' : 'failed', 'reason' => 'operator_confirmed']);
         } elseif ($row->source_type === 'event_blast') {
             $log = EventNotificationLog::withoutGlobalScopes()->where('tenant_id', $tenant->id)->find($row->source_id);
             if ($log !== null) {

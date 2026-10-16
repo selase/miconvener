@@ -73,7 +73,7 @@ it('shows member usage and explains preservation when over the plan cap', () => 
             memberUsage={{ count: 312, limit: 50, plan: 'Free', over_cap: true }}
         />
     );
-    expect(screen.getByText('312 of 50 members')).toBeTruthy();
+    expect(screen.getByText('312 of 50 member slots (including pending requests)')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('Free plan includes 50 members');
     expect(screen.getByRole('alert').textContent).toContain('Existing members can still pay');
     expect(screen.getByRole('button', { name: 'Add member' }).disabled).toBe(true);
@@ -87,7 +87,7 @@ it('shows unlimited membership without a cap warning', () => {
             memberUsage={{ count: 7000, limit: null, plan: 'Enterprise', over_cap: false }}
         />
     );
-    expect(screen.getByText('7,000 members · Unlimited')).toBeTruthy();
+    expect(screen.getByText('7,000 member slots · Unlimited')).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('button', { name: 'Add member' }).disabled).toBe(false);
 });

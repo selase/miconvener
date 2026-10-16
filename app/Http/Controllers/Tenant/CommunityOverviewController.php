@@ -35,6 +35,13 @@ final class CommunityOverviewController extends Controller
 
         return Inertia::render('Tenant/Community/Overview', [
             'canReadFinance' => $canReadFinance,
+            'joinSettings' => CommunitySettings::for($tenant)->only(['join_mode', 'public_join_enabled', 'public_membership_type_id']),
+            'membershipTypes' => \App\Models\MembershipType::query()->where('tenant_id', $tenant->id)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'amount', 'currency', 'period']),
+            'reviewCounts' => [
+                'claims' => \App\Models\CommunityAccessClaim::query()->where('tenant_id', $tenant->id)->where('status', 'pending')->where('expires_at', '>', now())->count(),
+                'joins' => \App\Models\CommunityJoinRequest::query()->where('tenant_id', $tenant->id)->whereIn('status', ['pending', 'review_required'])->count(),
+                'reports' => \App\Models\CommunityWrongNumberReport::query()->where('tenant_id', $tenant->id)->where('status', 'pending')->count(),
+            ],
             'recentMessages' => $tenant->featureEnabled('community_messages') && auth()->user()->can('send community messages')
                 ? \App\Models\CommunityMessage::query()->where('tenant_id', $tenant->id)->when(! $canReadFinance, fn ($query) => $query->where('audience->kind', '!=', 'arrears'))->latest()->limit(3)->get(['id', 'subject', 'status', 'created_at']) : null,
             'reminderSettings' => CommunitySettings::for($tenant)->only(['reminders_enabled', 'reminder_offsets', 'frequent_digest', 'sms_monthly_limit', 'week_starts_on']),

@@ -16,6 +16,7 @@ beforeEach(function () {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
     Cache::flush();
+    Illuminate\Support\Facades\Queue::fake([App\Jobs\Community\DeliverContactNotice::class]);
     [$this->tenant, $this->owner] = eventHost('imports');
     Artisan::call('community:enable', ['tenant' => $this->tenant->slug]);
     $this->type = MembershipType::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Regular']);
@@ -47,7 +48,7 @@ test('preview validates every row and saves nothing with physical line numbers',
     MembershipType::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Retired', 'is_active' => false]);
     MembershipType::factory()->create(['name' => 'Foreign']);
     $result = previewMembers($this, "Ama,0241234567,AMA@example.test,regular,2026-10-01\nAma,+233241234567,,Regular,\nNo contact,,,Regular,\nUnknown,0241234568,,Missing,\nInactive,0241234569,,Retired,\nDate,0241234570,,Regular,2026-02-30\nPhone,garbage1234567890,,Regular,\nForeign,0241234571,,Foreign,\n");
-    expect($result['summary'])->toBe(['new' => 1, 'duplicate' => 1, 'existing' => 0, 'error' => 6])
+    expect($result['summary'])->toBe(['new' => 1, 'duplicate' => 0, 'existing' => 0, 'error' => 6, 'review_required' => 1])
         ->and($result['rows'][0]['phone'])->toBe('+233241234567')
         ->and($result['rows'][0]['email'])->toBe('ama@example.test')
         ->and($result['rows'][2]['line'])->toBe(4)
@@ -89,11 +90,11 @@ test('existing policy updates only register fields and preserves exited status m
     $paid = DuesCharge::factory()->create(['status' => 'paid', 'tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'member_id' => $member->id]);
     $original = $member->fresh()->getAttributes();
     $preview = previewMembers($this, "Ama Mensah,+233241234567,new@example.test,Regular,2026-10-01\n");
-    expect($preview['summary']['existing'])->toBe(1);
-    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'skip'])->assertOk()->assertJsonPath('skipped', 1);
+    expect($preview['summary']['review_required'])->toBe(1);
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'skip', 'decisions' => ['2' => ['action' => 'skip']]])->assertOk()->assertJsonPath('skipped', 1);
     expect($member->fresh()->email)->toBe($member->email);
     $preview = previewMembers($this, "Ama Mensah,+233241234567,new@example.test,Regular,2026-10-01\n");
-    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update'])->assertOk()->assertJsonPath('updated', 1);
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update', 'decisions' => ['2' => ['action' => 'update', 'member_id' => $member->id]]])->assertOk()->assertJsonPath('updated', 1);
     $fresh = $member->fresh();
     expect($fresh->email)->toBe('new@example.test')->and($fresh->status)->toBe(MemberStatusEnum::Exited)
         ->and($fresh->only(['pay_token', 'amount_override', 'active_since', 'exited_on', 'notes', 'joined_on']))
@@ -104,7 +105,7 @@ test('existing policy updates only register fields and preserves exited status m
 test('confirm revalidates the current register and never updates someone added after preview', function () {
     $preview = previewMembers($this, "Ama,0241234567,new@example.test,Regular,\n");
     $member = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'name' => 'Ama', 'phone' => '0241234567', 'email' => 'keep@example.test']);
-    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update'])->assertOk()->assertJsonPath('created', 0)->assertJsonPath('skipped', 1);
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update'])->assertStatus(409);
     expect($member->fresh()->email)->toBe('keep@example.test')->and(Member::query()->count())->toBe(1);
 });
 
@@ -119,7 +120,7 @@ test('over cap refuses the whole transaction including existing member updates',
     $this->tenant->features()->create(['feature_key' => 'community_members', 'enabled' => true, 'meta' => ['type' => 'limit', 'value' => 1]]);
     $member = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'name' => 'Ama', 'phone' => '0241234567', 'email' => 'keep@example.test']);
     $preview = previewMembers($this, "Ama,0241234567,change@example.test,Regular,\nNew,0241234568,,Regular,\n");
-    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update'])->assertUnprocessable()->assertJsonPath('message', fn ($message) => str_contains($message, 'Free plan includes 1 members'));
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update', 'decisions' => ['2' => ['action' => 'update', 'member_id' => $member->id]]])->assertUnprocessable()->assertJsonPath('message', fn ($message) => str_contains($message, 'Free plan includes 1 members'));
     expect(Member::query()->count())->toBe(1)->and($member->fresh()->email)->toBe('keep@example.test');
 });
 
@@ -130,7 +131,7 @@ test('manual and imported identities share normalization and preserve email-only
         $this->postJson(route('tenant.community.members.store', ['subdomain' => 'imports']), ['name' => $name, 'phone' => $phone, 'email' => $email, 'membership_type_id' => $this->type->id])->assertUnprocessable();
     }
     $preview = previewMembers($this, "  AMA  ,+233241234567,,Regular,\nAnother,0241234569,only@example.test,Regular,\nSibling,0241234567,family@example.test,Regular,\nEmail Only,,family@example.test,Regular,\n");
-    expect($preview['summary'])->toBe(['new' => 2, 'duplicate' => 0, 'existing' => 2, 'error' => 0]);
+    expect($preview['summary'])->toBe(['new' => 0, 'duplicate' => 1, 'existing' => 1, 'error' => 0, 'review_required' => 2]);
 });
 
 test('manual updates use the same identity guard', function () {
@@ -143,8 +144,8 @@ test('manual updates use the same identity guard', function () {
 test('csv and xlsx fixtures both import', function (string $fixture) {
     $file = new UploadedFile(base_path('tests/Fixtures/community/'.$fixture), $fixture, null, null, true);
     $preview = $this->postJson(importRoute('preview'), ['file' => $file])->assertOk()->json();
-    expect($preview['summary']['new'])->toBe(2);
-    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'skip'])->assertOk()->assertJsonPath('created', 2);
+    expect($preview['summary']['new'])->toBe(1)->and($preview['summary']['review_required'])->toBe(1);
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'skip', 'decisions' => ['3' => ['action' => 'create_distinct']]])->assertOk()->assertJsonPath('created', 2);
 })->with(['members-good.csv', 'members-good.xlsx']);
 
 test('three thousand rows with forty errors preview without saving and confirm exactly once', function () {
@@ -204,7 +205,7 @@ test('CSV preserves international phone prefixes as text', function () {
 test('mixed fixture reports duplicates and errors while retaining physical blank line numbering', function () {
     $file = new UploadedFile(base_path('tests/Fixtures/community/members-mixed.csv'), 'members-mixed.csv', null, null, true);
     $result = $this->postJson(importRoute('preview'), ['file' => $file])->assertOk()->json();
-    expect($result['summary'])->toBe(['new' => 1, 'duplicate' => 1, 'existing' => 0, 'error' => 2]);
+    expect($result['summary'])->toBe(['new' => 1, 'duplicate' => 0, 'existing' => 0, 'error' => 2, 'review_required' => 1]);
     $result = previewMembers($this, "Ama,0241234567,,Regular,\n\nNo Contact,,,Regular,\n");
     expect($result['rows'][1]['line'])->toBe(4);
 });
@@ -239,10 +240,10 @@ test('one existing email-only member is updated at most once when distinct file 
     expect($member->fresh()->name)->toBe('Ama')->and(Member::query()->count())->toBe(1);
 });
 
-test('a legacy phone-bearing record does not reserve its email even if the old phone needs correction', function () {
+test('a legacy phone-bearing record reserves its exact email even if the old phone needs correction', function () {
     Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'phone' => 'legacy-invalid', 'email' => 'family@example.test']);
     $preview = previewMembers($this, "Email Only,,family@example.test,Regular,\n");
-    expect($preview['summary']['new'])->toBe(1);
+    expect($preview['summary']['existing'])->toBe(1);
 });
 
 test('preview rejects ambiguous active membership type names instead of choosing a dues price', function (string $collision) {
@@ -267,31 +268,31 @@ test('confirmation rejects an active name collision introduced after preview wit
         ->and(Member::query()->count())->toBe(1);
 });
 
-test('conflicting email and phone identities are row errors and preserve both members', function (bool $afterPreview) {
+test('conflicting email and phone identities require review and preserve both members', function (bool $afterPreview) {
     $alice = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'name' => 'Alice', 'phone' => null, 'email' => 'shared@example.test', 'status' => 'exited', 'notes' => 'retain history', 'amount_override' => 700]);
     $paid = DuesCharge::factory()->create(['status' => 'paid', 'tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'member_id' => $alice->id]);
     $createSam = fn () => Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'name' => 'Sam', 'phone' => '+233241234567', 'email' => 'sam@example.test']);
     $sam = $afterPreview ? null : $createSam();
     $preview = previewMembers($this, "Sam,0241234567,shared@example.test,Regular,\nUnrelated,0241234568,valid@example.test,Regular,\n");
-    expect($preview['summary']['error'])->toBe($afterPreview ? 0 : 1);
-    if (! $afterPreview) {
-        expect($preview['rows'][0]['errors'])->toBe(['The email and name/phone match different members. Correct the contacts before importing.']);
-    }
+    expect($preview['summary']['review_required'])->toBe($afterPreview ? 0 : 1);
     $sam ??= $createSam();
     $originalAlice = $alice->fresh()->getAttributes();
     $originalSam = $sam->fresh()->getAttributes();
     $originalPaid = $paid->fresh()->getAttributes();
     $this->patchJson(route('tenant.community.members.update', ['subdomain' => 'imports', 'member' => $alice->id]), ['name' => 'Sam', 'phone' => '0241234567', 'email' => 'shared@example.test', 'membership_type_id' => $this->type->id])
         ->assertUnprocessable()->assertJsonValidationErrors(['phone']);
-    $payload = ['token' => $preview['token'], 'existing_policy' => 'update'];
-    $this->postJson(importRoute('confirm'), $payload)->assertOk()->assertJsonPath('created', 1)->assertJsonPath('updated', 0)->assertJsonPath('errors', 1)
-        ->assertJsonPath('rows.0.status', 'error')->assertJsonPath('rows.0.errors.0', 'The email and name/phone match different members. Correct the contacts before importing.');
+    $payload = ['token' => $preview['token'], 'existing_policy' => 'update', 'decisions' => ['2' => ['action' => 'skip']]];
+    if ($afterPreview) {
+        $this->postJson(importRoute('confirm'), $payload)->assertStatus(409);
+    } else {
+        $this->postJson(importRoute('confirm'), $payload)->assertOk()->assertJsonPath('created', 1)->assertJsonPath('updated', 0)->assertJsonPath('skipped', 1);
+    }
     $this->postJson(importRoute('confirm'), $payload)->assertGone();
     expect($alice->fresh()->getAttributes())->toBe($originalAlice)
         ->and($sam->fresh()->getAttributes())->toBe($originalSam)
         ->and($paid->fresh()->getAttributes())->toBe($originalPaid)
-        ->and(Member::query()->where('name', 'Unrelated')->count())->toBe(1)
-        ->and(Member::query()->count())->toBe(3);
+        ->and(Member::query()->where('name', 'Unrelated')->count())->toBe($afterPreview ? 0 : 1)
+        ->and(Member::query()->count())->toBe($afterPreview ? 2 : 3);
 })->with(['before preview' => false, 'after preview' => true]);
 
 test('planned updates cannot claim the same new phone identity for different members', function () {
@@ -299,7 +300,7 @@ test('planned updates cannot claim the same new phone identity for different mem
     $second = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'phone' => null, 'email' => 'second@example.test']);
     $originalSecond = $second->fresh()->getAttributes();
     $preview = previewMembers($this, "Sam,0241234567,first@example.test,Regular,\nSam,0241234567,second@example.test,Regular,\n");
-    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update'])->assertOk()->assertJsonPath('updated', 1)->assertJsonPath('skipped', 1);
+    $this->postJson(importRoute('confirm'), ['token' => $preview['token'], 'existing_policy' => 'update', 'decisions' => ['3' => ['action' => 'skip']]])->assertOk()->assertJsonPath('updated', 1)->assertJsonPath('skipped', 1);
     expect($first->fresh()->name)->toBe('Sam')->and($first->fresh()->phone)->toBe('+233241234567')
         ->and($second->fresh()->getAttributes())->toBe($originalSecond);
 });

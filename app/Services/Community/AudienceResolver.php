@@ -27,7 +27,7 @@ final class AudienceResolver
         $this->assertValid($tenant, $selector, $channel, $actor);
         $run = (string) Str::uuid();
         try {
-            $sources = ($selector['kind'] ?? '') === 'event' ? [app(EventAudienceSource::class)] : [$this->members, ...$this->additionalSources];
+            $sources = ($selector['kind'] ?? '') === 'event' ? [app(EventAudienceSource::class)] : [$this->members, app(FollowerAudienceSource::class), ...$this->additionalSources];
             foreach ($sources as $source) {
                 $batch = [];
                 foreach ($source->addresses($tenant, $selector, $channel) as $candidate) {
@@ -59,8 +59,8 @@ final class AudienceResolver
     public function assertValid(Tenant $tenant, array $selector, string $channel, ?User $actor): void
     {
         $kind = $selector['kind'] ?? '';
-        if (! in_array($channel, ['email', 'sms'], true) || ! in_array($kind, ['all_members', 'status', 'groups', 'arrears', 'event'], true)
-            || array_diff(array_keys($selector), ['kind', 'status', 'group_ids', 'event_id', 'event_audience', 'member_ids', 'as_of']) !== []
+        if (! in_array($channel, ['email', 'sms'], true) || ! in_array($kind, ['all_members', 'status', 'groups', 'arrears', 'event', 'followers', 'members_and_followers'], true)
+            || array_diff(array_keys($selector), ['kind', 'status', 'group_ids', 'event_id', 'event_audience', 'member_ids', 'follower_ids', 'as_of']) !== []
             || (isset($selector['status']) && ! in_array($selector['status'], array_column(MemberStatusEnum::cases(), 'value'), true))) {
             throw ValidationException::withMessages(['audience' => 'Choose a valid audience and channel.']);
         }

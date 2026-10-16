@@ -288,6 +288,17 @@ export default function MessageComposer({
                                 }
                             >
                                 <option value="all_members">All active members</option>
+                                <option value="followers" disabled={!capabilities.followers}>
+                                    Consented followers
+                                    {!capabilities.followers ? ' (Following is off)' : ''}
+                                </option>
+                                <option
+                                    value="members_and_followers"
+                                    disabled={!capabilities.followers}
+                                >
+                                    Active members and consented followers
+                                    {!capabilities.followers ? ' (Following is off)' : ''}
+                                </option>
                                 <option value="status">Members by status</option>
                                 <option value="groups" disabled={!capabilities.groups}>
                                     Selected groups · Growth

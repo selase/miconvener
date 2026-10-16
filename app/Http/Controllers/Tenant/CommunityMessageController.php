@@ -44,7 +44,7 @@ final class CommunityMessageController extends Controller
         return Inertia::render('Tenant/Community/Messages', [
             'reconciliationUrl' => $request->user()->can('access-superadmin-dashboard') ? mb_rtrim((string) config('app.url'), '/').route('admin.messages.reconciliation.index', ['tenant_id' => $tenant->id], false) : null,
             'messages' => $messages, 'timezone' => $timezone, 'offsets' => $offsets,
-            'capabilities' => ['schedule' => $entitlements->canSchedule($tenant), 'groups' => $entitlements->canMessageGroups($tenant), 'finance' => $request->user()->can('read finance')],
+            'capabilities' => ['followers' => $tenant->followingEnabled(), 'schedule' => $entitlements->canSchedule($tenant), 'groups' => $entitlements->canMessageGroups($tenant), 'finance' => $request->user()->can('read finance')],
         ]);
     }
 

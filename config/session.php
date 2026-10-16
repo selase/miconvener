@@ -22,6 +22,13 @@ return [
 
     'driver' => env('SESSION_DRIVER', 'file'),
 
+    // Every stateful writer must share the lock, including ordinary public GETs.
+    // Otherwise an in-flight response can restore proofs after sign-out.
+    'block' => true,
+    'block_store' => 'portal_sessions',
+    'block_lock_seconds' => 600,
+    'block_wait_seconds' => 60,
+
     /*
     |--------------------------------------------------------------------------
     | Session Lifetime

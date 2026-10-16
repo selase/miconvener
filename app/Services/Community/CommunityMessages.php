@@ -12,15 +12,18 @@ use App\Mail\CommunityMessage as MessageMail;
 use App\Models\CommunityMessage;
 use App\Models\CommunityMessageDelivery;
 use App\Models\CommunitySettings;
+use App\Models\Event;
 use App\Models\Tenant;
 use App\Models\TenantNotificationSetting;
 use App\Models\User;
+use App\Scopes\TenantScope;
 use App\Services\Billing\EmailAllowance;
 use App\Services\Notifications\NotificationGatewayService;
 use App\Services\Sms\SmsAllowance;
 use App\Services\Sms\SmsMessage;
 use App\Services\Sms\SmsResult;
 use Carbon\CarbonImmutable;
+use DateTimeZone;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -38,11 +41,17 @@ final class CommunityMessages
     /** @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function preview(Tenant $tenant, User $actor, array $input): array
+    public function preview(Tenant $tenant, User $actor, array $input, ?Event $followingEvent = null): array
     {
-        $this->authorize($tenant, $actor);
+        $this->authorize($tenant, $actor, $followingEvent !== null);
+        if ($followingEvent !== null) {
+            $this->assertFollowingEvent($tenant, $followingEvent);
+        }
         $this->checkEntitlements($tenant, $input);
         $scheduled = $this->schedule($tenant, $input['scheduled_at'] ?? null);
+        if ($followingEvent !== null && $scheduled !== null && $scheduled->gt($followingEvent->ends_at)) {
+            throw ValidationException::withMessages(['scheduled_at' => 'Schedule this invitation before the event ends.']);
+        }
         $counts = [];
         foreach ($input['channels'] as $channel) {
             $counts[$channel] = iterator_count($this->audiences->resolve($tenant, $input['audience'], $channel, $actor));
@@ -59,9 +68,14 @@ final class CommunityMessages
     }
 
     /** @param array<string, mixed> $input */
-    public function queue(Tenant $tenant, User $actor, array $input, ?CommunityMessage $editing = null): CommunityMessage
+    public function queue(Tenant $tenant, User $actor, array $input, ?CommunityMessage $editing = null, ?Event $followingEvent = null): CommunityMessage
     {
-        $this->authorize($tenant, $actor);
+        $this->authorize($tenant, $actor, $followingEvent !== null);
+        if ($followingEvent !== null) {
+            $this->assertFollowingEvent($tenant, $followingEvent);
+            abort_unless(($input['audience'] ?? []) === ['kind' => 'followers'], 422);
+        }
+        abort_if($editing !== null && ($editing->purpose ?? 'community') !== 'community', 404);
         $key = $input['idempotency_key'] ?? '';
         if (! is_string($key) || ! Str::isUuid($key)) {
             throw ValidationException::withMessages(['idempotency_key' => 'Start a fresh message and try again.']);
@@ -70,9 +84,12 @@ final class CommunityMessages
         foreach (['subject', 'body', 'channels', 'audience', 'scheduled_at', 'mode'] as $field) {
             $payload[$field] = $input[$field] ?? null;
         }
+        if ($followingEvent !== null) {
+            $payload['source_event_id'] = $followingEvent->id;
+        }
         $hash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
 
-        return $tenant->getConnection()->transaction(function () use ($tenant, $actor, $input, $key, $hash, $editing): CommunityMessage {
+        return $tenant->getConnection()->transaction(function () use ($tenant, $actor, $input, $key, $hash, $editing, $followingEvent): CommunityMessage {
             $tenant->getConnection()->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community.message.submit:'.$tenant->id.':'.$key]);
             $existing = CommunityMessage::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('idempotency_key', $key)->first();
             if ($existing !== null) {
@@ -84,7 +101,7 @@ final class CommunityMessages
                 $editing = CommunityMessage::withoutGlobalScopes()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($editing->id);
                 abort_unless($editing->status === 'draft', 409, 'Only a draft can be edited. Start a new announcement instead.');
             }
-            $preview = $this->preview($tenant, $actor, $input);
+            $preview = $this->preview($tenant, $actor, $input, $followingEvent);
             $draft = ($input['mode'] ?? 'send') === 'draft';
             if (! $draft) {
                 if (! filter_var($input['confirm_authority'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
@@ -98,6 +115,7 @@ final class CommunityMessages
             $scheduled = $preview['scheduled_at'];
             $message = $editing ?? new CommunityMessage;
             $message->fill([
+                'purpose' => $followingEvent === null ? 'community' : 'following_event', 'source_event_id' => $followingEvent?->id,
                 'tenant_id' => $tenant->id, 'sent_by' => $actor->id, 'idempotency_key' => $key, 'payload_hash' => $hash,
                 'subject' => $input['subject'], 'body' => $input['body'], 'channels' => $input['channels'], 'audience' => $input['audience'],
                 'estimate' => $preview['counts'], 'scheduled_at' => $scheduled,
@@ -115,9 +133,10 @@ final class CommunityMessages
         });
     }
 
-    public function cancel(Tenant $tenant, User $actor, CommunityMessage $message): void
+    public function cancel(Tenant $tenant, User $actor, CommunityMessage $message, bool $followingEvent = false): void
     {
-        $this->authorize($tenant, $actor);
+        $this->authorize($tenant, $actor, $followingEvent);
+        abort_unless(($message->purpose === 'following_event') === $followingEvent, 404);
         abort_unless($message->tenant_id === $tenant->id, 404);
         $tenant->getConnection()->transaction(function () use ($message): void {
             $locked = CommunityMessage::withoutGlobalScopes()->lockForUpdate()->findOrFail($message->id);
@@ -148,6 +167,8 @@ final class CommunityMessages
             $selector = $message->audience + ['as_of' => $started];
             $ids = $this->members->query($tenant, $selector)->when($message->last_member_id !== null, fn ($query) => $query->where('id', '>', $message->last_member_id))->orderBy('id')->limit(self::PAGE_SIZE)->pluck('id')->all();
             $selector['member_ids'] = $ids;
+            $followerIds = app(FollowerAudienceSource::class)->query($tenant, $selector)->when($message->last_follower_id !== null, fn ($query) => $query->where('id', '>', $message->last_follower_id))->orderBy('id')->limit(self::PAGE_SIZE)->pluck('id')->all();
+            $selector['follower_ids'] = $followerIds;
             $ready = ['email' => [], 'sms' => []];
             foreach ($message->channels as $channel) {
                 foreach ($this->audiences->resolve($tenant, $selector, $channel, $actor) as $address) {
@@ -160,8 +181,8 @@ final class CommunityMessages
                     }
                 }
             }
-            $complete = count($ids) < self::PAGE_SIZE;
-            $message->update(['status' => 'sending', 'started_at' => $started, 'last_member_id' => $ids === [] ? $message->last_member_id : $ids[array_key_last($ids)], 'selection_complete' => $complete]);
+            $complete = count($ids) < self::PAGE_SIZE && count($followerIds) < self::PAGE_SIZE;
+            $message->update(['status' => 'sending', 'started_at' => $started, 'last_member_id' => $ids === [] ? $message->last_member_id : $ids[array_key_last($ids)], 'last_follower_id' => $followerIds === [] ? $message->last_follower_id : $followerIds[array_key_last($followerIds)], 'selection_complete' => $complete]);
             foreach ($ready as $channel => $deliveryIds) {
                 foreach (array_chunk($deliveryIds, $channel === 'email' ? 1 : 50) as $batch) {
                     DeliverCommunityMessage::dispatch($message->id, $batch, $channel)->afterCommit();
@@ -195,7 +216,7 @@ final class CommunityMessages
             if ($delivery === null) {
                 continue;
             }
-            if (! $this->eligible($tenant, $message, $delivery) || $message->fresh()->status === 'cancelled') {
+            if (! $this->stillAllowed($tenant->fresh(), $actor->fresh(), $message->fresh()) || ! $this->eligible($tenant, $message, $delivery)) {
                 $this->refundUnsubmitted($tenant, $delivery);
 
                 continue;
@@ -274,9 +295,9 @@ final class CommunityMessages
             });
     }
 
-    public function authorize(Tenant $tenant, User $actor): void
+    public function authorize(Tenant $tenant, User $actor, bool $followingEvent = false): void
     {
-        abort_unless($tenant->communityEnabled() && $tenant->featureEnabled('community_messages'), 404);
+        abort_unless($followingEvent ? $tenant->followingEnabled() : ($tenant->communityEnabled() && $tenant->featureEnabled('community_messages')), 404);
         abort_unless($tenant->status === TenantStatusEnum::ACTIVE && ($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists()), 403);
         $team = getPermissionsTeamId();
         try {
@@ -294,6 +315,24 @@ final class CommunityMessages
         }
         $partial = $message->deliveries()->whereIn('status', ['failed', 'unknown'])->exists();
         $message->update(['status' => $partial ? 'partial' : 'completed', 'finished_at' => now()]);
+    }
+
+    /** @return array{timezone:string,offsets:list<string>} */
+    public function scheduleOptions(Tenant $tenant): array
+    {
+        $timezone = CommunitySettings::for($tenant)->timezone;
+        $zone = new DateTimeZone($timezone);
+        $now = CarbonImmutable::now();
+        $offsets = collect($zone->getTransitions($now->subYear()->timestamp, $now->addYears(2)->timestamp) ?: [])
+            ->pluck('offset')->push($zone->getOffset($now))->unique()
+            ->map(fn (int $seconds): string => sprintf('%s%02d:%02d', $seconds < 0 ? '-' : '+', intdiv(abs($seconds), 3600), intdiv(abs($seconds) % 3600, 60)))->values()->all();
+
+        return ['timezone' => $timezone, 'offsets' => $offsets];
+    }
+
+    public function assertFollowingEvent(Tenant $tenant, Event $event): void
+    {
+        abort_unless(! $event->trashed() && $tenant->followingEnabled() && $event->tenant_id === $tenant->id && $event->status === Event::STATUS_PUBLISHED && $event->ends_at->gte(now()), 404);
     }
 
     private function claim(Tenant $tenant, User $actor, CommunityMessage $message, string $id, string $channel): ?CommunityMessageDelivery
@@ -333,7 +372,8 @@ final class CommunityMessages
     private function eligible(Tenant $tenant, CommunityMessage $message, CommunityMessageDelivery $delivery): bool
     {
         return $this->preferences->allowsMarketing($tenant, $delivery->channel, $delivery->address)
-            && $this->members->contains($tenant, $message->audience + ['as_of' => $message->started_at], $delivery->channel, $delivery->address);
+            && ($this->members->contains($tenant, $message->audience + ['as_of' => $message->started_at], $delivery->channel, $delivery->address)
+            || app(FollowerAudienceSource::class)->contains($tenant, $message->audience + ['as_of' => $message->started_at], $delivery->channel, $delivery->address));
     }
 
     private function refundUnsubmitted(Tenant $tenant, CommunityMessageDelivery $delivery): void
@@ -357,7 +397,12 @@ final class CommunityMessages
 
                 return false;
             }
-            $this->authorize($tenant, $actor);
+            $this->authorize($tenant, $actor, $message->purpose === 'following_event');
+            if ($message->purpose === 'following_event') {
+                $event = Event::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->find($message->source_event_id);
+                abort_unless($event !== null && $message->audience === ['kind' => 'followers'], 404);
+                $this->assertFollowingEvent($tenant, $event);
+            }
             $this->checkEntitlements($tenant, ['audience' => $message->audience, 'scheduled_at' => $message->scheduled_at]);
             $this->audiences->assertValid($tenant, $message->audience, 'email', $actor);
 

@@ -66,6 +66,7 @@ final class PublicEventController extends Controller
                         'starts_at' => $suspendedEvent->starts_at->toIso8601String(),
                         'ends_at' => $suspendedEvent->ends_at->toIso8601String(),
                     ],
+                    'community' => $tenant->followingEnabled() || $tenant->communityEnabled() ? app(\App\Services\Community\CommunityPublicContext::class)->for($tenant, request()->session(), $eventModel) : null,
                     'org' => ['name' => $tenant->name],
                 ])->toResponse(request())->setStatusCode(SymfonyResponse::HTTP_GONE);
             }
@@ -73,12 +74,21 @@ final class PublicEventController extends Controller
             abort(404);
         }
 
-        return Inertia::render('Public/Events/Show', [
+        $page = Inertia::render('Public/Events/Show', [
             // A private event shows enough to register and nothing more.
             'event' => $this->toPublicPayload($eventModel, revealDetails: ! $eventModel->isPrivate()),
+            'community' => $tenant->followingEnabled() || $tenant->communityEnabled() ? app(\App\Services\Community\CommunityPublicContext::class)->for($tenant, request()->session(), $eventModel) : null,
             'org' => ['name' => $tenant->name],
             'isPrivate' => $eventModel->isPrivate(),
         ]);
+        if ($tenant->followingEnabled() || $tenant->communityEnabled()) {
+            $response = $page->toResponse(request());
+            $response->headers->set('Cache-Control', 'private, no-store');
+
+            return $response;
+        }
+
+        return $page;
     }
 
     public function calendarFeed(Request $request, string $subdomain, string $event): SymfonyResponse

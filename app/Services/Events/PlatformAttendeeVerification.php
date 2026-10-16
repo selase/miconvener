@@ -140,7 +140,7 @@ final class PlatformAttendeeVerification
             return false;
         }
 
-        $session->regenerate();
+        $session->regenerate(true);
         $session->put(self::SESSION_KEY, [
             'email' => $normalized,
             'verified_at' => now()->getTimestamp(),

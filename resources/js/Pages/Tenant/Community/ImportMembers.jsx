@@ -5,7 +5,13 @@ import Button from '@/Components/Console/Button';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import { Table, Thead, Th, Td, TableEmpty } from '@/Components/Console/Table';
 
-const STATUSES = { new: 'New', existing: 'Existing', duplicate: 'Duplicate', error: 'Error' };
+const STATUSES = {
+    new: 'New',
+    existing: 'Existing',
+    duplicate: 'Duplicate',
+    error: 'Error',
+    review_required: 'Review required',
+};
 const PAGE_SIZE = 100;
 
 export default function ImportMembers() {
@@ -15,6 +21,7 @@ export default function ImportMembers() {
     const [filter, setFilter] = useState('all');
     const [page, setPage] = useState(1);
     const [policy, setPolicy] = useState('skip');
+    const [decisions, setDecisions] = useState({});
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
 
@@ -45,6 +52,7 @@ export default function ImportMembers() {
         setBusy(true);
         setError('');
         setPreview(null);
+        setDecisions({});
         setResult(null);
         try {
             const body = new FormData();
@@ -63,7 +71,13 @@ export default function ImportMembers() {
         setBusy(true);
         setError('');
         try {
-            setResult(await request('confirm', { token: preview.token, existing_policy: policy }));
+            setResult(
+                await request('confirm', {
+                    token: preview.token,
+                    existing_policy: policy,
+                    decisions,
+                })
+            );
             setPreview(null);
             setPage(1);
         } catch (failure) {
@@ -77,9 +91,21 @@ export default function ImportMembers() {
     const resultIssues =
         result?.rows?.filter((row) => ['skipped', 'error'].includes(row.status)) ?? [];
     const shown = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-    const importable = preview
-        ? preview.summary.new + (policy === 'update' ? preview.summary.existing : 0)
-        : 0;
+    const reviewRows = preview?.rows.filter((row) => row.status === 'review_required') ?? [];
+    const unresolved = reviewRows.some((row) => !decisions[row.line]);
+    const planned = { create_distinct: 0, update: 0, skip: 0 };
+    for (const row of preview?.rows ?? []) {
+        const action = ['error', 'duplicate'].includes(row.status)
+            ? 'skip'
+            : (decisions[row.line]?.action ??
+              (row.status === 'new'
+                  ? 'create_distinct'
+                  : row.status === 'existing'
+                    ? policy
+                    : null));
+        if (action) planned[action] += 1;
+    }
+    const importable = planned.create_distinct + planned.update + reviewRows.length;
 
     return (
         <ConsoleLayout>
@@ -143,8 +169,8 @@ export default function ImportMembers() {
                             skipped · {result.errors} {result.errors === 1 ? 'error' : 'errors'}
                         </p>
                         <p>
-                            Rows added since the preview are skipped. Existing members keep their
-                            status, dues history, join date, custom amount and pay link.
+                            Existing members keep their status, dues history, join date, custom
+                            amount and pay link. A changed contact match requires a fresh preview.
                         </p>
                         <Button href={route('tenant.community.people.index')}>View members</Button>
                     </div>
@@ -203,7 +229,7 @@ export default function ImportMembers() {
                         <div aria-live="polite" className="flex flex-wrap gap-4 text-sm text-ink">
                             {Object.entries(STATUSES).map(([status, label]) => (
                                 <span key={status}>
-                                    {label}: {preview.summary[status].toLocaleString()}
+                                    {label}: {(preview.summary[status] ?? 0).toLocaleString()}
                                 </span>
                             ))}
                         </div>
@@ -259,15 +285,19 @@ export default function ImportMembers() {
                             <Button
                                 onClick={confirm}
                                 variant="primary"
-                                disabled={busy || importable === 0}
+                                disabled={busy || importable === 0 || unresolved}
                             >
                                 {busy ? 'Importing…' : 'Confirm import'}
                             </Button>
                         </div>
+                        <p aria-live="polite" className="text-sm font-medium text-ink">
+                            {planned.create_distinct} add · {planned.update} update · {planned.skip}{' '}
+                            skip{unresolved ? ' · Choose a decision for every review row.' : ''}
+                        </p>
                         <p className="text-xs text-ink-secondary">
-                            Errors and duplicates are skipped. Correct them in your spreadsheet and
-                            preview again. The whole import is refused if new members exceed your
-                            plan limit.
+                            Errors and exact duplicates are skipped. Correct them in your
+                            spreadsheet and preview again. The whole import is refused if new
+                            members exceed your plan limit.
                         </p>
                         <div className="overflow-x-auto">
                             <Table>
@@ -303,6 +333,95 @@ export default function ImportMembers() {
                                                 <span className="font-medium">
                                                     {STATUSES[row.status]}
                                                 </span>
+                                                {row.status === 'review_required' && (
+                                                    <div className="mt-3 min-w-64 space-y-2">
+                                                        <p className="text-xs text-ink-secondary">
+                                                            A shared contact is a possible match,
+                                                            not proof of identity.
+                                                        </p>
+                                                        <label
+                                                            htmlFor={`decision-${row.line}`}
+                                                            className="block text-xs font-medium text-ink"
+                                                        >
+                                                            Decision for line {row.line}
+                                                        </label>
+                                                        <select
+                                                            id={`decision-${row.line}`}
+                                                            aria-label={`Decision for line ${row.line}`}
+                                                            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink"
+                                                            value={
+                                                                decisions[row.line]?.action ===
+                                                                'update'
+                                                                    ? `update:${decisions[row.line].member_id}`
+                                                                    : (decisions[row.line]
+                                                                          ?.action ?? '')
+                                                            }
+                                                            onChange={(event) => {
+                                                                const value = event.target.value;
+                                                                setDecisions((current) => ({
+                                                                    ...current,
+                                                                    [row.line]: value.startsWith(
+                                                                        'update:'
+                                                                    )
+                                                                        ? {
+                                                                              action: 'update',
+                                                                              member_id:
+                                                                                  value.slice(7),
+                                                                          }
+                                                                        : value
+                                                                          ? { action: value }
+                                                                          : undefined,
+                                                                }));
+                                                            }}
+                                                        >
+                                                            <option value="">
+                                                                Choose a decision
+                                                            </option>
+                                                            <option value="skip">
+                                                                Skip this row
+                                                            </option>
+                                                            {(row.candidates ?? [])
+                                                                .filter(
+                                                                    (candidate) =>
+                                                                        !candidate.source_line
+                                                                )
+                                                                .map((candidate) => (
+                                                                    <option
+                                                                        key={candidate.id}
+                                                                        value={`update:${candidate.id}`}
+                                                                    >
+                                                                        Update {candidate.name} ·{' '}
+                                                                        {candidate.email ??
+                                                                            candidate.phone}
+                                                                    </option>
+                                                                ))}
+                                                            {!(row.candidates ?? []).some(
+                                                                (candidate) =>
+                                                                    candidate.reasons.includes(
+                                                                        'email'
+                                                                    )
+                                                            ) && (
+                                                                <option value="create_distinct">
+                                                                    Create a distinct new person
+                                                                </option>
+                                                            )}
+                                                        </select>
+                                                        {(row.candidates ?? [])
+                                                            .filter(
+                                                                (candidate) => candidate.source_line
+                                                            )
+                                                            .map((candidate) => (
+                                                                <p
+                                                                    key={candidate.id}
+                                                                    className="text-xs text-ink-secondary"
+                                                                >
+                                                                    Also shares a contact with
+                                                                    spreadsheet line{' '}
+                                                                    {candidate.source_line}.
+                                                                </p>
+                                                            ))}
+                                                    </div>
+                                                )}
                                                 {row.errors.map((reason) => (
                                                     <p key={reason} className="text-danger-fg">
                                                         {reason}

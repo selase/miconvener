@@ -23,7 +23,7 @@ final class DuesReminder extends Model
 
     protected $guarded = [];
 
-    protected $casts = ['charge_ids' => 'array', 'sent_for_date' => 'immutable_date'];
+    protected $casts = ['contact_version' => 'integer', 'charge_ids' => 'array', 'sent_for_date' => 'immutable_date'];
 
     /** @return BelongsTo<Member, $this> */
     public function member(): BelongsTo

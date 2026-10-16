@@ -18,10 +18,11 @@ final class StoreMessageRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'purpose' => ['prohibited'], 'source_event_id' => ['prohibited'],
             'subject' => ['required', 'string', 'max:255'], 'body' => ['required', 'string', 'max:10000'],
             'channels' => ['required', 'array', 'min:1', 'max:2'], 'channels.*' => ['required', Rule::in(['email', 'sms']), 'distinct'],
             'audience' => ['required', 'array:kind,status,group_ids'],
-            'audience.kind' => ['required', Rule::in(['all_members', 'status', 'groups', 'arrears'])],
+            'audience.kind' => ['required', Rule::in(['all_members', 'status', 'groups', 'arrears', 'followers', 'members_and_followers'])],
             'audience.status' => ['sometimes', Rule::in(['pending', 'active', 'lapsed', 'exited'])],
             'audience.group_ids' => ['required_if:audience.kind,groups', 'array', 'min:1', 'max:100'],
             'audience.group_ids.*' => ['required', 'uuid', 'distinct'],

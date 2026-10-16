@@ -1,3 +1,4 @@
+import JoinSettingsPanel from './JoinSettingsPanel';
 import { useState } from 'react';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
@@ -129,6 +130,9 @@ export default function Overview({
     reminderSettings,
     canReadFinance = false,
     recentMessages = null,
+    joinSettings = null,
+    membershipTypes = [],
+    reviewCounts = null,
 }) {
     const [tab, setTab] = useState('overview');
     const [settingsForm, setSettingsForm] = useState(reminderSettings);
@@ -181,15 +185,35 @@ export default function Overview({
             </div>
             <div role="tabpanel" id="community-tab-panel" aria-labelledby={`community-tab-${tab}`}>
                 {tab === 'settings' ? (
-                    <ReminderSettings
-                        settings={reminderSettings}
-                        form={settingsForm}
-                        setForm={setSettingsForm}
-                        errors={settingsErrors}
-                        setErrors={setSettingsErrors}
-                    />
+                    <>
+                        <JoinSettingsPanel
+                            settings={joinSettings}
+                            membershipTypes={membershipTypes}
+                        />
+                        <ReminderSettings
+                            settings={reminderSettings}
+                            form={settingsForm}
+                            setForm={setSettingsForm}
+                            errors={settingsErrors}
+                            setErrors={setSettingsErrors}
+                        />
+                    </>
                 ) : (
                     <div className="grid gap-4 px-4 py-6 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
+                        {reviewCounts &&
+                            Object.entries({
+                                joins: 'Membership requests',
+                                claims: 'Access reviews',
+                                reports: 'Wrong-number reports',
+                            }).map(([key, label]) => (
+                                <Stat
+                                    key={key}
+                                    label={label}
+                                    value={reviewCounts[key]}
+                                    href={`${route('tenant.community.people.index')}?tab=reviews&queue=${key}`}
+                                    hint="Independent review required"
+                                />
+                            ))}
                         <Stat
                             label="Members"
                             value={counts.members}

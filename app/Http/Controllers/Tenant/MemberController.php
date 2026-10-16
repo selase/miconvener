@@ -75,8 +75,9 @@ final class MemberController extends Controller
         $limit = $cap->limit($tenant);
 
         return Inertia::render('Tenant/Community/People', [
+            'followingEnabled' => $tenant->followingEnabled(),
             'groupsEnabled' => $tenant->featureEnabled('community_messages'),
-            'activeTab' => request('tab') === 'groups' && $tenant->featureEnabled('community_messages') ? 'groups' : 'members',
+            'activeTab' => request('tab') === 'reviews' ? 'reviews' : (request('tab') === 'groups' && $tenant->featureEnabled('community_messages') ? 'groups' : 'members'),
             'memberUsage' => ['count' => $count, 'limit' => $limit, 'plan' => $tenant->package->name ?? 'Free', 'over_cap' => $limit !== null && $count > $limit],
             'members' => $members,
             'membershipTypes' => MembershipType::query()
@@ -94,20 +95,28 @@ final class MemberController extends Controller
         ]);
     }
 
+    public function candidates(\App\Http\Requests\Tenant\Community\MemberCandidatesRequest $request): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $identity = app(MemberIdentity::class);
+        $data = $request->validated();
+        $ignoreId = $data['ignore_id'] ?? null;
+        $register = $identity->register($tenant, $ignoreId);
+        $candidates = $identity->candidatesIn($register, $data['name'], $data['phone'] ?? null, $data['email'] ?? null);
+
+        return response()->json(['candidates' => $candidates, 'revision' => $identity->duplicateRevision($tenant, $data, $ignoreId),
+            'can_create_distinct' => count(array_filter($candidates, fn ($candidate) => in_array('email', $candidate['reasons'], true))) === 0]);
+    }
+
     public function store(StoreMemberRequest $request): JsonResponse
     {
         $tenant = $this->getTenant();
         $cap = app(MemberCap::class);
         try {
-            $member = $cap->withLock($tenant, function () use ($request, $tenant, $cap): Member {
+            $member = $cap->withLock($tenant, function () use ($request, $tenant): Member {
                 app(MemberIdentity::class)->assertUnique($tenant, $request->validated());
-                $cap->assertRoomFor($tenant, 1);
 
-                return Member::query()->create([
-                    ...$request->validated(),
-                    'tenant_id' => $tenant->id,
-                    'status' => MemberStatusEnum::Active,
-                ]);
+                return app(\App\Services\Community\MemberEnrollment::class)->create($tenant, array_diff_key($request->validated(), array_flip(['confirm_distinct', 'duplicate_revision'])), MemberStatusEnum::Active);
             });
         } catch (DomainException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
@@ -122,7 +131,7 @@ final class MemberController extends Controller
         $model = app(MemberCap::class)->withLock($tenant, function () use ($request, $tenant, $member): Member {
             $model = $this->findMember($member);
             app(MemberIdentity::class)->assertUnique($tenant, $request->validated(), $model->id);
-            $model->update($request->validated());
+            $model = app(\App\Services\Community\MemberContactChanges::class)->update($model, array_diff_key($request->validated(), array_flip(['confirm_distinct', 'duplicate_revision'])), $request->user());
 
             return $model;
         });

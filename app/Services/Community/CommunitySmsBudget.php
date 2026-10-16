@@ -43,7 +43,7 @@ final class CommunitySmsBudget
 
     public function reserve(Tenant $tenant, string $sourceType, string $sourceId, CarbonImmutable $at): ?CommunitySmsReservation
     {
-        if (! in_array($sourceType, ['dues_reminder', 'community_message', 'event_blast'], true)) {
+        if (! in_array($sourceType, ['dues_reminder', 'community_message', 'event_blast', 'member_contact_notice'], true)) {
             throw new InvalidArgumentException('Unknown Community SMS source.');
         }
 

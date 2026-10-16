@@ -44,7 +44,18 @@ final class MessagingPreferences
 
     public function disableMarketing(Tenant $tenant, string $channel, string $address): void
     {
-        $this->preference($tenant, $channel, $address)->update(['marketing_disabled_at' => now()]);
+        $connection = (new CommunityMessagePreference)->getConnection();
+        $connection->transaction(function () use ($connection, $tenant, $channel, $address): void {
+            $hash = $this->hash($channel, $address);
+            $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community-follow:'.$tenant->id.':'.$channel.':'.$hash]);
+            $this->preference($tenant, $channel, $address)->update(['marketing_disabled_at' => now()]);
+            \App\Models\CommunityFollower::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('channel', $channel)->where('address_hash', $hash)->whereNull('unfollowed_at')->update(['unfollowed_at' => now()]);
+        });
+    }
+
+    public function enableMarketing(Tenant $tenant, string $channel, string $address): void
+    {
+        $this->preference($tenant, $channel, $address)->update(['marketing_disabled_at' => null]);
     }
 
     public function token(Tenant $tenant, string $channel, string $address): string

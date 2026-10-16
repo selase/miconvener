@@ -3,6 +3,9 @@ import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import csrfFetch from '@/lib/csrfFetch';
 import VerifyPrompt from './VerifyPrompt';
+import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
+import CommunitiesPanel from '@/Pages/Public/Community/CommunitiesPanel';
+import RecoveryCredential from '@/Pages/Public/Community/RecoveryCredential';
 import NeedsAttentionSection from './components/NeedsAttentionSection';
 import LiveNowSection from './components/LiveNowSection';
 import OrganiserEventsSection from './components/OrganiserEventsSection';
@@ -22,6 +25,8 @@ import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
  */
 export default function MyPortal({
     organiser = null,
+    communityPhoneVerified: phoneAtLoad = false,
+    communityReturnUrl = null,
     verifiedEmail: provenAtLoad = null,
     initialHistory = null,
     initialCertificates = null,
@@ -29,6 +34,10 @@ export default function MyPortal({
     initialAttendance = null,
     initialContributions = null,
 }) {
+    const [phoneVerified, setPhoneVerified] = useState(phoneAtLoad);
+    const [phoneEntry, setPhoneEntry] = useState(false);
+    const [credential, setCredential] = useState(null);
+    const [communityVersion, setCommunityVersion] = useState(0);
     const [verifiedEmail, setVerifiedEmail] = useState(provenAtLoad);
     const [history, setHistory] = useState(initialHistory);
     const [certificates, setCertificates] = useState(initialCertificates || []);
@@ -40,9 +49,10 @@ export default function MyPortal({
     const [selectedOrganiser, setSelectedOrganiser] = useState(organiser);
     const [signOutError, setSignOutError] = useState(false);
 
-    const initialTab = typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('tab') || 'events'
-        : 'events';
+    const initialTab =
+        typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('tab') || 'events'
+            : 'events';
     const [activeTab, setActiveTab] = useState(initialTab);
 
     useEffect(() => {
@@ -55,7 +65,9 @@ export default function MyPortal({
     const certificatesRoute = window.route ? route('attendee.my.certificates') : '/my/certificates';
     const abstractsRoute = window.route ? route('attendee.my.abstracts') : '/my/abstracts';
     const attendanceRoute = window.route ? route('attendee.my.attendance') : '/my/attendance';
-    const contributionsRoute = window.route ? route('attendee.my.contributions') : '/my/contributions';
+    const contributionsRoute = window.route
+        ? route('attendee.my.contributions')
+        : '/my/contributions';
 
     const fetchData = useCallback(
         async (orgSlug = null) => {
@@ -71,13 +83,22 @@ export default function MyPortal({
             };
 
             try {
-                const [eventsRes, certsRes, abstractsRes, attendanceRes, contribsRes] = await Promise.all([
-                    fetch(buildUrl(eventsRoute), { headers: { Accept: 'application/json' } }),
-                    fetch(buildUrl(certificatesRoute), { headers: { Accept: 'application/json' } }),
-                    fetch(buildUrl(abstractsRoute), { headers: { Accept: 'application/json' } }),
-                    fetch(buildUrl(attendanceRoute), { headers: { Accept: 'application/json' } }),
-                    fetch(buildUrl(contributionsRoute), { headers: { Accept: 'application/json' } }),
-                ]);
+                const [eventsRes, certsRes, abstractsRes, attendanceRes, contribsRes] =
+                    await Promise.all([
+                        fetch(buildUrl(eventsRoute), { headers: { Accept: 'application/json' } }),
+                        fetch(buildUrl(certificatesRoute), {
+                            headers: { Accept: 'application/json' },
+                        }),
+                        fetch(buildUrl(abstractsRoute), {
+                            headers: { Accept: 'application/json' },
+                        }),
+                        fetch(buildUrl(attendanceRoute), {
+                            headers: { Accept: 'application/json' },
+                        }),
+                        fetch(buildUrl(contributionsRoute), {
+                            headers: { Accept: 'application/json' },
+                        }),
+                    ]);
 
                 if (
                     eventsRes.status === 401 ||
@@ -99,7 +120,9 @@ export default function MyPortal({
                 }
 
                 if (!eventsRes.ok) {
-                    setError("Couldn't load your events. Please check your connection and try again.");
+                    setError(
+                        "Couldn't load your events. Please check your connection and try again."
+                    );
                     setLoading(false);
                     return;
                 }
@@ -141,7 +164,25 @@ export default function MyPortal({
         }
     }, [verifiedEmail, history, loading, selectedOrganiser, fetchData]);
 
-    const handleVerified = (maskedEmail) => {
+    const handleVerified = (maskedEmail, channel = 'email', phoneOrganiser = null) => {
+        clearAllOfflineTickets();
+        if (communityReturnUrl) {
+            window.location.assign(communityReturnUrl);
+            return;
+        }
+        if (channel === 'phone') {
+            setPhoneVerified(true);
+            setPhoneEntry(false);
+            if (phoneOrganiser && !selectedOrganiser) {
+                setSelectedOrganiser({ slug: phoneOrganiser, name: phoneOrganiser });
+                const url = new URL(window.location.href);
+                url.searchParams.set('organiser', phoneOrganiser);
+                url.hash = 'communities';
+                window.history.replaceState({}, '', url);
+            }
+            setCommunityVersion((value) => value + 1);
+            return;
+        }
         // Someone sent here from a workspace they could not open yet is put
         // back where they were going. The target is only ever followed when it
         // is a path on this portal, so a crafted ?return_to cannot bounce a
@@ -174,6 +215,9 @@ export default function MyPortal({
             }
             clearAllOfflineTickets();
             setSignOutError(false);
+            setPhoneVerified(false);
+            setCredential(null);
+            setCommunityVersion((value) => value + 1);
             setVerifiedEmail(null);
             setHistory(null);
             setCertificates([]);
@@ -235,17 +279,36 @@ export default function MyPortal({
     const hasLiveNow = (history?.live_now?.length ?? 0) > 0;
     const hasOrganisers = (history?.organisers?.length ?? 0) > 0;
     const hasUrgent = hasNeedsAttention || hasLiveNow;
-    const hasAnyRecords = certificates.length > 0 || abstracts.length > 0 || attendance.length > 0 || contributions.length > 0;
+    const hasAnyRecords =
+        certificates.length > 0 ||
+        abstracts.length > 0 ||
+        attendance.length > 0 ||
+        contributions.length > 0;
     const isEmpty =
-        history &&
-        !hasNeedsAttention &&
-        !hasLiveNow &&
-        !hasOrganisers &&
-        !hasAnyRecords;
+        history && !hasNeedsAttention && !hasLiveNow && !hasOrganisers && !hasAnyRecords;
+
+    const clearCredential = () => {
+        setCredential(null);
+        setCommunityVersion((value) => value + 1);
+    };
+    const expireCommunity = () => {
+        setPhoneVerified(false);
+        setVerifiedEmail(null);
+        setHistory(null);
+        setCredential(null);
+        clearAllOfflineTickets();
+    };
+    if (credential)
+        return (
+            <PublicLayout>
+                <Head title="Save your private recovery key" />
+                <RecoveryCredential credential={credential} onClear={clearCredential} />
+            </PublicLayout>
+        );
 
     return (
         <PublicLayout>
-            <Head>
+            <Head title="My MiConvener">
                 <link rel="manifest" href="/my/manifest.json" />
                 <meta name="theme-color" content="#4f46e5" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -257,13 +320,48 @@ export default function MyPortal({
                     <h1 className="text-2xl font-normal tracking-tight text-ink">
                         {selectedOrganiser?.name
                             ? `Your events with ${selectedOrganiser.name}`
-                            : 'Your MiConvener events'}
+                            : phoneVerified && !verifiedEmail
+                              ? 'Your MiConvener Communities'
+                              : 'Your MiConvener events'}
                     </h1>
                     <p className="text-[13.5px] text-ink-secondary">
-                        Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.
+                        {phoneVerified && !verifiedEmail
+                            ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
+                            : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
                     </p>
                 </div>
 
+                {communityReturnUrl && (verifiedEmail || phoneVerified) && (
+                    <a
+                        href={communityReturnUrl}
+                        className="mb-6 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white"
+                    >
+                        Continue to organisation
+                    </a>
+                )}
+                {verifiedEmail && !phoneVerified && (
+                    <section className="mb-6 space-y-4 rounded-lg border border-border bg-surface p-4">
+                        {phoneEntry ? (
+                            <PhoneVerify
+                                organiserSlug={selectedOrganiser?.slug}
+                                onVerified={handleVerified}
+                                onUseEmail={() => setPhoneEntry(false)}
+                            />
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setPhoneEntry(true)}
+                                className="text-sm font-medium text-accent underline"
+                            >
+                                Verify a phone number
+                            </button>
+                        )}
+                        <p className="text-xs text-ink-secondary">
+                            Keep your email sign-in and add independent phone verification for
+                            membership recovery. This does not link other people or event records.
+                        </p>
+                    </section>
+                )}
                 {verifiedEmail ? (
                     <div className="space-y-8">
                         {/* Attendee identity banner */}
@@ -271,7 +369,10 @@ export default function MyPortal({
                             <div className="flex items-center gap-2 text-[13.5px] text-ink-secondary">
                                 <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                 <span>
-                                    Signed in as <strong className="font-medium text-ink">{verifiedEmail}</strong>
+                                    Signed in as{' '}
+                                    <strong className="font-medium text-ink">
+                                        {verifiedEmail}
+                                    </strong>
                                 </span>
                             </div>
 
@@ -320,7 +421,9 @@ export default function MyPortal({
                                     No MiConvener events or records were found for this address yet.
                                 </p>
                                 <p className="text-xs text-ink-secondary max-w-md mx-auto">
-                                    Registrations and credentials made with this email address will appear here automatically. If you registered with a different address, you can sign in with that one instead.
+                                    Registrations and credentials made with this email address will
+                                    appear here automatically. If you registered with a different
+                                    address, you can sign in with that one instead.
                                 </p>
                                 <div className="pt-2">
                                     <button
@@ -390,7 +493,9 @@ export default function MyPortal({
                                                     No registered events found
                                                 </p>
                                                 <p className="text-xs text-ink-secondary max-w-sm mx-auto">
-                                                    You do not have any registered events for this email address. Switch to the tabs above to access your certificates and records.
+                                                    You do not have any registered events for this
+                                                    email address. Switch to the tabs above to
+                                                    access your certificates and records.
                                                 </p>
                                             </div>
                                         )}
@@ -421,10 +526,53 @@ export default function MyPortal({
                             </div>
                         )}
                     </div>
+                ) : phoneVerified ? (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm text-ink">
+                                Your phone is verified for Community actions.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={signOut}
+                                className="text-sm text-accent underline"
+                            >
+                                Sign out
+                            </button>
+                        </div>
+                        <details className="rounded-lg border border-border p-4">
+                            <summary className="cursor-pointer text-sm text-ink">
+                                Verify email for tickets and event history
+                            </summary>
+                            <div className="mt-4">
+                                <VerifyPrompt
+                                    onVerified={handleVerified}
+                                    organiserSlug={selectedOrganiser?.slug}
+                                    allowPhone={false}
+                                />
+                            </div>
+                        </details>
+                    </div>
                 ) : (
                     <div className="mt-8">
-                        <VerifyPrompt onVerified={handleVerified} />
+                        <VerifyPrompt
+                            onVerified={handleVerified}
+                            organiserSlug={selectedOrganiser?.slug}
+                        />
                     </div>
+                )}
+                {(verifiedEmail || phoneVerified) && (
+                    <CommunitiesPanel
+                        key={communityVersion}
+                        organiser={selectedOrganiser}
+                        initiallyOpen={phoneVerified || window.location.hash === '#communities'}
+                        onCredential={setCredential}
+                        onExpired={expireCommunity}
+                        onPhoneRemoved={() => {
+                            setPhoneVerified(false);
+                            setCommunityVersion((value) => value + 1);
+                        }}
+                    />
                 )}
             </div>
         </PublicLayout>

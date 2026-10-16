@@ -297,6 +297,12 @@ These are enforced by tests. Breaking one is a bug, not a style choice.
 - **Billing emails go through `BillingNotifier` only.** Receipt, payment failed, plan ending and plan ended are sent to the payer and `tenants.email`, once per `(type, dedupe_key)` in `billing_emails`. Call the notifier from every path that sees the event; the guard makes repeats a no-op. They are transactional: not metered against email credits, no opt-out.
 
 
+# Portal session safety
+
+All stateful web requests use Laravel's native session blocking, backed by the shared landlord `portal_session_locks` table through the lock-only `portal_sessions` cache store. Do not narrow blocking to `/my`: an ordinary concurrent request can otherwise restore proofs after sign-out. The lock lease is 600 seconds; longer work belongs in a queue, and the session driver must not be `cookie`. Portal proof/grant rotations and identifier removal use `regenerate(true)` to destroy the old persisted record while retaining unrelated staff authentication attributes. Test persisted-cookie replay and an overlapping writer, not only in-memory marker removal. Existing unknown aliases created before this protection are not retroactively enumerated or revoked; existing email proofs still expire on their fixed 12-hour boundary.
+
 # Current work: Community
 
 Before starting work on members, dues, giving, following, `/my` or community messaging, read `docs/superpowers/community-roadmap.md`. It holds the milestone status table, links to the spec and plans, the rules for continuing, and the briefs for milestones without a plan. Tick plan steps (`- [ ]` to `- [x]`) in the same commit as the work, and update the roadmap's status table when a milestone changes state.
+
+**Standing pilot policy (owner, 2026-10-16):** Always enable newly approved and deployed Community milestones for `purpledot` as part of the release process. Do not ask again for Purpledot pilot activation. Keep rollout switches for other organisations unchanged, preserve plan entitlements, and verify the enabled organisation after activation.
