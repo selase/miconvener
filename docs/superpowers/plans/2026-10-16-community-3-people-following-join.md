@@ -105,7 +105,7 @@ it('does not couple Following to Community', function (): void {
 
 **Interfaces:** `PhoneVerification::requestSend(string $phone, string $ip, ?string $challenge): array{status:string, request_id?:string}`; `confirm(Session $session, string $phone, string $code, string $ip): bool`; `verifiedPhone(Session $session): ?string`; `forget(Session $session): void`. `PhoneSignInBudget::reserve(string $requestId): bool`, `finish(string $requestId, string $outcome): void`. HMAC domain must be distinct from messaging. Community identity guard accepts a current email OR current phone proof, with a separate request attribute for each; it does not grant record access.
 
-- [ ] Write failing normalisation, 5-minute expiry, fixed 12-hour proof, single consumption, resend/guess limits, enumeration-neutral responses, shared-IP capacity, global cap and fail-closed transport tests. Include:
+- [x] Write failing normalisation, 5-minute expiry, fixed 12-hour proof, single consumption, resend/guess limits, enumeration-neutral responses, shared-IP capacity, global cap and fail-closed transport tests. Include:
 
 ```php
 it('does not turn phone proof into email proof', function (): void {
@@ -116,11 +116,13 @@ it('does not turn phone proof into email proof', function (): void {
 });
 ```
 
-- [ ] Run the focused file and record meaningful failure. Use a dedicated race database for actual two-worker simultaneous confirm and last-budget-slot tests; do not treat sequential calls as concurrency coverage.
-- [ ] Implement the contracts. Reserve capacity and number cooldown atomically before queueing; jobs are idempotent and do not resubmit after uncertain transport acceptance. New code supersedes old code without resetting consecutive guess limits. Rotate session ID on successful proof. Reject malformed numbers; never guess missing international country codes beyond existing Ghana normalisation.
-- [ ] Add `attendee_portal.phone.enabled` default false and sender/limit config in `.env.example`. Require an explicitly supplied, active organisation context with either Community or Following rollout enabled before issuing phone challenges; no member lookup. This is an abuse/rollout check, not organisation membership evidence. Persist only the allowlisted return path, not an arbitrary redirect URL. Email remains usable when the phone switch/provider/budget is unavailable.
-- [ ] Add `POST /my/verify/phone/send`, `/confirm`, `/forget`; preserve existing email endpoints and email-only protected history routes. Codes send for valid numbers regardless of whether a membership exists; apply the same response shape/timing controls for both. Add pruning for expired challenges/reservations using existing scheduler patterns; do not prune unresolved submission evidence prematurely.
-- [ ] Pass focused/race tests and existing `PlatformAttendeeVerificationTest`; Pint; commit `feat(community): add bounded independent phone verification`.
+- [x] Run the focused file and record meaningful failure. Use a dedicated race database for actual two-worker simultaneous confirm and last-budget-slot tests; do not treat sequential calls as concurrency coverage.
+- [x] Implement the contracts. Reserve capacity and number cooldown atomically before queueing; jobs are idempotent and do not resubmit after uncertain transport acceptance. New code supersedes old code without resetting consecutive guess limits. Rotate session ID on successful proof. Reject malformed numbers; never guess missing international country codes beyond existing Ghana normalisation.
+- [x] Add `attendee_portal.phone.enabled` default false and sender/limit config in `.env.example`. Require an explicitly supplied, active organisation context with either Community or Following rollout enabled before issuing phone challenges; no member lookup. This is an abuse/rollout check, not organisation membership evidence. Persist only the allowlisted return path, not an arbitrary redirect URL. Email remains usable when the phone switch/provider/budget is unavailable.
+- [x] Add `POST /my/verify/phone/send`, `/confirm`, `/forget`; preserve existing email endpoints and email-only protected history routes. Codes send for valid numbers regardless of whether a membership exists; apply the same response shape/timing controls for both. Add pruning for expired challenges/reservations using existing scheduler patterns; do not prune unresolved submission evidence prematurely.
+- [x] Pass focused/race tests and existing `PlatformAttendeeVerificationTest`; Pint; commit `feat(community): add bounded independent phone verification`.
+
+**Ruling:** Real worker races live in Infrastructure with DatabaseTruncation and a separate database, matching project conventions. Phone send/confirm reuse the venue-friendly identity limiter, not the unrelated 10/min registration throttle (15-person HTTP regression RED→GREEN). Request validation composes rule sets because Pint makes concrete requests final. Operational daily caps/IP controls are configurable; code lifetime (5 minutes), attempt ceiling (5) and resend floor (60 seconds) remain fixed security bounds. Tests: 27 focused phone/email tests, 117 assertions; 2 real-worker races, 14 assertions.
 
 ## Task 3: Member claims and explicit representative grants
 

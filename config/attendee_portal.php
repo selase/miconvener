@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 return [
+    'phone' => [
+        'enabled' => (bool) env('ATTENDEE_PHONE_ENABLED', false),
+        'daily_cap' => (int) env('ATTENDEE_PHONE_DAILY_CAP', 500),
+        'number_daily_cap' => (int) env('ATTENDEE_PHONE_NUMBER_DAILY_CAP', 5),
+    ],
     /*
     |--------------------------------------------------------------------------
     | Cloudflare Turnstile Settings

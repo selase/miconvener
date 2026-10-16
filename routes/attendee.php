@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('my')->group(function (): void {
     Route::get('/', [PlatformAttendeeAccessController::class, 'page'])->name('attendee.my');
     Route::get('/manifest.json', [PlatformAttendeeAccessController::class, 'manifest'])->name('attendee.my.manifest');
+    Route::post('/verify/phone/send', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'send'])->name('attendee.my.phone.send');
+    Route::post('/verify/phone/confirm', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'confirm'])->name('attendee.my.phone.confirm');
+    Route::post('/verify/phone/forget', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'forget'])->middleware('throttle:public-registration')->name('attendee.my.phone.forget');
     Route::post('/verify/send', [PlatformAttendeeAccessController::class, 'send'])->name('attendee.my.verify.send');
     Route::post('/verify/confirm', [PlatformAttendeeAccessController::class, 'confirm'])->name('attendee.my.verify.confirm');
     Route::post('/verify/forget', [PlatformAttendeeAccessController::class, 'forget'])->name('attendee.my.verify.forget');
