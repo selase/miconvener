@@ -18,6 +18,8 @@ Route::prefix('my')->group(function (): void {
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::post('/communities/{tenantSlug}/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'store'])->name('attendee.my.follow.store');
+        Route::delete('/communities/{tenantSlug}/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'destroy'])->name('attendee.my.follow.destroy');
         Route::post('/communities/{tenantSlug}/wrong-number', [App\Http\Controllers\Public\CommunityWrongNumberController::class, 'store'])->name('attendee.my.wrong-number');
         Route::post('/communities/{tenantSlug}/access', [App\Http\Controllers\Public\CommunityClaimController::class, 'recover'])->name('attendee.my.access.recover');
         Route::post('/communities/{tenantSlug}/members/{member}/phone-access', [App\Http\Controllers\Public\CommunityClaimController::class, 'enrolPhone'])->name('attendee.my.access.enrol');

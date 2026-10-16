@@ -19,7 +19,7 @@ final class CommunityFollowerFactory extends Factory
         $address = fake()->unique()->safeEmail();
 
         return ['tenant_id' => Tenant::factory(), 'channel' => 'email', 'address' => $address,
-            'address_hash' => app(MessagingPreferences::class)->hash('email', $address),
+            'address_hash' => fn (array $attributes) => app(MessagingPreferences::class)->hash($attributes['channel'], $attributes['address']),
             'consented_at' => now(), 'consent_source' => 'organisation'];
     }
 }

@@ -196,7 +196,7 @@ it('does not retain exact email access after a contact edit', function (): void 
 
 **Interfaces:** `Following::follow(Tenant $tenant, Session $session, string $channel, bool $resumeMarketing, ?Event $source): CommunityFollower`; `unfollow(Tenant $tenant, Session $session, string $channel): void`; `isFollowing(Tenant $tenant, Session $session, string $channel): bool`; `MessagingPreferences::enableMarketing(Tenant $tenant, string $channel, string $address): void` is callable only after explicit verified re-consent, with audit evidence. Use `email`/`sms` channel values consistently; phone proofs use the sms channel but never email proof.
 
-- [ ] Write failing tests for Free and Community-off follows, two organisations, anonymous/unverified writes, forged address/source event, idempotent concurrent follow, member/follower overlap and explicit re-consent. Include:
+- [x] Write failing tests for Free and Community-off follows, two organisations, anonymous/unverified writes, forged address/source event, idempotent concurrent follow, member/follower overlap and explicit re-consent. Include:
 
 ```php
 it('does not follow a second contact just because staff recorded it', function (): void {
@@ -208,9 +208,11 @@ it('does not follow a second contact just because staff recorded it', function (
 });
 ```
 
-- [ ] Run the two focused files and confirm failure, then implement source-bound consent and unique upsert under the tenant/channel key. Follow writes derive the address from session proof, never a submitted contact. Refollow without explicit opt-in cannot clear a previous preference opt-out. Following neither creates a Member nor grants access.
-- [ ] Implement `POST/DELETE /my/communities/{tenantSlug}/follow`; staff `GET /community/followers` under Following, staff authentication and `manage members`, outside Community middleware. Token unfollow links reuse preferences' GET confirmation/POST mutation; POST marks matching follower inactive and disables marketing atomically. Existing preference tokens remain valid with rollout switches off. Show shared-address scope: “This stops announcements from this organisation to this address.”
-- [ ] Pass focused tests plus `CommunityPreferencesTest.php`. Pint; commit `feat(community): add consent-aware Following and follower management`.
+- [x] Run the two focused files and confirm failure, then implement source-bound consent and unique upsert under the tenant/channel key. Follow writes derive the address from session proof, never a submitted contact. Refollow without explicit opt-in cannot clear a previous preference opt-out. Following neither creates a Member nor grants access.
+- [x] Implement `POST/DELETE /my/communities/{tenantSlug}/follow`; staff `GET /community/followers` under Following, staff authentication and `manage members`, outside Community middleware. Token unfollow links reuse preferences' GET confirmation/POST mutation; POST marks matching follower inactive and disables marketing atomically. Existing preference tokens remain valid with rollout switches off. Show shared-address scope: “This stops announcements from this organisation to this address.”
+- [x] Pass focused tests plus `CommunityPreferencesTest.php`. Pint; commit `feat(community): add consent-aware Following and follower management`.
+
+**Evidence:** Following/consent/preference links11 tests/39 assertions; two real-worker follow/withdrawal races2/22. The independent Followers endpoint enforces manage-members and works with Community off. Its HTML console page is delivered in Task10; this task supplies the usable JSON contract. Following and preference withdrawal acquire the same tenant/channel/address lock, so a withdrawal cannot be lost to a duplicate follow. No new dependency or JS/CSS change.
 
 ## Task 6: Joining, staff approval and cap-safe membership transitions
 
