@@ -300,3 +300,5 @@ These are enforced by tests. Breaking one is a bug, not a style choice.
 # Current work: Community
 
 Before starting work on members, dues, giving, following, `/my` or community messaging, read `docs/superpowers/community-roadmap.md`. It holds the milestone status table, links to the spec and plans, the rules for continuing, and the briefs for milestones without a plan. Tick plan steps (`- [ ]` to `- [x]`) in the same commit as the work, and update the roadmap's status table when a milestone changes state.
+
+**Standing pilot policy (owner, 2026-10-16):** Always enable newly approved and deployed Community milestones for `purpledot` as part of the release process. Do not ask again for Purpledot pilot activation. Keep rollout switches for other organisations unchanged, preserve plan entitlements, and verify the enabled organisation after activation.
