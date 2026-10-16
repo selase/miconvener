@@ -269,7 +269,7 @@ it('does not include members in a follower-only audience', function (): void {
 
 **Interfaces:** `CommunityHistory::communities(Session $session): array` returns organisations followed by proven addresses or holding members authorised by MemberAccess; `members(Tenant $tenant, Session $session): iterable` returns authorised members only. No phone-based candidate list. API accepts only explicit proven identifiers, never inferred contacts, admin notes, other family members or private staff fields.
 
-- [ ] Write failures across two organisations where A(email)+B(phone) occurs on one record, B occurs elsewhere, and a separate relative shares B. Include:
+- [x] Write failures across two organisations where A(email)+B(phone) occurs on one record, B occurs elsewhere, and a separate relative shares B. Include:
 
 ```php
 it('keeps phone-only verification outside existing email history', function (): void {
@@ -282,10 +282,10 @@ it('keeps phone-only verification outside existing email history', function (): 
 
 The host setup matches `PlatformAttendeeAccessControllerTest.php`; retain it so the test reaches the intended host/middleware. Add cases for revoked grants on detail/receipt download, arbitrary tenant/member IDs, email expiry with a still-live phone proof, rollout-off history and a pay-link bearer attempting `/my` access.
 
-- [ ] Run focused files and confirm failures. Implement `GET /my/identity` (masked proofs, expiry, available actions), `/my/communities`, `/my/communities/{tenantSlug}`, `/my/communities/{tenantSlug}/members/{member}`, plus scoped charges/receipt download routes. Use Community identity middleware then per-record authorisation on every request. Sign-in alone is not a history query.
-- [ ] Return stable IDs/organisation branding, follow state for each proven channel, member status/type, represented/self label, open dues and paid receipts for that member only. Hide grant credentials, other contact addresses, staff notes and raw pay tokens. Use the existing pay page for checkout; generate an authorised member's current pay URL server-side without making it a portal credential. Paginate histories and bound queries; no broad response filtered only in React.
-- [ ] Gate new follow/join actions on current rollout; retain authorised existing financial history and receipts when rollout is disabled, consistent with downgrade invariants. Mark every response/download no-store and exclude it from the service worker. Do not expose a combined empty email history as evidence that phone access covers Events.
-- [ ] Pass focused privacy/download tests and all existing platform attendee route/host/history/workspace tests. Pint; commit `feat(community): expose scoped Communities and member history`.
+- [x] Run focused files and confirm failures. Implement `GET /my/identity` (masked proofs, expiry, available actions), `/my/communities`, `/my/communities/{tenantSlug}`, `/my/communities/{tenantSlug}/members/{member}`, plus scoped charges/receipt download routes. Use Community identity middleware then per-record authorisation on every request. Sign-in alone is not a history query.
+- [x] Return stable IDs/organisation branding, follow state for each proven channel, member status/type, represented/self label, open dues and paid receipts for that member only. Hide grant credentials, other contact addresses, staff notes and raw pay tokens. Use the existing pay page for checkout; generate an authorised member's current pay URL server-side without making it a portal credential. Paginate histories and bound queries; no broad response filtered only in React.
+- [x] Gate new follow/join actions on current rollout; retain authorised existing financial history and receipts when rollout is disabled, consistent with downgrade invariants. Mark every response/download no-store and exclude it from the service worker. Do not expose a combined empty email history as evidence that phone access covers Events.
+- [x] Pass focused privacy/download tests and all existing platform attendee route/host/history/workspace tests. Pint; commit `feat(community): expose scoped Communities and member history`.
 
 ## Task 9: Import collision handling without silent merges
 

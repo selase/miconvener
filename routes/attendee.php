@@ -18,6 +18,12 @@ Route::prefix('my')->group(function (): void {
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::get('/identity', [App\Http\Controllers\Public\MyCommunitiesController::class, 'identity'])->name('attendee.my.identity');
+        Route::get('/communities', [App\Http\Controllers\Public\MyCommunitiesController::class, 'index'])->name('attendee.my.communities.index');
+        Route::get('/communities/{tenantSlug}', [App\Http\Controllers\Public\MyCommunitiesController::class, 'show'])->name('attendee.my.communities.show');
+        Route::get('/communities/{tenantSlug}/members/{member}', [App\Http\Controllers\Public\MyCommunitiesController::class, 'member'])->name('attendee.my.communities.member');
+        Route::get('/communities/{tenantSlug}/members/{member}/charges', [App\Http\Controllers\Public\MyCommunitiesController::class, 'charges'])->name('attendee.my.communities.charges');
+        Route::get('/communities/{tenantSlug}/members/{member}/receipts/{charge}', [App\Http\Controllers\Public\MyCommunitiesController::class, 'receipt'])->name('attendee.my.communities.receipt');
         Route::post('/communities/{tenantSlug}/join', [App\Http\Controllers\Public\CommunityJoinController::class, 'store'])->name('attendee.my.joins.store');
         Route::get('/communities/{tenantSlug}/joins/{join}', [App\Http\Controllers\Public\CommunityJoinController::class, 'show'])->name('attendee.my.joins.show');
         Route::post('/communities/{tenantSlug}/joins/{join}/credential', [App\Http\Controllers\Public\CommunityJoinController::class, 'credential'])->name('attendee.my.joins.credential');

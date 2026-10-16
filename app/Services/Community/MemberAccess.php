@@ -23,28 +23,33 @@ final class MemberAccess
 
     public function canView(Session $session, Member $member): bool
     {
+        return $this->role($session, $member) !== null;
+    }
+
+    public function role(Session $session, Member $member): ?string
+    {
         $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $member->tenant_id)->find($member->id);
         if ($member === null) {
-            return false;
+            return null;
         }
         $email = $this->emails->verifiedEmail($session);
         if ($email !== null && $this->identity->normaliseEmail($email) === $this->identity->normaliseEmail($member->email)) {
-            return true;
+            return 'self';
         }
         $phone = $this->phones->verifiedPhone($session);
         $grants = $session->get('community_member_grants', []);
         if ($phone === null || ! is_array($grants) || $grants === []) {
-            return false;
+            return null;
         }
         $credentials = CommunityAccessCredential::withoutGlobalScope(TenantScope::class)->where('tenant_id', $member->tenant_id)
             ->where('member_id', $member->id)->whereIn('id', array_keys($grants))->whereNull('revoked_at')->whereNull('suspended_at')->get();
         foreach ($credentials as $credential) {
             if ($this->valid($credential, $member, $phone) && ($grants[$credential->id]['version'] ?? null) === $credential->version) {
-                return true;
+                return $credential->role;
             }
         }
 
-        return false;
+        return null;
     }
 
     public function establish(Session $session, string $selector, string $secret): bool
