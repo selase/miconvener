@@ -75,3 +75,25 @@ describe('isGroupCollapsed', () => {
         ).toBe(false);
     });
 });
+
+it('gates Community Messages by its own rollout and sending permission', () => {
+    const allowed = {
+        features: { community: true, community_messages: true },
+        can: { send_community_messages: true },
+    };
+    expect(
+        visibleGroups(NAV_GROUPS, allowed)
+            .flatMap((group) => group.items)
+            .some((item) => item.href === 'tenant.community.messages.index')
+    ).toBe(true);
+    for (const context of [
+        { ...allowed, features: { community: true } },
+        { ...allowed, can: { manage_members: true } },
+    ]) {
+        expect(
+            visibleGroups(NAV_GROUPS, context)
+                .flatMap((group) => group.items)
+                .some((item) => item.href === 'tenant.community.messages.index')
+        ).toBe(false);
+    }
+});

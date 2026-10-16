@@ -162,7 +162,7 @@ final class EventAnnouncementDelivery
                 $eligible = $blast !== null && $blast->event !== null && $registration !== null
                     && $this->preferences->normalise('sms', (string) $registration->phone) === $address
                     && EventBlast::audienceQuery($blast->event, $blast->audience)->whereKey($registration->id)->exists();
-                if (! $eligible || $address === null || $blast === null || $blast->status === EventBlast::STATUS_CANCELLED || ! $settings->canSend('sms') || ! $this->preferences->allowsMarketing($tenant, 'sms', $address)) {
+                if (! $eligible || $address === null || $blast->status === EventBlast::STATUS_CANCELLED || ! $settings->canSend('sms') || ! $this->preferences->allowsMarketing($tenant, 'sms', $address)) {
                     $row->update(['status' => EventNotificationLog::STATUS_UNSUBSCRIBED]);
 
                     return null;

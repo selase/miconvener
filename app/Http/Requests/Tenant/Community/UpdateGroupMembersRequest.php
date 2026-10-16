@@ -19,6 +19,7 @@ final class UpdateGroupMembersRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'action' => [Rule::requiredIf($this->isMethod('PATCH')), Rule::in(['attach', 'detach'])],
             'member_ids' => ['present', 'array', 'max:10000'],
             'member_ids.*' => ['required', 'uuid', 'distinct', Rule::exists('landlord.members', 'id')->where('tenant_id', app(TenantContext::class)->getTenant()?->id)],
         ];

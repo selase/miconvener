@@ -27,7 +27,7 @@ final class StoreMessageRequest extends FormRequest
             'audience.group_ids.*' => ['required', 'uuid', 'distinct'],
             'idempotency_key' => ['required', 'uuid'], 'mode' => ['sometimes', Rule::in(['draft', 'send'])],
             'scheduled_at' => ['nullable', 'string', 'max:35'],
-            'confirm_authority' => [Rule::requiredIf($this->input('mode', 'send') !== 'draft'), 'accepted'],
+            'confirm_authority' => $this->input('mode', 'send') === 'draft' ? ['sometimes', 'accepted'] : ['required', 'accepted'],
         ];
     }
 

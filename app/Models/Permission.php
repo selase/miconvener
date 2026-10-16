@@ -35,6 +35,7 @@ final class Permission extends SpatiePermission
         'delete communication',
         'manage organization settings',
         'read finance',
+        'send community messages',
         'read badge-template',
         'update badge-template',
     ];

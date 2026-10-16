@@ -32,6 +32,7 @@ final class CommunitySmsReconciliationController extends Controller
             'legacy_reminder' => DuesReminder::withoutGlobalScopes()->where('channel', 'sms')->where('status', 'reserved')
                 ->where(fn ($query) => $query->where('reason', 'outcome_unknown')->orWhere('created_at', '<', $cutoff))
                 ->whereNotIn('id', CommunitySmsReservation::query()->where('source_type', 'dues_reminder')->select('source_id')),
+            default => abort(422, 'Choose a supported source kind.'),
         };
         $rows = $query->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))->oldest()->paginate(25)->withQueryString()->through(function ($row) use ($kind) {
             $row->setAttribute('review_context', $this->reviewContext($row, $kind));
@@ -56,12 +57,12 @@ final class CommunitySmsReconciliationController extends Controller
     }
 
     /** @return array{source: string, destination: string} */
-    private function reviewContext(\Illuminate\Database\Eloquent\Model $row, string $kind): array
+    private function reviewContext(CommunitySmsReservation|CommunityMessageDelivery|EventBlastEmailClaim|DuesReminder $row, string $kind): array
     {
         $address = null;
         $source = $kind.' / '.$row->id;
         try {
-            if ($kind === 'sms_reservation') {
+            if ($row instanceof CommunitySmsReservation) {
                 $source = $row->source_type.' / '.$row->source_id;
                 if ($row->source_type === 'community_message') {
                     $address = CommunityMessageDelivery::query()->where('tenant_id', $row->tenant_id)->find($row->source_id)?->address;
@@ -71,10 +72,10 @@ final class CommunitySmsReconciliationController extends Controller
                     $reminder = DuesReminder::withoutGlobalScopes()->where('tenant_id', $row->tenant_id)->find($row->source_id);
                     $address = $reminder === null ? null : \App\Models\Member::withoutGlobalScopes()->where('tenant_id', $row->tenant_id)->find($reminder->member_id)?->phone;
                 }
-            } elseif ($kind === 'community_email') {
+            } elseif ($row instanceof CommunityMessageDelivery) {
                 $address = $row->address;
                 $source = 'Community message / '.$row->message_id;
-            } elseif ($kind === 'event_email') {
+            } elseif ($row instanceof EventBlastEmailClaim) {
                 $source = 'Event announcement / '.$row->blast_id;
                 $recipient = \App\Models\EventBlastRecipient::withoutGlobalScopes()->where('tenant_id', $row->tenant_id)->find($row->recipient_id);
                 $address = $recipient === null ? null : \App\Models\EventRegistration::withoutGlobalScopes()->where('tenant_id', $row->tenant_id)->find($recipient->registration_id)?->email;

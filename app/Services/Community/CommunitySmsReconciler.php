@@ -82,19 +82,19 @@ final class CommunitySmsReconciler
         });
     }
 
-    private function assertUncertain(Model $row, string $kind): void
+    private function assertUncertain(CommunitySmsReservation|CommunityMessageDelivery|EventBlastEmailClaim|DuesReminder $row, string $kind): void
     {
-        if ($kind === 'legacy_reminder' && ($row->channel !== 'sms' || CommunitySmsReservation::query()->where('tenant_id', $row->tenant_id)->where('source_type', 'dues_reminder')->where('source_id', $row->id)->exists())) {
+        if ($row instanceof DuesReminder && ($row->channel !== 'sms' || CommunitySmsReservation::query()->where('tenant_id', $row->tenant_id)->where('source_type', 'dues_reminder')->where('source_id', $row->id)->exists())) {
             throw ValidationException::withMessages(['source_id' => 'Use the linked SMS reservation rather than the legacy reminder.']);
         }
-        if ($kind === 'community_email' && $row->channel !== 'email') {
+        if ($row instanceof CommunityMessageDelivery && $row->channel !== 'email') {
             throw ValidationException::withMessages(['source_id' => 'Choose the email delivery source.']);
         }
-        $uncertain = match ($kind) {
-            'sms_reservation' => $row->status === 'reserved' && ($row->reason === 'outcome_unknown' || $row->reserved_at->lessThan(now()->subMinutes(2))),
-            'legacy_reminder' => $row->status === 'reserved' && ($row->reason === 'outcome_unknown' || $row->created_at->lessThan(now()->subMinutes(2))),
-            'community_email' => $row->status === 'unknown' || ($row->status === 'claimed' && $row->claimed_at?->lessThan(now()->subMinutes(2))),
-            'event_email' => $row->status === 'unknown' || (in_array($row->status, ['reserved', 'submitting'], true) && $row->claimed_at?->lessThan(now()->subMinutes(2))),
+        $uncertain = match (true) {
+            $row instanceof CommunitySmsReservation => $row->status === 'reserved' && ($row->reason === 'outcome_unknown' || $row->reserved_at->lessThan(now()->subMinutes(2))),
+            $row instanceof DuesReminder => $row->status === 'reserved' && ($row->reason === 'outcome_unknown' || $row->created_at->lessThan(now()->subMinutes(2))),
+            $row instanceof CommunityMessageDelivery => $row->status === 'unknown' || ($row->status === 'claimed' && $row->claimed_at?->lessThan(now()->subMinutes(2))),
+            $row instanceof EventBlastEmailClaim => $row->status === 'unknown' || (in_array($row->status, ['reserved', 'submitting'], true) && $row->claimed_at?->lessThan(now()->subMinutes(2))),
         };
         if (! $uncertain) {
             throw ValidationException::withMessages(['source_id' => 'Only uncertain or interrupted submissions may be resolved here.']);

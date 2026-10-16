@@ -59,22 +59,30 @@ final class CommunityMessages
     }
 
     /** @param array<string, mixed> $input */
-    public function queue(Tenant $tenant, User $actor, array $input): CommunityMessage
+    public function queue(Tenant $tenant, User $actor, array $input, ?CommunityMessage $editing = null): CommunityMessage
     {
         $this->authorize($tenant, $actor);
         $key = $input['idempotency_key'] ?? '';
         if (! is_string($key) || ! Str::isUuid($key)) {
             throw ValidationException::withMessages(['idempotency_key' => 'Start a fresh message and try again.']);
         }
-        $hash = hash('sha256', json_encode(array_intersect_key($input, array_flip(['subject', 'body', 'channels', 'audience', 'scheduled_at', 'mode'])), JSON_THROW_ON_ERROR));
+        $payload = [];
+        foreach (['subject', 'body', 'channels', 'audience', 'scheduled_at', 'mode'] as $field) {
+            $payload[$field] = $input[$field] ?? null;
+        }
+        $hash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
 
-        return $tenant->getConnection()->transaction(function () use ($tenant, $actor, $input, $key, $hash): CommunityMessage {
+        return $tenant->getConnection()->transaction(function () use ($tenant, $actor, $input, $key, $hash, $editing): CommunityMessage {
             $tenant->getConnection()->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community.message.submit:'.$tenant->id.':'.$key]);
             $existing = CommunityMessage::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('idempotency_key', $key)->first();
             if ($existing !== null) {
-                abort_unless(hash_equals($existing->payload_hash, $hash), 409, 'This submission key already belongs to a different message.');
+                abort_unless(($editing === null || $existing->id === $editing->id) && hash_equals($existing->payload_hash, $hash), 409, 'This submission key already belongs to a different message.');
 
                 return $existing;
+            }
+            if ($editing !== null) {
+                $editing = CommunityMessage::withoutGlobalScopes()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($editing->id);
+                abort_unless($editing->status === 'draft', 409, 'Only a draft can be edited. Start a new announcement instead.');
             }
             $preview = $this->preview($tenant, $actor, $input);
             $draft = ($input['mode'] ?? 'send') === 'draft';
@@ -88,12 +96,14 @@ final class CommunityMessages
                 }
             }
             $scheduled = $preview['scheduled_at'];
-            $message = CommunityMessage::query()->create([
+            $message = $editing ?? new CommunityMessage;
+            $message->fill([
                 'tenant_id' => $tenant->id, 'sent_by' => $actor->id, 'idempotency_key' => $key, 'payload_hash' => $hash,
                 'subject' => $input['subject'], 'body' => $input['body'], 'channels' => $input['channels'], 'audience' => $input['audience'],
                 'estimate' => $preview['counts'], 'scheduled_at' => $scheduled,
                 'status' => $draft ? 'draft' : ($scheduled === null ? 'queued' : 'scheduled'),
             ]);
+            $message->save();
             if (! $draft) {
                 $dispatch = DispatchCommunityMessage::dispatch($message->id)->afterCommit();
                 if ($scheduled !== null) {

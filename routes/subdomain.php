@@ -313,11 +313,15 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
                 Route::get('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'index'])->name('groups.index');
                 Route::post('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'store'])->name('groups.store');
                 Route::patch('groups/{group}', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'update'])->name('groups.update');
+                Route::get('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'memberOptions'])->name('groups.member-options');
+                Route::patch('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'members'])->name('groups.members.patch');
                 Route::put('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'members'])->name('groups.members');
                 Route::post('groups/{group}/archive', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'archive'])->name('groups.archive');
                 Route::get('messages', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'index'])->name('messages.index');
                 Route::post('messages/preview', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'preview'])->name('messages.preview');
                 Route::post('messages', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'store'])->name('messages.store');
+                Route::get('messages/groups', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'groups'])->name('messages.groups');
+                Route::patch('messages/{message}', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'update'])->name('messages.update');
                 Route::get('messages/{message}', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'show'])->name('messages.show');
                 Route::post('messages/{message}/cancel', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'cancel'])->name('messages.cancel');
             });
