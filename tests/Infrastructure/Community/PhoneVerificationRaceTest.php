@@ -81,7 +81,7 @@ it('waits for an ordinary in-flight session writer before removing persisted por
     $session->save();
     $lock = Illuminate\Support\Facades\Cache::store(config('session.block_store') ?? 'file')->lock('session:'.$id, 600);
     expect($lock->get())->toBeTrue();
-    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'PAO_DISABLE' => '1', 'TELESCOPE_ENABLED' => 'false'];
+    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'CACHE_PREFIX' => Illuminate\Support\Facades\Cache::store(config('session.block_store'))->getStore()->getPrefix(), 'APP_ENV' => 'testing', 'PAO_DISABLE' => '1', 'TELESCOPE_ENABLED' => 'false'];
     $worker = new Process([PHP_BINARY, base_path('tests/Fixtures/community/session-removal-worker.php'), $id, $directory], base_path(), $environment);
     try {
         $worker->start();

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md`, sections 4, 6.1, 6.3, 8, 10, 13 and 13.1, including the owner's email-first safeguards agreed 2026-10-16.
 
-**Status:** Built locally on `codex/community-3`, backend source `a1f5540` plus final client-only link fix, 2026-10-16. Awaiting owner review and remote CI before merge. No push, merge, deployment, production write or real recipient send has occurred.
+**Status:** Built locally on `codex/community-3`, backend source `a1f5540` plus final client-only link fix, 2026-10-16. Owner approved push, merge and deployment on 2026-10-16; PR #28 is open. Require green remote CI before merging. No merge, deployment or real recipient send has occurred at this point.
 
 **Baseline:** Deployed milestone 2 merge `b659e66`; planning branch `codex/community-3-plan` descends from the tested milestone 2 source and carries its release/pilot notes. Local `origin/main` is stale; fetch and compare before execution. Reuse the owned linked worktree at `.worktrees/artifact-completion`; leave the original `community-1a` checkout and Claude's files untouched. Create implementation branch `codex/community-3` from the reviewed planning head after reconciling any newer main changes.
 
@@ -445,3 +445,9 @@ Backend source: `a1f5540` on `codex/community-3`, based on `b659e66`. The final 
 - Final UI self-review: retained private history no longer links to an unavailable public organisation page when both Community and Following are disabled. The new regression failed before the fix and passed afterward; the complete318-test JavaScript suite, ESLint and rebuilt assets passed. Isolated browser acceptance confirmed the public link was absent while the owner’s private history remained available. No PHP source changed, so the full PHP gate was not repeated for this client-only fix.
 - Remote CI has **not** run: this branch has not been pushed or made a PR. The CI-only lock-capacity change parsed as valid YAML; container execution is to be verified on the PR before merging. Four local rebuilds were invalidated by stock PostgreSQL lock exhaustion; no shared local server setting was changed. Do not claim those failed/aborted attempts as passes.
 - Claude’s original checkout remains clean on `community-1a` at `0173494`; its `.env`, branches, uncommitted files and owner data were not modified. Production was not changed. Keep the owned worktree for review. Task11's final two release steps remain pending the owner's go-ahead.
+
+## Approved release verification (2026-10-16)
+
+- Owner explicitly authorised push, merge and deployment; PR #28 targets main, which still matched base `b659e66` before release. Production uses Redis sessions, meeting the server-side session requirement. Purpledot Community was already on; Following was off. All eight other organisations had both switches off.
+- First remote run `38893022753`: quality job passed; PHP2,870 passed/one failed. A focused local parallel reproduction confirmed that Laravel’s parallel cache prefix was not inherited by the session-race subprocess. Pass the actual parent lock-store prefix through `CACHE_PREFIX`; do not weaken the lock assertion or change production code. Local serial acceptance had not exercised this parallel cache-prefix boundary.
+- Corrected fixture: focused local parallel `PhoneVerificationRaceTest` passed3 tests/24 assertions in52.01seconds; Pint passed. Application/backend code and assets are unchanged by this test-only correction.
