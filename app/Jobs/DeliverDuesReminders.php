@@ -17,6 +17,9 @@ final class DeliverDuesReminders implements ShouldQueue
 {
     use Queueable;
 
+    /** @var array<string, int> */
+    public array $contactVersions = [];
+
     public int $tries = 3;
 
     public int $timeout = 60;
@@ -26,6 +29,7 @@ final class DeliverDuesReminders implements ShouldQueue
     /** @param list<string> $memberIds */
     public function __construct(public string $tenantId, public array $memberIds, public string $channel, public ?int $userId = null, public ?string $localDate = null)
     {
+        $this->contactVersions = \App\Models\Member::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereIn('id', $memberIds)->pluck('access_version', 'id')->map(fn ($version) => (int) $version)->all();
         $this->localDate ??= CarbonImmutable::now(CommunitySettings::for(Tenant::query()->findOrFail($tenantId))->timezone)->toDateString();
     }
 
@@ -39,7 +43,7 @@ final class DeliverDuesReminders implements ShouldQueue
         $previous = $context->getTenant();
         try {
             $context->setTenant($tenant);
-            $reminders->deliverUnit($tenant, $this->memberIds, $this->channel, $this->userId, $this->localDate);
+            $reminders->deliverUnit($tenant, $this->memberIds, $this->channel, $this->userId, $this->localDate, $this->contactVersions);
         } finally {
             $previous === null ? $context->clear() : $context->setTenant($previous);
         }

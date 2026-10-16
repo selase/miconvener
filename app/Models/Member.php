@@ -121,6 +121,13 @@ final class Member extends Model
         });
 
         self::updating(function (Member $member): void {
+            $identity = app(\App\Services\Community\MemberIdentity::class);
+            $changed = $identity->normaliseEmail($member->email) !== $identity->normaliseEmail($member->getOriginal('email'))
+                || $identity->normalisePhone($member->phone) !== $identity->normalisePhone($member->getOriginal('phone'));
+            if ($changed) {
+                $member->access_version = ((int) $member->getOriginal('access_version')) + 1;
+            }
+
             if (! $member->isDirty('status')) {
                 return;
             }
@@ -135,6 +142,13 @@ final class Member extends Model
         });
 
         self::updated(function (Member $member): void {
+            if ($member->wasChanged('access_version') && ($member->wasChanged('phone') || $member->wasChanged('email'))) {
+                CommunityAccessCredential::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)->where('member_id', $member->id)->where('role', 'self')->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                CommunityAccessCredential::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)->where('member_id', $member->id)->where('role', 'representative')->whereNull('revoked_at')->update(['suspended_at' => now()]);
+                CommunityAccessClaim::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)->where('member_id', $member->id)->whereIn('status', ['pending', 'approved'])->update(['status' => 'expired']);
+                CommunityAccessAudit::query()->create(['tenant_id' => $member->tenant_id, 'member_id' => $member->id, 'action' => 'contact_changed', 'method' => 'contact_version']);
+            }
+
             if ($member->wasChanged('status') && in_array($member->status, [MemberStatusEnum::Exited, MemberStatusEnum::Lapsed], true)) {
                 app(\App\Services\Dues\DuesCharges::class)->cancelAdvanceFor($member);
             }

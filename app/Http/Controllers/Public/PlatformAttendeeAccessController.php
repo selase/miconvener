@@ -136,6 +136,10 @@ final class PlatformAttendeeAccessController extends Controller
     public function forget(Request $request): JsonResponse
     {
         $this->verification->forget($request->session());
+        app(\App\Services\Community\PhoneVerification::class)->forget($request->session());
+        app(\App\Services\Community\MemberAccess::class)->forget($request->session());
+        $request->session()->forget([\App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY, \App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::REGISTERED_SESSION_KEY]);
+        $request->session()->regenerate();
 
         return response()->json([
             'message' => 'Signed out.',

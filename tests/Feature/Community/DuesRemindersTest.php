@@ -412,3 +412,36 @@ test('manual dispatcher payload freezes the run day before dispatch and continua
     Http::assertNothingSent();
     Mail::assertNothingSent();
 });
+
+it('does not send a queued unit to a changed member contact', function (): void {
+    $job = new App\Jobs\DeliverDuesReminders($this->tenant->id, [$this->member->id], 'sms');
+    $this->member->update(['phone' => '+233241234568']);
+    $job->handle(app(DuesReminders::class));
+    Http::assertNothingSent();
+    expect(Reminder::query()->where('member_id', $this->member->id)->where('channel', 'sms')->first()->reason)->toBe('contact_changed_or_disputed');
+});
+
+it('refunds an unsubmitted batch item if contact changes while the batch is collected', function (): void {
+    $second = Member::factory()->create(['tenant_id' => $this->tenant->id, 'membership_type_id' => $this->type->id, 'phone' => '+233241234568']);
+    DuesCharge::factory()->create(['tenant_id' => $this->tenant->id, 'member_id' => $second->id, 'membership_type_id' => $this->type->id, 'due_on' => '2026-10-08']);
+    $fired = false;
+    App\Models\CommunitySmsReservation::created(function () use (&$fired): void {
+        if (! $fired) {
+            $fired = true;
+            $this->member->update(['phone' => '+233241234569']);
+        }
+    });
+    try {
+        remindToday($this);
+        Http::assertSent(fn ($request) => count($request->data()[0]['users'] ?? []) === 1);
+    } finally {
+        App\Models\CommunitySmsReservation::flushEventListeners();
+    }
+});
+
+it('keeps service reminders available for retained dues after lapse or exit', function (string $status): void {
+    $this->member->update(['status' => $status]);
+    remindToday($this);
+    Mail::assertSent(DuesReminder::class);
+    Http::assertSentCount(1);
+})->with(['lapsed', 'exited']);

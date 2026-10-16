@@ -113,6 +113,8 @@ return [
     ],
 
     'ignore_paths' => [
+        'my',
+        'my/*',
         'nova-api*',
     ],
 

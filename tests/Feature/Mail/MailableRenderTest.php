@@ -280,6 +280,7 @@ test('every mailable renders', function (): void {
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),
         'WelcomeMail' => fn () => new WelcomeMail($user),
+        'CommunityContactNotice' => fn () => new App\Mail\CommunityContactNotice('Acme Events'),
         'CommunityMessage' => fn () => new CommunityMessage(App\Models\CommunityMessage::factory()->create(['tenant_id' => $tenant->id]), 'https://render-check.miconvener.test/community/preferences/'.str_repeat('a', 64)),
         'DuesReminder' => fn () => new DuesReminder($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge])),
         'DuesReceipt' => fn () => new DuesReceipt($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge]), 'ref_render_dues'),

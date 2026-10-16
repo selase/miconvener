@@ -165,3 +165,28 @@ it('rejects a code exactly at its expiry boundary', function (): void {
     PlatformPhoneAccessCode::factory()->create(['expires_at' => now(), 'submitted_at' => now()]);
     expect(app(PhoneVerification::class)->confirm(app('session.store'), '+233241234567', '123456', '192.0.2.8'))->toBeFalse();
 });
+
+it('does not record sign-in SMS plaintext in diagnostic outgoing-request entries', function (): void {
+    $filters = Laravel\Telescope\Telescope::$filterUsing;
+    try {
+        Laravel\Telescope\Telescope::$filterUsing = [];
+        Laravel\Telescope\Telescope::flushEntries();
+        Laravel\Telescope\Telescope::startRecording(false);
+        $gateway = Mockery::mock(SmsGateway::class);
+        $gateway->shouldReceive('isConfigured')->andReturn(true);
+        $gateway->shouldReceive('send')->once()->andReturnUsing(function (array $messages): array {
+            Laravel\Telescope\Telescope::recordClientRequest(Laravel\Telescope\IncomingEntry::make(['payload' => $messages[0]->text]));
+
+            return [$messages[0]->reference => SmsResult::accepted('fake-provider')];
+        });
+        app()->instance(SmsGateway::class, $gateway);
+        phoneProofTestSend(app(PhoneVerification::class), '+233241234567', '192.0.2.88', null);
+        expect(Laravel\Telescope\Telescope::$entriesQueue)->toBe([]);
+        Laravel\Telescope\Telescope::recordClientRequest(Laravel\Telescope\IncomingEntry::make(['payload' => 'ordinary nonsensitive request']));
+        expect(Laravel\Telescope\Telescope::$entriesQueue)->toHaveCount(1);
+    } finally {
+        Laravel\Telescope\Telescope::stopRecording();
+        Laravel\Telescope\Telescope::flushEntries();
+        Laravel\Telescope\Telescope::$filterUsing = $filters;
+    }
+});

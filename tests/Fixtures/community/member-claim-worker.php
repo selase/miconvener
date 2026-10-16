@@ -15,6 +15,13 @@ $session = app('session.store');
 $session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
 echo "READY\n";
 flush();
+if (($argv[2] ?? '') === 'contact') {
+    $claim = App\Models\CommunityAccessClaim::withoutGlobalScopes()->findOrFail($argv[1]);
+    $member = App\Models\Member::withoutGlobalScopes()->where('tenant_id', $claim->tenant_id)->findOrFail($claim->member_id);
+    $member->getConnection()->transaction(fn () => $member->update(['phone' => '+233241234568']));
+    echo 'CHANGED';
+    exit(0);
+}
 try {
     app(MemberClaims::class)->complete($session, $argv[1], str_repeat('a', 64));
     echo 'SUCCESS';

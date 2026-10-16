@@ -122,7 +122,7 @@ final class MemberController extends Controller
         $model = app(MemberCap::class)->withLock($tenant, function () use ($request, $tenant, $member): Member {
             $model = $this->findMember($member);
             app(MemberIdentity::class)->assertUnique($tenant, $request->validated(), $model->id);
-            $model->update($request->validated());
+            $model = app(\App\Services\Community\MemberContactChanges::class)->update($model, $request->validated(), $request->user());
 
             return $model;
         });

@@ -309,6 +309,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::post('access/reports/{report}/resolve', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'resolve'])->name('reports.resolve');
+            Route::post('access/credentials/{credential}/revoke', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'revokeCredential'])->name('credentials.revoke');
+            Route::get('access/reports', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'index'])->name('reports.index');
+            Route::post('access/reports/{report}/review', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'review'])->name('reports.review');
+            Route::get('people/members/{member}/credentials', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'credentials'])->name('credentials.index');
+            Route::post('people/members/{member}/revoke-access', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'revoke'])->name('credentials.revoke-all');
             Route::get('access/claims', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'index'])->name('claims.index');
             Route::post('access/claims/{claim}/approve', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'approve'])->name('claims.approve');
             Route::post('access/claims/{claim}/reject', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'reject'])->name('claims.reject');

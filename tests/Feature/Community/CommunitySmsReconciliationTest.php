@@ -128,3 +128,11 @@ test('the audit retains its operator reference if the account is later removed',
     $this->operator->delete();
     expect(MessageOutcomeResolution::query()->firstOrFail()->operator_reference)->toBe($reference);
 });
+
+it('resolves an uncertain contact notice through the existing audited SMS workflow', function (): void {
+    $notice = App\Models\CommunityContactNotice::factory()->create(['tenant_id' => $this->tenant->id, 'channel' => 'sms', 'status' => 'unknown']);
+    $reservation = app(CommunitySmsBudget::class)->reserve($this->tenant, 'member_contact_notice', $notice->id, CarbonImmutable::now());
+    app(CommunitySmsBudget::class)->finish($this->tenant, $reservation->id, SmsResult::unknown('Transport interrupted.'));
+    app(CommunitySmsReconciler::class)->resolve($this->operator, $this->tenant, $reservation->id, 'confirmed_not_submitted', 'Provider confirms no message accepted.', 'Original provider account independently reviewed.');
+    expect($notice->fresh()->status)->toBe('failed')->and($reservation->fresh()->status)->toBe('refused');
+});

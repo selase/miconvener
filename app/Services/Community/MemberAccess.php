@@ -90,6 +90,7 @@ final class MemberAccess
                 $email = $this->emails->verifiedEmail($session);
                 abort_unless($email !== null && $this->identity->normaliseEmail($email) === $this->identity->normaliseEmail($locked->email), 403);
             }
+            abort_if($this->phoneHeld($locked->tenant_id, PhoneVerification::digest($phone)), 403, 'This number needs an independent ownership review.');
             abort_if($role === 'self' && $phone !== $this->identity->normalisePhone($locked->phone), 403);
             CommunityAccessCredential::withoutGlobalScope(TenantScope::class)->where('tenant_id', $locked->tenant_id)->where('member_id', $locked->id)
                 ->where('phone_hash', PhoneVerification::digest($phone))->where('role', $role)->whereNull('revoked_at')->update(['revoked_at' => now()]);
@@ -112,8 +113,24 @@ final class MemberAccess
         $member->getConnection()->transaction(function () use ($member, $actor, $reason): void {
             $locked = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $member->tenant_id)->lockForUpdate()->findOrFail($member->id);
             $locked->increment('access_version');
+            \App\Models\CommunityAccessClaim::withoutGlobalScope(TenantScope::class)->where('tenant_id', $locked->tenant_id)->where('member_id', $locked->id)->whereIn('status', ['pending', 'approved'])->update(['status' => 'expired']);
             CommunityAccessCredential::withoutGlobalScope(TenantScope::class)->where('tenant_id', $locked->tenant_id)->where('member_id', $locked->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
             CommunityAccessAudit::query()->create(['tenant_id' => $locked->tenant_id, 'member_id' => $locked->id, 'actor_id' => $actor->id, 'action' => 'access_revoked', 'reason' => $reason]);
+        });
+    }
+
+    public function revokeCredential(CommunityAccessCredential $credential, User $actor, string $reason): void
+    {
+        $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $credential->tenant_id)->findOrFail($credential->member_id);
+        $this->authorizeStaff($member->tenant, $actor);
+        abort_if(mb_strlen(mb_trim($reason)) < 10 || mb_strlen($reason) > 1000, 422);
+        $credential->getConnection()->transaction(function () use ($credential, $actor, $reason): void {
+            $locked = CommunityAccessCredential::withoutGlobalScope(TenantScope::class)->where('tenant_id', $credential->tenant_id)->lockForUpdate()->findOrFail($credential->id);
+            if ($locked->revoked_at !== null) {
+                return;
+            }
+            $locked->update(['revoked_at' => now()]);
+            CommunityAccessAudit::query()->create(['tenant_id' => $locked->tenant_id, 'member_id' => $locked->member_id, 'actor_id' => $actor->id, 'action' => 'credential_revoked', 'reason' => $reason]);
         });
     }
 
@@ -136,9 +153,14 @@ final class MemberAccess
         $session->forget(['community_member_grants', 'community_claim_capabilities']);
     }
 
+    private function phoneHeld(string $tenantId, string $hash): bool
+    {
+        return \App\Models\CommunityWrongNumberReport::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenantId)->where('phone_hash', $hash)->where('status', 'confirmed')->exists();
+    }
+
     private function valid(CommunityAccessCredential $credential, Member $member, string $phone): bool
     {
-        return $credential->revoked_at === null && $credential->suspended_at === null
+        return ! $this->phoneHeld($member->tenant_id, $credential->phone_hash) && $credential->revoked_at === null && $credential->suspended_at === null
             && $credential->approved_at !== null && $credential->member_access_version === $member->access_version
             && hash_equals($credential->phone_hash, PhoneVerification::digest($phone))
             && ($credential->role === 'representative' || ($credential->role === 'self' && $this->identity->normalisePhone($member->phone) === $phone));

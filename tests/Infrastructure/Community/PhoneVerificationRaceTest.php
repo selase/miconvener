@@ -22,7 +22,7 @@ it('serialises concurrent phone budget and code consumption', function (string $
     if ($mode === 'confirm') {
         PlatformPhoneAccessCode::factory()->create(['phone' => $phone, 'phone_hash' => PhoneVerification::digest($phone), 'code_hash' => Hash::make('123456')]);
     }
-    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'BCRYPT_ROUNDS' => '4'];
+    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1', 'BCRYPT_ROUNDS' => '4'];
     $workers = array_map(fn () => new Process([PHP_BINARY, base_path('tests/Fixtures/community/phone-verification-worker.php'), $mode, $mode === 'budget' ? (string) Str::uuid() : $phone], base_path(), $environment), [1, 2]);
     $connection = DB::connection('landlord');
     $connection->beginTransaction();
@@ -49,6 +49,7 @@ it('serialises concurrent phone budget and code consumption', function (string $
         foreach ($workers as $worker) {
             $worker->wait();
             expect($worker->isSuccessful())->toBeTrue($worker->getErrorOutput().$worker->getOutput());
+            expect((bool) preg_match('/SUCCESS|DENIED|CHANGED/', $worker->getOutput()))->toBeTrue($worker->getErrorOutput().$worker->getOutput());
         }
         expect(count(array_filter($workers, fn ($worker) => str_contains($worker->getOutput(), 'SUCCESS'))))->toBe(1);
         if ($mode === 'budget') {

@@ -48,9 +48,9 @@ final class MemberClaims
             throw ValidationException::withMessages(['reason' => 'Record the independent check and its evidence (10–1000 characters).']);
         }
         $claim->getConnection()->transaction(function () use ($claim, $member, $actor, $method, $reason): void {
+            $person = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $claim->tenant_id)->lockForUpdate()->findOrFail($member->id);
             $locked = CommunityAccessClaim::withoutGlobalScope(TenantScope::class)->where('tenant_id', $claim->tenant_id)->lockForUpdate()->findOrFail($claim->id);
             abort_unless($locked->status === 'pending' && $locked->expires_at->isFuture(), 410);
-            $person = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $locked->tenant_id)->lockForUpdate()->findOrFail($member->id);
             abort_if($locked->role === 'self' && $this->identity->normalisePhone($person->phone) !== $locked->phone, 422, 'The member contact must match the independently verified number.');
             $locked->update(['member_id' => $person->id, 'member_access_version' => $person->access_version, 'status' => 'approved', 'reviewed_by' => $actor->id, 'method' => $method, 'reason' => $reason]);
             CommunityAccessAudit::query()->create(['tenant_id' => $locked->tenant_id, 'member_id' => $person->id, 'actor_id' => $actor->id, 'action' => 'claim_approved', 'method' => $method, 'reason' => $reason]);
@@ -60,13 +60,17 @@ final class MemberClaims
     /** @return array{selector:string, secret:string} */
     public function complete(Session $session, string $claimId, string $capability): array
     {
-        return (new CommunityAccessClaim)->getConnection()->transaction(function () use ($session, $claimId, $capability): array {
-            $claim = CommunityAccessClaim::withoutGlobalScope(TenantScope::class)->lockForUpdate()->findOrFail($claimId);
+        $candidate = CommunityAccessClaim::withoutGlobalScope(TenantScope::class)->findOrFail($claimId);
+        abort_unless($this->owns($session, $candidate, $capability), 404);
+        abort_unless($candidate->status === 'approved' && $candidate->member_id !== null && $candidate->expires_at->isFuture(), 410);
+
+        return $candidate->getConnection()->transaction(function () use ($session, $claimId, $capability, $candidate): array {
+            $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->member_id);
+            $claim = CommunityAccessClaim::withoutGlobalScope(TenantScope::class)->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($claimId);
             abort_unless($this->owns($session, $claim, $capability), 404);
             abort_unless($claim->status === 'approved' && $claim->completed_at === null && $claim->expires_at->isFuture(), 410);
             abort_unless($claim->tenant->communityEnabled(), 404);
-            $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $claim->tenant_id)->lockForUpdate()->findOrFail($claim->member_id);
-            abort_unless($member->access_version === $claim->member_access_version, 410);
+            abort_unless($claim->member_id === $member->id && $member->access_version === $claim->member_access_version, 410);
             $credential = $this->access->issue($session, $member, $claim->phone, $claim->role, User::query()->find($claim->reviewed_by), $claim->method);
             $claim->update(['status' => 'completed', 'completed_at' => now()]);
 

@@ -70,14 +70,14 @@ final class DuesReminders
      * @param  list<string>  $memberIds
      * @return array{sent: int, skipped: int}
      */
-    public function deliverUnit(Tenant $tenant, array $memberIds, string $channel, ?int $userId, ?string $localDate): array
+    public function deliverUnit(Tenant $tenant, array $memberIds, string $channel, ?int $userId, ?string $localDate, ?array $contactVersions = null): array
     {
         if (! in_array($channel, ['email', 'sms'], true) || count($memberIds) > ($channel === 'email' ? 1 : self::SMS_BATCH_SIZE)) {
             throw new InvalidArgumentException('Reminder delivery units must be bounded by channel.');
         }
         $today = $this->executionDate($tenant, $userId, $localDate);
 
-        return $today === null ? ['sent' => 0, 'skipped' => 0] : $this->send($tenant, $today, $userId !== null, $memberIds, $channel);
+        return $today === null ? ['sent' => 0, 'skipped' => 0] : $this->send($tenant, $today, $userId !== null, $memberIds, $channel, $contactVersions);
     }
 
     public function authorizeArrears(Tenant $tenant, int $userId): void
@@ -145,19 +145,25 @@ final class DuesReminders
      * @param  list<string>|null  $memberIds
      * @return array{sent: int, skipped: int}
      */
-    private function send(Tenant $tenant, CarbonImmutable $today, bool $arrears, ?array $memberIds = null, ?string $channel = null): array
+    private function send(Tenant $tenant, CarbonImmutable $today, bool $arrears, ?array $memberIds = null, ?string $channel = null, ?array $contactVersions = null): array
     {
         $counts = ['sent' => 0, 'skipped' => 0];
         if (! $tenant->communityEnabled() || $tenant->status !== TenantStatusEnum::ACTIVE || ! CommunitySettings::for($tenant)->reminders_enabled) {
             return $counts;
         }
         $this->members($tenant, $today, $arrears)->when($memberIds !== null, fn (Builder $query) => $query->whereIn('id', $memberIds))
-            ->chunkById(self::SMS_BATCH_SIZE, function (Collection $members) use ($tenant, $today, $arrears, $channel, &$counts): void {
+            ->chunkById(self::SMS_BATCH_SIZE, function (Collection $members) use ($tenant, $today, $arrears, $channel, $contactVersions, &$counts): void {
                 $messages = [];
                 $rows = [];
                 $emails = [];
                 foreach ($members as $member) {
                     if ($member->charges->isEmpty()) {
+                        continue;
+                    }
+                    if ($contactVersions !== null && ($contactVersions[$member->id] ?? null) !== $member->access_version) {
+                        DuesReminder::withoutGlobalScopes()->firstOrCreate(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'channel' => $channel, 'sent_for_date' => $today->toDateString()], ['step' => 'contact_check', 'status' => 'skipped', 'reason' => 'contact_changed_or_disputed', 'charge_ids' => [], 'contact_version' => $contactVersions[$member->id] ?? 0]);
+                        $counts['skipped']++;
+
                         continue;
                     }
                     $member->setRelation('tenant', $tenant);
@@ -183,6 +189,18 @@ final class DuesReminders
                         }
                     }
                 }
+                $messages = array_values(array_filter($messages, function (SmsMessage $message) use ($tenant, &$rows, &$counts): bool {
+                    $row = $rows[$message->reference];
+                    if ($this->currentContact($tenant, $row->member_id, 'sms', $message->to, $row->contact_version)) {
+                        return true;
+                    }
+                    $this->finishSms($tenant, $row, SmsResult::refused('Confirmed not submitted: contact changed or disputed.'));
+                    $row->update(['status' => 'skipped', 'reason' => 'contact_changed_or_disputed']);
+                    unset($rows[$message->reference]);
+                    $counts['skipped']++;
+
+                    return false;
+                }));
                 try {
                     $results = $messages === [] ? [] : $this->gateway->send($messages);
                 } catch (Throwable $exception) {
@@ -197,6 +215,12 @@ final class DuesReminders
                 foreach ($emails as [$member, $step]) {
                     $row = $this->reserve($tenant, $member, $today, $step, 'email');
                     if ($row?->status === 'reserved') {
+                        if (! $this->currentContact($tenant, $member->id, 'email', $member->email, $row->contact_version)) {
+                            $row->update(['status' => 'skipped', 'reason' => 'contact_changed_or_disputed']);
+                            $counts['skipped']++;
+
+                            continue;
+                        }
                         try {
                             Mail::to($member->email)->send(new ReminderMail($member, $member->charges));
                             $row->update(['status' => 'sent']);
@@ -261,7 +285,7 @@ final class DuesReminders
                 'tenant_id' => $tenant->id, 'member_id' => $member->id, 'step' => $step,
                 'channel' => $channel, 'charge_ids' => $member->charges->modelKeys(),
                 'sent_for_date' => $today->toDateString(), 'status' => $reason === null ? ($channel === 'sms' ? 'pending' : 'reserved') : 'skipped',
-                'reason' => $reason,
+                'reason' => $reason, 'contact_version' => $member->access_version,
             ]);
             if ($channel === 'sms' && $reason === null) {
                 $reservation = app(CommunitySmsBudget::class)->reserve($tenant, 'dues_reminder', $row->id, $today);
@@ -305,6 +329,19 @@ final class DuesReminders
                 $locked->update(['status' => $result->isThrottled() ? 'skipped' : 'failed', 'reason' => $result->isThrottled() ? 'provider_throttled' : 'provider_refused']);
             }
         });
+    }
+
+    private function currentContact(Tenant $tenant, string $memberId, string $channel, string $address, ?int $version): bool
+    {
+        $member = Member::withoutGlobalScopes()->where('tenant_id', $tenant->id)->find($memberId);
+        if ($member === null || $version === null || $member->access_version !== $version) {
+            return false;
+        }
+        $identity = app(\App\Services\Community\MemberIdentity::class);
+        $current = $channel === 'sms' ? $identity->normalisePhone($member->phone) : $identity->normaliseEmail($member->email);
+        $original = $channel === 'sms' ? $identity->normalisePhone($address) : $identity->normaliseEmail($address);
+
+        return $current !== null && $current === $original && ! app(\App\Services\Community\WrongNumberReports::class)->isBlocked($tenant, $channel, $address);
     }
 
     private function smsEnabled(Tenant $tenant): bool
