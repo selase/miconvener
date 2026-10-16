@@ -247,7 +247,7 @@ Also create the pending member through `MembershipJoining::submit`, run `DuesSch
 
 **Interfaces:** FollowerAudienceSource implements existing `AudienceSource::addresses(Tenant $tenant, array $selector, string $channel): iterable` and adds `contains(Tenant $tenant, array $selector, string $channel, string $address): bool`. Add audience kinds `followers` and `members_and_followers`, preserving `all_members`, `status`, `groups`, `arrears`, `event`. Member source returns no addresses for `followers`; follower source returns none for old member-only selectors. `members_and_followers` means active members plus consented active followers. Email and SMS dedupe independently; never infer a person's second contact.
 
-- [ ] Write failures for phone/email normalisation, member overlap, follower-only excluding unrelated members, Community-off Free event send, missing send permission, inactive source event, opt-out/unfollow between preview and dispatch, and follow arriving after send start. Include:
+- [x] Write failures for phone/email normalisation, member overlap, follower-only excluding unrelated members, Community-off Free event send, missing send permission, inactive source event, opt-out/unfollow between preview and dispatch, and follow arriving after send start. Include:
 
 ```php
 it('does not include members in a follower-only audience', function (): void {
@@ -258,10 +258,10 @@ it('does not include members in a follower-only audience', function (): void {
 });
 ```
 
-- [ ] Run focused files and confirm failure, then register the follower source and explicit selector dispatch. Update BOTH resolution and CommunityMessages' current member-only pre-transport `contains` check; frozen recipients are still rechecked against current consent, Following flag and event publication. Retain durable claims, exact refunds and unknown handling. Re-follow/new follow after the send snapshot is for the next announcement.
-- [ ] Add event context to message records (nullable source_event_id plus purpose `community|following_event`); event remains in its existing table. Following-event controller restricts event to this tenant's published/non-ended event, and audience to followers; review subject/body, published URL, channel costs and authority before send. Require current send permission. Expose this same record under Followers' announcement history when Community is off, including preview, detail and cancel routes. A narrow purpose check permits this record only; never bypass general Community gates.
-- [ ] Prevent arbitrary reuse of following_event purpose via Community store/edit endpoints. Reject disallowed scheduling on Free; Starter+ retains schedule access. Pause unsent announcements if the event is unpublished/cancelled or Following disabled. Existing Event blast tracking/templates stay in Event records and do not automatically announce on publish.
-- [ ] Pass follower tests, all Event blast/SMS regression tests and existing Community messaging cancellation/retry tests. Pint; commit `feat(community): announce published events to consented followers`.
+- [x] Run focused files and confirm failure, then register the follower source and explicit selector dispatch. Update BOTH resolution and CommunityMessages' current member-only pre-transport `contains` check; frozen recipients are still rechecked against current consent, Following flag and event publication. Retain durable claims, exact refunds and unknown handling. Re-follow/new follow after the send snapshot is for the next announcement.
+- [x] Add event context to message records (nullable source_event_id plus purpose `community|following_event`); event remains in its existing table. Following-event controller restricts event to this tenant's published/non-ended event, and audience to followers; review subject/body, published URL, channel costs and authority before send. Require current send permission. Expose this same record under Followers' announcement history when Community is off, including preview, detail and cancel routes. A narrow purpose check permits this record only; never bypass general Community gates.
+- [x] Prevent arbitrary reuse of following_event purpose via Community store/edit endpoints. Reject disallowed scheduling on Free; Starter+ retains schedule access. Pause unsent announcements if the event is unpublished/cancelled or Following disabled. Existing Event blast tracking/templates stay in Event records and do not automatically announce on publish.
+- [x] Pass follower tests, all Event blast/SMS regression tests and existing Community messaging cancellation/retry tests. Pint; commit `feat(community): announce published events to consented followers`.
 
 ## Task 8: Private Communities data without widening Event access
 

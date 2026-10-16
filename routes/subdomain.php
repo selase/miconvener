@@ -307,6 +307,14 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
 
+    Route::prefix('community/followers/announcements')->middleware('community.following')->name('tenant.following.announcements.')->group(function (): void {
+        Route::get('/', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'index'])->name('index');
+        Route::post('/preview', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'preview'])->name('preview');
+        Route::post('/', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'store'])->name('store');
+        Route::get('/{message}', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'show'])->name('show');
+        Route::post('/{message}/cancel', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'cancel'])->name('cancel');
+    });
+
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
     Route::middleware('community.enabled')->group(function (): void {
