@@ -243,3 +243,29 @@ it('requires an explicit separate-membership decision for a reserved phone appli
         ).toBe(true)
     );
 });
+
+it('does not link retained private history to a disabled public organisation page', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => ({
+        ok: true,
+        status: 200,
+        json: async () =>
+            String(url).endsWith('/identity')
+                ? { email: { masked: 'a•@example.test' }, phone: null }
+                : String(url).includes('/options')
+                  ? {
+                        communityEnabled: false,
+                        followingEnabled: false,
+                        requests: { claims: [], joins: [] },
+                        organisation: {
+                            slug: 'pilot',
+                            name: 'Paused organisation',
+                            about_url: 'https://pilot.example.test/community/about',
+                        },
+                        joinOptions: { enabled: false },
+                    }
+                  : { communities: { data: [] } },
+    }));
+    render(<CommunitiesPanel organiser={{ slug: 'pilot' }} initiallyOpen />);
+    await screen.findByRole('heading', { name: 'Paused organisation' });
+    expect(screen.queryByRole('link', { name: 'Public organisation page' })).toBeNull();
+});

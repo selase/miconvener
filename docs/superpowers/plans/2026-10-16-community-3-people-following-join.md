@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md`, sections 4, 6.1, 6.3, 8, 10, 13 and 13.1, including the owner's email-first safeguards agreed 2026-10-16.
 
-**Status:** Built locally on `codex/community-3`, source `a1f5540`, 2026-10-16. Awaiting owner review and remote CI before merge. No push, merge, deployment, production write or real recipient send has occurred.
+**Status:** Built locally on `codex/community-3`, backend source `a1f5540` plus final client-only link fix, 2026-10-16. Awaiting owner review and remote CI before merge. No push, merge, deployment, production write or real recipient send has occurred.
 
 **Baseline:** Deployed milestone 2 merge `b659e66`; planning branch `codex/community-3-plan` descends from the tested milestone 2 source and carries its release/pilot notes. Local `origin/main` is stale; fetch and compare before execution. Reuse the owned linked worktree at `.worktrees/artifact-completion`; leave the original `community-1a` checkout and Claude's files untouched. Create implementation branch `codex/community-3` from the reviewed planning head after reconciling any newer main changes.
 
@@ -365,7 +365,7 @@ Use the existing VerifyPrompt test setup/actual props and mocked Inertia routing
 - Permissions/seeders: reuse existing manage-members and send-community-message permissions. No new permission or role is required; independent Following remains outside Community/package gating. Existing deployment permission propagation retained.
 - Configuration: platform phone enable/caps documented in `.env.example`; phone entry defaults off, no new dependency. Sign-in uses platform allowance, never tenant credits.
 - Documentation: spec/plan/roadmap carry the approved email-first model and progress. No separate memory file is required. Existing AGENTS finance invariants retained.
-- Tests: per-task RED→GREEN, private endpoint and receipt authorization, real-worker concurrency, consent/credits and import review, React interactions. Final whole-branch gate/reviewer below remain pending.
+- Tests: per-task RED→GREEN, private endpoint and receipt authorization, real-worker concurrency, consent/credits and import review, React interactions. Final whole-branch review and local verification results are recorded below; remote CI remains pending.
 
 ### UI gap analysis
 
@@ -434,13 +434,14 @@ Post-fix browser confirmation: additive phone verification retained the email ba
 
 ## Final pre-merge evidence (2026-10-16)
 
-Source: `a1f5540` on `codex/community-3`, based on `b659e66`. Implementation plus review fixes are committed; this final evidence update changes documentation only.
+Backend source: `a1f5540` on `codex/community-3`, based on `b659e66`. The final follow-up only changes the client link, its regression test and rebuilt assets; PHP source is unchanged from the full PHP verification. Implementation, review fixes and final evidence are committed locally.
 
 - Full Unit/Feature suite: **2,844 passed, 13,638 assertions**, exit0, `PAO_DISABLE=1` with two local parallel workers;1,215.24seconds. The earlier inventory count did not represent the final parametrised run count; the actual completed report is authoritative.
 - Full Infrastructure suite, separate isolated database: **27 passed, 200 assertions**, exit0,57.29seconds. Total PHP: **2,871 passed /13,838 assertions**. Includes real session-writer/OTP/claim/follow/join/import/delivery races, `PayoutOtpFlowTest` and `finance:verify-categories` coverage.
-- Full JavaScript suite: **317 passed in46 files**, exit0. Local CLI used two workers/20-second timeout under CPU contention; repository/CI timeout was not weakened. The strengthened fourth-send consumed-token assertion also passed in the focused7-test review suite.
+- Full JavaScript suite: **318 passed in46 files**, exit0. Local CLI used two workers/20-second timeout under CPU contention; repository/CI timeout was not weakened. The strengthened fourth-send consumed-token assertion also passed in the focused7-test review suite.
 - PHPStan:0 errors, baseline unchanged. Pint passed; ESLint passed; Node24 asset build passed. All4 manifest entries point to existing tracked assets. Existing large-chunk warning remains; no dependency manifests/locks changed.
 - Browser: isolated fake-data QA only. Email/phone independence; zero historic cards before approval; two member-scoped family grants; revoking one leaves the other; pending joining; Community-off Following; Free scheduling denied; opted-out preview audience excluded; dark/light desktop/390px layout and readable fields; transient key UI/storage cleanup; additive phone verification and paused recovery/report controls after fixes. Private history responded200 with `Cache-Control: no-store, private`. No real outbound transport or payments used.
 - Fresh independent reviewer found2 Critical and6 Important issues at `4ec3b85`; all were accepted and corrected in `a1f5540`, with RED→GREEN tests and the full gates above. The reviewer did not re-review the fix commit; the implementer verified the targeted changes and final regression results. The generic recovery-download naming improvement remains a disclosed minor follow-up.
+- Final UI self-review: retained private history no longer links to an unavailable public organisation page when both Community and Following are disabled. The new regression failed before the fix and passed afterward; the complete318-test JavaScript suite, ESLint and rebuilt assets passed. Isolated browser acceptance confirmed the public link was absent while the owner’s private history remained available. No PHP source changed, so the full PHP gate was not repeated for this client-only fix.
 - Remote CI has **not** run: this branch has not been pushed or made a PR. The CI-only lock-capacity change parsed as valid YAML; container execution is to be verified on the PR before merging. Four local rebuilds were invalidated by stock PostgreSQL lock exhaustion; no shared local server setting was changed. Do not claim those failed/aborted attempts as passes.
 - Claude’s original checkout remains clean on `community-1a` at `0173494`; its `.env`, branches, uncommitted files and owner data were not modified. Production was not changed. Keep the owned worktree for review. Task11's final two release steps remain pending the owner's go-ahead.

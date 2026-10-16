@@ -320,12 +320,14 @@ export default function CommunitiesPanel({
                                 <h3 className="text-lg font-semibold text-ink">
                                     {options.organisation.name}
                                 </h3>
-                                <a
-                                    href={options.organisation.about_url}
-                                    className="text-sm text-accent underline"
-                                >
-                                    Public organisation page
-                                </a>
+                                {(options.communityEnabled || options.followingEnabled) && (
+                                    <a
+                                        href={options.organisation.about_url}
+                                        className="text-sm text-accent underline"
+                                    >
+                                        Public organisation page
+                                    </a>
+                                )}
                             </div>
                             {detail?.members?.data?.map((row) => (
                                 <article
