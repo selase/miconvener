@@ -428,10 +428,16 @@ final class NotificationGatewayService
             $sendable[] = $delivery;
         }
 
-        if ($eventAnnouncements !== []) {
-            $results += app(\App\Services\Community\EventAnnouncementDelivery::class)->sms($eventAnnouncements);
-        }
         $retryAfter = null;
+        if ($eventAnnouncements !== []) {
+            $eventResults = app(\App\Services\Community\EventAnnouncementDelivery::class)->sms($eventAnnouncements);
+            foreach ($eventResults as $result) {
+                if (($result['retry_after'] ?? null) !== null) {
+                    $retryAfter = max($retryAfter ?? 0, $result['retry_after']);
+                }
+            }
+            $results += $eventResults;
+        }
 
         foreach (collect($sendable)->groupBy('tenant_id') as $tenantId => $tenantDeliveries) {
             $tenant = Tenant::query()->find($tenantId);

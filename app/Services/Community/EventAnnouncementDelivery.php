@@ -133,7 +133,7 @@ final class EventAnnouncementDelivery
     }
 
     /** @param iterable<EventNotificationLog> $deliveries
-     * @return array<string, array{status: string, message: string, cost: int}>
+     * @return array<string, array{status: string, message: string, cost: int, retry_after?: ?int}>
      */
     public function sms(iterable $deliveries): array
     {
@@ -150,19 +150,7 @@ final class EventAnnouncementDelivery
                     return null;
                 }
                 $address = $this->preferences->normalise('sms', (string) $row->recipient_phone);
-                $blast = EventBlast::withoutGlobalScopes()->where('tenant_id', $tenant->id)->find($row->source_id);
-                $settings = TenantNotificationSetting::forTenant($tenant->id);
-                $registrationId = $row->metadata['registration_id'] ?? null;
-                if ($registrationId === null && $blast !== null) {
-                    $prefix = 'blast-sms:'.$blast->id.':';
-                    $legacyId = str_starts_with($row->dedupe_key, $prefix) ? mb_substr($row->dedupe_key, mb_strlen($prefix)) : '';
-                    $registrationId = \Illuminate\Support\Str::isUuid($legacyId) ? $legacyId : null;
-                }
-                $registration = EventRegistration::withoutGlobalScope(\App\Scopes\TenantScope::class)->where('tenant_id', $tenant->id)->find($registrationId);
-                $eligible = $blast !== null && $blast->event !== null && $registration !== null
-                    && $this->preferences->normalise('sms', (string) $registration->phone) === $address
-                    && EventBlast::audienceQuery($blast->event, $blast->audience)->whereKey($registration->id)->exists();
-                if (! $eligible || $address === null || $blast->status === EventBlast::STATUS_CANCELLED || ! $settings->canSend('sms') || ! $this->preferences->allowsMarketing($tenant, 'sms', $address)) {
+                if (! $this->smsEligible($tenant, $row)) {
                     $row->update(['status' => EventNotificationLog::STATUS_UNSUBSCRIBED]);
 
                     return null;
@@ -188,6 +176,17 @@ final class EventAnnouncementDelivery
             }
         }
         foreach (array_chunk($pending, 50, true) as $batch) {
+            foreach ($batch as $id => [$row, $tenant]) {
+                if (! $this->smsEligible($tenant->fresh(), $row)) {
+                    $this->budget->finish($tenant, $row->metadata['community_reservation_id'], SmsResult::refused('Confirmed not submitted.'));
+                    $row->update(['status' => EventNotificationLog::STATUS_UNSUBSCRIBED]);
+                    $results[$id] = ['status' => $row->status, 'message' => 'No longer eligible before submission.', 'cost' => 0];
+                    unset($batch[$id]);
+                }
+            }
+            if ($batch === []) {
+                continue;
+            }
             $messages = [];
             foreach ($batch as $id => [$row, $tenant]) {
                 $token = Crypt::decryptString($row->metadata['unsubscribe_token']);
@@ -205,13 +204,33 @@ final class EventAnnouncementDelivery
             foreach ($batch as $id => [$row, $tenant]) {
                 $result = $outcomes[$id] ?? SmsResult::unknown('Provider outcome missing.');
                 $this->budget->finish($tenant, $row->metadata['community_reservation_id'], $result);
-                $status = $result->accepted ? EventNotificationLog::STATUS_SENT : ($result->uncertain ? EventNotificationLog::STATUS_STAGED : EventNotificationLog::STATUS_FAILED);
+                $status = $result->accepted ? EventNotificationLog::STATUS_SENT : ($result->isThrottled() ? EventNotificationLog::STATUS_PENDING : ($result->uncertain ? EventNotificationLog::STATUS_STAGED : EventNotificationLog::STATUS_FAILED));
                 $row->update(['status' => $status, 'sent_at' => $result->accepted ? now() : null,
                     'metadata' => array_merge($row->metadata, ['provider_reference' => $result->providerReference, 'outcome' => $result->accepted ? 'accepted' : ($result->uncertain ? 'unknown' : 'refused')])]);
-                $results[$id] = ['status' => $status, 'message' => $result->accepted ? 'SMS accepted by provider.' : 'SMS not confirmed; see outcome.', 'cost' => 0];
+                $results[$id] = ['status' => $status, 'message' => $result->accepted ? 'SMS accepted by provider.' : 'SMS not confirmed; see outcome.', 'cost' => 0, 'retry_after' => $result->retryAfter];
             }
         }
 
         return $results;
+    }
+
+    private function smsEligible(Tenant $tenant, EventNotificationLog $row): bool
+    {
+        $address = $this->preferences->normalise('sms', (string) $row->recipient_phone);
+        $blast = EventBlast::withoutGlobalScopes()->where('tenant_id', $tenant->id)->find($row->source_id);
+        if ($address === null || $blast === null || $blast->event === null || $blast->status === EventBlast::STATUS_CANCELLED
+            || ! TenantNotificationSetting::forTenant($tenant->id)->canSend('sms') || ! $this->preferences->allowsMarketing($tenant, 'sms', $address)) {
+            return false;
+        }
+        $registrationId = $row->metadata['registration_id'] ?? null;
+        if ($registrationId === null) {
+            $prefix = 'blast-sms:'.$blast->id.':';
+            $legacyId = str_starts_with($row->dedupe_key, $prefix) ? mb_substr($row->dedupe_key, mb_strlen($prefix)) : '';
+            $registrationId = \Illuminate\Support\Str::isUuid($legacyId) ? $legacyId : null;
+        }
+        $registration = EventRegistration::withoutGlobalScope(\App\Scopes\TenantScope::class)->where('tenant_id', $tenant->id)->find($registrationId);
+
+        return $registration !== null && $this->preferences->normalise('sms', (string) $registration->phone) === $address
+            && EventBlast::audienceQuery($blast->event, $blast->audience)->whereKey($registration->id)->exists();
     }
 }

@@ -247,3 +247,30 @@ it('shows the review link only when the server grants an operator URL', async ()
         )
     ).toBe('https://example.test/messages/reconciliation');
 });
+it('does not promise future recipient selection after an empty completed send', async () => {
+    sendJson.mockResolvedValue({
+        ok: true,
+        body: {
+            message: {
+                id: 'empty',
+                subject: 'News',
+                body: 'Hello',
+                status: 'completed',
+                channels: ['email'],
+                audience: { kind: 'groups' },
+            },
+            deliveries: { data: [] },
+        },
+    });
+    render(
+        <MessageDetail
+            id="empty"
+            onClose={vi.fn()}
+            onEdit={vi.fn()}
+            onChanged={vi.fn()}
+            timezone="Africa/Accra"
+        />
+    );
+    await screen.findByText('Processing finished');
+    expect(screen.queryByText('Recipients will be selected when processing begins.')).toBeNull();
+});

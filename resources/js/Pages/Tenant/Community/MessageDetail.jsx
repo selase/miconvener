@@ -137,7 +137,9 @@ export default function MessageDetail({
                     </ul>
                     {!data.deliveries.data.length && (
                         <p className="text-sm text-ink-secondary">
-                            Recipients will be selected when processing begins.
+                            {['completed', 'partial', 'cancelled'].includes(message.status)
+                                ? 'No recipients were selected for this announcement.'
+                                : 'Recipients will be selected when processing begins.'}
                         </p>
                     )}
                     <div className="flex flex-wrap gap-3">

@@ -213,6 +213,18 @@ final class CommunityMessages
             }
         }
         if ($pending !== []) {
+            $message = $message->fresh();
+            $tenant = $tenant->fresh();
+            $actor = User::query()->find($message->sent_by);
+            $allowed = $message->status === 'sending' && $this->stillAllowed($tenant, $actor, $message);
+            foreach ($pending as $id => $delivery) {
+                if (! $allowed || ! $this->eligible($tenant, $message, $delivery)) {
+                    $this->refundUnsubmitted($tenant, $delivery);
+                    unset($pending[$id]);
+                }
+            }
+        }
+        if ($pending !== []) {
             $sms = array_map(fn ($row) => new SmsMessage($row->address, $this->smsText($tenant, $message->subject, $message->body, $row->unsubscribe_token), $row->id), array_values($pending));
             try {
                 $results = $this->transport->sms($sms);

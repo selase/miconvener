@@ -77,3 +77,19 @@ test('send preflight reports SMS budget credit and availability failures', funct
     $this->postJson(messageTestUrl(), array_replace($this->input, ['channels' => ['sms']]))->assertUnprocessable();
     expect(CommunityMessage::query()->count())->toBe(0);
 })->with(['monthly', 'credit', 'switch', 'provider']);
+
+test('cancelling between two SMS claims stops the entire unsubmitted batch', function () {
+    App\Models\Member::factory()->create(['tenant_id' => $this->tenant->id, 'phone' => '+233241234568']);
+    $message = app(App\Services\Community\CommunityMessages::class)->queue($this->tenant, $this->owner, array_replace($this->input, ['channels' => ['sms']]));
+    $service = app(App\Services\Community\CommunityMessages::class);
+    $service->dispatchDue($message->id);
+    $claims = 0;
+    App\Models\CommunityMessageDelivery::updated(function ($row) use (&$claims, $message) {
+        if ($row->wasChanged('status') && $row->status === 'claimed' && ++$claims === 2) {
+            $message->update(['status' => 'cancelled', 'cancelled_at' => now()]);
+        }
+    });
+    $service->deliver($message->id, $message->deliveries()->pluck('id')->all(), 'sms');
+    Illuminate\Support\Facades\Http::assertNothingSent();
+    expect(app(App\Services\Sms\SmsAllowance::class)->remaining($this->tenant))->toBe(100);
+});

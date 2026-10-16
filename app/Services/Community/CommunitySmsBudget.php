@@ -49,7 +49,8 @@ final class CommunitySmsBudget
 
         return $this->allowance->withLock($tenant, function () use ($tenant, $sourceType, $sourceId, $at): ?CommunitySmsReservation {
             $existing = CommunitySmsReservation::query()->where('tenant_id', $tenant->id)->where('source_type', $sourceType)->where('source_id', $sourceId)->first();
-            if ($existing !== null) {
+            $retry = $existing !== null && $sourceType === 'event_blast' && $existing->status === 'refused' && $existing->reason === 'provider_throttled';
+            if ($existing !== null && ! $retry) {
                 return $existing;
             }
             $remaining = $this->remaining($tenant, $at);
@@ -61,11 +62,16 @@ final class CommunitySmsBudget
                 return null;
             }
 
-            return CommunitySmsReservation::query()->create([
+            $reservation = $existing ?? new CommunitySmsReservation;
+            $reservation->fill([
                 'tenant_id' => $tenant->id, 'source_type' => $sourceType, 'source_id' => $sourceId,
                 'credit_receipt_id' => $receipt->id, 'credits' => 1, 'status' => 'reserved',
+                'reason' => null, 'provider_reference' => null,
                 'reserved_at' => $at, 'budget_month' => $at->setTimezone(CommunitySettings::for($tenant)->timezone)->format('Y-m'),
             ]);
+            $reservation->save();
+
+            return $reservation;
         });
     }
 

@@ -192,10 +192,10 @@ it('honors an opt-out made after scheduling', function () {
 - [x] Write failing interaction tests: Groups tab empty state, attach/remove, modal Escape/cancel; composer preview/change clears stale estimate; disabled submit/loading/errors; plan upgrade explanation; timezone confirmation; confirmation audience/channels/credits; cancel; partial/unknown delivery detail; link to superadmin resolution gated. Generic announcement copy must not expose member debts or pay tokens on shared addresses.
 - [x] Build accessible responsive forms with current design tokens/dark mode; groups on People, Messages navigation under Community, recent message summary on Overview. Hide future Followers UI; show real history even if scheduling/group entitlement later becomes read-only. Arrears option absent without finance access and backend rejects forged payload too.
 - [x] Run affected JS tests, lint, Pint and build once after UI stabilizes; commit rebuilt assets with the same UI commit.
-- [ ] Browser acceptance on isolated QA:390px+desktop, light/dark, group editing, send preview, future schedule/cancel/downgrade, unsubscribe before due, shared address dedupe, no-credit/monthly-limit messages, unknown outcome resolution using fake adapters. No real messages or payments to third parties. Check console errors and actual rendered send outcome; email acceptance is not proof of inbox delivery.
-- [ ] One final CI run: PHP four-worker suite, all JS tests, PHPStan zero/no baseline growth, Pint/lint/build, finance category verification; one fresh whole-branch reviewer. Use targeted tests during each task; no full suite per small edit. Fix new findings, repeat only affected checks until final CI.
-- [ ] Self-review every touchpoint: navigation, permissions deployment, feature metadata, retained history, scheduling/downgrade, consent, budget concurrency, unknown resolution, no new unused package, accessible states and all regression suites. Report remaining limits plainly.
-- [ ] Commit plan ticks/roadmap built evidence in implementation commits, push feature PR, get owner integration/deployment go-ahead. Main auto-deploys. Pilot only Purpledot after explicit milestone2 activation; do not change other tenants or prices.
+- [x] Browser acceptance on isolated QA:390px+desktop, light/dark, group editing, send preview, future schedule/cancel/downgrade, unsubscribe before due, shared address dedupe, no-credit/monthly-limit messages, unknown outcome resolution using fake adapters. No real messages or payments to third parties. Check console errors and actual rendered send outcome; email acceptance is not proof of inbox delivery.
+- [ ] Final CI result (recorded on the feature pull request; must be green before integration): PHP four-worker suite, all JS tests, PHPStan zero/no baseline growth, Pint/lint/build, finance category verification; one fresh whole-branch reviewer. Use targeted tests during each task; no full suite per small edit. Fix new findings, repeat only affected checks until final CI.
+- [x] Self-review every touchpoint: navigation, permissions deployment, feature metadata, retained history, scheduling/downgrade, consent, budget concurrency, unknown resolution, no new unused package, accessible states and all regression suites. Report remaining limits plainly.
+- [ ] Push feature PR and obtain owner integration/deployment go-ahead. Implementation and review evidence are committed here; the PR is the authoritative record of final CI results. Main auto-deploys. Pilot only Purpledot after explicit milestone2 activation; do not change other tenants or prices.
 
 ## Self-review of this plan
 
@@ -225,3 +225,69 @@ it('honors an opt-out made after scheduling', function () {
 - Task7 UI: Groups tab with paged incremental member selection; Messages list/composer/draft editing/history/cancel; explicit timezone, fresh audience confirmation, credit estimates, plan explanations and operator-only review link. New send permission is tenant-assignable and shared with navigation. Narrow `community:sync-message-entitlements --dry-run` / command fills only missing rows, preserves commercial terms/overrides and never enables rollout.
 - Verification in progress: affected Community287/287 (1599 assertions), extra UI/API7/7 (65 assertions), all JS295/295, lint/build, PHPStan zero. Browser isolated QA: group create/add/remove/Escape; log-only email2 accepted; draft edit, future schedule/cancel; dark390px dialog388/scroll388 and main390/scroll390, associated readable fields. No production activity.
 - Review caught and fixed preview-request inheritance incompatible with Pint final classes, unintended form submission by action buttons, and drafts incorrectly requiring send authority. Regression tests cover each. Optional local `laravel/pao` formatter hid fatal output; `PAO_DISABLE=1` exposes full results and was used for the affected Community rerun.
+
+
+### Final self-review report (2026-10-16)
+
+**Touchpoints updated**
+
+- [x] Seeders/permissions: permission definition and built-in role grants; custom-role ceiling; Inertia `auth.can`; missing-only entitlement sync. Existing deployment seeds permissions. Activation remains explicit.
+- [x] Navigation: Community Messages; People Groups; recent authorised messages on Overview; operator entry from Message delivery and gated console link.
+- [x] Tests: affected Community287/1599 assertions; UI/API7/65; all JS295; final review corrections61/223; later empty-completed-result regression10/10. Full CI status lives on the feature PR, not this snapshot.
+- [x] Config: separate milestone switch and scheduled recovery command registered. No new environment variables or dependency.
+- AGENTS.md: unchanged; existing finance/continuation rules still apply. These operational notes and roadmap hold the new commands.
+- Memory: no new personal preference or separate memory artifact required.
+- `.env.example`: unchanged; no new key.
+
+**UI gap analysis**
+
+- Discoverability, empty states and permission gating: present. Arrears history, cancellation responses and Overview also require finance access; send-only staff cannot recover counts through history.
+- Loading/errors/retry: present; sending disabled while busy and after stale/failed estimates. Form labels and keyboard dismissal work.
+- Mobile/dark: isolated QA390px main390/scroll390, composer388/scroll388; light text on dark fields with associated labels. Desktop tested at1366px.
+- History: provider acceptance is not called inbox delivery; unknown credits remain held; paid history stays visible after downgrade. Empty completed sends now say no recipients were selected, rather than promising future selection.
+
+**Solved during review**
+
+- Fresh independent review:3 Important,0 Critical,0 Minor. All reproduced with failing tests, then corrected in one pass: Event SMS429 preserves provider delay and retries with exactly one eventual debit; Community/Event SMS batches recheck cancellation/eligibility immediately before transport and refund confirmed unsubmitted units; every arrears-history touchpoint obeys finance access. Focused correction suite61/61 passes.
+- Preview request composes shared validation instead of extending a final class; explicit action-button types prevent accidental form submission; draft saves do not require send confirmation. Optional local Pao reporting was disabled for reliable test evidence.
+- Browser operator path: ordinary QA owner denied; dummy global operator recorded synthetic evidence-backed non-submission and an immutable audit entry; no resend. Local legacy admin dashboard has an unavailable Reverb websocket; no message-workflow JavaScript exception was observed.
+
+**Recommended for owner decision**
+
+- Review the feature PR and approve integration/deployment, then explicitly activate milestone2 for Purpledot only. This session does neither. Keep the real-provider pilot and operator responsibility as release gates; no external SMS or real inbox delivery is claimed by fake/log-only testing.
+
+**Not gaps / limits**
+
+- Initial scheduled jobs use the selected UTC time; lost-job recovery can take15 minutes to preserve the existing scale-to-zero schedule.
+- Real Followers integration belongs to milestone3; overlap is tested using the source contract here.
+- Generic announcements never generate personalised dues balances or pay tokens. Essential dues/service notices keep their existing path.
+- Browser QA includes create/add/remove/archive-capable group controls, draft edit, log-only email2 accepted, future schedule/cancel, a public opt-out before due processing (zero selected), shared-email estimate2 for three eligible member records, no-credit rejection, paid capability withdrawal with retained history, synthetic unknown resolution, mobile/dark and keyboard dismissal. Capability overrides were restored afterwards. Providers and production data were untouched.
+
+**Deployment handover, after owner approval only**
+
+1. Main auto-deploys. Review green PR checks and merge only after the owner agrees.
+2. Normal deploy migrations/PermissionsSeeder install schema and role permission. Run `community:sync-message-entitlements --dry-run`, inspect, then `community:sync-message-entitlements`; it fills only missing rows for these two new entitlements and never rewrites prices, commissions, existing overrides or rollout switches.
+3. Leave milestone2 off until explicitly approved; pilot `community:messages-enable purpledot` only then. Other tenants stay off. Confirm queue workers and the scheduled recovery command are healthy. Assign an application operator to investigate held outcomes using provider evidence.
+4. Rollback new sending by disabling the milestone switch; historical/audit/preference records stay intact. Do not replay unknown submissions or reverse schema containing history.
+
+### Implementation rulings (durable record)
+
+- Ruling: Follow existing React/Tailwind console rather than legacy Metronic/Blade skill guidance — current code and approved spec bind this feature — cost if wrong: visual inconsistency with legacy screens only.
+- Task1: RED routes404/classes absent; fixed mistaken test helper before GREEN13/13 + contracts11/11. Ruling: migration timestamp Oct18 follows existing Oct16/17 Community migrations — generated current-date order would precede member schema — no data change.
+- Task2 Ruling: use encrypted temporary audience rows keyed by run/channel/hash, deleted in finally and pruned hourly after expiry — persistent uniqueness gives bounded memory for enterprise audiences and source overlap; cost if wrong: extra selection writes.
+- Task2 Ruling: keep multiple random hashed unsubscribe tokens per address rather than replacing a single token — old emails must remain actionable; cost: small growing token table.
+- Task4 Ruling: source selection uses a stored member cursor and started_at cutoff in pages of100; delivery uniqueness spans pages — avoids unbounded selection jobs and excludes later joins — cost if wrong: late source changes need milestone3 paging adapter integration.
+- Task4 Ruling: a scheduled opt-out may yield zero selected delivery records (not an artificial skipped row for an ineligible address) — audience re-evaluated at send time as spec requires — cost: fewer per-address reasons for people removed before selection.
+- Task4 Ruling: initial delayed job plus15-minute recovery sweep rather than a per-minute cron — preserves production scale-to-zero wake policy while normally queueing at selected UTC time — cost: recovery after lost scheduling may take15 minutes.
+- Task4 Ruling: groups and messages share their own community_messages admin rollout override, default off, separate from Community1c — each milestone must dark-launch independently — cost: groups are not visible until milestone2 enabled.
+- Task5 Ruling: event announcement SMS also uses the shared monthly budget, including known accepted legacy event SMS in current-month accounting — otherwise Events bypasses the organisation cap — cost: existing announcement traffic can use up the cap.
+- Task5 Ruling: new event email claim table preserves EventBlastRecipient and EventNotificationLog schemas/tracking — durable replay prevention cannot safely use recipient existence alone — cost: one extra infrastructure table.
+- Task5 Ruling: prepaid reserve defaults remain strict; opt-in allowMissingLegacyFeature is used only for existing Events email paths — preserve their existing absent-entitlement behavior, never explicit withdrawals — cost: unbackfilled legacy accounts keep the same permissive behavior until feature sync.
+- Task5 Ruling: SMS payload regression assertion now requires per-address opt-out URLs through the existing Omnichannel template placeholder, still one provider request — spec requires actionable opt-outs; asserting old text would prohibit them — cost: link reduces space for announcement text within459 characters.
+- Task6 Ruling: also resolve unknown metered Community/Event email through the same audited operator screen — holding email credits without an auditable resolution would strand them — cost: additional source kinds in the operator UI, no automatic resend.
+- Task7 Ruling: add a narrow missing-only message entitlement sync command — normal deploy only seeds permissions and wholesale package seeding would overwrite commercial terms — cost: owner-approved deployment needs one extra command.
+- Task7 Ruling: expose draft updates and incremental paged group membership — saved drafts and large groups otherwise have no usable completion path — cost: two additional guarded endpoints.
+- Final: Ruling: production provider/deployment readiness not independently judged by reviewer — no real provider or production test is claimed; owner-approved pilot still required — cost: true external delivery remains unproven.
+- Final: Ruling: full suite and browser acceptance not independently reproduced by reviewer — author evidence and final CI cover these; source review is read-only — cost: no separate browser tester.
+
+Deferred minors: none.

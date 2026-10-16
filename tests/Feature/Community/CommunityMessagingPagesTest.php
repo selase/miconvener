@@ -73,3 +73,19 @@ test('saving a draft does not require send authority confirmation', function () 
     unset($input['confirm_authority']);
     $this->postJson(messageTestUrl(), $input + ['mode' => 'draft'])->assertCreated()->assertJsonPath('message.status', 'draft');
 });
+
+test('arrears history obeys finance access for JSON and console after revocation', function () {
+    $sender = App\Models\User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($sender->id);
+    setPermissionsTeamId($this->tenant->id);
+    $sender->givePermissionTo(['send community messages', 'read finance']);
+    $message = CommunityMessage::factory()->create(['tenant_id' => $this->tenant->id, 'sent_by' => $sender->id, 'audience' => ['kind' => 'arrears'], 'estimate' => ['email' => 12]]);
+    $this->actingAs($sender)->getJson(messageTestUrl('/'.$message->id))->assertOk();
+    $sender->revokePermissionTo('read finance');
+    $this->actingAs($sender->fresh())->getJson(messageTestUrl())->assertJsonCount(0, 'messages.data');
+    $this->getJson(messageTestUrl('/'.$message->id))->assertNotFound();
+    $this->postJson(messageTestUrl('/'.$message->id.'/cancel'))->assertNotFound();
+    $sender->givePermissionTo('manage members');
+    $this->actingAs($sender->fresh())->get('http://'.eventSubdomainHost('message-qa').'/community')->assertInertia(fn (Assert $page) => $page->component('Tenant/Community/Overview')->has('recentMessages', 0));
+    $this->get(messageTestUrl())->assertInertia(fn (Assert $page) => $page->component('Tenant/Community/Messages')->has('messages.data', 0));
+});

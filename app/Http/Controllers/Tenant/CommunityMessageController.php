@@ -29,6 +29,7 @@ final class CommunityMessageController extends Controller
         $tenant = $this->tenant();
         $service->authorize($tenant, $request->user());
         $messages = CommunityMessage::query()->where('tenant_id', $tenant->id)
+            ->when(! $request->user()->can('read finance'), fn ($query) => $query->where('audience->kind', '!=', 'arrears'))
             ->withCount(['deliveries', 'deliveries as accepted_count' => fn ($q) => $q->where('status', 'accepted'), 'deliveries as unknown_count' => fn ($q) => $q->where('status', 'unknown')])->latest()->paginate(30);
         if ($request->wantsJson()) {
             return response()->json(['messages' => $messages]);
@@ -60,7 +61,8 @@ final class CommunityMessageController extends Controller
     public function update(StoreMessageRequest $request, string $subdomain, string $message, CommunityMessages $service): JsonResponse
     {
         $tenant = $this->tenant();
-        $model = CommunityMessage::query()->where('tenant_id', $tenant->id)->findOrFail($message);
+        $model = CommunityMessage::query()->where('tenant_id', $tenant->id)
+            ->when(! $request->user()->can('read finance'), fn ($query) => $query->where('audience->kind', '!=', 'arrears'))->findOrFail($message);
 
         return response()->json(['message' => $service->queue($tenant, $request->user(), $request->validated(), $model)]);
     }
@@ -69,7 +71,8 @@ final class CommunityMessageController extends Controller
     {
         $tenant = $this->tenant();
         $service->authorize($tenant, $request->user());
-        $model = CommunityMessage::query()->where('tenant_id', $tenant->id)->findOrFail($message);
+        $model = CommunityMessage::query()->where('tenant_id', $tenant->id)
+            ->when(! $request->user()->can('read finance'), fn ($query) => $query->where('audience->kind', '!=', 'arrears'))->findOrFail($message);
 
         return response()->json(['message' => $model, 'deliveries' => $model->deliveries()->select(['id', 'channel', 'status', 'reason', 'provider_reference'])->paginate(50)]);
     }
@@ -89,7 +92,8 @@ final class CommunityMessageController extends Controller
     public function cancel(Request $request, string $subdomain, string $message, CommunityMessages $service): JsonResponse
     {
         $tenant = $this->tenant();
-        $model = CommunityMessage::query()->where('tenant_id', $tenant->id)->findOrFail($message);
+        $model = CommunityMessage::query()->where('tenant_id', $tenant->id)
+            ->when(! $request->user()->can('read finance'), fn ($query) => $query->where('audience->kind', '!=', 'arrears'))->findOrFail($message);
         $service->cancel($tenant, $request->user(), $model);
 
         return response()->json(['message' => $model->fresh()]);

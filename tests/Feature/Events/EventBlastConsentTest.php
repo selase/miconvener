@@ -120,3 +120,33 @@ test('a legacy queued SMS still resolves its original registration safely', func
     (new App\Jobs\Notifications\SendSmsBatchJob($this->tenant->id, [$row->id]))->handle(app(App\Services\Notifications\NotificationGatewayService::class));
     Http::assertSentCount(1);
 });
+
+test('a throttled event blast retries with one final SMS debit', function () {
+    Illuminate\Support\Facades\Queue::fake([App\Jobs\Notifications\SendSmsBatchJob::class]);
+    (new SendEventBlastJob($this->blast))->handle();
+    $row = EventNotificationLog::query()->where('channel', 'sms')->firstOrFail();
+    Http::swap(new Illuminate\Http\Client\Factory);
+    Http::fake(['messaging.test/*' => Http::sequence()->push([], 429, ['Retry-After' => '42'])->push(['data' => ['campaign_id' => 'retried']], 202)]);
+    $gateway = app(App\Services\Notifications\NotificationGatewayService::class);
+    $result = $gateway->deliverSmsBatch(collect([$row]));
+    expect($result['retry_after'])->toBe(42)->and($row->fresh()->status)->toBe(EventNotificationLog::STATUS_PENDING)
+        ->and(app(App\Services\Sms\SmsAllowance::class)->remaining($this->tenant))->toBe(10);
+    $gateway->deliverSmsBatch(collect([$row->fresh()]));
+    expect($row->fresh()->status)->toBe(EventNotificationLog::STATUS_SENT)->and(app(App\Services\Sms\SmsAllowance::class)->remaining($this->tenant))->toBe(9);
+    Http::assertSentCount(2);
+});
+
+test('event cancellation while a batch is prepared stops all its unsubmitted SMS', function () {
+    Illuminate\Support\Facades\Queue::fake([App\Jobs\Notifications\SendSmsBatchJob::class]);
+    EventRegistration::factory()->create(['tenant_id' => $this->tenant->id, 'event_id' => $this->event->id, 'phone' => '+233241234568', 'status' => EventRegistration::STATUS_CONFIRMED]);
+    (new SendEventBlastJob($this->blast))->handle();
+    $claims = 0;
+    EventNotificationLog::updated(function ($row) use (&$claims) {
+        if ($row->wasChanged('status') && $row->status === EventNotificationLog::STATUS_STAGED && ++$claims === 2) {
+            $this->blast->update(['status' => EventBlast::STATUS_CANCELLED]);
+        }
+    });
+    app(App\Services\Notifications\NotificationGatewayService::class)->deliverSmsBatch(EventNotificationLog::query()->where('channel', 'sms')->get());
+    Http::assertNothingSent();
+    expect(app(App\Services\Sms\SmsAllowance::class)->remaining($this->tenant))->toBe(10);
+});
