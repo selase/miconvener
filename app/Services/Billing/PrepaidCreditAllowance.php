@@ -66,11 +66,14 @@ abstract class PrepaidCreditAllowance
 
     /**
      * Reserve available credits, recording their exact sources for a later refund.
+     * Legacy Events may explicitly retain their missing-entitlement behavior; an
+     * existing disabled/zero feature is never bypassed. Community uses strict defaults.
      */
-    final public function reserve(Tenant $tenant, int $quantity): ?PrepaidCreditReceipt
+    final public function reserve(Tenant $tenant, int $quantity, bool $allowMissingLegacyFeature = false): ?PrepaidCreditReceipt
     {
-        return $this->withLock($tenant, function () use ($tenant, $quantity): ?PrepaidCreditReceipt {
-            if ($quantity <= 0 || ! $this->canSend($tenant, $quantity)) {
+        return $this->withLock($tenant, function () use ($tenant, $quantity, $allowMissingLegacyFeature): ?PrepaidCreditReceipt {
+            $legacy = $allowMissingLegacyFeature && ! $tenant->features()->where('feature_key', $this->feature())->exists();
+            if ($quantity <= 0 || (! $legacy && ! $this->canSend($tenant, $quantity))) {
                 return null;
             }
 

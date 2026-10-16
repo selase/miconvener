@@ -42,7 +42,9 @@ final class Kernel extends ConsoleKernel
          * for everyone until it has. This closes that window nightly instead of
          * leaving it to whoever remembers.
          */
+        $schedule->call(fn () => \App\Models\CommunityAudienceAddress::query()->where('expires_at', '<', now())->delete())->hourly()->name('community:prune-audience-previews')->withoutOverlapping();
         $schedule->command('tenants:sync-features')->dailyAt('03:45')->withoutOverlapping();
+        $schedule->command('community:messages-dispatch')->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('dues:process')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('usage:process-rollups --period=hour')->hourly();
         $schedule->command('usage:process-rollups --period=day')->daily();

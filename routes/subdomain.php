@@ -309,6 +309,22 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::middleware('community.messages')->group(function (): void {
+                Route::get('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'index'])->name('groups.index');
+                Route::post('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'store'])->name('groups.store');
+                Route::patch('groups/{group}', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'update'])->name('groups.update');
+                Route::get('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'memberOptions'])->name('groups.member-options');
+                Route::patch('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'members'])->name('groups.members.patch');
+                Route::put('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'members'])->name('groups.members');
+                Route::post('groups/{group}/archive', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'archive'])->name('groups.archive');
+                Route::get('messages', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'index'])->name('messages.index');
+                Route::post('messages/preview', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'preview'])->name('messages.preview');
+                Route::post('messages', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'store'])->name('messages.store');
+                Route::get('messages/groups', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'groups'])->name('messages.groups');
+                Route::patch('messages/{message}', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'update'])->name('messages.update');
+                Route::get('messages/{message}', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'show'])->name('messages.show');
+                Route::post('messages/{message}/cancel', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'cancel'])->name('messages.cancel');
+            });
             Route::patch('settings/reminders', [App\Http\Controllers\Tenant\DuesReminderController::class, 'updateSettings'])->name('settings.update');
             Route::get('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'preview'])->name('money.dues.remind-arrears.preview');
             Route::post('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'send'])->name('money.dues.remind-arrears');
@@ -594,3 +610,7 @@ Route::get('/slides', App\Http\Controllers\Marketing\PitchDeckController::class)
 
 Route::get('/media/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*')->name('tenant.media.show');
 Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*');
+
+// Opt-out links remain available even when Community is switched off.
+Route::get('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'show'])->middleware('throttle:30,1')->name('public.community.preferences.show');
+Route::post('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'update'])->middleware('throttle:30,1')->name('public.community.preferences.update');

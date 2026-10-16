@@ -58,6 +58,7 @@ final class HandleInertiaRequests extends Middleware
                     'read_finance' => fn (): bool => (bool) $request->user()?->can('read finance'),
                     'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),
                     'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
+                    'send_community_messages' => fn (): bool => (bool) $request->user()?->can('send community messages'),
                     'manage_members' => fn (): bool => (bool) $request->user()?->can('manage members'),
                     'manage_payment_settings' => fn (): bool => (bool) $request->user()?->can('manage payment settings'),
                     'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
@@ -78,6 +79,7 @@ final class HandleInertiaRequests extends Middleware
                     'finance' => $tenant->showsFinance(),
                     'llm_byok' => $tenant->featureEnabled('llm_byok'),
                     'community' => $tenant->communityEnabled(),
+                    'community_messages' => $tenant->communityEnabled() && $tenant->featureEnabled('community_messages'),
                     // Payouts stay in the menu while dues money is held, even with Community off.
                     'dues_payouts' => $tenant->communityEnabled() || $tenant->hasDuesMoney(),
                 ],

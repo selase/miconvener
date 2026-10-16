@@ -75,6 +75,8 @@ final class MemberController extends Controller
         $limit = $cap->limit($tenant);
 
         return Inertia::render('Tenant/Community/People', [
+            'groupsEnabled' => $tenant->featureEnabled('community_messages'),
+            'activeTab' => request('tab') === 'groups' && $tenant->featureEnabled('community_messages') ? 'groups' : 'members',
             'memberUsage' => ['count' => $count, 'limit' => $limit, 'plan' => $tenant->package->name ?? 'Free', 'over_cap' => $limit !== null && $count > $limit],
             'members' => $members,
             'membershipTypes' => MembershipType::query()

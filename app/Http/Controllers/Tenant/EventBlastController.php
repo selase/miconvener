@@ -13,7 +13,6 @@ use App\Models\TenantNotificationSetting;
 use App\Services\Sms\SmsAllowance;
 use App\Services\Tenancy\FeatureMeteringService;
 use App\Services\Tenancy\TenantContext;
-use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -86,7 +85,8 @@ final class EventBlastController extends Controller
             throw ValidationException::withMessages(['audience' => 'That audience is no longer available.']);
         }
 
-        $recipientsCount = EventBlast::audienceQuery($eventModel, $validated['audience'])->count();
+        $selector = ['kind' => 'event', 'event_id' => $eventModel->id, 'event_audience' => $validated['audience']];
+        $recipientsCount = iterator_count(app(\App\Services\Community\AudienceResolver::class)->resolve($tenant, $selector, 'email'));
 
         // A blast is the one action that can send hundreds of emails from a
         // single click, and it was the only email path that never consulted the
@@ -105,10 +105,7 @@ final class EventBlastController extends Controller
                 throw ValidationException::withMessages(['send_sms' => 'Turn on SMS in this event\'s notification settings before texting attendees.']);
             }
 
-            $phoneCount = EventBlast::audienceQuery($eventModel, $validated['audience'])
-                ->pluck('phone')
-                ->filter(fn (?string $phone): bool => PhoneNumber::toInternationalDigits($phone) !== null)
-                ->count();
+            $phoneCount = iterator_count(app(\App\Services\Community\AudienceResolver::class)->resolve($tenant, $selector, 'sms'));
             $remaining = app(SmsAllowance::class)->remaining($tenant);
 
             if ($remaining !== null && $phoneCount > $remaining) {

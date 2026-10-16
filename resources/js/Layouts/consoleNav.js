@@ -32,6 +32,13 @@ export const NAV_GROUPS = [
                 permission: 'manage_members',
             },
             {
+                label: 'Messages',
+                href: 'tenant.community.messages.index',
+                icon: 'Inbox',
+                feature: 'community_messages',
+                permission: 'send_community_messages',
+            },
+            {
                 label: 'Money',
                 href: 'tenant.community.money.dues.index',
                 icon: 'Coins',

@@ -13,6 +13,7 @@
                 </div>
             </div>
             <div class="card-body py-4">
+                <a href="{{ route('admin.messages.reconciliation.index') }}" class="btn btn-light-primary mb-5">Review uncertain outcomes</a>
                 <form method="GET" action="{{ route('admin.messages.index') }}" class="d-flex gap-3 mb-8">
                     <input type="text" name="q" value="{{ $term }}" class="form-control form-control-solid mw-450px" placeholder="ama@example.com or 024 123 4567" aria-label="Email or phone">
                     <button type="submit" class="btn btn-primary">Search</button>

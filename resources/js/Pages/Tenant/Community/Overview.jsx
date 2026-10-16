@@ -128,6 +128,7 @@ export default function Overview({
     collectedThisMonth,
     reminderSettings,
     canReadFinance = false,
+    recentMessages = null,
 }) {
     const [tab, setTab] = useState('overview');
     const [settingsForm, setSettingsForm] = useState(reminderSettings);
@@ -208,6 +209,41 @@ export default function Overview({
                                 hint="View collections, cash and current balances in Finance"
                                 href={route('tenant.finance.index')}
                             />
+                        )}
+                        {recentMessages !== null && (
+                            <section className="border border-border p-5 sm:col-span-2 xl:col-span-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <h2 className="font-semibold text-ink">Recent announcements</h2>
+                                    <Link
+                                        className="text-sm text-ink underline"
+                                        href={route('tenant.community.messages.index')}
+                                    >
+                                        View messages
+                                    </Link>
+                                </div>
+                                {recentMessages.length === 0 ? (
+                                    <p className="mt-3 text-sm text-ink-secondary">
+                                        No announcements yet. Write your first message to keep
+                                        members informed.
+                                    </p>
+                                ) : (
+                                    <ul className="mt-3 divide-y divide-border">
+                                        {recentMessages.map((message) => (
+                                            <li
+                                                className="flex flex-wrap justify-between gap-2 py-2 text-sm"
+                                                key={message.id}
+                                            >
+                                                <span className="break-words text-ink">
+                                                    {message.subject}
+                                                </span>
+                                                <span className="text-ink-secondary">
+                                                    {message.status}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </section>
                         )}
                     </div>
                 )}

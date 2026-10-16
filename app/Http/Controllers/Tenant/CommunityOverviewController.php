@@ -35,6 +35,8 @@ final class CommunityOverviewController extends Controller
 
         return Inertia::render('Tenant/Community/Overview', [
             'canReadFinance' => $canReadFinance,
+            'recentMessages' => $tenant->featureEnabled('community_messages') && auth()->user()->can('send community messages')
+                ? \App\Models\CommunityMessage::query()->where('tenant_id', $tenant->id)->when(! $canReadFinance, fn ($query) => $query->where('audience->kind', '!=', 'arrears'))->latest()->limit(3)->get(['id', 'subject', 'status', 'created_at']) : null,
             'reminderSettings' => CommunitySettings::for($tenant)->only(['reminders_enabled', 'reminder_offsets', 'frequent_digest', 'sms_monthly_limit', 'week_starts_on']),
             'counts' => [
                 'members' => Member::query()->where('tenant_id', $tenant->id)->count(),
