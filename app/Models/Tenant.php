@@ -270,6 +270,11 @@ final class Tenant extends Model
     /**
      * The Community rollout switch (`php artisan community:enable`).
      */
+    public function followingEnabled(): bool
+    {
+        return $this->featureEnabled('community_following');
+    }
+
     public function communityEnabled(): bool
     {
         return $this->featureEnabled('community');

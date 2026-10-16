@@ -80,7 +80,7 @@ New class names below are proposed implementation paths, not claims that these f
 
 **Interfaces:** `Tenant::followingEnabled(): bool`; command `community:following-enable {tenant} {--off}` follows the existing enable-command convention, is idempotent and edits only the selected rollout. Existing `manage members` manages followers/join settings/claims. Existing `send community messages` permits event announcements; no new permission unless a concrete uncovered operation requires one, then update seeder/RolePermissions together.
 
-- [ ] Write the failing matrix for Following on/off × Community on/off × Free/paid, cross-tenant source event/type and missing feature metadata. Include:
+- [x] Write the failing matrix for Following on/off × Community on/off × Free/paid, cross-tenant source event/type and missing feature metadata. Include:
 
 ```php
 it('does not couple Following to Community', function (): void {
@@ -91,9 +91,11 @@ it('does not couple Following to Community', function (): void {
 });
 ```
 
-- [ ] Run `php artisan test --compact tests/Feature/Community/FollowingRolloutTest.php`; establish failure on the absent command/contract.
-- [ ] Generate schema/classes, register middleware and share `community_following` independently. Missing-only feature registration must preserve existing tenant overrides, prices and roles. Model all new tables on the landlord connection and scope every public query explicitly by tenant.
-- [ ] Pass the matrix and permission/component contracts; Pint; commit `feat(community): add independent Following rollout and settings` with this task ticked.
+- [x] Run `php artisan test --compact tests/Feature/Community/FollowingRolloutTest.php`; establish failure on the absent command/contract.
+- [x] Generate schema/classes, register middleware and share `community_following` independently. Missing-only feature registration must preserve existing tenant overrides, prices and roles. Model all new tables on the landlord connection and scope every public query explicitly by tenant.
+- [x] Pass the matrix and permission/component contracts; Pint; commit `feat(community): add independent Following rollout and settings` with this task ticked.
+
+**Ruling:** Cross-tenant event/type validation is exercised in Tasks 5/6 where those write endpoints exist, rather than adding model-side partial public actions here. Existing manage-members/send permissions suffice; their catalog is unchanged. Migration timestamps follow existing milestone 2 migrations (already dated October 18).
 
 ## Task 2: Independent phone proof and platform-paid abuse budget
 

@@ -22,6 +22,7 @@ final class CommunitySettings extends Model
     protected $connection = 'landlord';
 
     protected $fillable = [
+        'join_mode', 'public_join_enabled', 'public_membership_type_id',
         'reminders_enabled', 'reminder_offsets', 'frequent_digest', 'sms_monthly_limit',
         'tenant_id',
         'timezone',
@@ -32,6 +33,8 @@ final class CommunitySettings extends Model
     ];
 
     protected $attributes = [
+        'join_mode' => 'approval_required',
+        'public_join_enabled' => false,
         'reminders_enabled' => true,
         'reminder_offsets' => '{"before":7,"on_day":0,"after_7":7,"after_30":30}',
         'frequent_digest' => 'daily',
@@ -43,6 +46,7 @@ final class CommunitySettings extends Model
     ];
 
     protected $casts = [
+        'public_join_enabled' => 'boolean',
         'reminders_enabled' => 'boolean',
         'reminder_offsets' => 'array',
         'sms_monthly_limit' => 'integer',
