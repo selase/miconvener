@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md`, sections 2, 4, 8, 10, 13 and 13.1. Roadmap milestone 2. Baseline `a3880c2` on main, deployed; original Claude checkout remains on `community-1a`.
 
-**Status:** Built and independently reviewed on `codex/community-2`, [PR #27](https://github.com/selase/miconvener/pull/27). Final CI is authoritative on the PR; integration and activation await owner approval. Main auto-deploys.
+**Status:** Owner approved merge; PR27 merged as `b659e66` and automatically deployed2026-10-16 03:42:42 UTC. Exact tested/merged tree equality confirmed. Milestone2 remains off for every organisation; activation awaits explicit approval. The missing-only entitlement sync is deferred to the controlled activation step.
 
 ## Global Constraints
 
@@ -196,7 +196,8 @@ it('honors an opt-out made after scheduling', function () {
 - [x] Final CI gate configured on the feature pull request (the run and authoritative results are recorded there; must be green before integration): PHP four-worker suite, all JS tests, PHPStan zero/no baseline growth, Pint/lint/build, finance category verification; one fresh whole-branch reviewer. Use targeted tests during each task; no full suite per small edit. Fix new findings, repeat only affected checks until final CI.
 - [x] Self-review every touchpoint: navigation, permissions deployment, feature metadata, retained history, scheduling/downgrade, consent, budget concurrency, unknown resolution, no new unused package, accessible states and all regression suites. Report remaining limits plainly.
 - [x] Commit/push implementation and review evidence for the feature PR; its checks are the authoritative record of final CI results.
-- [ ] Obtain owner integration/deployment go-ahead. Main auto-deploys. Pilot only Purpledot after explicit milestone2 activation; do not change other tenants or prices.
+- [x] Obtain owner integration/deployment go-ahead: owner said "merge"; PR27 merged and automatic deployment verified.
+- [ ] Obtain explicit Purpledot pilot activation approval, run the narrow entitlement sync, then activate only that organisation. Main auto-deploys. Pilot only Purpledot after explicit milestone2 activation; do not change other tenants or prices.
 
 ## Self-review of this plan
 
@@ -296,3 +297,5 @@ Deferred minors: none.
 - Final local evidence: affected correction regression61/223 assertions; full JS295 before the final one-case empty-result addition, then composer/detail10/10; PHPStan zero; Pint/lint/build clean; finance category verification exits0. One final full CI run is submitted through the feature PR. CI outcome is reported in the PR rather than triggering another full run solely to rewrite this documentation snapshot.
 
 - Full CI first run:2705 passed; one existing guard correctly rejected missing `CommunityMessage` coverage in the all-mailables render matrix. Added the actual render case (not a guard suppression); focused matrix/render checks passed. This test-only correction and updated handover trigger the final CI retry. No application or production behavior changed.
+
+- Release verification2026-10-16: deployment `depl-a2fe17c8-cad4-4bc3-8364-9eef240d4859`, SHA `b659e66ca5e51b3a32b1d81996a3511366dbb3d1`, succeeded. Seven required tables and send permission exist; rollout enabled count0. Homepage and tenant login returned200, browser homepage loaded without JavaScript errors, manifest’s production-built JS/CSS returned200 and JS contains the reviewed Messages screen and final empty-result copy. Production uses its own environment-dependent JS hashes. No runtime data changes, activation or external sends. Original Claude checkout remains clean at0173494. Release-status docs remain on the working branch for the next milestone merge, avoiding an extra documentation-only deployment.
