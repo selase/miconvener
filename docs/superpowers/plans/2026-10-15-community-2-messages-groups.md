@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md`, sections 2, 4, 8, 10, 13 and 13.1. Roadmap milestone 2. Baseline `a3880c2` on main, deployed; original Claude checkout remains on `community-1a`.
 
-**Status:** Owner approved via Proceed. Inline implementation on `codex/community-2`; no merge/deployment approval for this milestone. Task checkboxes record progress. Main auto-deploys.
+**Status:** Built and independently reviewed on `codex/community-2`, [PR #27](https://github.com/selase/miconvener/pull/27). Final CI is authoritative on the PR; integration and activation await owner approval. Main auto-deploys.
 
 ## Global Constraints
 
@@ -294,3 +294,5 @@ it('honors an opt-out made after scheduling', function () {
 Deferred minors: none.
 
 - Final local evidence: affected correction regression61/223 assertions; full JS295 before the final one-case empty-result addition, then composer/detail10/10; PHPStan zero; Pint/lint/build clean; finance category verification exits0. One final full CI run is submitted through the feature PR. CI outcome is reported in the PR rather than triggering another full run solely to rewrite this documentation snapshot.
+
+- Full CI first run:2705 passed; one existing guard correctly rejected missing `CommunityMessage` coverage in the all-mailables render matrix. Added the actual render case (not a guard suppression); focused matrix/render checks passed. This test-only correction and updated handover trigger the final CI retry. No application or production behavior changed.

@@ -26,13 +26,13 @@ Status values: `not started` → `planned` (plan written) → `in progress` → 
 
 Merge policy (owner's decision): D2 is not merged on its own. 1a, 1b and 1c land on top of it; the branch is merged to `main` when the owner says so (the spec recommends after 1a at the earliest, since 1a keeps money logic unchanged).
 
-## Next action (handover, 2026-10-15)
+## Next action (handover, 2026-10-16)
 
 - Owner approved integration after review. D2 + Community 1a + 1b + 1c are **deployed in production**, via [PR #26](https://github.com/selase/miconvener/pull/26), merge commit `6aa8900`. The merged tree exactly matches tested head `327ac1a`.
 - [Final CI](https://github.com/selase/miconvener/actions/runs/38810540132) passed both code-quality and Laravel tests on `327ac1a`. Browser acceptance completed on isolated QA: imports/reminders, Finance date filters and real CSV downloads, dues-only payment settings, existing pay links, desktop/mobile and light/dark payment fields. Independent reviews approved the implementation and final UI fixes.
 - Owner clarified that pushes/merges to `main` automatically deploy. Cloud releases `6aa8900` and `f8e7ba5` succeeded; all eight Community/dues migrations and permission seeding completed. Public homepage/login/assets returned HTTP 200; signed-out Community access redirects to login. Targeted setup added the missing `community_members` feature, four standard package caps and four tenant limit rows; existing rows, prices, commissions and other features were preserved. Purpledot was subsequently enabled alone at the owner's request; production verification confirmed exactly one enabled organisation. Other organisations remain off. Before high-volume SMS, assign an operator and auditable reconciliation workflow; keep uncertain reservations held. The plan records remaining operational and historical rollback limitations.
 - The original checkout remains on `community-1a` at `0173494`; Claude's checkout and owner Purpledot data/settlement mode remain untouched. The owned QA worktree and private acceptance artifacts are retained.
-- Milestone 2 plan was approved; inline implementation is in progress on its isolated branch; read the spec, brief and prior self-reviews/rulings first. Voids remain cancelled; rejoin starts next period; unpaid advance charges cancel on exit/lapse.
+- Milestone2 implementation and fresh review corrections are built on `codex/community-2`, [PR #27](https://github.com/selase/miconvener/pull/27). The next action is to verify its CI checks, then obtain owner approval to merge/deploy (main auto-deploys). Activation is a separate explicit decision; `community_messages` remains off in production. Read the plan’s final self-review, rulings and deployment handover. Milestone3 still needs the shared/recycled phone-number decision. Voids remain cancelled; rejoin starts next period; unpaid advance charges cancel on exit/lapse.
 
 ## How to continue
 
