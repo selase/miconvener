@@ -18,6 +18,9 @@ Route::prefix('my')->group(function (): void {
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::post('/communities/{tenantSlug}/join', [App\Http\Controllers\Public\CommunityJoinController::class, 'store'])->name('attendee.my.joins.store');
+        Route::get('/communities/{tenantSlug}/joins/{join}', [App\Http\Controllers\Public\CommunityJoinController::class, 'show'])->name('attendee.my.joins.show');
+        Route::post('/communities/{tenantSlug}/joins/{join}/credential', [App\Http\Controllers\Public\CommunityJoinController::class, 'credential'])->name('attendee.my.joins.credential');
         Route::post('/communities/{tenantSlug}/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'store'])->name('attendee.my.follow.store');
         Route::delete('/communities/{tenantSlug}/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'destroy'])->name('attendee.my.follow.destroy');
         Route::post('/communities/{tenantSlug}/wrong-number', [App\Http\Controllers\Public\CommunityWrongNumberController::class, 'store'])->name('attendee.my.wrong-number');

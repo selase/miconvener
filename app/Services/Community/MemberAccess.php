@@ -150,7 +150,7 @@ final class MemberAccess
 
     public function forget(Session $session): void
     {
-        $session->forget(['community_member_grants', 'community_claim_capabilities']);
+        $session->forget(['community_member_grants', 'community_claim_capabilities', 'community_join_capabilities']);
     }
 
     private function phoneHeld(string $tenantId, string $hash): bool

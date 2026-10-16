@@ -222,7 +222,7 @@ it('does not follow a second contact just because staff recorded it', function (
 
 **Interfaces:** `MembershipJoining::submit(Tenant $tenant, Session $session, array $input, string $requestKey): CommunityJoinRequest`; `approve(CommunityJoinRequest $request, User $actor): Member`; `reject(CommunityJoinRequest $request, User $actor, string $reason): void`; `MemberEnrollment::create(Tenant $tenant, array $validated, MemberStatusEnum $status): Member`. The actor controls type/configuration; public callers cannot set status, amount, waiver, joined date, contact ownership or charge options.
 
-- [ ] Write failures for all three modes, no active type, Community off, foreign type, pending no charges, immediate active, cap reached/downgraded, rejected/repeated requests, ambiguous contact and concurrent duplicate approval. Include:
+- [x] Write failures for all three modes, no active type, Community off, foreign type, pending no charges, immediate active, cap reached/downgraded, rejected/repeated requests, ambiguous contact and concurrent duplicate approval. Include:
 
 ```php
 it('never charges a pending member', function (): void {
@@ -235,11 +235,11 @@ it('never charges a pending member', function (): void {
 
 Also create the pending member through `MembershipJoining::submit`, run `DuesScheduler::generateFor($tenant, CarbonImmutable::today())` on an enabled active tenant, and assert zero charges for that pending member. The direct createFor check above is an existing invariant; the join-path test must be red before joining is implemented.
 
-- [ ] Run join/approval files and see failures before implementation. Add actual two-worker last-slot and duplicate-request tests on a separate race database.
-- [ ] Implement with MemberCap's tenant lock; normal pending/immediate creation consumes one slot. Approving an existing pending member adds zero slots, but explicitly block approval when the tenant is already over cap per spec; do not use `assertRoomFor($tenant, 1)` and double-count it. Lock the request/member and re-read mode/type/cap. Immediate joins use existing member hooks/dues services and default next full period; no duplicate current charge.
-- [ ] Pending rejection marks its member exited (preserve audit, no charges), allowing a future reviewed rejoin. Existing/lapsed/exited ambiguous contacts go through review without changing historic status or resuming old liabilities. Invitation-only disables public submit; staff may still add members or review existing-member claims. A successful membership approval is not approval for any other record or representative access.
-- [ ] Return only the claimant's request state with no historic match hint. Store its session capability for the basic request screen. For a newly created phone-only record, provision a recoverable credential scoped only to that record; on ambiguous review, use Task 3's independent claim instead. Do not trust caller-supplied member IDs.
-- [ ] Pass focused join/race/cap/dues-period tests; Pint; commit `feat(community): add safe joining and membership approval`.
+- [x] Run join/approval files and see failures before implementation. Add actual two-worker last-slot and duplicate-request tests on a separate race database.
+- [x] Implement with MemberCap's tenant lock; normal pending/immediate creation consumes one slot. Approving an existing pending member adds zero slots, but explicitly block approval when the tenant is already over cap per spec; do not use `assertRoomFor($tenant, 1)` and double-count it. Lock the request/member and re-read mode/type/cap. Immediate joins use existing member hooks/dues services and default next full period; no duplicate current charge.
+- [x] Pending rejection marks its member exited (preserve audit, no charges), allowing a future reviewed rejoin. Existing/lapsed/exited ambiguous contacts go through review without changing historic status or resuming old liabilities. Invitation-only disables public submit; staff may still add members or review existing-member claims. A successful membership approval is not approval for any other record or representative access.
+- [x] Return only the claimant's request state with no historic match hint. Store its session capability for the basic request screen. For a newly created phone-only record, provision a recoverable credential scoped only to that record; on ambiguous review, use Task 3's independent claim instead. Do not trust caller-supplied member IDs.
+- [x] Pass focused join/race/cap/dues-period tests; Pint; commit `feat(community): add safe joining and membership approval`.
 
 ## Task 7: Follower audiences and reviewed event announcements
 

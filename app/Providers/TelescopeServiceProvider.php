@@ -63,7 +63,7 @@ final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
     private function hideSensitiveRequestDetails(): void
     {
         Telescope::hideRequestParameters(['_token', 'code', 'secret', 'capability', 'community_verified_phone',
-            'community_member_grants', 'community_claim_capabilities', 'attendee_verified_platform',
+            'community_member_grants', 'community_claim_capabilities', 'community_join_capabilities', 'attendee_verified_platform',
             'attendee_checkout_grants', 'attendee_registered_in_session']);
         Telescope::hideRequestHeaders(['cookie', 'x-csrf-token', 'x-xsrf-token']);
     }

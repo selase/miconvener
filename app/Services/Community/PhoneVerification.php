@@ -156,6 +156,6 @@ final class PhoneVerification
 
     public function forget(Session $session): void
     {
-        $session->forget([self::SESSION_KEY, 'community_member_grants', 'community_claim_capabilities']);
+        $session->forget([self::SESSION_KEY, 'community_member_grants', 'community_claim_capabilities', 'community_join_capabilities']);
     }
 }

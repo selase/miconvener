@@ -99,15 +99,10 @@ final class MemberController extends Controller
         $tenant = $this->getTenant();
         $cap = app(MemberCap::class);
         try {
-            $member = $cap->withLock($tenant, function () use ($request, $tenant, $cap): Member {
+            $member = $cap->withLock($tenant, function () use ($request, $tenant): Member {
                 app(MemberIdentity::class)->assertUnique($tenant, $request->validated());
-                $cap->assertRoomFor($tenant, 1);
 
-                return Member::query()->create([
-                    ...$request->validated(),
-                    'tenant_id' => $tenant->id,
-                    'status' => MemberStatusEnum::Active,
-                ]);
+                return app(\App\Services\Community\MemberEnrollment::class)->create($tenant, $request->validated(), MemberStatusEnum::Active);
             });
         } catch (DomainException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);

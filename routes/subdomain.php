@@ -311,6 +311,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::get('people/joins', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'index'])->name('joins.index');
+            Route::post('people/joins/{join}/approve', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'approve'])->name('joins.approve');
+            Route::post('people/joins/{join}/reject', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'reject'])->name('joins.reject');
+            Route::patch('settings/joining', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'settings'])->name('joining.settings');
             Route::post('access/reports/{report}/resolve', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'resolve'])->name('reports.resolve');
             Route::post('access/credentials/{credential}/revoke', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'revokeCredential'])->name('credentials.revoke');
             Route::get('access/reports', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'index'])->name('reports.index');
