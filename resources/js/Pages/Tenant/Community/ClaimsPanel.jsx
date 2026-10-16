@@ -13,14 +13,15 @@ const QUEUES = {
 
 function ReviewModal({ review, membershipTypes = [], onClose, onSaved }) {
     const kind = review.kind;
+    const needsDistinct =
+        review.row.status === 'review_required' ||
+        (review.row.channel === 'sms' && !review.row.member_id);
     const initialAction =
         kind === 'report'
             ? 'confirm'
             : kind === 'resolve'
               ? 'resolve'
-              : kind === 'join' &&
-                  review.row.status === 'review_required' &&
-                  review.row.channel === 'email'
+              : kind === 'join' && needsDistinct && review.row.channel === 'email'
                 ? 'reject'
                 : 'approve';
     const [form, setForm] = useState({
@@ -71,8 +72,7 @@ function ReviewModal({ review, membershipTypes = [], onClose, onSaved }) {
     }, [kind, search, form.action]);
     const needsMethod = (kind === 'claim' && form.action === 'approve') || kind === 'resolve';
     const needsMember = kind === 'claim' && form.action === 'approve';
-    const distinct =
-        kind === 'join' && review.row.status === 'review_required' && form.action === 'approve';
+    const distinct = kind === 'join' && needsDistinct && form.action === 'approve';
     const canSave =
         form.reason.trim().length >= 10 &&
         (!needsMethod || form.method) &&
@@ -175,7 +175,7 @@ function ReviewModal({ review, membershipTypes = [], onClose, onSaved }) {
                                         value="approve"
                                         disabled={
                                             kind === 'join' &&
-                                            review.row.status === 'review_required' &&
+                                            needsDistinct &&
                                             review.row.channel === 'email'
                                         }
                                     >
@@ -243,15 +243,12 @@ function ReviewModal({ review, membershipTypes = [], onClose, onSaved }) {
                             ))}
                         </Select>
                     )}
-                    {kind === 'join' &&
-                        review.row.status === 'review_required' &&
-                        review.row.channel === 'email' && (
-                            <p className="text-sm text-ink-secondary">
-                                The email already identifies a membership. Review the existing
-                                record or ask the applicant to correct the contact; do not duplicate
-                                its history.
-                            </p>
-                        )}
+                    {kind === 'join' && needsDistinct && review.row.channel === 'email' && (
+                        <p className="text-sm text-ink-secondary">
+                            The email already identifies a membership. Review the existing record or
+                            ask the applicant to correct the contact; do not duplicate its history.
+                        </p>
+                    )}
                     {distinct && (
                         <label className="flex items-start gap-2 text-sm text-ink">
                             <input

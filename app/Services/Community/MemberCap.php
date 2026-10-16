@@ -43,9 +43,13 @@ final class MemberCap
 
     public function counted(Tenant $tenant): int
     {
-        return Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)
+        $members = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)
             ->whereIn('status', [MemberStatusEnum::Pending, MemberStatusEnum::Active, MemberStatusEnum::Lapsed])
             ->count();
+
+        return $members + \App\Models\CommunityJoinRequest::withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenant->id)->where('channel', 'sms')->whereNull('member_id')
+            ->whereIn('status', ['pending', 'review_required'])->count();
     }
 
     /** Call inside withLock(), keeping the check and all additions in its transaction. */

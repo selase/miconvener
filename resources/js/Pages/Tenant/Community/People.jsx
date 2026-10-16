@@ -337,8 +337,8 @@ export default function People({
                         {memberUsage && (
                             <p className="mb-4 text-sm text-ink-secondary">
                                 {memberUsage.limit === null
-                                    ? `${memberUsage.count.toLocaleString()} members · Unlimited`
-                                    : `${memberUsage.count.toLocaleString()} of ${memberUsage.limit.toLocaleString()} members`}
+                                    ? `${memberUsage.count.toLocaleString()} member slots · Unlimited`
+                                    : `${memberUsage.count.toLocaleString()} of ${memberUsage.limit.toLocaleString()} member slots (including pending requests)`}
                             </p>
                         )}
                         {atCap && (

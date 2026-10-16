@@ -108,9 +108,11 @@ export default function Join({
                 </label>
             )}
             <p className="text-xs text-ink-secondary">
-                {joinOptions.mode === 'immediate'
-                    ? 'New memberships can be approved immediately; some requests need a separate review.'
-                    : 'The organisation must approve your membership before dues or member benefits begin.'}{' '}
+                {channel === 'sms'
+                    ? 'Phone applications always await review to protect people with shared or reassigned numbers.'
+                    : joinOptions.mode === 'immediate'
+                      ? 'New memberships can be approved immediately; some requests need a separate review.'
+                      : 'The organisation must approve your membership before dues or member benefits begin.'}{' '}
                 Joining does not subscribe you to announcements.
             </p>
             <button

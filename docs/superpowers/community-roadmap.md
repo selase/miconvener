@@ -44,7 +44,7 @@ Merge policy (owner's decision): D2 is not merged on its own. 1a, 1b and 1c land
 1. Read the spec, then the next milestone's plan (or brief).
 2. Work on that milestone's branch. Never on `main`.
 3. Follow the plan's tasks in order. **Tick each `- [ ]` step in the plan file in the same commit as the work**, so progress is visible in git to every agent. Add a short `Ruling:` line under a step when you deviate from the plan, with why.
-4. Before marking a milestone `built`: full suite (`php artisan test --parallel --processes=4 --compact`), `vendor/bin/pint --dirty`, phpstan (0 errors, baseline must not grow), `npm run lint`, `npm run test`, `npm run build`, and one review of the whole branch by a fresh reviewer.
+4. Before marking a milestone `built`: full suite (CI: `php artisan test --parallel --processes=4 --compact`; on this Mac use two workers because four schema rebuilds exceed the stock PostgreSQL lock table), `vendor/bin/pint --dirty`, phpstan (0 errors, baseline must not grow), `npm run lint`, `npm run test`, `npm run build`, and one review of the whole branch by a fresh reviewer.
 5. Update the status table here, with the commit as evidence.
 6. For a milestone that only has a brief: write its plan first (superpowers writing-plans format: header, Global Constraints, Review Focus, tasks with failing tests first), save it under `plans/`, link it here, set status `planned`, and get the owner's review before building.
 
@@ -115,3 +115,5 @@ Each brief is enough to write the plan from. Write the plan against the code as 
 ## Decisions log
 
 Decisions live in spec section 3 and the plans' `Ruling:` lines. Add any new owner decision to the spec in the same commit that relies on it.
+
+Local test resource note (M3): database suites share the cluster-wide PostgreSQL lock table even when their database names differ. Do not overlap a full parallel suite with refreshing/race suites. CI provisions its disposable service with `max_locks_per_transaction=256` for four workers; do not change/restart the owner’s shared local database server merely to match CI worker count.

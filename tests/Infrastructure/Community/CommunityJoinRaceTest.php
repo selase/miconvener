@@ -26,15 +26,18 @@ it('serialises the final slot duplicate joins and duplicate approval across actu
     $type = MembershipType::factory()->create(['tenant_id' => $tenant->id]);
     CommunitySettings::for($tenant)->fill(['public_join_enabled' => true, 'public_membership_type_id' => $type->id])->save();
     $key = (string) Str::uuid();
-    if ($mode === 'approve') {
+    if (in_array($mode, ['approve', 'approve_phone'], true)) {
         $session = app('session.store');
         $session->put(PlatformAttendeeVerification::SESSION_KEY, ['email' => 'join@example.test', 'expires_at' => now()->addHour()->timestamp]);
-        $key = app(MembershipJoining::class)->submit($tenant, $session, ['name' => 'Applicant', 'channel' => 'email'], $key)->id;
+        if ($mode === 'approve_phone') {
+            $session->put(App\Services\Community\PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
+        }
+        $key = app(MembershipJoining::class)->submit($tenant, $session, ['name' => 'Applicant', 'channel' => $mode === 'approve_phone' ? 'sms' : 'email'], $key)->id;
     }
     $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
     $workers = [];
     foreach ([0, 1] as $index) {
-        $workers[] = new Process([PHP_BINARY, base_path('tests/Fixtures/community/joining-worker.php'), $tenant->id, $mode, $mode === 'last_slot' ? 'join'.$index.'@example.test' : 'join@example.test', $mode === 'last_slot' ? (string) Str::uuid() : $key, (string) $owner->id], base_path(), $environment);
+        $workers[] = new Process([PHP_BINARY, base_path('tests/Fixtures/community/joining-worker.php'), $tenant->id, $mode === 'approve_phone' ? 'approve' : $mode, $mode === 'last_slot' ? 'join'.$index.'@example.test' : 'join@example.test', $mode === 'last_slot' ? (string) Str::uuid() : $key, (string) $owner->id], base_path(), $environment);
     }
     $connection = DB::connection('landlord');
     $connection->beginTransaction();
@@ -75,4 +78,4 @@ it('serialises the final slot duplicate joins and duplicate approval across actu
             }
         }
     }
-})->with(['last_slot', 'duplicate', 'approve']);
+})->with(['last_slot', 'duplicate', 'approve', 'approve_phone']);

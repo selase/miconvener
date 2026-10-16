@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import csrfFetch from '@/lib/csrfFetch';
 import VerifyPrompt from './VerifyPrompt';
+import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
 import CommunitiesPanel from '@/Pages/Public/Community/CommunitiesPanel';
 import RecoveryCredential from '@/Pages/Public/Community/RecoveryCredential';
 import NeedsAttentionSection from './components/NeedsAttentionSection';
@@ -34,6 +35,7 @@ export default function MyPortal({
     initialContributions = null,
 }) {
     const [phoneVerified, setPhoneVerified] = useState(phoneAtLoad);
+    const [phoneEntry, setPhoneEntry] = useState(false);
     const [credential, setCredential] = useState(null);
     const [communityVersion, setCommunityVersion] = useState(0);
     const [verifiedEmail, setVerifiedEmail] = useState(provenAtLoad);
@@ -170,6 +172,7 @@ export default function MyPortal({
         }
         if (channel === 'phone') {
             setPhoneVerified(true);
+            setPhoneEntry(false);
             if (phoneOrganiser && !selectedOrganiser) {
                 setSelectedOrganiser({ slug: phoneOrganiser, name: phoneOrganiser });
                 const url = new URL(window.location.href);
@@ -335,6 +338,29 @@ export default function MyPortal({
                     >
                         Continue to organisation
                     </a>
+                )}
+                {verifiedEmail && !phoneVerified && (
+                    <section className="mb-6 space-y-4 rounded-lg border border-border bg-surface p-4">
+                        {phoneEntry ? (
+                            <PhoneVerify
+                                organiserSlug={selectedOrganiser?.slug}
+                                onVerified={handleVerified}
+                                onUseEmail={() => setPhoneEntry(false)}
+                            />
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setPhoneEntry(true)}
+                                className="text-sm font-medium text-accent underline"
+                            >
+                                Verify a phone number
+                            </button>
+                        )}
+                        <p className="text-xs text-ink-secondary">
+                            Keep your email sign-in and add independent phone verification for
+                            membership recovery. This does not link other people or event records.
+                        </p>
+                    </section>
                 )}
                 {verifiedEmail ? (
                     <div className="space-y-8">

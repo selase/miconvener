@@ -42,6 +42,7 @@ final class MembershipJoining
             }
             $recent = CommunityJoinRequest::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->where('channel', $channel)->where('address_hash', $hash)->where('submitted_at', '>=', now()->subDay())->count();
             abort_if($recent >= 5, 429, 'Please try again later.');
+            $this->cap->assertRoomFor($tenant, 1);
             $identity = app(MemberIdentity::class);
             $matches = false;
             foreach (Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->select(['email', 'phone'])->cursor() as $candidate) {
@@ -52,17 +53,17 @@ final class MembershipJoining
                 }
             }
             $member = null;
-            if (! $matches) {
+            if ($channel === 'email' && ! $matches) {
                 $member = $this->enrollment->create($tenant, ['name' => $name, 'membership_type_id' => $configuration['type']->id,
-                    $channel === 'email' ? 'email' : 'phone' => $address], $configuration['settings']->join_mode === 'immediate' ? MemberStatusEnum::Active : MemberStatusEnum::Pending);
+                    'email' => $address], $configuration['settings']->join_mode === 'immediate' ? MemberStatusEnum::Active : MemberStatusEnum::Pending);
             }
-            if ($member !== null && ! app(Following::class)->isFollowing($tenant, $session, $channel)) {
-                app(MessagingPreferences::class)->disableMarketing($tenant, $channel, $address);
+            if ($member !== null) {
+                $this->preserveExplicitConsent($tenant, $channel, $address);
             }
             $capability = bin2hex(random_bytes(32));
             $row = CommunityJoinRequest::query()->create(['tenant_id' => $tenant->id, 'channel' => $channel, 'address' => $address, 'address_hash' => $hash, 'request_key' => $requestKey,
                 'submitted_name' => $name, 'membership_type_id' => $configuration['type']->id, 'member_id' => $member?->id, 'member_access_version' => $member?->access_version,
-                'status' => $member === null ? 'review_required' : ($member->status === MemberStatusEnum::Active ? 'approved' : 'pending'),
+                'status' => $member === null ? ($channel === 'sms' && ! $matches ? 'pending' : 'review_required') : ($member->status === MemberStatusEnum::Active ? 'approved' : 'pending'),
                 'capability_hash' => hash('sha256', $capability), 'submitted_at' => now()]);
             $session->put('community_join_capabilities.'.$row->id, $capability);
 
@@ -93,21 +94,26 @@ final class MembershipJoining
             if ($limit !== null && $this->cap->counted($tenant) > $limit) {
                 throw new DomainException('The organisation is over its member limit.');
             }
+            $newUnambiguous = false;
             if ($member === null) {
+                $newUnambiguous = $row->channel === 'sms' && $row->status === 'pending' && app(MemberIdentity::class)->candidates($tenant, $row->submitted_name, $row->address, null) === [];
                 if ($row->channel === 'email' && app(MemberIdentity::class)->candidates($tenant, $row->submitted_name, null, $row->address) !== []) {
                     throw ValidationException::withMessages(['create_distinct' => 'This email already identifies a membership. Review that record or correct the contact instead of creating a duplicate.']);
                 }
                 if (! $createDistinct || mb_strlen(mb_trim($reason ?? '')) < 10) {
                     throw ValidationException::withMessages(['create_distinct' => 'Review the contact ambiguity and explicitly confirm a separate new membership. Existing records need the independent claim process.']);
                 }
+                // Release the request's reservation inside the same cap transaction.
+                $row->update(['status' => 'approved']);
                 $member = $this->enrollment->create($tenant, ['name' => $row->submitted_name, 'membership_type_id' => $type->id, $row->channel === 'email' ? 'email' : 'phone' => $row->address], MemberStatusEnum::Active);
+                $this->preserveExplicitConsent($tenant, $row->channel, $row->address);
             } else {
                 if ($member->status !== MemberStatusEnum::Pending) {
                     throw new DomainException('This member is no longer awaiting approval.');
                 }
                 $member->update(['membership_type_id' => $type->id, 'status' => MemberStatusEnum::Active]);
             }
-            $row->update(['member_id' => $member->id, 'status' => 'approved', 'reviewed_by' => $actor->id, 'review_reason' => $reason, 'reviewed_at' => now()]);
+            $row->update(['member_id' => $member->id, 'member_access_version' => $newUnambiguous ? $member->access_version : $row->member_access_version, 'status' => 'approved', 'reviewed_by' => $actor->id, 'review_reason' => $reason, 'reviewed_at' => now()]);
             CommunityAccessAudit::query()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'actor_id' => $actor->id, 'action' => 'joining_approved', 'method' => $createDistinct ? 'create_distinct' : 'staff_review', 'reason' => $reason.($type->id !== $row->membership_type_id ? ' Requested type '.$row->membership_type_id.'; approved type '.$type->id.'.' : '')]);
 
             return $member;
@@ -156,7 +162,9 @@ final class MembershipJoining
     public function credential(Session $session, CommunityJoinRequest $request): array
     {
         return $this->cap->withLock(Tenant::findOrFail($request->tenant_id), function () use ($session, $request): array {
-            $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $request->tenant_id)->lockForUpdate()->findOrFail($request->member_id);
+            $current = CommunityJoinRequest::withoutGlobalScope(TenantScope::class)->where('tenant_id', $request->tenant_id)->findOrFail($request->id);
+            abort_unless($this->owns($session, $current) && $current->channel === 'sms' && $current->status === 'approved' && $current->member_id !== null, 404);
+            $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $request->tenant_id)->lockForUpdate()->findOrFail($current->member_id);
             $row = CommunityJoinRequest::withoutGlobalScope(TenantScope::class)->lockForUpdate()->findOrFail($request->id);
             abort_unless($this->owns($session, $row) && $row->channel === 'sms' && $row->member_access_version !== null && $row->member_access_version === $member->access_version
                 && $row->credential_issued_at === null && $row->status === 'approved' && $member->tenant->communityEnabled(), 404);
@@ -174,5 +182,16 @@ final class MembershipJoining
             'sms' => app(PhoneVerification::class)->verifiedPhone($session),
             default => throw ValidationException::withMessages(['channel' => 'Choose email or SMS.']),
         };
+    }
+
+    private function preserveExplicitConsent(Tenant $tenant, string $channel, string $address): void
+    {
+        $preferences = app(MessagingPreferences::class);
+        $following = \App\Models\CommunityFollower::withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenant->id)->where('channel', $channel)
+            ->where('address_hash', $preferences->hash($channel, $address))->whereNull('unfollowed_at')->exists();
+        if (! $following) {
+            $preferences->disableMarketing($tenant, $channel, $address);
+        }
     }
 }

@@ -128,3 +128,25 @@ it('searches only current-tenant published non-ended announcement events includi
     Event::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Search Draft', 'ends_at' => now()->addDay()]);
     $this->getJson($this->url.'/events?search=Search')->assertOk()->assertJsonCount(1, 'events.data')->assertJsonPath('events.data.0.id', $this->event->id);
 });
+
+it('pauses soft-deleted source events before dispatch and immediately before transport', function (bool $afterClaim): void {
+    $this->postJson($this->url, $this->input)->assertCreated();
+    $message = CommunityMessage::firstOrFail();
+    $service = app(CommunityMessages::class);
+    if ($afterClaim) {
+        $service->dispatchDue($message->id);
+        $event = $this->event;
+        App\Models\CommunityMessageDelivery::updated(function ($delivery) use ($event): void {
+            if ($delivery->wasChanged('status') && $delivery->status === 'claimed') {
+                $event->delete();
+            }
+        });
+        $service->deliver($message->id, [$message->deliveries()->firstOrFail()->id], 'email');
+        expect($message->deliveries()->firstOrFail()->status)->toBe('skipped');
+    } else {
+        $this->event->delete();
+        $service->dispatchDue($message->id);
+        expect($message->fresh()->status)->toBe('paused');
+    }
+    Mail::assertNothingSent();
+})->with([false, true]);

@@ -497,7 +497,7 @@ export default function CommunitiesPanel({
                                     )}
                                 </div>
                             ))}
-                            {options.communityEnabled && (
+                            {identity?.phone && (
                                 <MemberClaim
                                     key={selected}
                                     allowRequests={options.communityEnabled}

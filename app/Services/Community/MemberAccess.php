@@ -63,7 +63,7 @@ final class MemberAccess
         if ($credential === null || $member === null || ! $this->valid($credential, $member, $phone) || ! Hash::check($secret, $credential->secret_hash)) {
             return false;
         }
-        $session->regenerate();
+        $session->regenerate(true);
         $session->put('community_member_grants.'.$credential->id, ['version' => $credential->version]);
 
         return true;
@@ -105,7 +105,7 @@ final class MemberAccess
                 'member_access_version' => $locked->access_version, 'approved_by' => $actor?->id, 'method' => $method, 'approved_at' => now()]);
             CommunityAccessAudit::query()->create(['tenant_id' => $locked->tenant_id, 'member_id' => $locked->id, 'actor_id' => $actor?->id, 'action' => 'credential_issued', 'method' => $method]);
             $session->put('community_member_grants.'.$credential->id, ['version' => 1]);
-            $session->regenerate();
+            $session->regenerate(true);
 
             return ['selector' => $credential->id, 'secret' => $secret];
         });

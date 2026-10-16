@@ -19,7 +19,8 @@ echo "READY\n";
 flush();
 try {
     if ($argv[2] === 'approve') {
-        app(MembershipJoining::class)->approve(CommunityJoinRequest::withoutGlobalScopes()->findOrFail($argv[4]), User::findOrFail($argv[5]));
+        $request = CommunityJoinRequest::withoutGlobalScopes()->findOrFail($argv[4]);
+        app(MembershipJoining::class)->approve($request, User::findOrFail($argv[5]), $request->channel === 'sms', 'Independent QA check of the new phone applicant.');
     } else {
         app(MembershipJoining::class)->submit($tenant, $session, ['name' => 'Applicant', 'channel' => 'email'], $argv[4]);
     }

@@ -95,7 +95,7 @@ test('a duplicate name and phone in the same organisation is rejected, the same 
         ->assertCreated();
 });
 
-test('an email already used by a member without a phone is rejected, but is fine next to a phone', function () {
+test('an email already used by another member is rejected even alongside a phone', function () {
     [$tenant, $user, $class] = duesMembersTenant();
     Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'email' => 'taken@example.com', 'phone' => null]);
     Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'email' => 'shared@example.com', 'phone' => '0244000009']);
@@ -106,7 +106,8 @@ test('an email already used by a member without a phone is rejected, but is fine
         ->assertUnprocessable()->assertJsonValidationErrors(['email']);
     $this->actingAs($user)->withServerVariables($host)
         ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => 'shared@example.com', 'phone' => '0244000010']))
-        ->assertCreated();
+        ->assertUnprocessable()->assertJsonValidationErrors(['email']);
+    expect(Member::where('tenant_id', $tenant->id)->count())->toBe(2);
 });
 
 test('an admin updates a member, keeping their own phone and email', function () {

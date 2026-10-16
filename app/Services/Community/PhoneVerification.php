@@ -135,7 +135,7 @@ final class PhoneVerification
             if ($old !== null && $old !== $normalised) {
                 $session->forget('community_member_grants');
             }
-            $session->regenerate();
+            $session->regenerate(true);
             $session->put(self::SESSION_KEY, ['phone' => $normalised, 'verified_at' => now()->timestamp, 'expires_at' => now()->addHours(12)->timestamp]);
         }
 

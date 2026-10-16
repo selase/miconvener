@@ -27,6 +27,12 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                 sitekey: challenge.site_key,
                 action: challenge.action,
                 callback: setToken,
+                'expired-callback': () => {
+                    setToken(null);
+                    setMessage(
+                        'The challenge expired. Complete a fresh challenge before resending.'
+                    );
+                },
                 'error-callback': () =>
                     setMessage(
                         'The verification challenge could not load. Try again or use email.'
@@ -78,6 +84,10 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                 return;
             }
             if (!response.ok) {
+                if (data.status === 'challenge_failed' && challenge) {
+                    setToken(null);
+                    setChallenge({ ...challenge });
+                }
                 setMessage(
                     Object.values(data.errors ?? {}).flat()[0] ??
                         data.message ??
@@ -85,6 +95,8 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                 );
                 return;
             }
+            setChallenge(null);
+            setToken(null);
             setSent(true);
             setCode('');
             setWait(60);
@@ -156,7 +168,6 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                             className="mt-2 block w-full rounded-md border border-border bg-surface px-3 py-2 text-ink"
                         />
                     </label>
-                    {challenge && <div ref={challengeElement} />}
                     <button
                         disabled={busy || wait > 0 || (challenge && !token)}
                         type="submit"
@@ -195,7 +206,7 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                         </button>
                         <button
                             type="button"
-                            disabled={busy || wait > 0}
+                            disabled={busy || wait > 0 || (challenge && !token)}
                             onClick={send}
                             className="text-sm font-medium text-accent underline disabled:opacity-50"
                         >
@@ -217,6 +228,7 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                     </button>
                 </form>
             )}
+            {challenge && <div ref={challengeElement} aria-label="Phone verification challenge" />}
             {message && (
                 <p role="status" className="text-sm text-ink-secondary">
                     {message}

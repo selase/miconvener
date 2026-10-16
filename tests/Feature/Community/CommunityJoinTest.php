@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
 beforeEach(function (): void {
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
     Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
-    [$this->tenant] = eventHost('join-qa');
+    [$this->tenant, $this->owner] = eventHost('join-qa');
     Artisan::call('community:enable', ['tenant' => $this->tenant->slug]);
     $this->type = MembershipType::factory()->create(['tenant_id' => $this->tenant->id]);
     CommunitySettings::for($this->tenant)->fill(['public_join_enabled' => true, 'public_membership_type_id' => $this->type->id])->save();
@@ -94,6 +94,9 @@ it('offers a phone recovery credential only once for a newly approved unambiguou
     CommunitySettings::for($this->tenant)->update(['join_mode' => 'immediate']);
     $service = app(MembershipJoining::class);
     $row = $service->submit($this->tenant, $this->session, ['name' => 'New Person', 'channel' => 'sms'], (string) Str::uuid());
+    expect($row->status)->toBe('pending');
+    $service->approve($row, $this->owner, true, 'Independently confirmed this new phone applicant.');
+    $row->refresh();
     $credential = $service->credential($this->session, $row);
     expect($credential)->toHaveKeys(['selector', 'secret'])->and(app(App\Services\Community\MemberAccess::class)->canView($this->session, Member::findOrFail($row->member_id)))->toBeTrue();
     expect(fn () => $service->credential($this->session, $row))->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class);
@@ -131,4 +134,43 @@ it('does not silently opt a newly active joining address into marketing', functi
     app(MembershipJoining::class)->submit($this->tenant, $this->session, ['name' => 'Applicant', 'channel' => 'email'], (string) Str::uuid());
     $addresses = iterator_to_array(app(App\Services\Community\AudienceResolver::class)->resolve($this->tenant, ['kind' => 'all_members'], 'email'));
     expect(count($addresses))->toBe($alreadyFollowing ? 1 : 0);
+})->with([false, true]);
+
+it('keeps phone join responses and recovery eligibility uniform for old and new numbers in immediate mode', function (bool $historic): void {
+    CommunitySettings::for($this->tenant)->update(['join_mode' => 'immediate']);
+    if ($historic) {
+        Member::factory()->create(['tenant_id' => $this->tenant->id, 'phone' => '+233241234567']);
+    }
+    $this->session->forget(PlatformAttendeeVerification::SESSION_KEY);
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
+    $base = 'http://'.mb_ltrim((string) config('session.domain'), '.').'/my/communities/'.$this->tenant->slug;
+    $response = $this->withSession($this->session->all())->postJson($base.'/join', ['name' => 'My supplied name', 'channel' => 'sms', 'request_key' => (string) Str::uuid()])->assertCreated()->assertJsonPath('request.status', 'pending');
+    $id = $response->json('request.id');
+    $this->getJson($base.'/joins/'.$id)->assertOk()->assertJsonPath('request.status', 'pending');
+    $this->postJson($base.'/joins/'.$id.'/credential')->assertNotFound();
+    $this->getJson($base)->assertNotFound();
+})->with([false, true]);
+it('does not distinguish historic phone matches through the public cap response', function (bool $historic): void {
+    $this->tenant->features()->create(['feature_key' => 'community_members', 'enabled' => true, 'meta' => ['type' => 'limit', 'value' => 1]]);
+    Member::factory()->create(['tenant_id' => $this->tenant->id, 'phone' => $historic ? '+233241234567' : '+233241234568']);
+    $this->session->forget(PlatformAttendeeVerification::SESSION_KEY);
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
+    $base = 'http://'.mb_ltrim((string) config('session.domain'), '.').'/my/communities/'.$this->tenant->slug;
+    $this->withSession($this->session->all())->postJson($base.'/join', ['name' => 'Applicant', 'channel' => 'sms', 'request_key' => (string) Str::uuid()])->assertUnprocessable()->assertExactJson(['message' => 'Joining is temporarily unavailable. Please contact the organisation.']);
+})->with([false, true]);
+
+it('reserves the same pending phone slot without creating a member or exposing historic matches', function (bool $historic): void {
+    $this->tenant->features()->create(['feature_key' => 'community_members', 'enabled' => true, 'meta' => ['type' => 'limit', 'value' => 1]]);
+    if ($historic) {
+        Member::factory()->create(['tenant_id' => $this->tenant->id, 'phone' => '+233241234567', 'status' => MemberStatusEnum::Exited]);
+    }
+    $this->session->forget(PlatformAttendeeVerification::SESSION_KEY);
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
+    $service = app(MembershipJoining::class);
+    $row = $service->submit($this->tenant, $this->session, ['name' => 'Applicant', 'channel' => 'sms'], (string) Str::uuid());
+    expect($row->member_id)->toBeNull()->and(app(App\Services\Community\MemberCap::class)->counted($this->tenant))->toBe(1);
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234568', 'expires_at' => now()->addHour()->timestamp]);
+    expect(fn () => $service->submit($this->tenant, $this->session, ['name' => 'Second applicant', 'channel' => 'sms'], (string) Str::uuid()))->toThrow(DomainException::class);
+    $service->reject($row, $this->owner, 'The applicant withdrew the request.');
+    expect(app(App\Services\Community\MemberCap::class)->counted($this->tenant))->toBe(0);
 })->with([false, true]);

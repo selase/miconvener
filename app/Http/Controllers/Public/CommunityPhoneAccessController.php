@@ -44,7 +44,7 @@ final class CommunityPhoneAccessController extends Controller
     public function forget(Request $request): JsonResponse
     {
         $this->verification->forget($request->session());
-        $request->session()->regenerate();
+        $request->session()->regenerate(true);
 
         return response()->json(['forgotten' => true])->header('Cache-Control', 'private, no-store');
     }

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md`, sections 4, 6.1, 6.3, 8, 10, 13 and 13.1, including the owner's email-first safeguards agreed 2026-10-16.
 
-**Status:** Planned; awaiting owner review. No implementation, migration, production write or outbound send is authorised by this document alone.
+**Status:** Native implementation approved by owner 2026-10-16; in progress on `codex/community-3`. Merge, deployment, production writes and real recipient sends remain unauthorised.
 
 **Baseline:** Deployed milestone 2 merge `b659e66`; planning branch `codex/community-3-plan` descends from the tested milestone 2 source and carries its release/pilot notes. Local `origin/main` is stale; fetch and compare before execution. Reuse the owned linked worktree at `.worktrees/artifact-completion`; leave the original `community-1a` checkout and Claude's files untouched. Create implementation branch `codex/community-3` from the reviewed planning head after reconciling any newer main changes.
 
@@ -392,3 +392,23 @@ Use the existing VerifyPrompt test setup/actual props and mocked Inertia routing
 - Representative authority is per member; it grants no contact editing, delegation or ticket transfer. Existing bearer pay-link rules remain unchanged.
 - Already accepted/in-flight provider messages cannot be recalled. Eligibility is rechecked immediately before transport; unknown submissions retain budget/credit claims for reconciliation.
 - No merge, deployment, production migrations or real recipient tests are included in this authorization.
+
+
+## Independent review and fix pass (2026-10-16)
+
+Fresh `gpt-6-astra` whole-branch review of `b659e66..4ec3b85`: two Critical and six Important findings; no stylistic minors. Initial verdict was **not ready to merge**. Each finding was confirmed against source and reproduced in a focused regression before correction:
+
+1. Persisted old session IDs survived sign-out/removal and proof/grant rotations. All portal rotations now destroy the old persisted record while retaining staff attributes. Native session blocking covers all stateful web requests using shared PostgreSQL locks, preventing an overlapping ordinary writer from restoring removed proofs. Dedicated additive lock-table migration; no identity/person model or new dependency. Persisted replay and actual-worker overlap tests cover it. The 600-second lease bounds supported request duration; longer work must be queued. Unknown aliases created before this release cannot be retroactively enumerated; legacy email proofs retain their original fixed 12-hour expiry.
+2. Phone joining differed for historic and unseen numbers in immediate mode and at the cap. Every phone application now awaits review. Follow-up self-review found a second oracle through slot consumption: all pending phone envelopes now reserve one slot, without creating/linking a member. Approval converts that reservation inside the same cap transaction; rejection releases it. Staff explicitly confirms creation of a separate membership. Unknown and historic numbers have the same pre-review status, history/recovery denial and cap behavior. Immediate email joining remains available. This is an explicit security amendment to the spec, not a hidden UI-only mapping.
+3. Distinct-person approval inherited default marketing eligibility. It now preserves only existing explicit follower consent using the stored channel/address; it never uses staff-session proof or enables an opted-out address.
+4. Soft-deleted event sources were eligible during their recovery window. Source lookup preserves SoftDeletes and the final event check rejects trashed events, before dispatch and immediately before transport.
+5. Email-first users could not add phone proof. Additive phone verification preserves email sign-in and reaches the exact-member recovery-enrolment action.
+6. Community-off UI hid existing private-key recovery and generic wrong-number reporting. Both remain reachable with phone proof; new access requests remain closed.
+7. Only the latest family claim could be completed. An owned-request selector exposes all capability-held requests by submitted name/role/status; each approval remains member-scoped.
+8. A resend challenge was invisible and could reuse a consumed token. The challenge is available in both code stages, successful sends clear it, and failed/expired challenges require fresh completion.
+
+Reviewer's declined-to-judge items retained explicitly: actual carrier/sender/cap readiness and staff identity-check quality need operational acceptance; native OS popup visuals remain a browser-capture limitation; unreported legacy service contacts keep the approved trust model. Full-suite results and built assets are verified by the implementer below. No second broad review is scheduled; substantive fixes use RED→GREEN plus final quality gates.
+
+Final gate environment ruling: local PostgreSQL's stock lock table (100 connections ×64 locks) was exhausted by four simultaneous schema rebuilds even after removing the extra race suite. Fail-fast reproduction:4 SQLSTATE53200 setup failures/23passes in28s; no application assertion was implicated. Run the identical full Unit/Feature suite with two local workers and Infrastructure serially; do not tune/restart the shared local server. CI retains four workers and explicitly increases only its disposable PostgreSQL container's lock allocation to256 before testing. No production database or infrastructure setting is changed.
+
+Post-fix browser confirmation: additive phone verification retained the email banner; paused Community exposed existing key restoration and generic wrong-number reporting but no new claim action; staff authentication survived these portal rotations. Remaining minor usability recommendation: recovery downloads currently have a generic filename; use distinct saved-key labels for family members (a small follow-up could add approved-member context to the one-time response and filename). Existing member cards and owned-request choices are labelled; this does not widen authority or block this milestone.

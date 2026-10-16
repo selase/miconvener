@@ -68,3 +68,45 @@ it('serialises concurrent phone budget and code consumption', function (string $
         }
     }
 })->with(['budget', 'confirm']);
+
+it('waits for an ordinary in-flight session writer before removing persisted portal access', function (): void {
+    $files = new Illuminate\Filesystem\Filesystem;
+    $directory = sys_get_temp_dir().'/community-session-race-'.Str::uuid();
+    $files->makeDirectory($directory, 0700, true);
+    $handler = new Illuminate\Session\FileSessionHandler($files, $directory, 120);
+    $id = str_repeat('a', 20).bin2hex(random_bytes(10));
+    $session = new Illuminate\Session\Store('qa', $handler, $id);
+    $session->start();
+    $session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
+    $session->save();
+    $lock = Illuminate\Support\Facades\Cache::store(config('session.block_store') ?? 'file')->lock('session:'.$id, 600);
+    expect($lock->get())->toBeTrue();
+    $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'PAO_DISABLE' => '1', 'TELESCOPE_ENABLED' => 'false'];
+    $worker = new Process([PHP_BINARY, base_path('tests/Fixtures/community/session-removal-worker.php'), $id, $directory], base_path(), $environment);
+    try {
+        $worker->start();
+        $deadline = microtime(true) + 15;
+        do {
+            usleep(20000);
+        } while (! str_contains($worker->getOutput(), 'READY') && $worker->isRunning() && microtime(true) < $deadline);
+        expect($worker->getOutput())->toContain('READY');
+        usleep(250000);
+        expect($worker->getOutput())->not->toContain('ENTERED');
+        $late = new Illuminate\Session\Store('qa', $handler, $id);
+        $late->start();
+        $late->put('ordinary_request', 'finished');
+        $late->save();
+        $lock->release();
+        $worker->wait();
+        expect($worker->isSuccessful())->toBeTrue($worker->getErrorOutput().$worker->getOutput());
+        expect($worker->getOutput())->toContain('DONE');
+        $replay = new Illuminate\Session\Store('qa', $handler, $id);
+        $replay->start();
+        expect($replay->has(PhoneVerification::SESSION_KEY))->toBeFalse();
+    } finally {
+        $lock->release();
+        if ($worker->isRunning()) {
+            $worker->stop();
+        }$files->deleteDirectory($directory);
+    }
+});

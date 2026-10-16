@@ -16,6 +16,7 @@ use App\Models\Event;
 use App\Models\Tenant;
 use App\Models\TenantNotificationSetting;
 use App\Models\User;
+use App\Scopes\TenantScope;
 use App\Services\Billing\EmailAllowance;
 use App\Services\Notifications\NotificationGatewayService;
 use App\Services\Sms\SmsAllowance;
@@ -331,7 +332,7 @@ final class CommunityMessages
 
     public function assertFollowingEvent(Tenant $tenant, Event $event): void
     {
-        abort_unless($tenant->followingEnabled() && $event->tenant_id === $tenant->id && $event->status === Event::STATUS_PUBLISHED && $event->ends_at->gte(now()), 404);
+        abort_unless(! $event->trashed() && $tenant->followingEnabled() && $event->tenant_id === $tenant->id && $event->status === Event::STATUS_PUBLISHED && $event->ends_at->gte(now()), 404);
     }
 
     private function claim(Tenant $tenant, User $actor, CommunityMessage $message, string $id, string $channel): ?CommunityMessageDelivery
@@ -398,7 +399,7 @@ final class CommunityMessages
             }
             $this->authorize($tenant, $actor, $message->purpose === 'following_event');
             if ($message->purpose === 'following_event') {
-                $event = Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->find($message->source_event_id);
+                $event = Event::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->find($message->source_event_id);
                 abort_unless($event !== null && $message->audience === ['kind' => 'followers'], 404);
                 $this->assertFollowingEvent($tenant, $event);
             }

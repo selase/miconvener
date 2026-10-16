@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { communityRequest } from '@/lib/community';
 
 export default function MemberClaim({
@@ -15,7 +15,15 @@ export default function MemberClaim({
     const [name, setName] = useState('');
     const [role, setRole] = useState('self');
     const [recovery, setRecovery] = useState('');
+    const [claims, setClaims] = useState(initialClaims);
     const [claim, setClaim] = useState(allowRequests ? (initialClaims[0] ?? null) : null);
+    useEffect(() => {
+        if (!allowRequests) {
+            setMode('recover');
+            setClaim(null);
+            setRecovery('');
+        }
+    }, [allowRequests]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [restored, setRestored] = useState(false);
@@ -70,6 +78,10 @@ export default function MemberClaim({
                     role,
                 });
                 setClaim(data.claim);
+                setClaims((current) => [
+                    data.claim,
+                    ...current.filter((row) => row.id !== data.claim.id),
+                ]);
             }
         } catch (failure) {
             setError(failure.message);
@@ -83,6 +95,9 @@ export default function MemberClaim({
         try {
             const data = await communityRequest(`${base}/claims/${claim.id}`);
             setClaim(data.claim);
+            setClaims((current) =>
+                current.map((row) => (row.id === data.claim.id ? data.claim : row))
+            );
         } catch (failure) {
             setError(failure.message);
         } finally {
@@ -97,6 +112,9 @@ export default function MemberClaim({
             onCredential?.(data);
             onUpdated?.();
             setClaim({ ...claim, status: 'completed' });
+            setClaims((current) =>
+                current.map((row) => (row.id === claim.id ? { ...row, status: 'completed' } : row))
+            );
         } catch (failure) {
             setError(failure.message);
         } finally {
@@ -141,6 +159,32 @@ export default function MemberClaim({
                     Use my private recovery key
                 </button>
             </div>
+            {allowRequests && claims.length > 1 && (
+                <label className="block text-sm font-medium text-ink">
+                    Your access requests
+                    <select
+                        value={claim?.id ?? ''}
+                        onChange={(event) => {
+                            setClaim(claims.find((row) => row.id === event.target.value) ?? null);
+                            setMode('claim');
+                            setRecovery('');
+                            setError('');
+                        }}
+                        className="mt-2 block w-full rounded-md border border-border bg-surface px-3 py-2 text-ink"
+                    >
+                        <option value="">Choose a request</option>
+                        {claims.map((row) => (
+                            <option key={row.id} value={row.id}>
+                                {row.claimant_name} ·{' '}
+                                {row.role === 'representative'
+                                    ? 'Representative'
+                                    : 'Own membership'}{' '}
+                                · {row.status}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            )}
             {restored && (
                 <p role="status" className="text-sm text-success-fg">
                     Membership access restored.
