@@ -146,7 +146,7 @@ final class PhoneVerification
     {
         $proof = $session->get(self::SESSION_KEY);
         if (! is_array($proof) || ! isset($proof['phone'], $proof['expires_at']) || ! is_string($proof['phone']) || ! is_numeric($proof['expires_at']) || $proof['expires_at'] <= now()->timestamp) {
-            $this->forget($session);
+            $session->forget([self::SESSION_KEY, 'community_member_grants']);
 
             return null;
         }

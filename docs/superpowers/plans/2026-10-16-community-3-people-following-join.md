@@ -142,7 +142,7 @@ MemberClaims::complete(\Illuminate\Contracts\Session\Session $session, string $c
 // complete returns {selector:string, secret:string} once, or a generic denied/expired response.
 ```
 
-- [ ] Write failing exact-email, phone-without-grant, different tenant/member, representative, guessed selector, revoked/version mismatch and one-time claim-completion cases. Include:
+- [x] Write failing exact-email, phone-without-grant, different tenant/member, representative, guessed selector, revoked/version mismatch and one-time claim-completion cases. Include:
 
 ```php
 it('does not reveal members through phone proof alone', function (): void {
@@ -153,10 +153,12 @@ it('does not reveal members through phone proof alone', function (): void {
 });
 ```
 
-- [ ] Run `MemberAccessTest.php` and `MemberClaimsTest.php`; confirm failure before implementation.
-- [ ] Implement exact-email access first, then phone+credential check. Require phone proof matching credential, live version, matching tenant/member, approved role and current membership state; lapsed/exited can view retained history but gain no benefits. Staff approval requires `manage members`, tenant scope and recorded independent-check method/reason; require the claimant to return with both request capability and current matching phone proof. Approval alone reveals no member details to the claimant.
-- [ ] Add email-authorised phone enrollment: current verified email must exactly match that member and added phone must be independently verified; issue a member-scoped credential. Do not infer proof of any email on the record from phone enrollment.
-- [ ] Pass focused tests including parallel claim completion and credential rotation; verify hashes/plaintext never enter JSON list/detail exports. Pint; commit `feat(community): add member-scoped claims and representative access`.
+- [x] Run `MemberAccessTest.php` and `MemberClaimsTest.php`; confirm failure before implementation.
+- [x] Implement exact-email access first, then phone+credential check. Require phone proof matching credential, live version, matching tenant/member, approved role and current membership state; lapsed/exited can view retained history but gain no benefits. Staff approval requires `manage members`, tenant scope and recorded independent-check method/reason; require the claimant to return with both request capability and current matching phone proof. Approval alone reveals no member details to the claimant.
+- [x] Add email-authorised phone enrollment: current verified email must exactly match that member and added phone must be independently verified; issue a member-scoped credential. Do not infer proof of any email on the record from phone enrollment.
+- [x] Pass focused tests including parallel claim completion and credential rotation; verify hashes/plaintext never enter JSON list/detail exports. Pint; commit `feat(community): add member-scoped claims and representative access`.
+
+**Ruling:** Existing-email phone enrollment requires the verified phone to match the current member contact; a different contact needs an organisation edit/independent claim. Pending claim capabilities survive proof expiry in the same browser, but completing still needs fresh matching phone proof; explicit phone removal clears capabilities. Staff gates reload the actor after changing permission team (cached-role regression RED→GREEN). Returning claims/recovery use no-store JSON, never Inertia secret props. Tests: 14 access/claim tests, 60 assertions; combined phone/access/claim 25/120; two-worker claim completion 1/8.
 
 ## Task 4: Revocation, contact edits and wrong-number review
 

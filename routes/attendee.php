@@ -17,6 +17,14 @@ Route::prefix('my')->group(function (): void {
     Route::post('/verify/forget', [PlatformAttendeeAccessController::class, 'forget'])->name('attendee.my.verify.forget');
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
+    Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::post('/communities/{tenantSlug}/access', [App\Http\Controllers\Public\CommunityClaimController::class, 'recover'])->name('attendee.my.access.recover');
+        Route::post('/communities/{tenantSlug}/members/{member}/phone-access', [App\Http\Controllers\Public\CommunityClaimController::class, 'enrolPhone'])->name('attendee.my.access.enrol');
+        Route::post('/communities/{tenantSlug}/claims', [App\Http\Controllers\Public\CommunityClaimController::class, 'store'])->name('attendee.my.claims.store');
+        Route::get('/communities/{tenantSlug}/claims/{claim}', [App\Http\Controllers\Public\CommunityClaimController::class, 'show'])->name('attendee.my.claims.show');
+        Route::post('/communities/{tenantSlug}/claims/{claim}/complete', [App\Http\Controllers\Public\CommunityClaimController::class, 'complete'])->name('attendee.my.claims.complete');
+    });
+
     // Authenticated history endpoints
     Route::middleware('platform_attendee_verified')->group(function (): void {
         Route::get('/events', [PlatformAttendeeAccessController::class, 'events'])->name('attendee.my.events');

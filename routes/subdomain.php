@@ -309,6 +309,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::get('access/claims', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'index'])->name('claims.index');
+            Route::post('access/claims/{claim}/approve', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'approve'])->name('claims.approve');
+            Route::post('access/claims/{claim}/reject', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'reject'])->name('claims.reject');
             Route::middleware('community.messages')->group(function (): void {
                 Route::get('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'index'])->name('groups.index');
                 Route::post('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'store'])->name('groups.store');

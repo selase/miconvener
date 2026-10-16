@@ -76,6 +76,15 @@ final class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(30)
             ->by($request->ip()));
 
+        RateLimiter::for('community-access', function (Request $request): array {
+            $proof = $request->session()->get(\App\Services\Community\PhoneVerification::SESSION_KEY, []);
+            $email = $request->session()->get(\App\Services\Events\PlatformAttendeeVerification::SESSION_KEY, []);
+            $address = $proof['phone'] ?? $email['email'] ?? $request->session()->getId();
+
+            return [Limit::perMinute(30)->by('community-proof:'.hash_hmac('sha256', $address, (string) config('app.key'))),
+                Limit::perMinute(600)->by('community-ip:'.$request->ip())];
+        });
+
         RateLimiter::for('public-registration', fn (Request $request) => Limit::perMinute(10)
             ->by($request->ip()));
 

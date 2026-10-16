@@ -48,11 +48,14 @@ final class Member extends Model
         'notes',
     ];
 
+    protected $attributes = ['access_version' => 1];
+
     protected $hidden = [
         'pay_token',
     ];
 
     protected $casts = [
+        'access_version' => 'integer',
         'amount_override' => 'integer',
         'status' => MemberStatusEnum::class,
         'joined_on' => 'date',
