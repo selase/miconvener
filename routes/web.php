@@ -110,6 +110,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('health.tenants');
     Route::get('health/tenants/{tenant:uuid}', [TenantHealthController::class, 'show'])
         ->name('health.tenants.show');
+    Route::get('messages/reconciliation', [App\Http\Controllers\Admin\CommunitySmsReconciliationController::class, 'index'])->name('admin.messages.reconciliation.index');
+    Route::post('messages/reconciliation', [App\Http\Controllers\Admin\CommunitySmsReconciliationController::class, 'resolve'])->name('admin.messages.reconciliation.resolve');
     Route::get('messages', [App\Http\Controllers\Admin\MessageDeliveryController::class, 'index'])
         ->name('admin.messages.index');
     Route::post('takedowns/{type}/{id}', [App\Http\Controllers\Admin\TakedownController::class, 'store'])
