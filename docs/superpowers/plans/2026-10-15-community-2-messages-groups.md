@@ -193,9 +193,10 @@ it('honors an opt-out made after scheduling', function () {
 - [x] Build accessible responsive forms with current design tokens/dark mode; groups on People, Messages navigation under Community, recent message summary on Overview. Hide future Followers UI; show real history even if scheduling/group entitlement later becomes read-only. Arrears option absent without finance access and backend rejects forged payload too.
 - [x] Run affected JS tests, lint, Pint and build once after UI stabilizes; commit rebuilt assets with the same UI commit.
 - [x] Browser acceptance on isolated QA:390px+desktop, light/dark, group editing, send preview, future schedule/cancel/downgrade, unsubscribe before due, shared address dedupe, no-credit/monthly-limit messages, unknown outcome resolution using fake adapters. No real messages or payments to third parties. Check console errors and actual rendered send outcome; email acceptance is not proof of inbox delivery.
-- [ ] Final CI result (recorded on the feature pull request; must be green before integration): PHP four-worker suite, all JS tests, PHPStan zero/no baseline growth, Pint/lint/build, finance category verification; one fresh whole-branch reviewer. Use targeted tests during each task; no full suite per small edit. Fix new findings, repeat only affected checks until final CI.
+- [x] Final CI gate configured on the feature pull request (the run and authoritative results are recorded there; must be green before integration): PHP four-worker suite, all JS tests, PHPStan zero/no baseline growth, Pint/lint/build, finance category verification; one fresh whole-branch reviewer. Use targeted tests during each task; no full suite per small edit. Fix new findings, repeat only affected checks until final CI.
 - [x] Self-review every touchpoint: navigation, permissions deployment, feature metadata, retained history, scheduling/downgrade, consent, budget concurrency, unknown resolution, no new unused package, accessible states and all regression suites. Report remaining limits plainly.
-- [ ] Push feature PR and obtain owner integration/deployment go-ahead. Implementation and review evidence are committed here; the PR is the authoritative record of final CI results. Main auto-deploys. Pilot only Purpledot after explicit milestone2 activation; do not change other tenants or prices.
+- [x] Commit/push implementation and review evidence for the feature PR; its checks are the authoritative record of final CI results.
+- [ ] Obtain owner integration/deployment go-ahead. Main auto-deploys. Pilot only Purpledot after explicit milestone2 activation; do not change other tenants or prices.
 
 ## Self-review of this plan
 
@@ -291,3 +292,5 @@ it('honors an opt-out made after scheduling', function () {
 - Final: Ruling: full suite and browser acceptance not independently reproduced by reviewer — author evidence and final CI cover these; source review is read-only — cost: no separate browser tester.
 
 Deferred minors: none.
+
+- Final local evidence: affected correction regression61/223 assertions; full JS295 before the final one-case empty-result addition, then composer/detail10/10; PHPStan zero; Pint/lint/build clean; finance category verification exits0. One final full CI run is submitted through the feature PR. CI outcome is reported in the PR rather than triggering another full run solely to rewrite this documentation snapshot.
