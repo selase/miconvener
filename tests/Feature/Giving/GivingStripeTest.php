@@ -35,7 +35,8 @@ test('own Stripe checkout binds session account and idempotency and posts only a
         ->and($fake->requests[0]['params']['payment_intent_data']['application_fee_amount'])->toBe(100);
     $data = app(GivingGateways::class)->verify($attempt);
     app(GivingPaymentConfirmer::class)->confirm($attempt->reference, $data);
-    expect($attempt->fresh()->state)->toBe('confirmed')->and($attempt->fresh()->provider_reference)->toBe('pi_giving');
+    expect($attempt->fresh()->state)->toBe('confirmed')->and($attempt->fresh()->provider_reference)->toBe('pi_giving')
+        ->and($attempt->fresh()->gift->gateway_fee_amount)->toBe(200)->and($attempt->fresh()->gift->net_amount)->toBe(9700);
     $accounts = LedgerAccount::query()->where('tenant_id', $tenant->id)->where('category', LedgerCategoryEnum::Giving)->get()->keyBy('code');
     expect($accounts[LedgerAccount::CODE_GATEWAY_CLEARING]->currentBalance())->toBe(100)
         ->and($accounts[LedgerAccount::CODE_ORGANIZER_PAYABLE]->currentBalance())->toBe(0);

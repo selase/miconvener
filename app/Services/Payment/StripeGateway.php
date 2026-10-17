@@ -238,7 +238,16 @@ final class StripeGateway implements PaymentGateway
         $intent = $this->stripe->paymentIntents->retrieve($session->payment_intent, ['expand' => ['latest_charge.balance_transaction']], $this->accountOptions());
         $balance = is_object($intent->latest_charge) ? $intent->latest_charge->balance_transaction : null;
         $currency = mb_strtoupper((string) $session->currency);
-        $fees = is_object($balance) && mb_strtoupper((string) $balance->currency) === $currency ? (int) $balance->fee : null;
+        $fees = null;
+        if (is_object($balance) && mb_strtoupper((string) $balance->currency) === $currency) {
+            $applicationFees = 0;
+            foreach ($balance->fee_details as $detail) {
+                if ($detail->type === 'application_fee') {
+                    $applicationFees += (int) $detail->amount;
+                }
+            }
+            $fees = (int) $balance->fee - $applicationFees;
+        }
 
         return ['status' => $intent->status === 'succeeded' && $intent->amount_received === $session->amount_total ? 'success' : 'pending',
             'metadata' => $session->metadata?->toArray() ?? [], 'amount' => (int) $session->amount_total, 'currency' => $currency,
@@ -259,7 +268,7 @@ final class StripeGateway implements PaymentGateway
     public function verifyGivingRefund(string $refundId, string $reference, string $operationKey): array
     {
         $refund = $this->stripe->refunds->retrieve($refundId, ['expand' => ['balance_transaction']], $this->accountOptions());
-        if ($refund->payment_intent !== $reference || ($refund->metadata?->giving_operation_key ?? '') !== $operationKey) {
+        if ($refund->payment_intent !== $reference || ($refund->metadata->toArray()['giving_operation_key'] ?? '') !== $operationKey) {
             return ['status' => 'unknown'];
         }
         $intent = $this->stripe->paymentIntents->retrieve($reference, ['expand' => ['latest_charge']], $this->accountOptions());

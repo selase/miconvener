@@ -171,7 +171,7 @@ final class PayoutRelease
     /** @param array<string, mixed> $attributes */
     private function changeProcessing(EventPayout $payout, array $attributes): void
     {
-        EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', EventPayout::STATUS_PROCESSING)->update($attributes);
+        EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('provider_reference', $payout->provider_reference)->where('provider_transfer_code', $payout->provider_transfer_code)->where('status', EventPayout::STATUS_PROCESSING)->update($attributes);
     }
 
     /**

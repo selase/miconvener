@@ -43,7 +43,7 @@ function MemberAttribution({ value, onChange }) {
                     <p className="text-sm text-ink">
                         {value.name} · {value.id.slice(-6)}
                     </p>
-                    <Button type="button" variant="secondary" onClick={() => onChange(null)}>
+                    <Button type="button" variant="default" onClick={() => onChange(null)}>
                         Remove member attribution
                     </Button>
                 </>
@@ -61,7 +61,7 @@ function MemberAttribution({ value, onChange }) {
                     />
                     <Button
                         type="button"
-                        variant="secondary"
+                        variant="default"
                         disabled={busy || query.trim().length < 2}
                         onClick={search}
                     >
@@ -72,7 +72,7 @@ function MemberAttribution({ value, onChange }) {
                             <li key={member.id}>
                                 <Button
                                     type="button"
-                                    variant="secondary"
+                                    variant="default"
                                     onClick={() => {
                                         generation.current++;
                                         onChange(member);
@@ -174,7 +174,7 @@ function GivingForm({ mode, funds, fund, onClose, canAttributeMember, knownGiver
             try {
                 const result = await sendJson(
                     'GET',
-                    `${route('tenant.community.giving.refunds.preview', { type: 'gift', source: fund.id })}?${query}`
+                    `${route('tenant.community.giving.refunds.preview', { type: fund.source_type ?? 'gift', source: fund.id })}?${query}`
                 );
                 if (result.ok) {
                     setPreview(result.body);
@@ -243,7 +243,10 @@ function GivingForm({ mode, funds, fund, onClose, canAttributeMember, knownGiver
                 operation_key: values.operation_key,
             };
         } else if (mode === 'refund') {
-            url = route('tenant.community.giving.refunds.store', { type: 'gift', source: fund.id });
+            url = route('tenant.community.giving.refunds.store', {
+                type: fund.source_type ?? 'gift',
+                source: fund.id,
+            });
             payload = {
                 principal: toMinorUnits(values.principal),
                 reason: values.reason,
@@ -526,6 +529,9 @@ export default function MoneyGiving({
     delivery = null,
     gifts = [],
     adjustments = [],
+    giftPages = null,
+    adjustmentPages = null,
+    filters = {},
     canAttributeMember = false,
     knownGivers = [],
     canManageGiving = false,
@@ -535,6 +541,40 @@ export default function MoneyGiving({
     enabled = false,
 }) {
     const [dialog, setDialog] = useState(null);
+    const [search, setSearch] = useState(filters.q ?? '');
+    const [refundStatus, setRefundStatus] = useState(filters.refund_status ?? 'all');
+    const visit = (changes) =>
+        router.get(
+            route('tenant.community.money.giving.index'),
+            { ...filters, ...changes },
+            { preserveState: true, preserveScroll: true }
+        );
+    const pages = (meta, kind, label) =>
+        meta &&
+        meta.last_page > 1 && (
+            <nav
+                aria-label={`${label} pages`}
+                className="mt-4 flex flex-wrap items-center gap-3 text-sm"
+            >
+                <Button
+                    variant="default"
+                    disabled={meta.current_page <= 1}
+                    onClick={() => visit({ [kind]: meta.current_page - 1 })}
+                >
+                    Previous {label} page
+                </Button>
+                <span className="text-ink-secondary">
+                    Page {meta.current_page} of {meta.last_page} · {meta.total} records
+                </span>
+                <Button
+                    variant="default"
+                    disabled={meta.current_page >= meta.last_page}
+                    onClick={() => visit({ [kind]: meta.current_page + 1 })}
+                >
+                    Next {label} page
+                </Button>
+            </nav>
+        );
     return (
         <ConsoleLayout>
             <PageHeader
@@ -765,17 +805,50 @@ export default function MoneyGiving({
                         ))}
                     </div>
                 )}
-                {canReadFinance && gifts.length > 0 && (
+                {canReadFinance && (
+                    <form
+                        aria-label="Search Giving history"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            visit({
+                                q: search,
+                                refund_status: refundStatus,
+                                gifts_page: 1,
+                                adjustments_page: 1,
+                            });
+                        }}
+                        className="grid gap-4 border border-border p-5 sm:grid-cols-3"
+                    >
+                        <Input
+                            label="Find contribution"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            hint="Search by fund or record ID. Donor contact details stay private."
+                        />
+                        <Select
+                            label="Refund status"
+                            value={refundStatus}
+                            onChange={(e) => setRefundStatus(e.target.value)}
+                        >
+                            <option value="all">All refunds and corrections</option>
+                            <option value="unresolved">Unresolved refunds</option>
+                        </Select>
+                        <Button type="submit" className="self-end">
+                            Search history
+                        </Button>
+                    </form>
+                )}
+                {canReadFinance && (
                     <section className="border border-border p-5">
-                        <h3 className="text-lg font-semibold text-ink">Recent contributions</h3>
+                        <h3 className="text-lg font-semibold text-ink">Contribution history</h3>
                         <p className="mt-2 text-xs text-ink-secondary">
-                            Latest 50 standalone contributions. Reports include all selected funds
-                            and event contributions.
+                            Standalone and event contributions, with their original source
+                            preserved. Use search or the page controls to find older records.
                         </p>
                         <ul className="mt-4 divide-y divide-border">
                             {gifts.map((gift) => (
                                 <li
-                                    key={gift.id}
+                                    key={`${gift.source_type ?? 'gift'}:${gift.id}`}
                                     className="flex flex-wrap items-center justify-between gap-3 py-4"
                                 >
                                     <div>
@@ -785,7 +858,9 @@ export default function MoneyGiving({
                                         </p>
                                         <p className="mt-1 text-xs text-ink-secondary">
                                             {gift.is_anonymous
-                                                ? 'Anonymous'
+                                                ? ['Anonymous publicly', gift.payer_name]
+                                                      .filter(Boolean)
+                                                      .join(' · ')
                                                 : gift.payer_name || 'Unnamed giver'}{' '}
                                             ·{' '}
                                             {gift.source === 'online'
@@ -808,6 +883,7 @@ export default function MoneyGiving({
                                             </Button>
                                         )}
                                     {canRefund &&
+                                        gift.can_refund !== false &&
                                         gift.source === 'online' &&
                                         gift.status === 'completed' && (
                                             <Button
@@ -821,9 +897,15 @@ export default function MoneyGiving({
                                 </li>
                             ))}
                         </ul>
+                        {gifts.length === 0 && (
+                            <p className="mt-4 text-sm text-ink-secondary">
+                                No matching contributions.
+                            </p>
+                        )}
+                        {pages(giftPages, 'gifts_page', 'contribution')}
                     </section>
                 )}
-                {canReadFinance && adjustments.length > 0 && (
+                {canReadFinance && (
                     <section className="border border-border p-5">
                         <h3 className="text-lg font-semibold text-ink">Refunds and corrections</h3>
                         <ul className="mt-4 divide-y divide-border">
@@ -866,6 +948,12 @@ export default function MoneyGiving({
                                 </li>
                             ))}
                         </ul>
+                        {adjustments.length === 0 && (
+                            <p className="mt-4 text-sm text-ink-secondary">
+                                No matching refunds or corrections.
+                            </p>
+                        )}
+                        {pages(adjustmentPages, 'adjustments_page', 'adjustment')}
                     </section>
                 )}
                 {dialog && (

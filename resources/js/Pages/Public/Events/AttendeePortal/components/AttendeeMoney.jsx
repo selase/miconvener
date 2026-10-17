@@ -123,6 +123,7 @@ export default function AttendeeMoney({
     onPage,
     onRefresh,
     initialTab = null,
+    tenantSlug = null,
     status = 'success',
 }) {
     const [chosenTab, setTab] = useState(null);
@@ -174,7 +175,7 @@ export default function AttendeeMoney({
                 ))}
             </div>
             {tab === 'giving' ? (
-                <GivingSection giving={data?.giving} onPage={onPage} />
+                <GivingSection giving={data?.giving} onPage={onPage} tenantSlug={tenantSlug} />
             ) : tab === 'contributions' ? (
                 <section className="mt-5">
                     <p className="mb-4 text-sm text-ink-secondary">
@@ -229,7 +230,7 @@ export default function AttendeeMoney({
                 </section>
             ) : (
                 <>
-                    {tab === 'statements' && <GivingStatementForm />}
+                    {tab === 'statements' && <GivingStatementForm tenantSlug={tenantSlug} />}
                     {tab === 'dues' && (
                         <div className="mt-5 flex flex-wrap gap-4">
                             {data?.totals_by_currency?.map((row) => (

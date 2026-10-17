@@ -141,7 +141,14 @@ final class GivingHistory
             ->where('adjustments.status', 'confirmed')->where(fn ($q) => $q->whereIn('adjustments.gift_id', $giftIds)->orWhereIn('adjustments.event_contribution_id', $eventIds));
         $this->dates($adjustments, 'adjustments.confirmed_at', $filters);
         $changes = $adjustments->get(['adjustments.id', 'adjustments.tenant_id', 'adjustments.fund_id', 'adjustments.principal', 'adjustments.kind', 'adjustments.confirmed_at', 'funds.currency', 'adjustments.gift_id', 'adjustments.event_contribution_id', 'settings.timezone as tenant_timezone']);
-        $funds = \App\Models\GivingFund::withoutGlobalScopes()->with('tenant')->whereIn('id', $payments->pluck('fund_id')->merge($changes->pluck('fund_id')))->get()->keyBy('id');
+        $legacyQuery = (new \App\Models\EventLedgerEntry)->getConnection()->query()->from('event_ledger_entries as refunds')
+            ->join('giving_contribution_links as links', function ($join): void {
+                $join->on('links.event_contribution_id', '=', 'refunds.contribution_id')->on('links.tenant_id', '=', 'refunds.tenant_id');
+            })->leftJoin('community_settings as settings', 'settings.tenant_id', '=', 'refunds.tenant_id')
+            ->where('links.category', 'event')->where('refunds.type', \App\Models\EventLedgerEntry::TYPE_REFUND)->whereIn('refunds.contribution_id', $eventIds);
+        $this->dates($legacyQuery, "(refunds.created_at AT TIME ZONE 'UTC')", $filters);
+        $legacyRefunds = $legacyQuery->get(['refunds.id', 'refunds.gross_amount', 'refunds.created_at', 'links.fund_id', 'settings.timezone as tenant_timezone']);
+        $funds = \App\Models\GivingFund::withoutGlobalScopes()->with('tenant')->whereIn('id', $payments->pluck('fund_id')->merge($changes->pluck('fund_id'))->merge($legacyRefunds->pluck('fund_id')))->get()->keyBy('id');
         $giftRecords = GivingGift::withoutGlobalScopes()->whereIn('id', $payments->where('source_type', 'gift')->pluck('id')->merge($changes->pluck('gift_id')->filter()))->get()->keyBy('id');
         $authorisedMembers = $this->community->memberQuery($session)->get()->keyBy('id');
         $email = PlatformAttendeeVerification::getVerifiedEmail($session);
@@ -163,6 +170,7 @@ final class GivingHistory
         $rows = $payments->map(fn (object $row): array => $this->statementRow($row->source_type.':'.$row->id, $funds[$row->fund_id], $row->kind, $row->occurred_at === null ? 'Unknown' : CarbonImmutable::parse($row->occurred_at)->setTimezone($row->tenant_timezone ?? 'Africa/Accra')->format('Y-m-d H:i'), (int) $row->amount, $context($row->source_type === 'gift' ? $row->id : null)));
 
         $combined = $rows->concat($changes->map(fn (object $row): array => $this->statementRow('adjustment:'.$row->id, $funds[$row->fund_id], $row->kind, CarbonImmutable::parse($row->confirmed_at)->setTimezone($row->tenant_timezone ?? 'Africa/Accra')->format('Y-m-d H:i'), -(int) $row->principal, $context($row->gift_id))));
+        $combined = $combined->concat($legacyRefunds->map(fn (object $row): array => $this->statementRow('legacy_refund:'.$row->id, $funds[$row->fund_id], 'refund', CarbonImmutable::parse($row->created_at)->setTimezone($row->tenant_timezone ?? 'Africa/Accra')->format('Y-m-d H:i'), -abs((int) $row->gross_amount), ['access_role' => 'payer', 'member_name' => null])));
         $undated = (clone $all)->reorder()->where('source_type', 'event_contribution')->where('sources.status', 'refunded')->get(['sources.id', 'sources.fund_id']);
         $known = \App\Models\EventLedgerEntry::withoutGlobalScopes()->whereIn('contribution_id', $undated->pluck('id'))->where('type', \App\Models\EventLedgerEntry::TYPE_REFUND)->pluck('contribution_id')->merge(GivingAdjustment::withoutGlobalScopes()->whereIn('event_contribution_id', $undated->pluck('id'))->where('status', 'confirmed')->pluck('event_contribution_id'));
         $records = EventContribution::withoutGlobalScopes()->whereIn('id', $undated->pluck('id')->diff($known))->get()->keyBy('id');

@@ -147,7 +147,10 @@ final class GivingContributionBridge
             if ($source->fund->id !== $attempt->fund_id || $source->principal !== $attempt->amount || $source->currency !== $attempt->currency || ! in_array($source->model->status, ['completed', 'refunded'], true)) {
                 $issues[] = 'Source mismatch '.$attempt->id;
             }
-            $posting = LedgerTransaction::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', LedgerCategoryEnum::Giving)->where('reference', $attempt->reference)->where('transaction_type', LedgerTransaction::TYPE_GIVING_PAYMENT)->first();
+            $settlement = $attempt->commission_settlement;
+            $receivable = $attempt->settlement_mode !== Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT && $attempt->commission_amount > (int) ($settlement['actual_received'] ?? 0) + (int) ($settlement['actual_credit_used'] ?? 0);
+            $postingType = $receivable ? LedgerTransaction::TYPE_COMMISSION_RECEIVABLE : LedgerTransaction::TYPE_GIVING_PAYMENT;
+            $posting = LedgerTransaction::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', LedgerCategoryEnum::Giving)->whereHas('entries', fn ($q) => $q->where('currency', $attempt->currency))->whereNull('event_id')->where('reference', $attempt->reference)->where('transaction_type', $postingType)->first();
             $needsPosting = $attempt->settlement_mode === Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT || $attempt->commission_amount > 0;
             if ($needsPosting && $posting === null) {
                 $issues[] = 'Missing payment posting '.$attempt->id;

@@ -818,6 +818,7 @@ export default function AttendeeApp({
                         <AttendeeMoney
                             key={`${cacheContext?.owner_key ?? 'anonymous'}:${record ?? 'money'}`}
                             data={money}
+                            tenantSlug={organiser?.slug}
                             status={moneyStatus}
                             initialTab={
                                 ['contributions', 'giving', 'dues'].includes(record) ? record : null

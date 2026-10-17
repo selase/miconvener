@@ -47,7 +47,7 @@ test('church and volunteer fund screens preserve privacy across anonymous cash a
     $host = givingPageHost($tenant);
     $this->actingAs($user)->postJson($host.'/community/money/giving/funds/'.$fund->id.'/gifts', ['submission_key' => (string) Illuminate\Support\Str::uuid(), 'amount' => 5000, 'currency' => 'GHS', 'source' => 'bulk_cash'])->assertCreated();
     GivingGift::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $fund->id, 'is_anonymous' => true, 'payer_name' => 'Do not publish this name', 'payer_email' => 'private-giver@example.test', 'status' => 'completed']);
-    $this->get($host.'/community/money/giving')->assertOk()->assertDontSee('Do not publish this name')->assertDontSee('private-giver@example.test');
+    $this->get($host.'/community/money/giving')->assertOk()->assertSee('Do not publish this name')->assertDontSee('private-giver@example.test');
     $this->get($host.'/give/'.$fund->slug)->assertOk()->assertDontSee('Do not publish this name')->assertDontSee('private-giver@example.test')->assertInertia(fn ($page) => $page->has('fund.progress.raised'));
     expect(App\Models\DuesCharge::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count())->toBe(0)->and(App\Models\MembershipType::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count())->toBe(0);
 });

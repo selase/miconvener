@@ -64,3 +64,20 @@ test('associating historical contributions includes deleted events without chang
     app(App\Services\Giving\GivingContributionBridge::class)->associate($tenant, true);
     expect(App\Models\GivingContributionLink::withoutGlobalScopes()->where('event_contribution_id', $source->id)->count())->toBe(1)->and($source->fresh()->getRawOriginal())->toBe($before);
 });
+
+test('historical dated refunds appear in their own local-date period under the same reader authorisation', function () {
+    [$tenant] = GivingScenario::make();
+    App\Models\CommunitySettings::withoutGlobalScopes()->updateOrCreate(['tenant_id' => $tenant->id], ['timezone' => 'America/New_York']);
+    $event = App\Models\Event::factory()->published()->create(['tenant_id' => $tenant->id, 'currency' => 'GHS']);
+    $source = App\Models\EventContribution::withoutGlobalScopes()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'contributor_name' => 'Giver', 'contributor_email' => 'giver@example.test', 'amount' => 10000, 'currency' => 'GHS', 'status' => 'refunded', 'paid_at' => '2026-10-01 12:00:00', 'payment_reference' => 'dated_personal']);
+    app(App\Services\Giving\GivingContributionBridge::class)->associate($tenant, true);
+    $refund = App\Models\EventLedgerEntry::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'contribution_id' => $source->id, 'type' => 'refund', 'gross_amount' => -10000, 'currency' => 'GHS', 'created_at' => '2026-10-11 02:00:00']);
+    $session = app('session.store');
+    $session->put(App\Services\Events\PlatformAttendeeVerification::SESSION_KEY, ['email' => 'giver@example.test', 'expires_at' => now()->addHour()->timestamp]);
+    $history = app(App\Services\Giving\GivingHistory::class);
+    $rows = $history->statement($session, ['tenant_slug' => $tenant->slug, 'from' => '2026-10-10', 'to' => '2026-10-10']);
+    expect($rows)->toHaveCount(1)->and($rows->sole()['amount'])->toBe(-10000)->and($rows->sole()['date'])->toBe('2026-10-10 22:00');
+    expect($history->statement($session, ['from' => '2026-10-01', 'to' => '2026-10-31'])->sum('amount'))->toBe(0);
+    $session->put(App\Services\Events\PlatformAttendeeVerification::SESSION_KEY, ['email' => 'other@example.test', 'expires_at' => now()->addHour()->timestamp]);
+    expect($history->statement($session, ['from' => '2026-10-01', 'to' => '2026-10-31']))->toHaveCount(0);
+});

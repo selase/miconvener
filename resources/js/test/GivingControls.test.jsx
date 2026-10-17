@@ -175,3 +175,75 @@ it('the optional reminder form does not steal initial focus from the fund page',
     render(<Fund organisation={{ name: 'Church' }} fund={fund} providers={[]} accepting />);
     expect(screen.getByLabelText('Your email address')).not.toBe(document.activeElement);
 });
+
+it('event-origin refunds use their canonical source and older contribution pages stay reachable', async () => {
+    sendJson.mockResolvedValue({
+        ok: true,
+        body: {
+            principal: 2000,
+            currency: 'GHS',
+            commission_reversal: 40,
+            original_gateway_fee: 200,
+            payable_impact: 1960,
+            amount_owed: 0,
+        },
+    });
+    render(
+        <MoneyGiving
+            funds={[fund]}
+            gifts={[
+                {
+                    id: 'event-gift',
+                    source_type: 'event_contribution',
+                    can_refund: true,
+                    fund_name: 'Event appeal',
+                    amount: 10000,
+                    currency: 'GHS',
+                    source: 'online',
+                    status: 'completed',
+                },
+            ]}
+            giftPages={{ current_page: 1, last_page: 3, total: 51 }}
+            adjustmentPages={{ current_page: 1, last_page: 3, total: 51 }}
+            canReadFinance
+            canRefund
+            enabled
+        />
+    );
+    expect(screen.getByRole('button', { name: 'Next contribution page' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next adjustment page' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+    fireEvent.change(screen.getByLabelText('Amount (GHS)'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Requested' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview refund' }));
+    await waitFor(() =>
+        expect(sendJson).toHaveBeenLastCalledWith(
+            'GET',
+            expect.stringContaining('type=event_contribution')
+        )
+    );
+});
+
+it('finance staff can identify a privately recorded giver while preserving the public anonymity label', () => {
+    render(
+        <MoneyGiving
+            funds={[fund]}
+            gifts={[
+                {
+                    id: 'anonymous-gift',
+                    source_type: 'gift',
+                    fund_name: 'Offering',
+                    amount: 10000,
+                    currency: 'GHS',
+                    source: 'recorded_cash',
+                    status: 'completed',
+                    is_anonymous: true,
+                    payer_name: 'Private finance identity',
+                },
+            ]}
+            canReadFinance
+            enabled
+        />
+    );
+    expect(screen.getByText(/Anonymous publicly.*Private finance identity/)).toBeTruthy();
+});

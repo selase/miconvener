@@ -89,3 +89,25 @@ test('an optional event binding stays private and cannot cross organisations', f
     $foreign = App\Models\Event::factory()->create();
     $this->postJson(givingUrl(), [...$data, 'slug' => 'foreign', 'event_id' => $foreign->id])->assertUnprocessable()->assertJsonValidationErrors('event_id');
 });
+
+test('staff from another organisation can use public Giving without gaining console or receipt access', function () {
+    [$home, $actor] = Tests\Support\GivingScenario::make();
+    $tenant = App\Models\Tenant::factory()->create();
+    $tenant->features()->create(['feature_key' => 'community', 'enabled' => true]);
+    $tenant->features()->create(['feature_key' => 'community_giving', 'enabled' => true]);
+    $fund = GivingFund::factory()->create(['tenant_id' => $tenant->id, 'state' => 'open', 'visibility' => 'public']);
+    $private = GivingFund::factory()->create(['tenant_id' => $tenant->id, 'state' => 'open', 'visibility' => 'private']);
+    $gift = GivingGift::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $fund->id, 'status' => 'completed', 'payer_email' => 'private-recipient@example.test']);
+    $attempt = App\Models\GivingPaymentAttempt::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $fund->id, 'gift_id' => $gift->id, 'state' => 'confirmed']);
+    $host = 'http://'.eventSubdomainHost($tenant->slug);
+    $proof = ['email' => 'independent-giver@example.test', 'expires_at' => now()->addHour()->timestamp];
+    $this->actingAs($actor)->withSession([App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => $proof])->get($host.'/give')->assertOk()->assertInertia(fn ($page) => $page->has('funds', 1));
+    $this->get($host.'/give/'.$fund->slug)->assertOk()->assertDontSee('private-recipient@example.test');
+    $this->get($host.'/give/'.$private->slug)->assertNotFound();
+    $this->get($host.'/giving/payments/'.$attempt->reference.'/receipt')->assertNotFound();
+    $this->assertAuthenticatedAs($actor);
+    $this->assertEquals($proof, session(App\Services\Events\PlatformAttendeeVerification::SESSION_KEY));
+    $this->getJson($host.'/community/money/giving')->assertForbidden();
+    $this->assertAuthenticatedAs($actor);
+    expect($actor->tenants()->where('tenants.id', $tenant->id)->exists())->toBeFalse();
+});

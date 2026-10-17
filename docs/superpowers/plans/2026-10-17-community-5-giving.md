@@ -238,11 +238,11 @@ $expiredProofReceipt->assertUnauthorized();
 - [x] Write failing tests for one receipt under duplicate/callback race, queue after commit only, no receipt on failed/rolled-back payment, original receipt preserved after refund with adjustment note. Transactional receipt delivery follows dues receipt billing (not metered as a marketing send); voluntary reminders use the existing metered EmailAllowance and marketing opt-out. Never mail synthetic gateway emails. Reminder subscribe requires verified email and purpose consent; no prechecked consent/mandate. Weekly/monthly tenant-timezone boundary, short-month anchor (2026-01-31→2026-02-28→2026-03-31 at09:00 local), DST, duplicate scheduler run, catch-up sends at most one current reminder, explicit unsubscribe, organisation opt-out, closed fund/deadline/auto-close and flag-off stop future sends. Email delivery failure leaves a retryable notice, not a new gift/charge/arrears. Email credits exhausted produces an honest staff outcome; it never charges a card or spends SMS. Follow/member counts unchanged.
 ```php
 // Same due period processed twice for the consented verified email reminder:
-Mail::assertQueued(GivingReminderMail::class, 1);
+Mail::assertSent(\App\Mail\GivingReminder::class, 1);
 expect(DuesCharge::query()->where('tenant_id', $tenant->id)->count())->toBe(0)
     ->and(Member::query()->where('tenant_id', $tenant->id)->count())->toBe(0);
 // After explicit unsubscribe and the next due period:
-Mail::assertQueued(GivingReminderMail::class, 1);
+Mail::assertSent(\App\Mail\GivingReminder::class, 1);
 ```
 
 - [x] Run receipt/reminder files; observe RED.
@@ -263,12 +263,15 @@ expect($reconciliation['discrepancies'])->toBe([]);
 ```
 
 - [x] Run focused affected tests while joining tasks; fix integration gaps without weakening assertions. Walk Overview, People, Money, Messages, Finance, Payment settings, public organisation, event widget/moderation/tributes/export, old `/pay`/callback/receipt, `/my` and role onboarding touchpoints. Implement no unrelated redesign.
-- [ ] Perform one fresh whole-branch review and self-review: requirements/dependencies/edge cases/dead code/permissions/seeders/config/real UI. Fix Important/Critical findings with focused regressions; no second blanket review unless the fix changes the design. Document any remaining decision instead of silently deferring a promised feature.
-- [ ] Run one full integration gate: all PHP tests (Mac two workers; CI four with existing lock allowance), JS suite, PHPStan0/no baseline growth, Pint, ESLint, production build; commit matching assets. `finance:verify-categories` must pass. Avoid overlapping refreshing/race suites on the same cluster and redundant full local+CI cycles; focused local plus one full CI is the preferred release gate.
-- [ ] Perform local browser acceptance using normal synthetic email/phone/member proofs: giving-only church and volunteer organisation; public/unlisted/private funds; guest and anonymous checkout in provider test mode; named/bulk cash; no-dues copy and navigation; statements/receipts; partial refund/status; dark/light, keyboard,320/390px and actual200%; unavailable gateway/empty/loading/error states; tickets/contributions/inbox still work. No live provider money or donor notifications. Save screenshots and acceptance evidence.
-- [ ] Update roadmap to built only with exact evidence; open the reviewable PR only when authorised. **Stop for owner plan/build review first; later obtain merge/deploy approval.** After approved deployment, verify schema/permissions/assets/queues/category verifier before enabling Giving screens/recorded cash for Purpledot under standing pilot policy. Do not enable the online readiness capability until the separate readiness go-ahead. Keep other organisations off and preserve settlement mode. Processor readiness/recipient test-mode consent are separate from UI enablement.
+- [x] Perform one fresh whole-branch review and self-review: requirements/dependencies/edge cases/dead code/permissions/seeders/config/real UI. Fix Important/Critical findings with focused regressions; no second blanket review unless the fix changes the design. Document any remaining decision instead of silently deferring a promised feature.
+- [x] Run one full integration gate (full pass plus the documented targeted repairs): all PHP tests (Mac two workers; CI four with existing lock allowance), JS suite, PHPStan0/no baseline growth, Pint, ESLint, production build; commit matching assets. `finance:verify-categories` must pass. Avoid overlapping refreshing/race suites on the same cluster and redundant full local+CI cycles; focused local plus one full CI is the preferred release gate.
+- [x] Complete the available local browser checks: empty church/volunteer Give pages; public/unlisted/private visibility; normal synthetic staff/email verification; explicit reminder consent; precise-amount rejection before provider submission; named/bulk cash and cash correction; native Money, original receipt PDF/CSV; dark/light fields; keyboard date control;320/390px reflow; staff search/unresolved filter; existing Tickets/Communities; cross-organisation public visits preserve the staff session. All local data/transport are synthetic or log-only. Hosted checkout used programmatic provider fixtures, not a real browser payment. Screenshots and limitations are recorded below.
+- [ ] Remaining manual pilot acceptance: actual200% zoom, physical-device cold-offline, normal member/representative browser sessions (including carried-forward inbox acceptance), and a separately approved hosted-provider sandbox checkout/refund/OTP session. Do not claim viewport checks or mocked gateways prove these.
+- [x] Update roadmap to built locally with exact evidence and retain the branch for owner build review. No PR, push, merge, deploy, production queries or production feature activation are included in this completion.
+- [ ] After owner approval, push/open the reviewable PR and obtain merge/deploy approval. Fresh CI on the final commit has not run because the branch has not been pushed.
+- [ ] After approved deployment, verify schema, permission propagation, matching assets, queues/scheduler and category verifier. Enable Giving screens/recorded cash for Purpledot only under the standing pilot policy. Keep online readiness off until separate readiness approval; keep other organisations off and preserve settlement mode.
 - [ ] Before **any** production association/cutover: read-only inventory and reconciliation for the specifically approved tenant, including the probe's live mixed payouts and pending references; show report and proposed UTC boundary to owner. Verify all serving application nodes and queue workers support the new metadata before cutover. Obtain explicit apply approval; apply bounded links/cutover idempotently; compare balances/payouts/provider refs/history/receipts before/after. Nonzero discrepancy means no cutover. Never “fix” a difference by editing historic ledger rows. Record final deployed SHA and results.
-- [ ] Tick and commit final source/docs evidence; after approved deploy keep release-only notes local or in the next authorised change rather than triggering a second application deployment solely for status text.
+- [x] Tick and commit final local source/docs evidence; after approved deploy keep release-only notes local or in the next authorised change rather than triggering a second application deployment solely for status text.
 
 ## Rollback and operations
 
@@ -286,6 +289,91 @@ expect($reconciliation['discrepancies'])->toBe([]);
 
 **Interfaces/steps:** existing class/method paths were inspected; proposed new interfaces are listed once and tasks consume them. Task1 supplies Giving category/schema before the cash/source tests need it; Task2 progress uses prepared online domain fixtures until Task3 supplies real confirmation; Task3 ledger assertions do not depend on Task4's not-yet-built GivingBalance. Task6 runs after checkout/payout/UI foundations; Task7's event history integration follows it. Amount/currency/source typing,0 waiver, own-account accounting and statement/adjustment timing agree across tasks. Every task starts RED, has a bounded PASS command and a commit/tick step. No implementation checkbox is pre-ticked. Data structures are part of the proposal, not a generated migration.
 
-**Remaining review choices:** the seven recommendations at the top, especially reminder scope, report entitlement boundary and commission reversal policy. None authorises building or production operations. No application files, tests, assets, local data or production state were changed for this plan. Full suites are deliberately not run for a documentation-only proposal.
+**Original planning review (before approval):** the seven recommendations above covered reminder scope, report entitlement and commission reversal policy. The owner subsequently approved them and native implementation2026-10-17. This historical planning review did not authorise production operations; the implementation review and test evidence below describe the later work.
 
 **Document validation:** expanded existing modification paths, roadmap link, nine task headers/assertion examples, balanced code fences and unchecked implementation steps were checked against the current checkout. This is documentation validation, not a claim that the planned application tests have run.
+
+
+## Implementation self-review — local branch, 2026-10-17
+
+### Touchpoints updated
+
+- [x] `AGENTS.md`: Giving source, frozen-account, money, payout, history, consent and rollout invariants documented.
+- [x] Project handover: this plan, parent spec and roadmap record the implemented contracts and release boundaries. No unrelated personal memory file is needed.
+- [x] Seeders/roles: `manage giving` is defined in PermissionsSeeder and RolePermissions; new model factories support disposable tests. No production demo seeding.
+- [x] Navigation: Community Overview/Money, Finance, payment settings, public organisation Give entry point, fund links and private Money records. Giving-only organisations do not need a member register, membership type, dues or event.
+- [x] Permissions: request/action guards and tenant-bound source lookups; finance-only donor props; explicit member-attribution permission; permission propagation uses the existing deploy seeder. Production propagation has not run for this branch.
+- [x] Configuration: Giving currencies and commercial defaults are in `config/services.php`; separate UI/online readiness/cutover controls. No new environment variable, package or dependency, so `.env.example` needs no new secret or entry.
+- [x] Tests: focused schema, cash, checkout, provider, refund, payout, privacy, historical association, statement, receipt, consent, UI and actual PostgreSQL concurrency coverage; final release-gate results recorded below when complete.
+
+### UI Gap Analysis
+
+- **Discoverability — present:** existing organisation, Community Money and Finance entries lead to Giving; central `/my` Money supplies payer receipts/statements and does not create an inbox recipient. Public gives include a private-history link through the normal central verification flow.
+- **Empty state — present:** no-fund creation action for authorised staff; unavailable/closed fund copy; no matching staff records; no private contributions; no dues requirement. Bulk offerings never fabricate an individual donor.
+- **Permission gating — present:** finance totals and donor/action props require finance access, cash changes require manage Giving, member attribution additionally requires manage members, refunds/payouts retain their existing permissions. All requests enforce the same restrictions as the UI.
+- **Loading/error states — present:** protected identity generations, offline/expiry invalidation, busy controls, server validation, retryable forms with stable operation IDs, honest unknown provider outcomes and recovery controls. Receipt/reminder delivery outcomes stay in staff screens.
+- **Mobile — locally checked:** public dark form at390px, actual staff/native Money320px with no page overflow; immutable PDF rendered and CSV downloaded from normal UI. Recheck the new staff history search after the final build. Actual200% zoom and physical-device cold-offline are outstanding manual checks; responsive viewport tests are not substitutes.
+- **Accessibility — locally checked:** labelled native controls, keyboard date input, dialog/focus behavior and ARIA loading/error states. Verification button contrast was reproduced at1.81:1 and corrected to9.44:1 using the existing accent-ink token. Actual200% acceptance is not claimed.
+
+### Solved (auto-fixed)
+
+The one fresh whole-branch review found seven Important/P2 issues, no Critical, no minor and no declined-to-judge findings. Each received a focused reproducing regression before the fix:
+
+1. `PayoutSender`: safely release a committed community claim when recipient creation failed before transfer submission; preserve uncertain transfer submission as processing, never resend blindly.
+2. `StripeGateway`: remove the application-fee component from direct-charge provider fees before separately recording commission, using the real `fee_details` breakdown.
+3. `GivingHistory`: include dated historical flat-ledger contribution refunds in their own organisation-local period, preserve authorised/currency/source filters and exclude native Giving links from legacy lines. Undated legacy refunds remain an explicit exception, never an invented date.
+4. `GivingContributionBridge`: accept the original own-account `commission_receivable` transaction when the frozen actual settlement leaves commission owed; keep category/reference/currency checks and the zero-commission/null-posting case.
+5. `GivingStaffHistory`, `GivingFundController`, `MoneyGiving`: one paginated typed contribution history, original event-origin refund routes, older cash/refund actions, paginated corrections and explicit unresolved-refund filter. Encrypted standalone donor names are decoded through Eloquent only for the selected page, not selected as ciphertext or searched in an unbounded plaintext scan.
+6. `AttendeeApp`, `AttendeeMoney`: selected organisation reaches both Giving statement entry points and the filtered-history link.
+7. `ReconcileStuckPayouts`: provider-confirmed original OTP recovery applies to shared Dues and Giving release claims, with reference/net/currency/transfer-code verification and no fee posting or resend.
+
+Other integrated self-review corrections: permit signed-in staff from another organisation to browse public Giving without losing their session, while preserving console membership and private receipt/proof guards; preserve incomplete community transfer responses for original-reference recovery; bind send/release/reconcile mutations to their original claim so stale replies cannot overwrite a newer transfer; expose an anonymous giver’s private name only to finance staff, as specified; add the two new mails to the real render registry; update the exact category expectation; use supported default Button variants. Also separate payer identity from member attribution; bounded permission-safe member picker; organisation-host aliases delegate existing email verification instead of a404/cross-origin flow; post-cutover event provider flags; negative payable operational signal; timestamp and original-currency preservation; no autofocus page jump; clearly labelled cash reduction and local collection date.
+
+### Recommended for user decision
+
+- Shared light-theme primary-button contrast is4.31:1 against white, just below the4.5:1 normal-text target. This is the existing Console Button/theme token, reused by Giving. Recommend a small shared palette/accessibility correction (~15–30 minutes plus theme regression checks), rather than silently recolouring the entire application in this milestone. Deferred minor, not a completed accessibility acceptance.
+- Keep the branch for merge review first. A merge will trigger production deployment; none is authorised by this implementation request.
+- Complete actual200% zoom and physical-device cold-offline checks before final pilot acceptance (one manual browser/device session). Recommend keeping private Money online-only and preserving the existing ticked-pass offline rule.
+- Hosted-provider end-to-end checkout/refund/OTP acceptance remains a separate sandbox session with confirmed test accounts. No real keys, donor notification, payment, refund, transfer, historical association or cutover was exercised here. Recommend approving that bounded test separately before enabling online Giving.
+- After an approved deploy, verify additive migrations, permission propagation, queue/scheduler, category verifier and assets; enable Giving for Purpledot only under the approved pilot scope. Its online readiness flag and event cutover still require the separate go-ahead and tenant-bounded reconciliation.
+
+### Not gaps
+
+- No member/dues/follower/inbox recipient creation from giving is intentional; churches and volunteer groups can collect without them.
+- No automatic recurring charge: optional weekly/monthly email reminders are consented marketing with metered email, not a payment mandate.
+- Recorded/bulk cash contributes to campaign progress but never creates a platform-held payout balance.
+- Historical associations preserve old accounting. No implicit FX, ledger rewriting or retroactive event cutover.
+- A receipt is a service acknowledgement, not a tax-deductibility claim. Representatives see only explicitly attributed member records and do not inherit payer contacts or receipts.
+
+### Final verification evidence
+
+- One full PHP pass, two local workers:3122 tests,3116 passed,15197 assertions,1342.977seconds. Six failures were traced to the exact category expectation, unsupported default-style aliases, two new incomplete-transfer cases, the corrected anonymous finance-visibility assertion and the two-mail render registry. All were corrected rather than suppressed. This full run is not represented as an all-green run on the final commit.
+- Final targeted financial/compatibility gate:96/96 passed,533 assertions. Includes new and existing Giving/Dues/event senders, OTP release/reconciliation, all stale-claim cases, staff pages/history, real mailable rendering, console component usage and category enum. No second blanket PHP suite was run.
+- Public Giving cross-organisation browser regression reproduced302 instead of200, then corrected. The first36-test access/privacy/reminder pass passed32; four legacy resolver tests exposed non-Route request stubs. The final11/11 Giving/resolver pass (80 assertions) verifies the type-safe route check plus private fund/receipt/console boundaries; previously passing reminder/history cases remain covered. No tests were weakened.
+- JavaScript: full62 files/409 tests passed; final affected18/18 passed after the last UI changes. Source ESLint clean. Full PHPStan0 errors, one obsolete baseline entry removed and none added; Pint applied. Production asset build passed6.20seconds; existing large-chunk warning remains. All final assets are committed with source.
+- `finance:verify-categories` passed read-only on the local preview database. The end-to-end test also checks real synthetic Giving postings; no production ledger check or provider transaction is claimed.
+- Browser: named/bulk cash, correction, normal email verification/unchecked consent, receipt PDF/CSV, church/volunteer public pages, unavailable gateway, invalid precision, scoped native history, staff filters, dark/light, keyboard and narrow widths. Staff and native Money measured320px pageWidth=viewport; public dark form checked390px. Cross-organisation public Giving and return to the original console preserve login. Actual200%, physical-device offline and hosted-provider acceptance remain unverified.
+- Screenshots/artifacts: `giving-fund-desktop.png`, `giving-mobile-dark.png`, `giving-money-320.png`, `giving-staff-320.png`, `giving-local-receipt.pdf`/rendered PNG and `giving-local-statement.csv` in the task’s local visualization directory. Public preview: `https://giving-church-qa.miconvener-artifacts.test/give/community-fund`; volunteer listing: `https://giving-volunteer-qa.miconvener-artifacts.test/give`. Dummy local payment credentials are for form inspection, not a usable hosted checkout.
+- Original checkout remains clean on community-1a at01734944; Claude’s checkout remains clean on claude/community-inbox-design atd342e8c0. Work is confined to codex/community-5 in the owned artifact-completion worktree. No remote upload, merge, deployment, real payment or notification, production query, association/cutover or production flag change.
+
+
+### Implementation decisions (in order)
+
+1. Boost was unavailable in this tool session; installed commands and official versioned documentation supplied the fallback. Cost if wrong: recheck with Boost when exposed.
+2. An own-account commission waiver produces no ledger transaction because no platform cash/commission moves. Cost if wrong: callers must handle the documented nullable result.
+3. Restricted guest receipt capability uses the existing12-hour proof lifetime, a server-session token and stored hash. Cost if wrong: an email-less guest needs to download within that window.
+4. One unresolved refund per typed source. Cost if wrong: staff must resolve it before another partial refund.
+5. Reuse category-aware StoreDuesPayoutRequest, with Dues as the legacy default. Cost if wrong: the shared request retains its less descriptive name.
+6. Own-account commission rebates credit held Giving payable; only consumed CommissionCredit is restored, never double benefit. Cost if wrong: a rebate may need payout instead of future-fee credit.
+7. A legacy refund without a durable date stays an explicit undated exception, excluded from dated net and blocking cutover reconciliation. Cost if wrong: operator reconciliation is needed before cutover.
+8. Changing browser identity ends an email-less guest receipt capability early. Cost if wrong: download before changing identity, even within12hours.
+9. With community_app off, use a separate guarded native history page via the existing portal. Cost if wrong: an extra private page needs identity/offline coverage.
+10. Historical event funds remain separate per original currency, without FX. Cost if wrong: an event that changed currency has multiple private funds.
+11. Mail transport runs synchronously inside its one dedicated queued delivery job, with stable receipt Message-ID. Cost if wrong: tests assert sent rather than queued; uncertain SMTP receipt/reminder outcomes need controlled recovery, not an exactly-once promise or blind resend.
+12. Giving organisation-host email aliases delegate unchanged platform handlers. Cost if wrong: two aliases need the same proof/abuse tests, with no new identity authority.
+13. Weekly reminder anchors reuse0=Sunday…6=Saturday; monthly anchors stay1–31. Cost if wrong: future external clients must document that existing convention.
+14. Staff history searches fund names or record IDs, not encrypted donor-contact scans. Cost if wrong: finding a person requires their fund or receipt ID/browsing rather than a name search.
+
+### Deferred minors
+
+- Shared light-theme primary-button contrast4.31:1 vs4.5:1 target; a separate shared theme correction is recommended. No minors were raised by the independent review; this was measured in the final author browser audit.
