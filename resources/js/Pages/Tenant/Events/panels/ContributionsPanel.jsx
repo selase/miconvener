@@ -32,11 +32,15 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
     // Settings form
     const { data, setData, patch, processing, errors, recentlySuccessful } = useForm({
         allow_contributions: Boolean(event.allow_contributions),
-        contribution_title: event.contribution_title || event.lexicon?.contributions_title || 'Voluntary Contributions',
+        contribution_title:
+            event.contribution_title ||
+            event.lexicon?.contributions_title ||
+            'Voluntary Contributions',
         contribution_description: event.contribution_description || '',
-        contribution_presets: Array.isArray(event.contribution_presets) && event.contribution_presets.length > 0
-            ? event.contribution_presets.map((p) => Math.round(p / 100)).join(', ')
-            : '20, 50, 100, 200, 500',
+        contribution_presets:
+            Array.isArray(event.contribution_presets) && event.contribution_presets.length > 0
+                ? event.contribution_presets.map((p) => Math.round(p / 100)).join(', ')
+                : '20, 50, 100, 200, 500',
         contribution_min_amount: event.contribution_min_amount_pesewas
             ? (event.contribution_min_amount_pesewas / 100).toString()
             : '1.00',
@@ -127,15 +131,26 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
 
     return (
         <div className="space-y-6">
+            {stats.giving_payout_url && (
+                <div className="border border-border p-4 text-sm text-ink-secondary">
+                    New Giving contributions are paid out through Finance → Giving, separately from
+                    event ticket money.{' '}
+                    <a href={stats.giving_payout_url} className="text-accent underline">
+                        Open Giving payouts
+                    </a>
+                </div>
+            )}
             {/* Header & Actions */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-xl font-bold tracking-tight text-ink flex items-center gap-2">
                         <HeartHandshake className="h-6 w-6 text-accent" />
-                        {event.lexicon?.contributions_panel_title || 'Voluntary Contributions & Support'}
+                        {event.lexicon?.contributions_panel_title ||
+                            'Voluntary Contributions & Support'}
                     </h2>
                     <p className="mt-1 text-sm text-ink-secondary">
-                        {event.lexicon?.contributions_panel_subtitle || 'Collect voluntary contributions with live message moderation.'}
+                        {event.lexicon?.contributions_panel_subtitle ||
+                            'Collect voluntary contributions with live message moderation.'}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -163,14 +178,18 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                     <div className="mt-1 text-2xl font-bold text-ink">
                         {formatMoney(stats?.total_raised ?? 0, event.currency)}
                     </div>
-                    <div className="mt-1 text-xs text-ink-secondary">Gross contributions received</div>
+                    <div className="mt-1 text-xs text-ink-secondary">
+                        Gross contributions received
+                    </div>
                 </div>
                 <div className="rounded-lg border border-border bg-surface p-4">
                     <div className="text-xs font-medium text-ink-secondary">Net Settlement</div>
                     <div className="mt-1 text-2xl font-bold text-success-fg">
                         {formatMoney(stats?.net_payout ?? 0, event.currency)}
                     </div>
-                    <div className="mt-1 text-xs text-ink-secondary">After gateway & platform fees</div>
+                    <div className="mt-1 text-xs text-ink-secondary">
+                        After gateway & platform fees
+                    </div>
                 </div>
                 <div className="rounded-lg border border-border bg-surface p-4">
                     <div className="text-xs font-medium text-ink-secondary">Confirmed Donors</div>
@@ -215,10 +234,10 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             {st === 'all'
                                 ? 'All'
                                 : st === 'completed'
-                                ? 'Completed'
-                                : st === 'pending_payment'
-                                ? 'Pending'
-                                : 'Failed'}
+                                  ? 'Completed'
+                                  : st === 'pending_payment'
+                                    ? 'Pending'
+                                    : 'Failed'}
                         </button>
                     ))}
                 </div>
@@ -239,8 +258,16 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                     {filteredContributions.length > 0 ? (
                         filteredContributions.map((c) => {
                             const isCompleted = c.status === 'completed';
-                            const pillStatus = isCompleted ? 'success' : c.status === 'pending_payment' ? 'pending' : 'failed';
-                            const statusLabel = isCompleted ? 'Completed' : c.status === 'pending_payment' ? 'Pending' : c.status;
+                            const pillStatus = isCompleted
+                                ? 'success'
+                                : c.status === 'pending_payment'
+                                  ? 'pending'
+                                  : 'failed';
+                            const statusLabel = isCompleted
+                                ? 'Completed'
+                                : c.status === 'pending_payment'
+                                  ? 'Pending'
+                                  : c.status;
 
                             return (
                                 <Tr key={c.id}>
@@ -273,15 +300,15 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                                         )}
                                     </Td>
                                     <Td>
-                                        <StatusPill status={pillStatus}>
-                                            {statusLabel}
-                                        </StatusPill>
+                                        <StatusPill status={pillStatus}>{statusLabel}</StatusPill>
                                     </Td>
                                     <Td>
                                         {c.tribute_message ? (
                                             <div className="max-w-xs text-xs text-ink italic flex items-start gap-1.5">
                                                 <MessageSquareQuote className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
-                                                <span className="line-clamp-2">{c.tribute_message}</span>
+                                                <span className="line-clamp-2">
+                                                    {c.tribute_message}
+                                                </span>
                                             </div>
                                         ) : (
                                             <span className="text-xs text-ink-secondary">—</span>
@@ -305,7 +332,11 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                                                         ? 'bg-surface-sunken text-ink hover:bg-surface-hover'
                                                         : 'bg-warning-bg text-warning-fg hover:opacity-80'
                                                 }`}
-                                                title={c.is_approved ? 'Hide from Tribute Wall' : 'Show on Tribute Wall'}
+                                                title={
+                                                    c.is_approved
+                                                        ? 'Hide from Tribute Wall'
+                                                        : 'Show on Tribute Wall'
+                                                }
                                             >
                                                 {c.is_approved ? (
                                                     <>
@@ -361,7 +392,9 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                         </span>
                     </label>
                     {event.contribution_fee_note && (
-                        <p className="-mt-2 text-xs text-ink-secondary">{event.contribution_fee_note}</p>
+                        <p className="-mt-2 text-xs text-ink-secondary">
+                            {event.contribution_fee_note}
+                        </p>
                     )}
 
                     <div>
@@ -372,10 +405,16 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             type="text"
                             value={data.contribution_title}
                             onChange={(e) => setData('contribution_title', e.target.value)}
-                            placeholder={event.lexicon?.contributions_title ? `e.g. ${event.lexicon.contributions_title}` : 'e.g. Voluntary Contributions'}
+                            placeholder={
+                                event.lexicon?.contributions_title
+                                    ? `e.g. ${event.lexicon.contributions_title}`
+                                    : 'e.g. Voluntary Contributions'
+                            }
                         />
                         {errors.contribution_title && (
-                            <p className="mt-1 text-xs text-danger-fg">{errors.contribution_title}</p>
+                            <p className="mt-1 text-xs text-danger-fg">
+                                {errors.contribution_title}
+                            </p>
                         )}
                     </div>
 
@@ -387,7 +426,11 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             rows={3}
                             value={data.contribution_description}
                             onChange={(e) => setData('contribution_description', e.target.value)}
-                            placeholder={event.lexicon?.contributions_subtitle ? `e.g. ${event.lexicon.contributions_subtitle}` : 'Describe what contributions will be used for...'}
+                            placeholder={
+                                event.lexicon?.contributions_subtitle
+                                    ? `e.g. ${event.lexicon.contributions_subtitle}`
+                                    : 'Describe what contributions will be used for...'
+                            }
                             className="w-full rounded-md border border-border bg-surface p-2.5 text-sm text-ink placeholder:text-ink-secondary focus:border-accent focus:outline-none"
                         />
                     </div>
@@ -414,7 +457,9 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                                 step="1"
                                 placeholder="e.g. 10000"
                                 value={data.contribution_goal_amount}
-                                onChange={(e) => setData('contribution_goal_amount', e.target.value)}
+                                onChange={(e) =>
+                                    setData('contribution_goal_amount', e.target.value)
+                                }
                             />
                         </div>
                     </div>
@@ -451,7 +496,9 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             <input
                                 type="checkbox"
                                 checked={data.show_contributor_amounts}
-                                onChange={(e) => setData('show_contributor_amounts', e.target.checked)}
+                                onChange={(e) =>
+                                    setData('show_contributor_amounts', e.target.checked)
+                                }
                                 className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
                             />
                             <span className="text-sm font-medium text-ink">
@@ -468,11 +515,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                         >
                             Cancel
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="primary"
-                            disabled={processing}
-                        >
+                        <Button type="submit" variant="primary" disabled={processing}>
                             {processing ? 'Saving...' : 'Save Settings'}
                         </Button>
                     </div>

@@ -33,9 +33,15 @@ final class GivingProgress
                 $keys[$gift->giver_key] = true;
             }
         }
+        $eventGiverKeys = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $fund->tenant_id)->where('fund_id', $fund->id)->where('state', 'confirmed')->whereNotNull('event_contribution_id')->pluck('giver_key', 'event_contribution_id');
         foreach ($contributions as $contribution) {
             $legacyRefunded = $contribution->status === EventContribution::STATUS_REFUNDED && ! $eventReductions->has($contribution->id);
-            $raised += $legacyRefunded ? 0 : max(0, $contribution->amount - ($eventReductions[$contribution->id] ?? 0));
+            $netPrincipal = $legacyRefunded ? 0 : max(0, $contribution->amount - ($eventReductions[$contribution->id] ?? 0));
+            $raised += $netPrincipal;
+            $key = $eventGiverKeys[$contribution->id] ?? null;
+            if ($netPrincipal > 0 && $key !== null) {
+                $keys[$key] = true;
+            }
         }
         $target = $fund->kind === 'campaign' ? $fund->target : null;
 

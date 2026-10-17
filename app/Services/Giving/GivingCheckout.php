@@ -13,6 +13,7 @@ use App\Models\GivingPaymentAttempt;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Finance\CommercialTerms;
 use App\Services\Payment\StripeGateway;
+use Closure;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -23,14 +24,17 @@ final class GivingCheckout
 {
     public function __construct(private readonly GivingRollout $rollout, private readonly GivingProgress $progress, private readonly GivingGateways $gateways, private readonly CommercialTerms $terms) {}
 
-    /** @param array<string, mixed> $validated */
-    public function start(GivingFund $fund, array $validated, Session $session, string $submissionKey, ?EventContribution $eventSource = null): string
+    /**
+     * @param  array<string, mixed>  $validated
+     * @param  (Closure(): EventContribution)|null  $createEventSource
+     */
+    public function start(GivingFund $fund, array $validated, Session $session, string $submissionKey, ?EventContribution $eventSource = null, ?Closure $createEventSource = null): string
     {
         abort_unless($this->rollout->onlineEnabled($fund->tenant), 404);
         if (! Str::isUuid($submissionKey)) {
             throw ValidationException::withMessages(['submission_key' => 'Use a valid submission identifier.']);
         }
-        [$attempt, $isNew] = $fund->getConnection()->transaction(function () use ($fund, $validated, $session, $submissionKey, $eventSource): array {
+        [$attempt, $isNew] = $fund->getConnection()->transaction(function () use ($fund, $validated, $session, $submissionKey, $eventSource, $createEventSource): array {
             $fund = GivingFund::withoutGlobalScopes()->where('tenant_id', $fund->tenant_id)->lockForUpdate()->findOrFail($fund->id);
             $old = GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $fund->tenant_id)->where('submission_key', $submissionKey)->first();
             if ($old !== null) {
@@ -45,6 +49,9 @@ final class GivingCheckout
                 return [$old, false];
             }
             $this->progress->assertOpen($fund);
+            if ($createEventSource !== null) {
+                $eventSource = $createEventSource();
+            }
             if ($eventSource === null) {
                 abort_if($fund->visibility === 'private' || $fund->event_id !== null, 404);
             } else {
@@ -91,6 +98,7 @@ final class GivingCheckout
         if (! $isNew) {
             return $attempt->checkout_url;
         }
+        $eventSource = $attempt->event_contribution_id === null ? null : EventContribution::withoutGlobalScopes()->where('tenant_id', $attempt->tenant_id)->findOrFail($attempt->event_contribution_id);
         try {
             $prepared = $this->gateways->prepare($attempt);
             $attempt->update(['commission_settlement' => $prepared['settlement']]);
@@ -99,7 +107,7 @@ final class GivingCheckout
                 'tenant_id' => $attempt->tenant_id, 'fund_id' => $attempt->fund_id, 'local_reference' => $attempt->reference,
                 'source_type' => $attempt->gift_id === null ? 'event_contribution' : 'gift', 'source_id' => $attempt->gift_id ?? $attempt->event_contribution_id,
                 'source' => config('services.paystack.metadata_source')];
-            $callback = route('public.giving.callback', ['subdomain' => $attempt->tenant->slug, 'reference' => $attempt->reference]);
+            $callback = $eventSource !== null && isset($validated['callback_url']) ? str_replace(':id', $eventSource->id, $validated['callback_url']) : route('public.giving.callback', ['subdomain' => $attempt->tenant->slug, 'reference' => $attempt->reference]);
             $payerEmail = ($eventSource !== null ? $eventSource->contributor_email : $attempt->gift->payer_email) ?? 'giving+'.$attempt->id.'@miconvener.com';
             $payerName = ($eventSource !== null ? $eventSource->contributor_name : $attempt->gift->payer_name) ?? 'Contributor';
             $providerSession = null;

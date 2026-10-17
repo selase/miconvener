@@ -17,7 +17,7 @@ final class GivingReport
     public function summary(Tenant $tenant, CarbonImmutable $from, CarbonImmutable $to, ?string $fund = null, ?string $currency = null): array
     {
         $rows = [];
-        $empty = ['collected_online' => 0, 'recorded_cash' => 0, 'refunds' => 0, 'corrections' => 0, 'net_online' => 0, 'available' => 0];
+        $empty = ['collected_online' => 0, 'recorded_cash' => 0, 'refunds' => 0, 'corrections' => 0, 'net_online' => 0, 'available' => 0, 'undated_legacy_refunds' => 0];
         $gifts = GivingGift::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereIn('status', ['completed', 'refunded'])->when($fund, fn ($q) => $q->where('fund_id', $fund))->when($currency, fn ($q) => $q->where('currency', $currency))->where(fn ($q) => $q->whereBetween('collected_at', [$from, $to])->orWhere(fn ($q) => $q->whereNull('collected_at')->whereBetween('paid_at', [$from, $to])))->get();
         foreach ($gifts as $gift) {
             $rows[$gift->currency] ??= $empty;
@@ -40,6 +40,20 @@ final class GivingReport
         }
         foreach (\App\Models\LedgerAccount::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNull('event_id')->where('category', \App\Enum\LedgerCategoryEnum::Giving)->where('code', \App\Models\LedgerAccount::CODE_ORGANIZER_PAYABLE)->when($currency, fn ($q) => $q->where('currency', $currency))->pluck('currency') as $code) {
             $rows[$code] ??= $empty;
+        }
+        $legacyIds = GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'event')->when($fund, fn ($q) => $q->where('fund_id', $fund))->pluck('event_contribution_id');
+        $legacyRefunds = \App\Models\EventLedgerEntry::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereIn('contribution_id', $legacyIds)->where('type', \App\Models\EventLedgerEntry::TYPE_REFUND)->when($currency, fn ($q) => $q->where('currency', $currency))->get();
+        foreach ($legacyRefunds as $refund) {
+            if ($refund->created_at->betweenIncluded($from, $to)) {
+                $rows[$refund->currency] ??= $empty;
+                $rows[$refund->currency]['refunds'] += abs($refund->gross_amount);
+            }
+        }
+        foreach (EventContribution::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereIn('id', $legacyIds)->where('status', 'refunded')->when($currency, fn ($q) => $q->where('currency', $currency))->get() as $source) {
+            if (! $legacyRefunds->contains('contribution_id', $source->id)) {
+                $rows[$source->currency] ??= $empty;
+                $rows[$source->currency]['undated_legacy_refunds'] += $source->amount;
+            }
         }
         foreach ($rows as $code => &$values) {
             $values['net_online'] = $values['collected_online'] - $values['refunds'];

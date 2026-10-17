@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Input from '@/Components/Console/Input';
@@ -7,6 +7,7 @@ import Select from '@/Components/Console/Select';
 import Button from '@/Components/Console/Button';
 import { formatDuesMoney } from '@/lib/dues';
 export default function GivingReport({ summary, filters, funds }) {
+    const errors = usePage().props.errors ?? {};
     const [form, setForm] = useState({
         from: filters.from,
         to: filters.to,
@@ -32,18 +33,21 @@ export default function GivingReport({ summary, filters, funds }) {
                 >
                     <Input
                         label="From"
+                        error={errors.from}
                         type="date"
                         value={form.from}
                         onChange={(e) => setForm({ ...form, from: e.target.value })}
                     />
                     <Input
                         label="To"
+                        error={errors.to}
                         type="date"
                         value={form.to}
                         onChange={(e) => setForm({ ...form, to: e.target.value })}
                     />
                     <Select
                         label="Fund"
+                        error={errors.fund}
                         value={form.fund}
                         onChange={(e) => setForm({ ...form, fund: e.target.value })}
                     >
@@ -56,6 +60,7 @@ export default function GivingReport({ summary, filters, funds }) {
                     </Select>
                     <Select
                         label="Currency"
+                        error={errors.currency}
                         value={form.currency}
                         onChange={(e) => setForm({ ...form, currency: e.target.value })}
                     >
@@ -84,6 +89,15 @@ export default function GivingReport({ summary, filters, funds }) {
                     Object.entries(summary).map(([currency, row]) => (
                         <section key={currency} className="border border-border p-6">
                             <h2 className="text-xl font-semibold text-ink">{currency}</h2>
+                            {row.undated_legacy_refunds > 0 && (
+                                <p role="alert" className="mt-4 text-sm text-ink">
+                                    Legacy refunds of{' '}
+                                    {formatDuesMoney(row.undated_legacy_refunds, currency)} have no
+                                    recorded refund date. Dated net totals exclude them. Reconcile
+                                    these before relying on the period totals or cutting over event
+                                    collections.
+                                </p>
+                            )}
                             <dl className="mt-5 grid gap-5 sm:grid-cols-3">
                                 {[
                                     ['collected_online', 'Collected online'],

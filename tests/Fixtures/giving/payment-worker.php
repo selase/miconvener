@@ -35,7 +35,11 @@ if ($argv[2] === 'confirm') {
         },
     ]);
     try {
-        app(GivingCheckout::class)->start($fund, ['amount_minor' => 10000, 'currency' => 'GHS', 'provider' => 'paystack'], app('session.store'), $argv[3]);
+        if ($argv[2] === 'event_checkout') {
+            app(App\Services\Giving\GivingContributionBridge::class)->initiate($fund->event, ['contributor_name' => 'Concurrent guest', 'amount' => '100', 'submission_key' => $argv[3]], '/callback/:id', 'paystack', Carbon\CarbonImmutable::now());
+        } else {
+            app(GivingCheckout::class)->start($fund, ['amount_minor' => 10000, 'currency' => 'GHS', 'provider' => 'paystack'], app('session.store'), $argv[3]);
+        }
         echo 'STARTED';
     } catch (ValidationException $exception) {
         if (! isset($exception->errors()['submission_key']) && ! isset($exception->errors()['payment'])) {

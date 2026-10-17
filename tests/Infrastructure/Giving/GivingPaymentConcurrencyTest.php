@@ -19,7 +19,11 @@ afterEach(function (): void {
 });
 
 it('serialises duplicate checkout and provider confirmations across actual workers', function (string $mode): void {
-    [, , $fund, $attempt] = GivingScenario::online();
+    [$tenant, , $fund, $attempt] = GivingScenario::online();
+    if ($mode === 'event_checkout') {
+        $event = App\Models\Event::factory()->published()->create(['tenant_id' => $tenant->id, 'currency' => 'GHS', 'allow_contributions' => true]);
+        $fund = app(App\Services\Giving\GivingContributionBridge::class)->fundFor($event);
+    }
     $key = $mode === 'confirm' ? $attempt->id : (string) Str::uuid();
     $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
     $workers = array_map(fn () => new Process([PHP_BINARY, base_path('tests/Fixtures/giving/payment-worker.php'), $fund->id, $mode, $key], base_path(), $environment), [0, 1]);
@@ -49,8 +53,11 @@ it('serialises duplicate checkout and provider confirmations across actual worke
                 ->and(mb_substr_count($output, 'CONFIRMED'))->toBe(2);
         } else {
             expect(GivingPaymentAttempt::withoutGlobalScopes()->where('submission_key', $key)->count())->toBe(1)
-                ->and(GivingGift::withoutGlobalScopes()->where('submission_key', $key)->count())->toBe(1)
+                ->and(GivingGift::withoutGlobalScopes()->where('submission_key', $key)->count())->toBe($mode === 'event_checkout' ? 0 : 1)
                 ->and(mb_substr_count($output, 'INITIALIZED'))->toBe(1);
+            if ($mode === 'event_checkout') {
+                expect(App\Models\EventContribution::withoutGlobalScopes()->where('event_id', $fund->event_id)->count())->toBe(1);
+            }
         }
     } finally {
         if ($connection->transactionLevel() > 0) {
@@ -62,4 +69,4 @@ it('serialises duplicate checkout and provider confirmations across actual worke
             }
         }
     }
-})->with(['checkout', 'confirm']);
+})->with(['checkout', 'confirm', 'event_checkout']);

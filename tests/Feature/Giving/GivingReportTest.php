@@ -22,7 +22,7 @@ test('giving reports require finance support filters and neutralise formula cell
     GivingGift::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $fund->id, 'status' => 'completed', 'source' => 'recorded_cash', 'collected_at' => now()]);
     $url = 'http://'.eventSubdomainHost($tenant->slug).'/community/money/giving/report';
     $this->actingAs($user)->get($url)->assertOk()->assertInertia(fn ($page) => $page->component('Tenant/Community/GivingReport'));
-    $this->get($url.'?format=csv')->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertStreamedContent("Currency,\"Collected online\",\"Recorded cash\",Refunds,Corrections,\"Net online\",Available\nGHS,0,10000,0,0,0,0\n");
+    $this->get($url.'?format=csv')->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertStreamedContent("Currency,\"Collected online\",\"Recorded cash\",Refunds,Corrections,\"Net online\",Available,\"Undated legacy refunds (excluded from dated net)\"\nGHS,0,10000,0,0,0,0,0\n");
     $this->getJson($url.'?fund='.App\Models\GivingFund::factory()->create()->id)->assertUnprocessable();
     $this->getJson($url.'?from=2026-12-01&to=2026-01-01')->assertUnprocessable();
     $user->revokePermissionTo('read finance');

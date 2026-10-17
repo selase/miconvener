@@ -545,6 +545,23 @@ export default function FinancePanel({ event }) {
 
     return (
         <div className="max-w-4xl space-y-6">
+            {stats.giving_payout_url && (
+                <section className="border border-border bg-surface p-5">
+                    <p className="font-semibold text-ink">
+                        Giving contributions · {formatMoney(stats.giving_collected, event.currency)}
+                    </p>
+                    <p className="mt-2 text-sm text-ink-secondary">
+                        These contributions are paid out through Finance → Giving. They are excluded
+                        from this event’s available payout balance.
+                    </p>
+                    <a
+                        href={stats.giving_payout_url}
+                        className="mt-3 inline-block text-sm text-accent underline"
+                    >
+                        Open Giving payouts
+                    </a>
+                </section>
+            )}
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>

@@ -29,7 +29,7 @@ final class GivingReportController extends Controller
         if (($input['format'] ?? null) === 'csv') {
             return response()->streamDownload(function () use ($summary): void {
                 $file = fopen('php://output', 'w');
-                fputcsv($file, ['Currency', 'Collected online', 'Recorded cash', 'Refunds', 'Corrections', 'Net online', 'Available'], ',', '"', '');
+                fputcsv($file, ['Currency', 'Collected online', 'Recorded cash', 'Refunds', 'Corrections', 'Net online', 'Available', 'Undated legacy refunds (excluded from dated net)'], ',', '"', '');
                 foreach ($summary as $currency => $values) {
                     fputcsv($file, [$currency, ...array_values($values)], ',', '"', '');
                 }

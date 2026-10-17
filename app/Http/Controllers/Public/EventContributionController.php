@@ -50,6 +50,7 @@ final class EventContributionController extends Controller
             'tribute_message' => ['nullable', 'string', 'max:1000'],
             'is_anonymous' => ['sometimes', 'boolean'],
             'provider' => ['sometimes', 'nullable', 'in:paystack,stripe'],
+            'submission_key' => ['sometimes', 'uuid'],
         ]);
 
         $callbackUrl = route('public.events.contributions.callback', [
@@ -85,6 +86,17 @@ final class EventContributionController extends Controller
             ->where('event_id', $eventModel->id)
             ->where('id', $contribution)
             ->firstOrFail();
+
+        $givingAttempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('event_contribution_id', $contributionModel->id)->first();
+        if ($givingAttempt !== null) {
+            try {
+                app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($givingAttempt->reference, app(\App\Services\Giving\GivingGateways::class)->verify($givingAttempt));
+            } catch (Throwable) {
+                app(\App\Services\Giving\GivingPaymentConfirmer::class)->quarantine($givingAttempt, 'event_callback_verification_unavailable');
+            }
+
+            return redirect()->route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug])->with($givingAttempt->fresh()->state === 'confirmed' ? 'success' : 'info', $givingAttempt->fresh()->state === 'confirmed' ? 'Thank you for your contribution.' : 'Your contribution is being verified. Please do not pay again.');
+        }
 
         if ($contributionModel->isCompleted()) {
             return redirect()->route('public.events.show', [

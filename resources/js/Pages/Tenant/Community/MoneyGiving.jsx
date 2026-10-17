@@ -439,6 +439,14 @@ export default function MoneyGiving({
                     Object.entries(report).map(([currency, row]) => (
                         <section key={currency} className="border border-border bg-surface p-5">
                             <h3 className="font-semibold text-ink">This month · {currency}</h3>
+                            {row.undated_legacy_refunds > 0 && (
+                                <p role="alert" className="mt-4 text-sm text-ink">
+                                    Legacy refunds of{' '}
+                                    {formatDuesMoney(row.undated_legacy_refunds, currency)} have no
+                                    recorded refund date. They are excluded from dated net totals
+                                    and need reconciliation.
+                                </p>
+                            )}
                             <div className="mt-4 grid gap-4 sm:grid-cols-3">
                                 {[
                                     ['collected_online', 'Collected online'],

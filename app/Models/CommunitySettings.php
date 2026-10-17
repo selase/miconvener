@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/** @property \Carbon\CarbonImmutable|null $giving_event_cutover_at */
 final class CommunitySettings extends Model
 {
     use BelongsToTenant;

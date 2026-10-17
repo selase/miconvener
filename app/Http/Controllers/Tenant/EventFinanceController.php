@@ -33,6 +33,7 @@ final class EventFinanceController extends Controller
         $paidOut = (int) $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount');
 
         $stats = [
+            ...app(\App\Services\Giving\GivingContributionBridge::class)->eventSummary($eventModel),
             'collected' => $collected,
             'refunded' => (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_REFUND)->sum('gross_amount'),
             'fees' => $fees,

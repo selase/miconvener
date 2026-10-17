@@ -97,3 +97,39 @@ it('refunds show the recorded fee impact before sending', async () => {
     await waitFor(() => expect(screen.getByText(/Commission reversed/)).toBeTruthy());
     expect(sendJson.mock.calls.at(-1)[0]).toBe('GET');
 });
+
+it('event checkout retries retain one operation key and exact decimal input', async () => {
+    const { default: ContributionWidget } = await import('@/Components/Events/ContributionWidget');
+    const submissions = [];
+    const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(function () {
+        submissions.push(Object.fromEntries(new FormData(this)));
+        throw new Error('Synthetic navigation failure');
+    });
+    try {
+        const view = render(
+            <ContributionWidget
+                event={{
+                    slug: 'fundraiser',
+                    currency: 'GHS',
+                    contribution_providers: ['paystack'],
+                    allow_contributions: true,
+                }}
+            />
+        );
+        fireEvent.change(screen.getByPlaceholderText('e.g. Kwame Mensah'), {
+            target: { value: 'Synthetic giver' },
+        });
+        fireEvent.change(screen.getByPlaceholderText(/Other amount/), {
+            target: { value: '100.01' },
+        });
+        fireEvent.submit(view.container.querySelector('form'));
+        await waitFor(() => expect(submissions.length).toBe(1));
+        fireEvent.submit(view.container.querySelector('form'));
+        await waitFor(() => expect(submissions.length).toBe(2));
+        expect(submissions[0].submission_key).toBe(submissions[1].submission_key);
+        expect(submissions[0].amount).toBe('100.01');
+    } finally {
+        submit.mockRestore();
+        document.querySelectorAll('body > form').forEach((form) => form.remove());
+    }
+});
