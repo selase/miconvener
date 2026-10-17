@@ -91,3 +91,18 @@ it('fails closed on expired or corrupted ownership', () => {
         saveOfflineTicket(registration(), event(), { ...proof, proof_expires_at: NaN })
     ).toBeNull();
 });
+it('broadcasts sign-out when legacy call sites clear all ticket copies', () => {
+    const proof = context();
+    reconcileAttendeeIdentity(proof);
+    saveOfflineTicket(registration(), event(), proof);
+    let called = 0;
+    const handler = () => called++;
+    window.addEventListener('miconvener:attendee-identity', handler);
+    try {
+        clearAllOfflineTickets();
+        expect(localStorage.getItem('miconvener_attendee_identity_v3')).toBeNull();
+        expect(called).toBe(1);
+    } finally {
+        window.removeEventListener('miconvener:attendee-identity', handler);
+    }
+});

@@ -26,3 +26,7 @@ it('issues opaque proof-bound cache partitions and never caches signed in HTML',
     $response = $this->withSession($session->all())->get("http://{$host}/my", ['HTTP_HOST' => $host])->assertOk();
     expect($response->headers->get('Cache-Control'))->toContain('no-store');
 });
+it('allows the worker to control both canonical my and nested workspaces', function (): void {
+    $host = mb_ltrim((string) config('session.domain'), '.');
+    $this->get("http://{$host}/attendee-worker.js", ['HTTP_HOST' => $host])->assertOk()->assertHeader('Service-Worker-Allowed', '/my');
+});

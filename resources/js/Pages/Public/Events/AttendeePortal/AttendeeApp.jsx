@@ -2,7 +2,6 @@ import AttendeeMoney from './components/AttendeeMoney';
 import AttendeeMe from './components/AttendeeMe';
 import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
 import {
-    clearAllOfflineTickets,
     listOfflineTickets,
     removeOfflineTicket,
     getOfflineTicket,
@@ -46,7 +45,9 @@ export default function AttendeeApp({
     communityReturnUrl,
     offline_identity,
 }) {
-    const [online, setOnline] = useState(navigator.onLine);
+    const [online, setOnline] = useState(
+        navigator.onLine && offline_identity?.state !== 'unknown_offline'
+    );
     const [savedPasses, setSavedPasses] = useState([]);
     const [ticketDetail, setTicketDetail] = useState(null);
     const [cacheContext, setCacheContext] = useState(offline_identity);
@@ -65,6 +66,8 @@ export default function AttendeeApp({
     const [email, setEmail] = useState(verifiedEmail);
     const [phone, setPhone] = useState(communityPhoneVerified);
     const [money, setMoney] = useState(null);
+    const [moneyStatus, setMoneyStatus] = useState('idle');
+    const [preferencesStatus, setPreferencesStatus] = useState('idle');
     const [moneyPage, setMoneyPage] = useState(1);
     const [contributionsPage, setContributionsPage] = useState(1);
     const [identity, setIdentity] = useState(null);
@@ -77,7 +80,7 @@ export default function AttendeeApp({
     const expire = useCallback(() => {
         generation.current++;
         clearAttendeeIdentity();
-        clearAllOfflineTickets();
+
         setIdentity(null);
         setPreferences(null);
         setEmail(null);
@@ -100,6 +103,10 @@ export default function AttendeeApp({
     useEffect(() => {
         if (previousOwner.current !== offline_identity?.owner_key) {
             generation.current++;
+            setIdentity(null);
+            setPreferences(null);
+            setMoneyStatus('idle');
+            setPreferencesStatus('idle');
             setHistory(null);
             setRecords(null);
             setMoney(null);
@@ -111,6 +118,8 @@ export default function AttendeeApp({
         setPhone(communityPhoneVerified);
         setCacheContext(offline_identity);
         const context = reconcileAttendeeIdentity(offline_identity || { state: 'signed_out' });
+        if (offline_identity?.state === 'unknown_offline')
+            setCacheContext(context || offline_identity);
         setSavedPasses(
             navigator.onLine && offline_identity?.state === 'unknown_offline'
                 ? []
@@ -120,12 +129,13 @@ export default function AttendeeApp({
             setSection('tickets');
             setPeriod('saved');
         }
-        if (navigator.onLine && offline_identity?.state === 'unknown_offline') {
-            window.location.replace('/my' + window.location.search);
-        }
         registerAttendeeServiceWorker();
         const invalidate = () => {
             generation.current++;
+            setIdentity(null);
+            setPreferences(null);
+            setMoneyStatus('idle');
+            setPreferencesStatus('idle');
             setHistory(null);
             setRecords(null);
             setMoney(null);
@@ -139,10 +149,49 @@ export default function AttendeeApp({
         const storage = (event) => {
             if (isIdentityStorageEvent(event)) invalidate();
         };
-        const onOnline = () => {
-            setOnline(true);
-            window.location.assign('/my' + window.location.search);
+        const probeController = new AbortController();
+        const onOnline = async () => {
+            const current = generation.current;
+            try {
+                const response = await csrfFetch('/my/identity', {
+                    signal: probeController.signal,
+                });
+                if (probeController.signal.aborted || current !== generation.current) return;
+                if (response.status === 401) {
+                    clearAttendeeIdentity();
+                    setOnline(true);
+                    return;
+                }
+                if (!response.ok) throw new Error('Identity check unavailable');
+                const proof = await response.json();
+                if (probeController.signal.aborted || current !== generation.current) return;
+                const authoritative = proof.offline_identity;
+                if (authoritative?.state !== 'verified')
+                    throw new Error('Identity check unavailable');
+                generation.current++;
+                setIdentity(null);
+                setPreferences(null);
+                setHistory(null);
+                setRecords(null);
+                setMoney(null);
+                setTicketDetail(null);
+                setCredential(null);
+                reconcileAttendeeIdentity(authoritative);
+                setCacheContext(authoritative);
+                setEmail(proof.email?.masked ?? null);
+                setPhone(Boolean(proof.phone));
+                setOnline(true);
+                setSavedPasses(listOfflineTickets(authoritative));
+            } catch {
+                if (!probeController.signal.aborted) {
+                    setOnline(false);
+                    setSection('tickets');
+                    setPeriod('saved');
+                    setSavedPasses(listOfflineTickets({ state: 'unknown_offline' }));
+                }
+            }
         };
+        if (navigator.onLine && offline_identity?.state === 'unknown_offline') onOnline();
         const onOffline = () => {
             setOnline(false);
             setSection('tickets');
@@ -155,17 +204,8 @@ export default function AttendeeApp({
         window.addEventListener(IDENTITY_EVENT, invalidate);
         window.addEventListener('online', onOnline);
         window.addEventListener('offline', onOffline);
-        const timer = context
-            ? window.setTimeout(
-                  () => {
-                      clearAttendeeIdentity();
-                      invalidate();
-                  },
-                  Math.max(0, context.proof_expires_at - Date.now())
-              )
-            : null;
         return () => {
-            if (timer !== null) window.clearTimeout(timer);
+            probeController.abort();
             window.removeEventListener('storage', storage);
             window.removeEventListener(IDENTITY_EVENT, invalidate);
             window.removeEventListener('online', onOnline);
@@ -178,6 +218,14 @@ export default function AttendeeApp({
         verifiedEmail,
         communityPhoneVerified,
     ]);
+    useEffect(() => {
+        if (cacheContext?.state !== 'verified') return undefined;
+        const timer = window.setTimeout(
+            () => clearAttendeeIdentity(),
+            Math.max(0, cacheContext.proof_expires_at - Date.now())
+        );
+        return () => window.clearTimeout(timer);
+    }, [cacheContext?.state, cacheContext?.owner_key, cacheContext?.proof_expires_at]);
     const openTicket = async (entry) => {
         const current = generation.current;
         setError('');
@@ -242,7 +290,12 @@ export default function AttendeeApp({
         window.history.pushState({}, '', url);
     };
     useEffect(() => {
-        if (!online || !email || !['home', 'tickets'].includes(section) || period === 'saved')
+        if (
+            !online ||
+            !email ||
+            !['home', 'tickets'].includes(section) ||
+            (section === 'tickets' && period === 'saved')
+        )
             return undefined;
         const controller = new AbortController();
         const current = generation.current;
@@ -318,6 +371,7 @@ export default function AttendeeApp({
     };
     useEffect(() => {
         if (!online || section !== 'me' || (!email && !phone)) return undefined;
+        setPreferencesStatus('loading');
         const controller = new AbortController();
         const current = generation.current;
         Promise.all(
@@ -335,16 +389,20 @@ export default function AttendeeApp({
                 if (current === generation.current) {
                     setIdentity(proof);
                     setPreferences(data.preferences);
+                    setPreferencesStatus('success');
                 }
             })
             .catch((failure) => {
-                if (failure.name !== 'AbortError' && current === generation.current)
+                if (failure.name !== 'AbortError' && current === generation.current) {
                     setError(failure.message);
+                    setPreferencesStatus('error');
+                }
             });
         return () => controller.abort();
-    }, [section, email, phone, revision, preferencesPage, expire]);
+    }, [online, section, email, phone, revision, preferencesPage, expire]);
     useEffect(() => {
         if (!online || !['home', 'money'].includes(section) || (!email && !phone)) return undefined;
+        setMoneyStatus('loading');
         const controller = new AbortController();
         const current = generation.current;
         const params = new URLSearchParams({
@@ -360,14 +418,29 @@ export default function AttendeeApp({
                 }
                 if (!response.ok) throw new Error('Could not load money records. Try again.');
                 const data = await response.json();
-                if (current === generation.current) setMoney(data);
+                if (current === generation.current) {
+                    setMoney(data);
+                    setMoneyStatus('success');
+                }
             })
             .catch((failure) => {
-                if (failure.name !== 'AbortError' && current === generation.current)
+                if (failure.name !== 'AbortError' && current === generation.current) {
                     setError(failure.message);
+                    setMoneyStatus('error');
+                }
             });
         return () => controller.abort();
-    }, [section, email, phone, moneyPage, contributionsPage, organiser?.slug, revision, expire]);
+    }, [
+        online,
+        section,
+        email,
+        phone,
+        moneyPage,
+        contributionsPage,
+        organiser?.slug,
+        revision,
+        expire,
+    ]);
     const changePreference = async (slug, channel, enabled) => {
         setBusy(true);
         setError('');
@@ -419,11 +492,12 @@ export default function AttendeeApp({
             setError(failure.message);
         }
     };
+    const identityGeneration = generation.current;
     const Record = RECORDS[record];
     const needsEmail =
         online &&
-        ((['home', 'tickets'].includes(section) && !email) ||
-            (section === 'money' && !email && !phone));
+        ((section === 'tickets' && !email) ||
+            (['home', 'money'].includes(section) && !email && !phone));
     return (
         <AttendeeAppShell section={section} onSectionChange={navigate} offline={!online}>
             <Head title="My MiConvener">
@@ -507,7 +581,12 @@ export default function AttendeeApp({
                     ) : !loading && section === 'home' ? (
                         <AttendeeHome
                             history={history}
-                            duesSummary={money}
+                            duesSummary={moneyStatus === 'success' ? money : null}
+                            eventAccess={Boolean(email)}
+                            onVerifyEmail={() => {
+                                navigate('me');
+                                setVerifyChannel('email');
+                            }}
                             onSectionChange={navigate}
                             onOpen={openTicket}
                         />
@@ -531,11 +610,18 @@ export default function AttendeeApp({
                             <CommunitiesPanel
                                 organiser={organiser}
                                 initiallyOpen
-                                onCredential={setCredential}
-                                onExpired={expire}
+                                onCredential={(value) => {
+                                    if (
+                                        identityGeneration === generation.current &&
+                                        (email || phone)
+                                    )
+                                        setCredential(value);
+                                }}
+                                onExpired={() => {
+                                    if (identityGeneration === generation.current) expire();
+                                }}
                                 onPhoneRemoved={() => {
-                                    setPhone(false);
-                                    setRevision((value) => value + 1);
+                                    router.reload();
                                 }}
                             />
                         ) : (
@@ -544,6 +630,7 @@ export default function AttendeeApp({
                     {section === 'money' && (
                         <AttendeeMoney
                             data={money}
+                            status={moneyStatus}
                             initialTab={record === 'contributions' ? 'contributions' : 'dues'}
                             onPage={(kind, next) =>
                                 kind === 'dues' ? setMoneyPage(next) : setContributionsPage(next)
@@ -561,6 +648,7 @@ export default function AttendeeApp({
                                     }
                                 }
                                 preferences={preferences}
+                                status={preferencesStatus}
                                 onPreference={changePreference}
                                 onRemove={removeIdentity}
                                 onSignOut={signOut}

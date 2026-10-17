@@ -97,3 +97,93 @@ it('offers retry for a failed reader and does not mislabel phone-only access as 
         window.history.replaceState({}, '', '/');
     }
 });
+
+it('discards displayed Me contacts and organisation preferences after cross-tab sign-out', async () => {
+    window.history.replaceState({}, '', '/my?section=me');
+    const proof = {
+        state: 'verified',
+        owner_key: 'c'.repeat(64),
+        proof_expires_at: Date.now() + 3600000,
+    };
+    const fetcher = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async (url) => ({
+            ok: true,
+            status: 200,
+            json: async () =>
+                String(url).startsWith('/my/identity')
+                    ? { email: { masked: 'OLD PRIVATE CONTACT' }, phone: null }
+                    : {
+                          preferences: {
+                              data: [
+                                  {
+                                      tenant_slug: 'old',
+                                      name: 'PRIVATE OLD ORGANISATION',
+                                      channels: { email: { marketing_enabled: false } },
+                                  },
+                              ],
+                          },
+                      },
+        }));
+    try {
+        render(<AttendeeApp verifiedEmail="OLD PRIVATE CONTACT" offline_identity={proof} />);
+        expect(await screen.findByText('PRIVATE OLD ORGANISATION')).toBeTruthy();
+        window.dispatchEvent(
+            new StorageEvent('storage', { key: 'miconvener_attendee_identity_v3', newValue: null })
+        );
+        await waitFor(() => expect(screen.queryByText('OLD PRIVATE CONTACT')).toBeNull());
+        expect(screen.queryByText('PRIVATE OLD ORGANISATION')).toBeNull();
+    } finally {
+        fetcher.mockRestore();
+        window.history.replaceState({}, '', '/');
+    }
+});
+it('refreshes upcoming Home independently of a previously selected saved-ticket filter', async () => {
+    window.history.replaceState({}, '', '/my?section=tickets');
+    const fetcher = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue({ ok: true, status: 200, json: async () => ({ passes: { data: [] } }) });
+    try {
+        render(<AttendeeApp verifiedEmail="a••@example.test" />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Saved offline' }));
+        const before = fetcher.mock.calls.length;
+        fireEvent.click(
+            within(screen.getByRole('navigation', { name: 'Personal app navigation' })).getByRole(
+                'button',
+                { name: 'Home' }
+            )
+        );
+        await waitFor(() =>
+            expect(
+                fetcher.mock.calls
+                    .slice(before)
+                    .some(([url]) => String(url).includes('/my/app/events?period=upcoming'))
+            ).toBe(true)
+        );
+    } finally {
+        fetcher.mockRestore();
+        window.history.replaceState({}, '', '/');
+    }
+});
+it('shows authorised Community dues on Home without treating phone proof as ticket ownership', async () => {
+    window.history.replaceState({}, '', '/my?section=home');
+    const fetcher = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                totals_by_currency: [{ currency: 'GHS', open_total: 12000 }],
+                dues: { data: [] },
+                contributions: null,
+            }),
+        });
+    try {
+        render(<AttendeeApp communityPhoneVerified />);
+        expect(await screen.findByText('GHS 120.00 due')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Open ticket' })).toBeNull();
+    } finally {
+        fetcher.mockRestore();
+        window.history.replaceState({}, '', '/');
+    }
+});

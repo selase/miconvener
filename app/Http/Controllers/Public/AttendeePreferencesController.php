@@ -17,15 +17,16 @@ use Illuminate\Http\Request;
 
 final class AttendeePreferencesController extends Controller
 {
-    public function index(Request $request, CommunityHistory $history, Following $following): JsonResponse
+    public function index(Request $request, CommunityHistory $history, MessagingPreferences $preferences): JsonResponse
     {
         $rows = $history->communities($request->session());
-        $rows['data'] = array_map(function (array $row) use ($request, $following): array {
+        $rows['data'] = array_map(function (array $row) use ($request, $preferences): array {
             $tenant = Tenant::query()->findOrFail($row['id']);
             $channels = [];
             foreach (['email', 'sms'] as $channel) {
-                if ($this->address($request, $channel) !== null) {
-                    $channels[$channel] = ['marketing_enabled' => $following->isFollowing($tenant, $request->session(), $channel)];
+                $address = $this->address($request, $channel);
+                if ($address !== null) {
+                    $channels[$channel] = ['marketing_enabled' => $preferences->allowsMarketing($tenant, $channel, $address)];
                 }
             }
 
@@ -43,7 +44,19 @@ final class AttendeePreferencesController extends Controller
         $address = $this->address($request, $channel);
         abort_if($address === null, 403, 'Verify this contact first.');
         if ($request->boolean('marketing_enabled')) {
-            $following->follow($tenant, $request->session(), $channel, $request->boolean('resume_marketing'));
+            abort_unless($tenant->status === \App\Enum\TenantStatusEnum::ACTIVE, 404);
+            if ($tenant->followingEnabled()) {
+                $following->follow($tenant, $request->session(), $channel, $request->boolean('resume_marketing'));
+            } else {
+                $connection = $tenant->getConnection();
+                $connection->transaction(function () use ($connection, $tenant, $channel, $address, $preferences): void {
+                    $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community-follow:'.$tenant->id.':'.$channel.':'.$preferences->hash($channel, $address)]);
+                    if ($channel === 'sms' && app(\App\Services\Community\WrongNumberReports::class)->isBlocked($tenant, $channel, $address)) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['channel' => 'This number needs an independent review before SMS announcements can resume.']);
+                    }
+                    $preferences->enableMarketing($tenant, $channel, $address);
+                });
+            }
         } else {
             $preferences->disableMarketing($tenant, $channel, $address);
         }

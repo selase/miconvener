@@ -34,3 +34,10 @@ it('separates currencies, names representative access and preserves real payment
     fireEvent.click(screen.getByRole('button', { name: 'Contributions & receipts' }));
     expect(screen.getByText(/Verify your email/)).toBeTruthy();
 });
+it('does not describe pending or failed reads as an empty membership history', () => {
+    const view = render(<AttendeeMoney data={null} status="loading" />);
+    expect(screen.queryByText(/No authorised dues/)).toBeNull();
+    expect(screen.getByRole('status')).toBeTruthy();
+    view.rerender(<AttendeeMoney data={null} status="error" />);
+    expect(screen.queryByText(/No authorised dues/)).toBeNull();
+});

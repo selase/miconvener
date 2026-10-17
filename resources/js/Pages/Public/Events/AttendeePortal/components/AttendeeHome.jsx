@@ -1,5 +1,12 @@
 import TicketPass from './TicketPass';
-export default function AttendeeHome({ history, duesSummary, onSectionChange, onOpen }) {
+export default function AttendeeHome({
+    history,
+    duesSummary,
+    onSectionChange,
+    onOpen,
+    eventAccess = true,
+    onVerifyEmail,
+}) {
     const next = history?.live_now?.[0] || history?.passes?.data?.[0];
     const hour = new Date().getHours();
     return (
@@ -14,9 +21,27 @@ export default function AttendeeHome({ history, duesSummary, onSectionChange, on
             <div className="mt-7 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="space-y-5">
                     <h2 className="text-lg font-medium">
-                        {history?.live_now?.length ? 'Happening now' : 'Coming up next'}
+                        {!eventAccess
+                            ? 'Your communities'
+                            : history?.live_now?.length
+                              ? 'Happening now'
+                              : 'Coming up next'}
                     </h2>
-                    {next ? (
+                    {!eventAccess ? (
+                        <div className="border border-border bg-surface p-6 text-sm text-ink-secondary">
+                            <p>
+                                Your Community access is ready. Verify your email separately to see
+                                event tickets and records.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={onVerifyEmail}
+                                className="mt-3 min-h-11 text-accent underline"
+                            >
+                                Verify email for event tickets
+                            </button>
+                        </div>
+                    ) : next ? (
                         <TicketPass entry={next} onOpen={onOpen} />
                     ) : (
                         <div className="border border-border bg-surface p-6 text-sm text-ink-secondary">

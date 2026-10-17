@@ -342,7 +342,7 @@ final class PlatformAttendeeAccessController extends Controller
             'short_name' => 'My Events',
             'description' => 'Your tickets, materials, and agendas across all MiConvener events',
             'start_url' => '/my',
-            'scope' => '/my/',
+            'scope' => '/my',
             'display' => 'standalone',
             'background_color' => '#ffffff',
             'theme_color' => '#4f46e5',

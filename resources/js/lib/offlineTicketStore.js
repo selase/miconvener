@@ -1,4 +1,4 @@
-import { currentIdentity } from './attendeeIdentityCache';
+import { currentIdentity, clearAttendeeIdentity } from './attendeeIdentityCache';
 const PREFIX = 'miconvener_offline_ticket_';
 const DAY = 86400000;
 const time = (value) => (typeof value === 'string' ? Date.parse(value) : NaN);
@@ -105,13 +105,7 @@ export function hasOfflineTicket(id, context) {
     return Boolean(getOfflineTicket(id, context));
 }
 export function clearAllOfflineTickets() {
-    try {
-        Object.keys(localStorage)
-            .filter((key) => key.startsWith(PREFIX))
-            .forEach((key) => localStorage.removeItem(key));
-    } catch {
-        /* Storage may be disabled. */
-    }
+    clearAttendeeIdentity();
 }
 export function purgeExpiredOfflineTickets(context) {
     listOfflineTickets(context);

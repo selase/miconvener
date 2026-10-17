@@ -8,6 +8,7 @@ export default function AttendeeMe({
     onVerify,
     onPage,
     busy = false,
+    status = 'success',
 }) {
     const [consents, setConsents] = useState({});
     return (
@@ -62,7 +63,18 @@ export default function AttendeeMe({
                     Choose organisation announcements. Sign-in codes, receipts and essential service
                     notices stay available.
                 </p>
-                {preferences?.data?.length ? (
+                {status !== 'success' ? (
+                    <p
+                        role={status === 'error' ? 'alert' : 'status'}
+                        className="mt-4 border border-border p-5 text-sm text-ink-secondary"
+                    >
+                        {status === 'error'
+                            ? 'Your announcement preferences could not be loaded. Use Retry to reconnect.'
+                            : identity?.email || identity?.phone
+                              ? 'Loading your announcement preferences…'
+                              : 'Verify a contact to manage your announcements.'}
+                    </p>
+                ) : preferences?.data?.length ? (
                     preferences.data.map((row) => (
                         <article
                             key={row.tenant_slug}

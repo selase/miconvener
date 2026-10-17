@@ -26,3 +26,19 @@ it('removes only email proof but revokes checkout capabilities when email is rem
     $proof = [...$this->session->all(), PhoneVerification::SESSION_KEY => ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp], PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY => ['one' => now()->addHour()->timestamp]];
     $this->withSession($proof)->deleteJson($this->base.'/identity/email')->assertOk()->assertSessionMissing(PlatformAttendeeVerification::SESSION_KEY)->assertSessionMissing(PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY)->assertSessionHas(PhoneVerification::SESSION_KEY);
 });
+it('shows the actual member announcement permission and permits explicit resume with Following off', function (): void {
+    $this->withSession($this->session->all())->getJson($this->base.'/preferences')->assertOk()->assertJsonPath('preferences.data.0.channels.email.marketing_enabled', true);
+    $url = $this->base.'/preferences/'.$this->tenant->slug;
+    $this->patchJson($url, ['channel' => 'email', 'marketing_enabled' => false])->assertOk();
+    $this->patchJson($url, ['channel' => 'email', 'marketing_enabled' => true, 'resume_marketing' => true])->assertOk();
+    expect(app(MessagingPreferences::class)->allowsMarketing($this->tenant, 'email', 'a@example.test'))->toBeTrue();
+    expect(App\Models\CommunityFollower::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count())->toBe(0);
+});
+it('never resumes held SMS announcements through member preferences with Following off', function (): void {
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => $this->member->phone, 'expires_at' => now()->addHour()->timestamp]);
+    app(App\Services\Community\WrongNumberReports::class)->report($this->tenant, $this->session, 'Number is reassigned.');
+    App\Models\CommunityWrongNumberReport::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->update(['status' => 'confirmed']);
+    app(MessagingPreferences::class)->disableMarketing($this->tenant, 'sms', $this->member->phone);
+    $this->withSession($this->session->all())->patchJson($this->base.'/preferences/'.$this->tenant->slug, ['channel' => 'sms', 'marketing_enabled' => true, 'resume_marketing' => true])->assertUnprocessable();
+    expect(app(MessagingPreferences::class)->allowsMarketing($this->tenant, 'sms', $this->member->phone))->toBeFalse();
+});

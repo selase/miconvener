@@ -27,9 +27,14 @@ final class CommunityHistory
             return $tenants->where('slug', $organiserSlug)->exists();
         }
 
-        return $tenants->where(function ($query) use ($session): void {
+        $email = $this->emails->verifiedEmail($session);
+
+        return $tenants->where(function ($query) use ($session, $email): void {
             $query->whereIn('id', $this->memberQuery($session)->select('tenant_id'))
                 ->orWhereIn('id', $this->followerQuery($session)->select('tenant_id'));
+            if ($email !== null) {
+                $query->orWhereIn('id', \App\Models\EventRegistration::withoutGlobalScopes()->forEmail($email)->whereNotIn('status', [\App\Models\EventRegistration::STATUS_CANCELLED, \App\Models\EventRegistration::STATUS_REJECTED])->whereHas('event', fn ($event) => $event->withoutGlobalScopes()->whereNull('deleted_at'))->select('tenant_id'));
+            }
         })->exists();
     }
 

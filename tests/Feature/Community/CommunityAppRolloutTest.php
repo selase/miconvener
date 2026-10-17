@@ -44,3 +44,14 @@ it('finds an authorised pilot beyond the first page and never infers it from ano
     $host = mb_ltrim((string) config('session.domain'), '.');
     $this->get("http://{$host}/my?organiser=zzz-pilot", ['HTTP_HOST' => $host])->assertOk()->assertInertia(fn ($page) => $page->where('app_shell_enabled', true));
 });
+it('includes a pilot organisation reached only through the current event ticket email', function (): void {
+    $tenant = Tenant::factory()->create();
+    $tenant->features()->create(['feature_key' => 'community_app', 'enabled' => true]);
+    $event = App\Models\Event::factory()->published()->create(['tenant_id' => $tenant->id]);
+    $reg = App\Models\EventRegistration::factory()->confirmed()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'email' => 'ticket-only@example.test']);
+    $session = app('session.store');
+    $session->put(PlatformAttendeeVerification::SESSION_KEY, ['email' => 'ticket-only@example.test', 'expires_at' => now()->addHour()->timestamp]);
+    expect(app(CommunityHistory::class)->usesAppShell($session, null))->toBeTrue();
+    $reg->update(['email' => 'changed@example.test']);
+    expect(app(CommunityHistory::class)->usesAppShell($session, null))->toBeFalse();
+});

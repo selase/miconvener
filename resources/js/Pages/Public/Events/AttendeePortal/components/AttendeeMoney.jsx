@@ -117,9 +117,29 @@ function MemberRecords({ row, statement = false }) {
         </div>
     );
 }
-export default function AttendeeMoney({ data, onPage, onRefresh, initialTab = 'dues' }) {
+export default function AttendeeMoney({
+    data,
+    onPage,
+    onRefresh,
+    initialTab = 'dues',
+    status = 'success',
+}) {
     const [tab, setTab] = useState(initialTab);
     const [open, setOpen] = useState(null);
+    if (status !== 'success')
+        return (
+            <>
+                <h1 className="text-3xl font-medium">Your money records</h1>
+                <p
+                    role={status === 'error' ? 'alert' : 'status'}
+                    className="mt-5 border border-border p-5 text-sm text-ink-secondary"
+                >
+                    {status === 'error'
+                        ? 'Your money records could not be loaded. Use Retry to reconnect.'
+                        : 'Loading your authorised dues and contributions…'}
+                </p>
+            </>
+        );
     return (
         <>
             <p className="text-xs uppercase tracking-widest text-accent">Payments & records</p>

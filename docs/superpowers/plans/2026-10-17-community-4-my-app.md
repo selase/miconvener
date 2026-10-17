@@ -121,10 +121,10 @@ No new giving, membership-price or SMS rollout decisions are needed for this pla
 
 **Files:** Tests above; `docs/superpowers/community-roadmap.md`, this plan, relevant existing acceptance notes. No unrelated refactor or new feature.
 
-- [ ] Add/run interaction tests for skeleton/empty/403/404/429/500/retry/offline states; visible focus, keyboard dialog dismissal/focus return, labelled QR/action buttons and status announcements; retry preserves form inputs. Verify slow responses from identity A cannot repopulate state after switching to B (abort/version requests).
+- [x] Add/run interaction tests for skeleton/empty/403/404/429/500/retry/offline states; visible focus, keyboard dialog dismissal/focus return, labelled QR/action buttons and status announcements; retry preserves form inputs. Verify slow responses from identity A cannot repopulate state after switching to B (abort/version requests).
 - [ ] Verify 320px, 390px and desktop list/detail navigation, bottom safe-area spacing, 200% text/reflow, light and dark contrast (measure text/action pairs; if the existing accent pair fails AA, add a scoped accessible app-action token in `resources/css/app.css` rather than silently claiming compliance or recolouring the whole site); both layouts expose all existing ticket, abstract, certificate, attendance, tribute, speaker, material, community recovery and payment actions. Check deep link/browser Back and link sharing without leaking QR/session/recovery secrets.
 - [ ] Run scoped checks per task, then once for milestone release: complete PHP suite with **two local workers** on disposable testing databases, `pint --dirty`, PHPStan zero with unchanged baseline, full JS suite with bounded workers, lint and build; `php artisan finance:verify-categories` must exit 0 and `PayoutOtpFlowTest` remains green. Do not share databases or overlap full refreshing suites. CI uses its normal four-worker disposable service. Preserve output/evidence; do not repeat successful full gates without changes/findings.
-- [ ] Perform the AGENTS.md and post-implementation Self-Review Report, then **one** fresh whole-branch review; fix concrete findings and rerun affected checks, not a loop of full reviews. Record unverified acceptance honestly.
+- [x] Perform the AGENTS.md and post-implementation Self-Review Report, then **one** fresh whole-branch review; fix concrete findings and rerun affected checks, not a loop of full reviews. Record unverified acceptance honestly.
 - [ ] Let the owner click through phone and desktop. Update roadmap to `built` only after the agreed acceptance/decision criteria pass; commit rebuilt assets and checked plan steps together. Open review PR, do not merge/deploy automatically.
 - [ ] After explicit merge/deploy approval: verify exact deployed SHA, existing event/payment routes and cache-version upgrade, enable `community_app` only for Purpledot using the approved standing instruction and confirm readback. Leave other tenants and phone/SMS readiness switches unchanged. Roll back presentation via `community:enable-app purpledot --off` with no data deletion; retain legacy verification/payment routes and never restore unsafe v2 personal caches.
 
@@ -134,4 +134,56 @@ No new giving, membership-price or SMS rollout decisions are needed for this pla
 - Explicit proposed deviation: unread inbox; requires owner approval and spec update before implementation. No fake unread count or automatic phone-history access.
 - Existing offline agenda/virtual link storage conflicts with the newer ticket-only boundary; the planned v3 purge and visible online-only messaging address that conflict, pending owner review of the behavior change.
 - No future Giving/Library/member-price feature is silently pulled into milestone 4. Existing giving history and all legacy records stay accessible.
-- Reviewed for source paths/interfaces, privacy, paginated/mixed-currency input and empty/revoked states. Tests and release gate are bounded to avoid duplicate long review/test cycles. Implementation has not started; all implementation checkboxes intentionally remain unchecked.
+- Reviewed for source paths/interfaces, privacy, paginated/mixed-currency input and empty/revoked states. Tests and release gate are bounded to avoid duplicate long review/test cycles. Implementation is on `codex/community-4`. Tasks1–5 are implemented; the browser/owner acceptance and full final CI gates remain open.
+
+
+## Self-Review Report — 2026-10-17
+
+### Touchpoints updated
+
+- [x] Navigation: the five-section app is selected behind `community_app`; current event-only email owners, members and followers of a pilot can reach it at canonical `/my`. Legacy layouts and workspaces remain available.
+- [x] Tests: focused ownership, identifiers, preferences, mixed-currency dues, statements, PWA scope/cache, delayed responses and recovery, legacy sign-out broadcasts, loading/error and filter tests. All existing feature tests were included in the local release run.
+- [x] Build: rebuilt `public/build` committed with frontend work. Worker caches use the manifest build hash; `/my` and nested routes share scope and old registration migration.
+- AGENTS.md/memory: no new global convention or deployment rule; milestone decisions and continuation state are in this plan, spec and roadmap.
+- Seeders/permissions: not applicable; no new staff permission or onboarding entitlement. The idempotent command creates only the requested tenant feature row. No organisation has been activated by this implementation.
+- Config/.env/dependencies: not applicable; no new environment variable, package or infrastructure service.
+
+### UI Gap Analysis
+
+- Discoverability: Home, Tickets, Communities, Money and Me are visible on desktop rail/mobile bottom navigation. Full event workspace links preserve programme, speakers, polls, Q&A, surveys, materials, ticket transfer and payment flows. Certificate/abstract/attendance readers and contribution receipts/tribute editing remain reachable.
+- States: Money/Me now distinguish loading/error from successful empty data; Phone-only Home retains authorised dues while event records request independent email proof. Existing verification/rate-limit/retry flows remain.
+- Access: every new private reader is session-authorised and private/no-store. Current membership grants are rechecked for statements/receipts; no phone-to-email inference or pay-token-to-identity access was added.
+- Offline: v3 stores only explicit issued ticket passes, bound to opaque proof identity and expiry. No agenda, virtual link, financial history, document or recovery secret is stored. Authoritative identity changes, legacy sign-out/removal and cross-tab events clear private UI and snapshots. Unknown offline boot probes the server before accepting its online status; no redirect loop based solely on navigator.onLine.
+- Accessibility checked: anonymous actual app at320px,390px and1280px; no horizontal overflow. Mobile five-item nav targets about59x63px at320px; Me controls44px. Light accent corrected within this app to #007367 (5.76:1 on white), dark action #00c8b7/#042522 (7.69:1). Existing modal keyboard/focus tests retained.
+- **Still unverified:** signed-in responsive flows, actual phone/desktop cold network-disabled boot and200% text reflow. The browser tool has no network-emulation API. Local QA flag activation was blocked by automatic approval review and is awaiting owner approval; no workaround or production change was made. Do not claim WCAG certification or owner acceptance.
+
+### Independent review and fixes
+
+One fresh reviewer reported no Critical or Minor findings and10 Important findings. All were accepted and covered by a single regression/fix pass:
+
+1. Worker scope includes canonical `/my`; allowed header/manifest align and old `/my/` attendee registrations retire.
+2. Cross-tab expiry/sign-out and owner changes clear Me identity/preferences as well as tickets and Money.
+3. Existing legacy offline-clear call sites now clear/broadcast the shared identity lifecycle.
+4. Credential callbacks capture the originating identity generation; late recovery secrets are discarded.
+5. Preferences read actual marketing permission, not follower-row existence; explicit member resume works with Following off and keeps held-number/advisory-lock safeguards.
+6. Event-only pilot owners are included by current verified email, excluding deleted events and cancelled/rejected registrations.
+7. An offline shell stays usable when the browser reports online but server requests fail; authoritative server responses control reconnect.
+8. Home always loads Upcoming independently of the Saved/Past Tickets filter.
+9. Phone-only members/representatives retain Home’s authorised dues attention cards; event proof remains email-only.
+10. Money and Me render loading/failure states before deciding a history is empty.
+
+Evidence: all targeted regressions were observed failing, then passing. Full JS364/364; focused PHP36/36 (190 assertions), including payout OTP; PHPStan0 with baseline unchanged; lint, Pint, build and read-only finance category verification passed. Local full PHP ran2895 tests/14019 assertions:2894 passed, one old static worker-file assertion errored; its dynamic response contract was corrected and its PWA suite is green in the focused gate. Final full remote CI is required before merge; no second independent review was dispatched.
+
+### Recommended for user decision
+
+- Approve only local `community-qa` activation if signed-in browser acceptance should continue here; the existing Purpledot production standing instruction is retained for an approved deployment.
+- Review on phone and desktop, including real offline save/reload and text enlargement, before marking the milestone built.
+- In-app inbox is intentionally deferred. A reminder `in-app-inbox-follow-up` exists, quiet until milestone4 is deployed. Claude’s useful parallel scope is a separate inbox specification (recipient authorisation, email-first/shared-number safeguards, read/unread, retention), not this branch’s shared source files.
+
+### Not gaps and rulings
+
+- No new dependencies, fee/ledger/payment writes, permissions, SMS enablement or production changes are required.
+- The original event workspaces remain the canonical full-feature destination; the new ticket detail reuses the existing panel. This avoids duplicate payment/activity implementations; their old URLs retain their contracts.
+- Money exposes totals per recorded currency rather than one membership-currency total; otherwise historical mixed-currency charges would be misrepresented. Legacy payloads are unchanged.
+- Anonymous shell and public hashed assets are the only worker cache content. Personal passes live in the explicit partitioned store. Real browser acceptance remains a gate because unit/source tests cannot establish a complete device experience.
+- Deferred minors: none from the independent review. Unverified acceptance is reported explicitly rather than treated as a passed check.
