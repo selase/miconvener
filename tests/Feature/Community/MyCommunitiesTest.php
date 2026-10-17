@@ -17,9 +17,13 @@ it('shows explicit follows with Community off but never treats a matching phone 
     $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
     $this->withSession($this->session->all())->getJson($this->base.'/communities')->assertOk()->assertJsonCount(0, 'communities.data');
     CommunityFollower::factory()->create(['tenant_id' => $this->other->id, 'address' => '+233241234567', 'channel' => 'sms']);
-    $this->getJson($this->base.'/communities')->assertOk()->assertJsonCount(1, 'communities.data')->assertJsonPath('communities.data.0.id', $this->other->id)->assertJsonPath('communities.data.0.following.sms', true);
-    $this->getJson($this->base.'/communities/'.$this->other->slug)->assertOk()->assertJsonCount(0, 'members.data');
+    $this->getJson($this->base.'/communities')->assertOk()->assertJsonCount(0, 'communities.data');
     $this->getJson($this->base.'/identity')->assertOk()->assertJsonPath('can_access_events', false);
+    $parent = CommunityFollower::factory()->create(['tenant_id' => $this->other->id, 'address' => 'follower@example.test']);
+    App\Models\CommunityFollowerChannel::factory()->create(['tenant_id' => $this->other->id, 'follower_id' => $parent->id, 'address' => '+233241234567']);
+    $this->session->put(PlatformAttendeeVerification::SESSION_KEY, ['email' => 'follower@example.test', 'expires_at' => now()->addHour()->timestamp]);
+    $this->withSession($this->session->all())->getJson($this->base.'/communities')->assertOk()->assertJsonCount(1, 'communities.data')->assertJsonPath('communities.data.0.id', $this->other->id)->assertJsonPath('communities.data.0.following.email', true)->assertJsonPath('communities.data.0.following.sms', true);
+    $this->getJson($this->base.'/communities/'.$this->other->slug)->assertOk()->assertJsonCount(0, 'members.data');
 });
 it('retains authorised financial history after Community rollout is disabled', function (): void {
     $this->withSession($this->session->all())->getJson($this->base.'/communities/'.$this->tenant->slug.'/members/'.$this->member->id)->assertOk()->assertJsonPath('member.id', $this->member->id)->assertJsonPath('member.status', 'active')->assertJsonStructure(['member' => ['pay_url', 'membership_type', 'access_role']]);

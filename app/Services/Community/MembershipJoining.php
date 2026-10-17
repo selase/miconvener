@@ -188,8 +188,10 @@ final class MembershipJoining
     {
         $preferences = app(MessagingPreferences::class);
         $following = \App\Models\CommunityFollower::withoutGlobalScope(TenantScope::class)
-            ->where('tenant_id', $tenant->id)->where('channel', $channel)
-            ->where('address_hash', $preferences->hash($channel, $address))->whereNull('unfollowed_at')->exists();
+            ->where('tenant_id', $tenant->id)->where('channel', 'email')->whereNull('unfollowed_at')
+            ->when($channel === 'email', fn ($query) => $query->where('address_hash', $preferences->hash('email', $address)),
+                fn ($query) => $query->whereHas('channels', fn ($added) => $added->where('address_hash', $preferences->hash('sms', $address))
+                    ->whereNull('disabled_at')->whereColumn('community_follower_channels.consented_at', '>=', 'community_followers.consented_at')))->exists();
         if (! $following) {
             $preferences->disableMarketing($tenant, $channel, $address);
         }

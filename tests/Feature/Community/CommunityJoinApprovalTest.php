@@ -79,16 +79,24 @@ it('lets staff explicitly select an active replacement type when the requested t
         ->and($this->join->fresh()->membership_type_id)->toBe($this->type->id);
 });
 
-it('does not opt distinct phone applicants into marketing unless they already explicitly follow', function (bool $followed): void {
+it('does not opt distinct phone applicants into marketing unless they already explicitly follow', function (bool $followed, bool $followingPaused): void {
     $historic = Member::findOrFail($this->join->member_id);
     $historic->update(['status' => MemberStatusEnum::Exited, 'phone' => '+233241234567']);
     $this->session->put(App\Services\Community\PhoneVerification::SESSION_KEY, ['phone' => $historic->phone, 'expires_at' => now()->addHour()->timestamp]);
     if ($followed) {
         Artisan::call('community:following-enable', ['tenant' => $this->tenant->slug]);
+        app(App\Services\Community\Following::class)->follow($this->tenant, $this->session, 'email', true);
         app(App\Services\Community\Following::class)->follow($this->tenant, $this->session, 'sms', true);
+    }
+    if ($followingPaused) {
+        $this->tenant->features()->where('feature_key', 'community_following')->update(['enabled' => false]);
     }
     $service = app(MembershipJoining::class);
     $row = $service->submit($this->tenant, $this->session, ['name' => 'Distinct person', 'channel' => 'sms'], (string) Str::uuid());
     $service->approve($row, $this->owner, true, 'Independently verified that this is a distinct person.');
     expect(app(App\Services\Community\MessagingPreferences::class)->allowsMarketing($this->tenant, 'sms', $historic->phone))->toBe($followed);
-})->with([false, true]);
+})->with([
+    'no follow consent' => [false, false],
+    'consented email plus SMS' => [true, false],
+    'consent retained while Following paused' => [true, true],
+]);

@@ -22,9 +22,14 @@ it('shows public organisation and upcoming events without membership or private 
 });
 it('keeps tenant follow actions verified and usable without Community through same-origin public routes', function (): void {
     $this->postJson('http://'.eventSubdomainHost($this->tenant->slug).'/community/follow', ['channel' => 'sms', 'resume_marketing' => true])->assertUnauthorized();
+    $url = 'http://'.eventSubdomainHost($this->tenant->slug).'/community/follow';
     $this->withSession([PhoneVerification::SESSION_KEY => ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]])
-        ->postJson('http://'.eventSubdomainHost($this->tenant->slug).'/community/follow', ['channel' => 'sms', 'resume_marketing' => true])->assertCreated();
-    $this->deleteJson('http://'.eventSubdomainHost($this->tenant->slug).'/community/follow', ['channel' => 'sms'])->assertOk();
+        ->postJson($url, ['channel' => 'sms', 'resume_marketing' => true])->assertForbidden();
+    $this->withSession([App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => ['email' => 'follower@example.test', 'expires_at' => now()->addHour()->timestamp]])
+        ->postJson($url, ['channel' => 'sms', 'resume_marketing' => true])->assertForbidden();
+    $this->postJson($url, ['channel' => 'email', 'resume_marketing' => true])->assertCreated();
+    $this->postJson($url, ['channel' => 'sms', 'resume_marketing' => true])->assertCreated();
+    $this->deleteJson($url, ['channel' => 'sms'])->assertOk();
 });
 it('keeps phone-only page loading out of email history and validates organisation return URLs', function (): void {
     $host = mb_ltrim((string) config('session.domain'), '.');
