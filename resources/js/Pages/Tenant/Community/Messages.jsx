@@ -22,16 +22,17 @@ export default function Messages({
             <PageHeader
                 title="Messages"
                 actions={
-                    <Button icon={Plus} variant="primary" onClick={() => setComposer({})}>
+                    capabilities.enabled !== false && <Button icon={Plus} variant="primary" onClick={() => setComposer({})}>
                         New announcement
                     </Button>
                 }
             />
             <div className="space-y-6 px-4 py-6 sm:px-8">
                 <p className="max-w-3xl text-sm text-ink-secondary">
+                    {capabilities.enabled === false && <span>Sending is paused. You can review and withdraw existing in-app announcements. </span>}
                     Keep your community informed by email or SMS. Send to active members, choose a
                     status or reach a group. Announcements respect each address’s preferences;
-                    personal dues notices stay in Money.
+                    personal dues notices also appear in the member’s private inbox when enabled.
                 </p>
                 <div className="flex flex-wrap gap-x-6 gap-y-2 border-y border-border py-3 text-xs text-ink-secondary">
                     <span>Organisation time: {timezone}</span>
@@ -53,7 +54,7 @@ export default function Messages({
                             You can save a draft first.
                         </p>
                         <div className="mt-5">
-                            <Button onClick={() => setComposer({})}>Write an announcement</Button>
+                            {capabilities.enabled !== false && <Button onClick={() => setComposer({})}>Write an announcement</Button>}
                         </div>
                     </div>
                 ) : (

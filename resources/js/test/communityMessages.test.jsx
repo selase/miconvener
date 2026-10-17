@@ -274,3 +274,13 @@ it('does not promise future recipient selection after an empty completed send', 
     await screen.findByText('Processing finished');
     expect(screen.queryByText('Recipients will be selected when processing begins.')).toBeNull();
 });
+
+it('lets staff withdraw an inbox announcement without implying email recall', async () => {
+    sendJson.mockResolvedValue({ok:true, body:{message:{id:'inbox-message',subject:'Community news',body:'Hello',status:'completed',channels:['email'],audience:{kind:'all_members'}},deliveries:{data:[]},inbox:{inbox_count:12,inbox_read_count:3},sending_enabled:false}});
+    render(<MessageDetail id="inbox-message" onClose={()=>{}} onChanged={()=>{}} timezone="Africa/Accra"/>);
+    fireEvent.click(await screen.findByRole('button',{name:'Withdraw from inboxes'}));
+    fireEvent.change(screen.getByLabelText('Withdrawal reason'),{target:{value:'Superseded announcement'}});
+    fireEvent.click(screen.getByRole('button',{name:'Confirm inbox withdrawal'}));
+    await waitFor(()=>expect(sendJson).toHaveBeenCalledWith('POST','tenant.community.messages.withdraw',{reason:'Superseded announcement',confirmed:true}));
+    expect(screen.getByText(/Email and SMS already submitted/)).toBeTruthy();
+});

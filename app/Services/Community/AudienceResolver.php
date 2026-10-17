@@ -55,6 +55,30 @@ final class AudienceResolver
         }
     }
 
+    /** @param array<string,mixed> $selector
+     * @return iterable<InboxRecipient>
+     */
+    public function recipients(Tenant $tenant, array $selector, ?User $actor = null): iterable
+    {
+        $this->assertValid($tenant, $selector, 'email', $actor);
+        if (($selector['kind'] ?? '') === 'event') {
+            return;
+        }
+        foreach ($this->members->query($tenant, $selector)->when(isset($selector['member_ids']), fn ($q) => $q->whereIn('id', $selector['member_ids']))->select(['id', 'email', 'phone'])->lazyById(100) as $member) {
+            foreach (['email' => $member->email, 'sms' => $member->phone] as $channel => $address) {
+                if (filled($address) && $this->preferences->normalise($channel, $address) !== null && $this->preferences->allowsMarketing($tenant, $channel, $address)) {
+                    yield new InboxRecipient($tenant->id, 'member', $member->id);
+                    break;
+                }
+            }
+        }
+        foreach (app(FollowerAudienceSource::class)->query($tenant, $selector)->lazyById(100) as $follower) {
+            if ($this->preferences->normalise('email', $follower->address) !== null && $this->preferences->allowsMarketing($tenant, 'email', $follower->address)) {
+                yield new InboxRecipient($tenant->id, 'follower', $follower->id);
+            }
+        }
+    }
+
     /** @param array<string, mixed> $selector */
     public function assertValid(Tenant $tenant, array $selector, string $channel, ?User $actor): void
     {

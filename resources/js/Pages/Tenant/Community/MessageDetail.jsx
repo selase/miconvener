@@ -32,6 +32,8 @@ export default function MessageDetail({
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
     const [confirm, setConfirm] = useState(false);
+    const [withdrawConfirm, setWithdrawConfirm] = useState(false);
+    const [withdrawReason, setWithdrawReason] = useState('');
     const load = useCallback(
         async (url) => {
             const result = await sendJson(
@@ -60,6 +62,12 @@ export default function MessageDetail({
             load();
             onChanged();
         } else setError(result.message);
+    };
+    const withdraw = async () => {
+        setBusy(true);
+        const result = await sendJson('POST', route('tenant.community.messages.withdraw', {message:id}), {reason:withdrawReason,confirmed:true});
+        setBusy(false);
+        if (result.ok) { setWithdrawConfirm(false); load(); onChanged(); } else setError(result.message);
     };
     const message = data?.message;
     return (
@@ -116,6 +124,18 @@ export default function MessageDetail({
                             Review uncertain outcomes
                         </a>
                     )}
+                    {data.inbox && <section className="space-y-3 border border-border p-4" aria-label="In-app recipient copies">
+                        <p className="text-sm text-ink">In inbox: {data.inbox.inbox_count} recipient copies.
+                            {data.inbox.inbox_read_count !== null && <> Read recipient copies: {data.inbox.inbox_read_count}.</>}
+                        </p>
+                        <p className="text-xs text-ink-secondary">Read totals count recipient copies opened by an authorised reader. Individual readers are never listed. Email and SMS already submitted are unaffected by inbox withdrawal.</p>
+                        {message.inbox_withdrawn_at ? <p role="status">Withdrawn from in-app inboxes.</p> : data.inbox.inbox_count > 0 && <Button disabled={busy} onClick={()=>setWithdrawConfirm(true)}>Withdraw from inboxes</Button>}
+                        {withdrawConfirm && <div className="space-y-3">
+                            <label className="block text-sm text-ink">Withdrawal reason<textarea className="mt-2 block w-full border border-border bg-surface p-3 text-ink" value={withdrawReason} onChange={e=>setWithdrawReason(e.target.value)} maxLength={1000}/></label>
+                            <Button disabled={busy || withdrawReason.trim().length < 5} onClick={withdraw}>Confirm inbox withdrawal</Button>
+                            <Button disabled={busy} onClick={()=>setWithdrawConfirm(false)}>Keep in inboxes</Button>
+                        </div>}
+                    </section>}
                     <h3 className="font-semibold text-ink">Channel outcomes</h3>
                     <ul className="divide-y divide-border">
                         {data.deliveries.data.map((delivery) => (
@@ -154,10 +174,10 @@ export default function MessageDetail({
                             </Button>
                         )}
                         <Button onClick={() => load()}>Refresh status</Button>
-                        {message.status === 'draft' && (
+                        {data.sending_enabled !== false && message.status === 'draft' && (
                             <Button onClick={() => onEdit(message)}>Edit draft</Button>
                         )}
-                        {['draft', 'scheduled', 'queued', 'sending', 'paused'].includes(
+                        {data.sending_enabled !== false && ['draft', 'scheduled', 'queued', 'sending', 'paused'].includes(
                             message.status
                         ) && (
                             <Button disabled={busy} onClick={() => setConfirm(true)}>

@@ -143,7 +143,29 @@ final class CommunityMessages
             if (in_array($locked->status, ['completed', 'partial'], true)) {
                 throw ValidationException::withMessages(['message' => 'Processing has finished. Submitted messages cannot be recalled.']);
             }
+            app(InboxWriter::class)->withdrawMessage($locked);
             $locked->update(['status' => 'cancelled', 'cancelled_at' => $locked->cancelled_at ?? now()]);
+        });
+    }
+
+    public function withdraw(Tenant $tenant, User $actor, CommunityMessage $message, string $reason = 'Withdrawn by organisation'): void
+    {
+        abort_unless($tenant->communityEnabled() && $tenant->status === TenantStatusEnum::ACTIVE && $message->tenant_id === $tenant->id, 404);
+        abort_unless($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists(), 403);
+        $team = getPermissionsTeamId();
+        try {
+            setPermissionsTeamId($tenant->id);
+            Gate::forUser($actor->fresh())->authorize('send community messages');
+            if (($message->audience['kind'] ?? '') === 'arrears') {
+                Gate::forUser($actor->fresh())->authorize('read finance');
+            }
+        } finally {
+            setPermissionsTeamId($team);
+        }
+        $message->getConnection()->transaction(function () use ($message, $tenant, $actor, $reason): void {
+            $locked = CommunityMessage::withoutGlobalScopes()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($message->id);
+            app(InboxWriter::class)->withdrawMessage($locked);
+            \App\Models\CommunityAccessAudit::query()->create(['tenant_id' => $tenant->id, 'actor_id' => $actor->id, 'action' => 'inbox_announcement_withdrawn', 'method' => 'staff', 'reason' => mb_substr($reason, 0, 1000)]);
         });
     }
 
@@ -169,6 +191,11 @@ final class CommunityMessages
             $selector['member_ids'] = $ids;
             $followerIds = app(FollowerAudienceSource::class)->query($tenant, $selector)->when($message->last_follower_id !== null, fn ($query) => $query->where('id', '>', $message->last_follower_id))->orderBy('id')->limit(self::PAGE_SIZE)->pluck('id')->all();
             $selector['follower_ids'] = $followerIds;
+            if (app(InboxRollout::class)->enabled($tenant)) {
+                foreach ($this->audiences->recipients($tenant, $selector, $actor) as $recipient) {
+                    app(InboxWriter::class)->announcement($message, $recipient, $started);
+                }
+            }
             $ready = ['email' => [], 'sms' => []];
             foreach ($message->channels as $channel) {
                 foreach ($this->audiences->resolve($tenant, $selector, $channel, $actor) as $address) {
@@ -295,9 +322,9 @@ final class CommunityMessages
             });
     }
 
-    public function authorize(Tenant $tenant, User $actor, bool $followingEvent = false): void
+    public function authorize(Tenant $tenant, User $actor, bool $followingEvent = false, bool $readOnly = false): void
     {
-        abort_unless($followingEvent ? $tenant->followingEnabled() : ($tenant->communityEnabled() && $tenant->featureEnabled('community_messages')), 404);
+        abort_unless($followingEvent ? $tenant->followingEnabled() : ($tenant->communityEnabled() && ($tenant->featureEnabled('community_messages') || ($readOnly && app(InboxRollout::class)->enabled($tenant)))), 404);
         abort_unless($tenant->status === TenantStatusEnum::ACTIVE && ($actor->tenant_id === $tenant->id || $tenant->users()->where('users.id', $actor->id)->exists()), 403);
         $team = getPermissionsTeamId();
         try {

@@ -27,7 +27,7 @@ final class CommunityMessage extends Model
 
     protected $attributes = ['purpose' => 'community'];
 
-    protected $casts = ['channels' => 'array', 'audience' => 'array', 'estimate' => 'array', 'selection_complete' => 'boolean', 'scheduled_at' => 'immutable_datetime', 'started_at' => 'immutable_datetime', 'finished_at' => 'immutable_datetime', 'cancelled_at' => 'immutable_datetime'];
+    protected $casts = ['inbox_withdrawn_at' => 'immutable_datetime', 'channels' => 'array', 'audience' => 'array', 'estimate' => 'array', 'selection_complete' => 'boolean', 'scheduled_at' => 'immutable_datetime', 'started_at' => 'immutable_datetime', 'finished_at' => 'immutable_datetime', 'cancelled_at' => 'immutable_datetime'];
 
     /** @return HasMany<CommunityMessageDelivery, $this> */
     public function deliveries(): HasMany
