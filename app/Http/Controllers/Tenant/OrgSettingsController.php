@@ -37,6 +37,7 @@ final class OrgSettingsController extends Controller
                 'require_2fa' => (bool) $tenant->require_2fa,
                 'custom_domain' => $tenant->custom_domain,
                 'custom_domain_status' => $tenant->custom_domain_status,
+                'public_profile' => $tenant->meta['public_profile'] ?? [],
             ],
         ]);
     }
@@ -82,6 +83,9 @@ final class OrgSettingsController extends Controller
 
         $meta = $tenant->meta ?? [];
         $meta['primary_color'] = $validatedData['primary_color'] ?? $meta['primary_color'] ?? '#009EF7';
+        if (array_key_exists('public_profile', $validatedData)) {
+            $meta['public_profile'] = $validatedData['public_profile'];
+        }
         $tenant->meta = $meta;
 
         $tenant->save();

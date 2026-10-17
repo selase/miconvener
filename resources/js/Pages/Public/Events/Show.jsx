@@ -1,5 +1,5 @@
 import FollowControl from '@/Pages/Public/Community/FollowControl';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
 import {
     Lock,
@@ -16,11 +16,17 @@ import {
     X,
     Copy,
     Check,
+    Globe,
+    Share2,
+    CalendarDays,
+    MapPin,
+    Users,
 } from 'lucide-react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import CoverBars from '@/Components/Console/CoverBars';
 import Input from '@/Components/Console/Input';
 import Button from '@/Components/Console/Button';
+import Modal from '@/Components/Console/Modal';
 import ContributionWidget from '@/Components/Events/ContributionWidget';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import respondentToken from '@/lib/respondentToken';
@@ -63,7 +69,7 @@ function SpeakerCard({ speaker }) {
     const displayBio = !isLong || expanded ? bio : bio.slice(0, EXCERPT_LENGTH).trim() + '…';
 
     return (
-        <div className="flex gap-4 rounded-xl border border-border/80 bg-surface/70 p-4.5 sm:p-5 transition-all hover:border-border hover:bg-surface">
+        <div className="flex gap-4 border border-border bg-surface p-4 sm:p-5 transition-colors hover:border-accent/40">
             {speaker.photo_url ? (
                 <img
                     src={speaker.photo_url}
@@ -116,7 +122,7 @@ function SpeakersSection({ speakers }) {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {speakers.map((speaker) => (
                 <SpeakerCard key={speaker.id} speaker={speaker} />
             ))}
@@ -126,93 +132,88 @@ function SpeakersSection({ speakers }) {
 
 function NotesModal({ session, lexicon, onClose }) {
     const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState(false);
     if (!session) return null;
 
-    const handleCopy = () => {
-        if (session.notes) {
-            navigator.clipboard.writeText(session.notes);
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(session.notes);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            setCopyError(false);
+        } catch {
+            setCopyError(true);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div className="w-full max-w-xl rounded-2xl border border-border bg-surface p-6 shadow-2xl transition-all">
-                <div className="flex items-start justify-between gap-4 border-b border-border/80 pb-4">
-                    <div>
-                        <span className="inline-block rounded bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent uppercase tracking-wider">
-                            {lexicon?.notes_action_label ||
-                                (session.type === 'service'
-                                    ? 'Sermon Notes'
-                                    : session.type === 'lecture'
-                                      ? 'Lecture Outline'
-                                      : 'Session Notes')}
-                        </span>
-                        <h3 className="mt-1 text-lg font-bold text-ink leading-snug">
-                            {session.title}
-                        </h3>
-                        {session.speaker_names?.length > 0 && (
-                            <p className="mt-0.5 text-xs text-ink-secondary">
-                                {session.speaker_names.join(', ')}
-                            </p>
+        <Modal open onClose={onClose} title={session.title} className="max-w-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-border/80 pb-4">
+                <div>
+                    <span className="inline-block  bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent uppercase tracking-wider">
+                        {lexicon?.notes_action_label ||
+                            (session.type === 'service'
+                                ? 'Sermon Notes'
+                                : session.type === 'lecture'
+                                  ? 'Lecture Outline'
+                                  : 'Session Notes')}
+                    </span>
+                    {session.speaker_names?.length > 0 && (
+                        <p className="mt-0.5 text-xs text-ink-secondary">
+                            {session.speaker_names.join(', ')}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            <div className="my-5 max-h-[60vh] overflow-y-auto bg-surface-sunken p-4 border border-border/60">
+                <div className="text-[13.5px] leading-relaxed text-ink whitespace-pre-wrap font-sans">
+                    {session.notes}
+                </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 pt-4">
+                {session.presentation_url ? (
+                    <a
+                        href={session.presentation_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Open Presentation Slides
+                    </a>
+                ) : (
+                    <span />
+                )}
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={handleCopy}
+                        className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken transition-colors cursor-pointer"
+                    >
+                        {copied ? (
+                            <Check className="h-3.5 w-3.5 text-success-fg" />
+                        ) : (
+                            <Copy className="h-3.5 w-3.5" />
                         )}
-                    </div>
+                        {copied ? 'Copied' : 'Copy Notes'}
+                    </button>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-lg p-1.5 text-ink-secondary hover:bg-surface-sunken hover:text-ink transition-colors cursor-pointer"
-                        title="Close"
+                        className="bg-accent px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 transition-colors cursor-pointer"
                     >
-                        <X className="h-5 w-5" />
+                        Done
                     </button>
                 </div>
-
-                <div className="my-5 max-h-[60vh] overflow-y-auto rounded-lg bg-surface-sunken p-4 border border-border/60">
-                    <div className="text-[13.5px] leading-relaxed text-ink whitespace-pre-wrap font-sans">
-                        {session.notes}
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 pt-4">
-                    {session.presentation_url ? (
-                        <a
-                            href={session.presentation_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
-                        >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            Open Presentation Slides
-                        </a>
-                    ) : (
-                        <span />
-                    )}
-
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={handleCopy}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken transition-colors cursor-pointer"
-                        >
-                            {copied ? (
-                                <Check className="h-3.5 w-3.5 text-success-fg" />
-                            ) : (
-                                <Copy className="h-3.5 w-3.5" />
-                            )}
-                            {copied ? 'Copied' : 'Copy Notes'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 transition-colors cursor-pointer"
-                        >
-                            Done
-                        </button>
-                    </div>
-                </div>
             </div>
-        </div>
+            {copyError && (
+                <p role="status" className="mt-3 text-xs text-ink-secondary">
+                    Select and copy the notes above; clipboard access is unavailable.
+                </p>
+            )}
+        </Modal>
     );
 }
 
@@ -222,7 +223,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
     return (
         <div>
             {recurrenceSummary && (
-                <div className="mb-6 flex items-start gap-3 rounded-xl border border-accent/25 bg-accent/5 p-4 text-xs sm:text-sm text-ink">
+                <div className="mb-6 flex items-start gap-3 border border-accent/25 bg-accent/5 p-4 text-xs sm:text-sm text-ink">
                     <Repeat className="h-5 w-5 text-accent shrink-0 mt-0.5" />
                     <div>
                         <span className="font-semibold text-accent">
@@ -242,7 +243,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
             {icsUrl && (
                 <a
                     href={icsUrl}
-                    className="mb-4 inline-flex h-control items-center gap-1.5 border border-border px-3 text-[12.5px] text-ink-secondary hover:border-accent hover:text-accent rounded-md"
+                    className="mb-4 inline-flex h-control items-center gap-1.5 border border-border px-3 text-[12.5px] text-ink-secondary hover:border-accent hover:text-accent "
                 >
                     <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
                     Add to calendar
@@ -271,7 +272,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
                                     </div>
                                     {session.is_occurrence && session.occurrence_status && (
                                         <span
-                                            className={`mt-1 inline-block text-[10.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                                            className={`mt-1 inline-block text-[10.5px] uppercase font-bold tracking-wider px-1.5 py-0.5  ${
                                                 session.occurrence_status === 'completed'
                                                     ? 'bg-success-bg text-success-fg border border-success-fg/30'
                                                     : session.occurrence_status === 'cancelled'
@@ -290,7 +291,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
                                             {session.title}
                                         </h4>
                                         {session.type && session.type !== 'session' && (
-                                            <span className="rounded bg-surface-sunken px-2 py-0.5 text-[11px] font-medium text-ink-secondary border border-border/60 capitalize">
+                                            <span className=" bg-surface-sunken px-2 py-0.5 text-[11px] font-medium text-ink-secondary border border-border/60 capitalize">
                                                 {session.type.replace('_', ' ')}
                                             </span>
                                         )}
@@ -323,7 +324,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
                                     <button
                                         type="button"
                                         onClick={() => setViewingNotesSession(session)}
-                                        className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors cursor-pointer"
+                                        className="inline-flex items-center gap-1.5 border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors cursor-pointer"
                                     >
                                         <BookOpen className="h-3.5 w-3.5" />
                                         <span>
@@ -342,7 +343,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
                                         href={session.presentation_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken transition-colors"
+                                        className="inline-flex items-center gap-1.5 border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-surface-sunken transition-colors"
                                     >
                                         <ExternalLink className="h-3.5 w-3.5 text-ink-secondary" />
                                         <span>Slide Deck</span>
@@ -677,6 +678,7 @@ function isConditionSatisfied(field, answers) {
 }
 
 function RegistrationPanel({ event }) {
+    const titleId = useId();
     const { flash } = usePage().props;
     const settings = event.registration_settings || {
         phone: 'optional',
@@ -979,7 +981,7 @@ function RegistrationPanel({ event }) {
     return (
         <aside
             id="register-section"
-            className="rounded-xl border border-border bg-surface p-5 lg:sticky lg:top-6 shadow-xs"
+            className="border border-border bg-surface p-5 sm:p-6 lg:sticky lg:top-6"
         >
             <h3 className="text-[15px] font-medium text-ink">Register</h3>
 
@@ -1022,7 +1024,7 @@ function RegistrationPanel({ event }) {
                                             <span className="flex items-center gap-1.5 text-[13.5px] text-ink">
                                                 {ticketType.name}
                                                 {ticketType.is_invite_only && (
-                                                    <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-accent">
+                                                    <span className=" bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-accent">
                                                         Unlocked VIP
                                                     </span>
                                                 )}
@@ -1056,7 +1058,7 @@ function RegistrationPanel({ event }) {
                                     Have an access code for hidden tickets?
                                 </button>
                             ) : (
-                                <div className="rounded border border-border p-2.5 bg-surface-alt/40 space-y-2">
+                                <div className=" border border-border p-2.5 bg-surface-alt/40 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[11.5px] font-medium text-ink">
                                             Enter Access Code:
@@ -1104,10 +1106,14 @@ function RegistrationPanel({ event }) {
                 {/* Core Attendee Identity Fields */}
                 <div className="grid grid-cols-3 gap-2.5">
                     <div>
-                        <label className="block text-[12.5px] font-medium text-ink mb-1">
+                        <label
+                            htmlFor={titleId}
+                            className="block text-[12.5px] font-medium text-ink mb-1"
+                        >
                             Title <span className="text-danger-fg">*</span>
                         </label>
                         <select
+                            id={titleId}
                             value={data.title}
                             onChange={(e) => setData('title', e.target.value)}
                             className="w-full border border-border bg-surface px-2.5 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
@@ -1405,7 +1411,7 @@ function RegistrationPanel({ event }) {
                             <button
                                 type="button"
                                 onClick={() => setFieldsExpanded(!fieldsExpanded)}
-                                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-alt/60 hover:bg-surface-alt py-2 px-3 text-[12px] font-medium text-accent transition-colors cursor-pointer"
+                                className="flex w-full items-center justify-center gap-1.5 border border-border bg-surface-alt/60 hover:bg-surface-alt py-2 px-3 text-[12px] font-medium text-accent transition-colors cursor-pointer"
                             >
                                 <span>
                                     {fieldsExpanded
@@ -1425,7 +1431,7 @@ function RegistrationPanel({ event }) {
                 {/* Promo / Discount Code Input Section */}
                 <div className="border-t border-border/60 pt-3">
                     {appliedPromo ? (
-                        <div className="flex items-center justify-between rounded border border-success-fg/30 bg-success-bg/40 px-3 py-2 text-xs">
+                        <div className="flex items-center justify-between  border border-success-fg/30 bg-success-bg/40 px-3 py-2 text-xs">
                             <div className="flex items-center gap-2">
                                 <span className="inline-block h-2 w-2 rounded-full bg-success-fg animate-pulse"></span>
                                 <span className="font-semibold text-ink">
@@ -1458,7 +1464,7 @@ function RegistrationPanel({ event }) {
                             Have a promo code?
                         </button>
                     ) : (
-                        <div className="rounded border border-border p-2.5 bg-surface-alt/40 space-y-2">
+                        <div className=" border border-border p-2.5 bg-surface-alt/40 space-y-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-[11.5px] font-medium text-ink">
                                     Promo Code:
@@ -1498,7 +1504,7 @@ function RegistrationPanel({ event }) {
 
                 {/* Dynamic Price Summary Box */}
                 {calculatedPricing.hasAdjustments && (
-                    <div className="rounded border border-accent/20 bg-accent-soft/30 p-3 text-xs space-y-1.5">
+                    <div className=" border border-accent/20 bg-accent-soft/30 p-3 text-xs space-y-1.5">
                         <div className="flex justify-between font-medium text-ink">
                             <span>Base Ticket:</span>
                             <span>{formatMoney(basePrice, event.currency)}</span>
@@ -1635,297 +1641,530 @@ function FindMyTicket({ event }) {
     );
 }
 
+function OrganiserLinks({ links = {} }) {
+    const labels = {
+        website: 'Website',
+        instagram: 'Instagram',
+        x: 'X',
+        facebook: 'Facebook',
+        linkedin: 'LinkedIn',
+        youtube: 'YouTube',
+    };
+    const marks = {
+        website: <Globe className="h-4 w-4" />,
+        instagram: 'IG',
+        x: 'X',
+        facebook: 'f',
+        linkedin: 'in',
+        youtube: '▶',
+    };
+    return (
+        <div className="flex flex-wrap gap-2">
+            {Object.entries(labels)
+                .filter(([key]) => links[key])
+                .map(([key, label]) => (
+                    <a
+                        key={key}
+                        href={links[key]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={label}
+                        title={label}
+                        className="flex h-9 w-9 items-center justify-center border border-border text-xs font-semibold text-ink-secondary transition-colors hover:border-accent hover:text-accent"
+                    >
+                        {marks[key]}
+                    </a>
+                ))}
+        </div>
+    );
+}
+
 export default function Show({ event, org, isPrivate = false, community = null }) {
     const workshops = useMemo(
-        () => event.sessions.filter((s) => s.type === 'workshop'),
+        () => event.sessions.filter((session) => session.type === 'workshop'),
         [event.sessions]
     );
-
-    const sections = useMemo(() => {
-        const list = [{ key: 'about', label: 'About' }];
-        if (event.allow_contributions) {
-            list.push({
-                key: 'contributions',
-                label:
-                    event.contribution_title ||
-                    event.lexicon?.contributions_tab_label ||
-                    'Contributions',
-            });
-        }
-        if (event.sessions.length > 0) list.push({ key: 'schedule', label: 'Programme' });
-        if (event.speakers.length > 0) list.push({ key: 'speakers', label: 'Speakers' });
-        if (workshops.length > 0) list.push({ key: 'workshops', label: 'Workshops' });
-        if (event.plan_your_visit_content) list.push({ key: 'visit', label: 'Plan Your Visit' });
-        list.push({ key: 'qa', label: 'Q&A' });
-        list.push({ key: 'live', label: 'Live poll' });
-        return list;
-    }, [event, workshops]);
-
     const [active, setActive] = useState('about');
+    const [dialog, setDialog] = useState(null);
+    const [copied, setCopied] = useState(false);
+    const [copyError, setCopyError] = useState(false);
     const price = lowestPrice(event);
+    const interactive = ['qa', 'live', 'contributions'].includes(active);
+    const contributionLabel =
+        event.contribution_title || event.lexicon?.contributions_tab_label || 'Contributions';
+    const sections = [
+        { key: 'about', label: 'Overview' },
+        ...(event.sessions.length ? [{ key: 'schedule', label: 'Programme' }] : []),
+        ...(event.speakers.length ? [{ key: 'speakers', label: 'Speakers' }] : []),
+        ...(workshops.length ? [{ key: 'workshops', label: 'Workshops' }] : []),
+        ...(event.plan_your_visit_content ? [{ key: 'visit', label: 'Plan your visit' }] : []),
+        ...(event.allow_contributions ? [{ key: 'contributions', label: contributionLabel }] : []),
+        { key: 'qa', label: 'Q&A' },
+        { key: 'live', label: 'Live poll' },
+    ];
+    const selectSection = (key) => {
+        setActive(key);
+        requestAnimationFrame(() =>
+            document
+                .getElementById(
+                    ['qa', 'live', 'contributions'].includes(key)
+                        ? 'event-interaction'
+                        : `event-${key}`
+                )
+                ?.scrollIntoView({
+                    behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+                        ? 'instant'
+                        : 'smooth',
+                    block: 'start',
+                })
+        );
+    };
+    const shareUrl = typeof window === 'undefined' ? '' : window.location.href.split('#')[0];
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopied(true);
+            setCopyError(false);
+        } catch {
+            setCopyError(true);
+        }
+    };
+    const calendarUrl = route('public.events.schedule.ics', { event: event.slug });
+    const isVirtual = event.location_type === 'virtual';
+    const sectionHeading = 'mb-6 text-2xl font-medium tracking-tight text-ink sm:text-[28px]';
 
     return (
-        <PublicLayout>
-            {event.hero_image_url ? (
-                <img
-                    src={event.hero_image_url}
-                    alt={event.name}
-                    className="h-56 w-full border-b border-border object-cover sm:h-72"
-                />
-            ) : (
-                <CoverBars height={220} />
-            )}
-
-            <div className="mx-auto max-w-[1100px] px-6 pt-8 sm:px-10">
-                {isPrivate && (
-                    <span className="inline-flex items-center gap-1.5 border border-border px-2 py-0.5 text-[11.5px] text-ink-secondary">
-                        <Lock className="h-3 w-3" strokeWidth={1.75} />
-                        Private event
-                    </span>
-                )}
-
-                <h1 className="mt-4 text-[clamp(32px,6vw,64px)] font-normal leading-[0.98] tracking-tighter text-ink">
-                    {event.name}
-                </h1>
-                <p className="mt-3.5 text-[13.5px] text-ink-secondary">Hosted by {org.name}</p>
-                {community && (
-                    <details className="mt-5 max-w-xl rounded-lg border border-border bg-surface p-4">
-                        <summary className="cursor-pointer text-sm font-medium text-accent">
-                            Stay connected with {org.name}
-                        </summary>
-                        <div className="mt-4 space-y-4">
-                            {community.followingEnabled && (
-                                <FollowControl
-                                    identity={community.identity}
-                                    initialFollowing={community.following}
-                                    followUrl={community.followUrl}
-                                    signInUrl={community.signInUrl}
-                                    sourceEventId={event.id}
-                                />
-                            )}
-                            <a
-                                href={community.organisation.about_url}
-                                className="inline-block text-sm text-accent underline"
-                            >
-                                Organisation page and membership options
-                            </a>
-                        </div>
-                    </details>
-                )}
-                {event.is_recurring && event.recurrence_summary && (
-                    <div className="mt-3.5 inline-flex items-center gap-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-1.5 text-xs font-medium text-ink">
-                        <Repeat className="h-3.5 w-3.5 text-accent shrink-0" />
-                        <span className="font-semibold text-accent">Recurring Series:</span>
-                        <span>{event.recurrence_summary}</span>
-                    </div>
-                )}
-                {isPrivate && (
-                    <p className="mt-2 max-w-xl text-[13px] text-ink-secondary">
-                        The speakers, programme and materials for this event are shown to registered
-                        guests only.
-                    </p>
-                )}
-
-                <div className="mt-8 grid grid-cols-2 border-t border-border sm:grid-cols-4">
-                    <div className="border-r border-border py-4 pr-5">
-                        <span className="block text-[11.5px] text-ink-tertiary">When</span>
-                        <b className="mt-1.5 block text-[14px] font-normal text-ink">
-                            {formatDateRange(event.starts_at, event.ends_at, event.timezone)}
-                        </b>
-                        {event.is_recurring && event.recurrence_summary && (
-                            <span className="mt-1 block text-[11.5px] text-accent font-medium leading-snug">
-                                {event.recurrence_summary}
-                            </span>
-                        )}
-                    </div>
-                    <div className="border-r border-border py-4 px-5">
-                        <span className="block text-[11.5px] text-ink-tertiary">Where</span>
-                        <b className="mt-1.5 block truncate text-[14px] font-normal text-ink">
-                            {event.location_type === 'virtual' ? 'Virtual' : event.address}
-                        </b>
-                    </div>
-                    <div className="border-r border-border py-4 px-5">
-                        <span className="block text-[11.5px] text-ink-tertiary">Format</span>
-                        <b className="mt-1.5 block text-[14px] font-normal text-ink">
-                            {event.location_type === 'virtual' ? 'Online' : 'In person'}
-                        </b>
-                    </div>
-                    <div className="py-4 pl-5">
-                        <span className="block text-[11.5px] text-ink-tertiary">From</span>
-                        <b className="mt-1.5 block font-mono text-[14px] font-normal text-ink">
-                            {formatMoney(price, event.currency)}
-                        </b>
-                    </div>
-                </div>
-
-                <div className="mt-1 flex items-center justify-between border-b border-border">
-                    <nav className="flex gap-0 overflow-x-auto">
-                        {sections.map((section) => (
-                            <button
-                                key={section.key}
-                                type="button"
-                                onClick={() => setActive(section.key)}
-                                className={`-mb-px shrink-0 border-b px-4 py-3 text-[13px] transition-colors first:pl-0 ${
-                                    active === section.key
-                                        ? 'border-accent text-accent'
-                                        : 'border-transparent text-ink-secondary hover:text-ink'
-                                }`}
-                            >
-                                {section.label}
-                            </button>
-                        ))}
-                    </nav>
-                    {active !== 'about' && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setActive('about');
-                                setTimeout(() => {
-                                    document
-                                        .getElementById('register-section')
-                                        ?.scrollIntoView({ behavior: 'smooth' });
-                                }, 50);
-                            }}
-                            className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded-full bg-accent/10 hover:bg-accent/15 text-accent border border-accent/25 px-3 py-1 text-[12.5px] font-medium transition-colors cursor-pointer"
-                        >
-                            <Ticket className="h-3.5 w-3.5" />
-                            <span>Register · {formatMoney(price, event.currency)}</span>
-                        </button>
+        <PublicLayout
+            headerActions={
+                <a href="/my" className="text-xs text-ink-secondary hover:text-accent">
+                    My tickets
+                </a>
+            }
+        >
+            <article className="pb-16 [&_button]:rounded-none [&_input:not([type=radio]):not([type=checkbox])]:rounded-none [&_select]:rounded-none [&_textarea]:rounded-none [&_[role=dialog]]:rounded-none">
+                <div
+                    className="mx-auto mt-5 w-[calc(100%-2rem)] overflow-hidden sm:mt-8 lg:w-[80vw]"
+                    data-event-hero
+                >
+                    {event.hero_image_url ? (
+                        <img
+                            src={event.hero_image_url}
+                            alt={event.name}
+                            fetchPriority="high"
+                            className="h-[clamp(220px,28vw,430px)] w-full object-cover"
+                        />
+                    ) : (
+                        <CoverBars height={280} />
                     )}
                 </div>
-
-                {/* Main Content Area */}
-                {active === 'about' ? (
-                    <div className="grid gap-12 py-10 lg:grid-cols-[1fr_360px]">
-                        <div className="min-w-0">
-                            {event.allow_contributions && (
-                                <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-accent/25 bg-accent/5 p-4 sm:p-5">
-                                    <div className="flex items-start gap-3">
-                                        <div className="h-9 w-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                                            <Heart className="h-4.5 w-4.5 fill-current" />
-                                        </div>
-                                        <div>
-                                            <h4 className="text-sm font-semibold text-ink">
-                                                {event.contribution_title ||
-                                                    event.lexicon?.contributions_title ||
-                                                    'Voluntary Contributions'}
-                                            </h4>
-                                            <p className="text-xs text-ink-secondary mt-0.5">
-                                                {event.contributions_total_pesewas > 0
-                                                    ? `${event.currency} ${(event.contributions_total_pesewas / 100).toFixed(2)} contributed so far. Mobile Money & Cards accepted.`
-                                                    : event.lexicon?.contributions_subtitle ||
-                                                      'Voluntary contributions are warmly welcomed for this gathering via Mobile Money & Card.'}
-                                            </p>
-                                        </div>
+                <div className="mx-auto mt-8 w-[calc(100%-3rem)] max-w-[1100px] lg:mt-12 lg:w-[76vw]">
+                    <div className="grid min-w-0 gap-x-12 gap-y-9 lg:grid-cols-[minmax(0,1fr)_340px] xl:gap-x-16">
+                        <header className="min-w-0 lg:col-start-1 lg:row-start-1">
+                            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-secondary">
+                                <span className="inline-flex items-center gap-2 uppercase tracking-[0.12em]">
+                                    {isPrivate && <Lock className="h-3.5 w-3.5" />}
+                                    {isPrivate ? 'Private event' : 'You’re invited'}
+                                </span>
+                                <button
+                                    type="button"
+                                    aria-label="Share event"
+                                    onClick={() => {
+                                        setCopied(false);
+                                        setCopyError(false);
+                                        setDialog('share');
+                                    }}
+                                    className="inline-flex items-center gap-2 border border-border px-3 py-2 hover:border-accent hover:text-accent"
+                                >
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    Share
+                                </button>
+                            </div>
+                            <h1 className="break-words text-[clamp(32px,3.8vw,54px)] font-medium leading-[1.08] tracking-[-0.04em] text-ink">
+                                {event.name}
+                            </h1>
+                            <p className="mt-4 text-sm text-ink-secondary">
+                                Hosted by{' '}
+                                <a
+                                    href="#event-organiser"
+                                    className="font-medium text-ink underline decoration-border underline-offset-4 hover:text-accent"
+                                >
+                                    {org.name}
+                                </a>
+                            </p>
+                            {isPrivate && (
+                                <p className="mt-4 text-sm leading-relaxed text-ink-secondary">
+                                    The speakers, programme and materials for this event are shown
+                                    to registered guests only.
+                                </p>
+                            )}
+                            {event.is_recurring && event.recurrence_summary && (
+                                <p className="mt-4 flex items-start gap-2 text-sm text-accent">
+                                    <Repeat className="mt-0.5 h-4 w-4 shrink-0" />
+                                    {event.recurrence_summary}
+                                </p>
+                            )}
+                            <dl className="mt-7 divide-y divide-border border-y border-border">
+                                <div className="flex gap-4 py-4">
+                                    <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                                    <div className="min-w-0">
+                                        <dt className="text-sm font-medium">
+                                            {formatDateRange(
+                                                event.starts_at,
+                                                event.ends_at,
+                                                event.timezone
+                                            )}
+                                        </dt>
+                                        <dd className="mt-1 text-xs text-ink-secondary">
+                                            {new Date(event.starts_at).toLocaleTimeString(
+                                                undefined,
+                                                {
+                                                    timeZone: event.timezone,
+                                                    hour: 'numeric',
+                                                    minute: '2-digit',
+                                                }
+                                            )}{' '}
+                                            –{' '}
+                                            {new Date(event.ends_at).toLocaleTimeString(undefined, {
+                                                timeZone: event.timezone,
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                            })}{' '}
+                                            · {event.timezone}
+                                        </dd>
+                                        {!isPrivate && (
+                                            <dd className="mt-2">
+                                                <a
+                                                    href={calendarUrl}
+                                                    className="text-xs text-accent underline underline-offset-4"
+                                                >
+                                                    Add to calendar
+                                                </a>
+                                            </dd>
+                                        )}
                                     </div>
+                                </div>
+                                <div className="flex gap-4 py-4">
+                                    <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                                    <div className="min-w-0">
+                                        <dt className="break-words text-sm font-medium">
+                                            {isVirtual
+                                                ? 'Online event'
+                                                : event.address || 'Venue to be announced'}
+                                        </dt>
+                                        <dd className="mt-1 text-xs text-ink-secondary">
+                                            {isVirtual
+                                                ? 'Join from wherever you are'
+                                                : event.location_type === 'hybrid'
+                                                  ? 'In person and online'
+                                                  : 'In person'}
+                                        </dd>
+                                        {!isVirtual && event.address && (
+                                            <dd className="mt-2">
+                                                <a
+                                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-accent underline underline-offset-4"
+                                                >
+                                                    Get directions
+                                                </a>
+                                            </dd>
+                                        )}
+                                    </div>
+                                </div>
+                            </dl>
+                            {!isPrivate && Number.isInteger(event.going_count) && (
+                                <div className="mt-5 flex items-center gap-2 text-sm text-ink-secondary">
+                                    <Users className="h-4 w-4 text-accent" />
+                                    <span>
+                                        <b className="font-medium text-ink">
+                                            {event.going_count.toLocaleString()} going
+                                        </b>{' '}
+                                        · confirmed attendees
+                                    </span>
+                                </div>
+                            )}
+                        </header>
+                        <div className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+                            <div className="mb-3 flex items-baseline justify-between gap-3">
+                                <span className="text-xs uppercase tracking-wider text-ink-tertiary">
+                                    Your place at the event
+                                </span>
+                                <span className="font-mono text-sm text-ink">
+                                    {price > 0 ? 'From ' : ''}
+                                    {formatMoney(price, event.currency)}
+                                </span>
+                            </div>
+                            <RegistrationPanel event={event} />
+                        </div>
+                        <main className="min-w-0 lg:col-start-1 lg:row-start-2">
+                            <nav
+                                aria-label="Event sections"
+                                className="mb-9 flex max-w-full gap-6 overflow-x-auto border-b border-border"
+                            >
+                                {sections.map((section) => (
                                     <button
                                         type="button"
-                                        onClick={() => setActive('contributions')}
-                                        className="inline-flex shrink-0 items-center justify-center rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white hover:bg-accent/90 transition-colors cursor-pointer"
+                                        key={section.key}
+                                        aria-current={
+                                            active === section.key ? 'location' : undefined
+                                        }
+                                        onClick={() => selectSection(section.key)}
+                                        className={`shrink-0 border-b-2 py-3 text-xs font-medium transition-colors ${active === section.key ? 'border-accent text-accent' : 'border-transparent text-ink-secondary hover:text-ink'}`}
                                     >
-                                        {event.lexicon?.contributions_cta_label || 'Contribute'}
+                                        {section.label}
                                     </button>
-                                </div>
+                                ))}
+                            </nav>
+                            {interactive && (
+                                <section
+                                    id="event-interaction"
+                                    className="mb-12 scroll-mt-6 border-b border-border pb-10"
+                                >
+                                    <h2 className={sectionHeading}>
+                                        {sections.find((section) => section.key === active)?.label}
+                                    </h2>
+                                    {active === 'qa' && <ForumSection event={event} />}
+                                    {active === 'live' && <LivePollSection event={event} />}
+                                    {active === 'contributions' && (
+                                        <ContributionWidget event={event} />
+                                    )}
+                                </section>
                             )}
-
-                            {event.description ? (
-                                <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
-                                    {event.description}
+                            <section id="event-about" className="scroll-mt-6 pb-10">
+                                <h2 className={sectionHeading}>About the event</h2>
+                                <p className="whitespace-pre-line text-[15px] leading-7 text-ink-secondary">
+                                    {event.description ||
+                                        'More information about this event will be shared soon.'}
                                 </p>
-                            ) : (
-                                <p className="text-[14px] text-ink-secondary">
-                                    No description provided for this event.
-                                </p>
+                                {event.allow_contributions && (
+                                    <div className="mt-6 border-l-2 border-accent bg-accent/5 p-5">
+                                        <h3 className="flex items-center gap-2 text-sm font-medium">
+                                            <Heart className="h-4 w-4 text-accent" />
+                                            {event.contribution_title ||
+                                                event.lexicon?.contributions_title ||
+                                                'Voluntary contributions'}
+                                        </h3>
+                                        <p className="mt-2 text-sm text-ink-secondary">
+                                            {event.contributions_total_pesewas > 0
+                                                ? `${event.currency} ${(event.contributions_total_pesewas / 100).toFixed(2)} contributed so far.`
+                                                : event.lexicon?.contributions_subtitle ||
+                                                  'Support this gathering with a voluntary contribution.'}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => selectSection('contributions')}
+                                            className="mt-4 text-sm font-medium text-accent underline underline-offset-4"
+                                        >
+                                            {event.lexicon?.contributions_cta_label || 'Contribute'}
+                                        </button>
+                                    </div>
+                                )}
+                            </section>
+                            {event.sessions.length > 0 && (
+                                <section
+                                    id="event-schedule"
+                                    className="scroll-mt-6 border-t border-border py-10"
+                                >
+                                    <h2 className={sectionHeading}>Programme</h2>
+                                    <ScheduleSection
+                                        sessions={
+                                            event.is_recurring && event.upcoming_occurrences?.length
+                                                ? event.upcoming_occurrences
+                                                : event.sessions
+                                        }
+                                        timezone={event.timezone}
+                                        icsUrl={isPrivate ? null : calendarUrl}
+                                        recurrenceSummary={
+                                            event.is_recurring ? event.recurrence_summary : null
+                                        }
+                                        lexicon={event.lexicon}
+                                    />
+                                </section>
                             )}
-                        </div>
-
-                        <RegistrationPanel event={event} />
-                    </div>
-                ) : (
-                    <div className="max-w-4xl py-10">
-                        {active === 'contributions' && <ContributionWidget event={event} />}
-                        {active === 'schedule' && (
-                            <ScheduleSection
-                                sessions={
-                                    event.is_recurring && event.upcoming_occurrences?.length
-                                        ? event.upcoming_occurrences
-                                        : event.sessions
-                                }
-                                timezone={event.timezone}
-                                icsUrl={route('public.events.schedule.ics', { event: event.slug })}
-                                recurrenceSummary={
-                                    event.is_recurring ? event.recurrence_summary : null
-                                }
-                                lexicon={event.lexicon}
-                            />
-                        )}
-                        {active === 'speakers' && <SpeakersSection speakers={event.speakers} />}
-                        {active === 'workshops' && (
-                            <ScheduleSection sessions={workshops} timezone={event.timezone} />
-                        )}
-                        {active === 'visit' && (
-                            <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
-                                {event.plan_your_visit_content}
-                            </p>
-                        )}
-                        {active === 'qa' && <ForumSection event={event} />}
-                        {active === 'live' && <LivePollSection event={event} />}
-
-                        {/* Bottom CTA for quick registration on non-about tabs */}
-                        <div className="mt-12 rounded-xl border border-border/80 bg-surface/80 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                                <h4 className="text-[15px] font-semibold text-ink">
-                                    Ready to attend {event.name}?
-                                </h4>
-                                <p className="mt-1 text-[13px] text-ink-secondary">
-                                    Join us in person or online. Tickets from{' '}
-                                    {formatMoney(price, event.currency)}.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setActive('about');
-                                    setTimeout(() => {
-                                        document
-                                            .getElementById('register-section')
-                                            ?.scrollIntoView({ behavior: 'smooth' });
-                                    }, 50);
-                                }}
-                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13.5px] font-medium text-white shadow-xs hover:bg-accent/90 transition-colors cursor-pointer"
+                            {event.speakers.length > 0 && (
+                                <section
+                                    id="event-speakers"
+                                    className="scroll-mt-6 border-t border-border py-10"
+                                >
+                                    <h2 className={sectionHeading}>Meet the speakers</h2>
+                                    <SpeakersSection speakers={event.speakers} />
+                                </section>
+                            )}
+                            {workshops.length > 0 && (
+                                <section
+                                    id="event-workshops"
+                                    className="scroll-mt-6 border-t border-border py-10"
+                                >
+                                    <h2 className={sectionHeading}>Workshops</h2>
+                                    <ScheduleSection
+                                        sessions={workshops}
+                                        timezone={event.timezone}
+                                    />
+                                </section>
+                            )}
+                            {event.plan_your_visit_content && (
+                                <section
+                                    id="event-visit"
+                                    className="scroll-mt-6 border-t border-border py-10"
+                                >
+                                    <h2 className={sectionHeading}>Plan your visit</h2>
+                                    <p className="whitespace-pre-line text-[15px] leading-7 text-ink-secondary">
+                                        {event.plan_your_visit_content}
+                                    </p>
+                                </section>
+                            )}
+                            <section
+                                id="event-organiser"
+                                className="scroll-mt-6 border-t border-border py-10"
                             >
-                                <Ticket className="h-4 w-4" />
-                                Go to Registration
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {event.sponsors.length > 0 && (
-                    <div className="border-t border-border py-10">
-                        <p className="text-center text-[11px] uppercase tracking-wide text-ink-tertiary">
-                            Supported by
-                        </p>
-                        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
-                            {event.sponsors.map((sponsor) => (
-                                <div key={sponsor.id} title={sponsor.name}>
-                                    {sponsor.logo_url ? (
+                                <p className="mb-5 text-xs uppercase tracking-[0.12em] text-ink-tertiary">
+                                    Your organiser
+                                </p>
+                                <div className="flex items-start gap-4">
+                                    {org.logo_url ? (
                                         <img
-                                            src={sponsor.logo_url}
-                                            alt={sponsor.name}
-                                            className="h-9 max-w-35 object-contain"
+                                            src={org.logo_url}
+                                            alt=""
+                                            loading="lazy"
+                                            className="h-14 w-14 border border-border bg-white object-contain p-1"
                                         />
                                     ) : (
-                                        <span className="text-[13px] text-ink-secondary">
-                                            {sponsor.name}
-                                        </span>
+                                        <div
+                                            aria-hidden="true"
+                                            className="flex h-14 w-14 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
+                                        >
+                                            {org.name?.slice(0, 1)}
+                                        </div>
                                     )}
+                                    <div className="min-w-0">
+                                        <h2 className="text-xl font-medium tracking-tight">
+                                            {org.name}
+                                        </h2>
+                                        {org.description && (
+                                            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-secondary">
+                                                {org.description}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="mt-5">
+                                    <OrganiserLinks links={org.links} />
+                                </div>
+                                {org.contact_email && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDialog('contact')}
+                                        className="mt-4 border border-border px-4 py-2.5 text-xs font-medium hover:border-accent hover:text-accent"
+                                    >
+                                        Contact organiser
+                                    </button>
+                                )}
+                                {community && (
+                                    <div className="mt-6 flex flex-col items-start gap-4 border-t border-border pt-5">
+                                        {community.followingEnabled && (
+                                            <FollowControl
+                                                identity={community.identity}
+                                                initialFollowing={community.following}
+                                                followUrl={community.followUrl}
+                                                signInUrl={community.signInUrl}
+                                                sourceEventId={event.id}
+                                            />
+                                        )}
+                                        <a
+                                            href={community.organisation.about_url}
+                                            className="inline-block text-sm text-accent underline underline-offset-4"
+                                        >
+                                            Organisation page and membership options
+                                        </a>
+                                    </div>
+                                )}
+                            </section>
+                        </main>
                     </div>
-                )}
-            </div>
+                    {event.sponsors.length > 0 && (
+                        <section className="border-t border-border py-10">
+                            <h2 className="text-center text-xs uppercase tracking-widest text-ink-tertiary">
+                                Supported by
+                            </h2>
+                            <div className="mt-7 flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
+                                {event.sponsors.map((sponsor) => (
+                                    <div key={sponsor.id} title={sponsor.name}>
+                                        {sponsor.logo_url ? (
+                                            <img
+                                                src={sponsor.logo_url}
+                                                alt={sponsor.name}
+                                                loading="lazy"
+                                                className="h-12 max-w-35 object-contain"
+                                            />
+                                        ) : (
+                                            <span className="text-sm text-ink-secondary">
+                                                {sponsor.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+                    <footer className="border-t border-border py-6 text-center text-xs text-ink-tertiary">
+                        Gather with purpose. Powered by{' '}
+                        <a href="/" className="text-ink-secondary hover:text-accent">
+                            MiConvener
+                        </a>
+                    </footer>
+                </div>
+                <Modal
+                    open={dialog === 'share'}
+                    onClose={() => setDialog(null)}
+                    title="Share this event"
+                >
+                    <p className="mb-4 text-sm text-ink-secondary">
+                        Invite someone to {event.name}.
+                        {isPrivate && ' Guests will still need access to this private event.'}
+                    </p>
+                    <label className="block text-xs text-ink-secondary" htmlFor="event-share-link">
+                        Event link
+                    </label>
+                    <input
+                        id="event-share-link"
+                        readOnly
+                        value={shareUrl}
+                        onFocus={(e) => e.target.select()}
+                        className="mt-2 w-full border border-border bg-canvas p-3 text-sm text-ink"
+                    />
+                    <button
+                        type="button"
+                        onClick={copyLink}
+                        className="mt-4 inline-flex items-center gap-2 bg-accent px-4 py-2.5 text-sm font-medium text-white"
+                    >
+                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {copied ? 'Copied' : 'Copy link'}
+                    </button>
+                    <p role="status" className="mt-3 text-xs text-ink-secondary">
+                        {copied
+                            ? 'Link copied to clipboard.'
+                            : copyError
+                              ? 'Select and copy the link above to share it.'
+                              : ''}
+                    </p>
+                </Modal>
+                <Modal
+                    open={dialog === 'contact'}
+                    onClose={() => setDialog(null)}
+                    title={`Contact ${org.name}`}
+                >
+                    <p className="text-sm text-ink-secondary">
+                        Questions about the event? Reach your organiser directly.
+                    </p>
+                    <a
+                        href={`mailto:${org.contact_email}`}
+                        className="mt-4 inline-block break-all text-sm text-accent underline"
+                    >
+                        {org.contact_email}
+                    </a>
+                </Modal>
+            </article>
         </PublicLayout>
     );
 }

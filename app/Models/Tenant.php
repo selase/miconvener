@@ -275,6 +275,32 @@ final class Tenant extends Model
         return $this->featureEnabled('community_following');
     }
 
+    /** @return array{name: string, logo_url: ?string, description: ?string, contact_email: ?string, links: array<string, string>} */
+    public function publicEventProfile(): array
+    {
+        $profile = $this->meta['public_profile'] ?? [];
+        $profile = is_array($profile) ? $profile : [];
+        $links = [];
+
+        foreach (['website', 'instagram', 'x', 'facebook', 'linkedin', 'youtube'] as $key) {
+            $url = $profile[$key] ?? null;
+            if (is_string($url) && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && in_array(mb_strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+                $links[$key] = $url;
+            }
+        }
+
+        $contact = $profile['contact_email'] ?? null;
+
+        return [
+            'name' => $this->name,
+            'logo_url' => $this->canUseOwnLogo() ? $this->logo_url : null,
+            'description' => is_string($profile['description'] ?? null) ? $profile['description'] : null,
+            'contact_email' => is_string($contact) && filter_var($contact, FILTER_VALIDATE_EMAIL) !== false ? $contact : null,
+            'links' => $links,
+        ];
+    }
+
     public function communityEnabled(): bool
     {
         return $this->featureEnabled('community');

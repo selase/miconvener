@@ -78,7 +78,7 @@ final class PublicEventController extends Controller
             // A private event shows enough to register and nothing more.
             'event' => $this->toPublicPayload($eventModel, revealDetails: ! $eventModel->isPrivate()),
             'community' => $tenant->followingEnabled() || $tenant->communityEnabled() ? app(\App\Services\Community\CommunityPublicContext::class)->for($tenant, request()->session(), $eventModel) : null,
-            'org' => ['name' => $tenant->name],
+            'org' => $tenant->publicEventProfile(),
             'isPrivate' => $eventModel->isPrivate(),
         ]);
         if ($tenant->followingEnabled() || $tenant->communityEnabled()) {
@@ -651,6 +651,7 @@ final class PublicEventController extends Controller
             ] : []),
             'is_free' => $event->isFree(),
             'hero_image_url' => Helper::storageUrl($event->hero_image_path),
+            'going_count' => $event->isPrivate() ? null : $event->registrations()->confirmed()->whereNotNull('ticket_code')->count(),
             'plan_your_visit_content' => $event->plan_your_visit_content,
             'registration_settings' => $event->effectiveRegistrationSettings(),
             'form_fields' => $event->formFields()->ordered()->get()->map(fn (EventFormField $f): array => [
