@@ -22,6 +22,8 @@ Route::prefix('my')->group(function (): void {
         Route::get('/preferences', [App\Http\Controllers\Public\AttendeePreferencesController::class, 'index'])->name('attendee.my.preferences');
         Route::patch('/preferences/{tenantSlug}', [App\Http\Controllers\Public\AttendeePreferencesController::class, 'update'])->name('attendee.my.preferences.update');
         Route::delete('/identity/email', [PlatformAttendeeAccessController::class, 'removeEmail'])->name('attendee.my.identity.email.remove');
+        Route::get('/money', [App\Http\Controllers\Public\MyMoneyController::class, 'index'])->name('attendee.my.money');
+        Route::get('/communities/{tenantSlug}/members/{member}/statement', [App\Http\Controllers\Public\MyMoneyController::class, 'statement'])->name('attendee.my.communities.statement');
         Route::get('/identity', [App\Http\Controllers\Public\MyCommunitiesController::class, 'identity'])->name('attendee.my.identity');
         Route::get('/communities', [App\Http\Controllers\Public\MyCommunitiesController::class, 'index'])->name('attendee.my.communities.index');
         Route::get('/communities/{tenantSlug}/options', [App\Http\Controllers\Public\MyCommunitiesController::class, 'options'])->name('attendee.my.communities.options');

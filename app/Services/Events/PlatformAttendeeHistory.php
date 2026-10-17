@@ -365,11 +365,20 @@ final class PlatformAttendeeHistory
      */
     public function getContributions(string $emailNormalized, ?string $organiserSlug = null): array
     {
-        $email = PlatformAttendeeVerification::normalise($emailNormalized);
+        return $this->contributionQuery($emailNormalized, $organiserSlug)->get()->map(fn (EventContribution $c): array => $this->contributionRow($c))->all();
+    }
 
-        /** @var \Illuminate\Database\Eloquent\Collection<int, EventContribution> $contributions */
-        $contributions = EventContribution::withoutGlobalScopes()
-            ->whereRaw('lower(contributor_email) = ?', [$email])
+    /** @param array<string, mixed> $filters @return \Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>> */
+    public function getAppContributions(string $emailNormalized, array $filters): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        return $this->contributionQuery($emailNormalized, $filters['tenant_slug'] ?? null)->when(! empty($filters['currency']), fn ($q) => $q->where('currency', $filters['currency']))->orderByDesc('id')->paginate(20, ['*'], 'contributions_page', (int) ($filters['contributions_page'] ?? 1))->through(fn (EventContribution $c): array => $this->contributionRow($c));
+    }
+
+    /** @return Builder<EventContribution> */
+    private function contributionQuery(string $emailNormalized, ?string $organiserSlug): Builder
+    {
+        return EventContribution::withoutGlobalScopes()
+            ->whereRaw('lower(contributor_email) = ?', [PlatformAttendeeVerification::normalise($emailNormalized)])
             ->where('status', EventContribution::STATUS_COMPLETED)
             ->whereHas('tenant', fn (Builder $q) => $q->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
             ->when($organiserSlug !== null, fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $organiserSlug)))
@@ -378,43 +387,41 @@ final class PlatformAttendeeHistory
                 'tenant' => fn ($q) => $q->withoutGlobalScopes(),
             ])
             ->latest('paid_at')
-            ->latest('created_at')
-            ->get();
+            ->latest('created_at');
+    }
 
-        $results = [];
-        foreach ($contributions as $c) {
-            $event = $c->event;
-            $tenant = $c->tenant;
+    /** @return array<string, mixed> */
+    private function contributionRow(EventContribution $c): array
+    {
+        $event = $c->event;
+        $tenant = $c->tenant;
 
-            $results[] = [
-                'id' => $c->id,
-                'payment_reference' => $c->payment_reference,
-                'amount' => $c->amount,
-                'formatted_amount' => $c->formattedAmount(),
-                'currency' => $c->currency,
-                'paid_at' => $c->paid_at?->toIso8601String() ?? $c->created_at?->toIso8601String(),
-                'tribute_message' => $c->tribute_message,
-                'is_anonymous' => (bool) $c->is_anonymous,
-                'is_approved' => (bool) $c->is_approved,
-                'contributor_name' => $c->contributor_name,
-                'event' => [
-                    'id' => $event?->id,
-                    'name' => $event?->name,
-                    'slug' => $event?->slug,
-                    'category' => $event?->event_category ?? 'general',
-                    'contribution_title' => $event?->contribution_title,
-                    'url' => $event ? url("/e/{$event->slug}") : null,
-                ],
-                'organiser' => [
-                    'id' => $tenant?->id,
-                    'name' => $tenant?->name,
-                    'slug' => $tenant?->slug,
-                ],
-                'receipt_url' => url("/my/contributions/{$c->id}/receipt"),
-            ];
-        }
-
-        return $results;
+        return [
+            'id' => $c->id,
+            'payment_reference' => $c->payment_reference,
+            'amount' => $c->amount,
+            'formatted_amount' => $c->formattedAmount(),
+            'currency' => $c->currency,
+            'paid_at' => $c->paid_at?->toIso8601String() ?? $c->created_at?->toIso8601String(),
+            'tribute_message' => $c->tribute_message,
+            'is_anonymous' => (bool) $c->is_anonymous,
+            'is_approved' => (bool) $c->is_approved,
+            'contributor_name' => $c->contributor_name,
+            'event' => [
+                'id' => $event?->id,
+                'name' => $event?->name,
+                'slug' => $event?->slug,
+                'category' => $event?->event_category ?? 'general',
+                'contribution_title' => $event?->contribution_title,
+                'url' => $event ? url("/e/{$event->slug}") : null,
+            ],
+            'organiser' => [
+                'id' => $tenant?->id,
+                'name' => $tenant?->name,
+                'slug' => $tenant?->slug,
+            ],
+            'receipt_url' => url("/my/contributions/{$c->id}/receipt"),
+        ];
     }
 
     /** @return array<string, mixed> */

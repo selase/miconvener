@@ -52,6 +52,22 @@ final class CommunityHistory
             ->withSum(['charges as open_total' => fn ($query) => $query->open()], 'amount')->orderBy('name')->orderBy('id')->paginate(20);
     }
 
+    /** @param array<string, mixed> $filters @return LengthAwarePaginator<int, Member> */
+    public function moneyMembers(Session $session, array $filters): LengthAwarePaginator
+    {
+        return $this->moneyMemberQuery($session, $filters)->with(['tenant', 'membershipType', 'charges' => fn ($q) => $q->open()->selectRaw('member_id, currency, SUM(amount) as open_total')->groupBy('member_id', 'currency')])
+            ->orderBy('name')->orderBy('id')->paginate(20, ['*'], 'page', (int) ($filters['page'] ?? 1));
+    }
+
+    /** @param array<string, mixed> $filters @return list<array{currency: string, open_total: int}> */
+    public function moneyTotals(Session $session, array $filters): array
+    {
+        return \App\Models\DuesCharge::withoutGlobalScope(TenantScope::class)->open()->whereIn('member_id', $this->moneyMemberQuery($session, $filters)->select('id'))
+            ->when(! empty($filters['currency']), fn ($q) => $q->where('currency', $filters['currency']))
+            ->selectRaw('currency, SUM(amount) as open_total')->groupBy('currency')->orderBy('currency')->get()
+            ->map(fn ($charge): array => ['currency' => $charge->currency, 'open_total' => (int) $charge->getAttribute('open_total')])->all();
+    }
+
     public function hasOrganisation(Tenant $tenant, Session $session): bool
     {
         return $this->memberQuery($session)->where('tenant_id', $tenant->id)->exists() || $this->followerQuery($session)->where('tenant_id', $tenant->id)->exists();
@@ -85,6 +101,14 @@ final class CommunityHistory
                 'can_save_recovery' => $join->channel === 'sms' && $join->status === 'approved' && $join->member_access_version !== null && $join->credential_issued_at === null])->values()->all();
 
         return ['claims' => $claims, 'joins' => $joins];
+    }
+
+    /** @param array<string, mixed> $filters @return Builder<Member> */
+    private function moneyMemberQuery(Session $session, array $filters): Builder
+    {
+        return $this->memberQuery($session)->whereHas('tenant', fn ($q) => $q->where('status', '!=', \App\Enum\TenantStatusEnum::BANNED))
+            ->when(! empty($filters['tenant_slug']), fn ($q) => $q->whereHas('tenant', fn ($t) => $t->where('slug', $filters['tenant_slug'])))
+            ->when(! empty($filters['member_id']), fn ($q) => $q->where('id', $filters['member_id']));
     }
 
     /** Only exact email matches or independently valid member credentials enter the SQL query.

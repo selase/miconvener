@@ -1,3 +1,4 @@
+import AttendeeMoney from './components/AttendeeMoney';
 import AttendeeMe from './components/AttendeeMe';
 import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
 import { clearAllOfflineTickets } from '@/lib/offlineTicketStore';
@@ -43,6 +44,9 @@ export default function AttendeeApp({
     const [credential, setCredential] = useState(null);
     const [email, setEmail] = useState(verifiedEmail);
     const [phone, setPhone] = useState(communityPhoneVerified);
+    const [money, setMoney] = useState(null);
+    const [moneyPage, setMoneyPage] = useState(1);
+    const [contributionsPage, setContributionsPage] = useState(1);
     const [identity, setIdentity] = useState(null);
     const [preferences, setPreferences] = useState(null);
     const [preferencesPage, setPreferencesPage] = useState(1);
@@ -57,6 +61,7 @@ export default function AttendeeApp({
         setEmail(null);
         setPhone(false);
         setHistory(null);
+        setMoney(null);
         setRecords(null);
     }, []);
     useEffect(() => {
@@ -111,7 +116,7 @@ export default function AttendeeApp({
         return () => controller.abort();
     }, [email, section, period, page, organiser?.slug, revision, expire]);
     useEffect(() => {
-        if (!email || !RECORDS[record]) return undefined;
+        if (!email || !RECORDS[record] || record === 'contributions') return undefined;
         const controller = new AbortController();
         const current = generation.current;
         setLoading(true);
@@ -179,6 +184,31 @@ export default function AttendeeApp({
             });
         return () => controller.abort();
     }, [section, email, phone, revision, preferencesPage, expire]);
+    useEffect(() => {
+        if (!['home', 'money'].includes(section) || (!email && !phone)) return undefined;
+        const controller = new AbortController();
+        const current = generation.current;
+        const params = new URLSearchParams({
+            page: String(moneyPage),
+            contributions_page: String(contributionsPage),
+        });
+        if (organiser?.slug) params.set('tenant_slug', organiser.slug);
+        csrfFetch(`/my/money?${params}`, { signal: controller.signal })
+            .then(async (response) => {
+                if (response.status === 401) {
+                    expire();
+                    throw new Error('Verify your contact again.');
+                }
+                if (!response.ok) throw new Error('Could not load money records. Try again.');
+                const data = await response.json();
+                if (current === generation.current) setMoney(data);
+            })
+            .catch((failure) => {
+                if (failure.name !== 'AbortError' && current === generation.current)
+                    setError(failure.message);
+            });
+        return () => controller.abort();
+    }, [section, email, phone, moneyPage, contributionsPage, organiser?.slug, revision, expire]);
     const changePreference = async (slug, channel, enabled) => {
         setBusy(true);
         setError('');
@@ -229,7 +259,7 @@ export default function AttendeeApp({
         }
     };
     const Record = RECORDS[record];
-    const needsEmail = ['home', 'tickets', 'money'].includes(section) && !email;
+    const needsEmail = ['home', 'tickets'].includes(section) && !email;
     return (
         <AttendeeAppShell section={section} onSectionChange={navigate}>
             <Head title="My MiConvener" />
@@ -267,7 +297,7 @@ export default function AttendeeApp({
             ) : (
                 <>
                     {loading && <HistorySkeleton />}
-                    {!loading && Record && ['tickets', 'money'].includes(section) ? (
+                    {!loading && Record && section === 'tickets' ? (
                         <>
                             <button
                                 type="button"
@@ -284,6 +314,7 @@ export default function AttendeeApp({
                     ) : !loading && section === 'home' ? (
                         <AttendeeHome
                             history={history}
+                            duesSummary={money}
                             onSectionChange={navigate}
                             onOpen={(entry) => window.location.assign(entry.event_workspace_url)}
                         />
@@ -314,17 +345,15 @@ export default function AttendeeApp({
                         ) : (
                             <VerifyPrompt onVerified={verified} organiserSlug={organiser?.slug} />
                         ))}
-                    {section === 'money' && !Record && (
-                        <>
-                            <h1 className="text-3xl font-medium">Your money records</h1>
-                            <button
-                                type="button"
-                                onClick={() => openRecord('contributions')}
-                                className="mt-5 min-h-11 text-sm underline"
-                            >
-                                Contributions & receipts
-                            </button>
-                        </>
+                    {section === 'money' && (
+                        <AttendeeMoney
+                            data={money}
+                            initialTab={record === 'contributions' ? 'contributions' : 'dues'}
+                            onPage={(kind, next) =>
+                                kind === 'dues' ? setMoneyPage(next) : setContributionsPage(next)
+                            }
+                            onRefresh={() => setRevision((value) => value + 1)}
+                        />
                     )}
                     {section === 'me' && (
                         <>
