@@ -22,7 +22,7 @@ final class CommunitySettings extends Model
     protected $connection = 'landlord';
 
     protected $fillable = [
-        'join_mode', 'public_join_enabled', 'public_membership_type_id',
+        'giving_event_cutover_at', 'join_mode', 'public_join_enabled', 'public_membership_type_id',
         'reminders_enabled', 'reminder_offsets', 'frequent_digest', 'sms_monthly_limit',
         'tenant_id',
         'timezone',
@@ -46,6 +46,7 @@ final class CommunitySettings extends Model
     ];
 
     protected $casts = [
+        'giving_event_cutover_at' => 'immutable_datetime',
         'public_join_enabled' => 'boolean',
         'reminders_enabled' => 'boolean',
         'reminder_offsets' => 'array',

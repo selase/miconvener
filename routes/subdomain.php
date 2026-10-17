@@ -318,6 +318,14 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
+    Route::prefix('community/money/giving/funds')->name('tenant.community.giving.funds.')->group(function (): void {
+        Route::post('/', [App\Http\Controllers\Tenant\GivingFundController::class, 'store'])->name('store');
+        Route::put('/{fund}', [App\Http\Controllers\Tenant\GivingFundController::class, 'update'])->name('update');
+        Route::post('/{fund}/close', [App\Http\Controllers\Tenant\GivingFundController::class, 'close'])->name('close');
+        Route::post('/{fund}/reopen', [App\Http\Controllers\Tenant\GivingFundController::class, 'reopen'])->name('reopen');
+        Route::post('/{fund}/archive', [App\Http\Controllers\Tenant\GivingFundController::class, 'archive'])->name('archive');
+    });
+
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
             Route::get('people/joins', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'index'])->name('joins.index');

@@ -99,6 +99,17 @@ it('gates Community Messages by its own rollout and sending permission', () => {
 });
 
 it('keeps sent inbox announcements reachable when sending is switched off', () => {
-    const group = visibleGroups(NAV_GROUPS, {features:{community:true,community_inbox:true},can:{send_community_messages:true}}).find(g=>g.key==='community');
-    expect(group.items.some(item=>item.label==='Messages')).toBe(true);
+    const group = visibleGroups(NAV_GROUPS, {
+        features: { community: true, community_inbox: true },
+        can: { send_community_messages: true },
+    }).find((g) => g.key === 'community');
+    expect(group.items.some((item) => item.label === 'Messages')).toBe(true);
+});
+it('giving staff can reach Overview without member management', () => {
+    const community = visibleGroups(NAV_GROUPS, {
+        features: { community: true, community_giving: true },
+        can: { manage_giving: true },
+    }).find((g) => g.key === 'community');
+    expect(community.items.map((i) => i.href)).toContain('tenant.community.overview');
+    expect(community.items.map((i) => i.href)).not.toContain('tenant.community.people.index');
 });

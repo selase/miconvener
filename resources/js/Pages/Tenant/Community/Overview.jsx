@@ -126,6 +126,7 @@ function ReminderSettings({ settings, form, setForm, errors, setErrors }) {
 
 export default function Overview({
     counts,
+    givingFundsCount = null,
     collectedThisMonth,
     reminderSettings,
     canReadFinance = false,
@@ -152,7 +153,7 @@ export default function Overview({
                 aria-label="Community"
                 className="flex gap-3 border-b border-border px-4 py-3 sm:px-8"
             >
-                {['overview', 'settings'].map((key) => (
+                {(counts === null ? ['overview'] : ['overview', 'settings']).map((key) => (
                     <button
                         key={key}
                         type="button"
@@ -214,18 +215,30 @@ export default function Overview({
                                     hint="Independent review required"
                                 />
                             ))}
-                        <Stat
-                            label="Members"
-                            value={counts.members}
-                            hint={`${counts.activeMembers} active`}
-                            href={route('tenant.community.people.index')}
-                        />
-                        <Stat
-                            label="Open dues"
-                            value={counts.openCharges}
-                            hint={`${counts.overdueCharges} overdue`}
-                            href={route('tenant.community.money.dues.index')}
-                        />
+                        {counts !== null && (
+                            <>
+                                <Stat
+                                    label="Members"
+                                    value={counts?.members}
+                                    hint={`${counts?.activeMembers} active`}
+                                    href={route('tenant.community.people.index')}
+                                />
+                                <Stat
+                                    label="Open dues"
+                                    value={counts?.openCharges}
+                                    hint={`${counts?.overdueCharges} overdue`}
+                                    href={route('tenant.community.money.dues.index')}
+                                />
+                            </>
+                        )}
+                        {givingFundsCount !== null && (
+                            <Stat
+                                label="Giving funds"
+                                value={givingFundsCount}
+                                href={route('tenant.community.overview')}
+                                hint="Voluntary contributions without dues or membership"
+                            />
+                        )}
                         {canReadFinance && (
                             <Stat
                                 label="Collected online this month"

@@ -95,3 +95,17 @@ it('overview hides finance totals and reporting links without finance permission
     );
     expect(screen.queryByText('Collected online this month')).toBeNull();
 });
+it('giving-only overview omits member counts and member settings', () => {
+    render(
+        <Overview
+            counts={null}
+            collectedThisMonth={[]}
+            reminderSettings={null}
+            canReadFinance
+            givingFundsCount={2}
+        />
+    );
+    expect(screen.queryByText('Members')).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Settings' })).toBeNull();
+    expect(screen.getByText('Giving funds')).toBeTruthy();
+});

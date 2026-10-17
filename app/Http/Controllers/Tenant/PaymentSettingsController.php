@@ -46,6 +46,7 @@ final class PaymentSettingsController extends Controller
 
         return Inertia::render('Tenant/Settings/Payments', [
             'ticketPaymentsAvailable' => $tenant->handlesTicketMoney(),
+            'givingPaymentsAvailable' => app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) || $tenant->hasGivingMoney(),
             'settlementMode' => $tenant->settlement_mode,
             'platformSettlementAvailable' => (bool) config('services.settlement.paystack.secret_key'),
             'gateways' => [
@@ -155,8 +156,8 @@ final class PaymentSettingsController extends Controller
         $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        if (! $tenant->handlesTicketMoney() && ! app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) && ! $tenant->hasGivingMoney()) {
+            abort(403, 'Payment connection is not available for this organisation.');
         }
 
         if (! $this->stripeConnect->isConfigured()) {

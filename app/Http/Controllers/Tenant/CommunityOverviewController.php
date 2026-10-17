@@ -25,8 +25,18 @@ final class CommunityOverviewController extends Controller
 {
     public function index(): Response
     {
-        $this->authorize('manage members');
         $tenant = $this->getTenant();
+        if (! auth()->user()->can('manage members')) {
+            abort_unless(auth()->user()->can('manage giving') && app(\App\Services\Giving\GivingRollout::class)->enabled($tenant), 403);
+
+            return Inertia::render('Tenant/Community/Overview', [
+                'canReadFinance' => auth()->user()->can('read finance'),
+                'counts' => null, 'reviewCounts' => null, 'membershipTypes' => [],
+                'joinSettings' => null, 'reminderSettings' => null, 'recentMessages' => null,
+                'collectedThisMonth' => [],
+                'givingFundsCount' => \App\Models\GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count(),
+            ]);
+        }
 
         $charges = DuesCharge::query()->where('tenant_id', $tenant->id);
         $today = CarbonImmutable::now(CommunitySettings::for($tenant)->timezone);

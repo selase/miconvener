@@ -466,6 +466,7 @@ export default function Payments({
     settlementMode,
     platformSettlementAvailable,
     ticketPaymentsAvailable = true,
+    givingPaymentsAvailable = false,
     gateways,
     stripe,
     commissionSplit,
@@ -502,7 +503,9 @@ export default function Payments({
                         commissionSplit={commissionSplit}
                         commissionCredit={commissionCredit}
                     />
-                    {ticketPaymentsAvailable && <StripeCard stripe={stripe} />}
+                    {(ticketPaymentsAvailable || givingPaymentsAvailable) && (
+                        <StripeCard stripe={stripe} />
+                    )}
                 </div>
             </div>
         </ConsoleLayout>

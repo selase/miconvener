@@ -22,7 +22,7 @@ export const NAV_GROUPS = [
                 href: 'tenant.community.overview',
                 icon: 'LayoutGrid',
                 feature: 'community',
-                permission: 'manage_members',
+                anyPermissions: ['manage_members', 'manage_giving'],
             },
             {
                 label: 'People',
@@ -49,7 +49,7 @@ export const NAV_GROUPS = [
                 label: 'Messages',
                 href: 'tenant.community.messages.index',
                 icon: 'Inbox',
-                anyFeatures: ['community_messages','community_inbox'],
+                anyFeatures: ['community_messages', 'community_inbox'],
                 permission: 'send_community_messages',
             },
             {
@@ -163,8 +163,9 @@ export function visibleGroups(groups, { features = {}, can = {} } = {}) {
             items: group.items.filter(
                 (item) =>
                     (!item.feature || features[item.feature]) &&
-                    (!item.anyFeatures || item.anyFeatures.some(key=>features[key])) &&
-                    (!item.permission || can[item.permission])
+                    (!item.anyFeatures || item.anyFeatures.some((key) => features[key])) &&
+                    (!item.permission || can[item.permission]) &&
+                    (!item.anyPermissions || item.anyPermissions.some((key) => can[key]))
             ),
         }))
         .filter((group) => group.items.length > 0);

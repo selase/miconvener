@@ -10,11 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md` §§2,4,5.1–5.4,6.1–6.2,8,10,12–13.1,15; finance invariants in `AGENTS.md`. Read the roadmap and inbox design too; this plan does not change their identity rules.
 
-**Baseline:** deployed PR34, merge `1a87328e713ae8656318c866630f30a61ae89221`; tested source `a42a0b5`. Planning branch `codex/community-5-plan` carries local release evidence `5846921`. Status: **proposed for owner review; no implementation authorised by this document**. No migrations, production queries, provider calls or feature activation were run while preparing it.
+**Baseline:** deployed PR34, merge `1a87328e713ae8656318c866630f30a61ae89221`; tested source `a42a0b5`. Planning branch `codex/community-5-plan` carries local release evidence `5846921`. Status: **owner approved recommendations and native implementation2026-10-17; no merge, deploy or production cutover authorised**. No migrations, production queries, provider calls or feature activation were run while preparing it.
 
 ## What the owner should review
 
-The no-dues requirement is binding. The following details are **recommendations for approval**, not decisions already made by the owner:
+The no-dues requirement is binding. The following details are **recommendations approved by the owner2026-10-17**:
 
 - Use the familiar **Giving** tab in Community Money. Public copy can say **Contribute**, **Give an offering**, or **Support this project**, chosen by the organisation; never force church terminology onto a volunteer group. With no dues configuration/history, Giving is the default and zero arrears cards do not dominate Home/Overview. Dues remain optional and discoverable.
 - Campaign progress uses contributed principal, including cash, less confirmed refunds/corrections. Gateway and platform fees are separately reported, not subtracted from the campaign bar. Default public progress is hidden until the organisation chooses amounts or percentage. No public donor-name wall in this milestone.
@@ -92,7 +92,7 @@ These are proposed new names, not claims about existing code. All rows have UUID
 
 **Interfaces:** contracts above; new `manage giving` permission grants fund management. Gift/cash financial operations additionally require `read finance`; refunds require `process refunds`; payouts require `manage payouts`. No `manage members` permission is required to visit Giving. Existing built-in Org Superadmin/Org Admin receive the permission only on initial creation by the established seeder. New `community:enable-giving {tenant} {--off} {--online}` touches only that tenant's flag/cache, requires Community for new activity; no package/currency/settlement change. Cash/screens activation defaults `meta.online_enabled=false`; `--online` is a separate explicit operator opt-in after readiness approval. Readiness is not inferred from the presence of payment credentials. Preserve existing flag metadata when toggling.
 
-- [ ] Write failing schema/tenant-boundary tests and `a giving-only organisation needs no membership setup`: Free tenant, no types/members/events/charges, Community+Giving on, actor with manage giving/read finance → create/close/reopen a fund succeeds; missing/foreign permission or switched-off creation is403/404. `MembershipType(amount:null,period:null)` generates no dues; zero override remains a separate waived-charge case. Cash-only/zero-balance history keeps Finance reachable after flags off; history cannot grant new-write access. Assert status/target/currency immutability and slug collision validation.
+- [x] Write failing schema/tenant-boundary tests and `a giving-only organisation needs no membership setup`: Free tenant, no types/members/events/charges, Community+Giving on, actor with manage giving/read finance → create/close/reopen a fund succeeds; missing/foreign permission or switched-off creation is403/404. `MembershipType(amount:null,period:null)` generates no dues; zero override remains a separate waived-charge case. Cash-only/zero-balance history keeps Finance reachable after flags off; history cannot grant new-write access. Assert status/target/currency immutability and slug collision validation.
 ```php
 // After a fund is created for the empty Free tenant by its Giving manager:
 $response->assertCreated();
@@ -101,10 +101,10 @@ expect(Member::query()->where('tenant_id', $tenant->id)->count())->toBe(0)
     ->and(DuesCharge::query()->where('tenant_id', $tenant->id)->count())->toBe(0);
 ```
 
-- [ ] Run `php artisan test --compact tests/Feature/Giving/GivingSchemaTest.php tests/Feature/Giving/GivingFundAccessTest.php`; observe expected missing-feature failure.
-- [ ] Implement only the schema, fund actions and three-layer gates. Add seeded permission/navigation/auth props together; protect donor fields independently of fund editing. Add Giving enum/DB-category support and additive PostgreSQL constraints; rollbacks refuse to drop a category with financial rows; no historical backfill or provider call in migrations. Community Overview is usable without manage members: give-only staff see permitted fund activity and no People/claims payload. Preserve existing dues/people permissions. Payment settings and its Stripe Connect action must accept an effective Giving organisation with manage payment settings even without paid-ticket entitlement; keep that permission and platform-superadmin fee restrictions. Test both the page and the connect route, not only navigation.
-- [ ] Run the two files plus `tests/Feature/Admin/PermissionsSeederTest.php`, `tests/Feature/Billing/PaymentsAndFinanceAccessTest.php` and relevant existing Community Overview/navigation tests. Expected PASS; add a route test for every new action. Check every existing direct call to modified controller methods.
-- [ ] Tick steps, update roadmap status and commit `feat(giving): funds and dues-independent access`. Rebuild assets if navigation/props rendering changed.
+- [x] Run `php artisan test --compact tests/Feature/Giving/GivingSchemaTest.php tests/Feature/Giving/GivingFundAccessTest.php`; observe expected missing-feature failure.
+- [x] Implement only the schema, fund actions and three-layer gates. Add seeded permission/navigation/auth props together; protect donor fields independently of fund editing. Add Giving enum/DB-category support and additive PostgreSQL constraints; rollbacks refuse to drop a category with financial rows; no historical backfill or provider call in migrations. Community Overview is usable without manage members: give-only staff see permitted fund activity and no People/claims payload. Preserve existing dues/people permissions. Payment settings and its Stripe Connect action must accept an effective Giving organisation with manage payment settings even without paid-ticket entitlement; keep that permission and platform-superadmin fee restrictions. Test both the page and the connect route, not only navigation.
+- [x] Run the two files plus `tests/Feature/Admin/PermissionsSeederTest.php`, `tests/Feature/Billing/PaymentsAndFinanceAccessTest.php` and relevant existing Community Overview/navigation tests. Expected PASS; add a route test for every new action. Check every existing direct call to modified controller methods.
+- [x] Tick steps, update roadmap status and commit `feat(giving): funds and dues-independent access`. Rebuild assets if navigation/props rendering changed.
 
 ## Task 2: Recorded gifts, offering batches, corrections and campaign progress
 
