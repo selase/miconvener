@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import ThemeToggle from '@/Components/Console/ThemeToggle';
 
-export default function PublicLayout({ children }) {
+export default function PublicLayout({ children, headerActions = null }) {
     return (
         <div className="min-h-screen bg-canvas font-console text-ink">
             <header className="flex items-center justify-between border-b border-border px-6 py-3.5 sm:px-10">
@@ -27,7 +27,10 @@ export default function PublicLayout({ children }) {
                         className="hidden h-6 w-auto dark:block"
                     />
                 </Link>
-                <ThemeToggle />
+                <div className="flex items-center gap-4">
+                    {headerActions}
+                    <ThemeToggle />
+                </div>
             </header>
 
             {children}

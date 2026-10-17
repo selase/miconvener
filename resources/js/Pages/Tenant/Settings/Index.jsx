@@ -16,6 +16,18 @@ export default function Settings({ org }) {
         require_2fa: org.require_2fa ?? false,
         custom_domain: org.can_use_custom_domain ? (org.custom_domain ?? '') : '',
         logo: null,
+        public_profile: Object.fromEntries(
+            [
+                'description',
+                'contact_email',
+                'website',
+                'instagram',
+                'x',
+                'facebook',
+                'linkedin',
+                'youtube',
+            ].map((key) => [key, org.public_profile?.[key] ?? ''])
+        ),
     });
 
     const domainForm = useForm({});
@@ -165,6 +177,84 @@ export default function Settings({ org }) {
                             )}
                         </div>
                     )}
+
+                    <fieldset className="space-y-4 border-t border-border pt-6">
+                        <legend className="pt-6 text-sm font-semibold text-ink">
+                            Public event profile
+                        </legend>
+                        <p className="text-sm text-ink-secondary">
+                            These optional details appear on your public event pages. Publish only
+                            contact details you want attendees to see; your organisation’s account
+                            email stays private unless you enter it here.
+                        </p>
+                        <div>
+                            <label
+                                htmlFor="public-org-description"
+                                className="mb-1.5 block text-sm font-medium text-ink"
+                            >
+                                About the organiser
+                            </label>
+                            <textarea
+                                id="public-org-description"
+                                maxLength={500}
+                                rows={3}
+                                className="w-full border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-accent"
+                                value={data.public_profile.description}
+                                onChange={(event) =>
+                                    setData('public_profile', {
+                                        ...data.public_profile,
+                                        description: event.target.value,
+                                    })
+                                }
+                            />
+                            {errors['public_profile.description'] && (
+                                <p className="text-sm text-danger-fg">
+                                    {errors['public_profile.description']}
+                                </p>
+                            )}
+                        </div>
+                        <Input
+                            label="Public contact email"
+                            type="email"
+                            value={data.public_profile.contact_email}
+                            onChange={(event) =>
+                                setData('public_profile', {
+                                    ...data.public_profile,
+                                    contact_email: event.target.value,
+                                })
+                            }
+                            error={errors['public_profile.contact_email']}
+                        />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {Object.entries({
+                                website: 'Website',
+                                instagram: 'Instagram',
+                                x: 'X / Twitter',
+                                facebook: 'Facebook',
+                                linkedin: 'LinkedIn',
+                                youtube: 'YouTube',
+                            }).map(([key, label]) => (
+                                <Input
+                                    key={key}
+                                    label={`${label} URL`}
+                                    type="url"
+                                    placeholder="https://"
+                                    maxLength={2048}
+                                    value={data.public_profile[key]}
+                                    onChange={(event) =>
+                                        setData('public_profile', {
+                                            ...data.public_profile,
+                                            [key]: event.target.value,
+                                        })
+                                    }
+                                    error={errors[`public_profile.${key}`]}
+                                />
+                            ))}
+                        </div>
+                        {errors.public_profile && (
+                            <p className="text-sm text-danger-fg">{errors.public_profile}</p>
+                        )}
+                    </fieldset>
 
                     <Button type="submit" disabled={processing}>
                         Save changes
