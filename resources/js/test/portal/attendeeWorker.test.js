@@ -42,6 +42,11 @@ it('never intercepts private JSON, PDFs, finance, material or off-origin request
     const { listeners } = worker();
     for (const path of [
         '/my/money',
+        '/my/inbox',
+        '/my/communities/pilot/inbox',
+        '/my/communities/pilot/inbox/item',
+        '/my/communities/pilot/inbox/item/read',
+        '/my/communities/pilot/inbox/read-all',
         '/my/identity',
         '/my/preferences',
         '/my/communities',

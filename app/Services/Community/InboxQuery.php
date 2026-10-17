@@ -16,6 +16,11 @@ final class InboxQuery
 {
     public function __construct(private InboxAccess $access, private InboxRollout $rollout) {}
 
+    public function available(Session $session): bool
+    {
+        return $this->rollout->organisations()->whereIn('id', array_values(array_unique(array_column($this->access->contexts($session), 'tenant_id'))))->exists();
+    }
+
     /** @return list<array<string,mixed>> */
     public function counts(Session $session): array
     {

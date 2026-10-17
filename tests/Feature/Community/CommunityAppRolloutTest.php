@@ -55,3 +55,15 @@ it('includes a pilot organisation reached only through the current event ticket 
     $reg->update(['email' => 'changed@example.test']);
     expect(app(CommunityHistory::class)->usesAppShell($session, null))->toBeFalse();
 });
+
+it('exposes inbox discovery only for a currently authorised enabled organisation', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 'inbox-app-pilot']);
+    $tenant->features()->create(['feature_key' => 'community_app', 'enabled' => true]);
+    Member::factory()->create(['tenant_id' => $tenant->id, 'email' => 'inbox-owner@example.test']);
+    $host = mb_ltrim((string) config('session.domain'), '.');
+    $proof = [PlatformAttendeeVerification::SESSION_KEY => ['email' => 'inbox-owner@example.test', 'expires_at' => now()->addHour()->timestamp]];
+    $this->withSession($proof)->get('http://'.$host.'/my', ['HTTP_HOST' => $host])->assertOk()->assertInertia(fn ($page) => $page->where('community_inbox_enabled', false));
+    $tenant->features()->create(['feature_key' => 'community_inbox', 'enabled' => true]);
+    $this->get('http://'.$host.'/my', ['HTTP_HOST' => $host])->assertOk()->assertInertia(fn ($page) => $page->where('community_inbox_enabled', true));
+    $this->getJson('http://'.$host.'/my/identity', ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('community_inbox_enabled', true);
+});

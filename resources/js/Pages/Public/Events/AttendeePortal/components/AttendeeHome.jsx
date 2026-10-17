@@ -1,6 +1,11 @@
 import TicketPass from './TicketPass';
 export default function AttendeeHome({
     history,
+    eventLoading = false,
+    inbox,
+    inboxStatus = 'idle',
+    onOpenInbox,
+    onRetryInbox,
     duesSummary,
     onSectionChange,
     onOpen,
@@ -41,6 +46,13 @@ export default function AttendeeHome({
                                 Verify email for event tickets
                             </button>
                         </div>
+                    ) : eventLoading ? (
+                        <p
+                            role="status"
+                            className="border border-border p-6 text-sm text-ink-secondary"
+                        >
+                            Loading your events…
+                        </p>
                     ) : next ? (
                         <TicketPass entry={next} onOpen={onOpen} />
                     ) : (
@@ -100,6 +112,58 @@ export default function AttendeeHome({
                     )}
                 </div>
                 <aside className="space-y-5">
+                    {(inboxStatus === 'loading' ||
+                        inboxStatus === 'error' ||
+                        inbox?.some((row) => row.unread > 0)) && (
+                        <section
+                            aria-label="Community messages"
+                            className="border border-border bg-surface p-5"
+                        >
+                            <h2 className="text-lg font-medium">New messages</h2>
+                            {inboxStatus === 'loading' && (
+                                <p role="status" className="mt-3 text-sm text-ink-secondary">
+                                    Checking your messages…
+                                </p>
+                            )}
+                            {inboxStatus === 'error' && (
+                                <div role="alert">
+                                    <p className="mt-3 text-sm text-ink-secondary">
+                                        Messages could not be loaded.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={onRetryInbox}
+                                        className="mt-2 min-h-11 text-sm text-accent underline"
+                                    >
+                                        Retry messages
+                                    </button>
+                                </div>
+                            )}
+                            <ul className="mt-3 divide-y divide-border">
+                                {inbox
+                                    ?.filter((row) => row.unread > 0)
+                                    .map((row) => (
+                                        <li key={row.slug}>
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpenInbox(row)}
+                                                className="flex min-h-11 w-full items-center justify-between gap-3 py-3 text-left text-sm text-ink"
+                                            >
+                                                <span className="min-w-0 break-words">
+                                                    {row.name}
+                                                </span>
+                                                <span
+                                                    className="border border-accent px-2 py-0.5 text-xs font-medium text-accent"
+                                                    aria-label={`${row.unread} unread messages`}
+                                                >
+                                                    {row.unread > 99 ? '99+' : row.unread}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    ))}
+                            </ul>
+                        </section>
+                    )}
                     <section className="border border-border bg-surface p-5">
                         <h2 className="text-lg font-medium">Your communities</h2>
                         <p className="mt-2 text-sm text-ink-secondary">

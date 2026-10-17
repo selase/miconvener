@@ -104,3 +104,28 @@ it('exposes takedown only to the global superadmin and keeps transport diagnosti
     $this->actingAs($admin)->post($url, ['reason' => 'Privacy removal', 'confirmed' => true])->assertRedirect();
     expect($message->fresh()->inbox_withdrawn_at)->not->toBeNull();
 });
+
+it('retains the announcement when SMS credits disappear after queueing', function (): void {
+    $service = app(CommunityMessages::class);
+    $message = $service->queue($this->tenant, $this->owner, [...$this->input, 'channels' => ['sms']]);
+    $this->tenant->features()->where('feature_key', 'sms_credits')->update(['meta' => ['type' => 'limit', 'value' => 0]]);
+    deliverCommunityTestMessage($message);
+    expect(CommunityInboxItem::query()->where('message_id', $message->id)->whereNull('withdrawn_at')->count())->toBe(1)
+        ->and($message->fresh()->deliveries()->where('status', 'accepted')->count())->toBe(0);
+    Illuminate\Support\Facades\Http::assertNothingSent();
+});
+
+it('cancels between selection pages without materialising or delivering the remaining audience', function (): void {
+    $this->tenant->features()->where('feature_key', 'email_credits')->update(['meta' => ['type' => 'limit', 'value' => 500]]);
+    Member::factory()->count(101)->create(['tenant_id' => $this->tenant->id]);
+    $service = app(CommunityMessages::class);
+    $message = $service->queue($this->tenant, $this->owner, $this->input);
+    $service->dispatchDue($message->id);
+    expect($message->fresh()->selection_complete)->toBeFalse()
+        ->and(CommunityInboxItem::query()->where('message_id', $message->id)->count())->toBe(100);
+    $service->cancel($this->tenant, $this->owner, $message->fresh());
+    deliverCommunityTestMessage($message);
+    expect(CommunityInboxItem::query()->where('message_id', $message->id)->count())->toBe(100)
+        ->and(CommunityInboxItem::query()->where('message_id', $message->id)->whereNull('withdrawn_at')->count())->toBe(0);
+    Illuminate\Support\Facades\Mail::assertNothingSent();
+});

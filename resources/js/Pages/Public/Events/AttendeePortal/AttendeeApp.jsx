@@ -24,6 +24,7 @@ import AttendeeHome from './components/AttendeeHome';
 import AttendeeTickets from './components/AttendeeTickets';
 import VerifyPrompt from './VerifyPrompt';
 import CommunitiesPanel from '@/Pages/Public/Community/CommunitiesPanel';
+import InboxList from '@/Pages/Public/Community/InboxList';
 import RecoveryCredential from '@/Pages/Public/Community/RecoveryCredential';
 import CertificatesSection from './components/CertificatesSection';
 import AbstractsSection from './components/AbstractsSection';
@@ -39,12 +40,27 @@ const RECORDS = {
 };
 
 export default function AttendeeApp({
+    community_inbox_enabled = false,
     verifiedEmail,
     communityPhoneVerified,
     organiser,
     communityReturnUrl,
     offline_identity,
 }) {
+    const [inbox, setInbox] = useState(null);
+    const [inboxEnabled, setInboxEnabled] = useState(community_inbox_enabled);
+    const [inboxOwner, setInboxOwner] = useState(null);
+    const [inboxStatus, setInboxStatus] = useState('idle');
+    const [inboxLocation, setInboxLocation] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('inbox')
+            ? {
+                  slug: params.get('inbox'),
+                  item: params.get('item'),
+                  context: params.get('context') || 'self',
+              }
+            : null;
+    });
     const [online, setOnline] = useState(
         navigator.onLine && offline_identity?.state !== 'unknown_offline'
     );
@@ -77,6 +93,12 @@ export default function AttendeeApp({
     const [busy, setBusy] = useState(false);
     const generation = useRef(0);
     const previousOwner = useRef(offline_identity?.owner_key);
+    const inboxOwnerRef = useRef(null);
+    const inboxProof =
+        offline_identity?.owner_key ||
+        cacheContext?.owner_key ||
+        `${verifiedEmail || ''}:${Boolean(communityPhoneVerified)}`;
+    const visibleInbox = inboxOwner === inboxProof ? inbox : null;
     const expire = useCallback(() => {
         generation.current++;
         clearAttendeeIdentity();
@@ -87,6 +109,9 @@ export default function AttendeeApp({
         setPhone(false);
         setHistory(null);
         setMoney(null);
+        setInbox(null);
+        setInboxStatus('idle');
+        setInboxLocation(null);
         setTicketDetail(null);
         setSavedPasses([]);
         setCredential(null);
@@ -95,7 +120,17 @@ export default function AttendeeApp({
     useEffect(() => {
         const back = () => {
             setSection(sectionFromLocation(window.location));
-            setRecord(new URLSearchParams(window.location.search).get('tab'));
+            const params = new URLSearchParams(window.location.search);
+            setRecord(params.get('tab'));
+            setInboxLocation(
+                params.get('inbox')
+                    ? {
+                          slug: params.get('inbox'),
+                          item: params.get('item'),
+                          context: params.get('context') || 'self',
+                      }
+                    : null
+            );
         };
         window.addEventListener('popstate', back);
         return () => window.removeEventListener('popstate', back);
@@ -110,10 +145,14 @@ export default function AttendeeApp({
             setHistory(null);
             setRecords(null);
             setMoney(null);
+            setInbox(null);
+            setInboxStatus('idle');
+            setInboxLocation(null);
             setTicketDetail(null);
             setCredential(null);
         }
         previousOwner.current = offline_identity?.owner_key;
+        setInboxEnabled(community_inbox_enabled);
         setEmail(verifiedEmail);
         setPhone(communityPhoneVerified);
         setCacheContext(offline_identity);
@@ -139,6 +178,9 @@ export default function AttendeeApp({
             setHistory(null);
             setRecords(null);
             setMoney(null);
+            setInbox(null);
+            setInboxStatus('idle');
+            setInboxLocation(null);
             setTicketDetail(null);
             setSavedPasses([]);
             setCredential(null);
@@ -174,12 +216,16 @@ export default function AttendeeApp({
                 setHistory(null);
                 setRecords(null);
                 setMoney(null);
+                setInbox(null);
+                setInboxStatus('idle');
+                setInboxLocation(null);
                 setTicketDetail(null);
                 setCredential(null);
                 reconcileAttendeeIdentity(authoritative);
                 setCacheContext(authoritative);
                 setEmail(proof.email?.masked ?? null);
                 setPhone(Boolean(proof.phone));
+                setInboxEnabled(Boolean(proof.community_inbox_enabled));
                 setOnline(true);
                 setSavedPasses(listOfflineTickets(authoritative));
             } catch {
@@ -215,6 +261,7 @@ export default function AttendeeApp({
         offline_identity?.state,
         offline_identity?.owner_key,
         offline_identity?.proof_expires_at,
+        community_inbox_enabled,
         verifiedEmail,
         communityPhoneVerified,
     ]);
@@ -286,9 +333,73 @@ export default function AttendeeApp({
         const url = new URL(window.location.href);
         url.searchParams.set('section', key);
         url.searchParams.delete('tab');
+        for (const key of ['inbox', 'item', 'context']) url.searchParams.delete(key);
+        setInboxLocation(null);
         url.hash = '';
         window.history.pushState({}, '', url);
     };
+    const openInbox = (organisation, item = null) => {
+        setSection('communities');
+        setRecord(null);
+        const location = {
+            slug: organisation.slug,
+            item: item?.id || null,
+            context: item?.context || 'self',
+        };
+        setInboxLocation(location);
+        const url = new URL(window.location.href);
+        url.searchParams.set('section', 'communities');
+        url.searchParams.set('inbox', organisation.slug);
+        url.searchParams.delete('tab');
+        for (const key of ['item', 'context']) url.searchParams.delete(key);
+        if (item) {
+            url.searchParams.set('item', item.id);
+            url.searchParams.set('context', item.context);
+        }
+        window.history.pushState({}, '', url);
+    };
+    const closeInbox = () => {
+        setInboxLocation(null);
+        const url = new URL(window.location.href);
+        for (const key of ['inbox', 'item', 'context']) url.searchParams.delete(key);
+        window.history.pushState({}, '', url);
+        window.requestAnimationFrame(() => document.getElementById('communities')?.focus());
+    };
+    useEffect(() => {
+        if (!inboxEnabled || !online || (!email && !phone)) return undefined;
+        const abort = new AbortController();
+        const current = generation.current;
+        let disposed = false;
+        if (inboxOwnerRef.current !== inboxProof) {
+            setInbox(null);
+            setInboxOwner(inboxProof);
+            inboxOwnerRef.current = inboxProof;
+        }
+        setInboxStatus('loading');
+        csrfFetch('/my/inbox', { cache: 'no-store', signal: abort.signal })
+            .then(async (response) => {
+                if (response.status === 401) {
+                    if (current === generation.current && !disposed) expire();
+                    return;
+                }
+                if (!response.ok) throw new Error('Messages could not be loaded.');
+                const data = await response.json();
+                if (!disposed && current === generation.current) {
+                    setInbox(data.organisations || []);
+                    setInboxStatus('success');
+                }
+            })
+            .catch((failure) => {
+                if (!disposed && current === generation.current && failure.name !== 'AbortError') {
+                    setInbox(null);
+                    setInboxStatus('error');
+                }
+            });
+        return () => {
+            disposed = true;
+            abort.abort();
+        };
+    }, [inboxEnabled, online, email, phone, inboxProof, revision, expire]);
     useEffect(() => {
         if (
             !online ||
@@ -563,7 +674,7 @@ export default function AttendeeApp({
                 </section>
             ) : (
                 <>
-                    {loading && <HistorySkeleton />}
+                    {loading && section !== 'home' && <HistorySkeleton />}
                     {!loading && Record && section === 'tickets' ? (
                         <>
                             <button
@@ -578,9 +689,18 @@ export default function AttendeeApp({
                                 onContributionUpdated={() => setRevision((value) => value + 1)}
                             />
                         </>
-                    ) : !loading && section === 'home' ? (
+                    ) : section === 'home' ? (
                         <AttendeeHome
                             history={history}
+                            eventLoading={loading}
+                            inbox={
+                                organiser?.slug
+                                    ? visibleInbox?.filter((row) => row.slug === organiser.slug)
+                                    : visibleInbox
+                            }
+                            inboxStatus={inboxStatus}
+                            onOpenInbox={openInbox}
+                            onRetryInbox={() => setRevision((value) => value + 1)}
                             duesSummary={moneyStatus === 'success' ? money : null}
                             eventAccess={Boolean(email)}
                             onVerifyEmail={() => {
@@ -609,6 +729,8 @@ export default function AttendeeApp({
                         (email || phone ? (
                             <CommunitiesPanel
                                 organiser={organiser}
+                                inboxOverview={visibleInbox}
+                                onOpenInbox={openInbox}
                                 initiallyOpen
                                 onCredential={(value) => {
                                     if (
@@ -627,6 +749,31 @@ export default function AttendeeApp({
                         ) : (
                             <VerifyPrompt onVerified={verified} organiserSlug={organiser?.slug} />
                         ))}
+                    {section === 'communities' &&
+                        inboxEnabled &&
+                        inboxLocation &&
+                        (email || phone) &&
+                        online && (
+                            <InboxList
+                                key={`${offline_identity?.owner_key || email || phone}:${inboxLocation.slug}`}
+                                tenantSlug={inboxLocation.slug}
+                                name={
+                                    visibleInbox?.find((row) => row.slug === inboxLocation.slug)
+                                        ?.name || inboxLocation.slug
+                                }
+                                itemId={inboxLocation.item}
+                                context={inboxLocation.context}
+                                onOpen={(entry) => openInbox({ slug: inboxLocation.slug }, entry)}
+                                onBack={() => openInbox({ slug: inboxLocation.slug })}
+                                logoUrl={
+                                    visibleInbox?.find((row) => row.slug === inboxLocation.slug)
+                                        ?.logo_url
+                                }
+                                onClose={closeInbox}
+                                onChanged={() => setRevision((value) => value + 1)}
+                                onExpired={expire}
+                            />
+                        )}
                     {section === 'money' && (
                         <AttendeeMoney
                             data={money}

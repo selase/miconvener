@@ -1,8 +1,9 @@
 import csrfFetch from '@/lib/csrfFetch';
 
-export async function communityRequest(url, method = 'GET', payload) {
+export async function communityRequest(url, method = 'GET', payload, { signal } = {}) {
     const response = await csrfFetch(url, {
         method,
+        ...(signal ? { signal } : {}),
         cache: 'no-store',
         ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
     });

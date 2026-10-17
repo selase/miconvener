@@ -63,6 +63,7 @@ final class PlatformAttendeeAccessController extends Controller
 
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
             'app_shell_enabled' => $appEnabled,
+            'community_inbox_enabled' => $appEnabled && app(\App\Services\Community\InboxQuery::class)->available($request->session()),
             'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
             'communityPhoneVerified' => app(\App\Services\Community\PhoneVerification::class)->verifiedPhone($request->session()) !== null,
             'communityReturnUrl' => $this->communityReturnUrl($request, $organiserSlug),
