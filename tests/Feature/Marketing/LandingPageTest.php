@@ -39,8 +39,9 @@ test('hero use cases replace the plan limits line without removing pricing detai
 test('venue and engagement copy covers the supported workflows', function (): void {
     $this->get('/')->assertOk()
         ->assertSee('Create facility tasks')
-        ->assertDontSee('Assign facility tasks')
-        ->assertSee('Discussions &amp; forums', false);
+        ->assertDontSee('Assign facility tasks');
+
+    $this->get(route('features'))->assertOk()->assertSee('Discussions &amp; forums', false);
 });
 
 test('the landing page describes the event product, not the one this codebase replaced', function (): void {
@@ -115,14 +116,21 @@ test('the homepage explains facilities recognition and academic coordination', f
     $page = $this->get('/')->assertOk();
     foreach ([
         'Keep every space ready for the next gathering.',
-        'Academic submissions &amp; peer review',
-        'Receive abstracts, assign reviewers, record decisions and export an abstract book.',
-        'Sponsor commitments',
+        'Abstracts &amp; peer review',
         'Certificate verification',
-        'miconvener.com/my',
         'Know what came in—and what you receive.',
     ] as $copy) {
         expect(str_contains($page->getContent(), $copy))->toBeTrue("Missing homepage coverage: {$copy}");
+    }
+
+    $features = $this->get(route('features'))->assertOk();
+    foreach ([
+        'Academic submissions &amp; peer review',
+        'Receive abstracts, assign reviewers, record decisions and export an abstract book.',
+        'Sponsor commitments',
+        'miconvener.com/my',
+    ] as $copy) {
+        expect(str_contains($features->getContent(), $copy))->toBeTrue("Missing full features coverage: {$copy}");
     }
 });
 
