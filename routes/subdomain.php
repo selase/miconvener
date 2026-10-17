@@ -318,6 +318,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
+    Route::post('community/money/giving/funds/{fund}/gifts', [App\Http\Controllers\Tenant\GivingGiftController::class, 'store'])->name('tenant.community.giving.gifts.store');
+    Route::post('community/money/giving/gifts/{gift}/corrections', [App\Http\Controllers\Tenant\GivingGiftController::class, 'correct'])->name('tenant.community.giving.gifts.correct');
+
     Route::prefix('community/money/giving/funds')->name('tenant.community.giving.funds.')->group(function (): void {
         Route::post('/', [App\Http\Controllers\Tenant\GivingFundController::class, 'store'])->name('store');
         Route::put('/{fund}', [App\Http\Controllers\Tenant\GivingFundController::class, 'update'])->name('update');

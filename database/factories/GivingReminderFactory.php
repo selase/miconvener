@@ -16,8 +16,8 @@ final class GivingReminderFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => fn (array $attributes) => GivingFund::withoutGlobalScopes()->findOrFail($attributes['fund_id'])->tenant_id,
             'fund_id' => GivingFund::factory(),
+            'tenant_id' => fn (array $attributes) => GivingFund::withoutGlobalScopes()->findOrFail($attributes['fund_id'])->tenant_id,
         ];
     }
 }
