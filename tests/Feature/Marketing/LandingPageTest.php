@@ -187,3 +187,11 @@ test('the opening hero reuses the selected services auditorium photograph', func
     $images = $xpath->query('//img[@data-headline-image]');
     expect($images->item(0)->getAttribute('src'))->toBe($images->item(4)->getAttribute('data-src'));
 });
+
+test('the community cards keep their card styling after the feature grid moved', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect(str_contains($html, 'class="cap community-cards'))->toBeTrue()
+        ->and((bool) preg_match('/\.cap\s*\{[^}]*display:\s*grid/', $html))->toBeTrue()
+        ->and((bool) preg_match('/\.cap\s*>\s*div\s*\{[^}]*padding/', $html))->toBeTrue();
+});
