@@ -36,7 +36,7 @@ final class GivingContributionBridge
             $tenant->getConnection()->transaction(function () use ($tenant, $missing): void {
                 Tenant::query()->whereKey($tenant->id)->lockForUpdate()->firstOrFail();
                 foreach ($missing as $source) {
-                    $fund = $this->fundFor($source->event);
+                    $fund = $this->fundFor(Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($source->event_id), $source->currency);
                     GivingContributionLink::withoutGlobalScopes()->firstOrCreate(['event_contribution_id' => $source->id], ['tenant_id' => $tenant->id, 'fund_id' => $fund->id, 'origin' => 'legacy_association', 'category' => 'event', 'associated_at' => now()]);
                 }
             });
@@ -62,18 +62,26 @@ final class GivingContributionBridge
         });
     }
 
-    public function fundFor(Event $event): GivingFund
+    public function fundFor(Event $event, ?string $currency = null): GivingFund
     {
-        return $event->getConnection()->transaction(function () use ($event): GivingFund {
+        return $event->getConnection()->transaction(function () use ($event, $currency): GivingFund {
             Tenant::query()->whereKey($event->tenant_id)->lockForUpdate()->firstOrFail();
 
-            return GivingFund::withoutGlobalScopes()->firstOrCreate(['tenant_id' => $event->tenant_id, 'slug' => 'event-'.$event->id], [
+            $currency ??= $event->currency ?: 'GHS';
+            $existing = GivingFund::withoutGlobalScopes()->where('tenant_id', $event->tenant_id)->where('event_id', $event->id)->where('currency', $currency)->first();
+            if ($existing !== null) {
+                return $existing;
+            }
+            $fund = GivingFund::withoutGlobalScopes()->firstOrCreate(['tenant_id' => $event->tenant_id, 'slug' => 'event-'.$event->id.'-'.mb_strtolower($currency)], [
                 'event_id' => $event->id, 'name' => mb_substr($event->contribution_title ?: $event->name, 0, 160),
-                'description' => $event->contribution_description, 'currency' => $event->currency ?: 'GHS',
+                'description' => $event->contribution_description, 'currency' => $currency,
                 'kind' => 'open', 'target' => null, 'minimum_amount' => $event->contribution_min_amount_pesewas ?? 100,
                 'state' => 'open', 'visibility' => 'private', 'progress' => 'hidden',
                 'audit' => [['action' => 'event_fund_created', 'at' => now()->toIso8601String()]],
             ]);
+            abort_unless($fund->event_id === $event->id && $fund->currency === $currency && $fund->visibility === 'private', 409, 'The event contribution fund needs review.');
+
+            return $fund;
         });
     }
 

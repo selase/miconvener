@@ -85,6 +85,7 @@ export default function AttendeeApp({
     const [moneyStatus, setMoneyStatus] = useState('idle');
     const [preferencesStatus, setPreferencesStatus] = useState('idle');
     const [moneyPage, setMoneyPage] = useState(1);
+    const [givingPage, setGivingPage] = useState(1);
     const [contributionsPage, setContributionsPage] = useState(1);
     const [identity, setIdentity] = useState(null);
     const [preferences, setPreferences] = useState(null);
@@ -521,6 +522,7 @@ export default function AttendeeApp({
         const params = new URLSearchParams({
             page: String(moneyPage),
             contributions_page: String(contributionsPage),
+            giving_page: String(givingPage),
         });
         if (organiser?.slug) params.set('tenant_slug', organiser.slug);
         csrfFetch(`/my/money?${params}`, { signal: controller.signal })
@@ -550,10 +552,33 @@ export default function AttendeeApp({
         phone,
         moneyPage,
         contributionsPage,
+        givingPage,
         organiser?.slug,
         revision,
         expire,
     ]);
+    useEffect(() => {
+        if (!['home', 'money'].includes(section)) return undefined;
+        const clearMoney = () => {
+            generation.current++;
+            setMoney(null);
+            setMoneyStatus('loading');
+        };
+        const refreshMoney = () => {
+            clearMoney();
+            setRevision((value) => value + 1);
+        };
+        const visibility = () => {
+            if (document.visibilityState === 'hidden') clearMoney();
+            else refreshMoney();
+        };
+        window.addEventListener('focus', refreshMoney);
+        document.addEventListener('visibilitychange', visibility);
+        return () => {
+            window.removeEventListener('focus', refreshMoney);
+            document.removeEventListener('visibilitychange', visibility);
+        };
+    }, [section]);
     const changePreference = async (slug, channel, enabled) => {
         setBusy(true);
         setError('');
@@ -791,11 +816,18 @@ export default function AttendeeApp({
                         )}
                     {section === 'money' && (
                         <AttendeeMoney
+                            key={`${cacheContext?.owner_key ?? 'anonymous'}:${record ?? 'money'}`}
                             data={money}
                             status={moneyStatus}
-                            initialTab={record === 'contributions' ? 'contributions' : 'dues'}
+                            initialTab={
+                                ['contributions', 'giving', 'dues'].includes(record) ? record : null
+                            }
                             onPage={(kind, next) =>
-                                kind === 'dues' ? setMoneyPage(next) : setContributionsPage(next)
+                                kind === 'dues'
+                                    ? setMoneyPage(next)
+                                    : kind === 'giving'
+                                      ? setGivingPage(next)
+                                      : setContributionsPage(next)
                             }
                             onRefresh={() => setRevision((value) => value + 1)}
                         />

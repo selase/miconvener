@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import { formatDuesMoney } from '@/lib/dues';
-export default function Result({ status, amount, currency, receiptUrl = null }) {
+export default function Result({ status, amount, currency, receiptUrl = null, eventUrl = null }) {
     const confirmed = status === 'confirmed';
     return (
         <PublicLayout>
@@ -20,6 +20,11 @@ export default function Result({ status, amount, currency, receiptUrl = null }) 
                 {confirmed && receiptUrl && (
                     <a href={receiptUrl} className="mt-6 inline-block text-accent underline">
                         Download receipt
+                    </a>
+                )}
+                {eventUrl && (
+                    <a href={eventUrl} className="mt-6 block min-h-11 text-accent underline">
+                        Return to the event
                     </a>
                 )}
                 <p className="mt-8 text-sm text-ink-secondary">

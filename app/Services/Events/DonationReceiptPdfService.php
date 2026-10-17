@@ -14,7 +14,14 @@ final class DonationReceiptPdfService
      */
     public function generate(EventContribution $contribution): string
     {
-        $contribution->loadMissing(['event', 'tenant']);
+        $contribution->loadMissing(['event' => fn ($query) => $query->withoutGlobalScopes(), 'tenant']);
+        $link = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $contribution->tenant_id)->where('event_contribution_id', $contribution->id)->where('origin', 'checkout')->where('category', 'giving')->first();
+        if ($link !== null) {
+            $source = app(\App\Services\Giving\GivingSources::class)->find($contribution->tenant, 'event_contribution', $contribution->id);
+            $adjustments = \App\Models\GivingAdjustment::withoutGlobalScopes()->where('tenant_id', $contribution->tenant_id)->where('event_contribution_id', $contribution->id)->where('status', 'confirmed')->orderBy('confirmed_at')->get();
+
+            return Pdf::loadView('pdf.giving-receipt', ['receipt' => app(\App\Services\Giving\GivingHistory::class)->originalReceipt($source), 'adjustments' => $adjustments])->setPaper('a4', 'portrait')->output();
+        }
 
         $event = $contribution->event;
         $tenant = $contribution->tenant;

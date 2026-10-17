@@ -262,7 +262,8 @@ final class PlatformAttendeeAccessController extends Controller
             abort(403, 'You are not authorized to access this receipt.');
         }
 
-        if (! $record->isCompleted()) {
+        $refundedGiving = $record->status === EventContribution::STATUS_REFUNDED && \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $record->tenant_id)->where('event_contribution_id', $record->id)->where('origin', 'checkout')->where('category', 'giving')->exists();
+        if (! $record->isCompleted() && ! $refundedGiving) {
             abort(422, 'Receipt is only available for completed contributions.');
         }
 
@@ -271,6 +272,7 @@ final class PlatformAttendeeAccessController extends Controller
 
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'private, no-store',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }

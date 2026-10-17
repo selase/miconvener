@@ -34,6 +34,11 @@ export function clearAttendeeIdentity() {
         /* Storage may be disabled. */
     }
     if (typeof window !== 'undefined') window.dispatchEvent(new Event(IDENTITY_EVENT));
+    if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('miconvener-attendee-identity');
+        channel.postMessage('changed');
+        channel.close();
+    }
 }
 export function reconcileAttendeeIdentity(context) {
     if (context?.state === 'unknown_offline') {

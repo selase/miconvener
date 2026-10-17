@@ -46,10 +46,16 @@ final class GivingCheckoutController extends Controller
     public function result(Request $request, string $subdomain, string $reference): JsonResponse|\Symfony\Component\HttpFoundation\Response
     {
         $attempt = $this->attempt($reference);
-        $access = $request->session()->get('giving_checkout_access.'.$attempt->id);
-        abort_unless(is_array($access) && ($access['expires_at'] ?? 0) > now()->timestamp && $attempt->receipt_expires_at?->isFuture() && hash_equals((string) $attempt->receipt_token_hash, hash('sha256', (string) ($access['token'] ?? ''))), 404);
-
-        $data = ['status' => $attempt->state, 'amount' => $attempt->amount, 'currency' => $attempt->currency];
+        $history = app(\App\Services\Giving\GivingHistory::class);
+        $allowed = $history->ownsCapability($request->session(), $attempt);
+        if (! $allowed && $attempt->state === 'confirmed') {
+            $history->sourceForReceipt($request->session(), $attempt->tenant, $attempt->gift_id === null ? 'event_contribution' : 'gift', $attempt->gift_id ?? $attempt->event_contribution_id);
+            $allowed = true;
+        }
+        abort_unless($allowed, 404);
+        $data = ['status' => $attempt->state, 'amount' => $attempt->amount, 'currency' => $attempt->currency, 'receiptUrl' => $attempt->state === 'confirmed' ? route('public.giving.receipt', ['subdomain' => $subdomain, 'reference' => $reference]) : null];
+        $event = $attempt->event_contribution_id === null ? null : \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $attempt->tenant_id)->whereIn('id', \App\Models\EventContribution::withoutGlobalScopes()->whereKey($attempt->event_contribution_id)->select('event_id'))->whereNull('deleted_at')->first();
+        $data['eventUrl'] = $event === null ? null : route('public.events.show', ['subdomain' => $subdomain, 'event' => $event->slug]);
         if ($request->expectsJson()) {
             return response()->json($data)->header('Cache-Control', 'private, no-store');
         }

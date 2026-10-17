@@ -135,6 +135,7 @@ final class PhoneVerification
             if ($old !== null && $old !== $normalised) {
                 $session->forget('community_member_grants');
             }
+            $session->forget('giving_checkout_access');
             $session->regenerate(true);
             $session->put(self::SESSION_KEY, ['phone' => $normalised, 'verified_at' => now()->timestamp, 'expires_at' => now()->addHours(12)->timestamp]);
         }
@@ -156,6 +157,6 @@ final class PhoneVerification
 
     public function forget(Session $session): void
     {
-        $session->forget([self::SESSION_KEY, 'community_member_grants', 'community_claim_capabilities', 'community_join_capabilities']);
+        $session->forget([self::SESSION_KEY, 'giving_checkout_access', 'community_member_grants', 'community_claim_capabilities', 'community_join_capabilities']);
     }
 }

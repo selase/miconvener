@@ -27,6 +27,6 @@ final class MyMoneyController extends Controller
         $dates = $request->validated();
         $charges = $model->charges()->where('tenant_id', $tenant->id)->whereDate('period_start', '>=', $dates['from'])->whereDate('period_start', '<=', $dates['to'])->orderBy('period_start')->get();
 
-        return Pdf::loadView('pdf.community-member-statement', ['member' => $model, 'tenant' => $tenant, 'charges' => $charges, 'from' => $dates['from'], 'to' => $dates['to']])->setPaper('a4')->download('dues-statement.pdf')->header('Cache-Control', 'private, no-store');
+        return Pdf::loadView('pdf.community-member-statement', ['member' => $model, 'tenant' => $tenant, 'charges' => $charges, 'givingRows' => app(\App\Services\Giving\GivingHistory::class)->statement($request->session(), [...$dates, 'tenant_slug' => $tenant->slug, 'member_id' => $member]), 'from' => $dates['from'], 'to' => $dates['to']])->setPaper('a4')->download('dues-statement.pdf')->header('Cache-Control', 'private, no-store');
     }
 }

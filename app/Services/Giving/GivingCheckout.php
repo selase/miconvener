@@ -38,8 +38,7 @@ final class GivingCheckout
             $fund = GivingFund::withoutGlobalScopes()->where('tenant_id', $fund->tenant_id)->lockForUpdate()->findOrFail($fund->id);
             $old = GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $fund->tenant_id)->where('submission_key', $submissionKey)->first();
             if ($old !== null) {
-                $access = $session->get('giving_checkout_access.'.$old->id);
-                if ($old->fund_id !== $fund->id || $old->amount !== ($validated['amount_minor'] ?? null) || $old->provider !== ($validated['provider'] ?? 'paystack') || ! is_array($access) || ! hash_equals((string) $old->receipt_token_hash, hash('sha256', (string) ($access['token'] ?? '')))) {
+                if ($old->fund_id !== $fund->id || $old->amount !== ($validated['amount_minor'] ?? null) || $old->provider !== ($validated['provider'] ?? 'paystack') || ! app(GivingHistory::class)->ownsCapability($session, $old)) {
                     throw ValidationException::withMessages(['submission_key' => 'This submission was already used. Refresh before starting another contribution.']);
                 }
                 if ($old->state !== 'open' || $old->checkout_url === null) {
@@ -91,7 +90,7 @@ final class GivingCheckout
                 'reference' => 'giving_'.Str::uuid(), 'category' => 'giving', 'state' => 'initialising',
                 'receipt_token_hash' => hash('sha256', $token), 'receipt_expires_at' => now()->addHours(12), 'giver_key' => $giverKey,
             ]);
-            $session->put('giving_checkout_access.'.$attempt->id, ['token' => $token, 'expires_at' => now()->addHours(12)->timestamp]);
+            $session->put('giving_checkout_access.'.$attempt->id, ['token' => $token, 'expires_at' => now()->addHours(12)->timestamp, 'identity_owner' => app(GivingHistory::class)->capabilityOwner($session)]);
 
             return [$attempt, true];
         });

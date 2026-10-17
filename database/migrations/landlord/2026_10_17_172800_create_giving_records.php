@@ -33,6 +33,7 @@ return new class extends Migration
             $t->jsonb('audit')->default('[]');
             $t->timestamps();
             $t->unique(['tenant_id', 'slug']);
+            $t->unique(['tenant_id', 'event_id', 'currency']);
             $t->unique(['id', 'tenant_id']);
         });
         $schema->create('giving_gifts', function (Blueprint $t): void {

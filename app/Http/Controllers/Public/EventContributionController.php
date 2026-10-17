@@ -77,7 +77,7 @@ final class EventContributionController extends Controller
     {
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)
+        $eventModel = Event::withTrashed()->where('tenant_id', $tenant->id)
             ->where('slug', $event)
             ->firstOrFail();
 
@@ -95,8 +95,10 @@ final class EventContributionController extends Controller
                 app(\App\Services\Giving\GivingPaymentConfirmer::class)->quarantine($givingAttempt, 'event_callback_verification_unavailable');
             }
 
-            return redirect()->route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug])->with($givingAttempt->fresh()->state === 'confirmed' ? 'success' : 'info', $givingAttempt->fresh()->state === 'confirmed' ? 'Thank you for your contribution.' : 'Your contribution is being verified. Please do not pay again.');
+            return redirect()->route('public.giving.result', ['subdomain' => $tenant->slug, 'reference' => $givingAttempt->reference])->header('Cache-Control', 'private, no-store');
         }
+
+        abort_if($eventModel->trashed(), 404);
 
         if ($contributionModel->isCompleted()) {
             return redirect()->route('public.events.show', [

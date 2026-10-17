@@ -674,4 +674,5 @@ Route::get('/give', [App\Http\Controllers\Public\GivingFundController::class, 'i
 Route::get('/give/{slug}', [App\Http\Controllers\Public\GivingFundController::class, 'show'])->name('public.giving.show');
 Route::post('/give/{slug}/checkout', [App\Http\Controllers\Public\GivingCheckoutController::class, 'store'])->middleware('throttle:10,1')->block(15, 15)->name('public.giving.checkout');
 Route::get('/giving/payments/{reference}/callback', [App\Http\Controllers\Public\GivingCheckoutController::class, 'callback'])->name('public.giving.callback');
+Route::get('/giving/payments/{reference}/receipt', [App\Http\Controllers\Public\MyGivingController::class, 'guestReceipt'])->middleware('throttle:60,1')->name('public.giving.receipt');
 Route::get('/giving/payments/{reference}', [App\Http\Controllers\Public\GivingCheckoutController::class, 'result'])->name('public.giving.result');
