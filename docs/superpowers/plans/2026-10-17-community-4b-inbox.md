@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Planning only until the owner reviews this plan. No application implementation, migration, merge to main, deploy or production change is authorised by the design handover.
+- Owner approved native implementation2026-10-17; delivery outcomes stay in staff screens. No merge to main, deploy or production change is authorised.
 - Baseline: milestone 4 `c9f9ae0`, including event-page PR31. Planning branch `codex/community-4b-plan` imports Claude's design through `d342e8c`. Milestone 4 is implemented/unmerged, with device cold-offline/200% acceptance open; its deployment is a release prerequisite, not an assumed completed deployment. Rebase/reconcile this plan against its actual merged SHA before building.
 - "Followers are email-first"; "SMS is an optional added channel on that same follow". No phone-to-email inference; members may still use independently authorised phone credentials.
 - "Only while the inbox is on": `community_inbox` is off by default and effective only with explicit `community_app` on and an active organisation. No backfill.
@@ -34,7 +34,7 @@
 
 ## Decisions for this review
 
-**Delivery outcomes:** recommend showing the notice itself only. Transport acceptance is not proof that someone received/read an email/SMS; credit failures are an organisation operational concern. Keep channel outcomes in existing staff delivery screens, not member-facing “emailed”/“SMS not sent” labels. This is a recommendation awaiting the owner's answer, not an approved decision. If outcomes are requested, amend the design and add authoritative per-channel pending/accepted/unknown semantics before Task 4/6.
+**Delivery outcomes:** recommend showing the notice itself only. Transport acceptance is not proof that someone received/read an email/SMS; credit failures are an organisation operational concern. Keep channel outcomes in existing staff delivery screens, not member-facing “emailed”/“SMS not sent” labels. Owner approved this recommendation2026-10-17. If outcomes are requested, amend the design and add authoritative per-channel pending/accepted/unknown semantics before Task 4/6.
 
 Implementation clarifications proposed for review:
 
@@ -50,12 +50,14 @@ Implementation clarifications proposed for review:
 
 **Interfaces:** `InboxRollout::enabled(Tenant $tenant): bool`; `InboxReaderKey::forSubject(string $subject): string` uses HMAC-SHA256 with a derived `community-inbox-reader:v1` domain key, never a raw identifier. `InboxRetention::prune(CarbonImmutable $asOf): int` deletes items older than `$asOf->subMonthsNoOverflow(24)` in bounded batches and cleans orphaned reads. Commands `community:enable-inbox {tenant} {--off}` and `community:inbox-prune`.
 
-- [ ] Write failing storage/gate tests: exactly one tenant-matching recipient FK/type; announcements require message and no notice snapshot; notices member-only with source/subject/body and null message; unique per-message recipient and per-kind/source/member. Cross-tenant message/member/follower combinations are rejected by composite FK/unique constraints, not merely controller validation.
-- [ ] Add failing tests for all flag/active-state combinations, idempotent one-tenant activation, no default access through plan/missing-feature fallback; preserve other flags. Cover notice expiry, announcement with several surviving items/read keys, erasure of self/representative readers and no retained orphan reads (§12.19).
-- [ ] Run `php artisan test --compact tests/Feature/Community/InboxStorageTest.php tests/Feature/Community/InboxRolloutTest.php tests/Feature/Community/InboxRetentionTest.php`; observe specific RED assertions before implementation.
-- [ ] Implement §4 columns/checks/indexes on landlord. Announcement `entry_key` is message UUID; notice `entry_key` is item UUID. Reads unique `(entry_key,reader_key)`; cleanup is reference-aware because one message has many items. Explicit recipient-first indexes and stable `(available_at,id)` ordering. Add member/follower erasure hooks that remove their reader keys where no surviving item/context needs them; account for delete paths that bypass model events. No raw contact or recoverable credential in items/reads.
-- [ ] Implement gate command with explicit feature-row checks/cache invalidation, no automatic pilot activation; schedule bounded retention daily with overlap guard. Do not hard-delete `community_messages` or financial sources. Test month-end/leap-day cutoff, unread counts after prune and idempotent rerun.
-- [ ] Run affected tests to GREEN, `vendor/bin/pint --dirty`; tick steps and commit storage/gate/lifecycle together. Record any design clarification accepted at review.
+- [x] Write failing storage/gate tests: exactly one tenant-matching recipient FK/type; announcements require message and no notice snapshot; notices member-only with source/subject/body and null message; unique per-message recipient and per-kind/source/member. Cross-tenant message/member/follower combinations are rejected by composite FK/unique constraints, not merely controller validation.
+- [x] Add failing tests for all flag/active-state combinations, idempotent one-tenant activation, no default access through plan/missing-feature fallback; preserve other flags. Cover notice expiry, announcement with several surviving items/read keys, erasure of self/representative readers and no retained orphan reads (§12.19).
+- [x] Run `php artisan test --compact tests/Feature/Community/InboxStorageTest.php tests/Feature/Community/InboxRolloutTest.php tests/Feature/Community/InboxRetentionTest.php`; observe specific RED assertions before implementation.
+- [x] Implement §4 columns/checks/indexes on landlord. Announcement `entry_key` is message UUID; notice `entry_key` is item UUID. Reads unique `(entry_key,reader_key)`; cleanup is reference-aware because one message has many items. Explicit recipient-first indexes and stable `(available_at,id)` ordering. Add member/follower erasure hooks that remove their reader keys where no surviving item/context needs them; account for delete paths that bypass model events. No raw contact or recoverable credential in items/reads.
+- [x] Implement gate command with explicit feature-row checks/cache invalidation, no automatic pilot activation; schedule bounded retention daily with overlap guard. Do not hard-delete `community_messages` or financial sources. Test month-end/leap-day cutoff, unread counts after prune and idempotent rerun.
+- [x] Run affected tests to GREEN, `vendor/bin/pint --dirty`; tick steps and commit storage/gate/lifecycle together. Record any design clarification accepted at review.
+
+**Ruling:** storage/gate/retention cases share `InboxStorageTest.php` (12 tests/28 assertions), avoiding three duplicated test setups. Read rows include an item FK for immediate cascade erasure; see ledger.
 
 ## Task 2 — Email-first follows with optional SMS, preserving member consent
 
@@ -148,4 +150,4 @@ Implementation clarifications proposed for review:
 - [x] Compared task interfaces and paths with current milestone4 code; corrected private history-query reuse and actual landlord/admin route locations.
 - [x] Mapped all24 design acceptance cases, included RED/GREEN steps, reviewed privacy/finance/retry/erasure touchpoints and recorded owner decisions still needed.
 - [x] Recorded aggregate-only production inventory; no conversion, retirement, deployment or rollout performed.
-- [ ] Owner reviews this plan and confirms notice delivery-outcome presentation before implementation.
+- [x] Owner reviewed the plan, approved native implementation and staff-only delivery outcomes2026-10-17.
