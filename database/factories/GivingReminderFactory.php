@@ -18,7 +18,7 @@ final class GivingReminderFactory extends Factory
         return [
             'fund_id' => GivingFund::factory(),
             'tenant_id' => fn (array $attributes) => GivingFund::withoutGlobalScopes()->findOrFail($attributes['fund_id'])->tenant_id,
-            'email' => 'giver@example.test', 'email_hash' => hash('sha256', \Illuminate\Support\Str::random()),
+            'consent_key' => (string) \Illuminate\Support\Str::uuid(), 'email' => 'giver@example.test', 'email_hash' => hash('sha256', \Illuminate\Support\Str::random()),
             'consented_at' => now(), 'cadence' => 'monthly', 'anchor_day' => 1, 'local_time' => '09:00', 'timezone' => 'Africa/Accra',
             'next_due_at' => now()->addMonth()->startOfMonth()->setTime(9, 0), 'unsubscribe_hash' => hash('sha256', \Illuminate\Support\Str::random()),
         ];

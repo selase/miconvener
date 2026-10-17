@@ -77,6 +77,7 @@ final class GivingPaymentConfirmer
                 : [...$common, 'platform_fee_amount' => $attempt->commission_amount, 'payment_reference' => $providerReference,
                     'paystack_reference' => $attempt->provider === 'paystack' ? $providerReference : null, 'provider' => $attempt->provider]);
             $attempt->update(['commission_settlement' => [...$attempt->commission_settlement, 'actual_received' => $settlement['received'], 'actual_credit_used' => $settlement['credit']], 'state' => 'confirmed', 'confirmed_at' => now(), 'provider_reference' => $providerReference, 'review_reason' => null]);
+            app(GivingReceipts::class)->capture($this->sources->find($attempt->tenant, $type, $source->id));
             $this->progress->closeIfTargetReached($fund);
 
             return $attempt;

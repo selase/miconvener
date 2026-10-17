@@ -135,6 +135,9 @@ return new class extends Migration
             $t->timestampTz('disabled_at')->nullable();
             $t->string('unsubscribe_hash', 64)->unique();
             $t->string('last_delivery_key')->nullable();
+            $t->uuid('consent_key');
+            $t->string('delivery_state', 24)->default('idle');
+            $t->uuid('credit_receipt_id')->nullable();
             $t->unique(['fund_id', 'email_hash']);
         });
         $schema->table('community_settings', function (Blueprint $t): void {

@@ -26,6 +26,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Carbon\CarbonImmutable $next_due_at
  * @property \Carbon\CarbonImmutable|null $disabled_at
  * @property string $unsubscribe_hash
+ * @property string $consent_key
+ * @property string $delivery_state
+ * @property string|null $credit_receipt_id
  * @property string|null $last_delivery_key
  */
 final class GivingReminder extends Model
@@ -39,9 +42,9 @@ final class GivingReminder extends Model
 
     protected $connection = 'landlord';
 
-    protected $fillable = ['tenant_id', 'fund_id', 'email', 'email_hash', 'consented_at', 'cadence', 'anchor_day', 'local_time', 'timezone', 'next_due_at', 'disabled_at', 'unsubscribe_hash', 'last_delivery_key'];
+    protected $fillable = ['tenant_id', 'fund_id', 'email', 'email_hash', 'consented_at', 'cadence', 'anchor_day', 'local_time', 'timezone', 'next_due_at', 'disabled_at', 'unsubscribe_hash', 'last_delivery_key', 'consent_key', 'delivery_state', 'credit_receipt_id'];
 
-    protected $hidden = ['email', 'email_hash', 'unsubscribe_hash'];
+    protected $hidden = ['email', 'email_hash', 'unsubscribe_hash', 'consent_key'];
 
     protected $casts = ['email' => 'encrypted', 'consented_at' => 'immutable_datetime', 'next_due_at' => 'immutable_datetime', 'disabled_at' => 'immutable_datetime', 'anchor_day' => 'integer'];
 

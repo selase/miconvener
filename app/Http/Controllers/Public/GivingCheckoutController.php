@@ -55,6 +55,7 @@ final class GivingCheckoutController extends Controller
         abort_unless($allowed, 404);
         $data = ['status' => $attempt->state, 'amount' => $attempt->amount, 'currency' => $attempt->currency, 'receiptUrl' => $attempt->state === 'confirmed' ? route('public.giving.receipt', ['subdomain' => $subdomain, 'reference' => $reference]) : null];
         $event = $attempt->event_contribution_id === null ? null : \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $attempt->tenant_id)->whereIn('id', \App\Models\EventContribution::withoutGlobalScopes()->whereKey($attempt->event_contribution_id)->select('event_id'))->whereNull('deleted_at')->first();
+        $data['fundUrl'] = $attempt->fund->event_id === null && in_array($attempt->fund->visibility, ['public', 'unlisted'], true) && app(\App\Services\Giving\GivingRollout::class)->enabled($attempt->tenant) ? route('public.giving.show', ['subdomain' => $subdomain, 'slug' => $attempt->fund->slug]) : null;
         $data['eventUrl'] = $event === null ? null : route('public.events.show', ['subdomain' => $subdomain, 'event' => $event->slug]);
         if ($request->expectsJson()) {
             return response()->json($data)->header('Cache-Control', 'private, no-store');

@@ -672,6 +672,9 @@ Route::post('community/preferences/{token}', [App\Http\Controllers\Public\Commun
 
 Route::get('/give', [App\Http\Controllers\Public\GivingFundController::class, 'index'])->name('public.giving.index');
 Route::get('/give/{slug}', [App\Http\Controllers\Public\GivingFundController::class, 'show'])->name('public.giving.show');
+Route::post('/give/{slug}/reminder', [App\Http\Controllers\Public\GivingReminderController::class, 'subscribe'])->middleware('throttle:10,1')->name('public.giving.reminders.subscribe');
+Route::get('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'unsubscribe'])->middleware('throttle:60,1')->name('public.giving.reminders.unsubscribe');
+Route::post('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'stop'])->middleware('throttle:10,1')->name('public.giving.reminders.stop');
 Route::post('/give/{slug}/checkout', [App\Http\Controllers\Public\GivingCheckoutController::class, 'store'])->middleware('throttle:10,1')->block(15, 15)->name('public.giving.checkout');
 Route::get('/giving/payments/{reference}/callback', [App\Http\Controllers\Public\GivingCheckoutController::class, 'callback'])->name('public.giving.callback');
 Route::get('/giving/payments/{reference}/receipt', [App\Http\Controllers\Public\MyGivingController::class, 'guestReceipt'])->middleware('throttle:60,1')->name('public.giving.receipt');

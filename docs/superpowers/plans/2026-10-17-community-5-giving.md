@@ -235,7 +235,7 @@ $expiredProofReceipt->assertUnauthorized();
 **Modify:** `app/Console/Kernel.php`, `routes/subdomain.php`, public give/result UI; use existing email transport/allowance and MessagingPreferences. Add only receipt hooks to the successful confirmer/cash service; no private data in generic error logs.
 **Consumes/produces:** immutable Task3 confirmation and Task2 authorised recorded gifts; reminders contract above. Receipt notice is a service acknowledgement; recurring solicitation is opt-in and honours both its own unsubscribe and organisation marketing opt-out. Giving does not create a follower record. Receipts live in Money and email; extending the recipient-record inbox to non-member gifts is deferred, not faked with a member/follower. Existing inbox kinds/retention/access stay intact.
 
-- [ ] Write failing tests for one receipt under duplicate/callback race, queue after commit only, no receipt on failed/rolled-back payment, original receipt preserved after refund with adjustment note. Transactional receipt delivery follows dues receipt billing (not metered as a marketing send); voluntary reminders use the existing metered EmailAllowance and marketing opt-out. Never mail synthetic gateway emails. Reminder subscribe requires verified email and purpose consent; no prechecked consent/mandate. Weekly/monthly tenant-timezone boundary, short-month anchor (2026-01-31→2026-02-28→2026-03-31 at09:00 local), DST, duplicate scheduler run, catch-up sends at most one current reminder, explicit unsubscribe, organisation opt-out, closed fund/deadline/auto-close and flag-off stop future sends. Email delivery failure leaves a retryable notice, not a new gift/charge/arrears. Email credits exhausted produces an honest staff outcome; it never charges a card or spends SMS. Follow/member counts unchanged.
+- [x] Write failing tests for one receipt under duplicate/callback race, queue after commit only, no receipt on failed/rolled-back payment, original receipt preserved after refund with adjustment note. Transactional receipt delivery follows dues receipt billing (not metered as a marketing send); voluntary reminders use the existing metered EmailAllowance and marketing opt-out. Never mail synthetic gateway emails. Reminder subscribe requires verified email and purpose consent; no prechecked consent/mandate. Weekly/monthly tenant-timezone boundary, short-month anchor (2026-01-31→2026-02-28→2026-03-31 at09:00 local), DST, duplicate scheduler run, catch-up sends at most one current reminder, explicit unsubscribe, organisation opt-out, closed fund/deadline/auto-close and flag-off stop future sends. Email delivery failure leaves a retryable notice, not a new gift/charge/arrears. Email credits exhausted produces an honest staff outcome; it never charges a card or spends SMS. Follow/member counts unchanged.
 ```php
 // Same due period processed twice for the consented verified email reminder:
 Mail::assertQueued(GivingReminderMail::class, 1);
@@ -245,10 +245,10 @@ expect(DuesCharge::query()->where('tenant_id', $tenant->id)->count())->toBe(0)
 Mail::assertQueued(GivingReminderMail::class, 1);
 ```
 
-- [ ] Run receipt/reminder files; observe RED.
-- [ ] Implement deduped after-commit receipt outbox and explicit weekly/monthly email reminder schedule; hourly scheduler checks due_at, no unbounded replay of missed reminders. Give link is a public fund link, not a hidden pay token. Existing receipt wording and sign-in code billing are preserved. No actual Paystack subscriptions/authorization charging; no bulk outreach when first enabling Giving.
-- [ ] Run new files, existing message preference/following and donation receipt wording tests, reminder UI tests. Expected PASS. All transport fake in tests; no real recipients.
-- [ ] Tick and commit `feat(giving): receipts and consented giving reminders`; build UI assets.
+- [x] Run receipt/reminder files; observe RED.
+- [x] Implement deduped after-commit receipt outbox and explicit weekly/monthly email reminder schedule; hourly scheduler checks due_at, no unbounded replay of missed reminders. Give link is a public fund link, not a hidden pay token. Existing receipt wording and sign-in code billing are preserved. No actual Paystack subscriptions/authorization charging; no bulk outreach when first enabling Giving.
+- [x] Run new files, existing message preference/following and donation receipt wording tests, reminder UI tests. Expected PASS. All transport fake in tests; no real recipients.
+- [x] Tick and commit `feat(giving): receipts and consented giving reminders`; build UI assets.
 
 ## Task 9: Integration, reconciliation and controlled rollout
 

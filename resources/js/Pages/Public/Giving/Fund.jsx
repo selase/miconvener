@@ -1,3 +1,4 @@
+import GivingReminderControl from './ReminderControl';
 import { useState } from 'react';
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
@@ -161,6 +162,7 @@ export default function Fund({ organisation, fund, providers, accepting }) {
                                 </Button>
                             </form>
                         )}
+                        {accepting && <GivingReminderControl slug={fund.slug} />}
                     </section>
                 </div>
             </main>

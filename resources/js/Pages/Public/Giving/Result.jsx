@@ -1,7 +1,14 @@
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import { formatDuesMoney } from '@/lib/dues';
-export default function Result({ status, amount, currency, receiptUrl = null, eventUrl = null }) {
+export default function Result({
+    status,
+    amount,
+    currency,
+    receiptUrl = null,
+    eventUrl = null,
+    fundUrl = null,
+}) {
     const confirmed = status === 'confirmed';
     return (
         <PublicLayout>
@@ -20,6 +27,11 @@ export default function Result({ status, amount, currency, receiptUrl = null, ev
                 {confirmed && receiptUrl && (
                     <a href={receiptUrl} className="mt-6 inline-block text-accent underline">
                         Download receipt
+                    </a>
+                )}
+                {confirmed && fundUrl && (
+                    <a href={fundUrl} className="mt-6 block min-h-11 text-accent underline">
+                        Return to the fund · optional email reminders
                     </a>
                 )}
                 {eventUrl && (

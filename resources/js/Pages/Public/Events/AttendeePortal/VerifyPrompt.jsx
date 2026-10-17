@@ -22,6 +22,8 @@ export default function VerifyPrompt({
     onVerified,
     organiserSlug = null,
     allowPhone = true,
+    sendUrl = null,
+    confirmUrl = null,
 }) {
     const [phoneMode, setPhoneMode] = useState(false);
     const [stage, setStage] = useState(registrationId ? 'ready' : 'address');
@@ -92,8 +94,10 @@ export default function VerifyPrompt({
         }
     }, [challengeRequired, siteKey, challengeAction]);
 
-    const sendRoute = window.route ? route('attendee.my.verify.send') : '/my/verify/send';
-    const confirmRoute = window.route ? route('attendee.my.verify.confirm') : '/my/verify/confirm';
+    const sendRoute =
+        sendUrl ?? (window.route ? route('attendee.my.verify.send') : '/my/verify/send');
+    const confirmRoute =
+        confirmUrl ?? (window.route ? route('attendee.my.verify.confirm') : '/my/verify/confirm');
 
     const send = async (e) => {
         e?.preventDefault();

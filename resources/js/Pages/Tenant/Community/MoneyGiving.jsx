@@ -353,6 +353,7 @@ function GivingForm({ mode, funds, fund, onClose }) {
 export default function MoneyGiving({
     funds = [],
     report = null,
+    delivery = null,
     gifts = [],
     adjustments = [],
     canManageGiving = false,
@@ -391,6 +392,42 @@ export default function MoneyGiving({
                 }
             />
             <main className="space-y-8 px-4 py-6 sm:px-8">
+                {canReadFinance && delivery && (
+                    <section
+                        className="border border-border bg-surface p-5"
+                        aria-label="Giving email delivery"
+                    >
+                        <h2 className="font-semibold text-ink">Giving email delivery</h2>
+                        <p className="mt-2 text-sm text-ink-secondary">
+                            Receipts are service acknowledgements. Optional giving reminders use
+                            email credits; no SMS or automatic payments.
+                        </p>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            {[
+                                ['Receipts', delivery.receipts],
+                                ['Reminders', delivery.reminders],
+                            ].map(([label, states]) => (
+                                <div key={label}>
+                                    <h3 className="text-sm font-medium text-ink">{label}</h3>
+                                    <p className="mt-2 text-sm text-ink-secondary">
+                                        {Object.entries(states ?? {})
+                                            .map(
+                                                ([state, count]) =>
+                                                    `${state.replaceAll('_', ' ')}: ${count}`
+                                            )
+                                            .join(' · ') || 'No deliveries yet'}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="mt-3 text-xs text-ink-secondary">
+                            No credit: add email credits for future reminders. Outcome unknown: do
+                            not resend blindly. Retryable receipts are retried by the queue; a
+                            sending receipt interrupted by a worker needs operator review.
+                        </p>
+                    </section>
+                )}
+
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-widest text-accent">

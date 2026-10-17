@@ -28,6 +28,10 @@ final class GivingFundController extends Controller
             'funds' => $funds->map(fn (GivingFund $fund) => [...$fund->only(['id', 'name', 'slug', 'description', 'button_label', 'currency', 'kind', 'target', 'minimum_amount', 'ends_on', 'close_on_target', 'state', 'visibility', 'progress', 'event_id']),
                 'totals' => $finance ? app(\App\Services\Giving\GivingProgress::class)->for($fund) : null,
                 'url' => route('public.giving.show', ['subdomain' => $tenant->slug, 'slug' => $fund->slug])]),
+            'delivery' => $finance ? [
+                'reminders' => \App\Models\GivingReminder::withoutGlobalScopes()->where('tenant_id', $tenant->id)->get(['delivery_state'])->countBy('delivery_state'),
+                'receipts' => \App\Models\GivingReceiptNotice::withoutGlobalScopes()->where('tenant_id', $tenant->id)->get(['state'])->countBy('state'),
+            ] : null,
             'canManageGiving' => $request->user()->can('manage giving'), 'canReadFinance' => $finance,
             'enabled' => app(GivingRollout::class)->enabled($tenant),
             'canManageDues' => $request->user()->can('manage members'),

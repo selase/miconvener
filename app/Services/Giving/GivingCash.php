@@ -62,6 +62,7 @@ final class GivingCash
                 'recorded_by' => $actor->id, 'collected_at' => $collected, 'paid_at' => $collected,
                 'gateway_fee_amount' => 0, 'commission_amount' => 0, 'net_amount' => $amount, 'submission_key' => $submissionKey,
             ]);
+            app(GivingReceipts::class)->capture(app(GivingSources::class)->find($fund->tenant, 'gift', $gift->id));
             $this->progress->closeIfTargetReached($fund);
 
             return $gift;
