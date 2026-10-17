@@ -2,6 +2,8 @@
 
 @section('title', config('product-page.brand.name').' — run your whole event from one place')
 
+@include('product.partials.cap-styles')
+
 @push('styles')
 <style>
     /* ── Field ───────────────────────────────────────────────────────── */
