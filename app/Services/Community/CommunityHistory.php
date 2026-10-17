@@ -19,6 +19,25 @@ final class CommunityHistory
 {
     public function __construct(private readonly MemberAccess $access, private readonly PlatformAttendeeVerification $emails, private readonly PhoneVerification $phones, private readonly MessagingPreferences $preferences) {}
 
+    public function usesAppShell(Session $session, ?string $organiserSlug): bool
+    {
+        $tenants = Tenant::query()->where('status', \App\Enum\TenantStatusEnum::ACTIVE)
+            ->whereHas('features', fn ($query) => $query->where('feature_key', 'community_app')->where('enabled', true));
+        if ($organiserSlug !== null) {
+            return $tenants->where('slug', $organiserSlug)->exists();
+        }
+
+        $email = $this->emails->verifiedEmail($session);
+
+        return $tenants->where(function ($query) use ($session, $email): void {
+            $query->whereIn('id', $this->memberQuery($session)->select('tenant_id'))
+                ->orWhereIn('id', $this->followerQuery($session)->select('tenant_id'));
+            if ($email !== null) {
+                $query->orWhereIn('id', \App\Models\EventRegistration::withoutGlobalScopes()->forEmail($email)->whereNotIn('status', [\App\Models\EventRegistration::STATUS_CANCELLED, \App\Models\EventRegistration::STATUS_REJECTED])->whereHas('event', fn ($event) => $event->withoutGlobalScopes()->whereNull('deleted_at'))->select('tenant_id'));
+            }
+        })->exists();
+    }
+
     /** @return array<string,mixed> */
     public function communities(Session $session): array
     {
@@ -36,6 +55,28 @@ final class CommunityHistory
     {
         return $this->memberQuery($session)->where('tenant_id', $tenant->id)->with('membershipType')
             ->withSum(['charges as open_total' => fn ($query) => $query->open()], 'amount')->orderBy('name')->orderBy('id')->paginate(20);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Member>
+     */
+    public function moneyMembers(Session $session, array $filters): LengthAwarePaginator
+    {
+        return $this->moneyMemberQuery($session, $filters)->with(['tenant', 'membershipType', 'charges' => fn ($q) => $q->open()->selectRaw('member_id, currency, SUM(amount) as open_total')->groupBy('member_id', 'currency')])
+            ->orderBy('name')->orderBy('id')->paginate(20, ['*'], 'page', (int) ($filters['page'] ?? 1));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return list<array{currency: string, open_total: int}>
+     */
+    public function moneyTotals(Session $session, array $filters): array
+    {
+        return \App\Models\DuesCharge::withoutGlobalScope(TenantScope::class)->open()->whereIn('member_id', $this->moneyMemberQuery($session, $filters)->select('id'))
+            ->when(! empty($filters['currency']), fn ($q) => $q->where('currency', $filters['currency']))
+            ->selectRaw('currency, SUM(amount) as open_total')->groupBy('currency')->orderBy('currency')->get()
+            ->map(fn ($charge): array => ['currency' => $charge->currency, 'open_total' => (int) $charge->getAttribute('open_total')])->all();
     }
 
     public function hasOrganisation(Tenant $tenant, Session $session): bool
@@ -76,7 +117,7 @@ final class CommunityHistory
     /** Only exact email matches or independently valid member credentials enter the SQL query.
      * @return Builder<Member>
      */
-    private function memberQuery(Session $session): Builder
+    public function memberQuery(Session $session): Builder
     {
         $email = $this->emails->verifiedEmail($session);
         $phone = $this->phones->verifiedPhone($session);
@@ -103,18 +144,21 @@ final class CommunityHistory
     }
 
     /** @return Builder<CommunityFollower> */
-    private function followerQuery(Session $session): Builder
+    public function followerQuery(Session $session): Builder
     {
         $email = $this->emails->verifiedEmail($session);
-        $phone = $this->phones->verifiedPhone($session);
 
-        return CommunityFollower::withoutGlobalScope(TenantScope::class)->whereNull('unfollowed_at')->where(function ($query) use ($email, $phone): void {
-            $query->whereRaw('1=0');
-            foreach (['email' => $email, 'sms' => $phone] as $channel => $address) {
-                if ($address !== null) {
-                    $query->orWhere(fn ($match) => $match->where('channel', $channel)->where('address_hash', $this->preferences->hash($channel, $address)));
-                }
-            }
-        });
+        return CommunityFollower::withoutGlobalScope(TenantScope::class)->where('channel', 'email')->whereNull('unfollowed_at')->when($email === null, fn ($q) => $q->whereRaw('1=0'), fn ($q) => $q->where('address_hash', $this->preferences->hash('email', $email)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Member>
+     */
+    private function moneyMemberQuery(Session $session, array $filters): Builder
+    {
+        return $this->memberQuery($session)->whereHas('tenant', fn ($q) => $q->where('status', '!=', \App\Enum\TenantStatusEnum::BANNED))
+            ->when(! empty($filters['tenant_slug']), fn ($q) => $q->whereHas('tenant', fn ($t) => $t->where('slug', $filters['tenant_slug'])))
+            ->when(! empty($filters['member_id']), fn ($q) => $q->where('id', $filters['member_id']));
     }
 }

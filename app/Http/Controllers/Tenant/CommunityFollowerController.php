@@ -18,9 +18,9 @@ final class CommunityFollowerController extends Controller
     {
         $this->authorize('manage members');
         $tenant = app(TenantContext::class)->getTenant();
-        $rows = CommunityFollower::query()->where('tenant_id', $tenant->id)->whereNull('unfollowed_at')->latest()->paginate(30);
+        $rows = CommunityFollower::query()->where('tenant_id', $tenant->id)->with('channels')->whereNull('unfollowed_at')->latest()->paginate(30);
 
-        $followers = $rows->through(fn ($row) => ['id' => $row->id, 'channel' => $row->channel, 'address' => $row->address, 'consented_at' => $row->consented_at->toIso8601String(), 'source' => $row->consent_source]);
+        $followers = $rows->through(fn ($row) => ['id' => $row->id, 'channel' => $row->channel, 'address' => $row->address, 'consented_at' => $row->consented_at->toIso8601String(), 'source' => $row->consent_source, 'sms_added' => $row->channels->contains(fn ($c) => $c->disabled_at === null && $c->consented_at->gte($row->consented_at))]);
         if ($request->wantsJson()) {
             return response()->json(['followers' => $followers]);
         }

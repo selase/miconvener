@@ -67,10 +67,10 @@ Route::get('/staff-worker.js', fn () => response()->file(resource_path('js/worke
 ]))->name('staff.worker');
 
 // The attendee portal's offline worker, served uncached for the same reason.
-Route::get('/attendee-worker.js', fn () => response()->file(resource_path('js/workers/attendee-sw.js'), [
+Route::get('/attendee-worker.js', fn () => response(str_replace('__BUILD_ID__', is_file(public_path('build/manifest.json')) ? mb_substr(hash_file('sha256', public_path('build/manifest.json')), 0, 16) : 'dev', (string) file_get_contents(resource_path('js/workers/attendee-sw.js'))), 200, [
     'Content-Type' => 'application/javascript; charset=utf-8',
     'Cache-Control' => 'no-cache, no-store, must-revalidate',
-    'Service-Worker-Allowed' => '/my/',
+    'Service-Worker-Allowed' => '/my',
 ]))->name('attendee.worker');
 Route::get('/privacy', fn (): Factory|View => view('product.privacy'))->name('privacy');
 Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadController::class, 'store'])->name('product.enterprise.lead');
@@ -112,6 +112,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('health.tenants.show');
     Route::get('messages/reconciliation', [App\Http\Controllers\Admin\CommunitySmsReconciliationController::class, 'index'])->name('admin.messages.reconciliation.index');
     Route::post('messages/reconciliation', [App\Http\Controllers\Admin\CommunitySmsReconciliationController::class, 'resolve'])->name('admin.messages.reconciliation.resolve');
+    Route::post('messages/{message}/inbox-takedown', App\Http\Controllers\Admin\CommunityInboxTakedownController::class)->whereUuid('message')->name('admin.messages.inbox-takedown');
     Route::get('messages', [App\Http\Controllers\Admin\MessageDeliveryController::class, 'index'])
         ->name('admin.messages.index');
     Route::post('takedowns/{type}/{id}', [App\Http\Controllers\Admin\TakedownController::class, 'store'])

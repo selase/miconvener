@@ -22,7 +22,7 @@ final class MessageDeliverySearch
     private const int LIMIT = 100;
 
     /**
-     * @return list<array{at: ?string, sort: int, organisation: string, kind: string, channel: string, to: string, subject: string, status: string, error: ?string}>
+     * @return list<array{at: ?string, sort: int, organisation: string, kind: string, channel: string, to: string, subject: string, status: string, error: ?string, inbox_message_id: ?string}>
      */
     public function find(string $term): array
     {
@@ -43,6 +43,7 @@ final class MessageDeliverySearch
 
         $rows = collect([
             ...$this->notifications($term, $isEmail, $phoneTail),
+            ...$this->community($term, $isEmail),
             ...($isEmail ? $this->announcements($term) : []),
             ...($isEmail ? $this->directEmails($term) : []),
             ...($isEmail ? $this->billingEmails($term) : []),
@@ -62,9 +63,25 @@ final class MessageDeliverySearch
                 'subject' => $row['subject'],
                 'status' => $row['status'],
                 'error' => $row['error'],
+                'inbox_message_id' => $row['inbox_message_id'] ?? null,
             ])
             ->values()
             ->all();
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function community(string $term, bool $isEmail): array
+    {
+        $channel = $isEmail ? 'email' : 'sms';
+        $preferences = app(\App\Services\Community\MessagingPreferences::class);
+        $address = $preferences->normalise($channel, $term);
+        if ($address === null) {
+            return [];
+        }
+
+        return \App\Models\CommunityMessageDelivery::query()->where('channel', $channel)->where('address_hash', $preferences->hash($channel, $address))->with('message')->latest()->limit(self::LIMIT)->get()->map(fn ($row) => [
+            'tenant_id' => $row->tenant_id, 'at' => $row->created_at?->format('j M Y H:i'), 'sort' => (int) $row->created_at?->timestamp, 'kind' => 'Community announcement', 'channel' => mb_strtoupper($channel), 'to' => $row->address, 'subject' => $row->message->subject ?? 'Unavailable announcement', 'status' => str_replace('_', ' ', $row->status), 'error' => $row->reason, 'inbox_message_id' => $row->message_id,
+        ])->all();
     }
 
     /**

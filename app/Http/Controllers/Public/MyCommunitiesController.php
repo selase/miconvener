@@ -28,8 +28,9 @@ final class MyCommunitiesController extends Controller
         $email = app(PlatformAttendeeVerification::class)->verifiedEmail($request->session());
         $phone = app(PhoneVerification::class)->verifiedPhone($request->session());
 
-        return response()->json(['email' => $email === null ? null : ['masked' => ContactMask::email($email), 'expires_at' => $request->session()->get(PlatformAttendeeVerification::SESSION_KEY.'.expires_at')],
+        return response()->json(['offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()), 'email' => $email === null ? null : ['masked' => ContactMask::email($email), 'expires_at' => $request->session()->get(PlatformAttendeeVerification::SESSION_KEY.'.expires_at')],
             'phone' => $phone === null ? null : ['masked' => '••••'.mb_substr($phone, -4), 'expires_at' => $request->session()->get(PhoneVerification::SESSION_KEY.'.expires_at')],
+            'community_inbox_enabled' => app(\App\Services\Community\InboxQuery::class)->available($request->session()),
             'can_access_events' => $email !== null, 'can_access_communities' => $email !== null || $phone !== null]);
     }
 

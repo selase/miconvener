@@ -7,6 +7,8 @@ import { clearAllOfflineTickets } from '@/lib/offlineTicketStore';
 
 export default function CommunitiesPanel({
     organiser,
+    inboxOverview,
+    onOpenInbox,
     initiallyOpen = false,
     onCredential,
     onExpired,
@@ -194,6 +196,7 @@ export default function CommunitiesPanel({
     return (
         <section
             ref={section}
+            tabIndex={-1}
             id="communities"
             className="mt-10 space-y-5 border-t border-border pt-8"
             aria-label="My Communities"
@@ -280,6 +283,19 @@ export default function CommunitiesPanel({
                                     className="rounded-lg border border-border bg-surface px-4 py-3 text-left text-sm font-medium text-ink hover:bg-surface-hover"
                                 >
                                     {community.name}
+                                    {inboxOverview?.find((row) => row.slug === community.slug)
+                                        ?.unread > 0 && (
+                                        <span className="ml-2 text-xs text-accent">
+                                            {inboxOverview.find(
+                                                (row) => row.slug === community.slug
+                                            ).unread > 99
+                                                ? '99+'
+                                                : inboxOverview.find(
+                                                      (row) => row.slug === community.slug
+                                                  ).unread}{' '}
+                                            unread
+                                        </span>
+                                    )}
                                 </button>
                             ))}
                         </div>
@@ -291,6 +307,24 @@ export default function CommunitiesPanel({
                                 independent membership review below.
                             </p>
                         )
+                    )}
+                    {inboxOverview?.length > 0 && (
+                        <section aria-label="Organisation inboxes" className="flex flex-wrap gap-3">
+                            {inboxOverview.map((organisation) => (
+                                <button
+                                    key={organisation.slug}
+                                    type="button"
+                                    onClick={() => onOpenInbox?.(organisation)}
+                                    className="min-h-11 border border-border bg-surface px-4 py-3 text-left text-sm text-accent hover:bg-surface-hover"
+                                >
+                                    Messages · {organisation.name}{' '}
+                                    <span className="ml-1 text-xs">
+                                        {organisation.unread > 99 ? '99+' : organisation.unread}{' '}
+                                        unread
+                                    </span>
+                                </button>
+                            ))}
+                        </section>
                     )}
                     {communities && (
                         <div className="flex gap-3 text-sm">
@@ -344,9 +378,7 @@ export default function CommunitiesPanel({
                                         </span>
                                     </div>
                                     <p className="text-sm text-ink-secondary">
-                                        {row.membership_type.name} · Open dues{' '}
-                                        {row.membership_type.currency}{' '}
-                                        {(row.open_total / 100).toFixed(2)}
+                                        {row.membership_type.name}
                                     </p>
                                     <div className="flex flex-wrap gap-3 text-sm">
                                         <button

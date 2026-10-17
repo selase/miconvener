@@ -70,13 +70,14 @@ final class DuesCharges
      */
     public function recordOffline(DuesCharge $charge, int $userId, ?string $note): DuesCharge
     {
-        return $this->closeOpen($charge, [
-            'status' => DuesChargeStatusEnum::Paid,
-            'payment_method' => 'offline',
-            'paid_at' => now(),
-            'recorded_by' => $userId,
-            'note' => $note,
-        ]);
+        return $charge->getConnection()->transaction(function () use ($charge, $userId, $note): DuesCharge {
+            $paid = $this->closeOpen($charge, ['status' => DuesChargeStatusEnum::Paid, 'payment_method' => 'offline', 'paid_at' => now(), 'recorded_by' => $userId, 'note' => $note]);
+            $member = Member::withoutGlobalScopes()->where('tenant_id', $paid->tenant_id)->findOrFail($paid->member_id);
+            $tenant = \App\Models\Tenant::query()->findOrFail($paid->tenant_id);
+            app(\App\Services\Community\InboxNotices::class)->receipt($tenant, $member, $paid->id, new \Illuminate\Database\Eloquent\Collection([$paid]), CarbonImmutable::now());
+
+            return $paid;
+        });
     }
 
     /** Cancel unpaid advance periods when eligibility ends, preserving paid history. */

@@ -15,6 +15,17 @@ afterEach(() => {
     vi.useRealTimers();
     delete window.turnstile;
 });
+it('keeps live event entry email-first without offering phone verification as a ticket credential', () => {
+    const previous = window.location.href;
+    window.history.replaceState({}, '', '/my?return_to=%2Fmy%2Fjoin%2Fevent-id%3Ftab%3Dforms');
+    try {
+        render(<MyPortal />);
+        expect(screen.queryByRole('button', { name: 'Use a phone number instead' })).toBeNull();
+        expect(screen.getByText(/Verify your registration email/)).toBeTruthy();
+    } finally {
+        window.history.replaceState({}, '', previous);
+    }
+});
 it('offers additive phone proof after email sign-in without discarding the email identity', () => {
     render(
         <MyPortal
@@ -159,7 +170,7 @@ it('enrols phone recovery only for the selected email-owned membership after bot
         access_role: 'self',
         status: 'active',
         membership_type: { name: 'Regular', currency: 'GHS' },
-        open_total: 0,
+        open_total: 12500,
     };
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => ({
         ok: true,
@@ -187,7 +198,10 @@ it('enrols phone recovery only for the selected email-owned membership after bot
     render(
         <CommunitiesPanel organiser={{ slug: 'pilot' }} initiallyOpen onCredential={credential} />
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Set up phone recovery' }));
+    await screen.findByRole('button', { name: 'Set up phone recovery' });
+    expect(screen.queryByText(/Open dues GHS 125/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Charges and receipts' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Set up phone recovery' }));
     await vi.waitFor(() =>
         expect(credential).toHaveBeenCalledWith({ selector: 'scoped-key', secret: 'secret' })
     );

@@ -27,4 +27,10 @@ final class CommunityFollower extends Model
     protected $hidden = ['address_hash'];
 
     protected $casts = ['address' => 'encrypted', 'consented_at' => 'datetime', 'unfollowed_at' => 'datetime'];
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<CommunityFollowerChannel,$this> */
+    public function channels(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CommunityFollowerChannel::class, 'follower_id');
+    }
 }

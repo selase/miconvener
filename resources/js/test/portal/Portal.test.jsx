@@ -13,6 +13,45 @@ const tabLabels = () =>
         .map((button) => button.textContent);
 
 describe('attendee portal', () => {
+    it('opens a verified survey deep link in the existing forms panel', async () => {
+        const fetcher = vi
+            .spyOn(globalThis, 'fetch')
+            .mockResolvedValue({ ok: true, json: async () => ({ forms: [] }) });
+        try {
+            render(<Portal {...portalProps()} has_forms initial_tab="forms" />);
+            expect(await screen.findByText('Surveys & Evaluations')).toBeTruthy();
+            expect(fetcher).toHaveBeenCalledWith('/my/events/reg-1/forms', expect.any(Object));
+        } finally {
+            fetcher.mockRestore();
+        }
+    });
+    it('shows polls questions and surveys as direct activity shortcuts', () => {
+        render(<Portal {...portalProps()} has_live_poll has_forum has_forms />);
+        const activities = within(screen.getByRole('region', { name: 'Event activities' }));
+        expect(activities.getByRole('button', { name: /Live poll/ })).toBeTruthy();
+        expect(activities.getByRole('button', { name: 'Q&A' })).toBeTruthy();
+        expect(activities.getByRole('button', { name: 'Surveys & feedback' })).toBeTruthy();
+    });
+
+    it('never offers activity shortcuts to an unverified attendee', () => {
+        render(
+            <Portal
+                {...portalProps({ registration: { email_verified: false } })}
+                has_live_poll
+                has_forum
+                has_forms
+                initial_tab="forms"
+            />
+        );
+        expect(screen.queryByRole('region', { name: 'Event activities' })).toBeNull();
+        expect(screen.queryByText('Surveys & Evaluations')).toBeNull();
+    });
+
+    it('ignores a deep link to an activity which is not available', () => {
+        render(<Portal {...portalProps()} initial_tab="forms" />);
+        expect(screen.getByText('EVT-ABCD-123')).toBeTruthy();
+        expect(screen.queryByText('Surveys & Evaluations')).toBeNull();
+    });
     it('offers only the ticket when nothing else can be acted on', () => {
         render(<Portal {...portalProps({ event: { sessions: [] } })} />);
         expect(tabLabels()).toEqual(['My ticket']);

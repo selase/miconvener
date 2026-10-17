@@ -22,4 +22,10 @@ final class CommunityMessageDelivery extends Model
     protected $hidden = ['address', 'address_hash', 'unsubscribe_token'];
 
     protected $casts = ['address' => 'encrypted', 'unsubscribe_token' => 'encrypted', 'claimed_at' => 'immutable_datetime'];
+
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<CommunityMessage,$this> */
+    public function message(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(CommunityMessage::class, 'message_id');
+    }
 }

@@ -420,7 +420,7 @@ export default function Followers({
                                     <span className="break-all font-medium">
                                         {row.address}
                                         <span className="block text-xs text-ink-secondary">
-                                            {row.channel === 'sms' ? 'SMS' : 'Email'} ·{' '}
+                                            {row.channel === 'sms' ? 'Legacy SMS follow' : row.sms_added ? 'Email + SMS' : 'Email'} ·{' '}
                                             {row.source === 'event'
                                                 ? 'Followed from an event'
                                                 : 'Followed the organisation'}

@@ -1,0 +1,244 @@
+# Community milestone 4b — In-app inbox Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Native execution is the owner's established preference; one fresh whole-branch review at the end, not two review cycles.
+
+**Goal:** Give authorised members and email-first followers a private, deduplicated inbox for announcements, dues reminders and dues payment receipts inside the milestone 4 app.
+
+**Architecture:** Materialise recipient records independently of transport deliveries; derive visibility from current recipient access and organisation/message state on every request. Preserve the address-deduplicated email/SMS transport, existing payment paths and ticket-only offline store. Add Home discovery and a Communities message list/detail without a sixth tab.
+
+**Tech Stack:** Existing Laravel 13/PHP 8.5, PostgreSQL landlord connection, React/Inertia, Tailwind 4, Pest and Vitest. No new dependency.
+
+**Spec:** [Inbox design](../specs/2026-10-17-community-inbox-design.md), especially §§12–13; [parent](../specs/2026-10-15-community-design.md) §§6.1–6.3,8,13.1; [roadmap](../community-roadmap.md).
+
+## Global Constraints
+
+- Owner approved native implementation2026-10-17; delivery outcomes stay in staff screens. No merge to main, deploy or production change is authorised.
+- Baseline: milestone 4 `c9f9ae0`, including event-page PR31. Planning branch `codex/community-4b-plan` imports Claude's design through `d342e8c`. Milestone 4 is implemented/unmerged, with device cold-offline/200% acceptance open; its deployment is a release prerequisite, not an assumed completed deployment. Rebase/reconcile this plan against its actual merged SHA before building.
+- "Followers are email-first"; "SMS is an optional added channel on that same follow". No phone-to-email inference; members may still use independently authorised phone credentials.
+- "Only while the inbox is on": `community_inbox` is off by default and effective only with explicit `community_app` on and an active organisation. No backfill.
+- Notices appear when logically queued, independently of delivery success; marketing opt-outs never suppress service notices. No pay-link token in notice content or inbox responses.
+- "Retention: 24 months". "Counts ... shown as `99+` above 99". Organisation read statistics are totals only, hidden below 10 recipient records. No event-attendee inbox, replies, push or digests.
+- Current access rechecked for list/count/view/read; representative reads separate from self reads. Never persist inbox data in local/session storage, offline pass records or worker caches.
+- Preserve finance invariants: integer minor units grouped by recorded currency, existing reference/idempotency and ledger writers; no notification failure may create a duplicate payment or new ledger path.
+- Follow existing request classes, console component contracts, tenant scope conventions and permissions. Commit rebuilt `public/build` with each JS/CSS commit. Tick each implemented step in that same commit; update the roadmap at milestone state changes.
+- Full validation once after implementation; affected tests after concrete fixes. No overlapping refreshing database suites. Two local PHP workers or normal disposable four-worker CI. One self-review plus one fresh independent whole-branch review.
+- **Inbox exception to prior rollout instruction:** enable `community_inbox` for Purpledot only after a new explicit owner go-ahead; do not infer authority from the older “always enable Purpledot” instruction. All local testing is already approved.
+
+## Review Focus
+
+1. Shared contacts, contact edits, held/reassigned numbers, revoked credentials and in-flight requests must never reveal another recipient's body or restore stale UI. Tasks 2,5,6 test these boundaries.
+2. A member who also follows, or represents family members, must get correct separate contexts, pagination and unread totals; switching self proof must preserve read state. Task 5 tests SQL grouping before pagination and context-specific reads.
+3. Queue retry, worker crash, cancel/pause/withdraw and consent changes between pages must neither duplicate nor resurrect items. Tasks 3–5 test transactional page boundaries and request-time visibility.
+4. Reminder/receipt notices must survive unavailable transport and payment callback retry without changing money, mixing currencies or leaking payment tokens. Task 4 tests queue-time materialisation, immutable snapshots and rollback/retry.
+5. Small-audience statistics, erasure and retention must protect people even when reads are shared across several recipient items. Tasks 1,3,7 test suppression and reference-aware cleanup.
+
+## Decisions for this review
+
+**Delivery outcomes:** recommend showing the notice itself only. Transport acceptance is not proof that someone received/read an email/SMS; credit failures are an organisation operational concern. Keep channel outcomes in existing staff delivery screens, not member-facing “emailed”/“SMS not sent” labels. Owner approved this recommendation2026-10-17. If outcomes are requested, amend the design and add authoritative per-channel pending/accepted/unknown semantics before Task 4/6.
+
+Implementation clarifications proposed for review:
+
+- Keep existing email follower IDs as the canonical follow; attach SMS using a child channel table. Never pair legacy SMS rows to an email by shared member/phone/name. Production inventory and any legacy-data action require the separate gate below.
+- A reminder is logically queued when a currently eligible, cadence-matching member/day is selected and its immutable notice is recorded, before transport jobs. Selecting a member with open dues alone is insufficient. Receipt notices are committed with confirmation/recording, before mail queueing. Thus a stalled/failed transport cannot prevent the in-app notice.
+- For read statistics, count recipient records that have been opened by at least one authorised reader, not raw read rows/representative identities. Keep M ≤ N; show no individual readers and suppress M when N < 10. Explain these as recipient totals in staff copy so “people” is not overstated.
+- A withdraw is permanent for that announcement; subsequent delivery retries cannot reinsert readable items. Pause hides temporarily. Read cleanup removes a shared `(entry_key, reader_key)` only when no remaining authorised recipient item needs it; deleting one recipient must not erase another recipient's read history.
+- No wholesale migration rollback after real inbox use: disable rollout to recover presentation/access, preserve items and finance history. Additive schema can be rolled back only before use and after explicit approval.
+
+## Task 1 — Recipient storage, independent gate and lifecycle primitives
+
+**Files:** Create migrations under `database/migrations/landlord/` following the existing landlord convention; `app/Models/CommunityInboxItem.php`, `CommunityInboxRead.php`; corresponding factories in `database/factories/`; `app/Services/Community/InboxRollout.php`, `InboxReaderKey.php`, `InboxRetention.php`; `app/Console/Commands/Community/EnableInboxCommand.php`, `PruneInboxCommand.php`; modify `app/Console/Kernel.php`; tests `tests/Feature/Community/InboxStorageTest.php`, `InboxRolloutTest.php`, `InboxRetentionTest.php`. Use Artisan generators after checking available options, no model seed of private messages.
+
+**Interfaces:** `InboxRollout::enabled(Tenant $tenant): bool`; `InboxReaderKey::forSubject(string $subject): string` uses HMAC-SHA256 with a derived `community-inbox-reader:v1` domain key, never a raw identifier. `InboxRetention::prune(CarbonImmutable $asOf): int` deletes items older than `$asOf->subMonthsNoOverflow(24)` in bounded batches and cleans orphaned reads. Commands `community:enable-inbox {tenant} {--off}` and `community:inbox-prune`.
+
+- [x] Write failing storage/gate tests: exactly one tenant-matching recipient FK/type; announcements require message and no notice snapshot; notices member-only with source/subject/body and null message; unique per-message recipient and per-kind/source/member. Cross-tenant message/member/follower combinations are rejected by composite FK/unique constraints, not merely controller validation.
+- [x] Add failing tests for all flag/active-state combinations, idempotent one-tenant activation, no default access through plan/missing-feature fallback; preserve other flags. Cover notice expiry, announcement with several surviving items/read keys, erasure of self/representative readers and no retained orphan reads (§12.19).
+- [x] Run `php artisan test --compact tests/Feature/Community/InboxStorageTest.php tests/Feature/Community/InboxRolloutTest.php tests/Feature/Community/InboxRetentionTest.php`; observe specific RED assertions before implementation.
+- [x] Implement §4 columns/checks/indexes on landlord. Announcement `entry_key` is message UUID; notice `entry_key` is item UUID. Reads unique `(entry_key,reader_key)`; cleanup is reference-aware because one message has many items. Explicit recipient-first indexes and stable `(available_at,id)` ordering. Add member/follower erasure hooks that remove their reader keys where no surviving item/context needs them; account for delete paths that bypass model events. No raw contact or recoverable credential in items/reads.
+- [x] Implement gate command with explicit feature-row checks/cache invalidation, no automatic pilot activation; schedule bounded retention daily with overlap guard. Do not hard-delete `community_messages` or financial sources. Test month-end/leap-day cutoff, unread counts after prune and idempotent rerun.
+- [x] Run affected tests to GREEN, `vendor/bin/pint --dirty`; tick steps and commit storage/gate/lifecycle together. Record any design clarification accepted at review.
+
+**Ruling:** storage/gate/retention cases share `InboxStorageTest.php` (12 tests/28 assertions), avoiding three duplicated test setups. Read rows include an item FK for immediate cascade erasure; see ledger.
+
+## Task 2 — Email-first follows with optional SMS, preserving member consent
+
+**Files:** `app/Models/CommunityFollower.php`; new `CommunityFollowerChannel.php` and factory/migration; `app/Services/Community/{Following,FollowerAudienceSource,MessagingPreferences,CommunityHistory,CommunityPublicContext}.php`; `app/Http/Requests/Attendee/FollowCommunityRequest.php`; `app/Http/Controllers/Public/{CommunityFollowController,AttendeePreferencesController}.php`; `app/Http/Controllers/Tenant/CommunityFollowerController.php`; `resources/js/Pages/Public/Community/{FollowControl,CommunitiesPanel}.jsx`, `resources/js/Pages/Tenant/Community/Followers.jsx`; parent spec §§6.1,6.3 and any contradictory phone-follow wording; existing Following/FollowingConsent/FollowingEventAnnouncement tests and new `EmailFirstFollowingTest.php`; `resources/js/test/communityFollowing.test.jsx` and Me preference tests.
+
+**Interfaces:** Preserve `Following::follow(Tenant,Session,string $channel,bool $resumeMarketing,?Event): CommunityFollower`, `unfollow(...)`, `isFollowing(...)` call signatures. Email returns canonical `channel=email` follower. SMS requires current verified email plus phone and an active canonical follow; it adds/replaces an explicitly consented child channel and returns the parent. Child fields: uuid, tenant_id, follower_id, `channel=sms`, encrypted address, hidden address_hash, consented_at, disabled_at; one active SMS selection per parent. `FollowerAudienceSource` resolves both channels from canonical parent IDs and attached children; deliveries remain deduplicated by address.
+
+- [x] Write failing tests for §12.24: phone-only follow refused on public/event/platform routes; email follow unaffected; SMS attach requires both proofs and existing email follow; held number refused. Phone proof alone never lists follower history. One verified email cannot edit another email's SMS attachment.
+- [x] Add RED regressions: email unfollow immediately disables child delivery and inbox access, re-follow resets consent and does not silently resume SMS; SMS opt-out preserves email follow/inbox; token unsubscribe and shared-address opt-outs still respected; member-only phone consent/resume remains possible with Following on or off and never creates a phone-only follower. Existing event announcement page cursor/estimate tests remain valid with canonical IDs.
+- [x] Run affected Following/consent/announcement PHP tests and `npm test -- resources/js/test/communityFollowing.test.jsx --maxWorkers=2`; confirm RED.
+- [x] Implement additive SMS child storage and current-proof operations under canonical email and channel advisory locks in consistent order. Leave legacy standalone SMS rows unchanged until owner-approved conversion/retirement; never infer an email. Remove SMS-only creation choices across public, event, Me and console touchpoints. Update parent §6.3 and §6.1's “phone permits following” exception in the same implementation commit, retaining member recovery rules.
+- [x] Read-only production cutover gate: inventory legacy `channel=sms` rows, including inactive ones, by tenant/count only. If any exist, stop conversion/retirement and ask the owner with counts/options; no automatic data migration. Recheck immediately before approved deploy. Empty inventory does not authorise production deployment or feature activation.
+- [x] Run scoped PHP/JS regressions GREEN, Pint, lint and build; commit rebuilt assets and ticked plan steps. Document explicitly that email-first following applies at release even where inbox is off; request review of any proposed rollout variation before changing this policy.
+
+**Evidence:** PHP35/35 (125 assertions), JS5/5, scoped lint/Pint/build pass; production inventory from planning was empty and no production data changed.
+
+## Task 3 — Announcement materialisation, withdrawal and private staff totals
+
+**Files:** `app/Services/Community/{AudienceResolver,MemberAudienceSource,FollowerAudienceSource,CommunityMessages}.php`; new `InboxWriter.php`, `InboxRecipient.php` (typed recipient DTO); `app/Models/CommunityMessage.php`; `app/Http/Controllers/Tenant/{CommunityMessageController,FollowingEventAnnouncementController}.php`; new `app/Http/Controllers/Admin/CommunityInboxTakedownController.php`, `app/Http/Requests/Tenant/Community/WithdrawInboxMessageRequest.php`, `app/Http/Requests/Admin/TakedownInboxMessageRequest.php`; `routes/subdomain.php`, `routes/web.php`; `resources/js/Pages/Tenant/Community/Messages.jsx` `resources/views/admin/messages/index.blade.php` and `app/Services/Notifications/MessageDeliverySearch.php`; `tests/Feature/Community/InboxAnnouncementsTest.php`, `InboxWithdrawTest.php`, `InboxStatisticsTest.php`, existing message/announcement/delivery suites.
+
+**Interfaces:** `AudienceResolver::recipients(Tenant $tenant,array $selector,?User $actor=null): iterable<InboxRecipient>` applies the same selector validation/finance permission and current page IDs as `resolve`; DTO has recipient type/id/tenant, no raw address in persisted item. `InboxWriter::announcement(CommunityMessage $message,InboxRecipient $recipient,CarbonImmutable $availableAt): void` idempotently inserts only while rollout allows. `CommunityMessages::withdraw(Tenant,User,CommunityMessage): void`; `InboxWriter::withdrawMessage(CommunityMessage): void` used by cancel and superadmin takedown. No event-attendee source items.
+
+- [x] Write failing §12.8–11,18 tests: partial channel opt-out still eligible; all valid addresses opted out excluded; SMS credit skip still produces item; exited status audience receives new items; 101+ recipients paged, crash/retry same page no duplicate, no items outside selector/tenant or inbox gates. Preserve refusal of announcements with zero deliverable addresses. Exclude members with no valid address from announcement items/statistics.
+- [x] Add failing cancel-before/after first page, pause/resume, permission/plan loss, withdraw-during-retry and superadmin-only takedown tests; withdrawn items never reappear. Freeze available_at to message started_at, not retry time. Scheduling does not create early visible entries. Staff totals hidden below10, bounded by recipient records, no per-reader identifiers or read list in JSON; no duplicate count from member/follower address sharing.
+- [x] Run the three new files and relevant existing message tests; confirm RED before adding writer hooks.
+- [x] Materialise records inside each existing `dispatchDue` locked transaction, before the page cursor/selection_complete advance and before after-commit transport jobs; consume record selection independently of channel outcomes. Honour current consent before each page. Existing address resolver, billing/credit reservations and transport retries stay intact.
+- [x] Add permanent withdraw state on the source message (nullable inbox-withdrawn timestamp) as well as its items to prevent future page/retry resurrection. Completed/partial withdrawal requires `send community messages`, Community and active tenant, but not `community_messages`; retain finance visibility rules for arrears messages. Use a separate withdraw route outside the `community.messages` middleware group. A proposed `WithdrawInboxMessageRequest` validates the staff reason/confirmation rather than adding inline controller validation. Add the superadmin takedown action to the existing protected message-search result, using a dedicated request class and controller; keep event/listing takedown behavior unchanged. Superadmin takedown uses `access-superadmin-dashboard`, not email or tenant role. Add aggregate staff controls using supported console Modal/Button props; never claim sent email/SMS has been recalled.
+- [x] Run GREEN affected PHP/JS, Pint/lint/build and commit rebuilt assets, tests and checked steps. Preserve event blasts and existing follower event announcements unchanged except canonical follower resolution.
+
+**Evidence:** PHP37/37,131 assertions including unchanged event/listing takedowns; JS21/21; lint/Pint/build pass. Announcement/withdraw/statistics tests share `InboxAnnouncementsTest.php`. Archive GET routes remain available only with sending enabled or effective inbox rollout; all writes retain their original gates.
+
+## Task 4 — Queue-time reminder and receipt notices, without money changes
+
+**Files:** new `app/Services/Community/InboxNotices.php`; `app/Services/Dues/{DuesReminders,DuesPaymentConfirmer,DuesCharges}.php`; `app/Jobs/{SendDuesReminders,DeliverDuesReminders}.php`; `app/Models/DuesReminder.php`; tests `tests/Feature/Community/InboxNoticesTest.php`, existing `DuesRemindersTest.php`, `tests/Feature/Dues/{DuesPaymentConfirmationTest,DuesChargeActionsTest}.php` and receipt tests.
+
+**Interfaces:** `InboxNotices::reminder(Tenant $tenant,Member $member,CarbonImmutable $localDay,Collection $charges): void`; stable source_type=`dues_reminder_day`, source_id=`{tenant UUID}:{member UUID}:{YYYY-MM-DD}`. `InboxNotices::receipt(Tenant $tenant,Member $member,string $paymentReference,Collection $paidCharges,CarbonImmutable $confirmedAt): void`; source_type=`dues_payment`, source_id existing confirmed gateway reference; offline source_type=`dues_offline_charge`, source_id paid charge UUID. One item/payment/member, no attempt IDs or browser-generated key as identity.
+
+- [x] Write failing §12.20–23 tests: frozen eligible queue produces a reminder item before transport jobs run; email+SMS/manual arrears same tenant-local day creates one item; cadence mismatch/disabled reminders/stale job day/empty charges creates none. Insufficient SMS credit, email failure and marketing opt-out do not suppress a valid notice. Queue retries after inbox switches on never backfill work logically queued while it was off: carry an explicit selection-time inbox eligibility marker in transport jobs and do not create notices at delivery time.
+- [x] Write failing online/cash receipt tests: item exists on successful confirmation/recording even with absent email, fake stopped queue or mail exception; same callback/webhook reference retries do not duplicate; refunded/failed/rejected charge confirmation does not produce a paid receipt. Immutable subject/body preserve charge periods, dates, minor-unit amounts and separate totals per currency after waiver/reprice/contact edits. Assert no pay token, gateway authorization, raw contact, arbitrary HTML or recovery secret anywhere in snapshots/payloads.
+- [x] Run `InboxNoticesTest`, existing reminder/confirmation/charge-action tests to RED; inspect all confirmer settlement branches and offline `closeOpen` transaction before hooks.
+- [x] Extract/reuse cadence eligibility so queue selection can commit one logical member/day notice and its snapshot before dispatching transport units. Transport outcomes update delivery rows only. Do not derive notice existence from `sent` status or wait for a worker's channel reservation. The first eligible queue owns the immutable snapshot; concurrent automatic/manual runs converge on the unique notice key. Do not create notices merely for every member returned by the broad open-charge query.
+- [x] Write receipt item in the same landlord transaction as the successful paid-state transition; do not insert after the confirmer's early “already confirmed” return. Stage mail after commit separately so a mail exception cannot undo or lose a notice. Reuse LedgerService/idempotency unchanged. Cash records remain non-payout money; do not add ledger entries or gateway calls. Payment rollback leaves no receipt item; a committed retry converges to one item. Inbox-off returns without history backfill.
+- [x] Run GREEN affected finance/reminder/receipt regressions plus `PayoutOtpFlowTest`, read-only `finance:verify-categories`, Pint; tick and commit. No production payment, SMS or outbound test email.
+
+**Evidence:** PHP110/110,762 assertions including payout OTP; final no-backfill regression RED→GREEN then58/58 (501 assertions) reminder/notice checks. Read-only local finance category verification exit0; Pint green. Existing callback queue-failure handling preserved.
+
+## Task 5 — Authorised grouped readers and read state
+
+**Files:** new `app/Services/Community/{InboxAccess,InboxQuery,InboxReads}.php`; expose reusable `CommunityHistory::memberQuery(Session): Builder` and email-only `followerQuery(Session): Builder` with current contracts tested (currently private; do not call private methods from the new reader); new `app/Http/Controllers/Public/MyInboxController.php`, `app/Http/Requests/Attendee/{InboxListRequest,MarkInboxReadRequest,MarkInboxAllReadRequest}.php`; `routes/attendee.php`; tests `tests/Feature/Community/{MyInboxAccessTest,MyInboxReadsTest,MyInboxPaginationTest}.php`.
+
+**Interfaces:** `InboxAccess::contexts(Session): iterable<array{tenant_id:string,recipient_type:string,recipient_id:string,reader_key:string,context_key:string,label:?string}>` rechecks MemberAccess and live credentials; context_key=`self` merges own member+follower items for an announcement, `representative:{member UUID}` keeps each represented person separate. Resolve all valid proofs deterministically: self wins for its member; representative key uses existing stable verified-phone digest, never rotating credential ID. `InboxQuery::counts(Session): array` gives organisation slug/name/logo/unread; `entries(Session,Tenant,array $filters): LengthAwarePaginator` uses 20 grouped entries/page; `entry(Session,Tenant,string $itemId): array` resolves only a currently visible item and all merged contexts. `InboxReads::mark(Session,Tenant,string $itemId,string $context): void`; `markAll(Session,Tenant): void`.
+
+- [x] Write failing §12.1–7,12–16 tests: shared phone isolation, no credential no access, held number, current contact/version/revocation, exact email removal, representatives labelled/separate read state, self email↔self credential and rotation share read state. Followers require active current email and available_at ≥ current consent; unfollow hides all and re-follow excludes old entries. No phone-only follower access.
+- [x] Add failing grouped page/count tests with >20 messages, member+follower overlap, several self memberships, two represented members, equal timestamps, concurrent new entries, withdrawn/paused/suspended/deactivated gates, hidden message direct links404, guessed recipient/tenant IDs404. Count/group in SQL before limit, never load all items then paginate. Opening detail GET/list/count never marks read; POST mark-read scoped to context only, mark-all idempotently covers visible entries only, invalid context rejected and throttle enforced (§12.16).
+- [x] Run those three files to RED, then implement shared visibility predicates for count/list/view/read. Enumerate candidate recipients through the existing bounded access queries; do not load the database's entire member set or trust contact fields in request input. Recheck parent/source state within mark mutations. Mark-all uses bounded database work and revalidates visibility, not browser-supplied item ID arrays.
+- [x] Add identity-protected routes under existing `community.identity`/`throttle:community-access`: GET `/my/inbox`, GET `/my/communities/{tenantSlug}/inbox`, GET `/my/communities/{tenantSlug}/inbox/{item}`, POST same `/{item}/read`, POST `.../inbox/read-all`. Register static routes before dynamic item routes; route names `attendee.my.inbox.*`. Reader payload includes opaque item/context handle, kind/subject/body/date/organisation/read state and representative label; never reader HMAC, raw recipient contacts, delivery log or token. Every response private/no-store; unsafe/unknown context404. Body rendered as text with safe http/https links only.
+- [x] Marking a merged self entry writes reads for all currently applicable self/follower keys; adding a proof later may add a legitimate unread context but must not copy another representative's reads. Transactionally dedupe concurrent reads. Add revoked/withdrawn-between-GET-and-POST tests and run GREEN, Pint; tick and commit.
+
+**Evidence:** reader/access/revocation PHP36/36 (125 assertions); final empty discovery RED→GREEN,22/22 (71 assertions); PHPStan0, baseline unchanged, Pint green. Reader/read/pagination cases share `MyInboxAccessTest.php`.
+
+## Task 6 — Home discovery and Communities inbox UI
+
+**Files:** `resources/js/Pages/Public/Events/AttendeePortal/AttendeeApp.jsx`, `components/AttendeeHome.jsx`; `resources/js/Pages/Public/Community/CommunitiesPanel.jsx`; new `resources/js/Pages/Public/Community/{InboxList,InboxMessage}.jsx`, `resources/js/lib/communityInbox.js`; `resources/js/test/portal/AttendeeInbox.test.jsx`; worker/privacy regression tests; parent spec §6.2 in same UI commit. Reuse existing sheet/dialog primitives and design tokens, not another visual system.
+
+**Interfaces:** `InboxList({tenantSlug,context,onOpen,onClose,onExpired})`; `InboxMessage({tenantSlug,itemId,context,onRead,onBack,onExpired})`. `communityInbox.js` wraps existing CSRF/community request behavior and abort/identity-generation handling. App requests counts independently of email-only ticket history, so phone-credential members see Home messages. Query parameters `section=communities&inbox={tenantSlug}&item={uuid}&context={opaqueContext}` support Back/deep links; no credential/token/contact in URLs.
+
+- [x] Write failing UI tests: Home organisation unread card,99+ display, phone-only authorised member Home, per-organisation Communities count/link, paginated unread list, detail representative label, explicit post-open read only after body is visibly rendered, mark-all error/retry, invalid/withdrawn unavailable copy, offline online-only state. A sixth tab and fake delivery-derived unread badge must not exist.
+- [x] Add RED late-response sign-out/identifier-removal/owner-switch tests across list/body/count, keyboard Escape/focus return, Back restores list, 401/403/404/429/500/empty/loading retry, malicious body/link strings, untrusted deep-link context. Worker never caches inbox GET or read mutations; no browser storage/offline-store writes (§12.17). Browser prefetch/list preview never issues read POST.
+- [x] Run `npm test -- resources/js/test/portal/AttendeeInbox.test.jsx --maxWorkers=2` to RED. Implement phone sheet/desktop detail column within Communities, with labelled close/Back, focus trapping/return, loading/error/empty states, safe area and 44px targets. Mark read only for current visible detail; abort/version guards prevent stale mutation responses changing a new owner. Existing event/ticket/abstract/certificate/payment/recovery flows remain reachable.
+- [x] Update parent §6.2 from inbox deferral to switch-gated Home unread/list/read behavior, explicitly retaining email/SMS delivery and ticket-only offline. Keep Tasks2 email-first amendments in their own implementation commit; do not claim these behaviors are already shipped in planning docs.
+- [ ] Run GREEN new/existing attendee/community JS suites, lint, Pint/build; browser-test signed-in self/representative and email-follower synthetic fixtures on approved local QA,320/390/desktop, light/dark, keyboard,200% text and sign-out across tabs. Verify no external test sends; capture reviewable screen evidence. Commit assets and tick steps.
+
+**Evidence:** UI tests RED7 then GREEN17; owner-switch/late-list races RED2→GREEN19 across affected UI files. Full JS377/377 across58 files before the final keyboard-focus regression (RED1→GREEN10 inbox tests). Server visibility gate PHP8/8,73 assertions; lint/Pint/build pass and PHPStan0. Local synthetic fixture browser checks passed desktop/320/390 widths, light/dark, read-one/read-all, keyboard Back/Escape/focus return, and cross-tab sign-out. No outbound mail/SMS or payment; local mail is logged. Actual200% zoom and physical-device cold-offline checks remain manual acceptance gates; representative/follower authorization is programmatically covered, not claimed as separately browser-verified. Assets rebuilt in the same UI commit.
+
+## Task 7 — One release gate, self-review and owner-controlled rollout
+
+**Files:** this plan, roadmap, existing spec/acceptance evidence; no new unrelated feature.
+
+- [x] Map every design §12 test to passing evidence: 1–7→Task5;8–11→Task3;12–16→Tasks3/5;17→Task6;18–19→Tasks1/3/5;20–23→Task4;24→Task2. All24 are minimum, not substitutes for race/pagination/finance regressions above.
+- [ ] Run scoped tests per task, then one complete PHP gate on disposable test DB (two local workers or four CI), full JS bounded workers, lint, `vendor/bin/pint --dirty`, PHPStan0 without baseline growth, build, `finance:verify-categories`0 and payout OTP/event regression coverage. Preserve evidence; no redundant full suite after docs-only or unrelated read-only inspection. Correct actual failures, rerun affected suites; final CI must match the source submitted for merge.
+- [x] Pause for AGENTS self-review: “Is there anything I have overlooked? Is the solution optimal? Let me take a step back.” Report dependencies, current-access boundaries, all UI/permission/route/seed/config/worker/delete touchpoints, gaps and limitations. Run one fresh whole-branch review; fix findings with focused regressions. Do not run a second review cycle unless a concrete unresolved risk justifies it.
+- [ ] Let owner review native UI and delivery-outcome decision, verify real-device accessibility and no inbox caching, and confirm milestone4 prerequisites. Mark `built` only after agreed acceptance passes. Keep PR draft/unmerged pending explicit authority; `main` automatically deploys.
+- [ ] Only after explicit owner release approval: repeat aggregate legacy-SMS inventory, stop for owner decision if rows require conversion/retirement; verify deployed SHA/migrations/scheduler/current payment routes; obtain separate go-ahead to enable inbox for Purpledot, read back both flags, other tenants unchanged. Validate safe in-app notices using designated test data, no unauthorised live message/payment. Disable switch to recover; never delete money/history. Complete inbox reminder only when the inbox is actually delivered/accepted, not when this plan is saved.
+
+## Plan self-review — 2026-10-17
+
+- Reviewed the approved inbox design §§1–14, parent spec, roadmap and current M4 source. All24 minimum cases mapped above; identities, read dedupe, consent epoch, notices, withdrawal, statistics/erasure and offline boundaries each have owning tests/tasks.
+- Important amendments beyond the design's shorthand: current history query methods are private; notice materialisation must move ahead of transport, and online receipt hooks must be inside the paid-state transaction. Source-level permanent withdrawal and SQL grouping prevent retry/pagination gaps. No existing paid state or ledger behavior is replaced.
+- Proposed schema uses canonical existing email followers plus SMS children, retaining encrypted address/digest conventions and no automatic association. Legacy-production inventory is read-only; conversion remains a separate owner decision.
+- Owner approved member notice only, with delivery diagnostics retained in staff screens2026-10-17. Read-statistics recipient semantics and exact queue-time snapshot rules are explicitly presented above for plan review, rather than silently assumed approved.
+- Milestone4 implementation is available as the baseline but is not merged/deployed. Its remaining acceptance and PR31 dependency are not erased by Claude's “done” shorthand. Plan is ready for owner review; no4b code built and no milestone marked complete.
+
+## Read-only production inventory
+
+2026-10-17: Cloud production environment `env-a2ae4030-63cb-41a9-8281-36cffb804842`, command `comm-a300b7fe-2a94-40e2-b5e3-ca33b1912466`, exit0. Aggregate Eloquent SELECT across `CommunityFollower::withoutGlobalScopes()` returned `sms_rows_by_tenant=[]` and `email_rows=0`. This includes inactive SMS rows; no addresses were printed and no records/settings were changed. There are currently no legacy SMS-only rows to convert or retire. Recheck before the approved release; later rows still require owner approval before conversion/retirement.
+
+### Planning checks completed
+
+- [x] Imported the approved Claude design without changing application code or Claude's checkout.
+- [x] Compared task interfaces and paths with current milestone4 code; corrected private history-query reuse and actual landlord/admin route locations.
+- [x] Mapped all24 design acceptance cases, included RED/GREEN steps, reviewed privacy/finance/retry/erasure touchpoints and recorded owner decisions still needed.
+- [x] Recorded aggregate-only production inventory; no conversion, retirement, deployment or rollout performed.
+- [x] Owner reviewed the plan, approved native implementation and staff-only delivery outcomes2026-10-17.
+
+
+## Self-Review Report — implementation,2026-10-17
+
+“Is there anything I have overlooked? Is the solution optimal? Let me take a step back.”
+
+### Touchpoints updated
+
+- [x] AGENTS.md checked: finance invariants and Community handover rules followed. No new invariant needing a duplicate instruction; architecture/operational decisions recorded here and in the roadmap.
+- [x] Memory/handover: repository roadmap and parent spec updated; no separate private memory is needed for continuation.
+- [x] Seeders/permissions: no new permission or role. Existing `send community messages`, `read finance` for arrears and global superadmin gate protect existing/new actions; current seeded grants reused. No automatic feature enabling; dedicated missing-only pilot command.
+- [x] Navigation: Home positive unread card, Communities organisation inbox buttons including empty inboxes; Messages archive/withdraw remains reachable when sending is off. Existing five tabs retained.
+- [x] Environment/config/dependencies: no new package, environment variable, paid service or config requirement; `.env.example` unchanged intentionally. Separate tenant switches, scheduler prune registration and migrations included.
+- [x] Tests: storage, flags, tenant FKs, consent, shared contacts, proof revocation, read grouping/pagination, notices/payment failure, withdrawal/takedown, transport failure, worker exclusions and client races have focused regressions. New controllers' callers inspected; existing direct controller tests are covered by final full CI.
+- [x] Assets: regenerated `public/build` committed with UI; no baseline growth. Delete/retention uses FK cascades including bulk deletion. Scheduled prune requires the existing scheduler, not a new daemon.
+
+### UI Gap Analysis
+
+- Discoverability present: Home and Communities; empty authorised organisation remains listed.
+- Empty state present: “No messages yet”; no compose CTA for recipients. Staff retains the existing compose flow when authorised.
+- Permission gating present: current recipient proofs, tenant flags/status, source status and consent rechecked server-side; delivery diagnostics remain staff-only. No dues/charge prerequisite for announcements.
+- Loading/error states present: list/detail retry, mark-all/read-status errors, unavailable/expired identity, online-only boundary. Stale owner/body/count responses are discarded; no read mutation from list/prefetch.
+- Responsive present:320/390px browser widths and desktop checked without horizontal overflow, light/dark. Existing modal primitive reused.
+- Accessibility present: labelled buttons, focus trap/return, focus into detail and Back to originating list entry,44px new actions, unread textual indicator. Actual200% and real-device cold-offline acceptance remain explicitly open; representative/email-follower UI contexts are test-covered but have not each had a separate signed-in browser session.
+
+### Solved (auto-fixed)
+
+- `AttendeeApp.jsx`: capability discovery for phone-credential users independent of email-only ticket history; proof-stamped counts and owner changes clear private content.
+- `InboxList.jsx`: slow list response cannot restore unread after opening; origin focus restored on Back.
+- `InboxMessage.jsx`: body renders before read POST; abort/generation guards block stale identity results; detail receives keyboard focus.
+- `InboxQuery.php`: authorised empty inbox remains discoverable; SQL grouping occurs before pagination/count.
+- `SendDuesReminders.php` / `InboxNotices.php`: initially inbox-off queues and old same-day transport rows cannot backfill notices on retry; receipt-mail failure preserves the committed paid-state receipt and existing callback behavior.
+
+### Recommended for user decision
+
+- Acceptance/release only: check actual200% text and cold-offline ticket behavior on a physical device (about10–15 minutes); current tooling could not apply actual browser zoom. Recommend doing this before releasing dependent milestones4/4b. Inbox remains online-only.
+- Separate future scope: milestone5 should support churches/volunteers through voluntary funds/campaigns and contribution language, and review dues-oriented membership setup (estimate during milestone5 planning). Recommend retaining clear separation between debts and voluntary gifts; no financial behavior is changed in4b.
+
+### Not gaps
+
+- No member “emailed/SMS failed” label: owner explicitly chose staff-only outcomes.
+- No new Inbox tab: approved placement is within Communities with Home discovery.
+- No offline/private-message cache: intentional ticket-only offline boundary; inbox responses private/no-store and worker excluded.
+- No historic backfill, production activation or legacy follower conversion: explicitly separate owner release gates.
+- No arbitrary HTML/rich media: plain text with safe HTTP(S) links meets approved scope.
+
+### Minimum acceptance evidence map
+
+- §12.1–7,12–16,18: `MyInboxAccessTest.php`, existing `PortalSessionRevocationTest.php` and recipient announcement tests; focused reader/revocation run36/36 plus empty-discovery22/22.
+- §12.8–11,18–19: `InboxAnnouncementsTest.php`9/9,31 assertions, including lost SMS credit and cancel between100/102 selection pages; existing delivery regression suite passed with Task3.
+- §12.14,19: `InboxStorageTest.php`12/12,28 assertions (tenant/cascade/retention) plus reader gate tests.
+- §12.17: worker exclusion and portal privacy/identity JS suites; local cross-tab sign-out verified. Actual physical-device acceptance remains pending as stated above.
+- §12.20–23: `InboxNoticesTest.php` and existing finance/reminder/receipt suites110/110,762 assertions including payout OTP; subsequent no-backfill run58/58,501 assertions. Finance category verification exit0.
+- §12.24: `EmailFirstFollowingTest.php` plus existing following/preference suites35/35,125 assertions, UI5/5.
+
+Final independent review/CI outcomes will be appended below; no merge readiness or production release is claimed by this report.
+
+
+### Independent review and fix pass
+
+One fresh `gpt-6-astra` review covered implementation `3da228f..3ba8575` against the spec, plan, Review Focus and recorded decisions. Critical0, Important3, Minor0. All three Important findings were confirmed and fixed:
+
+1. Preserve microseconds for follower-channel consent and inbox availability, including model serialization and the current-time SQL binding. Positive same-second consent/message tests failed before the fix; pre-consent and future-item exclusions remain tested. The first correction exposed Laravel's default whole-second query binding; a frozen instant regression reproduced that boundary and the binding now explicitly preserves precision. No production migration has run; the two new unmerged migrations were corrected and the approved local QA schema aligned without deleting fixtures.
+2. Disable Previous/More navigation while Mark all read commits, preventing a concurrent page response from restoring stale unread state. New UI regression RED→GREEN.
+3. Prefer a valid self credential before representative credentials, while still falling back only to a separately valid representative grant if self is revoked. Both issuance orders tested; representative-first failed before the fix.
+
+Final focused regression evidence: PHP58/58,183 assertions across email-first follows, inbox access, existing member access/revocation and storage/retention; inbox UI11/11. Lint, Pint, build passed; PHPStan0 before the final one-line query-binding correction. Existing generated bundle-size warning is unchanged. Supplementary announcement acceptance9/9,31 assertions. Owner explicitly approved feature-branch push and draft PR on2026-10-17 after the automatic approval block; [PR #33](https://github.com/selase/miconvener/pull/33) is open. Full release CI is the remaining automated gate. No redundant full local PHP run was added.
+
+Review decisions retained: unchangedM4/manual device acceptance remains a separate dependency; real200% and separate follower/representative browser sessions are not certified by source review; production rollout/inventory require the stated gates; generated assets validated by build and future CI; approved recipient-copy statistics and staff-only outcomes retained. No deferred minor findings. Self-review/review completion does not grant merge/deploy/activation approval.
+
+
+### CI integration correction
+
+First remote release run39033022450 on `722bc55` passed code quality (including all379 JS tests) and2959 PHP tests, with3 PHP failures. Two old public/discovery tests still required SMS-only follows; those expectations are amended to refuse phone-only following and require a canonical verified-email follow before the optional SMS channel. This preserves Following with Community off and forbids inferring membership from a shared phone.
+
+Updating the third fixture exposed a real integration gap: `MembershipJoining::preserveExplicitConsent()` still searched standalone SMS follower rows, so approving a distinct applicant could disable their already-consented canonical SMS add-on. Focused consent tests reproduced both normal and Following-paused cases as RED; the helper now checks an active email parent plus an active, current-consent SMS child. It never enables marketing itself, never revives disabled channels and does not treat a legacy SMS-only row as canonical consent. Consent is retained while a rollout is paused, matching existing semantics. Existing join/approval privacy rules are unchanged.
+
+This is a bounded integration fix with focused regressions, not another independent review cycle. Repeating CI is required because the first complete run found actual failures. Final run evidence is attached to PR #33; manual acceptance and release/activation approvals remain separate.
+
+
+**Integration-fix evidence:** initial corrected fixtures22 tests→21 pass/1 failing canonical-consent assertion; expanded normal/paused/no-follow cases→2 intended RED/1 pass. After the helper correction, joining/approval/public routes/discovery/email-first suites51/51,241 assertions; Pint and PHPStan0. No JS/CSS changed in this correction, so existing rebuilt assets are retained. Self-review checked the tenant-bounded correlated child query and existing opt-out/no-auto-marketing semantics; no new navigation, dependencies, permissions or configuration. Owner-approved feature-branch push and CI resume only; no production operation.

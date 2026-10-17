@@ -27,7 +27,7 @@ final class CommunityMessageController extends Controller
     public function index(Request $request, CommunityMessages $service): JsonResponse|Response
     {
         $tenant = $this->tenant();
-        $service->authorize($tenant, $request->user());
+        $service->authorize($tenant, $request->user(), false, true);
         $messages = CommunityMessage::query()->where('tenant_id', $tenant->id)
             ->when(! $request->user()->can('read finance'), fn ($query) => $query->where('audience->kind', '!=', 'arrears'))
             ->withCount(['deliveries', 'deliveries as accepted_count' => fn ($q) => $q->where('status', 'accepted'), 'deliveries as unknown_count' => fn ($q) => $q->where('status', 'unknown')])->latest()->paginate(30);
@@ -44,7 +44,7 @@ final class CommunityMessageController extends Controller
         return Inertia::render('Tenant/Community/Messages', [
             'reconciliationUrl' => $request->user()->can('access-superadmin-dashboard') ? mb_rtrim((string) config('app.url'), '/').route('admin.messages.reconciliation.index', ['tenant_id' => $tenant->id], false) : null,
             'messages' => $messages, 'timezone' => $timezone, 'offsets' => $offsets,
-            'capabilities' => ['followers' => $tenant->followingEnabled(), 'schedule' => $entitlements->canSchedule($tenant), 'groups' => $entitlements->canMessageGroups($tenant), 'finance' => $request->user()->can('read finance')],
+            'capabilities' => ['enabled' => $tenant->featureEnabled('community_messages'), 'followers' => $tenant->followingEnabled(), 'schedule' => $entitlements->canSchedule($tenant), 'groups' => $entitlements->canMessageGroups($tenant), 'finance' => $request->user()->can('read finance')],
         ]);
     }
 
@@ -70,11 +70,11 @@ final class CommunityMessageController extends Controller
     public function show(Request $request, string $subdomain, string $message, CommunityMessages $service): JsonResponse
     {
         $tenant = $this->tenant();
-        $service->authorize($tenant, $request->user());
+        $service->authorize($tenant, $request->user(), false, true);
         $model = CommunityMessage::query()->where('tenant_id', $tenant->id)
             ->when(! $request->user()->can('read finance'), fn ($query) => $query->where('audience->kind', '!=', 'arrears'))->findOrFail($message);
 
-        return response()->json(['message' => $model, 'deliveries' => $model->deliveries()->select(['id', 'channel', 'status', 'reason', 'provider_reference'])->paginate(50)]);
+        return response()->json(['message' => $model, 'sending_enabled' => $tenant->featureEnabled('community_messages'), 'inbox' => app(\App\Services\Community\InboxWriter::class)->statistics($model), 'deliveries' => $model->deliveries()->select(['id', 'channel', 'status', 'reason', 'provider_reference'])->paginate(50)]);
     }
 
     public function preview(PreviewMessageRequest $request, CommunityMessages $service): JsonResponse
@@ -97,6 +97,14 @@ final class CommunityMessageController extends Controller
         $service->cancel($tenant, $request->user(), $model);
 
         return response()->json(['message' => $model->fresh()]);
+    }
+
+    public function withdraw(\App\Http\Requests\Tenant\Community\WithdrawInboxMessageRequest $request, string $subdomain, string $message, CommunityMessages $service): JsonResponse
+    {
+        $model = CommunityMessage::withoutGlobalScopes()->where('tenant_id', $this->tenant()->id)->findOrFail($message);
+        $service->withdraw($this->tenant(), $request->user(), $model, $request->validated('reason'));
+
+        return response()->json(['message' => 'Announcement removed from in-app inboxes. Existing email and SMS are unaffected.']);
     }
 
     private function tenant(): Tenant

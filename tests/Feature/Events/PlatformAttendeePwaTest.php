@@ -18,7 +18,7 @@ function pwaPlatformHost(): string
     return app(TenantHostMatcher::class)->baseDomain();
 }
 
-test('manifest endpoint returns valid PWA web app manifest scoped to /my/', function (): void {
+test('manifest endpoint returns valid PWA web app manifest scoped to canonical /my', function (): void {
     $host = pwaPlatformHost();
 
     $response = $this->get("http://{$host}/my/manifest.json", ['HTTP_HOST' => $host]);
@@ -29,7 +29,7 @@ test('manifest endpoint returns valid PWA web app manifest scoped to /my/', func
             'name' => 'MiConvener Attendee Portal',
             'short_name' => 'My Events',
             'start_url' => '/my',
-            'scope' => '/my/',
+            'scope' => '/my',
             'display' => 'standalone',
             'theme_color' => '#4f46e5',
         ]);
@@ -46,11 +46,13 @@ test('service worker is served uncached and contains scoped attendee cache logic
     // attendees' phones on their next visit.
     expect($response->headers->get('Content-Type'))->toContain('javascript')
         ->and($response->headers->get('Cache-Control'))->toContain('no-cache')
-        ->and($response->headers->get('Service-Worker-Allowed'))->toBe('/my/');
+        ->and($response->headers->get('Service-Worker-Allowed'))->toBe('/my');
 
-    $content = file_get_contents($response->baseResponse->getFile()->getPathname());
+    $content = $response->getContent();
     expect($content)
         ->toContain('miconvener-attendee-')
-        ->toContain('/my/manifest.json')
-        ->toContain("startsWith('/my')");
+        ->toContain('/my/offline-shell')
+        ->toContain('APP_PAGE')
+        ->toContain('/build')
+        ->not->toContain('__BUILD_ID__');
 });

@@ -11,6 +11,30 @@ beforeEach(function (): void {
     $this->seed([Database\Seeders\RoleSeeder::class, Database\Seeders\PermissionsSeeder::class]);
 });
 
+test('event participation publishes availability and a verified entry link without poll or form contents', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 'live-access']);
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id, 'starts_at' => now()->subHour(), 'ends_at' => now()->addHour()]);
+    App\Models\EventPoll::factory()->live()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'question' => 'Private poll question']);
+    App\Models\EventDynamicForm::query()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'is_active' => true, 'title' => 'Private feedback form', 'slug' => 'feedback', 'type' => 'feedback', 'schema' => []]);
+    $host = presentationHost($tenant);
+    $response = $this->get("http://{$host}/e/{$event->slug}", ['HTTP_HOST' => $host])->assertOk();
+    $props = $response->viewData('page')['props']['participation'];
+    expect($props['is_live'])->toBeTrue()
+        ->and($props['has_live_poll'])->toBeTrue()
+        ->and($props['has_forms'])->toBeTrue()
+        ->and($props['entry_url'])->toEndWith('/my/join/'.$event->id);
+    $response->assertDontSee('Private poll question')->assertDontSee('Private feedback form');
+});
+
+test('private event participation does not disclose activity availability', function (): void {
+    $tenant = Tenant::factory()->create(['slug' => 'private-live-access']);
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id, 'visibility' => Event::VISIBILITY_PRIVATE]);
+    App\Models\EventPoll::factory()->live()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+    $host = presentationHost($tenant);
+    $props = $this->get("http://{$host}/e/{$event->slug}", ['HTTP_HOST' => $host])->assertOk()->viewData('page')['props']['participation'];
+    expect($props['is_live'])->toBeFalse()->and($props['has_live_poll'])->toBeFalse()->and($props['has_forms'])->toBeFalse();
+});
+
 function presentationHost(Tenant $tenant): string
 {
     return $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');

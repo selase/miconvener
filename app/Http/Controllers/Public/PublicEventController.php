@@ -80,6 +80,12 @@ final class PublicEventController extends Controller
             'community' => $tenant->followingEnabled() || $tenant->communityEnabled() ? app(\App\Services\Community\CommunityPublicContext::class)->for($tenant, request()->session(), $eventModel) : null,
             'org' => $tenant->publicEventProfile(),
             'isPrivate' => $eventModel->isPrivate(),
+            'participation' => fn (): array => [
+                'entry_url' => mb_rtrim((string) config('app.url'), '/').route('attendee.my.join', ['event' => $eventModel->id], false),
+                'is_live' => ! $eventModel->isPrivate() && $eventModel->starts_at->lte(now()) && $eventModel->ends_at->gte(now()),
+                'has_live_poll' => ! $eventModel->isPrivate() && $eventModel->polls()->live()->get()->contains(fn ($poll): bool => ! $poll->timeUp()),
+                'has_forms' => ! $eventModel->isPrivate() && $eventModel->dynamicForms()->where('is_active', true)->get()->contains(fn ($form): bool => $form->isOpen()),
+            ],
         ]);
         if ($tenant->followingEnabled() || $tenant->communityEnabled()) {
             $response = $page->toResponse(request());

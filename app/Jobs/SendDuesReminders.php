@@ -18,14 +18,17 @@ final class SendDuesReminders implements ShouldQueue
 
     public const int PAGE_SIZE = 100;
 
+    public bool $inboxEligible = false;
+
     public int $tries = 3;
 
     public int $timeout = 30;
 
     public int $backoff = 10;
 
-    public function __construct(public string $tenantId, public ?int $userId = null, public ?string $localDate = null, public ?string $afterMemberId = null)
+    public function __construct(public string $tenantId, public ?int $userId = null, public ?string $localDate = null, public ?string $afterMemberId = null, ?bool $inboxEligible = null)
     {
+        $this->inboxEligible = $inboxEligible ?? app(\App\Services\Community\InboxRollout::class)->enabled(Tenant::query()->findOrFail($tenantId));
         $this->localDate ??= CarbonImmutable::now(CommunitySettings::for(Tenant::query()->findOrFail($tenantId))->timezone)->toDateString();
     }
 
@@ -37,6 +40,7 @@ final class SendDuesReminders implements ShouldQueue
         }
         $localDate = $this->localDate;
         $ids = $reminders->queuedRecipientIds($tenant, $this->userId, $localDate, $this->afterMemberId, self::PAGE_SIZE);
+        $reminders->queueInboxFor($tenant, $ids, $this->userId, $localDate, $this->inboxEligible);
         foreach (array_chunk($ids, DuesReminders::SMS_BATCH_SIZE) as $batch) {
             DeliverDuesReminders::dispatch($this->tenantId, $batch, 'sms', $this->userId, $localDate)->afterCommit();
         }
@@ -44,7 +48,7 @@ final class SendDuesReminders implements ShouldQueue
             DeliverDuesReminders::dispatch($this->tenantId, [$id], 'email', $this->userId, $localDate)->afterCommit();
         }
         if (count($ids) === self::PAGE_SIZE) {
-            self::dispatch($this->tenantId, $this->userId, $localDate, $ids[array_key_last($ids)])->afterCommit();
+            self::dispatch($this->tenantId, $this->userId, $localDate, $ids[array_key_last($ids)], $this->inboxEligible)->afterCommit();
         }
     }
 }

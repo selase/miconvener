@@ -25,7 +25,10 @@ final class Following
         if ($source !== null) {
             abort_unless($source->tenant_id === $tenant->id && $source->status === Event::STATUS_PUBLISHED, 404);
         }
-        $address = $this->address($session, $channel) ?? throw new AuthorizationException('Verify this contact first.');
+        if ($channel === 'sms') {
+            return $this->addSms($tenant, $session, $resumeMarketing);
+        }
+        $address = $this->address($session, $channel) ?? throw new AuthorizationException('Verify email to follow this organisation.');
         $hash = $this->preferences->hash($channel, $address);
         $connection = (new CommunityFollower)->getConnection();
 
@@ -60,10 +63,51 @@ final class Following
 
     public function isFollowing(Tenant $tenant, Session $session, string $channel): bool
     {
-        $address = $this->address($session, $channel);
+        $email = $this->address($session, 'email');
+        if ($email === null) {
+            return false;
+        }
+        $parent = CommunityFollower::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('channel', 'email')->where('address_hash', $this->preferences->hash('email', $email))->whereNull('unfollowed_at')->first();
+        if ($parent === null || ! $this->preferences->allowsMarketing($tenant, 'email', $email)) {
+            return false;
+        }
+        if ($channel === 'email') {
+            return true;
+        }
+        $phone = $this->address($session, 'sms');
 
-        return $address !== null && $this->preferences->allowsMarketing($tenant, $channel, $address)
-            && CommunityFollower::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)->where('channel', $channel)->where('address_hash', $this->preferences->hash($channel, $address))->whereNull('unfollowed_at')->exists();
+        return $phone !== null && $this->preferences->allowsMarketing($tenant, 'sms', $phone) && ! app(WrongNumberReports::class)->isBlocked($tenant, 'sms', $phone) && $parent->channels()->where('address_hash', $this->preferences->hash('sms', $phone))->whereNull('disabled_at')->where('consented_at', '>=', $parent->consented_at)->exists();
+    }
+
+    private function addSms(Tenant $tenant, Session $session, bool $resumeMarketing): CommunityFollower
+    {
+        $email = $this->address($session, 'email') ?? throw new AuthorizationException('Verify email to follow before adding SMS.');
+        $phone = $this->address($session, 'sms') ?? throw new AuthorizationException('Verify this phone before adding SMS.');
+        $emailHash = $this->preferences->hash('email', $email);
+        $phoneHash = $this->preferences->hash('sms', $phone);
+        $connection = $tenant->getConnection();
+
+        return $connection->transaction(function () use ($connection, $tenant, $emailHash, $email, $phone, $phoneHash, $resumeMarketing): CommunityFollower {
+            $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community-follow:'.$tenant->id.':email:'.$emailHash]);
+            $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community-follow:'.$tenant->id.':sms:'.$phoneHash]);
+            $parent = CommunityFollower::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('channel', 'email')->where('address_hash', $emailHash)->whereNull('unfollowed_at')->first();
+            if ($parent === null || ! $this->preferences->allowsMarketing($tenant, 'email', $email)) {
+                throw new AuthorizationException('Follow with your verified email before adding SMS.');
+            }
+            if (app(WrongNumberReports::class)->isBlocked($tenant, 'sms', $phone)) {
+                throw ValidationException::withMessages(['channel' => 'This number needs independent review before SMS announcements can resume.']);
+            }
+            if (! $this->preferences->allowsMarketing($tenant, 'sms', $phone)) {
+                if (! $resumeMarketing) {
+                    throw ValidationException::withMessages(['resume_marketing' => 'Confirm you want SMS announcements again.']);
+                }
+                $this->preferences->enableMarketing($tenant, 'sms', $phone);
+            }
+            $parent->channels()->updateOrCreate(['channel' => 'sms'], ['tenant_id' => $tenant->id, 'address' => $phone, 'address_hash' => $phoneHash, 'consented_at' => now(), 'disabled_at' => null]);
+            CommunityAccessAudit::query()->create(['tenant_id' => $tenant->id, 'action' => 'following_sms_added', 'method' => 'verified_email_and_sms', 'reason' => 'Explicit SMS opt-in for address digest '.$phoneHash]);
+
+            return $parent;
+        });
     }
 
     private function address(Session $session, string $channel): ?string

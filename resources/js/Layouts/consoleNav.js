@@ -49,7 +49,7 @@ export const NAV_GROUPS = [
                 label: 'Messages',
                 href: 'tenant.community.messages.index',
                 icon: 'Inbox',
-                feature: 'community_messages',
+                anyFeatures: ['community_messages','community_inbox'],
                 permission: 'send_community_messages',
             },
             {
@@ -163,6 +163,7 @@ export function visibleGroups(groups, { features = {}, can = {} } = {}) {
             items: group.items.filter(
                 (item) =>
                     (!item.feature || features[item.feature]) &&
+                    (!item.anyFeatures || item.anyFeatures.some(key=>features[key])) &&
                     (!item.permission || can[item.permission])
             ),
         }))

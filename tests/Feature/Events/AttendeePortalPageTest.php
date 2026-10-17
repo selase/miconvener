@@ -52,6 +52,50 @@ function portalProof(string $email = 'ama@stem.org'): array
     ];
 }
 
+test('joining an event requires existing email verification and preserves the requested activity', function (): void {
+    [$event, $registration, $host] = portalFor('join-proof');
+    $path = '/my/join/'.$event->id.'?tab=forms';
+    $this->get("http://{$host}{$path}", ['HTTP_HOST' => $host])
+        ->assertRedirect('/my?return_to='.urlencode($path));
+    $this->withSession(portalProof())->get("http://{$host}{$path}", ['HTTP_HOST' => $host])
+        ->assertRedirect("http://{$host}/my/events/{$registration->id}?tab=forms");
+});
+
+test('joining cannot choose another persons registration and fails safely for a different email', function (): void {
+    [$event, $registration, $host] = portalFor('join-other-email');
+    $this->withSession(portalProof('different@example.test'))
+        ->get("http://{$host}/my/join/{$event->id}?tab=poll", ['HTTP_HOST' => $host])
+        ->assertRedirect('/my?event_access=not_found');
+});
+
+test('joining ignores invalid tabs and never revives cancelled registrations', function (): void {
+    [$event, $registration, $host] = portalFor('join-tab');
+    $this->withSession(portalProof())->get("http://{$host}/my/join/{$event->id}?tab=https://evil.test", ['HTTP_HOST' => $host])
+        ->assertRedirect("http://{$host}/my/events/{$registration->id}?tab=agenda");
+    $registration->update(['status' => EventRegistration::STATUS_CANCELLED]);
+    $this->withSession(portalProof())->get("http://{$host}/my/join/{$event->id}", ['HTTP_HOST' => $host])
+        ->assertRedirect('/my?event_access=not_found');
+});
+
+test('workspace deep links are passed as a safe initial tab without changing its authorization', function (): void {
+    [$event, $registration, $host] = portalFor('workspace-tab');
+    $this->withSession(portalProof())->get("http://{$host}/my/events/{$registration->id}?tab=forms", ['HTTP_HOST' => $host])
+        ->assertOk()->assertInertia(fn ($page) => $page->where('initial_tab', 'forms'));
+    $this->withSession(portalProof('someoneelse@example.test'))->get("http://{$host}/my/events/{$registration->id}?tab=forms", ['HTTP_HOST' => $host])
+        ->assertForbidden();
+});
+
+test('expired timed quizzes are not advertised as active to attendees', function (): void {
+    [$event, $registration, $host] = portalFor('expired-live-poll');
+    \App\Models\EventPoll::factory()->quiz()->live()->create([
+        'tenant_id' => $event->tenant_id,
+        'event_id' => $event->id,
+        'went_live_at' => now()->subMinutes(2),
+    ]);
+    $this->withSession(portalProof())->get("http://{$host}/my/events/{$registration->id}", ['HTTP_HOST' => $host])
+        ->assertOk()->assertInertia(fn ($page) => $page->where('has_live_poll', false));
+});
+
 test('the portal page receives the registration, the event and what can be acted on', function () {
     [$event, $registration, $host] = portalFor('portal-props');
 

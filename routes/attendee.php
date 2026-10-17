@@ -7,7 +7,10 @@ use App\Http\Controllers\Public\PlatformAttendeeWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('my')->group(function (): void {
+    Route::get('/join/{event}', [PlatformAttendeeWorkspaceController::class, 'join'])->whereUuid('event')->name('attendee.my.join');
     Route::get('/', [PlatformAttendeeAccessController::class, 'page'])->name('attendee.my');
+    Route::get('/offline-shell', [PlatformAttendeeAccessController::class, 'offlineShell'])->name('attendee.my.offline-shell');
+    Route::get('/offline-assets', [PlatformAttendeeAccessController::class, 'offlineAssets'])->name('attendee.my.offline-assets');
     Route::get('/manifest.json', [PlatformAttendeeAccessController::class, 'manifest'])->name('attendee.my.manifest');
     Route::post('/verify/phone/send', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'send'])->name('attendee.my.phone.send');
     Route::post('/verify/phone/confirm', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'confirm'])->name('attendee.my.phone.confirm');
@@ -18,6 +21,16 @@ Route::prefix('my')->group(function (): void {
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::get('/inbox', [App\Http\Controllers\Public\MyInboxController::class, 'index'])->name('attendee.my.inbox.index');
+        Route::get('/communities/{tenantSlug}/inbox', [App\Http\Controllers\Public\MyInboxController::class, 'organisation'])->name('attendee.my.inbox.organisation');
+        Route::post('/communities/{tenantSlug}/inbox/read-all', [App\Http\Controllers\Public\MyInboxController::class, 'readAll'])->name('attendee.my.inbox.read-all');
+        Route::get('/communities/{tenantSlug}/inbox/{item}', [App\Http\Controllers\Public\MyInboxController::class, 'show'])->whereUuid('item')->name('attendee.my.inbox.show');
+        Route::post('/communities/{tenantSlug}/inbox/{item}/read', [App\Http\Controllers\Public\MyInboxController::class, 'read'])->whereUuid('item')->name('attendee.my.inbox.read');
+        Route::get('/preferences', [App\Http\Controllers\Public\AttendeePreferencesController::class, 'index'])->name('attendee.my.preferences');
+        Route::patch('/preferences/{tenantSlug}', [App\Http\Controllers\Public\AttendeePreferencesController::class, 'update'])->name('attendee.my.preferences.update');
+        Route::delete('/identity/email', [PlatformAttendeeAccessController::class, 'removeEmail'])->name('attendee.my.identity.email.remove');
+        Route::get('/money', [App\Http\Controllers\Public\MyMoneyController::class, 'index'])->name('attendee.my.money');
+        Route::get('/communities/{tenantSlug}/members/{member}/statement', [App\Http\Controllers\Public\MyMoneyController::class, 'statement'])->name('attendee.my.communities.statement');
         Route::get('/identity', [App\Http\Controllers\Public\MyCommunitiesController::class, 'identity'])->name('attendee.my.identity');
         Route::get('/communities', [App\Http\Controllers\Public\MyCommunitiesController::class, 'index'])->name('attendee.my.communities.index');
         Route::get('/communities/{tenantSlug}/options', [App\Http\Controllers\Public\MyCommunitiesController::class, 'options'])->name('attendee.my.communities.options');
@@ -40,6 +53,8 @@ Route::prefix('my')->group(function (): void {
 
     // Authenticated history endpoints
     Route::middleware('platform_attendee_verified')->group(function (): void {
+        Route::get('/app/events', [PlatformAttendeeAccessController::class, 'appEvents'])->name('attendee.my.app.events');
+        Route::get('/app/tickets/{registration}', [PlatformAttendeeWorkspaceController::class, 'ticketPass'])->whereUuid('registration')->name('attendee.my.app.ticket');
         Route::get('/events', [PlatformAttendeeAccessController::class, 'events'])->name('attendee.my.events');
         Route::get('/certificates', [PlatformAttendeeAccessController::class, 'certificates'])->name('attendee.my.certificates');
         Route::get('/abstracts', [PlatformAttendeeAccessController::class, 'abstracts'])->name('attendee.my.abstracts');

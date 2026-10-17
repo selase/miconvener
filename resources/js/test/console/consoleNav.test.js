@@ -97,3 +97,8 @@ it('gates Community Messages by its own rollout and sending permission', () => {
         ).toBe(false);
     }
 });
+
+it('keeps sent inbox announcements reachable when sending is switched off', () => {
+    const group = visibleGroups(NAV_GROUPS, {features:{community:true,community_inbox:true},can:{send_community_messages:true}}).find(g=>g.key==='community');
+    expect(group.items.some(item=>item.label==='Messages')).toBe(true);
+});

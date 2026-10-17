@@ -157,7 +157,7 @@ final class DuesPaymentConfirmer
         $member = $paid[0]->member ?? null;
 
         if ($member !== null && filled($member->email)) {
-            Mail::to($member->email)->queue(new DuesReceipt($member, new Collection($paid), $reference));
+            Mail::to($member->email)->queue((new DuesReceipt($member, new Collection($paid), $reference))->afterCommit());
         }
 
         return $paid;
@@ -291,6 +291,11 @@ final class DuesPaymentConfirmer
         }
 
         $attempt?->update(['status' => 'confirmed', 'confirmed_at' => now()]);
+
+        $member = $open->first()->member;
+        if ($member !== null) {
+            app(\App\Services\Community\InboxNotices::class)->receipt($tenant, $member, $reference, $open, \Carbon\CarbonImmutable::now());
+        }
 
         return $open->all();
     }

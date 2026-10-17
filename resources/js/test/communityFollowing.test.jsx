@@ -63,3 +63,13 @@ it('requires a reviewed event audience and invalidates the send review when copy
     fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Changed subject' } });
     expect(screen.getByRole('button', { name: 'Send announcement' }).disabled).toBe(true);
 });
+
+it('requires email before following and does not offer a standalone SMS follow', () => {
+    render(<FollowControl identity={{phone: {masked: '••4567'}}} followUrl="/community/follow" />);
+    expect(screen.getByRole('link', {name: /Verify email to follow/})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'Follow organisation'})).toBeNull();
+});
+it('offers SMS only as an added channel after an email follow', () => {
+    render(<FollowControl identity={{email: {masked: 'a•@example.test'}, phone: {masked:'••4567'}}} initialFollowing={{email:false}} followUrl="/community/follow" />);
+    expect(screen.queryByRole('option',{name:/Phone/})).toBeNull();
+});

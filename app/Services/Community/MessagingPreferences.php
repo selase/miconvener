@@ -49,6 +49,12 @@ final class MessagingPreferences
             $hash = $this->hash($channel, $address);
             $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community-follow:'.$tenant->id.':'.$channel.':'.$hash]);
             $this->preference($tenant, $channel, $address)->update(['marketing_disabled_at' => now()]);
+            if ($channel === 'sms') {
+                \App\Models\CommunityFollowerChannel::query()->where('tenant_id', $tenant->id)->where('address_hash', $hash)->update(['disabled_at' => now()]);
+            }
+            if ($channel === 'email') {
+                \App\Models\CommunityFollowerChannel::query()->where('tenant_id', $tenant->id)->whereIn('follower_id', \App\Models\CommunityFollower::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('channel', 'email')->where('address_hash', $hash)->select('id'))->update(['disabled_at' => now()]);
+            }
             \App\Models\CommunityFollower::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('channel', $channel)->where('address_hash', $hash)->whereNull('unfollowed_at')->update(['unfollowed_at' => now()]);
         });
     }

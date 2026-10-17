@@ -44,6 +44,7 @@ final class Kernel extends ConsoleKernel
          */
         $schedule->call(fn () => \App\Models\CommunityAudienceAddress::query()->where('expires_at', '<', now())->delete())->hourly()->name('community:prune-audience-previews')->withoutOverlapping();
         $schedule->command('tenants:sync-features')->dailyAt('03:45')->withoutOverlapping();
+        $schedule->command('community:inbox-prune')->dailyAt('04:15')->withoutOverlapping()->onOneServer();
         $schedule->command('community:messages-dispatch')->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('dues:process')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('usage:process-rollups --period=hour')->hourly();

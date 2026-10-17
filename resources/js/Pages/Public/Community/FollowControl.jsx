@@ -8,18 +8,18 @@ export default function FollowControl({
     signInUrl = '/my',
     sourceEventId = null,
 }) {
-    const [channel, setChannel] = useState(identity?.email ? 'email' : 'sms');
+    const [channel, setChannel] = useState('email');
     const [following, setFollowing] = useState(initialFollowing);
     const [consent, setConsent] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    if (!identity)
+    if (!identity?.email)
         return (
             <a
                 href={signInUrl}
                 className="inline-flex rounded-lg bg-accent px-5 py-3 text-sm font-medium text-white"
             >
-                Verify to follow
+                Verify email to follow
             </a>
         );
     const active = Boolean(following[channel]);
@@ -32,7 +32,7 @@ export default function FollowControl({
                 resume_marketing: consent,
                 ...(sourceEventId ? { source_event_id: sourceEventId } : {}),
             });
-            setFollowing({ ...following, [channel]: data.following });
+            setFollowing({ ...following, [channel]: data.following, ...(channel === 'email' && !data.following ? {sms:false} : {}) });
             setConsent(false);
         } catch (failure) {
             setError(failure.message);
@@ -56,7 +56,7 @@ export default function FollowControl({
                     {identity.email && (
                         <option value="email">Email · {identity.email.masked}</option>
                     )}
-                    {identity.phone && <option value="sms">Phone · {identity.phone.masked}</option>}
+                    {identity.phone && following.email && <option value="sms">Phone · {identity.phone.masked} (optional SMS)</option>}
                 </select>
             </label>
             {!active && (

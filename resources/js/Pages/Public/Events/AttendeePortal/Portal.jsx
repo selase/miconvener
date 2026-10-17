@@ -1,3 +1,9 @@
+import AttendeeTickets from './components/AttendeeTickets';
+import {
+    reconcileAttendeeIdentity,
+    IDENTITY_EVENT,
+    isIdentityStorageEvent,
+} from '@/lib/attendeeIdentityCache';
 import { useEffect, useRef, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
@@ -58,7 +64,8 @@ const STATUS_NOTICE = {
         icon: XCircle,
         color: 'text-danger-fg',
         title: 'Registration not approved',
-        description: (event) => `The organizers of ${event.name} could not confirm this registration.`,
+        description: (event) =>
+            `The organizers of ${event.name} could not confirm this registration.`,
     },
     cancelled: {
         icon: XCircle,
@@ -84,33 +91,67 @@ export default function Portal({
     active_service_requests_count = 0,
     certificate = null,
     attendance = [],
+    initial_tab = 'ticket',
+    offline_identity = { state: 'signed_out' },
 }) {
     const [currentRegistration, setCurrentRegistration] = useState(registration);
     const [isPolling, setIsPolling] = useState(
-        poll_payment || (registration.status === 'pending_payment' && !registration.awaiting_checkout)
+        poll_payment ||
+            (registration.status === 'pending_payment' && !registration.awaiting_checkout)
     );
     const [pollingDelayed, setPollingDelayed] = useState(false);
-    const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    const [isOnline, setIsOnline] = useState(
+        typeof navigator !== 'undefined' ? navigator.onLine : true
+    );
     const [offlineSnapshot, setOfflineSnapshot] = useState(null);
+    const [identityRevoked, setIdentityRevoked] = useState(false);
     const pollAttempts = useRef(0);
     const MAX_POLL_ATTEMPTS = 24; // 2s initial + ~23 * 5s = ~2 minutes
 
     useEffect(() => {
+        reconcileAttendeeIdentity(offline_identity);
         registerAttendeeServiceWorker();
         purgeExpiredOfflineTickets();
-        setOfflineSnapshot(getOfflineTicket(registration.id));
+        setOfflineSnapshot(getOfflineTicket(registration.id, offline_identity));
 
         const handleOnline = () => setIsOnline(true);
-        const handleOffline = () => setIsOnline(false);
+        const handleOffline = () => {
+            setIsOnline(false);
+            setOfflineSnapshot(getOfflineTicket(registration.id, offline_identity));
+        };
+        const invalidate = () => {
+            setOfflineSnapshot(null);
+            setIdentityRevoked(true);
+        };
+        const storage = (event) => {
+            if (isIdentityStorageEvent(event)) invalidate();
+        };
+        window.addEventListener(IDENTITY_EVENT, invalidate);
+        window.addEventListener('storage', storage);
+        const timer =
+            offline_identity.state === 'verified'
+                ? setTimeout(
+                      invalidate,
+                      Math.max(0, offline_identity.proof_expires_at - Date.now())
+                  )
+                : null;
 
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
         return () => {
+            if (timer !== null) clearTimeout(timer);
+            window.removeEventListener(IDENTITY_EVENT, invalidate);
+            window.removeEventListener('storage', storage);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
-    }, [registration.id]);
+    }, [
+        registration.id,
+        offline_identity.state,
+        offline_identity.owner_key,
+        offline_identity.proof_expires_at,
+    ]);
 
     useEffect(() => {
         if (!isPolling) return;
@@ -149,7 +190,7 @@ export default function Portal({
     }, [isPolling, currentRegistration.id]);
 
     const notice = STATUS_NOTICE[currentRegistration.status];
-    const [tab, setTab] = useState('ticket');
+    const [selectedTab, setTab] = useState(initial_tab);
     const [agendaIds, setAgendaIds] = useState(currentRegistration.agenda_session_ids ?? []);
 
     const verified = currentRegistration.email_verified !== false;
@@ -158,15 +199,31 @@ export default function Portal({
     const contextualTabs = [];
     if (verified && has_live_poll) contextualTabs.push(['poll', 'Live poll', BarChart2]);
     if (verified && has_forum) contextualTabs.push(['forum', 'Q&A', MessageSquare]);
-    if (verified && has_forms) contextualTabs.push(['forms', 'Feedback', FileText]);
+    if (verified && has_forms) contextualTabs.push(['forms', 'Surveys & feedback', FileText]);
     if (verified && canRequestHelp) contextualTabs.push(['help', 'Get help', HelpCircle]);
-    if (verified && materials.length > 0) contextualTabs.push(['downloads', `Downloads (${materials.length})`, Download]);
-
-    const isContextualTab = ['poll', 'forum', 'forms', 'help', 'downloads'].includes(tab);
+    if (verified && materials.length > 0)
+        contextualTabs.push(['downloads', `Downloads (${materials.length})`, Download]);
 
     const desktopTabs = verified ? [['ticket', 'My ticket', Ticket]] : [];
     if (verified && event.sessions?.length > 0) desktopTabs.push(['agenda', 'My day', Calendar]);
     desktopTabs.push(...contextualTabs);
+    const tab = desktopTabs.some(([key]) => key === selectedTab) ? selectedTab : 'ticket';
+    const isContextualTab = ['poll', 'forum', 'forms', 'help', 'downloads'].includes(tab);
+    const activities = contextualTabs.filter(([key]) => ['poll', 'forum', 'forms'].includes(key));
+
+    useEffect(() => {
+        if (!verified || !['confirmed', 'checked_in'].includes(registration.status)) return;
+        const refresh = () => {
+            if (!document.hidden && navigator.onLine)
+                router.reload({ only: ['has_live_poll', 'has_forms', 'has_forum'] });
+        };
+        const interval = setInterval(refresh, 30000);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, [verified, registration.status]);
 
     const restartPolling = () => {
         pollAttempts.current = 0;
@@ -180,6 +237,42 @@ export default function Portal({
             setTab(contextualTabs[0][0]);
         }
     };
+
+    if (identityRevoked)
+        return (
+            <PublicLayout>
+                <div className="mx-auto max-w-lg p-8">
+                    <h1 className="text-2xl font-medium">Verify your email again</h1>
+                    <p className="my-4 text-sm text-ink-secondary">
+                        This device’s verified access changed or expired. Reconnect to open your
+                        event.
+                    </p>
+                    <a href="/my" className="min-h-11 text-accent underline">
+                        Return to My MiConvener
+                    </a>
+                </div>
+            </PublicLayout>
+        );
+    if (!isOnline)
+        return (
+            <PublicLayout>
+                <div className="mx-auto max-w-2xl px-5 py-8">
+                    <h1 className="text-2xl font-medium">Your saved ticket</h1>
+                    <p className="my-4 text-sm text-ink-secondary">
+                        Only saved passes are available offline. Reconnect for your programme,
+                        activities and current ticket status.
+                    </p>
+                    <AttendeeTickets
+                        offline
+                        period="saved"
+                        offlineTickets={offlineSnapshot ? [offlineSnapshot] : []}
+                        onFilterChange={() => {}}
+                        onRecord={() => {}}
+                        onOpen={() => {}}
+                    />
+                </div>
+            </PublicLayout>
+        );
 
     return (
         <PublicLayout>
@@ -200,12 +293,15 @@ export default function Portal({
                         <div className="flex items-center gap-2">
                             <WifiOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                             <span>
-                                You are currently offline. Your saved ticket and personal agenda remain accessible.
+                                You are currently offline. Only explicitly saved ticket passes are
+                                available offline. Reconnect for your programme and event
+                                activities.
                             </span>
                         </div>
                         {offlineSnapshot?.last_confirmed_at && (
                             <span className="shrink-0 text-ink-secondary text-[11px]">
-                                Confirmed {new Date(offlineSnapshot.last_confirmed_at).toLocaleDateString()}
+                                Confirmed{' '}
+                                {new Date(offlineSnapshot.last_confirmed_at).toLocaleDateString()}
                             </span>
                         )}
                     </div>
@@ -247,14 +343,15 @@ export default function Portal({
                                 Check again
                             </button>
                         )}
-                        {currentRegistration.awaiting_checkout && currentRegistration.checkout_url && (
-                            <a
-                                href={currentRegistration.checkout_url}
-                                className="mt-6 inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90"
-                            >
-                                Complete payment
-                            </a>
-                        )}
+                        {currentRegistration.awaiting_checkout &&
+                            currentRegistration.checkout_url && (
+                                <a
+                                    href={currentRegistration.checkout_url}
+                                    className="mt-6 inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90"
+                                >
+                                    Complete payment
+                                </a>
+                            )}
                     </div>
                 ) : (
                     <>
@@ -281,10 +378,47 @@ export default function Portal({
                             )}
                         </div>
 
+                        {verified && activities.length > 0 && (
+                            <section
+                                aria-label="Event activities"
+                                className="mt-7 border-l-2 border-accent bg-accent/5 p-5"
+                            >
+                                <h2 className="text-lg font-medium tracking-tight text-ink">
+                                    Be part of the conversation.
+                                </h2>
+                                <p className="mt-1 text-sm text-ink-secondary">
+                                    Answer polls, ask questions and share your feedback.
+                                </p>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {activities.map(([key, label, Icon]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setTab(key)}
+                                            aria-pressed={tab === key}
+                                            className={`inline-flex min-h-11 items-center gap-2 border px-3 py-2 text-sm ${tab === key ? 'border-accent bg-accent text-accent-ink' : 'border-border bg-surface text-ink hover:border-accent'}`}
+                                        >
+                                            <Icon className="h-4 w-4" aria-hidden="true" />
+                                            {label}
+                                            {key === 'poll' && (
+                                                <span className="text-[11px]">· Active</span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                        {verified && selectedTab !== tab && (
+                            <p role="status" className="mt-5 text-sm text-ink-secondary">
+                                This activity is not available right now. Your ticket and other
+                                available activities are below.
+                            </p>
+                        )}
+
                         {/* Desktop Navigation (>= 768px) */}
                         <nav
                             aria-label="Event workspace navigation"
-                            className={`mt-9 mb-7 hidden md:flex justify-center gap-1 ${desktopTabs.length > 0 ? 'border-b border-border' : ''}`}
+                            className={`mt-9 mb-7 hidden md:flex flex-wrap justify-center gap-1 ${desktopTabs.length > 0 ? 'border-b border-border' : ''}`}
                         >
                             <Link
                                 href="/my"
@@ -347,6 +481,7 @@ export default function Portal({
                         {/* Panels */}
                         {verified && tab === 'ticket' && (
                             <MyTicketPanel
+                                offlineIdentity={offline_identity}
                                 event={event}
                                 registration={registration}
                                 isOnline={isOnline}
@@ -428,7 +563,8 @@ export default function Portal({
                                     >
                                         <div className="relative">
                                             <MoreHorizontal className="h-4 w-4" />
-                                            {(has_live_poll || active_service_requests_count > 0) && (
+                                            {(has_live_poll ||
+                                                active_service_requests_count > 0) && (
                                                 <span className="absolute -top-1 -right-1.5 h-2 w-2 rounded-full bg-accent animate-pulse" />
                                             )}
                                         </div>
