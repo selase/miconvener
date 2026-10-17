@@ -120,7 +120,7 @@ List, count, view and mark-read endpoints re-evaluate access, organisation state
 
 ### 6.1 When items are created
 
-- **Materialised while sending.** `CommunityMessages::dispatchDue` resolves recipients page by page while a message is `sending`. In the same pages it creates one item per eligible member record and per eligible email follower record (unique keys make re-runs and retries safe). Event-attendee sources produce no items.
+- **Materialised while sending.** `CommunityMessages::dispatchDue` resolves recipients page by page while a message is `sending`. In the same pages it creates one item per eligible member record and per eligible follower record (unique keys make re-runs and retries safe). Event-attendee sources produce no items.
 - **Record-level resolution.** `AudienceResolver` resolves addresses per channel today; add a record-level resolution (`recipients(Tenant, selector)`) returning member and follower records with the same tenant and permission rules, deduplicated by record.
 - **Eligibility within the send is channel-independent.** A follower is excluded when its address has opted out of marketing or unfollowed. A member is excluded only when every address on the record has opted out of marketing at this organisation (opt-outs are per channel and address in `MessagingPreferences`). A member whose SMS was skipped for credit, or whose email bounced, still gets an item.
 - **Notices.** When `DuesReminders` records a reminder for a member (automatic or the arrears button), the first reminder row for that member and organisation-local day creates one `dues_reminder` item (whatever its channels and their outcome: sent, skipped, failed). Its snapshot lists the open charges included, the total and the oldest due date, with a "Pay in MiConvener" action that opens `/my` > Money rather than a pay link. When a dues payment is confirmed (`DuesPaymentConfirmer`, or an admin recording cash), one `dues_receipt` item is created per payment. Notices are service messages: marketing opt-outs do not affect them; `community_settings.reminders_enabled = false` stops reminder items along with the reminders.
@@ -139,7 +139,7 @@ An item is visible only when all hold:
 
 ### 6.3 One message, one entry per reader
 
-A notice is always its own entry. For announcements, a person can hold several items for one message: a member item and an email follower item at the same organisation, or their own item and a represented member's item. Lists and counts show **one entry per message per reader context**: own items (self member and email follower) merge into one entry; each represented member's item is a separate, labelled entry. Opening an entry writes read rows for every reader key that applies to the items merged into it, so a person who is both member and follower sees the message once and reads it once.
+A notice is always its own entry. For announcements, a person can hold several items for one message: a member item and a follower item at the same organisation, or their own item and a represented member's item. Lists and counts show **one entry per message per reader context**: own items (self member and follower) merge into one entry; each represented member's item is a separate, labelled entry. Opening an entry writes read rows for every reader key that applies to the items merged into it, so a person who is both member and follower sees the message once and reads it once.
 
 ## 7. Read and unread
 
@@ -178,7 +178,7 @@ Enumerating what a person can see reuses the history queries `/my` already has (
 
 ## 11. Risks
 
-- **Leaking a message to the wrong person.** Mitigation: items keyed to recipient records, access only through `MemberAccess` and exact email-follower rules, no address on items, no phone followers in v1, every-request re-checks, the tests in section 12.
+- **Leaking a message to the wrong person.** Mitigation: items keyed to recipient records, access only through `MemberAccess` and exact follower-email rules, no address on items, no SMS-only followers, every-request re-checks, the tests in section 12.
 - **Recalled or suspended content staying readable.** Mitigation: visibility tied to message status, withdraw/cancel/takedown and organisation state (sections 6.2, 8).
 - **Write volume.** 5,000 recipients create 5,000 items inside the existing paged send. Reads are written only on opening.
 - **Count cost.** Recipient-first indexes; per-organisation counts over the person's accessible members and email follows, then per-message dedupe.
@@ -191,12 +191,12 @@ Enumerating what a person can see reuses the history queries `/my` already has (
 4. A representative sees the represented member's items labelled; reading marks only the representative's state.
 5. Exact current email sees items; a removed email loses access immediately.
 6. Self access by email then by phone credential shares one read state; credential rotation keeps it.
-7. Email follower: items before `consented_at` hidden; unfollow hides all; re-follow shows only new items.
+7. Follower: items before `consented_at` hidden; unfollow hides all; re-follow shows only new items.
 8. A member opted out on SMS only still gets an item; opted out on every address does not.
 9. A member whose SMS was skipped for credit still gets an item.
 10. Re-running a page of the send creates no duplicate items.
 11. Cancel mid-send withdraws every item already created; paused and draft messages show nothing.
-12. A member who is also an email follower sees the message once and one read clears it.
+12. A member who is also a follower sees the message once and one read clears it.
 13. Withdrawn, taken-down and organisation-suspended messages disappear from lists and counts; direct links show the unavailable notice.
 14. Inbox switch on but `community_app` off: no items created; turning the inbox off hides items; turning it on again shows them.
 15. Guessed item or message ids from another organisation or member return 404.
