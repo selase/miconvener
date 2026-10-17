@@ -25,6 +25,7 @@ export default function AttendeeAppShell({
     children,
     detail = null,
     offline = false,
+    communityUnread = 0,
 }) {
     const navigation = (mobile) =>
         APP_SECTIONS.map(([key, label, Icon]) => (
@@ -32,11 +33,24 @@ export default function AttendeeAppShell({
                 key={key}
                 type="button"
                 aria-current={section === key ? 'page' : undefined}
+                aria-label={
+                    key === 'communities' && communityUnread > 0
+                        ? `Communities, ${communityUnread > 99 ? '99+' : communityUnread} unread messages`
+                        : undefined
+                }
                 onClick={() => onSectionChange(key)}
                 className={`flex min-h-12 min-w-0 items-center gap-2 px-3 py-3 text-sm transition-colors ${mobile ? 'flex-col justify-center gap-1 px-0 text-[11px]' : 'text-left'} ${section === key ? 'bg-accent/10 font-medium text-accent' : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'}`}
             >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>{label}</span>
+                {key === 'communities' && communityUnread > 0 && (
+                    <span
+                        aria-hidden="true"
+                        className="border border-accent/20 bg-accent/10 px-1.5 py-0.5 text-xs font-semibold text-accent"
+                    >
+                        {communityUnread > 99 ? '99+' : communityUnread}
+                    </span>
+                )}
             </button>
         ));
     return (

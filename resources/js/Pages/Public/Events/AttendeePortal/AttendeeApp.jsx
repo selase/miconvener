@@ -360,7 +360,9 @@ export default function AttendeeApp({
     };
     const closeInbox = () => {
         setInboxLocation(null);
+        setSection('communities');
         const url = new URL(window.location.href);
+        url.searchParams.set('section', 'communities');
         for (const key of ['inbox', 'item', 'context']) url.searchParams.delete(key);
         window.history.pushState({}, '', url);
         window.requestAnimationFrame(() => document.getElementById('communities')?.focus());
@@ -610,7 +612,18 @@ export default function AttendeeApp({
         ((section === 'tickets' && !email) ||
             (['home', 'money'].includes(section) && !email && !phone));
     return (
-        <AttendeeAppShell section={section} onSectionChange={navigate} offline={!online}>
+        <AttendeeAppShell
+            section={section}
+            onSectionChange={navigate}
+            offline={!online}
+            communityUnread={
+                online
+                    ? (visibleInbox || [])
+                          .filter((row) => !organiser?.slug || row.slug === organiser.slug)
+                          .reduce((sum, row) => sum + row.unread, 0)
+                    : 0
+            }
+        >
             <Head title="My MiConvener">
                 <link rel="manifest" href="/my/manifest.json" />
                 <meta name="theme-color" content="#007367" />
@@ -726,12 +739,14 @@ export default function AttendeeApp({
                         />
                     ) : null}
                     {section === 'communities' &&
+                        !(inboxEnabled && inboxLocation && (email || phone)) &&
                         (email || phone ? (
                             <CommunitiesPanel
                                 organiser={organiser}
                                 inboxOverview={visibleInbox}
                                 onOpenInbox={openInbox}
                                 initiallyOpen
+                                appPage
                                 onCredential={(value) => {
                                     if (
                                         identityGeneration === generation.current &&

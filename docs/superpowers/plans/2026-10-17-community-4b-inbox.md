@@ -261,3 +261,32 @@ Release/readback IDs are in the local roadmap. Notes are on local codex/communit
 ## Pilot activation progress —2026-10-17
 
 Owner separately approved the Purpledot inbox pilot. Command comm-a300f7c5-b1b3-4214-bbb8-85465747901e exit0; readback cexe-a300f90b-2014-49a3-ac33-38ab05ae30a0 confirms active/app/inbox/effective true and onlyPurpledot enabled.0 members/followers/items/reads currently. Signed-out overview/list/detail401, read GET405, no bodies/entries, private/no-store. Browser control unavailable after two timeouts; normal verified-email/explicit-follow step requested from the owner, who designated a test email in chat. No live messages, member records, charges or receipts created. Activation is complete; end-to-end recipient/read/notice/representative acceptance is not claimed complete. Reminder remains useful until acceptance. Notes retained locally; no new remote upload attempted.
+
+
+## Approved inbox usability follow-up —2026-10-17
+
+Owner's live pilot exposed duplicated community entry points, settings dominating messages and an inbox modal. The owner approved one organisation card, a dedicated inbox page, collapsed community management and an unread Communities navigation badge. This is a frontend follow-up on `codex/community-inbox-usability`, not another Community milestone. No production changes or new dependencies.
+
+- [x] Add failing component regressions for page-level messages/history, one community card with explicit management, and navigation unread badges. Confirm expected RED, then implement using existing app components/tokens.
+- [x] Keep message transport, verified identity, eligibility, representative labels, mark-read services and ticket-only offline storage unchanged. Preserve existing deep-link query parameters.
+- [x] One fresh review: fix signed-out history restoration leaving blank content; retain cross-organisation navigation in the legacy portal. Add mounted cross-tab sign-out/history regression.
+- [x] Finish focused/server/UI verification, responsive browser acceptance and rebuilt assets; record evidence before committing.
+
+Review focus: signed-out/expired/deep-link states, stale owner responses, management/recovery entry points, narrow viewport and keyboard back navigation. This approval covers implementation; merge/deploy of the follow-up remains pending owner approval.
+
+
+### Self-Review Report — usability follow-up
+
+Is there anything I have overlooked? Is the solution optimal? Let me take a step back.
+
+**Touchpoints updated:** Communities cards/management, app-level inbox, desktop/mobile unread navigation, deep-link/history handling, component regressions, inbox spec, this plan, roadmap and rebuilt `public/build`. AGENTS/memory changes are not needed: no new operational pattern. Seeders, permissions, roles, environment and service configuration are N/A: unchanged services and rollout gates, no packages added.
+
+**UI Gap Analysis:** Discoverability present through Home, Communities badge and one View messages action per card. Empty/loading/error/retry states retained in list/detail; Community settings remain reachable. Server-side permission/identity/representative checks unchanged. Local browser acceptance passed normal desktop and390px phone, both themes, no dialog,390px document/viewport with no horizontal overflow, list/detail back navigation, management open/close and keyboard focus return. Private messages remain outside browser storage/service worker. No actual200%/physical-device claim is made.
+
+**Solved (auto-fixed):** `AttendeeApp.jsx` shows verification when an inbox history URL is restored after cross-tab sign-out; new regression covers mounted identity revocation/history. `CommunitiesPanel.jsx` confines organiser filtering to the new app so legacy navigation retains other accessible communities; regression covers both modes. Settings are collapsed by default in the new app, phone removal stays reachable in management, and single-page pagination controls no longer appear.
+
+**Recommended for user decision:** none within this approved usability scope. Merge/deploy of this follow-up awaits owner approval. Existing physical-device/cold-offline/actual200% and representative production-pilot acceptance remain separate open checks, not silently marked complete.
+
+**Not gaps:** five main navigation items retained; messages are a Communities page within the app. Delivery outcomes remain staff-only. No finance, consent, eligibility, transport, retention or production-data changes.
+
+**Evidence:** baseline27/27; expected RED for new page/navigation/card behavior; final385 JavaScript tests across58files passed (41.73s),37 PHP tests/130assertions passed (66.3s: inbox access, announcements, attendee history). ESLint/Pint passed; production assets rebuilt successfully. Existing bundle-size warning retained. One fresh independent review completed and findings fixed; no duplicate review cycle or full PHP rerun for this frontend-only follow-up. Local QA uses only existing synthetic records and normal logged-email verification; no production session bypass.

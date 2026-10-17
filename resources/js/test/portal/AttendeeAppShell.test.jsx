@@ -37,3 +37,12 @@ describe('personal app shell', () => {
         expect(sectionFromLocation({ search, hash })).toBe(expected);
     });
 });
+
+it('makes unread community messages discoverable in both navigation layouts', () => {
+    render(<AttendeeAppShell section="home" onSectionChange={() => {}} communityUnread={123} />);
+    for (const name of ['Personal app navigation', 'Mobile personal app navigation']) {
+        const nav = within(screen.getByRole('navigation', { name }));
+        expect(nav.getByRole('button', { name: 'Communities, 99+ unread messages' })).toBeTruthy();
+        expect(nav.getAllByRole('button')).toHaveLength(5);
+    }
+});

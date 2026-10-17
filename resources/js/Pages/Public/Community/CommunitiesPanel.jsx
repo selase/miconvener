@@ -10,6 +10,7 @@ export default function CommunitiesPanel({
     inboxOverview,
     onOpenInbox,
     initiallyOpen = false,
+    appPage = false,
     onCredential,
     onExpired,
     onPhoneRemoved,
@@ -19,7 +20,7 @@ export default function CommunitiesPanel({
     const [open, setOpen] = useState(initiallyOpen);
     const [identity, setIdentity] = useState(null);
     const [communities, setCommunities] = useState(null);
-    const [selected, setSelected] = useState(organiser?.slug ?? null);
+    const [selected, setSelected] = useState(appPage ? null : (organiser?.slug ?? null));
     const [detail, setDetail] = useState(null);
     const [options, setOptions] = useState(null);
     const [member, setMember] = useState(null);
@@ -28,6 +29,21 @@ export default function CommunitiesPanel({
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
     const section = useRef(null);
+    const settingsHeading = useRef(null);
+    const cards = Array.from(
+        new Map(
+            [
+                ...(communities?.data || []),
+                ...(communities && organiser?.slug ? [organiser] : []),
+                ...(inboxOverview || []),
+            ]
+                .filter((row) => !appPage || !organiser?.slug || row.slug === organiser.slug)
+                .map((row) => [row.slug, row])
+        ).values()
+    );
+    useEffect(() => {
+        if (options && appPage) settingsHeading.current?.focus();
+    }, [options, appPage]);
     const load = useCallback(
         async (url = '/my/communities') => {
             setBusy(true);
@@ -198,23 +214,24 @@ export default function CommunitiesPanel({
             ref={section}
             tabIndex={-1}
             id="communities"
-            className="mt-10 space-y-5 border-t border-border pt-8"
+            className={appPage ? 'space-y-6' : 'mt-10 space-y-5 border-t border-border pt-8'}
             aria-label="My Communities"
         >
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-ink">My Communities</h2>
-                <button
-                    type="button"
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    className="text-sm font-medium text-accent underline"
-                >
-                    {open ? 'Hide Communities' : 'Open Communities'}
-                </button>
+                {!appPage && (
+                    <button
+                        type="button"
+                        onClick={() => setOpen(!open)}
+                        aria-expanded={open}
+                        className="text-sm font-medium text-accent underline"
+                    >
+                        {open ? 'Hide Communities' : 'Open Communities'}
+                    </button>
+                )}
             </div>
             <p className="text-sm text-ink-secondary">
-                Memberships you can access and organisations you explicitly follow. A verified phone
-                alone does not reveal existing memberships.
+                Messages and memberships from the communities you belong to or follow.
             </p>
             {open && (
                 <div className="space-y-5">
@@ -230,7 +247,7 @@ export default function CommunitiesPanel({
                         >
                             Refresh my Communities
                         </button>
-                        {identity?.phone && (
+                        {!appPage && identity?.phone && (
                             <button
                                 type="button"
                                 onClick={() => setConfirmPhoneRemoval(true)}
@@ -272,59 +289,85 @@ export default function CommunitiesPanel({
                             </div>
                         </div>
                     )}
-                    {communities?.data?.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                            {communities.data.map((community) => (
-                                <button
-                                    key={community.id}
-                                    type="button"
-                                    onClick={() => setSelected(community.slug)}
-                                    aria-pressed={selected === community.slug}
-                                    className="rounded-lg border border-border bg-surface px-4 py-3 text-left text-sm font-medium text-ink hover:bg-surface-hover"
-                                >
-                                    {community.name}
-                                    {inboxOverview?.find((row) => row.slug === community.slug)
-                                        ?.unread > 0 && (
-                                        <span className="ml-2 text-xs text-accent">
-                                            {inboxOverview.find(
-                                                (row) => row.slug === community.slug
-                                            ).unread > 99
-                                                ? '99+'
-                                                : inboxOverview.find(
-                                                      (row) => row.slug === community.slug
-                                                  ).unread}{' '}
-                                            unread
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
+                    {cards.length > 0 ? (
+                        <div className="grid gap-4 xl:grid-cols-2">
+                            {cards.map((community) => {
+                                const inbox = inboxOverview?.find(
+                                    (row) => row.slug === community.slug
+                                );
+                                return (
+                                    <article
+                                        key={community.slug}
+                                        aria-label={community.name || community.slug}
+                                        className="flex min-w-0 flex-col gap-5 border border-border bg-surface p-5 sm:p-6"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            {inbox?.logo_url ? (
+                                                <img
+                                                    src={inbox.logo_url}
+                                                    alt=""
+                                                    className="h-12 w-12 shrink-0 object-contain"
+                                                />
+                                            ) : (
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="grid h-12 w-12 shrink-0 place-items-center border border-border bg-accent/5 text-lg font-medium text-accent"
+                                                >
+                                                    {(community.name || community.slug)
+                                                        .slice(0, 1)
+                                                        .toUpperCase()}
+                                                </span>
+                                            )}
+                                            <h3 className="min-w-0 break-words text-lg font-semibold text-ink">
+                                                {community.name || community.slug}
+                                            </h3>
+                                            {inbox?.unread > 0 && (
+                                                <span className="ml-auto shrink-0 border border-accent/20 bg-accent/5 px-2 py-1 text-xs font-medium text-accent">
+                                                    {inbox.unread > 99 ? '99+' : inbox.unread}{' '}
+                                                    unread
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2">
+                                            {inbox && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={`View messages for ${community.name || community.slug}`}
+                                                    onClick={() => onOpenInbox?.(inbox)}
+                                                    className="inline-flex min-h-11 items-center justify-center gap-2 bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                                                >
+                                                    View messages <span aria-hidden="true">→</span>
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                aria-label={`Manage community for ${community.name || community.slug}`}
+                                                aria-expanded={selected === community.slug}
+                                                aria-controls="community-settings"
+                                                data-community-manage={community.slug}
+                                                onClick={() =>
+                                                    setSelected(
+                                                        selected === community.slug
+                                                            ? null
+                                                            : community.slug
+                                                    )
+                                                }
+                                                className="min-h-11 text-sm text-accent underline"
+                                            >
+                                                Manage community
+                                            </button>
+                                        </div>
+                                    </article>
+                                );
+                            })}
                         </div>
                     ) : (
                         communities && (
-                            <p className="rounded-lg border border-border p-4 text-sm text-ink-secondary">
-                                No accessible memberships or followed organisations yet. Use an
-                                organisation’s public page to follow or join, or request an
-                                independent membership review below.
+                            <p className="border border-dashed border-border p-6 text-sm text-ink-secondary">
+                                No communities yet. Follow an organisation from its public page to
+                                see its updates here.
                             </p>
                         )
-                    )}
-                    {inboxOverview?.length > 0 && (
-                        <section aria-label="Organisation inboxes" className="flex flex-wrap gap-3">
-                            {inboxOverview.map((organisation) => (
-                                <button
-                                    key={organisation.slug}
-                                    type="button"
-                                    onClick={() => onOpenInbox?.(organisation)}
-                                    className="min-h-11 border border-border bg-surface px-4 py-3 text-left text-sm text-accent hover:bg-surface-hover"
-                                >
-                                    Messages · {organisation.name}{' '}
-                                    <span className="ml-1 text-xs">
-                                        {organisation.unread > 99 ? '99+' : organisation.unread}{' '}
-                                        unread
-                                    </span>
-                                </button>
-                            ))}
-                        </section>
                     )}
                     {communities && (
                         <div className="flex gap-3 text-sm">
@@ -348,8 +391,47 @@ export default function CommunitiesPanel({
                             )}
                         </div>
                     )}
-                    {options && (
-                        <div className="space-y-6 rounded-xl border border-border bg-surface p-5">
+                    {selected && options && (
+                        <div
+                            id="community-settings"
+                            className="space-y-6 border border-border bg-surface p-5"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <h3
+                                    ref={settingsHeading}
+                                    tabIndex={-1}
+                                    className="text-lg font-semibold text-ink"
+                                >
+                                    Manage community
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const slug = selected;
+                                        setSelected(null);
+                                        window.requestAnimationFrame(() =>
+                                            document
+                                                .querySelector(
+                                                    `[data-community-manage="${CSS.escape(slug)}"]`
+                                                )
+                                                ?.focus()
+                                        );
+                                    }}
+                                    className="min-h-11 text-sm text-accent underline"
+                                >
+                                    Close community settings
+                                </button>
+                            </div>
+                            {appPage && identity?.phone && (
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmPhoneRemoval(true)}
+                                    disabled={busy}
+                                    className="min-h-11 text-sm text-ink-secondary underline"
+                                >
+                                    Remove phone verification
+                                </button>
+                            )}
                             <div className="space-y-2">
                                 <h3 className="text-lg font-semibold text-ink">
                                     {options.organisation.name}
