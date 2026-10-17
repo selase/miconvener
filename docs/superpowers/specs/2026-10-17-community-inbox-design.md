@@ -161,7 +161,8 @@ A notice is always its own entry. For announcements, a person can hold several i
 Fits milestone 4's app shell without a new tab:
 
 - **Home:** a "New messages" card listing organisations with unread counts. It needs its own reader that works for email and phone-credential sessions (milestone 4's Home attention data comes from a verified-email reader).
-- **Communities:** each organisation card shows its unread count and opens that organisation's message list (newest first, unread marked, "Mark all read"). Milestone 4's plan has no per-organisation detail page; the inbox milestone adds a messages list reachable from the organisation card (a sheet on phones, the detail column on desktop).
+- **Communities:** each organisation card shows its unread count and opens that organisation's message list (newest first, unread marked, "Mark all read"). Milestone 4's plan has no per-organisation detail page; the inbox milestone adds a messages list reachable from the organisation card (a dedicated page in the app shell, with list/detail columns on desktop and full-page message reading on phones).
+- **Usability amendment (owner approved2026-10-17):** one card per organisation with its name, unread count and a prominent View messages action. Contact/follow/membership controls are tucked under Manage community. The existing Communities navigation item shows an unread badge; no sixth tab. The inbox replaces the Communities body rather than opening a modal. Existing `inbox`, `item` and `context` links and browser history remain supported. Verification and server-side access rules stay unchanged.
 - **Message view:** organisation name and logo, subject, sent date, body (plain text with safe link formatting, as the email body), and the representative label when it applies.
 - **Withdrawn or hidden messages** disappear from lists; a direct link shows "This message is no longer available".
 - **Offline:** never cached by the service worker (spec 6.2).

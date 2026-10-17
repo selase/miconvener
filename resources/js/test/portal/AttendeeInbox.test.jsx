@@ -171,7 +171,7 @@ it('shows phone-credential Home messages without requiring event-email access', 
         />
     );
     expect(await screen.findByText('New messages')).toBeTruthy();
-    expect(screen.getByText('99+')).toBeTruthy();
+    expect(screen.getAllByText('99+')).toHaveLength(3);
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/app/events'))).toBe(false);
     expect(screen.queryByRole('button', { name: 'Inbox' })).toBeNull();
 });
@@ -317,14 +317,18 @@ it('moves keyboard focus into a message and returns it to the originating list e
     );
 });
 
-
 it('holds pagination while mark-all commits so a later page cannot restore stale unread rows', async () => {
     let finishMark;
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
-        if (options?.method === 'POST') return {
-            ok: true, status: 200,
-            json: () => new Promise((resolve) => { finishMark = resolve; }),
-        };
+        if (options?.method === 'POST')
+            return {
+                ok: true,
+                status: 200,
+                json: () =>
+                    new Promise((resolve) => {
+                        finishMark = resolve;
+                    }),
+            };
         return response({ entries: { data: [entry], current_page: 1, last_page: 2 } });
     });
     render(<InboxList tenantSlug="group" name="Group" onClose={() => {}} />);
@@ -339,3 +343,149 @@ it('holds pagination while mark-all commits so a later page cannot restore stale
     expect(screen.queryByText('Unread')).toBeNull();
     expect(screen.getByRole('button', { name: 'More messages' }).disabled).toBe(false);
 });
+
+it('opens a dedicated messages page, restores browser navigation and keeps community settings out of the reading view', async () => {
+    window.history.replaceState({}, '', '/my?organiser=group&section=communities&inbox=group');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) =>
+        response(
+            options?.method === 'POST'
+                ? { read: true }
+                : String(url) === '/my/inbox'
+                  ? { organisations: [{ slug: 'group', name: 'Volunteer group', unread: 1 }] }
+                  : String(url).includes('/inbox/message-one')
+                    ? { entry: { ...entry, body: 'Our next gathering' } }
+                    : String(url).includes('/inbox?')
+                      ? { entries: { data: [entry], current_page: 1, last_page: 1 } }
+                      : String(url).endsWith('/identity')
+                        ? { email: { masked: 'a••@example.test' } }
+                        : {
+                              communities: {
+                                  data: [{ id: 'group', slug: 'group', name: 'Volunteer group' }],
+                              },
+                          }
+        )
+    );
+    render(<AttendeeApp community_inbox_enabled verifiedEmail="a••@example.test" />);
+    expect(await screen.findByRole('heading', { name: 'Messages' })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'My Communities' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: /Volunteer gathering/ }));
+    expect(await screen.findByText('Our next gathering')).toBeTruthy();
+    expect(new URLSearchParams(window.location.search).get('item')).toBe('message-one');
+    act(() => {
+        window.history.replaceState({}, '', '/my?organiser=group&section=communities&inbox=group');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(screen.queryByText('Our next gathering')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Communities' }));
+    expect(await screen.findByRole('region', { name: 'My Communities' })).toBeTruthy();
+    expect(new URLSearchParams(window.location.search).has('inbox')).toBe(false);
+});
+
+it('shows one community card with messages prominent and management collapsed', async () => {
+    const { default: CommunitiesPanel } = await import('@/Pages/Public/Community/CommunitiesPanel');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+        response(
+            String(url).endsWith('/identity')
+                ? { email: { masked: 'a••@example.test' } }
+                : String(url).endsWith('/options')
+                  ? {
+                        organisation: { slug: 'group', name: 'Volunteer group' },
+                        followingEnabled: true,
+                        following: { email: true },
+                    }
+                  : {
+                        communities: {
+                            data: [{ id: 'group', slug: 'group', name: 'Volunteer group' }],
+                        },
+                    }
+        )
+    );
+    const open = vi.fn();
+    render(
+        <CommunitiesPanel
+            initiallyOpen
+            appPage
+            organiser={{ slug: 'group', name: 'Volunteer group' }}
+            inboxOverview={[{ slug: 'group', name: 'Volunteer group', unread: 1 }]}
+            onOpenInbox={open}
+        />
+    );
+    expect(
+        await screen.findByRole('button', { name: 'View messages for Volunteer group' })
+    ).toBeTruthy();
+    expect(screen.getAllByText('1 unread')).toHaveLength(1);
+    expect(screen.queryByRole('region', { name: 'Organisation announcements' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'View messages for Volunteer group' }));
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ slug: 'group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage community for Volunteer group' }));
+    expect(await screen.findByRole('region', { name: 'Organisation announcements' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close community settings' }));
+    expect(screen.queryByRole('region', { name: 'Organisation announcements' })).toBeNull();
+});
+
+it('offers verification when history restores an inbox after cross-tab sign-out', async () => {
+    window.history.replaceState({}, '', '/my?section=communities&inbox=group&item=private');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+        response(
+            String(url) === '/my/inbox'
+                ? { organisations: [] }
+                : String(url).includes('/inbox?')
+                  ? { entries: { data: [], current_page: 1, last_page: 1 } }
+                  : {
+                        entry: {
+                            ...entry,
+                            id: 'private',
+                            read: true,
+                            body: 'Synthetic private body',
+                        },
+                    }
+        )
+    );
+    render(<AttendeeApp community_inbox_enabled verifiedEmail="a••@example.test" />);
+    await screen.findByRole('heading', { name: 'Messages' });
+    act(() =>
+        window.dispatchEvent(
+            new CustomEvent('miconvener:attendee-identity', { detail: { state: 'signed_out' } })
+        )
+    );
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    expect(screen.getByRole('textbox', { name: 'Your email address' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Messages' })).toBeNull();
+    expect(screen.queryByText('Synthetic private body')).toBeNull();
+});
+
+it.each([true, false])(
+    'scopes community cards only in the new app and preserves legacy navigation (appPage=%s)',
+    async (appPage) => {
+        const { default: CommunitiesPanel } =
+            await import('@/Pages/Public/Community/CommunitiesPanel');
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+            response(
+                String(url).endsWith('/identity')
+                    ? { email: { masked: 'a••@example.test' } }
+                    : String(url).endsWith('/options')
+                      ? { organisation: { slug: 'group', name: 'Volunteer group' } }
+                      : {
+                            communities: {
+                                data: [
+                                    { id: 'group', slug: 'group', name: 'Volunteer group' },
+                                    { id: 'other', slug: 'other', name: 'Another community' },
+                                ],
+                            },
+                        }
+            )
+        );
+        render(
+            <CommunitiesPanel
+                initiallyOpen
+                appPage={appPage}
+                organiser={{ slug: 'group', name: 'Volunteer group' }}
+            />
+        );
+        await screen.findByRole('article', { name: 'Volunteer group' });
+        expect(Boolean(screen.queryByRole('article', { name: 'Another community' }))).toBe(
+            !appPage
+        );
+    }
+);

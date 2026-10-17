@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import Modal from '@/Components/Console/Modal';
 import { inboxBase, inboxRequest } from '@/lib/communityInbox';
 import InboxMessage from './InboxMessage';
 
@@ -23,6 +22,10 @@ export default function InboxList({
     const [busy, setBusy] = useState(false);
     const mounted = useRef(true);
     const listFocus = useRef(null);
+    const heading = useRef(null);
+    useEffect(() => {
+        if (!itemId) heading.current?.focus();
+    }, [itemId]);
     const readCopies = useRef(new Set());
     const callbacks = useRef({ onChanged, onExpired });
     callbacks.current = { onChanged, onExpired };
@@ -134,13 +137,24 @@ export default function InboxList({
         callbacks.current.onChanged?.();
     };
     return (
-        <Modal
-            open
-            onClose={onClose}
-            title={`Messages · ${name || tenantSlug}`}
-            className="max-w-5xl"
-            fullScreenOnMobile
-        >
+        <section aria-label={`Messages · ${name || tenantSlug}`} className="space-y-6">
+            <header className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 tabIndex={-1} ref={heading} className="text-2xl font-semibold text-ink">
+                        Messages
+                    </h1>
+                    <p className="mt-2 text-sm text-ink-secondary">
+                        Updates from your community, all in one place.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="min-h-11 text-sm text-accent underline"
+                >
+                    Back to Communities
+                </button>
+            </header>
             <div className="mb-5 flex items-center gap-3 border-b border-border pb-4">
                 {logoUrl ? (
                     <img src={logoUrl} alt="" className="h-10 w-10 object-contain" />
@@ -154,7 +168,7 @@ export default function InboxList({
                 )}
                 <p className="text-sm font-medium text-ink">{name || tenantSlug}</p>
             </div>
-            <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                 <section
                     ref={listFocus}
                     aria-label="Message list"
@@ -162,7 +176,7 @@ export default function InboxList({
                     className={`${selected ? 'hidden lg:block' : ''} min-w-0 space-y-4`}
                 >
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="font-medium text-ink">Your organisation’s messages</h3>
+                        <h3 className="font-medium text-ink">Latest messages</h3>
                         <button
                             type="button"
                             disabled={busy || !entries?.data?.length}
@@ -173,8 +187,7 @@ export default function InboxList({
                         </button>
                     </div>
                     <p className="text-xs text-ink-secondary">
-                        Announcements and personal notices, newest first. Email and SMS are separate
-                        delivery channels.
+                        Announcements, reminders and receipts, newest first.
                     </p>
                     {error && (
                         <div role="alert">
@@ -203,7 +216,7 @@ export default function InboxList({
                                     aria-pressed={
                                         selected?.id === row.id && selected?.context === row.context
                                     }
-                                    className="block min-h-11 w-full space-y-2 py-4 text-left hover:bg-surface-hover focus-visible:outline-accent"
+                                    className={`block min-h-11 w-full space-y-2 border-l-2 px-4 py-4 text-left hover:bg-surface-hover focus-visible:outline-accent ${selected?.id === row.id && selected?.context === row.context ? 'border-accent bg-accent/5' : 'border-transparent'}`}
                                 >
                                     {!row.read && (
                                         <span className="inline-block border border-accent px-2 py-0.5 text-xs font-medium text-accent">
@@ -228,7 +241,7 @@ export default function InboxList({
                             </li>
                         ))}
                     </ul>
-                    {entries && (
+                    {entries?.last_page > 1 && (
                         <nav
                             aria-label="Message pages"
                             className="flex flex-wrap items-center gap-3"
@@ -274,13 +287,6 @@ export default function InboxList({
                     )}
                 </div>
             </div>
-            <button
-                type="button"
-                onClick={onClose}
-                className="mt-6 min-h-11 text-sm text-accent underline"
-            >
-                Back to Communities
-            </button>
-        </Modal>
+        </section>
     );
 }
