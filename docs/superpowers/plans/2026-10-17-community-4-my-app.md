@@ -188,3 +188,8 @@ Evidence: all targeted regressions were observed failing, then passing. Full JS3
 - Money exposes totals per recorded currency rather than one membership-currency total; otherwise historical mixed-currency charges would be misrepresented. Legacy payloads are unchanged.
 - Anonymous shell and public hashed assets are the only worker cache content. Personal passes live in the explicit partitioned store. Real browser acceptance remains a gate because unit/source tests cannot establish a complete device experience.
 - Deferred minors: none from the independent review. Unverified acceptance is reported explicitly rather than treated as a passed check.
+
+
+## Approved production release —2026-10-17
+
+Owner explicitly approved merge/deploy after disclosure of outstanding physical-device/200% acceptance. Milestone4 and live-event access were included in combined PR33; merge cb4cfcc exactly matches source tested in final CI39033885095 (2963 PHP/14250 assertions,379 JS, all quality/build checks green). Cloud deployment depl-a300e45c-64f1-4713-8acd-3db89d0012ca succeeded13:06:19UTC. Under standing approval, community_app was enabled for Purpledot only; live public payload and flag readback confirm it. Other organisations, phone readiness and settlement settings unchanged. Inbox code is deployed but its own switch remains off pending separate approval. Actual device cold-offline/200% acceptance remains open, not represented as passed. Full release evidence is in the local roadmap; no live messages/payments were sent. These documentation-only notes remain local after automatic review denied their optional separate branch upload.

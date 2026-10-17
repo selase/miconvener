@@ -137,7 +137,7 @@ Implementation clarifications proposed for review:
 **Files:** this plan, roadmap, existing spec/acceptance evidence; no new unrelated feature.
 
 - [x] Map every design §12 test to passing evidence: 1–7→Task5;8–11→Task3;12–16→Tasks3/5;17→Task6;18–19→Tasks1/3/5;20–23→Task4;24→Task2. All24 are minimum, not substitutes for race/pagination/finance regressions above.
-- [ ] Run scoped tests per task, then one complete PHP gate on disposable test DB (two local workers or four CI), full JS bounded workers, lint, `vendor/bin/pint --dirty`, PHPStan0 without baseline growth, build, `finance:verify-categories`0 and payout OTP/event regression coverage. Preserve evidence; no redundant full suite after docs-only or unrelated read-only inspection. Correct actual failures, rerun affected suites; final CI must match the source submitted for merge.
+- [x] Run scoped tests per task, then one complete PHP gate on disposable test DB (two local workers or four CI), full JS bounded workers, lint, `vendor/bin/pint --dirty`, PHPStan0 without baseline growth, build, `finance:verify-categories`0 and payout OTP/event regression coverage. Preserve evidence; no redundant full suite after docs-only or unrelated read-only inspection. Correct actual failures, rerun affected suites; final CI must match the source submitted for merge.
 - [x] Pause for AGENTS self-review: “Is there anything I have overlooked? Is the solution optimal? Let me take a step back.” Report dependencies, current-access boundaries, all UI/permission/route/seed/config/worker/delete touchpoints, gaps and limitations. Run one fresh whole-branch review; fix findings with focused regressions. Do not run a second review cycle unless a concrete unresolved risk justifies it.
 - [ ] Let owner review native UI and delivery-outcome decision, verify real-device accessibility and no inbox caching, and confirm milestone4 prerequisites. Mark `built` only after agreed acceptance passes. Keep PR draft/unmerged pending explicit authority; `main` automatically deploys.
 - [ ] Only after explicit owner release approval: repeat aggregate legacy-SMS inventory, stop for owner decision if rows require conversion/retirement; verify deployed SHA/migrations/scheduler/current payment routes; obtain separate go-ahead to enable inbox for Purpledot, read back both flags, other tenants unchanged. Validate safe in-app notices using designated test data, no unauthorised live message/payment. Disable switch to recover; never delete money/history. Complete inbox reminder only when the inbox is actually delivered/accepted, not when this plan is saved.
@@ -242,3 +242,16 @@ This is a bounded integration fix with focused regressions, not another independ
 
 
 **Integration-fix evidence:** initial corrected fixtures22 tests→21 pass/1 failing canonical-consent assertion; expanded normal/paused/no-follow cases→2 intended RED/1 pass. After the helper correction, joining/approval/public routes/discovery/email-first suites51/51,241 assertions; Pint and PHPStan0. No JS/CSS changed in this correction, so existing rebuilt assets are retained. Self-review checked the tenant-bounded correlated child query and existing opt-out/no-auto-marketing semantics; no new navigation, dependencies, permissions or configuration. Owner-approved feature-branch push and CI resume only; no production operation.
+
+
+## Approved production release —2026-10-17
+
+- [x] Owner explicitly approved merge/deploy after manual acceptance limits were disclosed. Combined PR33 merged as cb4cfcc; ancestry also marked31/32 merged, triggering one Cloud deployment.
+- [x] Final CI39033885095 passed2963 PHP/14250 assertions and379 JS plus quality/build on a55403c; merged tree equality verified.
+- [x] Repeated aggregate legacy follower inventory:0 SMS/0 email; no conversion/retirement.
+- [x] Cloud depl-a300e45c-64f1-4713-8acd-3db89d0012ca succeeded13:06:19UTC on exact mergeSHA; schema, routes, scheduler and finance integrity readback passed. Public pages/assets HTTP200.
+- [x] Standing rollout approval applied to milestone4: community_app enabled for Purpledot only; other8 organisations unchanged. Inbox remains off everywhere. No live test messages/payments/data.
+- [ ] Separate explicit Purpledot inbox activation approval and safe pilot acceptance.
+- [ ] Actual200% and physical-device cold-offline acceptance; dedicated representative/follower inbox browser sessions. Release approval does not imply these checks passed.
+
+Release/readback IDs are in the local roadmap. Notes are on local codex/community-4b-release-notes; automatic approval review denied the optional new documentation-branch upload. No further merge/deploy or repeat test cycle is needed solely for these status notes.
