@@ -94,9 +94,13 @@ final class LedgerService
         array $entries,
         ?string $userId = null,
         string $currency = 'GHS',
-        ?LedgerCategoryEnum $category = null
+        ?LedgerCategoryEnum $category = null,
+        ?\App\Models\GivingFund $givingFund = null
     ): LedgerTransaction {
         $category = $this->resolveCategory($event, $category);
+        if ($givingFund !== null && ($givingFund->tenant_id !== $tenant->id || $category !== LedgerCategoryEnum::Giving)) {
+            throw new InvalidArgumentException('Giving fund attribution must match the tenant and Giving category.');
+        }
 
         if (empty($entries)) {
             throw new InvalidArgumentException('Cannot post an empty ledger transaction.');
@@ -140,11 +144,12 @@ final class LedgerService
         $accounts = $this->ensureAccountsExist($tenant, $event, $currency, $category);
 
         try {
-            return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts, $category): LedgerTransaction {
+            return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts, $category, $givingFund): LedgerTransaction {
                 $transaction = LedgerTransaction::create([
                     'tenant_id' => $tenant->id,
                     'event_id' => $event?->id,
                     'category' => $category,
+                    'giving_fund_id' => $givingFund?->id,
                     'reference' => $reference,
                     'description' => $description,
                     'transaction_type' => $transactionType,
@@ -515,6 +520,35 @@ final class LedgerService
         ]);
 
         return $transaction;
+    }
+
+    /** @param array{gateway_fee:int, commission_received:int, credit_used:int} $verifiedAmounts */
+    public function recordGivingPayment(Tenant $tenant, \App\Services\Giving\GivingSource $source, \App\Models\GivingPaymentAttempt $attempt, array $verifiedAmounts): ?LedgerTransaction
+    {
+        if ($source->fund->tenant_id !== $tenant->id || $source->fund->id !== $attempt->fund_id || $source->principal !== $attempt->amount || $source->currency !== $attempt->currency || $attempt->category !== 'giving' || ($source->model instanceof \App\Models\GivingGift && $source->model->source !== 'online')) {
+            throw new InvalidArgumentException('Giving posting must match its online source and frozen attempt.');
+        }
+        $fees = $verifiedAmounts['gateway_fee'];
+        $commission = $attempt->commission_amount;
+        if ($fees < 0 || $fees + $commission > $attempt->amount) {
+            throw new InvalidArgumentException('Giving processing fees and commission exceed the payment.');
+        }
+        if ($attempt->settlement_mode !== Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT) {
+            return $this->recordOwnGatewaySale($tenant, null, 'Giving (own gateway): '.$source->key(), $attempt->reference,
+                $attempt->amount, $commission, $fees, $attempt->provider, $verifiedAmounts['commission_received'], $verifiedAmounts['credit_used'],
+                [], $attempt->provider_reference, LedgerTransaction::TYPE_GIVING_PAYMENT, LedgerCategoryEnum::Giving,
+                'Recorded Giving commission', $attempt->currency, $source->fund);
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $attempt->amount - $fees],
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $attempt->amount - $fees - $commission],
+        ];
+        if ($commission > 0) {
+            $entries[] = ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commission];
+        }
+
+        return $this->postTransaction($tenant, null, LedgerTransaction::TYPE_GIVING_PAYMENT, 'Giving: '.$source->key(), $attempt->reference,
+            $entries, null, $attempt->currency, LedgerCategoryEnum::Giving, $source->fund);
     }
 
     /**
@@ -1129,6 +1163,7 @@ final class LedgerService
         LedgerCategoryEnum $category,
         string $feeLabel,
         string $currency,
+        ?\App\Models\GivingFund $givingFund = null,
     ): ?LedgerTransaction {
         $received = min(max($commissionReceived, 0), $platformFee);
         $credited = min(max($creditUsed, 0), $platformFee - $received);
@@ -1191,7 +1226,8 @@ final class LedgerService
                 $entries,
                 null,
                 $currency,
-                $category
+                $category,
+                $givingFund
             );
         }
 

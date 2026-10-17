@@ -31,7 +31,7 @@ final class SaveFundRequest extends FormRequest
             'slug' => ['required', 'alpha_dash:ascii', 'max:120', Rule::unique('giving_funds')->where('tenant_id', $tenant?->id)->ignore($this->route('fund'))],
             'description' => ['nullable', 'string', 'max:10000'],
             'button_label' => ['sometimes', 'string', 'max:80'],
-            'currency' => ['required', Rule::in(['GHS', 'USD', 'EUR', 'GBP'])],
+            'currency' => ['required', Rule::in(config('services.giving.currencies', ['GHS']))],
             'kind' => ['required', Rule::in(['open', 'campaign'])],
             'target' => [Rule::requiredIf($this->input('kind') === 'campaign'), 'nullable', 'integer', 'min:1', 'max:999999999999'],
             'minimum_amount' => ['sometimes', 'integer', 'min:100', 'max:999999999999'],

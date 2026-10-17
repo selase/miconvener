@@ -104,6 +104,7 @@ final class SettlementWebhookController extends Controller
                     'venue_booking' => $this->confirmVenueBookingCharge($data, $data['reference'] ?? null),
                     'event_contribution' => $this->confirmContributionCharge($data, $data['reference'] ?? null),
                     'marketplace_quote' => $this->confirmMarketplaceQuoteCharge($data, $data['reference'] ?? null),
+                    'community_gift' => $this->confirmGivingCharge($data, $data['reference'] ?? null),
                     'member_dues' => $this->confirmDuesCharge($data, $data['reference'] ?? null),
                     default => $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
                 },
@@ -153,7 +154,7 @@ final class SettlementWebhookController extends Controller
 
         $type = $metadata['type'] ?? null;
 
-        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution', 'marketplace_quote', 'member_dues'], true);
+        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution', 'marketplace_quote', 'member_dues', 'community_gift'], true);
     }
 
     /**
@@ -178,6 +179,21 @@ final class SettlementWebhookController extends Controller
      *
      * @param  array<string, mixed>  $data
      */
+    private function confirmGivingCharge(array $data, ?string $reference): void
+    {
+        if ($reference === null) {
+            return;
+        }
+        app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($reference, [
+            'status' => 'success', 'provider' => 'paystack', 'account_identity' => app(\App\Services\Giving\GivingGateways::class)->platformIdentity(),
+            'reference' => $reference, 'provider_reference' => $reference,
+            'metadata' => BillingWebhookController::metadata($data['metadata'] ?? null),
+            'amount' => (int) ($data['amount'] ?? 0), 'fees' => isset($data['fees']) ? (int) $data['fees'] : null,
+            'currency' => mb_strtoupper((string) ($data['currency'] ?? '')), 'paid_at' => $data['paid_at'] ?? null,
+        ]);
+    }
+
+    /** @param array<string, mixed> $data */
     private function confirmDuesCharge(array $data, ?string $reference): void
     {
         if (! $reference) {

@@ -662,3 +662,7 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 // Opt-out links remain available even when Community is switched off.
 Route::get('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'show'])->middleware('throttle:30,1')->name('public.community.preferences.show');
 Route::post('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'update'])->middleware('throttle:30,1')->name('public.community.preferences.update');
+
+Route::post('/give/{slug}/checkout', [App\Http\Controllers\Public\GivingCheckoutController::class, 'store'])->middleware('throttle:10,1')->block(15, 15)->name('public.giving.checkout');
+Route::get('/giving/payments/{reference}/callback', [App\Http\Controllers\Public\GivingCheckoutController::class, 'callback'])->name('public.giving.callback');
+Route::get('/giving/payments/{reference}', [App\Http\Controllers\Public\GivingCheckoutController::class, 'result'])->name('public.giving.result');

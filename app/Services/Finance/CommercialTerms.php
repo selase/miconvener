@@ -33,12 +33,17 @@ final class CommercialTerms
         }
 
         $package = $tenant->package;
-        $prefix = $stream === CommercialStreamEnum::Dues ? 'dues' : 'contributions';
+        $prefix = match ($stream) {
+            CommercialStreamEnum::Dues => 'dues',
+            CommercialStreamEnum::Giving => 'giving',
+            default => 'contributions',
+        };
+        $freeRate = (float) config($stream === CommercialStreamEnum::Giving ? 'services.giving.free_plan_fee_percentage' : 'services.dues.free_plan_fee_percentage', 2);
         $rate = $package === null
-            ? ($stream === CommercialStreamEnum::Dues
-                ? (float) config('services.dues.free_plan_fee_percentage', 2)
+            ? (in_array($stream, [CommercialStreamEnum::Dues, CommercialStreamEnum::Giving], true)
+                ? $freeRate
                 : (float) config("services.{$prefix}.platform_fee_percentage", 1))
-            : ($package->isFree() ? (float) config('services.dues.free_plan_fee_percentage', 2) : 1.0);
+            : ($package->isFree() ? $freeRate : 1.0);
 
         return new ResolvedTerms($rate, null, 'organizer', $package === null ? 'platform' : 'plan');
     }

@@ -19,7 +19,9 @@ final class GivingAdjustmentFactory extends Factory
         return [
             'fund_id' => GivingFund::factory(),
             'tenant_id' => fn (array $attributes) => GivingFund::withoutGlobalScopes()->findOrFail($attributes['fund_id'])->tenant_id,
-            'gift_id' => GivingGift::factory(),
+            'gift_id' => fn (array $attributes) => GivingGift::factory()->create(['fund_id' => $attributes['fund_id'], 'tenant_id' => $attributes['tenant_id']])->id,
+            'reason' => 'Synthetic adjustment', 'principal' => 1000, 'kind' => 'refund', 'status' => 'requested',
+            'operation_key' => (string) \Illuminate\Support\Str::uuid(),
         ];
     }
 }

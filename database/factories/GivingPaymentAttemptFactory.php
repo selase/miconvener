@@ -19,7 +19,13 @@ final class GivingPaymentAttemptFactory extends Factory
         return [
             'fund_id' => GivingFund::factory(),
             'tenant_id' => fn (array $attributes) => GivingFund::withoutGlobalScopes()->findOrFail($attributes['fund_id'])->tenant_id,
-            'gift_id' => GivingGift::factory(),
+            'gift_id' => fn (array $attributes) => GivingGift::factory()->create(['fund_id' => $attributes['fund_id'], 'tenant_id' => $attributes['tenant_id']])->id,
+            'submission_key' => (string) \Illuminate\Support\Str::uuid(),
+            'amount' => 10000, 'currency' => 'GHS', 'rate' => '1.00', 'cap_amount' => null,
+            'bearer' => 'organizer', 'terms_source' => 'plan', 'commission_amount' => 100,
+            'provider' => 'paystack', 'account_identity' => 'paystack:platform:'.hash_hmac('sha256', 'sk_test_giving', (string) config('app.key')),
+            'settlement_mode' => 'platform_default', 'reference' => 'giving_'.\Illuminate\Support\Str::uuid(),
+            'category' => 'giving', 'state' => 'open',
         ];
     }
 }

@@ -55,3 +55,10 @@ test('typed giving sources reject arbitrary classes and other organisations', fu
     expect(fn () => $sources->find(Tenant::factory()->create(), 'gift', $gift->id))->toThrow(Illuminate\Database\Eloquent\ModelNotFoundException::class);
     expect(fn () => $sources->find($fund->tenant, GivingGift::class, $gift->id))->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class);
 });
+
+test('a pending Giving payment retains the recovery path when rollout switches are off', function () {
+    $tenant = Tenant::factory()->create();
+    $fund = GivingFund::factory()->create(['tenant_id' => $tenant->id]);
+    GivingGift::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $fund->id, 'source' => 'online', 'status' => 'pending']);
+    expect($tenant->hasGivingMoney())->toBeTrue()->and($tenant->showsFinance())->toBeTrue();
+});

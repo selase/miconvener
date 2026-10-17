@@ -324,7 +324,7 @@ final class Tenant extends Model
      */
     public function hasGivingMoney(): bool
     {
-        return GivingGift::withoutGlobalScopes()->where('tenant_id', $this->id)->whereIn('status', ['completed', 'refunded'])->exists()
+        return GivingGift::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
             || GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
             || GivingAdjustment::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
             || LedgerAccount::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Giving)->exists()

@@ -148,6 +148,20 @@ final class WebhookController extends Controller
 
         try {
             if ($event === 'charge.success') {
+                $metadata = \App\Http\Controllers\Billing\WebhookController::metadata($data['metadata'] ?? null);
+                if (($metadata['type'] ?? null) === 'community_gift') {
+                    $reference = (string) ($data['reference'] ?? '');
+                    app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($reference, [
+                        'status' => 'success', 'provider' => 'paystack', 'reference' => $reference, 'provider_reference' => $reference,
+                        'account_identity' => app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway),
+                        'metadata' => $metadata, 'amount' => (int) ($data['amount'] ?? 0),
+                        'fees' => isset($data['fees']) ? (int) $data['fees'] : null, 'currency' => mb_strtoupper((string) ($data['currency'] ?? '')),
+                        'commission_received' => is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : 0,
+                        'paid_at' => $data['paid_at'] ?? null,
+                    ]);
+
+                    return response()->json(['status' => 'success']);
+                }
                 $this->recordTransaction($tenant, 'paystack', (object) $data);
                 $this->flagMissingCommissionSplit($tenant, (array) $data);
                 $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')), 'paystack', is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : null);
@@ -193,6 +207,15 @@ final class WebhookController extends Controller
      */
     private function confirmStripeSession(Tenant $tenant, TenantPaymentGateway $gateway, object $session): void
     {
+        $givingMetadata = $session->metadata ? $session->metadata->toArray() : [];
+        if (($givingMetadata['type'] ?? null) === 'community_gift') {
+            $attempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('provider', 'stripe')->where('provider_session_id', $session->id)->find($givingMetadata['giving_attempt_id'] ?? null);
+            if ($attempt !== null && hash_equals($attempt->account_identity, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway))) {
+                app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($attempt->reference, app(\App\Services\Giving\GivingGateways::class)->verify($attempt));
+            }
+
+            return;
+        }
         $currency = mb_strtoupper((string) $session->currency);
         $paymentIntent = (string) ($session->payment_intent ?? $session->id);
         $fee = app(\App\Services\Payment\StripeConnect::class)

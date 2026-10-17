@@ -26,6 +26,8 @@ final class LedgerTransaction extends Model
 
     public const TYPE_DUES_PAYMENT = 'dues_payment';
 
+    public const TYPE_GIVING_PAYMENT = 'giving_payment';
+
     public const TYPE_COMMISSION_RECEIVABLE = 'commission_receivable';
 
     public const TYPE_REFUND = 'refund';
@@ -42,6 +44,7 @@ final class LedgerTransaction extends Model
 
     protected $fillable = [
         'tenant_id',
+        'giving_fund_id',
         'event_id',
         'category',
         'reference',

@@ -83,6 +83,10 @@ return new class extends Migration
             $t->string('provider_session_id')->nullable();
             $t->string('provider_reference')->nullable();
             $t->text('checkout_url')->nullable();
+            $t->string('receipt_token_hash', 64)->nullable()->unique();
+            $t->timestampTz('receipt_expires_at')->nullable();
+            $t->string('giver_key', 100)->nullable();
+            $t->string('review_reason', 80)->nullable();
             $t->string('category', 16)->default('giving');
             $t->string('state', 24)->default('created');
             $t->timestampTz('confirmed_at')->nullable();

@@ -278,6 +278,8 @@ final class PaystackGateway implements PaymentGateway
                 'type' => isset($data['plan']) && $data['plan'] ? 'subscription' : 'payment',
                 'amount' => $data['amount'] ?? 0,
                 'fees' => (int) ($data['fees'] ?? 0),
+                'fees_reported' => isset($data['fees']),
+                'fees_split' => (array) ($data['fees_split'] ?? []),
                 'currency' => mb_strtolower($data['currency'] ?? 'ghs'),
                 'channel' => $data['channel'] ?? null,
                 'authorization' => (array) ($data['authorization'] ?? []),

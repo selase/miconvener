@@ -37,6 +37,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $category
  * @property string $state
  * @property \Carbon\CarbonImmutable|null $confirmed_at
+ * @property string|null $receipt_token_hash
+ * @property \Carbon\CarbonImmutable|null $receipt_expires_at
+ * @property string|null $giver_key
+ * @property string|null $review_reason
  */
 final class GivingPaymentAttempt extends Model
 {
@@ -49,11 +53,11 @@ final class GivingPaymentAttempt extends Model
 
     protected $connection = 'landlord';
 
-    protected $fillable = ['tenant_id', 'fund_id', 'gift_id', 'event_contribution_id', 'submission_key', 'amount', 'currency', 'rate', 'cap_amount', 'bearer', 'terms_source', 'commission_amount', 'provider', 'account_identity', 'settlement_mode', 'commission_settlement', 'reference', 'provider_session_id', 'provider_reference', 'checkout_url', 'category', 'state', 'confirmed_at'];
+    protected $fillable = ['tenant_id', 'fund_id', 'gift_id', 'event_contribution_id', 'submission_key', 'amount', 'currency', 'rate', 'cap_amount', 'bearer', 'terms_source', 'commission_amount', 'provider', 'account_identity', 'settlement_mode', 'commission_settlement', 'reference', 'provider_session_id', 'provider_reference', 'checkout_url', 'receipt_token_hash', 'receipt_expires_at', 'giver_key', 'review_reason', 'category', 'state', 'confirmed_at'];
 
-    protected $hidden = ['commission_settlement', 'checkout_url'];
+    protected $hidden = ['receipt_token_hash', 'giver_key', 'commission_settlement', 'checkout_url'];
 
-    protected $casts = ['amount' => 'integer', 'rate' => 'decimal:2', 'cap_amount' => 'integer', 'commission_amount' => 'integer', 'commission_settlement' => 'array', 'confirmed_at' => 'immutable_datetime'];
+    protected $casts = ['receipt_expires_at' => 'immutable_datetime', 'checkout_url' => 'encrypted', 'amount' => 'integer', 'rate' => 'decimal:2', 'cap_amount' => 'integer', 'commission_amount' => 'integer', 'commission_settlement' => 'array', 'confirmed_at' => 'immutable_datetime'];
 
     /** @return BelongsTo<GivingFund, $this> */
     public function fund(): BelongsTo
