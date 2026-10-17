@@ -78,7 +78,27 @@ final class DuesReminders
         }
         $today = $this->executionDate($tenant, $userId, $localDate);
 
-        return $today === null ? ['sent' => 0, 'skipped' => 0] : $this->send($tenant, $today, $userId !== null, $memberIds, $channel, $contactVersions);
+        return $today === null ? ['sent' => 0, 'skipped' => 0] : $this->send($tenant, $today, $userId !== null, $memberIds, $channel, $contactVersions, false);
+    }
+
+    /** @param list<string> $memberIds */
+    public function queueInboxFor(Tenant $tenant, array $memberIds, ?int $userId, ?string $localDate, bool $inboxEligible): void
+    {
+        if (! $inboxEligible || $memberIds === []) {
+            return;
+        }
+        $today = $this->executionDate($tenant, $userId, $localDate);
+        if ($today === null) {
+            return;
+        }
+        $settings = CommunitySettings::for($tenant);
+        $this->members($tenant, $today, $userId !== null)->whereIn('id', $memberIds)->chunkById(100, function ($members) use ($tenant, $today, $settings, $userId): void {
+            foreach ($members as $member) {
+                if ($member->charges->isNotEmpty() && ($userId !== null || $this->step($member->charges, $settings, $today) !== null)) {
+                    app(\App\Services\Community\InboxNotices::class)->reminder($tenant, $member, $today, $member->charges);
+                }
+            }
+        });
     }
 
     public function authorizeArrears(Tenant $tenant, int $userId): void
@@ -147,14 +167,14 @@ final class DuesReminders
      * @param  array<string,int>|null  $contactVersions
      * @return array{sent: int, skipped: int}
      */
-    private function send(Tenant $tenant, CarbonImmutable $today, bool $arrears, ?array $memberIds = null, ?string $channel = null, ?array $contactVersions = null): array
+    private function send(Tenant $tenant, CarbonImmutable $today, bool $arrears, ?array $memberIds = null, ?string $channel = null, ?array $contactVersions = null, bool $recordInbox = true): array
     {
         $counts = ['sent' => 0, 'skipped' => 0];
         if (! $tenant->communityEnabled() || $tenant->status !== TenantStatusEnum::ACTIVE || ! CommunitySettings::for($tenant)->reminders_enabled) {
             return $counts;
         }
         $this->members($tenant, $today, $arrears)->when($memberIds !== null, fn (Builder $query) => $query->whereIn('id', $memberIds))
-            ->chunkById(self::SMS_BATCH_SIZE, function (Collection $members) use ($tenant, $today, $arrears, $channel, $contactVersions, &$counts): void {
+            ->chunkById(self::SMS_BATCH_SIZE, function (Collection $members) use ($tenant, $today, $arrears, $channel, $contactVersions, $recordInbox, &$counts): void {
                 $messages = [];
                 $rows = [];
                 $emails = [];
@@ -176,6 +196,9 @@ final class DuesReminders
                     $step = $arrears ? 'manual' : $this->step($member->charges, $settings, $today);
                     if ($step === null) {
                         continue;
+                    }
+                    if ($recordInbox) {
+                        app(\App\Services\Community\InboxNotices::class)->reminder($tenant, $member, $today, $member->charges);
                     }
                     if ($channel !== 'sms' && filled($member->email)) {
                         $emails[] = [$member, $step];
