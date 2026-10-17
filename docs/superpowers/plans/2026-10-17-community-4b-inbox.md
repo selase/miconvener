@@ -251,7 +251,13 @@ This is a bounded integration fix with focused regressions, not another independ
 - [x] Repeated aggregate legacy follower inventory:0 SMS/0 email; no conversion/retirement.
 - [x] Cloud depl-a300e45c-64f1-4713-8acd-3db89d0012ca succeeded13:06:19UTC on exact mergeSHA; schema, routes, scheduler and finance integrity readback passed. Public pages/assets HTTP200.
 - [x] Standing rollout approval applied to milestone4: community_app enabled for Purpledot only; other8 organisations unchanged. Inbox remains off everywhere. No live test messages/payments/data.
-- [ ] Separate explicit Purpledot inbox activation approval and safe pilot acceptance.
+- [x] Separate explicit Purpledot inbox activation approval; enabled and verified only for Purpledot.
+- [ ] Safe recipient/member/representative pilot acceptance using the designated test address and normal verification flows.
 - [ ] Actual200% and physical-device cold-offline acceptance; dedicated representative/follower inbox browser sessions. Release approval does not imply these checks passed.
 
 Release/readback IDs are in the local roadmap. Notes are on local codex/community-4b-release-notes; automatic approval review denied the optional new documentation-branch upload. No further merge/deploy or repeat test cycle is needed solely for these status notes.
+
+
+## Pilot activation progress —2026-10-17
+
+Owner separately approved the Purpledot inbox pilot. Command comm-a300f7c5-b1b3-4214-bbb8-85465747901e exit0; readback cexe-a300f90b-2014-49a3-ac33-38ab05ae30a0 confirms active/app/inbox/effective true and onlyPurpledot enabled.0 members/followers/items/reads currently. Signed-out overview/list/detail401, read GET405, no bodies/entries, private/no-store. Browser control unavailable after two timeouts; normal verified-email/explicit-follow step requested from the owner, who designated a test email in chat. No live messages, member records, charges or receipts created. Activation is complete; end-to-end recipient/read/notice/representative acceptance is not claimed complete. Reminder remains useful until acceptance. Notes retained locally; no new remote upload attempted.
