@@ -67,7 +67,7 @@ Route::get('/staff-worker.js', fn () => response()->file(resource_path('js/worke
 ]))->name('staff.worker');
 
 // The attendee portal's offline worker, served uncached for the same reason.
-Route::get('/attendee-worker.js', fn () => response()->file(resource_path('js/workers/attendee-sw.js'), [
+Route::get('/attendee-worker.js', fn () => response(str_replace('__BUILD_ID__', is_file(public_path('build/manifest.json')) ? mb_substr(hash_file('sha256', public_path('build/manifest.json')), 0, 16) : 'dev', (string) file_get_contents(resource_path('js/workers/attendee-sw.js'))), 200, [
     'Content-Type' => 'application/javascript; charset=utf-8',
     'Cache-Control' => 'no-cache, no-store, must-revalidate',
     'Service-Worker-Allowed' => '/my/',

@@ -14,6 +14,7 @@ final class MyMoneyRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         $required = $this->routeIs('attendee.my.communities.statement') ? 'required' : 'sometimes';

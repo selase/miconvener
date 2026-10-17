@@ -13,6 +13,7 @@ final class AppEventsRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return ['period' => ['sometimes', 'in:upcoming,past'], 'organiser' => ['nullable', 'string', 'max:100'], 'page' => ['sometimes', 'integer', 'min:1']];

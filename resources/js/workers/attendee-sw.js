@@ -1,80 +1,82 @@
-const CACHE_NAME = 'miconvener-attendee-v2';
-const PRECACHE_ASSETS = [
-    '/my/manifest.json',
-    '/assets/img/brand/miconvener.png',
-    '/assets/img/brand/miconvener-light.png',
-    '/assets/img/brand/mark-180.png',
-    '/assets/img/brand/mark-512.png',
-];
-
-// The shell is fetched WITHOUT credentials on purpose. /my answers a signed-in
-// visitor with their whole cross-tenant history inline in the page, and Cache
-// Storage outlives signing out -- so a credentialed copy would hand the next
-// person on a shared device the last person's events. Anonymous, the same URL
-// returns the empty shell, which is all an offline boot needs: the saved ticket
-// is read from local storage once the app is running.
-const SHELL_REQUEST = new Request('/my', { credentials: 'omit' });
-
+const CACHE_NAME = 'miconvener-attendee-v3-__BUILD_ID__';
+const SHELL = '/my/offline-shell';
+const STATIC = /^\/build\/assets\/[a-zA-Z0-9_-]+\.(js|css)$/;
+const APP_PAGE = /^\/my\/?$|^\/my\/events\/[a-f0-9-]{36}\/?$/i;
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return Promise.all([
-                cache.addAll(PRECACHE_ASSETS).catch(() => {
-                    // Precache failures should not abort installation
-                }),
-                fetch(SHELL_REQUEST)
-                    .then((response) => (response.ok ? cache.put(SHELL_REQUEST, response) : undefined))
-                    .catch(() => {
-                        // An offline install simply has no shell to fall back on
-                    }),
-            ]);
-        }).then(() => self.skipWaiting())
+        (async () => {
+            const cache = await caches.open(CACHE_NAME);
+            try {
+                const response = await fetch(
+                    new Request(SHELL, { credentials: 'omit', cache: 'no-store' })
+                );
+                if (response.ok && response.headers.get('content-type')?.includes('text/html'))
+                    await cache.put(SHELL, response);
+                const manifest = await fetch(
+                    new Request('/my/offline-assets', { credentials: 'omit', cache: 'no-store' })
+                );
+                const data = manifest.ok ? await manifest.json() : { assets: [] };
+                await Promise.all(
+                    data.assets
+                        .filter((path) => STATIC.test(path))
+                        .map(async (path) => {
+                            try {
+                                const asset = await fetch(
+                                    new Request(path, { credentials: 'omit' })
+                                );
+                                if (asset.ok) await cache.put(path, asset);
+                            } catch {
+                                /* Retry public assets next time online. */
+                            }
+                        })
+                );
+            } catch {
+                /* Offline installation cannot create an anonymous shell. */
+            }
+            await self.skipWaiting();
+        })()
     );
 });
-
 self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then((keys) => {
-            return Promise.all(
-                keys.map((key) => {
-                    if (key !== CACHE_NAME && key.startsWith('miconvener-attendee-')) {
-                        return caches.delete(key);
-                    }
-                })
+        (async () => {
+            await Promise.all(
+                (await caches.keys())
+                    .filter((key) => key.startsWith('miconvener-attendee-') && key !== CACHE_NAME)
+                    .map((key) => caches.delete(key))
             );
-        }).then(() => self.clients.claim())
+            await self.clients.claim();
+        })()
     );
 });
-
 self.addEventListener('fetch', (event) => {
-    if (event.request.method !== 'GET') {
+    const request = event.request;
+    const url = new URL(request.url);
+    if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+    if (STATIC.test(url.pathname)) {
+        event.respondWith(
+            (async () => {
+                const cached = await caches.match(url.pathname);
+                return cached || fetch(request);
+            })()
+        );
         return;
     }
-
-    const url = new URL(event.request.url);
-
-    // Only control requests on the platform /my scope
-    if (!url.pathname.startsWith('/my')) {
+    if (
+        request.mode !== 'navigate' ||
+        !APP_PAGE.test(url.pathname) ||
+        request.headers.get('X-Inertia') ||
+        request.headers.get('Accept')?.includes('application/json')
+    )
         return;
-    }
-
-    // Authenticated API endpoints are never stored indiscriminately in the HTTP cache
-    if (event.request.headers.get('Accept')?.includes('application/json')) {
-        return;
-    }
-
     event.respondWith(
-        fetch(event.request).catch(() => {
-            return caches.match(event.request).then((cachedResponse) => {
-                if (cachedResponse) {
-                    return cachedResponse;
-                }
-                // If it's a page navigation request under /my, return the precached shell
-                if (event.request.mode === 'navigate' || event.request.headers.get('Accept')?.includes('text/html')) {
-                    return caches.match(SHELL_REQUEST);
-                }
-            });
-        })
+        fetch(request).catch(
+            async () =>
+                (await caches.match(SHELL)) ||
+                new Response('Connect to open MiConvener for the first time.', {
+                    status: 503,
+                    headers: { 'Content-Type': 'text/plain' },
+                })
+        )
     );
 });
-

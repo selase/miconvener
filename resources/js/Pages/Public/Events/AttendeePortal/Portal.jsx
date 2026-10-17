@@ -1,3 +1,9 @@
+import AttendeeTickets from './components/AttendeeTickets';
+import {
+    reconcileAttendeeIdentity,
+    IDENTITY_EVENT,
+    isIdentityStorageEvent,
+} from '@/lib/attendeeIdentityCache';
 import { useEffect, useRef, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
@@ -86,6 +92,7 @@ export default function Portal({
     certificate = null,
     attendance = [],
     initial_tab = 'ticket',
+    offline_identity = { state: 'signed_out' },
 }) {
     const [currentRegistration, setCurrentRegistration] = useState(registration);
     const [isPolling, setIsPolling] = useState(
@@ -97,25 +104,54 @@ export default function Portal({
         typeof navigator !== 'undefined' ? navigator.onLine : true
     );
     const [offlineSnapshot, setOfflineSnapshot] = useState(null);
+    const [identityRevoked, setIdentityRevoked] = useState(false);
     const pollAttempts = useRef(0);
     const MAX_POLL_ATTEMPTS = 24; // 2s initial + ~23 * 5s = ~2 minutes
 
     useEffect(() => {
+        reconcileAttendeeIdentity(offline_identity);
         registerAttendeeServiceWorker();
         purgeExpiredOfflineTickets();
-        setOfflineSnapshot(getOfflineTicket(registration.id));
+        setOfflineSnapshot(getOfflineTicket(registration.id, offline_identity));
 
         const handleOnline = () => setIsOnline(true);
-        const handleOffline = () => setIsOnline(false);
+        const handleOffline = () => {
+            setIsOnline(false);
+            setOfflineSnapshot(getOfflineTicket(registration.id, offline_identity));
+        };
+        const invalidate = () => {
+            setOfflineSnapshot(null);
+            setIdentityRevoked(true);
+        };
+        const storage = (event) => {
+            if (isIdentityStorageEvent(event)) invalidate();
+        };
+        window.addEventListener(IDENTITY_EVENT, invalidate);
+        window.addEventListener('storage', storage);
+        const timer =
+            offline_identity.state === 'verified'
+                ? setTimeout(
+                      invalidate,
+                      Math.max(0, offline_identity.proof_expires_at - Date.now())
+                  )
+                : null;
 
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
         return () => {
+            if (timer !== null) clearTimeout(timer);
+            window.removeEventListener(IDENTITY_EVENT, invalidate);
+            window.removeEventListener('storage', storage);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
-    }, [registration.id]);
+    }, [
+        registration.id,
+        offline_identity.state,
+        offline_identity.owner_key,
+        offline_identity.proof_expires_at,
+    ]);
 
     useEffect(() => {
         if (!isPolling) return;
@@ -202,6 +238,42 @@ export default function Portal({
         }
     };
 
+    if (identityRevoked)
+        return (
+            <PublicLayout>
+                <div className="mx-auto max-w-lg p-8">
+                    <h1 className="text-2xl font-medium">Verify your email again</h1>
+                    <p className="my-4 text-sm text-ink-secondary">
+                        This device’s verified access changed or expired. Reconnect to open your
+                        event.
+                    </p>
+                    <a href="/my" className="min-h-11 text-accent underline">
+                        Return to My MiConvener
+                    </a>
+                </div>
+            </PublicLayout>
+        );
+    if (!isOnline)
+        return (
+            <PublicLayout>
+                <div className="mx-auto max-w-2xl px-5 py-8">
+                    <h1 className="text-2xl font-medium">Your saved ticket</h1>
+                    <p className="my-4 text-sm text-ink-secondary">
+                        Only saved passes are available offline. Reconnect for your programme,
+                        activities and current ticket status.
+                    </p>
+                    <AttendeeTickets
+                        offline
+                        period="saved"
+                        offlineTickets={offlineSnapshot ? [offlineSnapshot] : []}
+                        onFilterChange={() => {}}
+                        onRecord={() => {}}
+                        onOpen={() => {}}
+                    />
+                </div>
+            </PublicLayout>
+        );
+
     return (
         <PublicLayout>
             <Head>
@@ -221,8 +293,9 @@ export default function Portal({
                         <div className="flex items-center gap-2">
                             <WifiOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                             <span>
-                                You are currently offline. Your saved ticket and personal agenda
-                                remain accessible.
+                                You are currently offline. Only explicitly saved ticket passes are
+                                available offline. Reconnect for your programme and event
+                                activities.
                             </span>
                         </div>
                         {offlineSnapshot?.last_confirmed_at && (
@@ -408,6 +481,7 @@ export default function Portal({
                         {/* Panels */}
                         {verified && tab === 'ticket' && (
                             <MyTicketPanel
+                                offlineIdentity={offline_identity}
                                 event={event}
                                 registration={registration}
                                 isOnline={isOnline}

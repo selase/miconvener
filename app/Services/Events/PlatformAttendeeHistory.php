@@ -14,7 +14,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class PlatformAttendeeHistory
 {
-    /** @param array<string, mixed> $filters @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
     public function getAppHistory(string $emailNormalized, array $filters = []): array
     {
         $query = EventRegistration::withoutGlobalScopes()
@@ -368,7 +371,10 @@ final class PlatformAttendeeHistory
         return $this->contributionQuery($emailNormalized, $organiserSlug)->get()->map(fn (EventContribution $c): array => $this->contributionRow($c))->all();
     }
 
-    /** @param array<string, mixed> $filters @return \Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>> */
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return \Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>>
+     */
     public function getAppContributions(string $emailNormalized, array $filters): \Illuminate\Pagination\LengthAwarePaginator
     {
         return $this->contributionQuery($emailNormalized, $filters['tenant_slug'] ?? null)->when(! empty($filters['currency']), fn ($q) => $q->where('currency', $filters['currency']))->orderByDesc('id')->paginate(20, ['*'], 'contributions_page', (int) ($filters['contributions_page'] ?? 1))->through(fn (EventContribution $c): array => $this->contributionRow($c));

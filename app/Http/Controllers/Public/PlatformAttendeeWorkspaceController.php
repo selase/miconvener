@@ -176,6 +176,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             ->all();
 
         return Inertia::render('Public/Events/AttendeePortal/Portal', [
+            'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
             'initial_tab' => $this->workspaceTab($request, 'ticket'),
             'event' => $this->buildEventPayload($event, revealDetails: $registrationModel->isConfirmed(), registration: $registrationModel),
             'registration' => [
@@ -287,6 +288,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
         abort_unless($reg->isConfirmed() && $reg->email_verified_at !== null && filled($reg->qr_token) && filled($reg->ticket_code), 403);
 
         return response()->json([
+            'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
             'event' => $this->buildEventPayload($reg->event, revealDetails: true, registration: $reg),
             'registration' => ['id' => $reg->id, 'full_name' => $reg->full_name, 'status' => $reg->status, 'ticket_code' => $reg->ticket_code, 'ticket_type_name' => $reg->ticketType?->name, 'qr_image' => QrCodeGenerator::svgDataUri($reg->qr_token), 'checked_in' => $reg->isPresent(), 'seat_label' => $reg->seatAssignment?->seat_label, 'room_name' => $reg->seatAssignment?->room?->name],
         ])->header('Cache-Control', 'private, no-store');

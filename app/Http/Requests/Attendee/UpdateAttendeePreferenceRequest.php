@@ -13,6 +13,7 @@ final class UpdateAttendeePreferenceRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return ['channel' => ['required', 'in:email,sms'], 'marketing_enabled' => ['required', 'boolean'], 'resume_marketing' => ['required_if:marketing_enabled,true', 'accepted_if:marketing_enabled,true'], 'address' => ['prohibited'], 'member_id' => ['prohibited']];

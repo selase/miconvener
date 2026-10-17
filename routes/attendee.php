@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('my')->group(function (): void {
     Route::get('/join/{event}', [PlatformAttendeeWorkspaceController::class, 'join'])->whereUuid('event')->name('attendee.my.join');
     Route::get('/', [PlatformAttendeeAccessController::class, 'page'])->name('attendee.my');
+    Route::get('/offline-shell', [PlatformAttendeeAccessController::class, 'offlineShell'])->name('attendee.my.offline-shell');
+    Route::get('/offline-assets', [PlatformAttendeeAccessController::class, 'offlineAssets'])->name('attendee.my.offline-assets');
     Route::get('/manifest.json', [PlatformAttendeeAccessController::class, 'manifest'])->name('attendee.my.manifest');
     Route::post('/verify/phone/send', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'send'])->name('attendee.my.phone.send');
     Route::post('/verify/phone/confirm', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'confirm'])->name('attendee.my.phone.confirm');

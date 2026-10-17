@@ -63,6 +63,7 @@ final class PlatformAttendeeAccessController extends Controller
 
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
             'app_shell_enabled' => $appEnabled,
+            'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
             'communityPhoneVerified' => app(\App\Services\Community\PhoneVerification::class)->verifiedPhone($request->session()) !== null,
             'communityReturnUrl' => $this->communityReturnUrl($request, $organiserSlug),
             'organiser' => $organiser,
@@ -73,6 +74,27 @@ final class PlatformAttendeeAccessController extends Controller
             'initialAttendance' => $attendance,
             'initialContributions' => $contributions,
         ]);
+    }
+
+    public function offlineShell(): Response
+    {
+        return Inertia::render('Public/Events/AttendeePortal/MyPortal', ['app_shell_enabled' => true, 'offline_identity' => ['state' => 'unknown_offline']]);
+    }
+
+    public function offlineAssets(): JsonResponse
+    {
+        $path = public_path('build/manifest.json');
+        $manifest = is_file($path) ? json_decode((string) file_get_contents($path), true) : [];
+        $assets = [];
+        foreach (is_array($manifest) ? $manifest : [] as $entry) {
+            foreach ([$entry['file'] ?? null, ...($entry['css'] ?? [])] as $file) {
+                if (is_string($file) && preg_match('~^assets/[a-zA-Z0-9_-]+\.(js|css)$~D', $file) === 1) {
+                    $assets[] = '/build/'.$file;
+                }
+            }
+        }
+
+        return response()->json(['assets' => array_values(array_unique($assets))])->header('Cache-Control', 'no-cache');
     }
 
     public function send(PlatformSendAccessCodeRequest $request): JsonResponse

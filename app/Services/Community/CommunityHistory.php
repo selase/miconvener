@@ -52,14 +52,20 @@ final class CommunityHistory
             ->withSum(['charges as open_total' => fn ($query) => $query->open()], 'amount')->orderBy('name')->orderBy('id')->paginate(20);
     }
 
-    /** @param array<string, mixed> $filters @return LengthAwarePaginator<int, Member> */
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, Member>
+     */
     public function moneyMembers(Session $session, array $filters): LengthAwarePaginator
     {
         return $this->moneyMemberQuery($session, $filters)->with(['tenant', 'membershipType', 'charges' => fn ($q) => $q->open()->selectRaw('member_id, currency, SUM(amount) as open_total')->groupBy('member_id', 'currency')])
             ->orderBy('name')->orderBy('id')->paginate(20, ['*'], 'page', (int) ($filters['page'] ?? 1));
     }
 
-    /** @param array<string, mixed> $filters @return list<array{currency: string, open_total: int}> */
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return list<array{currency: string, open_total: int}>
+     */
     public function moneyTotals(Session $session, array $filters): array
     {
         return \App\Models\DuesCharge::withoutGlobalScope(TenantScope::class)->open()->whereIn('member_id', $this->moneyMemberQuery($session, $filters)->select('id'))
@@ -103,7 +109,10 @@ final class CommunityHistory
         return ['claims' => $claims, 'joins' => $joins];
     }
 
-    /** @param array<string, mixed> $filters @return Builder<Member> */
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Member>
+     */
     private function moneyMemberQuery(Session $session, array $filters): Builder
     {
         return $this->memberQuery($session)->whereHas('tenant', fn ($q) => $q->where('status', '!=', \App\Enum\TenantStatusEnum::BANNED))

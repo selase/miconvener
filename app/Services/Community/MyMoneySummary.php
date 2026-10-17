@@ -13,12 +13,21 @@ final class MyMoneySummary
 {
     public function __construct(private readonly CommunityHistory $history, private readonly MemberAccess $access, private readonly PlatformAttendeeVerification $emails, private readonly PlatformAttendeeHistory $events) {}
 
-    /** @param array<string,mixed> $filters @return array<string,mixed> */
+    /**
+     * @param  array<string,mixed>  $filters
+     * @return array<string,mixed>
+     */
     public function for(Session $session, array $filters): array
     {
         $members = $this->history->moneyMembers($session, $filters);
         $members->through(function (Member $member) use ($session, $filters): array {
-            $currencies = $member->charges->when(! empty($filters['currency']), fn ($rows) => $rows->where('currency', $filters['currency']))->map(fn ($charge): array => ['currency' => $charge->currency, 'open_total' => (int) $charge->getAttribute('open_total')])->values()->all();
+            $currencies = [];
+            foreach ($member->charges as $charge) {
+                if (isset($filters['currency']) && $charge->currency !== $filters['currency']) {
+                    continue;
+                }
+                $currencies[] = ['currency' => $charge->currency, 'open_total' => (int) $charge->getAttribute('open_total')];
+            }
             if ($currencies === []) {
                 $currencies = [['currency' => $filters['currency'] ?? $member->membershipType->currency, 'open_total' => 0]];
             }

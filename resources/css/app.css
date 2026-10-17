@@ -131,5 +131,18 @@
 }
 
 /* Personal app actions use a legible foreground in both colour modes. */
-.attendee-app .app-primary { background: #007367; color: #fff; }
-.dark .attendee-app .app-primary { background: #00c8b7; color: #042522; }
+.attendee-app .app-primary {
+    background: #007367;
+    color: #fff;
+}
+.dark .attendee-app .app-primary {
+    background: #00c8b7;
+    color: #042522;
+}
+
+.attendee-app {
+    --color-accent: #007367;
+}
+.dark .attendee-app {
+    --color-accent: #00d8c4;
+}
