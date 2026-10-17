@@ -19,6 +19,20 @@ final class CommunityHistory
 {
     public function __construct(private readonly MemberAccess $access, private readonly PlatformAttendeeVerification $emails, private readonly PhoneVerification $phones, private readonly MessagingPreferences $preferences) {}
 
+    public function usesAppShell(Session $session, ?string $organiserSlug): bool
+    {
+        $tenants = Tenant::query()->where('status', \App\Enum\TenantStatusEnum::ACTIVE)
+            ->whereHas('features', fn ($query) => $query->where('feature_key', 'community_app')->where('enabled', true));
+        if ($organiserSlug !== null) {
+            return $tenants->where('slug', $organiserSlug)->exists();
+        }
+
+        return $tenants->where(function ($query) use ($session): void {
+            $query->whereIn('id', $this->memberQuery($session)->select('tenant_id'))
+                ->orWhereIn('id', $this->followerQuery($session)->select('tenant_id'));
+        })->exists();
+    }
+
     /** @return array<string,mixed> */
     public function communities(Session $session): array
     {

@@ -135,11 +135,12 @@ The email-first, claim, shared-number, reassignment and import rules above repla
 
 Owner's reference designs (2026-10-15): event and ticket apps with a greeting header, card lists with large imagery, pill filters, wallet-style ticket passes with QR codes and download/share actions, and a bottom tab bar. They guide layout and feel, not colours; `/my` uses MiConvener's tokens and dark mode.
 
-- **Phone:** bottom tab bar: **Home** (greeting; what needs attention: dues due, next event, unread messages), **Tickets** (passes with QR), **Communities** (organisations I follow or belong to, each with its name and logo), **Money** (dues to pay, giving, receipts and statements), **Me** (identifiers, notifications and preferences, sign out). Full-bleed cards, large touch targets, sheet dialogs, safe-area insets, installable with icon and splash.
+- **Phone:** bottom tab bar: **Home** (greeting; what needs attention: dues due, next event; messages continue by email/SMS), **Tickets** (passes with QR), **Communities** (organisations I follow or belong to, each with its name and logo), **Money** (dues to pay, giving, receipts and statements), **Me** (identifiers, notifications and preferences, sign out). Full-bleed cards, large touch targets, sheet dialogs, safe-area insets, installable with icon and splash.
 - **Desktop:** the same five sections as a left rail with a two-column layout (list and detail). Nothing on the phone is missing on desktop.
 - **Accessibility:** WCAG 2.2 AA; keyboard and screen-reader navigation; text scales without breaking layouts.
 - **States:** skeleton loading, empty states, clear error states with retry, offline banner.
-- **Offline boundary:** only ticket passes are cached for offline use. Financial histories, membership lists, messages and private documents are never cached by the service worker. All personal caches are cleared on sign-out and when the session's identifiers change.
+- **Inbox deferral (owner approved 2026-10-17):** the in-app inbox and read/unread counts are a separate follow-up. Milestone 4 keeps email/SMS delivery and organisation preferences, without deriving unread counts from delivery logs.
+- **Offline boundary (ticket-only confirmed by owner 2026-10-17):** only ticket passes are cached for offline use. Financial histories, membership lists, messages and private documents are never cached by the service worker. All personal caches are cleared on sign-out and when the session's identifiers change.
 
 ### 6.3 Following and joining
 

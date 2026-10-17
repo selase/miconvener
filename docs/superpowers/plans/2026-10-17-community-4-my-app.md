@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans for native implementation, task by task; use superpowers:subagent-driven-development only if the owner requests it. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Planned, awaiting owner review of this plan and visual preview. No milestone 4 application code has been implemented.
+**Status:** In progress. Owner approved native implementation, inbox deferral and ticket-only offline behavior on 2026-10-17.
 
 **Goal:** Make `/my` a coherent, accessible personal app across Home, Tickets, Communities, Money and Me, retaining every existing attendee capability and milestone 3 identity safeguard.
 
@@ -33,8 +33,8 @@
 
 ## Owner review decisions
 
-1. **Recommended scope adjustment: no in-app unread inbox in milestone 4.** Spec §6.2 mentions unread messages on Home. Current `CommunityMessageDelivery` is an outbound delivery log, not an authorized inbox/read-receipt model; phone delivery addresses must not become historic private-message credentials. Show “Messages arrive by email and SMS” and per-organisation preferences, with **no unread badge**, until a separately designed inbox is approved. This is a proposed exception, **not an agreed spec amendment**. If approved, amend §6.2 and this roadmap in the first implementation commit. If declined, stop and design recipient authorization/read tracking before task 2; do not invent counts from delivery logs. Deferral avoids a separate inbox subsystem, migration and phone-reassignment review.
-2. **Confirm the specified offline restriction in the preview.** The current store also saves a personal agenda and may use `virtual_link` as its venue summary. Task 5 narrows saved records to ticket passes, physical venue/online-event label and QR only; programme/meeting links remain available online. No personal agenda, virtual access URL or private document is persisted. This implements §6.2 but changes the old offline-agenda behavior visibly.
+1. **Recommended scope adjustment: no in-app unread inbox in milestone 4.** Spec §6.2 mentions unread messages on Home. Current `CommunityMessageDelivery` is an outbound delivery log, not an authorized inbox/read-receipt model; phone delivery addresses must not become historic private-message credentials. Show “Messages arrive by email and SMS” and per-organisation preferences, with **no unread badge**, until a separately designed inbox is approved. Owner approved this exception on 2026-10-17; spec §6.2 is amended in the first implementation commit. Do not invent counts from delivery logs. Deferral avoids a separate inbox subsystem, migration and phone-reassignment review.
+2. **Ticket-only offline restriction approved 2026-10-17.** The current store also saves a personal agenda and may use `virtual_link` as its venue summary. Task 5 narrows saved records to ticket passes, physical venue/online-event label and QR only; programme/meeting links remain available online. No personal agenda, virtual access URL or private document is persisted. This implements §6.2 but changes the old offline-agenda behavior visibly.
 
 No new giving, membership-price or SMS rollout decisions are needed for this plan. Existing live OTP/private-ticket acceptance and phone-entry readiness remain tracked in milestone 3; app work must not silently enable phone entry.
 
@@ -63,11 +63,11 @@ No new giving, membership-price or SMS rollout decisions are needed for this pla
 
 **Interfaces:** `AttendeeAppShell({ section, onSectionChange, children, detail, offline })`; section is exactly `home|tickets|communities|money|me`. `CommunityHistory::usesAppShell(Session $session, ?string $organiserSlug): bool` checks an explicitly selected active pilot tenant or an actually authorized organisation with `community_app` enabled. It must not infer memberships from phone or inspect only the first paginated page. Controller supplies `app_shell_enabled`; legacy UI remains behind the off switch. Command `community:enable-app {tenant} {--off}` follows `EnableFollowingCommand`'s idempotent feature row/cache invalidation pattern; no plan price changes.
 
-- [ ] Add failing shell/rollout tests: exactly five sections and keyboard-labelled navigation; 320px bottom navigation and desktop rail; an off-switch tenant keeps old layout; a pilot organisation beyond page 1 can enable the shell without exposing its records; mixed-rollout users keep all already-authorized records.
-- [ ] Add URL tests: `section=…` restores selected section; legacy `tab=certificates|abstracts|attendance` maps to Tickets > Records, `tab=contributions` to Money > Contributions, `#communities` to Communities; organiser filter and safe `return_to` survive. `/my/events/{id}?tab=forms` still reaches the existing verification/deep-link flow. Invalid sections fall back to Home.
-- [ ] Run `npm test -- resources/js/test/portal/AttendeeAppShell.test.jsx` and `php artisan test --compact tests/Feature/Community/CommunityAppRolloutTest.php`; confirm intended failures.
-- [ ] Implement shell, history-aware switch and compatibility adapter. Use `section` rather than overloading workspace `tab`. Greeting must not infer a global name from an arbitrary registration; default “Good morning.”/appropriate local greeting. Do not change canonical workspace URLs.
-- [ ] Rerun the task tests and existing `AttendeePortalHostTest`, `PlatformAttendeePortalHostTest`; format/build, tick steps and commit.
+- [x] Add failing shell/rollout tests: exactly five sections and keyboard-labelled navigation; 320px bottom navigation and desktop rail; an off-switch tenant keeps old layout; a pilot organisation beyond page 1 can enable the shell without exposing its records; mixed-rollout users keep all already-authorized records.
+- [x] Add URL tests: `section=…` restores selected section; legacy `tab=certificates|abstracts|attendance` maps to Tickets > Records, `tab=contributions` to Money > Contributions, `#communities` to Communities; organiser filter and safe `return_to` survive. `/my/events/{id}?tab=forms` still reaches the existing verification/deep-link flow. Invalid sections fall back to Home.
+- [x] Run `npm test -- resources/js/test/portal/AttendeeAppShell.test.jsx` and `php artisan test --compact tests/Feature/Community/CommunityAppRolloutTest.php`; confirm intended failures.
+- [x] Implement shell, history-aware switch and compatibility adapter. Use `section` rather than overloading workspace `tab`. Greeting must not infer a global name from an arbitrary registration; default “Good morning.”/appropriate local greeting. Do not change canonical workspace URLs.
+- [x] Rerun the task tests and existing `AttendeePortalHostTest`, `PlatformAttendeePortalHostTest`; format/build, tick steps and commit.
 
 ## Task 2 — Home and Tickets, without losing attendee records
 
