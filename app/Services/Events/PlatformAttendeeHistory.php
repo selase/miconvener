@@ -14,6 +14,36 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class PlatformAttendeeHistory
 {
+    /** @param array<string, mixed> $filters @return array<string, mixed> */
+    public function getAppHistory(string $emailNormalized, array $filters = []): array
+    {
+        $query = EventRegistration::withoutGlobalScopes()
+            ->forEmail(PlatformAttendeeVerification::normalise($emailNormalized))
+            ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED])
+            ->whereHas('tenant', fn (Builder $q) => $q->withoutGlobalScopes()->where('status', '!=', TenantStatusEnum::BANNED))
+            ->whereHas('event', fn (Builder $q) => $q->withoutGlobalScopes()->whereNull('deleted_at'))
+            ->when(! empty($filters['organiser']), fn (Builder $q) => $q->whereHas('tenant', fn (Builder $t) => $t->withoutGlobalScopes()->where('slug', $filters['organiser'])))
+            ->with(['event' => fn ($q) => $q->withoutGlobalScopes(), 'tenant' => fn ($q) => $q->withoutGlobalScopes(), 'ticketType' => fn ($q) => $q->withoutGlobalScopes(), 'seatAssignment' => fn ($q) => $q->withoutGlobalScopes()]);
+        $past = ($filters['period'] ?? 'upcoming') === 'past';
+        $passes = (clone $query)->whereHas('event', fn (Builder $q) => $q->withoutGlobalScopes()->where('ends_at', $past ? '<' : '>=', now()))
+            ->orderBy(\App\Models\Event::withoutGlobalScopes()->select('starts_at')->whereColumn('events.id', 'event_registrations.event_id')->limit(1), $past ? 'desc' : 'asc')
+            ->orderBy('id', $past ? 'desc' : 'asc')->paginate(20, ['*'], 'page', (int) ($filters['page'] ?? 1));
+        $passes->through(fn (EventRegistration $reg): array => $this->appPass($reg));
+        $attention = (clone $query)->where('status', EventRegistration::STATUS_PENDING_PAYMENT)->orderBy('id')->limit(11)->get();
+        $live = (clone $query)->confirmed()->whereHas('event', fn (Builder $q) => $q->withoutGlobalScopes()->where('starts_at', '<=', now())->where('ends_at', '>=', now()))->orderBy('id')->limit(10)->get();
+
+        return [
+            'passes' => $passes->toArray(),
+            'live_now' => $live->map(fn (EventRegistration $reg): array => $this->appPass($reg))->all(),
+            'needs_attention' => $attention->take(10)->map(fn (EventRegistration $reg): array => [
+                'registration_id' => $reg->id, 'event' => ['name' => $reg->event->name],
+                'reason' => 'Payment required to secure your ticket',
+                'action' => ['label' => 'Complete payment', 'url' => route('attendee.my.events.workspace', ['registration' => $reg->id])],
+            ])->all(),
+            'has_more_attention' => $attention->count() > 10,
+        ];
+    }
+
     /**
      * Retrieve the attendee's complete multi-tenant event history grouped by lifecycle urgency.
      *
@@ -385,6 +415,22 @@ final class PlatformAttendeeHistory
         }
 
         return $results;
+    }
+
+    /** @return array<string, mixed> */
+    private function appPass(EventRegistration $reg): array
+    {
+        $event = $reg->event;
+        $reveal = ! $event->isPrivate() || $reg->isConfirmed();
+
+        return [
+            'registration_id' => $reg->id, 'registration_status' => $reg->status,
+            'event_workspace_url' => route('attendee.my.events.workspace', ['registration' => $reg->id]),
+            'event' => ['name' => $event->name, 'slug' => $event->slug, 'starts_at' => $event->starts_at->toIso8601String(), 'ends_at' => $event->ends_at->toIso8601String(), 'timezone' => $event->timezone, 'location' => $reveal ? $event->address : null, 'hero_image_url' => $reveal ? $event->heroImageUrl() : null],
+            'organiser' => ['id' => $reg->tenant->id, 'name' => $reg->tenant->name, 'slug' => $reg->tenant->slug, 'logo_url' => \App\Libraries\Helper::storageUrl($reg->tenant->logo)],
+            'ticket' => ['type' => $reg->ticketType?->name, 'status' => $reg->status, 'seat' => $reg->seatAssignment?->seat_label],
+            'available_actions' => $this->availableActionsFor($reg),
+        ];
     }
 
     /**

@@ -47,12 +47,13 @@ final class PlatformAttendeeAccessController extends Controller
             }
         }
 
+        $appEnabled = app(\App\Services\Community\CommunityHistory::class)->usesAppShell($request->session(), $organiserSlug);
         $history = null;
         $certificates = null;
         $abstracts = null;
         $attendance = null;
         $contributions = null;
-        if ($verifiedEmail !== null) {
+        if ($verifiedEmail !== null && ! $appEnabled) {
             $history = $this->history->getHistory($verifiedEmail, $organiserSlug);
             $certificates = $this->history->getCertificates($verifiedEmail, $organiserSlug);
             $abstracts = $this->history->getAbstracts($verifiedEmail, $organiserSlug);
@@ -61,7 +62,7 @@ final class PlatformAttendeeAccessController extends Controller
         }
 
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
-            'app_shell_enabled' => app(\App\Services\Community\CommunityHistory::class)->usesAppShell($request->session(), $organiserSlug),
+            'app_shell_enabled' => $appEnabled,
             'communityPhoneVerified' => app(\App\Services\Community\PhoneVerification::class)->verifiedPhone($request->session()) !== null,
             'communityReturnUrl' => $this->communityReturnUrl($request, $organiserSlug),
             'organiser' => $organiser,
@@ -156,6 +157,11 @@ final class PlatformAttendeeAccessController extends Controller
         return response()->json([
             'email' => ContactMask::email($email),
         ]);
+    }
+
+    public function appEvents(\App\Http\Requests\Attendee\AppEventsRequest $request): JsonResponse
+    {
+        return response()->json($this->history->getAppHistory((string) $request->attributes->get('attendee_email'), $request->validated()))->header('Cache-Control', 'private, no-store');
     }
 
     public function events(Request $request): JsonResponse

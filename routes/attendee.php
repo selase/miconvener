@@ -41,6 +41,8 @@ Route::prefix('my')->group(function (): void {
 
     // Authenticated history endpoints
     Route::middleware('platform_attendee_verified')->group(function (): void {
+        Route::get('/app/events', [PlatformAttendeeAccessController::class, 'appEvents'])->name('attendee.my.app.events');
+        Route::get('/app/tickets/{registration}', [PlatformAttendeeWorkspaceController::class, 'ticketPass'])->whereUuid('registration')->name('attendee.my.app.ticket');
         Route::get('/events', [PlatformAttendeeAccessController::class, 'events'])->name('attendee.my.events');
         Route::get('/certificates', [PlatformAttendeeAccessController::class, 'certificates'])->name('attendee.my.certificates');
         Route::get('/abstracts', [PlatformAttendeeAccessController::class, 'abstracts'])->name('attendee.my.abstracts');

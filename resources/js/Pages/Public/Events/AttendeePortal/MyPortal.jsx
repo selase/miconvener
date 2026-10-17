@@ -1,3 +1,4 @@
+import AttendeeApp from './AttendeeApp';
 import { useCallback, useEffect, useState } from 'react';
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
@@ -23,7 +24,7 @@ import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
  * and provides the action-first entrance to the attendee's event lifecycle,
  * certificates, abstracts, and verified attendance records.
  */
-export default function MyPortal({
+function LegacyMyPortal({
     organiser = null,
     communityPhoneVerified: phoneAtLoad = false,
     communityReturnUrl = null,
@@ -599,4 +600,8 @@ export default function MyPortal({
             </div>
         </PublicLayout>
     );
+}
+
+export default function MyPortal(props) {
+    return props.app_shell_enabled ? <AttendeeApp {...props} /> : <LegacyMyPortal {...props} />;
 }

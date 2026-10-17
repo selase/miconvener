@@ -278,6 +278,20 @@ final class PlatformAttendeeWorkspaceController extends Controller
         ]);
     }
 
+    public function ticketPass(Request $request, string $registration): JsonResponse
+    {
+        $reg = EventRegistration::withoutGlobalScopes()->with(['event' => fn ($q) => $q->withoutGlobalScopes(), 'tenant' => fn ($q) => $q->withoutGlobalScopes(), 'ticketType' => fn ($q) => $q->withoutGlobalScopes(), 'seatAssignment' => fn ($q) => $q->withoutGlobalScopes()->with('room')])->find($registration);
+        $email = app(\App\Services\Events\PlatformAttendeeVerification::class)->verifiedEmail($request->session());
+        abort_unless($reg !== null && $email !== null && \App\Services\Events\PlatformAttendeeVerification::normalise($reg->email) === $email, 401);
+        abort_if($reg->tenant === null || $reg->tenant->status === TenantStatusEnum::BANNED || $reg->event === null || $reg->event->deleted_at !== null, 404);
+        abort_unless($reg->isConfirmed() && $reg->email_verified_at !== null && filled($reg->qr_token) && filled($reg->ticket_code), 403);
+
+        return response()->json([
+            'event' => $this->buildEventPayload($reg->event, revealDetails: true, registration: $reg),
+            'registration' => ['id' => $reg->id, 'full_name' => $reg->full_name, 'status' => $reg->status, 'ticket_code' => $reg->ticket_code, 'ticket_type_name' => $reg->ticketType?->name, 'qr_image' => QrCodeGenerator::svgDataUri($reg->qr_token), 'checked_in' => $reg->isPresent(), 'seat_label' => $reg->seatAssignment?->seat_label, 'room_name' => $reg->seatAssignment?->room?->name],
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
     public function ticket(Request $request, string $registration): Response
     {
         $registrationModel = EventRegistration::withoutGlobalScopes()
