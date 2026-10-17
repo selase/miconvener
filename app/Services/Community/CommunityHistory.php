@@ -33,6 +33,7 @@ final class CommunityHistory
             $query->whereIn('id', $this->memberQuery($session)->select('tenant_id'))
                 ->orWhereIn('id', $this->followerQuery($session)->select('tenant_id'));
             if ($email !== null) {
+                $query->orWhereIn('id', app(\App\Services\Giving\GivingHistory::class)->tenantIdsForEmail($email));
                 $query->orWhereIn('id', \App\Models\EventRegistration::withoutGlobalScopes()->forEmail($email)->whereNotIn('status', [\App\Models\EventRegistration::STATUS_CANCELLED, \App\Models\EventRegistration::STATUS_REJECTED])->whereHas('event', fn ($event) => $event->withoutGlobalScopes()->whereNull('deleted_at'))->select('tenant_id'));
             }
         })->exists();

@@ -5,6 +5,7 @@ import Join from './Join';
 
 export default function Organisation({
     organisation,
+    givingUrl = null,
     events = [],
     identity,
     following,
@@ -45,6 +46,18 @@ export default function Organisation({
                         My Communities and membership access
                     </a>
                 </header>
+                {givingUrl && (
+                    <section className="border border-border p-6">
+                        <h2 className="text-xl font-semibold text-ink">Support our work</h2>
+                        <p className="my-3 text-ink-secondary">
+                            Contribute to the causes and projects you care about. Membership is
+                            optional.
+                        </p>
+                        <a href={givingUrl} className="text-accent underline">
+                            View contribution funds
+                        </a>
+                    </section>
+                )}
                 <div className="grid gap-6 md:grid-cols-2">
                     {followingEnabled && (
                         <section

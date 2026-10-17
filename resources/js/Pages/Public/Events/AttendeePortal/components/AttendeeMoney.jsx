@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import csrfFetch from '@/lib/csrfFetch';
 import ContributionsSection from './ContributionsSection';
+import GivingSection, { GivingStatementForm } from './GivingSection';
 const amount = (currency, value) =>
     `${currency} ${(value / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 function MemberRecords({ row, statement = false }) {
@@ -121,10 +122,14 @@ export default function AttendeeMoney({
     data,
     onPage,
     onRefresh,
-    initialTab = 'dues',
+    initialTab = null,
+    tenantSlug = null,
     status = 'success',
 }) {
-    const [tab, setTab] = useState(initialTab);
+    const [chosenTab, setTab] = useState(null);
+    const hasDues = data?.dues?.data?.some((row) => row.has_dues !== false);
+    const tab =
+        chosenTab ?? initialTab ?? (!hasDues && data?.giving?.data?.length ? 'giving' : 'dues');
     const [open, setOpen] = useState(null);
     if (status !== 'success')
         return (
@@ -143,12 +148,14 @@ export default function AttendeeMoney({
     return (
         <>
             <p className="text-xs uppercase tracking-widest text-accent">Payments & records</p>
-            <h1 className="mt-2 text-3xl font-medium">A clearer view of your dues.</h1>
+            <h1 className="mt-2 text-3xl font-medium">Your contributions and payments</h1>
             <p className="mt-3 text-sm text-ink-secondary">
-                Review what’s due, revisit contributions and keep your records together.
+                Keep voluntary contributions, dues and receipts together, with a clear record of
+                each.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
                 {[
+                    ['giving', 'Giving'],
                     ['dues', 'Dues'],
                     ['contributions', 'Contributions & receipts'],
                     ['statements', 'Statements'],
@@ -167,7 +174,9 @@ export default function AttendeeMoney({
                     </button>
                 ))}
             </div>
-            {tab === 'contributions' ? (
+            {tab === 'giving' ? (
+                <GivingSection giving={data?.giving} onPage={onPage} tenantSlug={tenantSlug} />
+            ) : tab === 'contributions' ? (
                 <section className="mt-5">
                     <p className="mb-4 text-sm text-ink-secondary">
                         Existing event contributions and tributes.
@@ -221,6 +230,7 @@ export default function AttendeeMoney({
                 </section>
             ) : (
                 <>
+                    {tab === 'statements' && <GivingStatementForm tenantSlug={tenantSlug} />}
                     {tab === 'dues' && (
                         <div className="mt-5 flex flex-wrap gap-4">
                             {data?.totals_by_currency?.map((row) => (

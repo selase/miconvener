@@ -108,8 +108,13 @@ final class TenantResolver
         return null;
     }
 
+    /** Public Giving retains its source/proof guards; visiting it must not sign out foreign console staff. */
     private function validateMembership(Tenant $tenant, Request $request): void
     {
+        $route = $request->route();
+        if ($route instanceof \Illuminate\Routing\Route && $route->named('public.giving.*')) {
+            return;
+        }
         $user = $request->user();
 
         // If there is no authenticated user, we treat it as a guest request (e.g. login/register pages or public tenant pages).

@@ -72,7 +72,8 @@ final class ReconcileStuckPayouts extends Command
 
         foreach ($stuck as $payout) {
             try {
-                $status = $settlementGateway->verifyTransfer((string) $payout->provider_reference)['status'] ?? '';
+                $verified = $settlementGateway->verifyTransfer((string) $payout->provider_reference);
+                $status = $verified['status'];
             } catch (PaymentFailedException|Throwable $e) {
                 // Leave the payout alone and try again on the next run: a provider
                 // outage must never be recorded as a failed transfer.
@@ -83,7 +84,7 @@ final class ReconcileStuckPayouts extends Command
             }
 
             try {
-                $this->resolve($payout, (string) $status);
+                $this->resolve($payout, (string) $status, $verified);
             } catch (Throwable $e) {
                 // One payout that cannot be settled must not stop the rest of
                 // the run; it stays in processing for the next one.
@@ -95,8 +96,27 @@ final class ReconcileStuckPayouts extends Command
         return self::SUCCESS;
     }
 
-    private function resolve(EventPayout $payout, string $status): void
+    /** @param array<string,mixed> $verified */
+    private function resolve(EventPayout $payout, string $status, array $verified = []): void
     {
+        if ($status === 'success' && $payout->category === LedgerCategoryEnum::Giving) {
+            app(\App\Services\Finance\CommunityPayouts::class)->settleTransfer($payout, (string) $payout->provider_reference);
+
+            return;
+        }
+
+        if ($status === 'otp' && in_array($payout->category, [LedgerCategoryEnum::Giving, LedgerCategoryEnum::Dues], true) && $payout->status === EventPayout::STATUS_PROCESSING) {
+            $code = $verified['transfer_code'] ?? null;
+            if (is_string($code) && str_starts_with($code, 'TRF_') && ($verified['reference'] ?? null) === $payout->provider_reference && ($verified['amount'] ?? null) === $payout->requested_net_amount && ($verified['currency'] ?? null) === $payout->currency) {
+                $updated = EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('provider_reference', $payout->provider_reference)->where('status', EventPayout::STATUS_PROCESSING)->update(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_transfer_code' => $code, 'failure_reason' => null]);
+                $this->line($updated === 1 ? "  {$payout->id}: recovered original transfer; waiting for its code." : "  {$payout->id}: state changed while verifying; current transfer left unchanged.");
+            } else {
+                $this->warn("  {$payout->id}: OTP transfer details need review; no transfer sent.");
+            }
+
+            return;
+        }
+
         if ($payout->status === EventPayout::STATUS_AWAITING_OTP) {
             if (in_array($status, PayoutRelease::DEAD_TRANSFER_STATUSES, true)
                 && $this->markFailed($payout, EventPayout::STATUS_AWAITING_OTP, PayoutRelease::OTP_EXPIRED_REASON)) {
@@ -116,7 +136,7 @@ final class ReconcileStuckPayouts extends Command
                 // provider was being asked, and it writes the same rows.
                 $locked = EventPayout::query()->whereKey($payout->id)->lockForUpdate()->first();
 
-                if (! $locked || $locked->status !== EventPayout::STATUS_PROCESSING) {
+                if (! $locked || $locked->status !== EventPayout::STATUS_PROCESSING || $locked->provider_reference !== $payout->provider_reference) {
                     return;
                 }
 
@@ -164,7 +184,10 @@ final class ReconcileStuckPayouts extends Command
                 }
             });
 
-            $this->line("  {$payout->id}: transfer succeeded — marked paid.");
+            $current = $payout->fresh();
+            $this->line($current !== null && $current->provider_reference === $payout->provider_reference && $current->status === EventPayout::STATUS_PAID
+                ? "  {$payout->id}: transfer succeeded — marked paid."
+                : "  {$payout->id}: state changed while verifying; current transfer left unchanged.");
 
             return;
         }
@@ -190,7 +213,7 @@ final class ReconcileStuckPayouts extends Command
         return DB::transaction(function () use ($payout, $expectedStatus, $reason): bool {
             $locked = EventPayout::query()->whereKey($payout->id)->lockForUpdate()->first();
 
-            if (! $locked || $locked->status !== $expectedStatus) {
+            if (! $locked || $locked->status !== $expectedStatus || $locked->provider_reference !== $payout->provider_reference) {
                 return false;
             }
 

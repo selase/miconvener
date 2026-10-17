@@ -50,6 +50,7 @@ final class EventContributionController extends Controller
             'tribute_message' => ['nullable', 'string', 'max:1000'],
             'is_anonymous' => ['sometimes', 'boolean'],
             'provider' => ['sometimes', 'nullable', 'in:paystack,stripe'],
+            'submission_key' => ['sometimes', 'uuid'],
         ]);
 
         $callbackUrl = route('public.events.contributions.callback', [
@@ -76,7 +77,7 @@ final class EventContributionController extends Controller
     {
         $tenant = $this->getTenant();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)
+        $eventModel = Event::withTrashed()->where('tenant_id', $tenant->id)
             ->where('slug', $event)
             ->firstOrFail();
 
@@ -85,6 +86,19 @@ final class EventContributionController extends Controller
             ->where('event_id', $eventModel->id)
             ->where('id', $contribution)
             ->firstOrFail();
+
+        $givingAttempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('event_contribution_id', $contributionModel->id)->first();
+        if ($givingAttempt !== null) {
+            try {
+                app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($givingAttempt->reference, app(\App\Services\Giving\GivingGateways::class)->verify($givingAttempt));
+            } catch (Throwable) {
+                app(\App\Services\Giving\GivingPaymentConfirmer::class)->quarantine($givingAttempt, 'event_callback_verification_unavailable');
+            }
+
+            return redirect()->route('public.giving.result', ['subdomain' => $tenant->slug, 'reference' => $givingAttempt->reference])->header('Cache-Control', 'private, no-store');
+        }
+
+        abort_if($eventModel->trashed(), 404);
 
         if ($contributionModel->isCompleted()) {
             return redirect()->route('public.events.show', [

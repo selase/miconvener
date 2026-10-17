@@ -105,26 +105,24 @@ it('discards displayed Me contacts and organisation preferences after cross-tab 
         owner_key: 'c'.repeat(64),
         proof_expires_at: Date.now() + 3600000,
     };
-    const fetcher = vi
-        .spyOn(globalThis, 'fetch')
-        .mockImplementation(async (url) => ({
-            ok: true,
-            status: 200,
-            json: async () =>
-                String(url).startsWith('/my/identity')
-                    ? { email: { masked: 'OLD PRIVATE CONTACT' }, phone: null }
-                    : {
-                          preferences: {
-                              data: [
-                                  {
-                                      tenant_slug: 'old',
-                                      name: 'PRIVATE OLD ORGANISATION',
-                                      channels: { email: { marketing_enabled: false } },
-                                  },
-                              ],
-                          },
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => ({
+        ok: true,
+        status: 200,
+        json: async () =>
+            String(url).startsWith('/my/identity')
+                ? { email: { masked: 'OLD PRIVATE CONTACT' }, phone: null }
+                : {
+                      preferences: {
+                          data: [
+                              {
+                                  tenant_slug: 'old',
+                                  name: 'PRIVATE OLD ORGANISATION',
+                                  channels: { email: { marketing_enabled: false } },
+                              },
+                          ],
                       },
-        }));
+                  },
+    }));
     try {
         render(<AttendeeApp verifiedEmail="OLD PRIVATE CONTACT" offline_identity={proof} />);
         expect(await screen.findByText('PRIVATE OLD ORGANISATION')).toBeTruthy();
@@ -167,23 +165,75 @@ it('refreshes upcoming Home independently of a previously selected saved-ticket 
 });
 it('shows authorised Community dues on Home without treating phone proof as ticket ownership', async () => {
     window.history.replaceState({}, '', '/my?section=home');
-    const fetcher = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue({
-            ok: true,
-            status: 200,
-            json: async () => ({
-                totals_by_currency: [{ currency: 'GHS', open_total: 12000 }],
-                dues: { data: [] },
-                contributions: null,
-            }),
-        });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+            totals_by_currency: [{ currency: 'GHS', open_total: 12000 }],
+            dues: { data: [] },
+            contributions: null,
+        }),
+    });
     try {
         render(<AttendeeApp communityPhoneVerified />);
         expect(await screen.findByText('GHS 120.00 due')).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Open ticket' })).toBeNull();
     } finally {
         fetcher.mockRestore();
+        window.history.replaceState({}, '', '/');
+    }
+});
+
+it('keeps Giving statements and history filters scoped to the selected organisation', async () => {
+    window.history.replaceState({}, '', '/my?organiser=church&section=money&tab=giving');
+    const fetcher = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                dues: { data: [] },
+                giving: { data: [] },
+                contributions: { data: [] },
+            }),
+        });
+    const routeMock = vi.spyOn(globalThis, 'route');
+    try {
+        render(
+            <AttendeeApp
+                verifiedEmail="g••@example.test"
+                organiser={{ slug: 'church', name: 'Church' }}
+            />
+        );
+        await screen.findByText('Your contributions and payments');
+        await waitFor(() =>
+            expect(screen.getByRole('link', { name: /Filter contribution records/ })).toBeTruthy()
+        );
+        expect(routeMock).toHaveBeenCalledWith(
+            'attendee.my.giving.index',
+            expect.objectContaining({ tenant_slug: 'church' })
+        );
+        const from = screen.getByLabelText('From');
+        const to = screen.getByLabelText('To');
+        fireEvent.change(from, { target: { value: '2026-10-01' } });
+        fireEvent.change(to, { target: { value: '2026-10-17' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Download statement' }));
+        expect(routeMock).toHaveBeenCalledWith(
+            'attendee.my.giving.statement',
+            expect.objectContaining({ tenant_slug: 'church' })
+        );
+        routeMock.mockClear();
+        fireEvent.click(screen.getByRole('button', { name: 'Statements' }));
+        fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-10-01' } });
+        fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-10-17' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Download statement' }));
+        expect(routeMock).toHaveBeenCalledWith(
+            'attendee.my.giving.statement',
+            expect.objectContaining({ tenant_slug: 'church' })
+        );
+    } finally {
+        fetcher.mockRestore();
+        routeMock.mockRestore();
         window.history.replaceState({}, '', '/');
     }
 });

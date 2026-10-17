@@ -322,9 +322,18 @@ final class Tenant extends Model
      * Whether the Finance section shows: ticket money, Community, or dues
      * money still held. The menu and the page both use this.
      */
+    public function hasGivingMoney(): bool
+    {
+        return GivingGift::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
+            || GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
+            || GivingAdjustment::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
+            || LedgerAccount::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Giving)->exists()
+            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Giving)->exists();
+    }
+
     public function showsFinance(): bool
     {
-        return $this->handlesTicketMoney() || $this->communityEnabled() || $this->hasDuesMoney();
+        return $this->handlesTicketMoney() || $this->communityEnabled() || $this->hasDuesMoney() || $this->hasGivingMoney();
     }
 
     public function paymentGateways(): HasMany

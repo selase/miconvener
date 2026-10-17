@@ -34,6 +34,8 @@ use App\Mail\Events\OccurrenceReminderMail;
 use App\Mail\Events\PlatformAttendeeAccessCodeMail;
 use App\Mail\Events\SpeakerPortalInvitationMail;
 use App\Mail\Events\UrgentServiceRequestRaised;
+use App\Mail\GivingReceipt;
+use App\Mail\GivingReminder;
 use App\Mail\Marketplace\BookingConfirmationGuest;
 use App\Mail\Marketplace\NewQuoteRequestNotification;
 use App\Mail\Marketplace\NewVenueBookingNotification;
@@ -128,6 +130,13 @@ test('every mailable renders', function (): void {
         'paid_at' => now(),
         'payment_reference' => 'ref_render_dues',
     ]);
+
+    $givingFund = App\Models\GivingFund::factory()->create(['tenant_id' => $tenant->id]);
+    $givingNotice = App\Models\GivingReceiptNotice::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $givingFund->id, 'snapshot' => [
+        'organisation' => $tenant->name, 'fund' => $givingFund->name, 'amount' => 10000, 'currency' => 'GHS',
+        'receipt_number' => 'GIVING-RENDER', 'paid_at' => now()->toIso8601String(), 'timezone' => 'Africa/Accra',
+    ]]);
+    $givingReminder = App\Models\GivingReminder::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $givingFund->id]);
 
     // Every real send happens with a tenant resolved, so the templates are
     // rendered the same way here. Whether a queued job actually restores this
@@ -282,6 +291,8 @@ test('every mailable renders', function (): void {
         'WelcomeMail' => fn () => new WelcomeMail($user),
         'CommunityContactNotice' => fn () => new App\Mail\CommunityContactNotice('Acme Events'),
         'CommunityMessage' => fn () => new CommunityMessage(App\Models\CommunityMessage::factory()->create(['tenant_id' => $tenant->id]), 'https://render-check.miconvener.test/community/preferences/'.str_repeat('a', 64)),
+        'GivingReceipt' => fn () => new GivingReceipt($givingNotice),
+        'GivingReminder' => fn () => new GivingReminder($givingReminder, str_repeat('a', 64)),
         'DuesReminder' => fn () => new DuesReminder($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge])),
         'DuesReceipt' => fn () => new DuesReceipt($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge]), 'ref_render_dues'),
         'BookingConfirmationGuest' => fn () => new BookingConfirmationGuest($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),

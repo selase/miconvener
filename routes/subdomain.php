@@ -318,6 +318,25 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
+    Route::get('community/money/giving', [App\Http\Controllers\Tenant\GivingFundController::class, 'index'])->name('tenant.community.money.giving.index');
+    Route::get('community/money/giving/report', [App\Http\Controllers\Tenant\GivingReportController::class, 'index'])->name('tenant.community.money.giving.report');
+
+    Route::post('finance/giving/refunds/{adjustment}/reconcile', [App\Http\Controllers\Tenant\GivingRefundController::class, 'reconcile'])->name('tenant.community.giving.refunds.reconcile');
+    Route::get('finance/giving/{type}/{source}/refunds/preview', [App\Http\Controllers\Tenant\GivingRefundController::class, 'preview'])->name('tenant.community.giving.refunds.preview');
+    Route::post('finance/giving/{type}/{source}/refunds', [App\Http\Controllers\Tenant\GivingRefundController::class, 'store'])->name('tenant.community.giving.refunds.store');
+
+    Route::get('community/money/giving/member-options', [App\Http\Controllers\Tenant\GivingGiftController::class, 'memberOptions'])->name('tenant.community.giving.member-options');
+    Route::post('community/money/giving/funds/{fund}/gifts', [App\Http\Controllers\Tenant\GivingGiftController::class, 'store'])->name('tenant.community.giving.gifts.store');
+    Route::post('community/money/giving/gifts/{gift}/corrections', [App\Http\Controllers\Tenant\GivingGiftController::class, 'correct'])->name('tenant.community.giving.gifts.correct');
+
+    Route::prefix('community/money/giving/funds')->name('tenant.community.giving.funds.')->group(function (): void {
+        Route::post('/', [App\Http\Controllers\Tenant\GivingFundController::class, 'store'])->name('store');
+        Route::put('/{fund}', [App\Http\Controllers\Tenant\GivingFundController::class, 'update'])->name('update');
+        Route::post('/{fund}/close', [App\Http\Controllers\Tenant\GivingFundController::class, 'close'])->name('close');
+        Route::post('/{fund}/reopen', [App\Http\Controllers\Tenant\GivingFundController::class, 'reopen'])->name('reopen');
+        Route::post('/{fund}/archive', [App\Http\Controllers\Tenant\GivingFundController::class, 'archive'])->name('archive');
+    });
+
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
             Route::get('people/joins', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'index'])->name('joins.index');
@@ -541,7 +560,7 @@ Route::get('/e/{event}/calendar.ics', [PublicEventController::class, 'calendarFe
 Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');
 Route::post('/e/{event}/unlock-tickets', [PublicEventController::class, 'unlockTicketTypes'])->name('public.events.unlock-tickets');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
-Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.contribute');
+Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->block(15, 15)->name('public.events.contribute');
 Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
 Route::post('/e/{event}/checkout/{registration}/paystack', [EventCheckoutController::class, 'payWithPaystack'])->name('public.events.checkout.paystack');
@@ -651,3 +670,15 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 // Opt-out links remain available even when Community is switched off.
 Route::get('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'show'])->middleware('throttle:30,1')->name('public.community.preferences.show');
 Route::post('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'update'])->middleware('throttle:30,1')->name('public.community.preferences.update');
+
+Route::get('/give', [App\Http\Controllers\Public\GivingFundController::class, 'index'])->name('public.giving.index');
+Route::get('/give/{slug}', [App\Http\Controllers\Public\GivingFundController::class, 'show'])->name('public.giving.show');
+Route::post('/giving/verify/email/send', [App\Http\Controllers\Public\GivingReminderController::class, 'sendVerification'])->name('public.giving.verify.send');
+Route::post('/giving/verify/email/confirm', [App\Http\Controllers\Public\GivingReminderController::class, 'confirmVerification'])->name('public.giving.verify.confirm');
+Route::post('/give/{slug}/reminder', [App\Http\Controllers\Public\GivingReminderController::class, 'subscribe'])->middleware('throttle:10,1')->name('public.giving.reminders.subscribe');
+Route::get('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'unsubscribe'])->middleware('throttle:60,1')->name('public.giving.reminders.unsubscribe');
+Route::post('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'stop'])->middleware('throttle:10,1')->name('public.giving.reminders.stop');
+Route::post('/give/{slug}/checkout', [App\Http\Controllers\Public\GivingCheckoutController::class, 'store'])->middleware('throttle:10,1')->block(15, 15)->name('public.giving.checkout');
+Route::get('/giving/payments/{reference}/callback', [App\Http\Controllers\Public\GivingCheckoutController::class, 'callback'])->name('public.giving.callback');
+Route::get('/giving/payments/{reference}/receipt', [App\Http\Controllers\Public\MyGivingController::class, 'guestReceipt'])->middleware('throttle:60,1')->name('public.giving.receipt');
+Route::get('/giving/payments/{reference}', [App\Http\Controllers\Public\GivingCheckoutController::class, 'result'])->name('public.giving.result');

@@ -147,7 +147,7 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
     );
 }
 
-export default function MoneyDues({ membershipTypes, canRemindArrears }) {
+export default function MoneyDues({ membershipTypes, canRemindArrears, canUseGiving = false }) {
     const inactiveMembers = membershipTypes.reduce(
         (sum, type) => sum + (!type.is_active ? type.member_count : 0),
         0
@@ -216,6 +216,15 @@ export default function MoneyDues({ membershipTypes, canRemindArrears }) {
             <PageHeader
                 title="Money"
                 tabs={[
+                    ...(canUseGiving
+                        ? [
+                              {
+                                  key: 'giving',
+                                  label: 'Giving',
+                                  href: route('tenant.community.money.giving.index'),
+                              },
+                          ]
+                        : []),
                     {
                         key: 'dues',
                         label: 'Dues',

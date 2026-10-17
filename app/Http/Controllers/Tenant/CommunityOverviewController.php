@@ -25,16 +25,30 @@ final class CommunityOverviewController extends Controller
 {
     public function index(): Response
     {
-        $this->authorize('manage members');
         $tenant = $this->getTenant();
+        if (! auth()->user()->can('manage members')) {
+            abort_unless(auth()->user()->can('manage giving') && app(\App\Services\Giving\GivingRollout::class)->enabled($tenant), 403);
+
+            return Inertia::render('Tenant/Community/Overview', [
+                'canReadFinance' => auth()->user()->can('read finance'),
+                'counts' => null, 'reviewCounts' => null, 'membershipTypes' => [],
+                'joinSettings' => null, 'reminderSettings' => null, 'recentMessages' => null,
+                'collectedThisMonth' => [],
+                'givingFundsCount' => \App\Models\GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count(),
+            ]);
+        }
 
         $charges = DuesCharge::query()->where('tenant_id', $tenant->id);
         $today = CarbonImmutable::now(CommunitySettings::for($tenant)->timezone);
         $canReadFinance = auth()->user()->can('read finance');
-        $report = $canReadFinance ? app(DuesReport::class)->summary($tenant, $today->startOfMonth()->utc(), $today->endOfDay()->utc()) : [];
+        $hasDues = \App\Models\MembershipType::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotNull('amount')->exists();
+        $givingFirst = ! $hasDues && app(\App\Services\Giving\GivingRollout::class)->enabled($tenant);
+        $report = $canReadFinance ? ($givingFirst ? app(\App\Services\Giving\GivingReport::class)->summary($tenant, $today->startOfMonth()->utc(), $today->endOfDay()->utc()) : app(DuesReport::class)->summary($tenant, $today->startOfMonth()->utc(), $today->endOfDay()->utc())) : [];
 
         return Inertia::render('Tenant/Community/Overview', [
             'canReadFinance' => $canReadFinance,
+            'givingFundsCount' => app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) && auth()->user()->can('manage giving') ? \App\Models\GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count() : null,
+            'hasDues' => \App\Models\MembershipType::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotNull('amount')->exists(),
             'joinSettings' => CommunitySettings::for($tenant)->only(['join_mode', 'public_join_enabled', 'public_membership_type_id']),
             'membershipTypes' => \App\Models\MembershipType::query()->where('tenant_id', $tenant->id)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'amount', 'currency', 'period']),
             'reviewCounts' => [
@@ -52,8 +66,8 @@ final class CommunityOverviewController extends Controller
                 'overdueCharges' => (clone $charges)->where('status', DuesChargeStatusEnum::Open)->whereDate('due_on', '<', $today->toDateString())->count(),
             ],
             'collectedThisMonth' => collect($report)
-                ->filter(fn (array $amounts): bool => $amounts['collected_online_gross'] > 0)
-                ->map(fn (array $amounts, string $currency): array => ['currency' => $currency, 'amount' => $amounts['collected_online_gross']])
+                ->filter(fn (array $amounts): bool => ($amounts['collected_online_gross'] ?? $amounts['collected_online'] ?? 0) > 0)
+                ->map(fn (array $amounts, string $currency): array => ['currency' => $currency, 'amount' => $amounts['collected_online_gross'] ?? $amounts['collected_online'] ?? 0])
                 ->values(),
         ]);
     }

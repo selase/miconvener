@@ -22,7 +22,7 @@ final class CommunityOrganisationController extends Controller
         $context = app(CommunityPublicContext::class)->for($tenant, $request->session());
         $events = Event::query()->where('tenant_id', $tenant->id)->published()->where('visibility', Event::VISIBILITY_PUBLIC)->where('ends_at', '>=', now())->orderBy('starts_at')->limit(12)->get()
             ->map(fn (Event $event): array => ['id' => $event->id, 'name' => $event->name, 'starts_at' => $event->starts_at->toIso8601String(), 'timezone' => $event->timezone, 'url' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $event->slug])])->values();
-        $response = Inertia::render('Public/Community/Organisation', [...$context, 'events' => $events, 'joinRequests' => $context['identity'] === null ? [] : app(\App\Services\Community\CommunityHistory::class)->requests($tenant, $request->session())['joins']])->toResponse($request);
+        $response = Inertia::render('Public/Community/Organisation', [...$context, 'givingUrl' => app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) ? route('public.giving.index', ['subdomain' => $tenant->slug]) : null, 'events' => $events, 'joinRequests' => $context['identity'] === null ? [] : app(\App\Services\Community\CommunityHistory::class)->requests($tenant, $request->session())['joins']])->toResponse($request);
         $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;

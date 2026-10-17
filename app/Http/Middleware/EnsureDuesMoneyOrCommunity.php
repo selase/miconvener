@@ -25,7 +25,7 @@ final readonly class EnsureDuesMoneyOrCommunity
     {
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant || (! $tenant->communityEnabled() && ! $tenant->hasDuesMoney())) {
+        if (! $tenant || (! $tenant->communityEnabled() && ! $tenant->hasDuesMoney() && ! $tenant->hasGivingMoney())) {
             abort(404);
         }
 

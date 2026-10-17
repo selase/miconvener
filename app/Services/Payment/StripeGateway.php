@@ -37,6 +37,24 @@ final class StripeGateway implements PaymentGateway
         array $metadata,
         int $applicationFee,
     ): string {
+        return $this->createConnectedCheckoutSessionResult($email, $amount, $currency, $description, $successUrl, $cancelUrl, $metadata, $applicationFee)['url'];
+    }
+
+    /**
+     * @param  array<string, string>  $metadata
+     * @return array{url:string, session_id:string, payment_intent:?string}
+     */
+    public function createConnectedCheckoutSessionResult(
+        string $email,
+        int $amount,
+        string $currency,
+        string $description,
+        string $successUrl,
+        string $cancelUrl,
+        array $metadata,
+        int $applicationFee,
+        ?string $idempotencyKey = null,
+    ): array {
         $paymentIntentData = ['metadata' => $metadata];
 
         if ($applicationFee > 0) {
@@ -59,9 +77,9 @@ final class StripeGateway implements PaymentGateway
                 'payment_intent_data' => $paymentIntentData,
                 'success_url' => $successUrl,
                 'cancel_url' => $cancelUrl,
-            ], $this->accountOptions());
+            ], $this->accountOptions() + ($idempotencyKey === null ? [] : ['idempotency_key' => $idempotencyKey]));
 
-            return $session->url ?? '';
+            return ['url' => $session->url ?? '', 'session_id' => $session->id ?? '', 'payment_intent' => is_string($session->payment_intent ?? null) ? $session->payment_intent : null];
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('stripe', $e->getMessage(), previous: $e);
         }
@@ -208,6 +226,59 @@ final class StripeGateway implements PaymentGateway
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('stripe', $e->getMessage(), previous: $e);
         }
+    }
+
+    /** @return array<string, mixed> */
+    public function verifyConnectedGivingSession(string $sessionId): array
+    {
+        $session = $this->stripe->checkout->sessions->retrieve($sessionId, [], $this->accountOptions());
+        if ($session->payment_status !== 'paid' || ! is_string($session->payment_intent)) {
+            return ['status' => 'pending'];
+        }
+        $intent = $this->stripe->paymentIntents->retrieve($session->payment_intent, ['expand' => ['latest_charge.balance_transaction']], $this->accountOptions());
+        $balance = is_object($intent->latest_charge) ? $intent->latest_charge->balance_transaction : null;
+        $currency = mb_strtoupper((string) $session->currency);
+        $fees = null;
+        if (is_object($balance) && mb_strtoupper((string) $balance->currency) === $currency) {
+            $applicationFees = 0;
+            foreach ($balance->fee_details as $detail) {
+                if ($detail->type === 'application_fee') {
+                    $applicationFees += (int) $detail->amount;
+                }
+            }
+            $fees = (int) $balance->fee - $applicationFees;
+        }
+
+        return ['status' => $intent->status === 'succeeded' && $intent->amount_received === $session->amount_total ? 'success' : 'pending',
+            'metadata' => $session->metadata?->toArray() ?? [], 'amount' => (int) $session->amount_total, 'currency' => $currency,
+            'fees' => $fees, 'commission_received' => (int) ($intent->application_fee_amount ?? 0),
+            'session_id' => $session->id, 'provider_reference' => $intent->id];
+    }
+
+    /** @return array{reference:string, status:string} */
+    public function requestGivingRefund(string $reference, int $amount, string $operationKey): array
+    {
+        $refund = $this->stripe->refunds->create(['payment_intent' => $reference, 'amount' => $amount,
+            'refund_application_fee' => true, 'metadata' => ['giving_operation_key' => $operationKey]], $this->accountOptions() + ['idempotency_key' => $operationKey]);
+
+        return ['reference' => $refund->id, 'status' => $refund->status];
+    }
+
+    /** @return array<string, mixed> */
+    public function verifyGivingRefund(string $refundId, string $reference, string $operationKey): array
+    {
+        $refund = $this->stripe->refunds->retrieve($refundId, ['expand' => ['balance_transaction']], $this->accountOptions());
+        if ($refund->payment_intent !== $reference || ($refund->metadata->toArray()['giving_operation_key'] ?? '') !== $operationKey) {
+            return ['status' => 'unknown'];
+        }
+        $intent = $this->stripe->paymentIntents->retrieve($reference, ['expand' => ['latest_charge']], $this->accountOptions());
+        $feeId = is_object($intent->latest_charge) ? ($intent->latest_charge->application_fee ?? null) : null;
+        $returned = $feeId === null ? 0 : (int) $this->stripe->applicationFees->retrieve($feeId)->amount_refunded;
+        $balance = $refund->balance_transaction;
+        $credit = is_object($balance) && mb_strtoupper((string) $balance->currency) === mb_strtoupper((string) $refund->currency) ? max(0, -(int) $balance->fee) : 0;
+
+        return ['status' => $refund->status, 'amount' => (int) $refund->amount, 'currency' => mb_strtoupper((string) $refund->currency),
+            'gateway_credit' => $credit, 'commission_returned_cumulative' => $returned];
     }
 
     public function verifyTransaction(string $reference): array

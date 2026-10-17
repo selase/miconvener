@@ -18,6 +18,8 @@ enum LedgerCategoryEnum: string
     /** Membership dues. */
     case Dues = 'dues';
 
+    case Giving = 'giving';
+
     /** Commission the platform owes an organisation back. */
     case CommissionCredit = 'commission_credit';
 
@@ -37,6 +39,7 @@ enum LedgerCategoryEnum: string
         return match ($this) {
             self::Event => 'Event sales',
             self::Dues => 'Member dues',
+            self::Giving => 'Giving',
             self::CommissionCredit => 'Commission credit',
             self::Marketplace => 'Marketplace',
         };
@@ -49,7 +52,7 @@ enum LedgerCategoryEnum: string
     {
         return match ($this) {
             self::Event => 'required',
-            self::Dues, self::CommissionCredit => 'forbidden',
+            self::Dues, self::Giving, self::CommissionCredit => 'forbidden',
             self::Marketplace => 'optional',
         };
     }

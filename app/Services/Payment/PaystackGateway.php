@@ -264,6 +264,32 @@ final class PaystackGateway implements PaymentGateway
         }
     }
 
+    /** @return array{reference:string, status:string} */
+    public function requestGivingRefund(string $reference, int $amount, string $operationKey): array
+    {
+        $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/refund", [
+            'transaction' => $reference, 'amount' => $amount, 'merchant_note' => 'giving:'.$operationKey,
+        ])->throw();
+        $data = $response->json('data');
+
+        return ['reference' => isset($data['id']) ? (string) $data['id'] : '', 'status' => (string) ($data['status'] ?? 'pending')];
+    }
+
+    /** @return array<string, mixed> */
+    public function verifyGivingRefund(string $refundId, string $reference, string $operationKey): array
+    {
+        if ($refundId === '') {
+            return ['status' => 'unknown'];
+        }
+        $data = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/refund/".rawurlencode($refundId))->throw()->json('data');
+        if ((string) ($data['id'] ?? '') !== $refundId || ($data['merchant_note'] ?? '') !== 'giving:'.$operationKey) {
+            return ['status' => 'unknown'];
+        }
+
+        return ['status' => (string) ($data['status'] ?? 'unknown'), 'amount' => (int) ($data['amount'] ?? 0),
+            'currency' => mb_strtoupper((string) ($data['currency'] ?? '')), 'gateway_credit' => 0, 'commission_returned' => 0];
+    }
+
     public function verifyTransaction(string $reference): array
     {
         try {
@@ -278,6 +304,8 @@ final class PaystackGateway implements PaymentGateway
                 'type' => isset($data['plan']) && $data['plan'] ? 'subscription' : 'payment',
                 'amount' => $data['amount'] ?? 0,
                 'fees' => (int) ($data['fees'] ?? 0),
+                'fees_reported' => isset($data['fees']),
+                'fees_split' => (array) ($data['fees_split'] ?? []),
                 'currency' => mb_strtolower($data['currency'] ?? 'ghs'),
                 'channel' => $data['channel'] ?? null,
                 'authorization' => (array) ($data['authorization'] ?? []),

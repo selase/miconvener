@@ -112,6 +112,21 @@ export default function AttendeeHome({
                     )}
                 </div>
                 <aside className="space-y-5">
+                    {duesSummary?.giving?.total > 0 && (
+                        <section className="border border-border bg-surface p-5">
+                            <h2 className="text-lg font-medium">Your contributions</h2>
+                            <p className="mt-3 text-sm text-ink-secondary">
+                                Revisit your giving, recorded contributions and private receipts.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => onSectionChange('money')}
+                                className="mt-3 min-h-11 text-sm text-accent underline"
+                            >
+                                View contribution records →
+                            </button>
+                        </section>
+                    )}
                     {(inboxStatus === 'loading' ||
                         inboxStatus === 'error' ||
                         inbox?.some((row) => row.unread > 0)) && (

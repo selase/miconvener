@@ -506,19 +506,22 @@ final class EventController extends Controller
 
         $filename = "{$eventModel->slug}-contributions.csv";
 
-        return response()->streamDownload(function () use ($eventModel): void {
+        $givingIds = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
+        $canFinance = auth()->user()->can('read finance');
+
+        return response()->streamDownload(function () use ($eventModel, $givingIds, $canFinance): void {
             $handle = fopen('php://output', 'wb');
             fputcsv($handle, ['Reference', 'Contributor Name', 'Email', 'Phone', 'Amount (Pesewas)', 'Amount (GHS)', 'Net (GHS)', 'Currency', 'Status', 'Is Anonymous', 'Tribute Message', 'Paid At', 'Created At']);
 
             $sanitizeCsv = fn (?string $v): ?string => ($v !== null && in_array($v[0] ?? '', ['=', '+', '-', '@'], true)) ? "'".$v : $v;
 
-            $eventModel->contributions()->orderByDesc('created_at')->chunk(200, function ($contributions) use ($handle, $sanitizeCsv): void {
+            $eventModel->contributions()->orderByDesc('created_at')->chunk(200, function ($contributions) use ($handle, $sanitizeCsv, $givingIds, $canFinance): void {
                 foreach ($contributions as $c) {
                     fputcsv($handle, [
                         $c->payment_reference,
-                        $sanitizeCsv($c->contributor_name),
-                        $c->contributor_email,
-                        $c->contributor_phone,
+                        $sanitizeCsv(in_array($c->id, $givingIds, true) && ($c->is_anonymous || ! $canFinance) ? $c->displayName() : $c->contributor_name),
+                        in_array($c->id, $givingIds, true) && ($c->is_anonymous || ! $canFinance) ? null : $sanitizeCsv($c->contributor_email),
+                        in_array($c->id, $givingIds, true) && ($c->is_anonymous || ! $canFinance) ? null : $sanitizeCsv($c->contributor_phone),
                         $c->amount,
                         number_format($c->amount / 100, 2),
                         number_format($c->net_amount / 100, 2),
@@ -659,6 +662,8 @@ final class EventController extends Controller
         $snapshot = app(EventWorkspaceSnapshot::class);
         $phase = $snapshot->phase($eventModel);
         $hasActiveGateway = $tenant->canAcceptPayments();
+        $givingLinks = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
+        $canReadGivingFinance = auth()->user()->can('read finance');
 
         return Inertia::render('Tenant/Events/Show', [
             'event' => [
@@ -684,9 +689,10 @@ final class EventController extends Controller
                 ->get()
                 ->map(fn (\App\Models\EventContribution $c): array => [
                     'id' => $c->id,
-                    'contributor_name' => $c->contributor_name,
-                    'contributor_email' => $c->contributor_email,
-                    'contributor_phone' => $c->contributor_phone,
+                    'contributor_name' => in_array($c->id, $givingLinks, true) && ($c->is_anonymous || ! $canReadGivingFinance) ? $c->displayName() : $c->contributor_name,
+                    'payout_category' => in_array($c->id, $givingLinks, true) ? 'giving' : 'event',
+                    'contributor_email' => in_array($c->id, $givingLinks, true) && ($c->is_anonymous || ! $canReadGivingFinance) ? null : $c->contributor_email,
+                    'contributor_phone' => in_array($c->id, $givingLinks, true) && ($c->is_anonymous || ! $canReadGivingFinance) ? null : $c->contributor_phone,
                     'amount' => $c->amount,
                     'gateway_fee_amount' => $c->gateway_fee_amount,
                     'platform_fee_amount' => $c->platform_fee_amount,
@@ -702,6 +708,7 @@ final class EventController extends Controller
                     'created_at' => $c->created_at->toIso8601String(),
                 ])->values() : [],
             'contributionsStats' => $section === 'contributions' ? [
+                ...app(\App\Services\Giving\GivingContributionBridge::class)->eventSummary($eventModel),
                 'total_raised' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('amount'),
                 'net_payout' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('net_amount'),
                 'contributors_count' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->count(),

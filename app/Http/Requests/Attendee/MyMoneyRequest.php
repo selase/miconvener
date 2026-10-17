@@ -19,7 +19,7 @@ final class MyMoneyRequest extends FormRequest
     {
         $required = $this->routeIs('attendee.my.communities.statement') ? 'required' : 'sometimes';
 
-        return ['tenant_slug' => ['sometimes', 'string', 'max:100'], 'member_id' => ['sometimes', 'uuid'], 'currency' => ['sometimes', 'string', 'size:3'], 'page' => ['sometimes', 'integer', 'min:1'], 'contributions_page' => ['sometimes', 'integer', 'min:1'], 'from' => [$required, 'date_format:Y-m-d'], 'to' => [$required, 'date_format:Y-m-d', 'after_or_equal:from']];
+        return ['source_type' => ['sometimes', \Illuminate\Validation\Rule::in(['gift', 'event_contribution'])], 'source' => ['sometimes', \Illuminate\Validation\Rule::in(['online', 'recorded_cash', 'bulk_cash'])], 'tenant_slug' => ['sometimes', 'string', 'max:100'], 'member_id' => ['sometimes', 'uuid'], 'currency' => ['sometimes', 'string', 'size:3'], 'page' => ['sometimes', 'integer', 'min:1'], 'giving_page' => ['sometimes', 'integer', 'min:1'], 'contributions_page' => ['sometimes', 'integer', 'min:1'], 'from' => [$required, 'date_format:Y-m-d'], 'to' => [$required, 'date_format:Y-m-d', 'after_or_equal:from']];
     }
 
     public function messages(): array

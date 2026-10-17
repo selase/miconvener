@@ -34,3 +34,18 @@ it('dues-only payment settings clearly offers Paystack and no Stripe connection'
         screen.queryByText(/Payments go straight into your own Paystack or Stripe account/)
     ).toBeNull();
 });
+it('giving-only payment settings offers its connected Stripe option', () => {
+    render(
+        <Payments
+            settlementMode="own_gateway"
+            platformSettlementAvailable
+            ticketPaymentsAvailable={false}
+            givingPaymentsAvailable
+            gateways={{ paystack: { connected: false } }}
+            stripe={{ configured: true }}
+            commissionSplit={{ enforced: false, destinations: {} }}
+            commissionCredit={[]}
+        />
+    );
+    expect(screen.getByRole('link', { name: 'Connect with Stripe' })).toBeTruthy();
+});

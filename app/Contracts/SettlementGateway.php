@@ -29,7 +29,7 @@ interface SettlementGateway
     public function finalizeTransfer(string $transferCode, string $otp): array;
 
     /**
-     * @return array{status: string, fee: int|null}
+     * @return array{status: string, fee: int|null, reference?:string, transfer_code?:string, amount?:int, currency?:string}
      */
     public function verifyTransfer(string $reference): array;
 

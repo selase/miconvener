@@ -186,7 +186,14 @@ function DuesSection({ dues, filters }) {
     );
 }
 
-export default function Index({ transactions, stats, filters, dues }) {
+export default function Index({
+    transactions,
+    stats,
+    filters,
+    dues,
+    givingOnly = false,
+    givingReportUrl = null,
+}) {
     const [selected, setSelected] = useState(null);
     const [search, setSearch] = useState(filters.search ?? '');
     const [refunding, setRefunding] = useState(null);
@@ -220,6 +227,16 @@ export default function Index({ transactions, stats, filters, dues }) {
     return (
         <ConsoleLayout>
             <PageHeader title="Finance" />
+            {givingReportUrl && (
+                <div className="border-b border-border px-4 py-5 sm:px-8">
+                    <a className="text-accent underline" href={givingReportUrl}>
+                        Giving collections, cash and payout report →
+                    </a>
+                    <p className="mt-2 text-sm text-ink-secondary">
+                        Voluntary contributions have their own report and payout balance.
+                    </p>
+                </div>
+            )}
 
             <div className="flex">
                 <div
@@ -229,14 +246,14 @@ export default function Index({ transactions, stats, filters, dues }) {
                             : 'min-w-0 flex-1 space-y-6 px-8 py-6'
                     }
                 >
-                    {dues && (
+                    {!givingOnly && dues && (
                         <DuesSection
                             key={`${dues.from}-${dues.to}`}
                             dues={dues}
                             filters={filters}
                         />
                     )}
-                    {(!dues || dues.show_ticket_finance) && (
+                    {!givingOnly && (!dues || dues.show_ticket_finance) && (
                         <>
                             {dues && (
                                 <h2 className="text-lg font-semibold text-ink">

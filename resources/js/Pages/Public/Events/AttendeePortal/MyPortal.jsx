@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import csrfFetch from '@/lib/csrfFetch';
+import { clearAttendeeIdentity } from '@/lib/attendeeIdentityCache';
 import VerifyPrompt from './VerifyPrompt';
 import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
 import CommunitiesPanel from '@/Pages/Public/Community/CommunitiesPanel';
@@ -169,6 +170,7 @@ function LegacyMyPortal({
     }, [verifiedEmail, history, loading, selectedOrganiser, fetchData]);
 
     const handleVerified = (maskedEmail, channel = 'email', phoneOrganiser = null) => {
+        clearAttendeeIdentity();
         clearAllOfflineTickets();
         if (communityReturnUrl) {
             window.location.assign(communityReturnUrl);
@@ -217,6 +219,7 @@ function LegacyMyPortal({
                 setSignOutError(true);
                 return;
             }
+            clearAttendeeIdentity();
             clearAllOfflineTickets();
             setSignOutError(false);
             setPhoneVerified(false);
@@ -300,6 +303,7 @@ function LegacyMyPortal({
         setVerifiedEmail(null);
         setHistory(null);
         setCredential(null);
+        clearAttendeeIdentity();
         clearAllOfflineTickets();
     };
     if (credential)
@@ -320,6 +324,14 @@ function LegacyMyPortal({
             </Head>
 
             <div className="mx-auto max-w-2xl px-6 py-16 sm:px-10">
+                {(verifiedEmail || phoneVerified) && (
+                    <a
+                        href={route('attendee.my.giving.index')}
+                        className="mb-6 inline-block min-h-11 py-2 text-sm text-accent underline"
+                    >
+                        My contributions, receipts and statements →
+                    </a>
+                )}
                 <div className="space-y-1 mb-8">
                     <h1 className="text-2xl font-normal tracking-tight text-ink">
                         {joiningEvent && !verifiedEmail

@@ -63,6 +63,12 @@ final class EventContributionService
             throw new InvalidArgumentException("Minimum contribution amount is {$event->currency} {$formattedMin}.");
         }
 
+        $initiatedAt = \Carbon\CarbonImmutable::now();
+        $bridge = app(\App\Services\Giving\GivingContributionBridge::class);
+        if ($bridge->usesGiving($tenant, $initiatedAt)) {
+            return $bridge->initiate($event, $data, $callbackUrl, $provider, $initiatedAt);
+        }
+
         $platformFee = $this->platformFeeFor($event, $amountPesewas);
         $stripeRow = null;
         $paystack = null;
@@ -84,8 +90,8 @@ final class EventContributionService
         $paymentReference = 'CONTRIB-'.mb_strtoupper(Str::random(16));
 
         /** @var EventContribution $contribution */
-        $contribution = DB::connection('landlord')->transaction(function () use ($tenant, $event, $data, $amountPesewas, $paymentReference): EventContribution {
-            return EventContribution::create([
+        $contribution = DB::connection('landlord')->transaction(function () use ($tenant, $event, $data, $amountPesewas, $paymentReference, $initiatedAt): EventContribution {
+            $source = new EventContribution([
                 'tenant_id' => $tenant->id,
                 'event_id' => $event->id,
                 'contributor_name' => mb_trim((string) $data['contributor_name']),
@@ -99,6 +105,10 @@ final class EventContributionService
                 'is_anonymous' => (bool) ($data['is_anonymous'] ?? false),
                 'is_approved' => true,
             ]);
+            $source->setCreatedAt($initiatedAt);
+            $source->save();
+
+            return $source;
         });
 
         try {
@@ -193,6 +203,13 @@ final class EventContributionService
             Log::warning("Event contribution for reference [{$reference}] was not found during confirmation.");
 
             return null;
+        }
+
+        $givingAttempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $contribution->tenant_id)->where('event_contribution_id', $contribution->id)->first();
+        if ($givingAttempt !== null) {
+            app(\App\Services\Giving\GivingPaymentConfirmer::class)->quarantine($givingAttempt, 'legacy_dispatch_for_giving_source');
+
+            return $givingAttempt->state === 'confirmed' ? $contribution : null;
         }
 
         if ($contribution->isCompleted()) {
@@ -297,6 +314,9 @@ final class EventContributionService
      */
     public function feeNoteFor(Event $event): string
     {
+        if (app(\App\Services\Giving\GivingContributionBridge::class)->usesGiving($event->tenant, \Carbon\CarbonImmutable::now())) {
+            return 'Your selected amount is your total contribution. Applicable processing fees and platform charges are covered by the organisation.';
+        }
         $percentage = $this->contributionPercentage();
 
         if ($percentage === 0.0) {

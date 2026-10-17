@@ -32,13 +32,13 @@ final class MyMoneySummary
                 $currencies = [['currency' => $filters['currency'] ?? $member->membershipType->currency, 'open_total' => 0]];
             }
 
-            return ['tenant_slug' => $member->tenant->slug, 'organisation' => $member->tenant->name, 'member_id' => $member->id, 'member_name' => $member->name, 'access_role' => $this->access->role($session, $member), 'status' => $member->status->value, 'totals_by_currency' => $currencies,
+            return ['has_dues' => $member->membershipType->amount !== null, 'tenant_slug' => $member->tenant->slug, 'organisation' => $member->tenant->name, 'member_id' => $member->id, 'member_name' => $member->name, 'access_role' => $this->access->role($session, $member), 'status' => $member->status->value, 'totals_by_currency' => $currencies,
                 'pay_url' => route('public.dues.show', ['subdomain' => $member->tenant->slug, 'token' => $member->pay_token]),
                 'charges_url' => route('attendee.my.communities.charges', ['tenantSlug' => $member->tenant->slug, 'member' => $member->id]),
                 'statement_url' => route('attendee.my.communities.statement', ['tenantSlug' => $member->tenant->slug, 'member' => $member->id])];
         });
         $email = $this->emails->verifiedEmail($session);
 
-        return ['dues' => $members->toArray(), 'totals_by_currency' => $this->history->moneyTotals($session, $filters), 'contributions' => $email === null ? null : $this->events->getAppContributions($email, $filters)->toArray()];
+        return ['giving' => app(\App\Services\Giving\GivingHistory::class)->page($session, $filters)->toArray(), 'dues' => $members->toArray(), 'totals_by_currency' => $this->history->moneyTotals($session, $filters), 'contributions' => $email === null ? null : $this->events->getAppContributions($email, $filters)->toArray()];
     }
 }

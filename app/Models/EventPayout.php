@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
+ * @property int|null $requested_transfer_fee_amount
+ * @property int|null $requested_net_amount
+ * @property string|null $event_id
  * @property LedgerCategoryEnum|null $category
  */
 final class EventPayout extends Model
@@ -46,6 +49,8 @@ final class EventPayout extends Model
         'amount',
         'currency',
         'transfer_fee_amount',
+        'requested_transfer_fee_amount',
+        'requested_net_amount',
         'net_paid_amount',
         'status',
         'scheduled_at',
@@ -60,6 +65,8 @@ final class EventPayout extends Model
         'category' => LedgerCategoryEnum::class,
         'amount' => 'integer',
         'transfer_fee_amount' => 'integer',
+        'requested_transfer_fee_amount' => 'integer',
+        'requested_net_amount' => 'integer',
         'net_paid_amount' => 'integer',
         'scheduled_at' => 'datetime',
         'paid_at' => 'datetime',

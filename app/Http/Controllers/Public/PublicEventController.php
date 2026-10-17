@@ -619,6 +619,22 @@ final class PublicEventController extends Controller
     {
         $tenant = $event->tenant ?? Tenant::find($event->tenant_id);
 
+        if (app(\App\Services\Giving\GivingContributionBridge::class)->usesGiving($tenant, \Carbon\CarbonImmutable::now())) {
+            if (! app(\App\Services\Giving\GivingRollout::class)->onlineEnabled($tenant)) {
+                return [];
+            }
+            $providers = [];
+            foreach (['paystack', 'stripe'] as $provider) {
+                try {
+                    app(\App\Services\Giving\GivingGateways::class)->identity($tenant, $provider, $event->currency ?: 'GHS');
+                    $providers[] = $provider;
+                } catch (\Illuminate\Validation\ValidationException) {
+                }
+            }
+
+            return $providers;
+        }
+
         return array_values(array_filter([
             app(\App\Services\Payment\TenantPaystackResolver::class)->isAvailableFor($tenant) ? 'paystack' : null,
             app(\App\Services\Payment\StripeConnect::class)->isAvailableFor($tenant) ? 'stripe' : null,

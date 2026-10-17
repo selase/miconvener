@@ -59,6 +59,7 @@ final class HandleInertiaRequests extends Middleware
                     'process_refunds' => fn (): bool => (bool) $request->user()?->can('process refunds'),
                     'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
                     'send_community_messages' => fn (): bool => (bool) $request->user()?->can('send community messages'),
+                    'manage_giving' => fn (): bool => (bool) $request->user()?->can('manage giving'),
                     'manage_members' => fn (): bool => (bool) $request->user()?->can('manage members'),
                     'manage_payment_settings' => fn (): bool => (bool) $request->user()?->can('manage payment settings'),
                     'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
@@ -80,10 +81,12 @@ final class HandleInertiaRequests extends Middleware
                     'llm_byok' => $tenant->featureEnabled('llm_byok'),
                     'community_following' => $tenant->followingEnabled(),
                     'community' => $tenant->communityEnabled(),
+                    'giving_history' => $tenant->hasGivingMoney() || app(\App\Services\Giving\GivingRollout::class)->enabled($tenant),
+                    'community_giving' => app(\App\Services\Giving\GivingRollout::class)->enabled($tenant),
                     'community_inbox' => $tenant->communityEnabled() && app(\App\Services\Community\InboxRollout::class)->enabled($tenant),
                     'community_messages' => $tenant->communityEnabled() && $tenant->featureEnabled('community_messages'),
                     // Payouts stay in the menu while dues money is held, even with Community off.
-                    'dues_payouts' => $tenant->communityEnabled() || $tenant->hasDuesMoney(),
+                    'dues_payouts' => $tenant->communityEnabled() || $tenant->hasDuesMoney() || $tenant->hasGivingMoney(),
                 ],
             ] : null,
             'flash' => [
