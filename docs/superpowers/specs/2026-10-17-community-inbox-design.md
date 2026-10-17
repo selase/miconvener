@@ -1,6 +1,6 @@
 # Community inbox: design
 
-Date: 2026-10-17. Status: draft for owner review (revised after a fresh review the same day). Author: Claude (design only; no application code). Path: architectural (new records, new access surface in `/my`).
+Date: 2026-10-17. Status: approved by the owner 2026-10-17 (section 13 as recommended, with two owner changes: followers are email-first with SMS as an added channel, and dues reminders and receipts are in scope). Author: Claude (design only; no application code). Path: architectural (new records, new access surface in `/my`).
 
 Builds on `docs/superpowers/specs/2026-10-15-community-design.md` (sections 6.1 identity and access, 6.2 `/my` as an app, 6.3 following, 8 audiences and consent) and on what milestones 2 and 3 shipped (`CommunityMessage`, `CommunityMessageDelivery`, `CommunityMessages`, `AudienceResolver`, `MemberAudienceSource`, `FollowerAudienceSource`, `MessagingPreferences`, `CommunityFollower`, `Following`, `MemberAccess`, `CommunityAccessCredential`). Milestone 4 (`codex/community-4`) ships `/my` with "Messages arrive by email and SMS" and no unread badge, and proposes amending spec 6.2 accordingly (its decision 1). This design is the inbox that milestone deferred; whichever ships second updates spec 6.2.
 
@@ -10,7 +10,7 @@ People should be able to open `/my` and read what their organisations sent them,
 
 Success looks like this:
 
-- A member or email follower sees, per organisation, the messages addressed to them, newest first, with unread ones marked.
+- A member or follower sees, per organisation, the messages and notices addressed to them (announcements, dues reminders, payment receipts), newest first, with unread ones marked.
 - Nobody ever sees a message addressed to someone else, including a family member on the same phone or the previous holder of a reassigned number.
 - Reading a message marks it read for that reader; one message never shows twice to the same reader.
 - An organisation that recalls or loses access to messaging does not leave messages readable.
@@ -29,18 +29,19 @@ So the inbox gets its own recipient records, created as a message is sent, along
 
 **In the first version:**
 
-- Organisation messages composed in Community > Messages (milestone 2) and follower announcements of new events (milestone 3, `purpose = following_event`), to **members** and **email followers**.
-- Per-organisation unread counts, a message list, a message view and "mark all read" in `/my`.
-- Organisation-side withdraw and totals.
+- **Announcements:** organisation messages composed in Community > Messages (milestone 2) and follower announcements of new events (milestone 3, `purpose = following_event`), to members and followers.
+- **Notices (owner decision 2026-10-17):** dues reminders (milestone 1c `dues_reminders`, including the arrears button) and dues payment receipts, to members. A notice appears as soon as it is queued for the member, whatever happens to its email or SMS (sent, skipped for lack of credit, failed), so the inbox is where a member always finds it.
+- Per-organisation unread counts, a list, a message view and "mark all read" in `/my`.
+- Organisation-side withdraw (announcements) and totals.
+
+**Followers are email-first (owner decision 2026-10-17).** Email is the primary channel; there are no SMS-only followers. Following requires a verified email; SMS is an optional added channel on that same follow, and the follower's inbox is reached through the email. This amends spec 6.3 and milestone 3's address-scoped follow (one follow row per channel and address): see section 5.2 and section 14 for what changes. Members are unchanged: a member may still be reachable only by phone (spec 6.1) and reads their inbox through their member credential (section 5.1).
 
 **Not in the first version:**
 
-- **SMS (phone) followers.** A phone follower is identified only by a 12-hour, non-sliding phone proof (spec 6.1); nothing outside a session can tie a later sign-in to the earlier holder, so either they see nothing between sessions or a reassigned number's new holder sees the previous holder's history. Neither is acceptable. Options for a later version: a follower recovery credential like the member one, or accepting the reassigned-number risk for announcements bounded by `consented_at`. Members reachable only by phone are not affected: they use their member credential (section 5.1).
-- Dues reminders and receipts (already visible in `/my` > Money).
 - Event blasts and event-attendee audiences (not members or followers; no recipient record).
 - Replies or messages from a person to an organisation; push notifications; email digests.
-- Backfill of messages sent before the inbox is switched on.
-- Sending to an audience with no deliverable email or phone at all. `CommunityMessages::queue()` refuses a send when no address resolves, and this design keeps that rule; the inbox helps recipients inside a normal send whose email bounced or whose SMS was skipped.
+- Backfill of anything sent before the inbox is switched on.
+- Sending an announcement to an audience with no deliverable email or phone at all. `CommunityMessages::queue()` refuses a send when no address resolves, and this design keeps that rule.
 
 ## 4. Records
 
@@ -52,7 +53,10 @@ So the inbox gets its own recipient records, created as a message is sent, along
 |---|---|
 | `id` | uuid |
 | `tenant_id` | the organisation |
-| `message_id` | the `community_messages` row; content is read from it, not copied |
+| `kind` | `announcement`, `dues_reminder` or `dues_receipt` |
+| `message_id` | for announcements: the `community_messages` row; content is read from it, not copied. Null for notices |
+| `source_type`, `source_id` | for notices: the originating record (`dues_reminder` day key, or the paid charge/payment reference); unique per recipient so retries never duplicate |
+| `subject`, `body` | for notices only: a snapshot written when the notice is queued (amounts, periods and due dates as they were), so later changes never rewrite history. Never contains a pay-link token |
 | `recipient_type` | `member` or `follower` |
 | `member_id` | set when `recipient_type = member`; foreign key, cascade on delete |
 | `follower_id` | set when `recipient_type = follower`; foreign key, cascade on delete |
@@ -60,7 +64,7 @@ So the inbox gets its own recipient records, created as a message is sent, along
 | `withdrawn_at` | set on withdraw, cancel or takedown |
 | `created_at` | |
 
-- Unique `(message_id, member_id)` and unique `(message_id, follower_id)`; a check that exactly one of `member_id` / `follower_id` is set and matches `recipient_type`.
+- Unique `(message_id, member_id)` and unique `(message_id, follower_id)` for announcements; unique `(kind, source_type, source_id, member_id)` for notices. A check that exactly one of `member_id` / `follower_id` is set and matches `recipient_type`, and that notices are member-only and have `subject`/`body` while announcements have `message_id`.
 - Indexes `(member_id, available_at)` and `(follower_id, available_at)` (cross-organisation `/my` queries filter by recipient, not tenant), plus `(message_id)`.
 - No phone, email or address is stored on an item. Access is decided by the recipient record (section 5).
 
@@ -70,11 +74,11 @@ So the inbox gets its own recipient records, created as a message is sent, along
 
 | Column | Notes |
 |---|---|
-| `message_id` | per message, so a member item and a follower item for the same message read together (section 6.3) |
+| `entry_key` | the announcement's `message_id`, or the notice item's own `id`; announcements read per message so a member item and a follower item for the same message read together (section 6.3) |
 | `reader_key` | HMAC (section 5.3); never a raw email, phone or credential |
 | `read_at` | |
 
-- Unique `(message_id, reader_key)`; cascade on message delete.
+- Unique `(entry_key, reader_key)`; deleted with the items they refer to.
 - Unread for a reader = a visible item for that message and no read row for that reader and message.
 
 ## 5. Access rules
@@ -96,9 +100,9 @@ Inherited consequences:
 - **Statuses:** members keep read access to their past items whatever their status. They receive new items only if the message's audience includes them; an organisation can deliberately message lapsed or exited members through a status audience, and they then receive items.
 - **Opt-out after delivery:** an existing item stays readable after the member opts out of marketing; opting out affects only future messages.
 
-### 5.2 Email follower items
+### 5.2 Follower items
 
-A follower is one verified address at one organisation (spec 6.3). An email follower's items are visible to a session holding a current verified email that exactly matches the follower's address, and only items with `available_at` at or after the follower's current `consented_at`. Because re-following reuses the same follower row and resets `consented_at`, this also hides everything from before an unfollow when someone follows again. An unfollowed follower (`unfollowed_at` set) sees no follower items. Reassigned email inboxes keep the existing mailbox trust model (spec 6.1).
+Every follow has a verified email (section 3). A follower's items are visible to a session holding a current verified email that exactly matches the follow's email, and only items with `available_at` at or after the follow's current `consented_at`. Re-following resets `consented_at`, so it never brings back items from before an unfollow. An unfollowed follow sees no items. Phone proof alone never opens follower items; SMS on a follow is a delivery channel only. Reassigned email inboxes keep the existing mailbox trust model (spec 6.1).
 
 ### 5.3 Reader key
 
@@ -106,7 +110,7 @@ A follower is one verified address at one organisation (spec 6.3). An email foll
 
 1. `member:{member_id}:self` when the session has self access to the member (exact email, or a self credential). Read state is shared across the member's own email and phone access and survives credential rotation.
 2. `member:{member_id}:rep:{representative phone HMAC}` when access is only through a representative credential. Stable across that representative's credential rotation; separate from the member's own state and from other representatives.
-3. `email:{normalised verified email}` for email follower items.
+3. `email:{normalised verified email}` for follower items.
 
 ### 5.4 Every request re-checks
 
@@ -119,13 +123,14 @@ List, count, view and mark-read endpoints re-evaluate access, organisation state
 - **Materialised while sending.** `CommunityMessages::dispatchDue` resolves recipients page by page while a message is `sending`. In the same pages it creates one item per eligible member record and per eligible email follower record (unique keys make re-runs and retries safe). Event-attendee sources produce no items.
 - **Record-level resolution.** `AudienceResolver` resolves addresses per channel today; add a record-level resolution (`recipients(Tenant, selector)`) returning member and follower records with the same tenant and permission rules, deduplicated by record.
 - **Eligibility within the send is channel-independent.** A follower is excluded when its address has opted out of marketing or unfollowed. A member is excluded only when every address on the record has opted out of marketing at this organisation (opt-outs are per channel and address in `MessagingPreferences`). A member whose SMS was skipped for credit, or whose email bounced, still gets an item.
+- **Notices.** When `DuesReminders` records a reminder for a member (automatic or the arrears button), the first reminder row for that member and organisation-local day creates one `dues_reminder` item (whatever its channels and their outcome: sent, skipped, failed). Its snapshot lists the open charges included, the total and the oldest due date, with a "Pay in MiConvener" action that opens `/my` > Money rather than a pay link. When a dues payment is confirmed (`DuesPaymentConfirmer`, or an admin recording cash), one `dues_receipt` item is created per payment. Notices are service messages: marketing opt-outs do not affect them; `community_settings.reminders_enabled = false` stops reminder items along with the reminders.
 - **Only while the inbox is on** (section 8). Nothing is backfilled when it is switched on later.
 
 ### 6.2 When items are visible
 
 An item is visible only when all hold:
 
-- its message status is `sending`, `completed` or `partial` (`draft`, `scheduled`, `paused` and `cancelled` show nothing);
+- for an announcement, its message status is `sending`, `completed` or `partial` (`draft`, `scheduled`, `paused` and `cancelled` show nothing); a notice is visible from the moment it is queued;
 - `withdrawn_at` is null;
 - the organisation passes section 8;
 - the reader has access (section 5).
@@ -134,7 +139,7 @@ An item is visible only when all hold:
 
 ### 6.3 One message, one entry per reader
 
-A person can hold several items for one message: a member item and an email follower item at the same organisation, or their own item and a represented member's item. Lists and counts show **one entry per message per reader context**: own items (self member and email follower) merge into one entry; each represented member's item is a separate, labelled entry. Opening an entry writes read rows for every reader key that applies to the items merged into it, so a person who is both member and follower sees the message once and reads it once.
+A notice is always its own entry. For announcements, a person can hold several items for one message: a member item and an email follower item at the same organisation, or their own item and a represented member's item. Lists and counts show **one entry per message per reader context**: own items (self member and email follower) merge into one entry; each represented member's item is a separate, labelled entry. Opening an entry writes read rows for every reader key that applies to the items merged into it, so a person who is both member and follower sees the message once and reads it once.
 
 ## 7. Read and unread
 
@@ -199,16 +204,25 @@ Enumerating what a person can see reuses the history queries `/my` already has (
 17. The service worker never caches inbox responses; sign-out clears personal caches.
 18. A status audience to exited members creates items for them; their older items stay readable.
 19. Deleting a member deletes their items; "Read by M" is hidden below 10 recipients.
+20. A dues reminder skipped for SMS credit still creates one inbox notice; email plus SMS on the same day create one notice, not two; the arrears button adds no second notice that day.
+21. A notice's snapshot does not change when the charge is later paid, waived or re-priced; it contains no pay-link token.
+22. A confirmed online payment and a recorded cash payment each create one receipt notice; retries create none.
+23. Reminders switched off create no reminder notices; marketing opt-out does not stop notices.
+24. Following without a verified email is refused; adding SMS to a follow requires the email follow first; phone proof alone shows no follower items.
 
-## 13. Decisions for the owner
+## 13. Decisions (owner, 2026-10-17)
 
-1. **Scope:** organisation messages and event announcements only (recommended), or also dues reminders and receipts?
-2. **SMS followers:** leave them out of the first version (recommended), add a follower recovery credential (safest, more friction), or show announcements bounded by follow date on phone proof alone (simplest, but a new holder of a reassigned number would see later announcements)?
-3. **Organisation read statistics:** totals only, hidden below 10 recipients (recommended), or a per-person read list?
-4. **Retention:** 24 months (recommended), or another period?
-5. **Placement:** Home card plus per-organisation list from Communities (recommended), or a sixth "Inbox" tab?
-6. **Cancelled messages:** cancelling mid-send withdraws what was already in inboxes (recommended), or leaves it with those who got it?
+1. **Scope:** announcements plus notices: dues reminders and payment receipts, shown as soon as they are queued whatever the email or SMS outcome (owner change to the recommendation).
+2. **Followers:** email-first; no SMS-only followers; SMS is an added channel on an email follow (owner change; replaces the "leave SMS followers out" option).
+3. **Organisation read statistics:** totals only, hidden below 10 recipients.
+4. **Retention:** 24 months.
+5. **Placement:** Home card plus per-organisation list from Communities; no sixth tab.
+6. **Cancelled messages:** cancelling mid-send withdraws what was already in inboxes.
+
+**To confirm when planning:** whether a member should also see the delivery outcome of a notice ("emailed", "texted", "SMS not sent"); this design shows the notice itself only, not its delivery outcome.
 
 ## 14. Where it fits
 
-After milestone 4 (the `/my` app shell and `community_app`), as its own milestone ("4b Inbox"). It depends on milestones 2, 3 and 4 as deployed. The implementation plan is written once the owner has answered section 13, against the code as it is then.
+After milestone 4 (the `/my` app shell and `community_app`), as its own milestone ("4b Inbox"). It depends on milestones 1c, 2, 3 and 4 as deployed. The implementation plan is written against the code as it is then.
+
+**Change to milestone 3 behaviour (email-first follows).** Today a follow is one row per channel and address, and a phone-only follow is possible when phone entry is on (it is off in production). The inbox milestone (or an earlier small change, if the owner prefers) must: require a verified email to follow; attach SMS to an email follow as an optional channel rather than a separate follower; refuse new SMS-only follows; and handle any existing SMS-only follow rows (expected to be none in production, since phone entry is off; verify before migrating, and ask the owner before converting or retiring any). Spec 6.3 is updated in the same commit.
