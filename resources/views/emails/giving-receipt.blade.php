@@ -11,6 +11,8 @@ Recorded: {{ $receipt['paid_at'] ? \Carbon\CarbonImmutable::parse($receipt['paid
 
 This voluntary contribution creates no dues, pledge or outstanding balance. This acknowledgement does not claim tax deductibility. Later refunds or corrections are recorded separately; the original receipt is unchanged.
 
+<x-mail::button :url="$historyUrl">Your contributions and receipts</x-mail::button>
+
 You can verify this email address in MiConvener’s **My → Money** to see your contribution history and download receipts and statements.
 
 This receipt does not subscribe you to announcements or giving reminders.

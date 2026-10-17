@@ -43,6 +43,7 @@ test('cash requires finance permission and rejects mismatched currency and forei
     [$tenant, $user, $fund] = GivingScenario::make();
     $cash = app(GivingCash::class);
     expect(fn () => $cash->record($fund, $user, ['amount' => 5000, 'currency' => 'USD', 'source' => 'bulk_cash'], (string) Str::uuid()))->toThrow(ValidationException::class);
+    $user->givePermissionTo('manage members');
     $foreign = App\Models\Member::factory()->create();
     expect(fn () => $cash->record($fund, $user, ['amount' => 5000, 'currency' => 'GHS', 'source' => 'recorded_cash', 'member_id' => $foreign->id], (string) Str::uuid()))->toThrow(ValidationException::class);
     $user->revokePermissionTo('read finance');

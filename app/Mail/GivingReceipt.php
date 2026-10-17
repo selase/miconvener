@@ -31,6 +31,6 @@ final class GivingReceipt extends Mailable
 
     public function content(): Content
     {
-        return new Content(markdown: 'emails.giving-receipt', with: ['receipt' => $this->notice->snapshot]);
+        return new Content(markdown: 'emails.giving-receipt', with: ['receipt' => $this->notice->snapshot, 'historyUrl' => app(\App\Services\Giving\GivingHistory::class)->portalUrl(Tenant::query()->findOrFail($this->notice->tenant_id))]);
     }
 }

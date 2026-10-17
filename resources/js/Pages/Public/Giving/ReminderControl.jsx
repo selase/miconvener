@@ -62,9 +62,10 @@ export default function GivingReminderControl({ slug }) {
                     </p>
                     <VerifyPrompt
                         allowPhone={false}
+                        autoFocus={false}
                         onVerified={setVerified}
-                        sendUrl="/my/verify/send"
-                        confirmUrl="/my/verify/confirm"
+                        sendUrl={route('public.giving.verify.send')}
+                        confirmUrl={route('public.giving.verify.confirm')}
                     />
                 </div>
             ) : (

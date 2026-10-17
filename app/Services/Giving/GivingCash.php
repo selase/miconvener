@@ -46,6 +46,9 @@ final class GivingCash
                 throw ValidationException::withMessages(['source' => 'Offering batches have no individual payer or member.']);
             }
             $memberId = $validated['member_id'] ?? null;
+            if ($memberId !== null) {
+                Gate::forUser($actor)->authorize('manage members');
+            }
             if ($memberId !== null && ! Member::withoutGlobalScopes()->where('tenant_id', $fund->tenant_id)->whereKey($memberId)->exists()) {
                 throw ValidationException::withMessages(['member_id' => 'Choose a member of this organisation.']);
             }
@@ -113,7 +116,7 @@ final class GivingCash
         if ($email !== null && ($input['identity_confirmed'] ?? false) === true) {
             return GivingIdentity::emailKey($fund->tenant, $email);
         }
-        if ($memberId !== null) {
+        if ($memberId !== null && ($input['payer_is_member'] ?? false) === true && ($input['identity_confirmed'] ?? false) === true) {
             return 'member:'.$memberId;
         }
 

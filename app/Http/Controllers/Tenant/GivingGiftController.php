@@ -15,6 +15,16 @@ use Illuminate\Http\JsonResponse;
 
 final class GivingGiftController extends Controller
 {
+    public function memberOptions(\App\Http\Requests\Tenant\Giving\SearchGivingMemberRequest $request): JsonResponse
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        abort_unless(app(\App\Services\Giving\GivingRollout::class)->enabled($tenant), 404);
+        $term = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $request->validated('q'));
+        $members = \App\Models\Member::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('name', 'ilike', '%'.$term.'%')->orderBy('name')->orderBy('id')->limit(15)->get(['id', 'name']);
+
+        return response()->json(['members' => $members])->header('Cache-Control', 'private, no-store');
+    }
+
     public function store(RecordCashGiftRequest $request, string $subdomain, string $fund, GivingCash $cash): JsonResponse
     {
         $tenant = app(TenantContext::class)->getTenant();

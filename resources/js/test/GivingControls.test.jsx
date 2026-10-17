@@ -133,3 +133,45 @@ it('event checkout retries retain one operation key and exact decimal input', as
         document.querySelectorAll('body > form').forEach((form) => form.remove());
     }
 });
+
+it('member attribution is optional separate from payer identity and restricted to authorised staff', async () => {
+    sendJson
+        .mockResolvedValueOnce({
+            ok: true,
+            body: { members: [{ id: 'member-1', name: 'Volunteer Pilot' }] },
+        })
+        .mockResolvedValue({ ok: false, message: 'Preview only' });
+    render(
+        <MoneyGiving funds={[fund]} canManageGiving canReadFinance canAttributeMember enabled />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Record contribution' }));
+    fireEvent.change(screen.getByLabelText('Find member by name'), {
+        target: { value: 'Volunteer' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Search members' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Volunteer Pilot/ }));
+    expect(
+        screen.getByLabelText('I have confirmed this member is the person who gave').checked
+    ).toBe(false);
+    fireEvent.change(screen.getByLabelText('Amount collected'), { target: { value: '50' } });
+    fireEvent.change(screen.getByLabelText('Collected at (optional)'), {
+        target: { value: '2026-10-15T09:00' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Record contribution' }).at(-1));
+    await waitFor(() =>
+        expect(sendJson).toHaveBeenLastCalledWith(
+            'POST',
+            expect.any(String),
+            expect.objectContaining({
+                collected_at: '2026-10-15 09:00',
+                member_id: 'member-1',
+                payer_is_member: false,
+                identity_confirmed: false,
+            })
+        )
+    );
+});
+it('the optional reminder form does not steal initial focus from the fund page', () => {
+    render(<Fund organisation={{ name: 'Church' }} fund={fund} providers={[]} accepting />);
+    expect(screen.getByLabelText('Your email address')).not.toBe(document.activeElement);
+});

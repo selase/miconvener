@@ -94,5 +94,5 @@ test('receipt mail renders frozen details and current adjustments stay outside i
     app(GivingCash::class)->correct($gift, $user, 1000, 'Correction', (string) Str::uuid());
     expect($notice->fresh()->snapshot)->toBe($original);
     $html = (new GivingReceipt($notice))->render();
-    expect($html)->toContain($original['fund'],'GHS 50.00')->not->toContain('Later name','Later organisation');
+    expect($html)->toContain($original['fund'], 'GHS 50.00')->not->toContain('Later name', 'Later organisation');
 });

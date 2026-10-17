@@ -325,6 +325,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::get('finance/giving/{type}/{source}/refunds/preview', [App\Http\Controllers\Tenant\GivingRefundController::class, 'preview'])->name('tenant.community.giving.refunds.preview');
     Route::post('finance/giving/{type}/{source}/refunds', [App\Http\Controllers\Tenant\GivingRefundController::class, 'store'])->name('tenant.community.giving.refunds.store');
 
+    Route::get('community/money/giving/member-options', [App\Http\Controllers\Tenant\GivingGiftController::class, 'memberOptions'])->name('tenant.community.giving.member-options');
     Route::post('community/money/giving/funds/{fund}/gifts', [App\Http\Controllers\Tenant\GivingGiftController::class, 'store'])->name('tenant.community.giving.gifts.store');
     Route::post('community/money/giving/gifts/{gift}/corrections', [App\Http\Controllers\Tenant\GivingGiftController::class, 'correct'])->name('tenant.community.giving.gifts.correct');
 
@@ -672,6 +673,8 @@ Route::post('community/preferences/{token}', [App\Http\Controllers\Public\Commun
 
 Route::get('/give', [App\Http\Controllers\Public\GivingFundController::class, 'index'])->name('public.giving.index');
 Route::get('/give/{slug}', [App\Http\Controllers\Public\GivingFundController::class, 'show'])->name('public.giving.show');
+Route::post('/giving/verify/email/send', [App\Http\Controllers\Public\GivingReminderController::class, 'sendVerification'])->name('public.giving.verify.send');
+Route::post('/giving/verify/email/confirm', [App\Http\Controllers\Public\GivingReminderController::class, 'confirmVerification'])->name('public.giving.verify.confirm');
 Route::post('/give/{slug}/reminder', [App\Http\Controllers\Public\GivingReminderController::class, 'subscribe'])->middleware('throttle:10,1')->name('public.giving.reminders.subscribe');
 Route::get('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'unsubscribe'])->middleware('throttle:60,1')->name('public.giving.reminders.unsubscribe');
 Route::post('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'stop'])->middleware('throttle:10,1')->name('public.giving.reminders.stop');

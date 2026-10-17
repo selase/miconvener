@@ -107,6 +107,11 @@ final class GivingHistory
         return is_array($access) && isset($access['identity_owner']) && hash_equals($access['identity_owner'], $this->capabilityOwner($session)) && ($access['expires_at'] ?? 0) > now()->timestamp && $attempt->receipt_expires_at?->isFuture() && hash_equals((string) $attempt->receipt_token_hash, hash('sha256', (string) ($access['token'] ?? '')));
     }
 
+    public function portalUrl(Tenant $tenant): string
+    {
+        return mb_rtrim((string) config('app.url'), '/').route('attendee.my', [], false).'?'.http_build_query(['organiser' => $tenant->slug, 'section' => 'money', 'tab' => 'giving']);
+    }
+
     /** @return array<string,mixed> */
     public function receiptSnapshot(GivingSource $source): array
     {

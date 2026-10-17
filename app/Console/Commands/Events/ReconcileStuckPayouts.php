@@ -72,7 +72,8 @@ final class ReconcileStuckPayouts extends Command
 
         foreach ($stuck as $payout) {
             try {
-                $status = $settlementGateway->verifyTransfer((string) $payout->provider_reference)['status'] ?? '';
+                $verified = $settlementGateway->verifyTransfer((string) $payout->provider_reference);
+                $status = $verified['status'];
             } catch (PaymentFailedException|Throwable $e) {
                 // Leave the payout alone and try again on the next run: a provider
                 // outage must never be recorded as a failed transfer.
@@ -83,7 +84,7 @@ final class ReconcileStuckPayouts extends Command
             }
 
             try {
-                $this->resolve($payout, (string) $status);
+                $this->resolve($payout, (string) $status, $verified);
             } catch (Throwable $e) {
                 // One payout that cannot be settled must not stop the rest of
                 // the run; it stays in processing for the next one.
@@ -95,10 +96,23 @@ final class ReconcileStuckPayouts extends Command
         return self::SUCCESS;
     }
 
-    private function resolve(EventPayout $payout, string $status): void
+    /** @param array<string,mixed> $verified */
+    private function resolve(EventPayout $payout, string $status, array $verified = []): void
     {
         if ($status === 'success' && $payout->category === LedgerCategoryEnum::Giving) {
             app(\App\Services\Finance\CommunityPayouts::class)->settleTransfer($payout, (string) $payout->provider_reference);
+
+            return;
+        }
+
+        if ($status === 'otp' && $payout->category === LedgerCategoryEnum::Giving && $payout->status === EventPayout::STATUS_PROCESSING) {
+            $code = $verified['transfer_code'] ?? null;
+            if (is_string($code) && str_starts_with($code, 'TRF_') && ($verified['reference'] ?? null) === $payout->provider_reference && ($verified['amount'] ?? null) === $payout->requested_net_amount && ($verified['currency'] ?? null) === $payout->currency) {
+                EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', EventPayout::STATUS_PROCESSING)->update(['status' => EventPayout::STATUS_AWAITING_OTP, 'provider_transfer_code' => $code, 'failure_reason' => null]);
+                $this->line("  {$payout->id}: recovered original transfer; waiting for its code.");
+            } else {
+                $this->warn("  {$payout->id}: OTP transfer details need review; no transfer sent.");
+            }
 
             return;
         }

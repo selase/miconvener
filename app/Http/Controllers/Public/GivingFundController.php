@@ -22,7 +22,7 @@ final class GivingFundController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         abort_unless(app(GivingRollout::class)->enabled($tenant), 404);
 
-        return Inertia::render('Public/Giving/Index', ['organisation' => ['name' => $tenant->name], 'funds' => GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('visibility', 'public')->whereNull('event_id')->whereIn('state', ['open', 'closed'])->orderBy('name')->get()->map(fn (GivingFund $fund) => $this->publicFund($fund))]);
+        return Inertia::render('Public/Giving/Index', ['historyUrl' => app(\App\Services\Giving\GivingHistory::class)->portalUrl($tenant), 'organisation' => ['name' => $tenant->name], 'funds' => GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('visibility', 'public')->whereNull('event_id')->whereIn('state', ['open', 'closed'])->orderBy('name')->get()->map(fn (GivingFund $fund) => $this->publicFund($fund))]);
     }
 
     public function show(Request $request, string $subdomain, string $slug): Response
@@ -47,7 +47,7 @@ final class GivingFundController extends Controller
             }
         }
 
-        return Inertia::render('Public/Giving/Fund', ['organisation' => ['name' => $tenant->name], 'fund' => $this->publicFund($fund), 'providers' => $providers, 'accepting' => $accepting]);
+        return Inertia::render('Public/Giving/Fund', ['historyUrl' => app(\App\Services\Giving\GivingHistory::class)->portalUrl($tenant), 'organisation' => ['name' => $tenant->name], 'fund' => $this->publicFund($fund), 'providers' => $providers, 'accepting' => $accepting]);
     }
 
     /** @return array<string,mixed> */

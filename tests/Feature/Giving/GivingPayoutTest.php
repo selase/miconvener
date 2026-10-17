@@ -110,3 +110,19 @@ test('releasing a Giving transfer calls the provider outside the payout transact
     expect($observedLevel)->toBe($level);
     expect($payout->fresh()->status)->toBe(EventPayout::STATUS_PROCESSING);
 });
+
+test('Giving transfer reconciliation recovers a lost OTP response without resending the transfer', function () {
+    [$tenant,$user] = GivingScenario::paid();
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true, 'recipient_code' => 'RCP_UNKNOWN']);
+    $service = app(CommunityPayouts::class);
+    $payout = $service->reserve($tenant, $user, LedgerCategoryEnum::Giving, ['payout_account_id' => $account->id, 'currency' => 'GHS', 'amount' => 9700]);
+    Http::fake(['*api.paystack.co/transfer' => fn () => throw new Illuminate\Http\Client\ConnectionException('Response lost')]);
+    $service->send($tenant, $user, $payout);
+    $payout->refresh();
+    expect($payout->status)->toBe('processing');
+    $payout->forceFill(['updated_at' => now()->subHours(2)])->save();
+    Http::fake(['*api.paystack.co/transfer/verify/*' => Http::response(['status' => true, 'data' => ['status' => 'otp', 'transfer_code' => 'TRF_RECOVERED', 'reference' => $payout->provider_reference, 'amount' => $payout->requested_net_amount, 'currency' => 'GHS']])]);
+    $this->artisan('payouts:reconcile')->assertSuccessful();
+    expect($payout->fresh()->status)->toBe('awaiting_otp')->and($payout->fresh()->provider_transfer_code)->toBe('TRF_RECOVERED')->and($payout->fresh()->transfer_fee_amount)->toBe(0);
+    expect($service->send($tenant, $user, $payout)['http_status'])->toBe(422);
+});

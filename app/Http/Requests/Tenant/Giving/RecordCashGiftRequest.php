@@ -27,7 +27,7 @@ final class RecordCashGiftRequest extends FormRequest
             'payer_email' => [$individual, 'nullable', 'email', 'max:254'],
             'payer_phone' => [$individual, 'nullable', 'string', 'max:40'],
             'member_id' => [$individual, 'nullable', 'uuid'], 'reuse_giver_key' => [$individual, 'nullable', 'string', 'max:100'],
-            'identity_confirmed' => ['sometimes', 'boolean'], 'is_anonymous' => ['sometimes', 'boolean'],
+            'payer_is_member' => [$individual, 'sometimes', 'boolean'], 'identity_confirmed' => ['sometimes', 'boolean'], 'is_anonymous' => ['sometimes', 'boolean'],
         ];
     }
 

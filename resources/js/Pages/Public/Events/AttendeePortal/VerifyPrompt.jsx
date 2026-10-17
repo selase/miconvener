@@ -7,7 +7,7 @@ const RESEND_AFTER_SECONDS = 60;
 const INPUT_CLASS =
     'w-full border border-border bg-surface px-3 py-2 text-[13px] text-ink focus:border-accent focus:outline-none';
 const PRIMARY_CLASS =
-    'inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed';
+    'inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-accent-ink hover:opacity-90 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed';
 
 const OFFLINE_MESSAGE = "Couldn't reach the server. Check your connection and try again.";
 
@@ -22,6 +22,7 @@ export default function VerifyPrompt({
     onVerified,
     organiserSlug = null,
     allowPhone = true,
+    autoFocus = true,
     sendUrl = null,
     confirmUrl = null,
 }) {
@@ -226,7 +227,7 @@ export default function VerifyPrompt({
                         Your email address
                     </label>
                     <input
-                        autoFocus
+                        autoFocus={autoFocus}
                         id="verify-email"
                         type="email"
                         required

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
@@ -8,7 +8,96 @@ import Select from '@/Components/Console/Select';
 import Modal from '@/Components/Console/Modal';
 import { formatDuesMoney, sendJson, toMinorUnits, toMajorUnits } from '@/lib/dues';
 
-function GivingForm({ mode, funds, fund, onClose }) {
+function MemberAttribution({ value, onChange }) {
+    const [query, setQuery] = useState(''),
+        [members, setMembers] = useState([]),
+        [busy, setBusy] = useState(false),
+        [message, setMessage] = useState('');
+    const generation = useRef(0);
+    const search = async () => {
+        const request = ++generation.current;
+        setBusy(true);
+        setMessage('');
+        setMembers([]);
+        const result = await sendJson(
+            'GET',
+            `${route('tenant.community.giving.member-options')}?${new URLSearchParams({ q: query })}`
+        );
+        if (request !== generation.current) return;
+        setBusy(false);
+        if (result.ok) {
+            setMembers(result.body.members);
+            if (!result.body.members.length)
+                setMessage(
+                    'No matching member. You can still record this contribution without membership.'
+                );
+        } else setMessage(result.message ?? 'Could not search members.');
+    };
+    return (
+        <fieldset className="space-y-3 border border-border p-4">
+            <legend className="px-1 text-sm font-medium text-ink">
+                Attribute to a member (optional)
+            </legend>
+            {value ? (
+                <>
+                    <p className="text-sm text-ink">
+                        {value.name} · {value.id.slice(-6)}
+                    </p>
+                    <Button type="button" variant="secondary" onClick={() => onChange(null)}>
+                        Remove member attribution
+                    </Button>
+                </>
+            ) : (
+                <>
+                    <Input
+                        label="Find member by name"
+                        value={query}
+                        onChange={(e) => {
+                            generation.current++;
+                            setQuery(e.target.value);
+                            setMembers([]);
+                            setBusy(false);
+                        }}
+                    />
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={busy || query.trim().length < 2}
+                        onClick={search}
+                    >
+                        {busy ? 'Searching…' : 'Search members'}
+                    </Button>
+                    <ul className="space-y-2">
+                        {members.map((member) => (
+                            <li key={member.id}>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        generation.current++;
+                                        onChange(member);
+                                        setMembers([]);
+                                    }}
+                                >
+                                    {member.name} · {member.id.slice(-6)}
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+            <p className="text-xs text-ink-secondary">
+                Attribution does not identify the payer, create membership or create dues.
+            </p>
+            {message && (
+                <p role="status" className="text-sm text-ink">
+                    {message}
+                </p>
+            )}
+        </fieldset>
+    );
+}
+function GivingForm({ mode, funds, fund, onClose, canAttributeMember, knownGivers, timezone }) {
     const creating = mode === 'create',
         editing = mode === 'edit',
         batch = mode === 'batch',
@@ -29,15 +118,21 @@ function GivingForm({ mode, funds, fund, onClose }) {
         minimum_amount: toMajorUnits(fund?.minimum_amount ?? 100),
         fund_id: funds.find((f) => f.state === 'open')?.id ?? '',
         amount: '',
+        collected_at: '',
         provider_refund_reference: fund?.provider_refund_reference ?? '',
         payer_name: '',
         payer_email: '',
+        member_id: '',
+        payer_is_member: false,
+        identity_confirmed: false,
+        reuse_giver_key: '',
         is_anonymous: false,
         reason: '',
         principal: '',
         operation_key: crypto.randomUUID(),
         submission_key: crypto.randomUUID(),
     });
+    const [member, setMember] = useState(null);
     const [errors, setErrors] = useState({});
     const [message, setMessage] = useState('');
     const [preview, setPreview] = useState(null);
@@ -120,11 +215,20 @@ function GivingForm({ mode, funds, fund, onClose }) {
                 amount: toMinorUnits(values.amount),
                 currency: selected?.currency,
                 source: batch ? 'bulk_cash' : 'recorded_cash',
+                ...(values.collected_at
+                    ? { collected_at: values.collected_at.replace('T', ' ') }
+                    : {}),
                 ...(batch
                     ? {}
                     : {
                           payer_name: values.payer_name || null,
                           payer_email: values.payer_email || null,
+                          member_id: canAttributeMember ? values.member_id || null : null,
+                          payer_is_member: canAttributeMember && values.payer_is_member,
+                          identity_confirmed:
+                              values.identity_confirmed ||
+                              (canAttributeMember && values.payer_is_member),
+                          reuse_giver_key: values.reuse_giver_key || null,
                           is_anonymous: values.is_anonymous,
                       }),
             };
@@ -251,10 +355,67 @@ function GivingForm({ mode, funds, fund, onClose }) {
                             inputMode: 'decimal',
                             required: true,
                         })}
+                        {field('collected_at', 'Collected at (optional)', {
+                            type: 'datetime-local',
+                            hint: `Time in ${timezone}. Leave blank for now.`,
+                        })}
                         {!batch && (
                             <>
                                 {field('payer_name', 'Giver name (optional)')}
                                 {field('payer_email', 'Giver email (optional)', { type: 'email' })}
+                                <label className="flex gap-3 text-sm text-ink">
+                                    <input
+                                        type="checkbox"
+                                        checked={values.identity_confirmed}
+                                        onChange={(e) =>
+                                            setValues({
+                                                ...values,
+                                                identity_confirmed: e.target.checked,
+                                            })
+                                        }
+                                    />
+                                    I have independently confirmed this giver’s email
+                                </label>
+                                {knownGivers.length > 0 &&
+                                    select(
+                                        'reuse_giver_key',
+                                        'Same person as a previously recorded giver (optional)',
+                                        [
+                                            ['', 'Treat as a separate giver'],
+                                            ...knownGivers.map((g) => [
+                                                g.key,
+                                                `${g.name} · ${g.key.slice(-6)}`,
+                                            ]),
+                                        ]
+                                    )}
+                                {canAttributeMember && (
+                                    <MemberAttribution
+                                        value={member}
+                                        onChange={(selection) => {
+                                            setMember(selection);
+                                            setValues({
+                                                ...values,
+                                                member_id: selection?.id ?? '',
+                                                payer_is_member: false,
+                                            });
+                                        }}
+                                    />
+                                )}
+                                {member && (
+                                    <label className="flex gap-3 text-sm text-ink">
+                                        <input
+                                            type="checkbox"
+                                            checked={values.payer_is_member}
+                                            onChange={(e) =>
+                                                setValues({
+                                                    ...values,
+                                                    payer_is_member: e.target.checked,
+                                                })
+                                            }
+                                        />
+                                        I have confirmed this member is the person who gave
+                                    </label>
+                                )}
                                 <label className="flex gap-3 text-sm text-ink">
                                     <input
                                         type="checkbox"
@@ -284,10 +445,18 @@ function GivingForm({ mode, funds, fund, onClose }) {
                 ) : (
                     <>
                         {['correct', 'refund'].includes(mode) &&
-                            field('principal', `Amount (${fund.currency})`, {
-                                inputMode: 'decimal',
-                                required: true,
-                            })}
+                            field(
+                                'principal',
+                                `${mode === 'correct' ? 'Reduce recorded amount by' : 'Amount'} (${fund.currency})`,
+                                {
+                                    inputMode: 'decimal',
+                                    required: true,
+                                    hint:
+                                        mode === 'correct'
+                                            ? 'Creates a separate reduction. The original contribution and receipt stay unchanged.'
+                                            : undefined,
+                                }
+                            )}
                         {field('reason', 'Reason', { required: true })}
                         {mode === 'refund' && (
                             <p className="text-sm text-ink-secondary">
@@ -353,9 +522,12 @@ function GivingForm({ mode, funds, fund, onClose }) {
 export default function MoneyGiving({
     funds = [],
     report = null,
+    timezone = 'the organisation’s timezone',
     delivery = null,
     gifts = [],
     adjustments = [],
+    canAttributeMember = false,
+    knownGivers = [],
     canManageGiving = false,
     canReadFinance = false,
     canRefund = false,
@@ -696,7 +868,16 @@ export default function MoneyGiving({
                         </ul>
                     </section>
                 )}
-                {dialog && <GivingForm {...dialog} funds={funds} onClose={() => setDialog(null)} />}
+                {dialog && (
+                    <GivingForm
+                        {...dialog}
+                        funds={funds}
+                        canAttributeMember={canAttributeMember}
+                        knownGivers={knownGivers}
+                        timezone={timezone}
+                        onClose={() => setDialog(null)}
+                    />
+                )}
             </main>
         </ConsoleLayout>
     );

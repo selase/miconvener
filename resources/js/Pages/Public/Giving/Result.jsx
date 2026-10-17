@@ -8,6 +8,7 @@ export default function Result({
     receiptUrl = null,
     eventUrl = null,
     fundUrl = null,
+    historyUrl = null,
 }) {
     const confirmed = status === 'confirmed';
     return (
@@ -32,6 +33,11 @@ export default function Result({
                 {confirmed && fundUrl && (
                     <a href={fundUrl} className="mt-6 block min-h-11 text-accent underline">
                         Return to the fund · optional email reminders
+                    </a>
+                )}
+                {historyUrl && (
+                    <a href={historyUrl} className="mt-6 block min-h-11 text-accent underline">
+                        Your contributions and receipts
                     </a>
                 )}
                 {eventUrl && (

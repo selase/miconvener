@@ -141,6 +141,18 @@ test('queued reminders recheck consent and uncertain mail outcomes stay claimed 
     Mail::swap(Mockery::mock(Illuminate\Contracts\Mail\Mailer::class));
     Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('Unknown send result'));
     $service->deliver($row->id, $key);
-    $service->deliver($row->id,$key);
-    expect($row->fresh()->delivery_state)->toBe('outcome_unknown')->and($tenant->usage()->where('feature_slug','email_credits')->sum('used_count'))->toBe(1);
+    $service->deliver($row->id, $key);
+    expect($row->fresh()->delivery_state)->toBe('outcome_unknown')->and($tenant->usage()->where('feature_slug', 'email_credits')->sum('used_count'))->toBe(1);
+});
+
+test('native fund email verification reaches the existing code service on an organisation host', function () {
+    Mail::fake();
+    [$tenant] = GivingScenario::make(['visibility' => 'public']);
+    $host = eventSubdomainHost($tenant->slug);
+    $this->withServerVariables(['HTTP_HOST' => $host])->postJson('http://'.$host.'/giving/verify/email/send', ['email' => 'giving-pilot@example.test'])->assertStatus(202);
+    expect(App\Models\PlatformAttendeeAccessCode::query()->where('email_normalized', 'giving-pilot@example.test')->count())->toBe(1);
+    $code = Mail::sent(App\Mail\Events\PlatformAttendeeAccessCodeMail::class)->sole()->code;
+    $this->postJson('http://'.$host.'/giving/verify/email/confirm', ['email' => 'giving-pilot@example.test', 'code' => $code])->assertOk();
+    $fund = App\Models\GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->sole();
+    $this->postJson('http://'.$host.'/give/'.$fund->slug.'/reminder', ['cadence' => 'monthly', 'consent' => true])->assertOk();
 });

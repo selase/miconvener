@@ -150,6 +150,9 @@ final class GivingRefunds
             $adjustment->fill(['commission_reversal' => $reversal, 'gateway_credit' => $credit, 'commission_returned' => $returned, 'credit_restored' => $creditRestored]);
             $this->ledger->recordGivingRefund($fund->tenant, $source, $adjustment);
             $adjustment->fill(['status' => 'confirmed', 'confirmed_at' => now()])->save();
+            if ($this->balance->payable($fund->tenant, $source->currency) < 0) {
+                $adjustment->getConnection()->afterCommit(fn () => app(OperationalSignals::class)->recordWebhookFailure('processing', 'Giving refund '.$adjustment->id.': negative payable; further payouts are held for operational review.'));
+            }
             if ($cumulative === $source->principal) {
                 $source->model->update(['status' => 'refunded']);
             }

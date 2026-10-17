@@ -17,6 +17,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class GivingReminderController extends Controller
 {
+    public function sendVerification(\App\Http\Requests\Attendee\PlatformSendAccessCodeRequest $request): JsonResponse
+    {
+        abort_unless(app(\App\Services\Giving\GivingRollout::class)->enabled(app(TenantContext::class)->getTenant()), 404);
+
+        return app(PlatformAttendeeAccessController::class)->send($request);
+    }
+
+    public function confirmVerification(\App\Http\Requests\Attendee\PlatformConfirmAccessCodeRequest $request): JsonResponse
+    {
+        abort_unless(app(\App\Services\Giving\GivingRollout::class)->enabled(app(TenantContext::class)->getTenant()), 404);
+
+        return app(PlatformAttendeeAccessController::class)->confirm($request);
+    }
+
     public function subscribe(SubscribeGivingReminderRequest $request, string $subdomain, string $slug, GivingReminders $reminders): JsonResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -45,6 +59,6 @@ final class GivingReminderController extends Controller
         $row = $reminders->forToken($tenant->id, $reminder, $request->validated('token'));
         $row->update(['disabled_at' => now(), 'delivery_state' => 'stopped']);
 
-        return response()->json(['message' => 'Giving reminders stopped.'])->header('Cache-Control','private, no-store');
+        return response()->json(['message' => 'Giving reminders stopped.'])->header('Cache-Control', 'private, no-store');
     }
 }

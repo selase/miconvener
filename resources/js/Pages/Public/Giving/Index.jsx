@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
-export default function Index({ organisation, funds }) {
+export default function Index({ organisation, funds, historyUrl = null }) {
     return (
         <PublicLayout>
             <Head title={`Contribute · ${organisation.name}`} />
@@ -11,6 +11,14 @@ export default function Index({ organisation, funds }) {
                     Support a cause, an offering or a shared project. Every contribution is
                     voluntary. You do not need to become a member.
                 </p>
+                {historyUrl && (
+                    <a
+                        href={historyUrl}
+                        className="mt-5 inline-block text-sm text-accent underline"
+                    >
+                        Your contributions and receipts
+                    </a>
+                )}
                 <div className="mt-10 grid gap-5 sm:grid-cols-2">
                     {funds.map((fund) => (
                         <a

@@ -156,3 +156,12 @@ test('staff can reconcile a lost refund response using a provider ID bound to th
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])->postJson('http://'.$host.'/finance/giving/refunds/'.$adjustment->id.'/reconcile', ['provider_refund_reference' => '501'])->assertOk()->assertJsonPath('adjustment.status', 'confirmed');
     expect(app(GivingBalance::class)->payable($tenant, 'GHS'))->toBe(7720);
 });
+
+test('a refund that leaves retained processing fees owed raises an operational review after commit', function () {
+    [$tenant,$user,,$attempt,$source] = GivingScenario::paid();
+    Http::fake(['*api.paystack.co/refund' => Http::response(['status' => true, 'data' => ['id' => 9901]])]);
+    $refund = app(GivingRefunds::class)->request($source, $user, 10000, 'Full return', (string) Str::uuid());
+    app(GivingRefunds::class)->confirm($refund, GivingScenario::refunded($refund, $attempt));
+    $signals = app(App\Services\Operations\OperationalSignals::class)->webhookFailuresSince(Carbon\CarbonImmutable::now()->subMinute(), 'processing');
+    expect(collect($signals)->contains(fn ($signal) => str_contains($signal['detail'], $refund->id) && str_contains($signal['detail'], 'negative payable')))->toBeTrue();
+});

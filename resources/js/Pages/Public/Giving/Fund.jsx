@@ -6,7 +6,7 @@ import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
 import Button from '@/Components/Console/Button';
 import { formatDuesMoney, sendJson } from '@/lib/dues';
-export default function Fund({ organisation, fund, providers, accepting }) {
+export default function Fund({ organisation, fund, providers, accepting, historyUrl = null }) {
     const [form, setForm] = useState({
         amount: '',
         payer_name: '',
@@ -50,6 +50,11 @@ export default function Fund({ organisation, fund, providers, accepting }) {
                 <a href={route('public.giving.index')} className="text-sm text-accent underline">
                     All contribution funds
                 </a>
+                {historyUrl && (
+                    <a href={historyUrl} className="mt-4 block text-sm text-accent underline">
+                        Your contributions and receipts
+                    </a>
+                )}
                 <div className="mt-8 grid gap-10 lg:grid-cols-2">
                     <section>
                         <p className="text-sm uppercase tracking-widest text-accent">

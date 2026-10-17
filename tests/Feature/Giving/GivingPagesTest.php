@@ -55,6 +55,13 @@ test('church and volunteer fund screens preserve privacy across anonymous cash a
 test('giving only finance does not default to empty dues or ticket cards', function () {
     [$tenant,$user] = GivingScenario::make();
     $tenant->update(['package_id' => App\Models\Package::factory()->create()->id]);
-    $tenant->features()->updateOrCreate(['feature_key'=>'paid_tickets'],['enabled'=>false]);
+    $tenant->features()->updateOrCreate(['feature_key' => 'paid_tickets'], ['enabled' => false]);
     $this->actingAs($user)->get(givingPageHost($tenant).'/finance')->assertOk()->assertInertia(fn ($page) => $page->where('givingOnly', true)->where('givingReportUrl', fn ($url) => str_contains($url, 'giving/report')));
+});
+
+test('give pages link to the central private contribution history on the platform host', function () {
+    [$tenant,,$fund] = GivingScenario::make(['visibility' => 'public']);
+    $host = eventSubdomainHost($tenant->slug);
+    $expected = mb_rtrim((string) config('app.url'), '/').'/my?organiser='.$tenant->slug.'&section=money&tab=giving';
+    $this->withServerVariables(['HTTP_HOST' => $host])->get('http://'.$host.'/give/'.$fund->slug)->assertInertia(fn ($page) => $page->where('historyUrl', $expected));
 });
