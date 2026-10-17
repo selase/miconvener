@@ -150,6 +150,15 @@ final class PlatformAttendeeAccessController extends Controller
         ]);
     }
 
+    public function removeEmail(Request $request): JsonResponse
+    {
+        $this->verification->forget($request->session());
+        $request->session()->forget([\App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY, \App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::REGISTERED_SESSION_KEY]);
+        $request->session()->regenerate(true);
+
+        return response()->json(['message' => 'Email removed from this device.'])->header('Cache-Control', 'private, no-store');
+    }
+
     public function session(Request $request): JsonResponse
     {
         $email = (string) $request->attributes->get('attendee_email');

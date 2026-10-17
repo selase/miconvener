@@ -1,3 +1,6 @@
+import AttendeeMe from './components/AttendeeMe';
+import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
+import { clearAllOfflineTickets } from '@/lib/offlineTicketStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import csrfFetch from '@/lib/csrfFetch';
@@ -40,9 +43,17 @@ export default function AttendeeApp({
     const [credential, setCredential] = useState(null);
     const [email, setEmail] = useState(verifiedEmail);
     const [phone, setPhone] = useState(communityPhoneVerified);
+    const [identity, setIdentity] = useState(null);
+    const [preferences, setPreferences] = useState(null);
+    const [preferencesPage, setPreferencesPage] = useState(1);
+    const [verifyChannel, setVerifyChannel] = useState(null);
+    const [busy, setBusy] = useState(false);
     const generation = useRef(0);
     const expire = useCallback(() => {
         generation.current++;
+        clearAllOfflineTickets();
+        setIdentity(null);
+        setPreferences(null);
         setEmail(null);
         setPhone(false);
         setHistory(null);
@@ -140,6 +151,71 @@ export default function AttendeeApp({
         else if (requested && /^\/my(\/|$)/.test(requested) && !requested.startsWith('//'))
             window.location.assign(requested);
         else router.reload();
+    };
+    useEffect(() => {
+        if (section !== 'me' || (!email && !phone)) return undefined;
+        const controller = new AbortController();
+        const current = generation.current;
+        Promise.all(
+            ['/my/identity', `/my/preferences?page=${preferencesPage}`].map(async (url) => {
+                const response = await csrfFetch(url, { signal: controller.signal });
+                if (response.status === 401) {
+                    expire();
+                    throw new Error('Please verify your contact again.');
+                }
+                if (!response.ok) throw new Error('Could not load your preferences. Try again.');
+                return response.json();
+            })
+        )
+            .then(([proof, data]) => {
+                if (current === generation.current) {
+                    setIdentity(proof);
+                    setPreferences(data.preferences);
+                }
+            })
+            .catch((failure) => {
+                if (failure.name !== 'AbortError' && current === generation.current)
+                    setError(failure.message);
+            });
+        return () => controller.abort();
+    }, [section, email, phone, revision, preferencesPage, expire]);
+    const changePreference = async (slug, channel, enabled) => {
+        setBusy(true);
+        setError('');
+        try {
+            const response = await csrfFetch(`/my/preferences/${encodeURIComponent(slug)}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    channel,
+                    marketing_enabled: enabled,
+                    resume_marketing: enabled,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Could not update preferences.');
+            setRevision((value) => value + 1);
+        } catch (failure) {
+            setError(failure.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+    const removeIdentity = async (channel) => {
+        setBusy(true);
+        setError('');
+        try {
+            const response = await csrfFetch(
+                channel === 'email' ? '/my/identity/email' : '/my/verify/phone/forget',
+                { method: channel === 'email' ? 'DELETE' : 'POST' }
+            );
+            if (!response.ok) throw new Error('Could not remove this contact. Try again.');
+            expire();
+            router.reload();
+        } catch (failure) {
+            setError(failure.message);
+        } finally {
+            setBusy(false);
+        }
     };
     const signOut = async () => {
         setError('');
@@ -251,28 +327,36 @@ export default function AttendeeApp({
                         </>
                     )}
                     {section === 'me' && (
-                        <section className="max-w-xl">
-                            <h1 className="text-3xl font-medium">Your details</h1>
-                            <p className="mt-5 text-sm text-ink-secondary">
-                                Email: {email || 'Not verified'}
-                            </p>
-                            <p className="mt-2 text-sm text-ink-secondary">
-                                Phone: {phone ? 'Independently verified' : 'Not verified'}
-                            </p>
-                            {!email && (
+                        <>
+                            <AttendeeMe
+                                identity={
+                                    identity || {
+                                        email: email ? { masked: email } : null,
+                                        phone: phone ? { masked: 'Verified phone' } : null,
+                                    }
+                                }
+                                preferences={preferences}
+                                onPreference={changePreference}
+                                onRemove={removeIdentity}
+                                onSignOut={signOut}
+                                onVerify={setVerifyChannel}
+                                onPage={setPreferencesPage}
+                                busy={busy}
+                            />
+                            {verifyChannel === 'email' && (
                                 <VerifyPrompt
                                     onVerified={verified}
                                     organiserSlug={organiser?.slug}
+                                    allowPhone={false}
+                                />
+                            )}{' '}
+                            {verifyChannel === 'phone' && (
+                                <PhoneVerify
+                                    organiserSlug={organiser?.slug}
+                                    onVerified={verified}
                                 />
                             )}
-                            <button
-                                type="button"
-                                onClick={signOut}
-                                className="mt-5 min-h-11 border border-border px-4 text-sm"
-                            >
-                                Sign out of this device
-                            </button>
-                        </section>
+                        </>
                     )}
                 </>
             )}
