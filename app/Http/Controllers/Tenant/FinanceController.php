@@ -121,11 +121,17 @@ final class FinanceController extends Controller
     /** @return array<string, mixed> */
     private function duesProps(DuesFinanceRequest $request, Tenant $tenant): array
     {
-        if (! $tenant->communityEnabled() && ! $tenant->hasDuesMoney()) {
-            return [];
+        $givingAvailable = app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) || $tenant->hasGivingMoney();
+        $hasDuesMoney = $tenant->hasDuesMoney();
+        $givingProps = [
+            'givingOnly' => $givingAvailable && ! $hasDuesMoney && ! \App\Models\MembershipType::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotNull('amount')->exists() && ! $tenant->handlesTicketMoney(),
+            'givingReportUrl' => $givingAvailable ? route('tenant.community.money.giving.report', ['subdomain' => $tenant->slug]) : null,
+        ];
+        if (! $tenant->communityEnabled() && ! $hasDuesMoney) {
+            return $givingProps;
         }
 
-        return ['dues' => [
+        return [...$givingProps, 'dues' => [
             'show_ticket_finance' => $tenant->handlesTicketMoney(),
             'from' => $request->validated('from'), 'to' => $request->validated('to'),
             'timezone' => $request->timezone(),

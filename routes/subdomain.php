@@ -318,6 +318,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
+    Route::get('community/money/giving', [App\Http\Controllers\Tenant\GivingFundController::class, 'index'])->name('tenant.community.money.giving.index');
+    Route::get('community/money/giving/report', [App\Http\Controllers\Tenant\GivingReportController::class, 'index'])->name('tenant.community.money.giving.report');
+
     Route::post('finance/giving/refunds/{adjustment}/reconcile', [App\Http\Controllers\Tenant\GivingRefundController::class, 'reconcile'])->name('tenant.community.giving.refunds.reconcile');
     Route::get('finance/giving/{type}/{source}/refunds/preview', [App\Http\Controllers\Tenant\GivingRefundController::class, 'preview'])->name('tenant.community.giving.refunds.preview');
     Route::post('finance/giving/{type}/{source}/refunds', [App\Http\Controllers\Tenant\GivingRefundController::class, 'store'])->name('tenant.community.giving.refunds.store');
@@ -667,6 +670,8 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 Route::get('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'show'])->middleware('throttle:30,1')->name('public.community.preferences.show');
 Route::post('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'update'])->middleware('throttle:30,1')->name('public.community.preferences.update');
 
+Route::get('/give', [App\Http\Controllers\Public\GivingFundController::class, 'index'])->name('public.giving.index');
+Route::get('/give/{slug}', [App\Http\Controllers\Public\GivingFundController::class, 'show'])->name('public.giving.show');
 Route::post('/give/{slug}/checkout', [App\Http\Controllers\Public\GivingCheckoutController::class, 'store'])->middleware('throttle:10,1')->block(15, 15)->name('public.giving.checkout');
 Route::get('/giving/payments/{reference}/callback', [App\Http\Controllers\Public\GivingCheckoutController::class, 'callback'])->name('public.giving.callback');
 Route::get('/giving/payments/{reference}', [App\Http\Controllers\Public\GivingCheckoutController::class, 'result'])->name('public.giving.result');

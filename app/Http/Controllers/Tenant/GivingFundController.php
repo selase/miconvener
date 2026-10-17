@@ -16,6 +16,35 @@ use Illuminate\Http\JsonResponse;
 
 final class GivingFundController extends Controller
 {
+    public function index(\Illuminate\Http\Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        abort_unless(app(GivingRollout::class)->enabled($tenant) || $tenant->hasGivingMoney(), 404);
+        abort_unless($request->user()->can('manage giving') || $request->user()->can('read finance'), 403);
+        $finance = $request->user()->can('read finance');
+        $today = \Carbon\CarbonImmutable::now(\App\Models\CommunitySettings::for($tenant)->timezone);
+        $funds = GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->orderBy('name')->get();
+        $response = \Inertia\Inertia::render('Tenant/Community/MoneyGiving', [
+            'funds' => $funds->map(fn (GivingFund $fund) => [...$fund->only(['id', 'name', 'slug', 'description', 'button_label', 'currency', 'kind', 'target', 'minimum_amount', 'ends_on', 'close_on_target', 'state', 'visibility', 'progress', 'event_id']),
+                'totals' => $finance ? app(\App\Services\Giving\GivingProgress::class)->for($fund) : null,
+                'url' => route('public.giving.show', ['subdomain' => $tenant->slug, 'slug' => $fund->slug])]),
+            'canManageGiving' => $request->user()->can('manage giving'), 'canReadFinance' => $finance,
+            'enabled' => app(GivingRollout::class)->enabled($tenant),
+            'canManageDues' => $request->user()->can('manage members'),
+            'canRefund' => $request->user()->can('process refunds'),
+            'report' => $finance ? app(\App\Services\Giving\GivingReport::class)->summary($tenant, $today->startOfMonth()->utc(), $today->endOfDay()->utc()) : null,
+            'adjustments' => $finance ? \App\Models\GivingAdjustment::withoutGlobalScopes()->with('fund:id,name,currency')->where('tenant_id', $tenant->id)->latest()->limit(50)->get()->map(fn ($row) => [...$row->only(['id', 'principal', 'kind', 'status', 'commission_reversal', 'provider_refund_reference']), 'fund_name' => $row->fund->name, 'currency' => $row->fund->currency]) : [],
+            'gifts' => $finance ? \App\Models\GivingGift::withoutGlobalScopes()->with('fund:id,name')->where('tenant_id', $tenant->id)->latest()->limit(50)->get()->map(fn ($gift) => [
+                ...$gift->only(['id', 'fund_id', 'amount', 'currency', 'source', 'status', 'is_anonymous']),
+                'fund_name' => $gift->fund->name,
+                'payer_name' => $gift->is_anonymous ? null : $gift->payer_name,
+            ]) : [],
+        ])->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
+    }
+
     public function store(SaveFundRequest $request, GivingFunds $funds): JsonResponse
     {
         return response()->json(['fund' => $funds->save($this->tenant(), $request->user(), $request->validated())], 201);

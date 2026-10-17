@@ -43,13 +43,20 @@ final class GivingCheckoutController extends Controller
         return redirect()->route('public.giving.result', ['subdomain' => $subdomain, 'reference' => $reference])->header('Cache-Control', 'private, no-store');
     }
 
-    public function result(Request $request, string $subdomain, string $reference): JsonResponse
+    public function result(Request $request, string $subdomain, string $reference): JsonResponse|\Symfony\Component\HttpFoundation\Response
     {
         $attempt = $this->attempt($reference);
         $access = $request->session()->get('giving_checkout_access.'.$attempt->id);
         abort_unless(is_array($access) && ($access['expires_at'] ?? 0) > now()->timestamp && $attempt->receipt_expires_at?->isFuture() && hash_equals((string) $attempt->receipt_token_hash, hash('sha256', (string) ($access['token'] ?? ''))), 404);
 
-        return response()->json(['status' => $attempt->state, 'amount' => $attempt->amount, 'currency' => $attempt->currency])->header('Cache-Control', 'private, no-store');
+        $data = ['status' => $attempt->state, 'amount' => $attempt->amount, 'currency' => $attempt->currency];
+        if ($request->expectsJson()) {
+            return response()->json($data)->header('Cache-Control', 'private, no-store');
+        }
+        $response = \Inertia\Inertia::render('Public/Giving/Result', $data)->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     private function attempt(string $reference): GivingPaymentAttempt

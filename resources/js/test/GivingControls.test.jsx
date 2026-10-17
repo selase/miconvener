@@ -1,0 +1,99 @@
+import { expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import MoneyGiving from '@/Pages/Tenant/Community/MoneyGiving';
+import Fund from '@/Pages/Public/Giving/Fund';
+import { sendJson } from '@/lib/dues';
+vi.mock('@/Layouts/ConsoleLayout', () => ({ default: ({ children }) => children }));
+vi.mock('@/Layouts/PublicLayout', () => ({ default: ({ children }) => children }));
+vi.mock('@/lib/dues', async (original) => ({
+    ...(await original()),
+    sendJson: vi.fn(async () => ({
+        ok: false,
+        errors: { amount: 'Enter a valid amount.' },
+        message: 'Check the amount.',
+    })),
+}));
+const fund = {
+    id: 'fund',
+    name: 'Offering',
+    slug: 'offering',
+    currency: 'GHS',
+    state: 'open',
+    kind: 'open',
+    visibility: 'public',
+    progress: 'hidden',
+    minimum_amount: 100,
+    button_label: 'Contribute',
+};
+it('empty giving screens guide communities without requiring dues or members', () => {
+    render(<MoneyGiving funds={[]} canManageGiving canReadFinance={false} enabled />);
+    expect(screen.getByRole('button', { name: 'Create fund' })).toBeTruthy();
+    expect(screen.getByText(/No funds yet/)).toBeTruthy();
+    expect(screen.queryByText(/arrears/i)).toBeNull();
+});
+it('fund creation defaults to a private draft', () => {
+    render(<MoneyGiving funds={[]} canManageGiving enabled />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create fund' }));
+    expect(screen.getByLabelText('Visibility').value).toBe('private');
+    expect(screen.getByLabelText('State').value).toBe('draft');
+});
+it('record offering batch omits all individual contact fields', () => {
+    render(<MoneyGiving funds={[fund]} canManageGiving canReadFinance enabled />);
+    fireEvent.click(screen.getByRole('button', { name: 'Record offering/cash batch' }));
+    expect(screen.queryByLabelText('Giver name (optional)')).toBeNull();
+});
+it('online unavailable state does not expose a checkout form', () => {
+    render(<Fund organisation={{ name: 'Church' }} fund={fund} providers={[]} accepting />);
+    expect(screen.getByRole('status').textContent).toMatch(/not available/);
+    expect(screen.queryByLabelText('Amount (GHS)')).toBeNull();
+});
+it('checkout preserves operation identity when validation fails', async () => {
+    render(
+        <Fund organisation={{ name: 'Church' }} fund={fund} providers={['paystack']} accepting />
+    );
+    fireEvent.change(screen.getByLabelText('Amount (GHS)'), { target: { value: '1.001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Contribute' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    const first = sendJson.mock.calls.at(-1)[2];
+    fireEvent.click(screen.getByRole('button', { name: 'Contribute' }));
+    await waitFor(() =>
+        expect(sendJson.mock.calls.at(-1)[2].submission_key).toBe(first.submission_key)
+    );
+});
+it('refunds show the recorded fee impact before sending', async () => {
+    sendJson.mockResolvedValue({
+        ok: true,
+        body: {
+            principal: 2000,
+            currency: 'GHS',
+            commission_reversal: 40,
+            original_gateway_fee: 200,
+            payable_impact: 1960,
+            amount_owed: 0,
+        },
+    });
+    render(
+        <MoneyGiving
+            funds={[fund]}
+            gifts={[
+                {
+                    id: 'gift',
+                    fund_name: 'Offering',
+                    amount: 10000,
+                    currency: 'GHS',
+                    source: 'online',
+                    status: 'completed',
+                },
+            ]}
+            canReadFinance
+            canRefund
+            enabled
+        />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+    fireEvent.change(screen.getByLabelText('Amount (GHS)'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Requested' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview refund' }));
+    await waitFor(() => expect(screen.getByText(/Commission reversed/)).toBeTruthy());
+    expect(sendJson.mock.calls.at(-1)[0]).toBe('GET');
+});

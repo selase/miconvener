@@ -41,10 +41,14 @@ final class CommunityOverviewController extends Controller
         $charges = DuesCharge::query()->where('tenant_id', $tenant->id);
         $today = CarbonImmutable::now(CommunitySettings::for($tenant)->timezone);
         $canReadFinance = auth()->user()->can('read finance');
-        $report = $canReadFinance ? app(DuesReport::class)->summary($tenant, $today->startOfMonth()->utc(), $today->endOfDay()->utc()) : [];
+        $hasDues = \App\Models\MembershipType::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotNull('amount')->exists();
+        $givingFirst = ! $hasDues && app(\App\Services\Giving\GivingRollout::class)->enabled($tenant);
+        $report = $canReadFinance ? ($givingFirst ? app(\App\Services\Giving\GivingReport::class)->summary($tenant, $today->startOfMonth()->utc(), $today->endOfDay()->utc()) : app(DuesReport::class)->summary($tenant, $today->startOfMonth()->utc(), $today->endOfDay()->utc())) : [];
 
         return Inertia::render('Tenant/Community/Overview', [
             'canReadFinance' => $canReadFinance,
+            'givingFundsCount' => app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) && auth()->user()->can('manage giving') ? \App\Models\GivingFund::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count() : null,
+            'hasDues' => \App\Models\MembershipType::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotNull('amount')->exists(),
             'joinSettings' => CommunitySettings::for($tenant)->only(['join_mode', 'public_join_enabled', 'public_membership_type_id']),
             'membershipTypes' => \App\Models\MembershipType::query()->where('tenant_id', $tenant->id)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'amount', 'currency', 'period']),
             'reviewCounts' => [
@@ -62,8 +66,8 @@ final class CommunityOverviewController extends Controller
                 'overdueCharges' => (clone $charges)->where('status', DuesChargeStatusEnum::Open)->whereDate('due_on', '<', $today->toDateString())->count(),
             ],
             'collectedThisMonth' => collect($report)
-                ->filter(fn (array $amounts): bool => $amounts['collected_online_gross'] > 0)
-                ->map(fn (array $amounts, string $currency): array => ['currency' => $currency, 'amount' => $amounts['collected_online_gross']])
+                ->filter(fn (array $amounts): bool => ($amounts['collected_online_gross'] ?? $amounts['collected_online'] ?? 0) > 0)
+                ->map(fn (array $amounts, string $currency): array => ['currency' => $currency, 'amount' => $amounts['collected_online_gross'] ?? $amounts['collected_online'] ?? 0])
                 ->values(),
         ]);
     }

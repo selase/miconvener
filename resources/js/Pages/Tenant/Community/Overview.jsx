@@ -127,6 +127,7 @@ function ReminderSettings({ settings, form, setForm, errors, setErrors }) {
 export default function Overview({
     counts,
     givingFundsCount = null,
+    hasDues = true,
     collectedThisMonth,
     reminderSettings,
     canReadFinance = false,
@@ -223,19 +224,21 @@ export default function Overview({
                                     hint={`${counts?.activeMembers} active`}
                                     href={route('tenant.community.people.index')}
                                 />
-                                <Stat
-                                    label="Open dues"
-                                    value={counts?.openCharges}
-                                    hint={`${counts?.overdueCharges} overdue`}
-                                    href={route('tenant.community.money.dues.index')}
-                                />
+                                {hasDues && (
+                                    <Stat
+                                        label="Open dues"
+                                        value={counts?.openCharges}
+                                        hint={`${counts?.overdueCharges} overdue`}
+                                        href={route('tenant.community.money.dues.index')}
+                                    />
+                                )}
                             </>
                         )}
                         {givingFundsCount !== null && (
                             <Stat
                                 label="Giving funds"
                                 value={givingFundsCount}
-                                href={route('tenant.community.overview')}
+                                href={route('tenant.community.money.giving.index')}
                                 hint="Voluntary contributions without dues or membership"
                             />
                         )}

@@ -53,7 +53,14 @@ export const NAV_GROUPS = [
                 permission: 'send_community_messages',
             },
             {
-                label: 'Money',
+                label: 'Giving',
+                href: 'tenant.community.money.giving.index',
+                icon: 'HandCoins',
+                feature: 'giving_history',
+                anyPermissions: ['manage_giving', 'read_finance'],
+            },
+            {
+                label: 'Dues',
                 href: 'tenant.community.money.dues.index',
                 icon: 'Coins',
                 feature: 'community',
