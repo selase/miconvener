@@ -78,7 +78,7 @@ final class InboxQuery
             $join->on('i.tenant_id', '=', 'a.tenant_id')->on('i.recipient_type', '=', 'a.recipient_type')->whereRaw('COALESCE(i.member_id,i.follower_id)=a.recipient_id');
         })->leftJoin('community_messages as m', 'm.id', '=', 'i.message_id')->leftJoin('community_inbox_reads as r', function ($join): void {
             $join->on('r.item_id', '=', 'i.id')->on('r.reader_key', '=', 'a.reader_key')->whereRaw('r.entry_key=COALESCE(i.message_id,i.id)');
-        })->whereIn('i.tenant_id', $this->rollout->organisations()->select('id'))->whereNull('i.withdrawn_at')->where('i.available_at', '<=', CarbonImmutable::now())
+        })->whereIn('i.tenant_id', $this->rollout->organisations()->select('id'))->whereNull('i.withdrawn_at')->where('i.available_at', '<=', CarbonImmutable::now()->format('Y-m-d H:i:s.uP'))
             ->whereRaw('(a.consented_at IS NULL OR i.available_at >= a.consented_at)')
             ->where(function ($query): void {
                 $query->whereNull('i.message_id')->orWhere(function ($source): void {

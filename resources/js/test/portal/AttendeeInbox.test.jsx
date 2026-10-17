@@ -316,3 +316,26 @@ it('moves keyboard focus into a message and returns it to the originating list e
         )
     );
 });
+
+
+it('holds pagination while mark-all commits so a later page cannot restore stale unread rows', async () => {
+    let finishMark;
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
+        if (options?.method === 'POST') return {
+            ok: true, status: 200,
+            json: () => new Promise((resolve) => { finishMark = resolve; }),
+        };
+        return response({ entries: { data: [entry], current_page: 1, last_page: 2 } });
+    });
+    render(<InboxList tenantSlug="group" name="Group" onClose={() => {}} />);
+    await screen.findByText('Unread');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all read' }));
+    await waitFor(() => expect(finishMark).toBeTypeOf('function'));
+    const more = screen.getByRole('button', { name: 'More messages' });
+    expect(more.disabled).toBe(true);
+    fireEvent.click(more);
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('page=2'))).toBe(false);
+    await act(async () => finishMark({ read: true }));
+    expect(screen.queryByText('Unread')).toBeNull();
+    expect(screen.getByRole('button', { name: 'More messages' }).disabled).toBe(false);
+});

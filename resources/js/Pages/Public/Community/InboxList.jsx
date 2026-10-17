@@ -235,7 +235,7 @@ export default function InboxList({
                         >
                             <button
                                 className="min-h-11 text-sm text-accent underline disabled:opacity-50"
-                                disabled={page <= 1}
+                                disabled={busy || page <= 1}
                                 onClick={() => setPage((value) => value - 1)}
                             >
                                 Previous messages
@@ -245,7 +245,7 @@ export default function InboxList({
                             </span>
                             <button
                                 className="min-h-11 text-sm text-accent underline disabled:opacity-50"
-                                disabled={page >= entries.last_page}
+                                disabled={busy || page >= entries.last_page}
                                 onClick={() => setPage((value) => value + 1)}
                             >
                                 More messages

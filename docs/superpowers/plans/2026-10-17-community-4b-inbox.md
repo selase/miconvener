@@ -136,9 +136,9 @@ Implementation clarifications proposed for review:
 
 **Files:** this plan, roadmap, existing spec/acceptance evidence; no new unrelated feature.
 
-- [ ] Map every design §12 test to passing evidence: 1–7→Task5;8–11→Task3;12–16→Tasks3/5;17→Task6;18–19→Tasks1/3/5;20–23→Task4;24→Task2. All24 are minimum, not substitutes for race/pagination/finance regressions above.
+- [x] Map every design §12 test to passing evidence: 1–7→Task5;8–11→Task3;12–16→Tasks3/5;17→Task6;18–19→Tasks1/3/5;20–23→Task4;24→Task2. All24 are minimum, not substitutes for race/pagination/finance regressions above.
 - [ ] Run scoped tests per task, then one complete PHP gate on disposable test DB (two local workers or four CI), full JS bounded workers, lint, `vendor/bin/pint --dirty`, PHPStan0 without baseline growth, build, `finance:verify-categories`0 and payout OTP/event regression coverage. Preserve evidence; no redundant full suite after docs-only or unrelated read-only inspection. Correct actual failures, rerun affected suites; final CI must match the source submitted for merge.
-- [ ] Pause for AGENTS self-review: “Is there anything I have overlooked? Is the solution optimal? Let me take a step back.” Report dependencies, current-access boundaries, all UI/permission/route/seed/config/worker/delete touchpoints, gaps and limitations. Run one fresh whole-branch review; fix findings with focused regressions. Do not run a second review cycle unless a concrete unresolved risk justifies it.
+- [x] Pause for AGENTS self-review: “Is there anything I have overlooked? Is the solution optimal? Let me take a step back.” Report dependencies, current-access boundaries, all UI/permission/route/seed/config/worker/delete touchpoints, gaps and limitations. Run one fresh whole-branch review; fix findings with focused regressions. Do not run a second review cycle unless a concrete unresolved risk justifies it.
 - [ ] Let owner review native UI and delivery-outcome decision, verify real-device accessibility and no inbox caching, and confirm milestone4 prerequisites. Mark `built` only after agreed acceptance passes. Keep PR draft/unmerged pending explicit authority; `main` automatically deploys.
 - [ ] Only after explicit owner release approval: repeat aggregate legacy-SMS inventory, stop for owner decision if rows require conversion/retirement; verify deployed SHA/migrations/scheduler/current payment routes; obtain separate go-ahead to enable inbox for Purpledot, read back both flags, other tenants unchanged. Validate safe in-app notices using designated test data, no unauthorised live message/payment. Disable switch to recover; never delete money/history. Complete inbox reminder only when the inbox is actually delivered/accepted, not when this plan is saved.
 
@@ -161,3 +161,72 @@ Implementation clarifications proposed for review:
 - [x] Mapped all24 design acceptance cases, included RED/GREEN steps, reviewed privacy/finance/retry/erasure touchpoints and recorded owner decisions still needed.
 - [x] Recorded aggregate-only production inventory; no conversion, retirement, deployment or rollout performed.
 - [x] Owner reviewed the plan, approved native implementation and staff-only delivery outcomes2026-10-17.
+
+
+## Self-Review Report — implementation,2026-10-17
+
+“Is there anything I have overlooked? Is the solution optimal? Let me take a step back.”
+
+### Touchpoints updated
+
+- [x] AGENTS.md checked: finance invariants and Community handover rules followed. No new invariant needing a duplicate instruction; architecture/operational decisions recorded here and in the roadmap.
+- [x] Memory/handover: repository roadmap and parent spec updated; no separate private memory is needed for continuation.
+- [x] Seeders/permissions: no new permission or role. Existing `send community messages`, `read finance` for arrears and global superadmin gate protect existing/new actions; current seeded grants reused. No automatic feature enabling; dedicated missing-only pilot command.
+- [x] Navigation: Home positive unread card, Communities organisation inbox buttons including empty inboxes; Messages archive/withdraw remains reachable when sending is off. Existing five tabs retained.
+- [x] Environment/config/dependencies: no new package, environment variable, paid service or config requirement; `.env.example` unchanged intentionally. Separate tenant switches, scheduler prune registration and migrations included.
+- [x] Tests: storage, flags, tenant FKs, consent, shared contacts, proof revocation, read grouping/pagination, notices/payment failure, withdrawal/takedown, transport failure, worker exclusions and client races have focused regressions. New controllers' callers inspected; existing direct controller tests are covered by final full CI.
+- [x] Assets: regenerated `public/build` committed with UI; no baseline growth. Delete/retention uses FK cascades including bulk deletion. Scheduled prune requires the existing scheduler, not a new daemon.
+
+### UI Gap Analysis
+
+- Discoverability present: Home and Communities; empty authorised organisation remains listed.
+- Empty state present: “No messages yet”; no compose CTA for recipients. Staff retains the existing compose flow when authorised.
+- Permission gating present: current recipient proofs, tenant flags/status, source status and consent rechecked server-side; delivery diagnostics remain staff-only. No dues/charge prerequisite for announcements.
+- Loading/error states present: list/detail retry, mark-all/read-status errors, unavailable/expired identity, online-only boundary. Stale owner/body/count responses are discarded; no read mutation from list/prefetch.
+- Responsive present:320/390px browser widths and desktop checked without horizontal overflow, light/dark. Existing modal primitive reused.
+- Accessibility present: labelled buttons, focus trap/return, focus into detail and Back to originating list entry,44px new actions, unread textual indicator. Actual200% and real-device cold-offline acceptance remain explicitly open; representative/email-follower UI contexts are test-covered but have not each had a separate signed-in browser session.
+
+### Solved (auto-fixed)
+
+- `AttendeeApp.jsx`: capability discovery for phone-credential users independent of email-only ticket history; proof-stamped counts and owner changes clear private content.
+- `InboxList.jsx`: slow list response cannot restore unread after opening; origin focus restored on Back.
+- `InboxMessage.jsx`: body renders before read POST; abort/generation guards block stale identity results; detail receives keyboard focus.
+- `InboxQuery.php`: authorised empty inbox remains discoverable; SQL grouping occurs before pagination/count.
+- `SendDuesReminders.php` / `InboxNotices.php`: initially inbox-off queues and old same-day transport rows cannot backfill notices on retry; receipt-mail failure preserves the committed paid-state receipt and existing callback behavior.
+
+### Recommended for user decision
+
+- Acceptance/release only: check actual200% text and cold-offline ticket behavior on a physical device (about10–15 minutes); current tooling could not apply actual browser zoom. Recommend doing this before releasing dependent milestones4/4b. Inbox remains online-only.
+- Separate future scope: milestone5 should support churches/volunteers through voluntary funds/campaigns and contribution language, and review dues-oriented membership setup (estimate during milestone5 planning). Recommend retaining clear separation between debts and voluntary gifts; no financial behavior is changed in4b.
+
+### Not gaps
+
+- No member “emailed/SMS failed” label: owner explicitly chose staff-only outcomes.
+- No new Inbox tab: approved placement is within Communities with Home discovery.
+- No offline/private-message cache: intentional ticket-only offline boundary; inbox responses private/no-store and worker excluded.
+- No historic backfill, production activation or legacy follower conversion: explicitly separate owner release gates.
+- No arbitrary HTML/rich media: plain text with safe HTTP(S) links meets approved scope.
+
+### Minimum acceptance evidence map
+
+- §12.1–7,12–16,18: `MyInboxAccessTest.php`, existing `PortalSessionRevocationTest.php` and recipient announcement tests; focused reader/revocation run36/36 plus empty-discovery22/22.
+- §12.8–11,18–19: `InboxAnnouncementsTest.php`9/9,31 assertions, including lost SMS credit and cancel between100/102 selection pages; existing delivery regression suite passed with Task3.
+- §12.14,19: `InboxStorageTest.php`12/12,28 assertions (tenant/cascade/retention) plus reader gate tests.
+- §12.17: worker exclusion and portal privacy/identity JS suites; local cross-tab sign-out verified. Actual physical-device acceptance remains pending as stated above.
+- §12.20–23: `InboxNoticesTest.php` and existing finance/reminder/receipt suites110/110,762 assertions including payout OTP; subsequent no-backfill run58/58,501 assertions. Finance category verification exit0.
+- §12.24: `EmailFirstFollowingTest.php` plus existing following/preference suites35/35,125 assertions, UI5/5.
+
+Final independent review/CI outcomes will be appended below; no merge readiness or production release is claimed by this report.
+
+
+### Independent review and fix pass
+
+One fresh `gpt-6-astra` review covered implementation `3da228f..3ba8575` against the spec, plan, Review Focus and recorded decisions. Critical0, Important3, Minor0. All three Important findings were confirmed and fixed:
+
+1. Preserve microseconds for follower-channel consent and inbox availability, including model serialization and the current-time SQL binding. Positive same-second consent/message tests failed before the fix; pre-consent and future-item exclusions remain tested. The first correction exposed Laravel's default whole-second query binding; a frozen instant regression reproduced that boundary and the binding now explicitly preserves precision. No production migration has run; the two new unmerged migrations were corrected and the approved local QA schema aligned without deleting fixtures.
+2. Disable Previous/More navigation while Mark all read commits, preventing a concurrent page response from restoring stale unread state. New UI regression RED→GREEN.
+3. Prefer a valid self credential before representative credentials, while still falling back only to a separately valid representative grant if self is revoked. Both issuance orders tested; representative-first failed before the fix.
+
+Final focused regression evidence: PHP58/58,183 assertions across email-first follows, inbox access, existing member access/revocation and storage/retention; inbox UI11/11. Lint, Pint, build passed; PHPStan0 before the final one-line query-binding correction. Existing generated bundle-size warning is unchanged. Supplementary announcement acceptance9/9,31 assertions. Full release CI remains pending remote push permission; automatic approval review rejected push/PR as not explicitly authorised for this milestone. No redundant full local PHP run was added.
+
+Review decisions retained: unchangedM4/manual device acceptance remains a separate dependency; real200% and separate follower/representative browser sessions are not certified by source review; production rollout/inventory require the stated gates; generated assets validated by build and future CI; approved recipient-copy statistics and staff-only outcomes retained. No deferred minor findings. Self-review/review completion does not grant merge/deploy/activation approval.

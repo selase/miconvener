@@ -21,6 +21,8 @@ final class CommunityInboxItem extends Model
 
     protected $connection = 'landlord';
 
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected $guarded = [];
 
     protected $hidden = ['reader_key'];

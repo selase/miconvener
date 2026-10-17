@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('channel', 8)->default('sms');
             $table->text('address');
             $table->char('address_hash', 64);
-            $table->timestampTz('consented_at');
+            $table->timestampTz('consented_at', 6);
             $table->timestampTz('disabled_at')->nullable();
             $table->timestamps();
             $table->foreign(['tenant_id', 'follower_id'])->references(['tenant_id', 'id'])->on('community_followers')->cascadeOnDelete();

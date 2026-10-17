@@ -59,3 +59,13 @@ it('does not enumerate a legacy standalone phone follower by phone proof', funct
     CommunityFollower::factory()->create(['tenant_id' => $this->tenant->id, 'channel' => 'sms', 'address' => '+233241234567', 'address_hash' => app(App\Services\Community\MessagingPreferences::class)->hash('sms', '+233241234567')]);
     expect(app(CommunityHistory::class)->communities($this->proof)['data'])->toBe([]);
 });
+
+it('keeps a same-second SMS consent after the email consent eligible', function (): void {
+    $this->proof->put(PlatformAttendeeVerification::SESSION_KEY, ['email' => 'owner@example.test', 'expires_at' => now()->addHour()->timestamp]);
+    $this->travelTo(Carbon\CarbonImmutable::parse('2026-10-17 09:00:00.100000 UTC'));
+    $parent = $this->following->follow($this->tenant, $this->proof, 'email', true);
+    $this->travelTo(Carbon\CarbonImmutable::parse('2026-10-17 09:00:00.200000 UTC'));
+    $this->following->follow($this->tenant, $this->proof, 'sms', true);
+    expect($parent->channels()->sole()->consented_at->format('u'))->toBe('200000')
+        ->and($this->following->isFollowing($this->tenant, $this->proof, 'sms'))->toBeTrue();
+});

@@ -42,7 +42,8 @@ final class MemberAccess
             return null;
         }
         $credentials = CommunityAccessCredential::withoutGlobalScope(TenantScope::class)->where('tenant_id', $member->tenant_id)
-            ->where('member_id', $member->id)->whereIn('id', array_keys($grants))->whereNull('revoked_at')->whereNull('suspended_at')->get();
+            ->where('member_id', $member->id)->whereIn('id', array_keys($grants))->whereNull('revoked_at')->whereNull('suspended_at')
+            ->orderByRaw("CASE WHEN role = 'self' THEN 0 ELSE 1 END")->get();
         foreach ($credentials as $credential) {
             if ($this->valid($credential, $member, $phone) && ($grants[$credential->id]['version'] ?? null) === $credential->version) {
                 return $credential->role;

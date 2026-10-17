@@ -182,7 +182,8 @@ it('uses the full consent instant and never restores pre-refollow messages', fun
     $message = CommunityMessage::factory()->create(['tenant_id' => $this->tenant->id, 'status' => 'completed']);
     $item = CommunityInboxItem::factory()->create(['tenant_id' => $this->tenant->id, 'recipient_type' => 'follower', 'member_id' => null, 'follower_id' => $follower->id, 'kind' => 'announcement', 'message_id' => $message->id, 'subject' => null, 'body' => null, 'source_type' => null, 'source_id' => null, 'available_at' => $now->subMicroseconds(100000)]);
     expect(app(InboxQuery::class)->entries($this->session, $this->tenant, [])->total())->toBe(0);
-    $item->update(['available_at' => $now->addSecond()]);
+    $item->update(['available_at' => $now->addMicroseconds(100000)]);
+    expect($item->fresh()->available_at->format('u'))->toBe('300000');
     expect(app(InboxQuery::class)->entries($this->session, $this->tenant, [])->total())->toBe(1);
     $follower->update(['consented_at' => $now->addSeconds(2)]);
     expect(app(InboxQuery::class)->entries($this->session, $this->tenant, [])->total())->toBe(0);
@@ -191,4 +192,29 @@ it('uses the full consent instant and never restores pre-refollow messages', fun
 it('keeps an enabled organisation discoverable when its inbox is empty', function (): void {
     $this->item->delete();
     $this->withSession($this->session->all())->getJson($this->base.'/inbox')->assertOk()->assertJsonPath('organisations.0.slug', $this->tenant->slug)->assertJsonPath('organisations.0.unread', 0);
+});
+
+it('prefers a valid self credential to a representative grant regardless of issuance order', function (array $roles): void {
+    app(InboxReads::class)->mark($this->session, $this->tenant, $this->item->id, 'self');
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => $this->member->phone, 'expires_at' => now()->addHour()->timestamp]);
+    foreach ($roles as $role) {
+        app(MemberAccess::class)->issue($this->session, $this->member, $this->member->phone, $role, null, 'independent_review');
+    }
+    $this->session->forget(PlatformAttendeeVerification::SESSION_KEY);
+    $entry = app(InboxQuery::class)->entries($this->session, $this->tenant, [])->items()[0];
+    expect($entry['context'])->toBe('self')->and($entry['read'])->toBeTrue();
+    App\Models\CommunityAccessCredential::withoutGlobalScopes()->where('member_id', $this->member->id)->where('role', 'self')->update(['revoked_at' => now()]);
+    $fallback = app(InboxQuery::class)->entries($this->session, $this->tenant, [])->items()[0];
+    expect($fallback['context'])->toBe('representative:'.$this->member->id)->and($fallback['read'])->toBeFalse();
+})->with([
+    'representative then self' => [['representative', 'self']],
+    'self then representative' => [['self', 'representative']],
+]);
+
+it('compares visibility using the full current instant without showing a future same-second item', function (): void {
+    $instant = Carbon\CarbonImmutable::parse('2026-10-17 09:00:00.500000 UTC');
+    $this->travelTo($instant);
+    $this->item->update(['available_at' => $instant]);
+    CommunityInboxItem::factory()->create(['tenant_id' => $this->tenant->id, 'member_id' => $this->member->id, 'available_at' => $instant->addMicroseconds(100000)]);
+    expect(app(InboxQuery::class)->entries($this->session, $this->tenant, [])->total())->toBe(1);
 });

@@ -30,7 +30,7 @@ return new class extends Migration
             $table->string('recipient_type', 12);
             $table->uuid('member_id')->nullable();
             $table->uuid('follower_id')->nullable();
-            $table->timestampTz('available_at');
+            $table->timestampTz('available_at', 6);
             $table->timestampTz('withdrawn_at')->nullable();
             $table->timestamps();
             $table->foreign(['tenant_id', 'member_id'])->references(['tenant_id', 'id'])->on('members')->cascadeOnDelete();
