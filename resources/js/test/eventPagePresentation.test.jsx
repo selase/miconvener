@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Show from '@/Pages/Public/Events/Show';
 
@@ -81,17 +81,52 @@ describe('public event presentation', { timeout: 30000 }, () => {
             encodeURIComponent(event.address)
         );
     });
-    it('keeps registration values while opening an interactive section and submits the existing contract', () => {
+    it('keeps the ticket card compact and retains registration values between opening and closing the form', () => {
         render(<Show event={event} org={org} />);
-        const first = screen.getByLabelText(/First name/);
+        expect(screen.queryByLabelText(/First name/)).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+        const dialog = screen.getByRole('dialog', { name: 'Complete your registration' });
+        const first = within(dialog).getByLabelText(/First name/);
         fireEvent.change(first, { target: { value: 'Ada' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Q&A' }));
-        expect(screen.getByLabelText(/First name/).value).toBe('Ada');
-        fireEvent.submit(first.closest('form'));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Close', exact: true }));
+        fireEvent.click(screen.getByRole('button', { name: 'Q&A', exact: true }));
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+        const reopened = screen.getByRole('dialog', { name: 'Complete your registration' });
+        expect(within(reopened).getByLabelText(/First name/).value).toBe('Ada');
+        fireEvent.submit(
+            within(reopened)
+                .getByLabelText(/First name/)
+                .closest('form')
+        );
         expect(submitted).toHaveBeenCalledWith(
             expect.stringContaining('public.events.register'),
             expect.objectContaining({ first_name: 'Ada', ticket_type_id: '', form_answers: {} })
         );
+    });
+
+    it('opens the full speaker profile from the portrait card and restores keyboard focus', () => {
+        render(<Show event={event} org={org} />);
+        expect(screen.queryByText('Expert speaker.')).toBeNull();
+        const card = screen.getByRole('button', { name: 'View profile: Dr Example' });
+        card.focus();
+        fireEvent.click(card);
+        expect(screen.getByRole('dialog', { name: 'Dr Example' })).toBeTruthy();
+        expect(screen.getByText('Expert speaker.')).toBeTruthy();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(document.activeElement).toBe(card);
+    });
+
+    it('places the organiser social row above the event heading', () => {
+        render(<Show event={event} org={org} />);
+        const row = screen.getByRole('region', { name: 'Event organiser' });
+        expect(within(row).getByRole('link', { name: 'Instagram' })).toBeTruthy();
+        expect(
+            Boolean(
+                row.compareDocumentPosition(screen.getByRole('heading', { level: 1 })) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+            )
+        ).toBe(true);
     });
     it('preserves paid-ticket totals, invite-code entry and waitlist actions', () => {
         render(
@@ -109,18 +144,79 @@ describe('public event presentation', { timeout: 30000 }, () => {
                 org={org}
             />
         );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+        const registration = within(
+            screen.getByRole('dialog', { name: 'Complete your registration' })
+        );
         expect(
-            screen.getByRole('button', { name: 'Continue to payment (GHS 105.00)' })
+            registration.getByRole('button', { name: 'Continue to payment (GHS 105.00)' })
         ).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: /access code for hidden tickets/i }));
         expect(screen.getByPlaceholderText('e.g. VIP2026')).toBeTruthy();
+        fireEvent.click(registration.getByRole('button', { name: 'Close', exact: true }));
         fireEvent.click(screen.getByRole('radio', { name: /Full workshop/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
         const waitlist = screen.getByRole('button', { name: 'Join waitlist' });
         fireEvent.submit(waitlist.closest('form'));
         expect(submitted).toHaveBeenCalledWith(
             expect.any(String),
             expect.objectContaining({ ticket_type_id: 'full' })
         );
+    });
+
+    it('retains conditional answers and price changes when registration is reopened', () => {
+        render(
+            <Show
+                event={{
+                    ...event,
+                    ticket_price: 1000,
+                    form_fields: [
+                        {
+                            id: 'mode',
+                            field_key: 'mode',
+                            field_type: 'select',
+                            label: 'Attendance mode',
+                            options: [{ value: 'room', label: 'In person', price: 500 }],
+                            is_required: true,
+                        },
+                        {
+                            id: 'seat',
+                            field_key: 'seat',
+                            field_type: 'text',
+                            label: 'Seating preference',
+                            conditional_logic: { depends_on_field: 'mode', value: 'room' },
+                        },
+                    ],
+                }}
+                org={org}
+            />
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+        expect(screen.queryByLabelText('Seating preference')).toBeNull();
+        fireEvent.change(screen.getByLabelText(/Attendance mode/), { target: { value: 'room' } });
+        fireEvent.change(screen.getByLabelText('Seating preference'), {
+            target: { value: 'Front' },
+        });
+        expect(
+            screen.getByRole('button', { name: 'Continue to payment (GHS 15.00)' })
+        ).toBeTruthy();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+        expect(screen.getByLabelText('Seating preference').value).toBe('Front');
+    });
+
+    it('keeps the event finish time visible even without a programme', () => {
+        render(<Show event={{ ...event, sessions: [] }} org={org} />);
+        const endTime = new Date(event.ends_at).toLocaleTimeString(undefined, {
+            timeZone: event.timezone,
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+        expect(
+            within(document.getElementById('register-section')).getByText(
+                (text) => text.includes('–') && text.includes(endTime)
+            )
+        ).toBeTruthy();
     });
 
     it('opens programme notes in a keyboard-accessible dialog and retains slide links', () => {
