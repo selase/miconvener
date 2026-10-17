@@ -131,10 +131,10 @@ No new giving, membership-price or SMS rollout decisions are needed for this pla
 ## Plan self-review
 
 - Covers five sections, desktop/mobile, accessibility/states, identity boundaries, existing records/actions, Money read-only surfaces, offline boot/cache clearing and independent rollout.
-- Explicit proposed deviation: unread inbox; requires owner approval and spec update before implementation. No fake unread count or automatic phone-history access.
-- Existing offline agenda/virtual link storage conflicts with the newer ticket-only boundary; the planned v3 purge and visible online-only messaging address that conflict, pending owner review of the behavior change.
+- Approved deviation: unread inbox is deferred; spec updated. No fake unread count or automatic phone-history access.
+- Existing offline agenda/virtual link storage conflicts with the newer ticket-only boundary; the planned v3 purge and visible online-only messaging address that conflict, approved by the owner.
 - No future Giving/Library/member-price feature is silently pulled into milestone 4. Existing giving history and all legacy records stay accessible.
-- Reviewed for source paths/interfaces, privacy, paginated/mixed-currency input and empty/revoked states. Tests and release gate are bounded to avoid duplicate long review/test cycles. Implementation is on `codex/community-4`. Tasks1–5 are implemented; the browser/owner acceptance and full final CI gates remain open.
+- Reviewed for source paths/interfaces, privacy, paginated/mixed-currency input and empty/revoked states. Tests and release gate are bounded to avoid duplicate long review/test cycles. Implementation is on `codex/community-4`. Tasks1–5 are implemented. Full source CI passed on `73e86c0`; signed-in local browser acceptance passed. Owner real-device cold-offline and 200% text acceptance remain open.
 
 
 ## Self-Review Report — 2026-10-17
@@ -145,7 +145,7 @@ No new giving, membership-price or SMS rollout decisions are needed for this pla
 - [x] Tests: focused ownership, identifiers, preferences, mixed-currency dues, statements, PWA scope/cache, delayed responses and recovery, legacy sign-out broadcasts, loading/error and filter tests. All existing feature tests were included in the local release run.
 - [x] Build: rebuilt `public/build` committed with frontend work. Worker caches use the manifest build hash; `/my` and nested routes share scope and old registration migration.
 - AGENTS.md/memory: no new global convention or deployment rule; milestone decisions and continuation state are in this plan, spec and roadmap.
-- Seeders/permissions: not applicable; no new staff permission or onboarding entitlement. The idempotent command creates only the requested tenant feature row. No organisation has been activated by this implementation.
+- Seeders/permissions: not applicable; no new staff permission or onboarding entitlement. The idempotent command creates only the requested tenant feature row. Only local `community-qa` was activated after the owner explicitly approved all local testing; production settings are unchanged.
 - Config/.env/dependencies: not applicable; no new environment variable, package or infrastructure service.
 
 ### UI Gap Analysis
@@ -155,7 +155,8 @@ No new giving, membership-price or SMS rollout decisions are needed for this pla
 - Access: every new private reader is session-authorised and private/no-store. Current membership grants are rechecked for statements/receipts; no phone-to-email inference or pay-token-to-identity access was added.
 - Offline: v3 stores only explicit issued ticket passes, bound to opaque proof identity and expiry. No agenda, virtual link, financial history, document or recovery secret is stored. Authoritative identity changes, legacy sign-out/removal and cross-tab events clear private UI and snapshots. Unknown offline boot probes the server before accepting its online status; no redirect loop based solely on navigator.onLine.
 - Accessibility checked: anonymous actual app at320px,390px and1280px; no horizontal overflow. Mobile five-item nav targets about59x63px at320px; Me controls44px. Light accent corrected within this app to #007367 (5.76:1 on white), dark action #00c8b7/#042522 (7.69:1). Existing modal keyboard/focus tests retained.
-- **Still unverified:** signed-in responsive flows, actual phone/desktop cold network-disabled boot and200% text reflow. The browser tool has no network-emulation API. Local QA flag activation was blocked by automatic approval review and is awaiting owner approval; no workaround or production change was made. Do not claim WCAG certification or owner acceptance.
+- Signed-in local browser acceptance passed with reserved synthetic QA data: Home, QR ticket detail, explicit save, Tickets/records, Communities, per-currency Money/charges, statement PDF, Me announcement opt-out and explicit opt-in, Escape/focus return, and cross-tab sign-out clearing an open private pass. Signed-in 320px Home/Communities and390px Money had no horizontal overflow; viewport override reset.
+- **Still unverified:** actual phone/desktop cold network-disabled boot and200% text reflow. The browser tool has no network-emulation API. The owner explicitly approved all local testing after the earlier approval rejection; local QA is enabled. No production setting changed. Do not claim WCAG certification or owner acceptance.
 
 ### Independent review and fixes
 
@@ -172,11 +173,11 @@ One fresh reviewer reported no Critical or Minor findings and10 Important findin
 9. Phone-only members/representatives retain Home’s authorised dues attention cards; event proof remains email-only.
 10. Money and Me render loading/failure states before deciding a history is empty.
 
-Evidence: all targeted regressions were observed failing, then passing. Full JS364/364; focused PHP36/36 (190 assertions), including payout OTP; PHPStan0 with baseline unchanged; lint, Pint, build and read-only finance category verification passed. Local full PHP ran2895 tests/14019 assertions:2894 passed, one old static worker-file assertion errored; its dynamic response contract was corrected and its PWA suite is green in the focused gate. Final full remote CI is required before merge; no second independent review was dispatched.
+Evidence: all targeted regressions were observed failing, then passing. Full JS364/364; focused PHP36/36 (190 assertions), including payout OTP; PHPStan0 with baseline unchanged; lint, Pint, build and read-only finance category verification passed. Local full PHP ran2895 tests/14019 assertions:2894 passed, one old static worker-file assertion errored; its dynamic response contract was corrected and its PWA suite is green in the focused gate. Full remote CI run [39024630808](https://github.com/selase/miconvener/actions/runs/39024630808) passed on `73e86c0`: PHP2899/2899 (14037 assertions), JS364/364, PHPStan0 and quality/build checks. No second independent review was dispatched. The final browser pass then exposed a pre-existing Communities summary combining historical currencies under the current membership currency. Removed that misleading aggregate while retaining detailed charges/payment actions; its regression was observed RED then GREEN (9/9 boundary tests), scoped lint and rebuilt assets passed. Money retains separate per-currency totals. This final client-only correction requires its new PR CI check before merge; no PHP code changed after the green full source gate.
 
 ### Recommended for user decision
 
-- Approve only local `community-qa` activation if signed-in browser acceptance should continue here; the existing Purpledot production standing instruction is retained for an approved deployment.
+- Local testing approval is granted and QA enabled. The existing Purpledot production standing instruction applies only after an approved deployment.
 - Review on phone and desktop, including real offline save/reload and text enlargement, before marking the milestone built.
 - In-app inbox is intentionally deferred. A reminder `in-app-inbox-follow-up` exists, quiet until milestone4 is deployed. Claude’s useful parallel scope is a separate inbox specification (recipient authorisation, email-first/shared-number safeguards, read/unread, retention), not this branch’s shared source files.
 

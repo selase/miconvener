@@ -344,9 +344,7 @@ export default function CommunitiesPanel({
                                         </span>
                                     </div>
                                     <p className="text-sm text-ink-secondary">
-                                        {row.membership_type.name} · Open dues{' '}
-                                        {row.membership_type.currency}{' '}
-                                        {(row.open_total / 100).toFixed(2)}
+                                        {row.membership_type.name}
                                     </p>
                                     <div className="flex flex-wrap gap-3 text-sm">
                                         <button
