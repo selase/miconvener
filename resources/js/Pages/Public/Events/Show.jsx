@@ -62,53 +62,68 @@ function lowestPrice(event) {
 }
 
 function SpeakerCard({ speaker }) {
-    const [expanded, setExpanded] = useState(false);
-    const bio = speaker.bio || '';
-    const EXCERPT_LENGTH = 140;
-    const isLong = bio.length > EXCERPT_LENGTH;
-    const displayBio = !isLong || expanded ? bio : bio.slice(0, EXCERPT_LENGTH).trim() + '…';
-
+    const [open, setOpen] = useState(false);
     return (
-        <div className="flex gap-4 border border-border bg-surface p-4 sm:p-5 transition-colors hover:border-accent/40">
-            {speaker.photo_url ? (
-                <img
-                    src={speaker.photo_url}
-                    alt={speaker.name}
-                    className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-full object-cover border border-border/70"
-                />
-            ) : (
-                <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-ink-secondary border border-border/60">
-                    <User className="h-6 w-6" strokeWidth={1.5} />
-                </div>
-            )}
-            <div className="min-w-0 flex-1">
-                <h3 className="text-[15px] font-semibold text-ink leading-snug">{speaker.name}</h3>
-                {[speaker.title, speaker.organization].some(Boolean) && (
-                    <p className="mt-0.5 text-[13px] text-ink-secondary">
-                        {[speaker.title, speaker.organization].filter(Boolean).join(', ')}
-                    </p>
-                )}
-                {bio && (
-                    <div className="mt-2 text-[13px] leading-relaxed text-ink-secondary">
-                        <p className="whitespace-pre-line">{displayBio}</p>
-                        {isLong && (
-                            <button
-                                type="button"
-                                onClick={() => setExpanded(!expanded)}
-                                className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:underline cursor-pointer transition-colors"
-                            >
-                                <span>{expanded ? 'Show less' : 'Read more'}</span>
-                                {expanded ? (
-                                    <ChevronUp className="h-3 w-3" />
-                                ) : (
-                                    <ChevronDown className="h-3 w-3" />
-                                )}
-                            </button>
-                        )}
+        <>
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                aria-label={`View profile: ${speaker.name}`}
+                className="group min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+                {speaker.photo_url ? (
+                    <img
+                        src={speaker.photo_url}
+                        alt={speaker.name}
+                        loading="lazy"
+                        className="mb-3 aspect-[4/4.3] w-full bg-surface-sunken object-cover object-[center_23%] transition-opacity group-hover:opacity-90"
+                    />
+                ) : (
+                    <div className="mb-3 flex aspect-[4/4.3] w-full items-center justify-center bg-surface-sunken text-ink-tertiary">
+                        <User className="h-12 w-12" strokeWidth={1} />
                     </div>
                 )}
-            </div>
-        </div>
+                <span className="block text-sm font-semibold leading-snug text-ink group-hover:text-accent">
+                    {speaker.name}
+                </span>
+                {speaker.title && (
+                    <span className="mt-1 block text-xs leading-relaxed text-ink-secondary">
+                        {speaker.title}
+                    </span>
+                )}
+                {speaker.organization && (
+                    <span className="mt-1 block text-[11px] leading-relaxed text-ink-tertiary">
+                        {speaker.organization}
+                    </span>
+                )}
+                <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-accent">
+                    View profile <ExternalLink className="h-3 w-3" />
+                </span>
+            </button>
+            <Modal
+                open={open}
+                onClose={() => setOpen(false)}
+                title={speaker.name}
+                className="max-w-xl"
+            >
+                <div className="flex items-start gap-4">
+                    {speaker.photo_url && (
+                        <img
+                            src={speaker.photo_url}
+                            alt=""
+                            className="h-24 w-24 shrink-0 object-cover object-[center_23%]"
+                        />
+                    )}
+                    <div className="min-w-0 text-sm text-ink-secondary">
+                        {speaker.title && <p className="font-medium text-ink">{speaker.title}</p>}
+                        {speaker.organization && <p className="mt-1">{speaker.organization}</p>}
+                    </div>
+                </div>
+                <p className="mt-5 whitespace-pre-line text-sm leading-7 text-ink-secondary">
+                    {speaker.bio || 'A biography will be shared soon.'}
+                </p>
+            </Modal>
+        </>
     );
 }
 
@@ -122,7 +137,7 @@ function SpeakersSection({ speakers }) {
     }
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5">
             {speakers.map((speaker) => (
                 <SpeakerCard key={speaker.id} speaker={speaker} />
             ))}
@@ -262,7 +277,7 @@ function ScheduleSection({ sessions, timezone, icsUrl, recurrenceSummary, lexico
                             className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 py-4 first:pt-0"
                         >
                             <div className="flex items-start gap-3 min-w-0 flex-1">
-                                <div className="w-36 shrink-0 font-mono text-[12px] text-ink-secondary">
+                                <div className="w-28 shrink-0 font-mono text-[12px] text-ink-secondary">
                                     <div>
                                         {formatSessionTime(
                                             session.starts_at,
@@ -679,6 +694,7 @@ function isConditionSatisfied(field, answers) {
 
 function RegistrationPanel({ event }) {
     const titleId = useId();
+    const [showRegistration, setShowRegistration] = useState(false);
     const { flash } = usePage().props;
     const settings = event.registration_settings || {
         phone: 'optional',
@@ -744,6 +760,9 @@ function RegistrationPanel({ event }) {
 
     // Automatically expand fields when validation errors exist on any collapsible fields
     useEffect(() => {
+        if (Object.keys(errors).length > 0) {
+            setShowRegistration(true);
+        }
         const hasCollapsibleError = Object.keys(errors).some(
             (key) =>
                 key.startsWith('form_answers') ||
@@ -979,590 +998,743 @@ function RegistrationPanel({ event }) {
     const titles = ['Mr', 'Mrs', 'Ms', 'Miss', 'Dr', 'Prof', 'Rev', 'Hon', 'Other'];
 
     return (
-        <aside
-            id="register-section"
-            className="border border-border bg-surface p-5 sm:p-6 lg:sticky lg:top-6"
-        >
-            <h3 className="text-[15px] font-medium text-ink">Register</h3>
-
-            {flash?.error && (
-                <div className="mt-3 bg-danger-bg px-3.5 py-2.5 text-[13px] text-danger-fg">
-                    {flash.error}
+        <>
+            <aside
+                id="register-section"
+                className="border border-border bg-surface p-5 sm:p-6 lg:sticky lg:top-5"
+            >
+                <div className="flex items-center gap-3 border-b border-border pb-4">
+                    <div
+                        aria-hidden="true"
+                        className="w-12 shrink-0 bg-accent/10 py-2 text-center leading-none text-accent"
+                    >
+                        <span className="block text-[10px] uppercase tracking-wider">
+                            {new Date(event.starts_at).toLocaleDateString(undefined, {
+                                timeZone: event.timezone,
+                                month: 'short',
+                            })}
+                        </span>
+                        <b className="mt-1 block text-2xl font-medium">
+                            {new Date(event.starts_at).toLocaleDateString(undefined, {
+                                timeZone: event.timezone,
+                                day: 'numeric',
+                            })}
+                        </b>
+                    </div>
+                    <div>
+                        <p className="text-[13px] font-medium">
+                            {formatDateRange(event.starts_at, event.ends_at, event.timezone)}
+                        </p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-ink-secondary">
+                            {new Date(event.starts_at).toLocaleTimeString(undefined, {
+                                timeZone: event.timezone,
+                                hour: 'numeric',
+                                minute: '2-digit',
+                            })}{' '}
+                            –{' '}
+                            {new Date(event.ends_at).toLocaleTimeString(undefined, {
+                                timeZone: event.timezone,
+                                hour: 'numeric',
+                                minute: '2-digit',
+                            })}{' '}
+                            · {event.timezone}
+                        </p>
+                    </div>
                 </div>
-            )}
-            {flash?.success && (
-                <div className="mt-3 bg-success-bg px-3.5 py-2.5 text-[13px] text-success-fg">
-                    {flash.success}
+                <p className="my-4 flex items-start gap-2 text-xs leading-relaxed text-ink-secondary">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                    {event.location_type === 'virtual'
+                        ? 'Online event'
+                        : event.address || 'Venue to be announced'}
+                </p>
+                <h2 className="mb-4 flex items-center justify-between gap-3 text-lg font-medium tracking-tight">
+                    Choose how to attend
+                    <Ticket className="h-4 w-4 text-ink-tertiary" />
+                </h2>
+                {availableTicketTypes.length > 0 && (
+                    <fieldset className="space-y-2">
+                        <legend className="sr-only">Ticket options</legend>
+                        {availableTicketTypes.map((ticket) => (
+                            <label
+                                key={ticket.id}
+                                className={`flex cursor-pointer items-start gap-2.5 border p-3 text-xs ${data.ticket_type_id === ticket.id ? 'border-accent bg-accent/5' : 'border-border'}`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="preview_ticket_type_id"
+                                    value={ticket.id}
+                                    checked={data.ticket_type_id === ticket.id}
+                                    onChange={() => setData('ticket_type_id', ticket.id)}
+                                    className="mt-0.5"
+                                />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block font-medium">{ticket.name}</span>
+                                    {ticket.is_sold_out && (
+                                        <span className="mt-1 block text-[11px] text-ink-secondary">
+                                            Full — join the waitlist
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="shrink-0 font-mono text-[11px]">
+                                    {ticket.is_sold_out
+                                        ? 'Waitlist'
+                                        : formatMoney(ticket.price, event.currency)}
+                                </span>
+                            </label>
+                        ))}
+                    </fieldset>
+                )}
+                <button
+                    type="button"
+                    onClick={() => {
+                        setShowRegistration(true);
+                        setShowPromoInput(true);
+                        setShowAccessCodeInput(hasTicketTypes);
+                    }}
+                    className="mt-4 text-xs text-ink-secondary underline underline-offset-4"
+                >
+                    Have a promo or access code?
+                </button>
+                <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-4">
+                    <span className="text-sm text-ink-secondary">Total</span>
+                    <strong className="text-xl font-medium tracking-tight">
+                        {formatMoney(calculatedPricing.total, event.currency)}
+                    </strong>
                 </div>
-            )}
+                {calculatedPricing.serviceFee > 0 && (
+                    <p className="mt-1 text-[11px] text-ink-secondary">
+                        Includes {formatMoney(calculatedPricing.serviceFee, event.currency)} service
+                        fee.
+                    </p>
+                )}
+                {flash?.error && (
+                    <p role="alert" className="mt-3 text-xs text-danger-fg">
+                        {flash.error}
+                    </p>
+                )}
+                {flash?.success && (
+                    <p role="status" className="mt-3 text-xs text-success-fg">
+                        {flash.success}
+                    </p>
+                )}
+                <Button
+                    type="button"
+                    onClick={() => setShowRegistration(true)}
+                    className="mt-5 w-full justify-center"
+                >
+                    Continue <ChevronDown className="ml-2 h-3.5 w-3.5 -rotate-90" />
+                </Button>
+                <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-tertiary">
+                    One attendee per registration.
+                </p>
+                <FindMyTicket event={event} />
+            </aside>
+            <Modal
+                open={showRegistration}
+                onClose={() => setShowRegistration(false)}
+                title="Complete your registration"
+                className="max-w-lg"
+            >
+                {flash?.error && (
+                    <div className="mt-3 bg-danger-bg px-3.5 py-2.5 text-[13px] text-danger-fg">
+                        {flash.error}
+                    </div>
+                )}
+                {flash?.success && (
+                    <div className="mt-3 bg-success-bg px-3.5 py-2.5 text-[13px] text-success-fg">
+                        {flash.success}
+                    </div>
+                )}
 
-            <form onSubmit={submit} className="mt-4 space-y-4">
-                {hasTicketTypes && (
-                    <div className="space-y-2">
-                        <div className="flex flex-col gap-px bg-border">
-                            {availableTicketTypes.map((ticketType) => (
-                                <label
-                                    key={ticketType.id}
-                                    className={`flex cursor-pointer items-center justify-between gap-3.5 bg-surface px-3.5 py-3 text-left ${
-                                        data.ticket_type_id === ticketType.id
-                                            ? 'shadow-[inset_2px_0_0_var(--color-accent)]'
-                                            : ''
-                                    }`}
-                                >
-                                    <span className="flex items-start gap-2.5">
-                                        <input
-                                            type="radio"
-                                            name="ticket_type_id"
-                                            value={ticketType.id}
-                                            checked={data.ticket_type_id === ticketType.id}
-                                            onChange={(e) =>
-                                                setData('ticket_type_id', e.target.value)
-                                            }
-                                            className="mt-0.5"
-                                        />
-                                        <span>
-                                            <span className="flex items-center gap-1.5 text-[13.5px] text-ink">
-                                                {ticketType.name}
-                                                {ticketType.is_invite_only && (
-                                                    <span className=" bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-accent">
-                                                        Unlocked VIP
+                <form onSubmit={submit} className="mt-4 space-y-4">
+                    {hasTicketTypes && (
+                        <div className="space-y-2">
+                            <div className="flex flex-col gap-px bg-border">
+                                {availableTicketTypes.map((ticketType) => (
+                                    <label
+                                        key={ticketType.id}
+                                        className={`flex cursor-pointer items-center justify-between gap-3.5 bg-surface px-3.5 py-3 text-left ${
+                                            data.ticket_type_id === ticketType.id
+                                                ? 'shadow-[inset_2px_0_0_var(--color-accent)]'
+                                                : ''
+                                        }`}
+                                    >
+                                        <span className="flex items-start gap-2.5">
+                                            <input
+                                                type="radio"
+                                                name="ticket_type_id"
+                                                value={ticketType.id}
+                                                checked={data.ticket_type_id === ticketType.id}
+                                                onChange={(e) =>
+                                                    setData('ticket_type_id', e.target.value)
+                                                }
+                                                className="mt-0.5"
+                                            />
+                                            <span>
+                                                <span className="flex items-center gap-1.5 text-[13.5px] text-ink">
+                                                    {ticketType.name}
+                                                    {ticketType.is_invite_only && (
+                                                        <span className=" bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-accent">
+                                                            Unlocked VIP
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                {ticketType.is_sold_out && (
+                                                    <span className="block text-[11.5px] text-ink-secondary">
+                                                        Full — join the waitlist
                                                     </span>
                                                 )}
                                             </span>
-                                            {ticketType.is_sold_out && (
-                                                <span className="block text-[11.5px] text-ink-secondary">
-                                                    Full — join the waitlist
-                                                </span>
-                                            )}
                                         </span>
-                                    </span>
-                                    <em
-                                        className={`shrink-0 font-mono text-[14px] not-italic ${data.ticket_type_id === ticketType.id ? 'text-accent' : 'text-ink'}`}
-                                    >
-                                        {ticketType.is_sold_out
-                                            ? 'Waitlist'
-                                            : formatMoney(ticketType.price, event.currency)}
-                                    </em>
-                                </label>
-                            ))}
-                        </div>
-
-                        {/* Unlock Invite-only Tickets */}
-                        <div className="pt-1">
-                            {!showAccessCodeInput ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAccessCodeInput(true)}
-                                    className="text-[12px] text-ink-secondary hover:text-accent underline transition-colors"
-                                >
-                                    Have an access code for hidden tickets?
-                                </button>
-                            ) : (
-                                <div className=" border border-border p-2.5 bg-surface-alt/40 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[11.5px] font-medium text-ink">
-                                            Enter Access Code:
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAccessCodeInput(false)}
-                                            className="text-[11px] text-ink-muted hover:text-ink"
+                                        <em
+                                            className={`shrink-0 font-mono text-[14px] not-italic ${data.ticket_type_id === ticketType.id ? 'text-accent' : 'text-ink'}`}
                                         >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={accessCodeInput}
-                                            onChange={(e) =>
-                                                setAccessCodeInput(e.target.value.toUpperCase())
-                                            }
-                                            placeholder="e.g. VIP2026"
-                                            className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
-                                        />
-                                        <Button
-                                            type="button"
-                                            onClick={handleUnlockTickets}
-                                            disabled={unlocking || !accessCodeInput.trim()}
-                                        >
-                                            {unlocking ? 'Unlocking...' : 'Unlock'}
-                                        </Button>
-                                    </div>
-                                    {accessCodeError && (
-                                        <p className="text-[11px] text-danger-fg">
-                                            {accessCodeError}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-                {errors.ticket_type_id && (
-                    <p className="text-[13px] text-danger-fg">{errors.ticket_type_id}</p>
-                )}
+                                            {ticketType.is_sold_out
+                                                ? 'Waitlist'
+                                                : formatMoney(ticketType.price, event.currency)}
+                                        </em>
+                                    </label>
+                                ))}
+                            </div>
 
-                {/* Core Attendee Identity Fields */}
-                <div className="grid grid-cols-3 gap-2.5">
-                    <div>
-                        <label
-                            htmlFor={titleId}
-                            className="block text-[12.5px] font-medium text-ink mb-1"
-                        >
-                            Title <span className="text-danger-fg">*</span>
-                        </label>
-                        <select
-                            id={titleId}
-                            value={data.title}
-                            onChange={(e) => setData('title', e.target.value)}
-                            className="w-full border border-border bg-surface px-2.5 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                            required
-                        >
-                            <option value="">Select...</option>
-                            {titles.map((t) => (
-                                <option key={t} value={t}>
-                                    {t}
-                                </option>
-                            ))}
-                        </select>
-                        {errors.title && (
-                            <p className="mt-1 text-[11.5px] text-danger-fg">{errors.title}</p>
-                        )}
-                    </div>
-                    <div className="col-span-2">
-                        <Input
-                            label="First name *"
-                            type="text"
-                            value={data.first_name}
-                            onChange={(e) => setData('first_name', e.target.value)}
-                            error={errors.first_name}
-                            required
-                        />
-                    </div>
-                </div>
-
-                <Input
-                    label="Last name *"
-                    type="text"
-                    value={data.last_name}
-                    onChange={(e) => setData('last_name', e.target.value)}
-                    error={errors.last_name}
-                    required
-                />
-
-                <Input
-                    label="Email *"
-                    type="email"
-                    value={data.email}
-                    onChange={(e) => setData('email', e.target.value)}
-                    error={errors.email}
-                    required
-                />
-
-                {/* Additional registration fields (Phone, Custom fields, Dietary/Accessibility) */}
-                {totalExtraCount > 0 && (
-                    <div className="space-y-3">
-                        <div
-                            className={`transition-all duration-300 ${
-                                !fieldsExpanded && totalExtraCount >= 2
-                                    ? 'max-h-60 overflow-hidden relative'
-                                    : ''
-                            }`}
-                        >
-                            {/* Standard Configurable Requirements */}
-                            {settings.phone !== 'hidden' && (
-                                <Input
-                                    label={`Phone ${settings.phone === 'required' ? '*' : '(optional)'}`}
-                                    type="tel"
-                                    value={data.phone}
-                                    onChange={(e) => setData('phone', e.target.value)}
-                                    error={errors.phone}
-                                    required={settings.phone === 'required'}
-                                />
-                            )}
-
-                            {/* Custom Event Form Fields (Conditional & Dynamic Pricing) */}
-                            {formFields.map((field) => {
-                                const visible = isConditionSatisfied(field, data.form_answers);
-                                if (!visible) return null;
-
-                                const fieldError = errors[`form_answers.${field.field_key}`];
-                                const val = data.form_answers[field.field_key] ?? '';
-
-                                return (
-                                    <div
-                                        key={field.id}
-                                        className="border-t border-border/60 pt-3 mt-3"
+                            {/* Unlock Invite-only Tickets */}
+                            <div className="pt-1">
+                                {!showAccessCodeInput ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAccessCodeInput(true)}
+                                        className="text-[12px] text-ink-secondary hover:text-accent underline transition-colors"
                                     >
-                                        <label className="block text-[13px] font-medium text-ink">
-                                            {field.label}{' '}
-                                            {field.is_required && (
-                                                <span className="text-danger-fg">*</span>
-                                            )}
-                                        </label>
-                                        {field.help_text && (
-                                            <p className="mt-0.5 text-[11.5px] text-ink-secondary">
-                                                {field.help_text}
-                                            </p>
-                                        )}
-
-                                        {field.field_type === 'select' && (
-                                            <select
-                                                value={val}
-                                                onChange={(e) =>
-                                                    handleAnswerChange(
-                                                        field.field_key,
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                                required={field.is_required}
+                                        Have an access code for hidden tickets?
+                                    </button>
+                                ) : (
+                                    <div className=" border border-border p-2.5 bg-surface-alt/40 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11.5px] font-medium text-ink">
+                                                Enter Access Code:
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAccessCodeInput(false)}
+                                                className="text-[11px] text-ink-muted hover:text-ink"
                                             >
-                                                <option value="">Select an option...</option>
-                                                {(field.options || []).map((opt, i) => (
-                                                    <option key={i} value={opt.value}>
-                                                        {opt.label}
-                                                        {opt.price
-                                                            ? ` (${opt.is_override ? 'Set to' : '+'} ${formatMoney(Number(opt.price), event.currency)})`
-                                                            : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        )}
-
-                                        {field.field_type === 'radio' && (
-                                            <div className="mt-2 space-y-1.5">
-                                                {(field.options || []).map((opt, i) => (
-                                                    <label
-                                                        key={i}
-                                                        className="flex cursor-pointer items-center justify-between gap-2 border border-border/70 p-2 text-[13px] hover:bg-surface-sunken"
-                                                    >
-                                                        <span className="flex items-center gap-2">
-                                                            <input
-                                                                type="radio"
-                                                                name={`custom_${field.field_key}`}
-                                                                value={opt.value}
-                                                                checked={
-                                                                    String(val) ===
-                                                                    String(opt.value)
-                                                                }
-                                                                onChange={(e) =>
-                                                                    handleAnswerChange(
-                                                                        field.field_key,
-                                                                        e.target.value
-                                                                    )
-                                                                }
-                                                                required={field.is_required}
-                                                            />
-                                                            <span className="text-ink">
-                                                                {opt.label}
-                                                            </span>
-                                                        </span>
-                                                        {opt.price ? (
-                                                            <span className="font-mono text-xs text-accent">
-                                                                {opt.is_override ? 'Total ' : '+'}
-                                                                {formatMoney(
-                                                                    Number(opt.price),
-                                                                    event.currency
-                                                                )}
-                                                            </span>
-                                                        ) : null}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {field.field_type === 'text' && (
+                                                Cancel
+                                            </button>
+                                        </div>
+                                        <div className="flex gap-2">
                                             <input
                                                 type="text"
-                                                value={val}
+                                                value={accessCodeInput}
                                                 onChange={(e) =>
-                                                    handleAnswerChange(
-                                                        field.field_key,
-                                                        e.target.value
-                                                    )
+                                                    setAccessCodeInput(e.target.value.toUpperCase())
                                                 }
-                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                                required={field.is_required}
+                                                placeholder="e.g. VIP2026"
+                                                className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
                                             />
+                                            <Button
+                                                type="button"
+                                                onClick={handleUnlockTickets}
+                                                disabled={unlocking || !accessCodeInput.trim()}
+                                            >
+                                                {unlocking ? 'Unlocking...' : 'Unlock'}
+                                            </Button>
+                                        </div>
+                                        {accessCodeError && (
+                                            <p className="text-[11px] text-danger-fg">
+                                                {accessCodeError}
+                                            </p>
                                         )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {errors.ticket_type_id && (
+                        <p className="text-[13px] text-danger-fg">{errors.ticket_type_id}</p>
+                    )}
 
-                                        {field.field_type === 'textarea' && (
-                                            <textarea
-                                                rows={2}
-                                                value={val}
-                                                onChange={(e) =>
-                                                    handleAnswerChange(
-                                                        field.field_key,
-                                                        e.target.value
-                                                    )
+                    {/* Core Attendee Identity Fields */}
+                    <div className="grid grid-cols-3 gap-2.5">
+                        <div>
+                            <label
+                                htmlFor={titleId}
+                                className="block text-[12.5px] font-medium text-ink mb-1"
+                            >
+                                Title <span className="text-danger-fg">*</span>
+                            </label>
+                            <select
+                                id={titleId}
+                                value={data.title}
+                                onChange={(e) => setData('title', e.target.value)}
+                                className="w-full border border-border bg-surface px-2.5 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                required
+                            >
+                                <option value="">Select...</option>
+                                {titles.map((t) => (
+                                    <option key={t} value={t}>
+                                        {t}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.title && (
+                                <p className="mt-1 text-[11.5px] text-danger-fg">{errors.title}</p>
+                            )}
+                        </div>
+                        <div className="col-span-2">
+                            <Input
+                                label="First name *"
+                                type="text"
+                                value={data.first_name}
+                                onChange={(e) => setData('first_name', e.target.value)}
+                                error={errors.first_name}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <Input
+                        label="Last name *"
+                        type="text"
+                        value={data.last_name}
+                        onChange={(e) => setData('last_name', e.target.value)}
+                        error={errors.last_name}
+                        required
+                    />
+
+                    <Input
+                        label="Email *"
+                        type="email"
+                        value={data.email}
+                        onChange={(e) => setData('email', e.target.value)}
+                        error={errors.email}
+                        required
+                    />
+
+                    {/* Additional registration fields (Phone, Custom fields, Dietary/Accessibility) */}
+                    {totalExtraCount > 0 && (
+                        <div className="space-y-3">
+                            <div
+                                className={`transition-all duration-300 ${
+                                    !fieldsExpanded && totalExtraCount >= 2
+                                        ? 'max-h-60 overflow-hidden relative'
+                                        : ''
+                                }`}
+                            >
+                                {/* Standard Configurable Requirements */}
+                                {settings.phone !== 'hidden' && (
+                                    <Input
+                                        label={`Phone ${settings.phone === 'required' ? '*' : '(optional)'}`}
+                                        type="tel"
+                                        value={data.phone}
+                                        onChange={(e) => setData('phone', e.target.value)}
+                                        error={errors.phone}
+                                        required={settings.phone === 'required'}
+                                    />
+                                )}
+
+                                {/* Custom Event Form Fields (Conditional & Dynamic Pricing) */}
+                                {formFields.map((field) => {
+                                    const visible = isConditionSatisfied(field, data.form_answers);
+                                    if (!visible) return null;
+
+                                    const fieldError = errors[`form_answers.${field.field_key}`];
+                                    const val = data.form_answers[field.field_key] ?? '';
+                                    const fieldId = `${titleId}-${field.field_key}`;
+
+                                    return (
+                                        <div
+                                            key={field.id}
+                                            className="border-t border-border/60 pt-3 mt-3"
+                                        >
+                                            <label
+                                                id={`${fieldId}-label`}
+                                                htmlFor={
+                                                    field.field_type === 'radio'
+                                                        ? undefined
+                                                        : fieldId
                                                 }
-                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                                required={field.is_required}
-                                            />
-                                        )}
+                                                className="block text-[13px] font-medium text-ink"
+                                            >
+                                                {field.label}{' '}
+                                                {field.is_required && (
+                                                    <span className="text-danger-fg">*</span>
+                                                )}
+                                            </label>
+                                            {field.help_text && (
+                                                <p className="mt-0.5 text-[11.5px] text-ink-secondary">
+                                                    {field.help_text}
+                                                </p>
+                                            )}
 
-                                        {field.field_type === 'number' && (
-                                            <input
-                                                type="number"
-                                                value={val}
-                                                onChange={(e) =>
-                                                    handleAnswerChange(
-                                                        field.field_key,
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
-                                                required={field.is_required}
-                                            />
-                                        )}
-
-                                        {field.field_type === 'checkbox' && (
-                                            <label className="mt-2 flex items-center gap-2 cursor-pointer text-[13px] text-ink">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={Boolean(val)}
+                                            {field.field_type === 'select' && (
+                                                <select
+                                                    id={fieldId}
+                                                    value={val}
                                                     onChange={(e) =>
                                                         handleAnswerChange(
                                                             field.field_key,
-                                                            e.target.checked
+                                                            e.target.value
                                                         )
                                                     }
+                                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                                    required={field.is_required}
+                                                >
+                                                    <option value="">Select an option...</option>
+                                                    {(field.options || []).map((opt, i) => (
+                                                        <option key={i} value={opt.value}>
+                                                            {opt.label}
+                                                            {opt.price
+                                                                ? ` (${opt.is_override ? 'Set to' : '+'} ${formatMoney(Number(opt.price), event.currency)})`
+                                                                : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+
+                                            {field.field_type === 'radio' && (
+                                                <div
+                                                    role="radiogroup"
+                                                    aria-labelledby={`${fieldId}-label`}
+                                                    className="mt-2 space-y-1.5"
+                                                >
+                                                    {(field.options || []).map((opt, i) => (
+                                                        <label
+                                                            key={i}
+                                                            className="flex cursor-pointer items-center justify-between gap-2 border border-border/70 p-2 text-[13px] hover:bg-surface-sunken"
+                                                        >
+                                                            <span className="flex items-center gap-2">
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`custom_${field.field_key}`}
+                                                                    value={opt.value}
+                                                                    checked={
+                                                                        String(val) ===
+                                                                        String(opt.value)
+                                                                    }
+                                                                    onChange={(e) =>
+                                                                        handleAnswerChange(
+                                                                            field.field_key,
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                    required={field.is_required}
+                                                                />
+                                                                <span className="text-ink">
+                                                                    {opt.label}
+                                                                </span>
+                                                            </span>
+                                                            {opt.price ? (
+                                                                <span className="font-mono text-xs text-accent">
+                                                                    {opt.is_override
+                                                                        ? 'Total '
+                                                                        : '+'}
+                                                                    {formatMoney(
+                                                                        Number(opt.price),
+                                                                        event.currency
+                                                                    )}
+                                                                </span>
+                                                            ) : null}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {field.field_type === 'text' && (
+                                                <input
+                                                    id={fieldId}
+                                                    type="text"
+                                                    value={val}
+                                                    onChange={(e) =>
+                                                        handleAnswerChange(
+                                                            field.field_key,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
                                                     required={field.is_required}
                                                 />
-                                                <span>{field.label}</span>
-                                            </label>
-                                        )}
+                                            )}
 
-                                        {fieldError && (
-                                            <p className="mt-1 text-[11.5px] text-danger-fg">
-                                                {fieldError}
-                                            </p>
-                                        )}
-                                    </div>
-                                );
-                            })}
-
-                            {/* Dietary and Accessibility standard options */}
-                            {(settings.dietary_requirements !== 'hidden' ||
-                                settings.accessibility_needs !== 'hidden') && (
-                                <div className="border-t border-border/60 pt-3 mt-3">
-                                    {settings.dietary_requirements === 'required' ||
-                                    settings.accessibility_needs === 'required' ||
-                                    fieldsExpanded ||
-                                    showExtras ? (
-                                        <div className="space-y-3">
-                                            {settings.dietary_requirements !== 'hidden' && (
-                                                <Input
-                                                    label={`Dietary requirements ${settings.dietary_requirements === 'required' ? '*' : '(optional)'}`}
-                                                    type="text"
-                                                    placeholder="e.g. Vegetarian, nut allergy"
-                                                    value={data.dietary_requirements}
+                                            {field.field_type === 'textarea' && (
+                                                <textarea
+                                                    id={fieldId}
+                                                    rows={2}
+                                                    value={val}
                                                     onChange={(e) =>
-                                                        setData(
-                                                            'dietary_requirements',
+                                                        handleAnswerChange(
+                                                            field.field_key,
                                                             e.target.value
                                                         )
                                                     }
-                                                    error={errors.dietary_requirements}
-                                                    required={
-                                                        settings.dietary_requirements === 'required'
-                                                    }
+                                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                                    required={field.is_required}
                                                 />
                                             )}
-                                            {settings.accessibility_needs !== 'hidden' && (
-                                                <Input
-                                                    label={`Accessibility needs ${settings.accessibility_needs === 'required' ? '*' : '(optional)'}`}
-                                                    type="text"
-                                                    placeholder="e.g. Step-free access, sign language"
-                                                    value={data.accessibility_needs}
+
+                                            {field.field_type === 'number' && (
+                                                <input
+                                                    id={fieldId}
+                                                    type="number"
+                                                    value={val}
                                                     onChange={(e) =>
-                                                        setData(
-                                                            'accessibility_needs',
+                                                        handleAnswerChange(
+                                                            field.field_key,
                                                             e.target.value
                                                         )
                                                     }
-                                                    error={errors.accessibility_needs}
-                                                    required={
-                                                        settings.accessibility_needs === 'required'
-                                                    }
+                                                    className="mt-1.5 w-full border border-border bg-surface px-3 py-2 text-[13.5px] text-ink focus:border-accent focus:outline-none"
+                                                    required={field.is_required}
                                                 />
+                                            )}
+
+                                            {field.field_type === 'checkbox' && (
+                                                <label className="mt-2 flex items-center gap-2 cursor-pointer text-[13px] text-ink">
+                                                    <input
+                                                        id={fieldId}
+                                                        type="checkbox"
+                                                        checked={Boolean(val)}
+                                                        onChange={(e) =>
+                                                            handleAnswerChange(
+                                                                field.field_key,
+                                                                e.target.checked
+                                                            )
+                                                        }
+                                                        required={field.is_required}
+                                                    />
+                                                    <span>{field.label}</span>
+                                                </label>
+                                            )}
+
+                                            {fieldError && (
+                                                <p className="mt-1 text-[11.5px] text-danger-fg">
+                                                    {fieldError}
+                                                </p>
                                             )}
                                         </div>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowExtras(true)}
-                                            className="text-[12.5px] text-ink-secondary underline hover:text-accent"
-                                        >
-                                            Add dietary or accessibility needs
-                                        </button>
-                                    )}
-                                </div>
-                            )}
+                                    );
+                                })}
 
-                            {!fieldsExpanded && totalExtraCount >= 2 && (
-                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface to-transparent" />
-                            )}
-                        </div>
-
-                        {totalExtraCount >= 2 && (
-                            <button
-                                type="button"
-                                onClick={() => setFieldsExpanded(!fieldsExpanded)}
-                                className="flex w-full items-center justify-center gap-1.5 border border-border bg-surface-alt/60 hover:bg-surface-alt py-2 px-3 text-[12px] font-medium text-accent transition-colors cursor-pointer"
-                            >
-                                <span>
-                                    {fieldsExpanded
-                                        ? 'Show fewer fields'
-                                        : `Show all registration questions (${totalExtraCount} details)`}
-                                </span>
-                                {fieldsExpanded ? (
-                                    <ChevronUp className="h-3.5 w-3.5" />
-                                ) : (
-                                    <ChevronDown className="h-3.5 w-3.5" />
+                                {/* Dietary and Accessibility standard options */}
+                                {(settings.dietary_requirements !== 'hidden' ||
+                                    settings.accessibility_needs !== 'hidden') && (
+                                    <div className="border-t border-border/60 pt-3 mt-3">
+                                        {settings.dietary_requirements === 'required' ||
+                                        settings.accessibility_needs === 'required' ||
+                                        fieldsExpanded ||
+                                        showExtras ? (
+                                            <div className="space-y-3">
+                                                {settings.dietary_requirements !== 'hidden' && (
+                                                    <Input
+                                                        label={`Dietary requirements ${settings.dietary_requirements === 'required' ? '*' : '(optional)'}`}
+                                                        type="text"
+                                                        placeholder="e.g. Vegetarian, nut allergy"
+                                                        value={data.dietary_requirements}
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                'dietary_requirements',
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        error={errors.dietary_requirements}
+                                                        required={
+                                                            settings.dietary_requirements ===
+                                                            'required'
+                                                        }
+                                                    />
+                                                )}
+                                                {settings.accessibility_needs !== 'hidden' && (
+                                                    <Input
+                                                        label={`Accessibility needs ${settings.accessibility_needs === 'required' ? '*' : '(optional)'}`}
+                                                        type="text"
+                                                        placeholder="e.g. Step-free access, sign language"
+                                                        value={data.accessibility_needs}
+                                                        onChange={(e) =>
+                                                            setData(
+                                                                'accessibility_needs',
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        error={errors.accessibility_needs}
+                                                        required={
+                                                            settings.accessibility_needs ===
+                                                            'required'
+                                                        }
+                                                    />
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowExtras(true)}
+                                                className="text-[12.5px] text-ink-secondary underline hover:text-accent"
+                                            >
+                                                Add dietary or accessibility needs
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
-                            </button>
-                        )}
-                    </div>
-                )}
 
-                {/* Promo / Discount Code Input Section */}
-                <div className="border-t border-border/60 pt-3">
-                    {appliedPromo ? (
-                        <div className="flex items-center justify-between  border border-success-fg/30 bg-success-bg/40 px-3 py-2 text-xs">
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block h-2 w-2 rounded-full bg-success-fg animate-pulse"></span>
-                                <span className="font-semibold text-ink">
-                                    Code: {appliedPromo.code}
-                                </span>
-                                <span className="text-[11px] text-success-fg">
-                                    (
-                                    {appliedPromo.discount_type === 'complimentary'
-                                        ? 'Complimentary pass (100% OFF)'
-                                        : appliedPromo.discount_type === 'percentage'
-                                          ? `${appliedPromo.discount_value}% OFF`
-                                          : `-${formatMoney(appliedPromo.discount_value, event.currency)}`}
-                                    )
-                                </span>
+                                {!fieldsExpanded && totalExtraCount >= 2 && (
+                                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface to-transparent" />
+                                )}
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleRemovePromo}
-                                className="text-[11px] text-danger-fg hover:underline"
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    ) : !showPromoInput ? (
-                        <button
-                            type="button"
-                            onClick={() => setShowPromoInput(true)}
-                            className="text-[12px] text-ink-secondary hover:text-accent underline transition-colors"
-                        >
-                            Have a promo code?
-                        </button>
-                    ) : (
-                        <div className=" border border-border p-2.5 bg-surface-alt/40 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11.5px] font-medium text-ink">
-                                    Promo Code:
-                                </span>
+
+                            {totalExtraCount >= 2 && (
                                 <button
                                     type="button"
-                                    onClick={() => setShowPromoInput(false)}
-                                    className="text-[11px] text-ink-muted hover:text-ink"
+                                    onClick={() => setFieldsExpanded(!fieldsExpanded)}
+                                    className="flex w-full items-center justify-center gap-1.5 border border-border bg-surface-alt/60 hover:bg-surface-alt py-2 px-3 text-[12px] font-medium text-accent transition-colors cursor-pointer"
                                 >
-                                    Cancel
+                                    <span>
+                                        {fieldsExpanded
+                                            ? 'Show fewer fields'
+                                            : `Show all registration questions (${totalExtraCount} details)`}
+                                    </span>
+                                    {fieldsExpanded ? (
+                                        <ChevronUp className="h-3.5 w-3.5" />
+                                    ) : (
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                    )}
                                 </button>
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={promoCodeInput}
-                                    onChange={(e) =>
-                                        setPromoCodeInput(e.target.value.toUpperCase())
-                                    }
-                                    placeholder="e.g. EARLYBIRD20"
-                                    className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
-                                />
-                                <Button
-                                    type="button"
-                                    onClick={handleApplyPromo}
-                                    disabled={validatingPromo || !promoCodeInput.trim()}
-                                >
-                                    {validatingPromo ? 'Checking...' : 'Apply'}
-                                </Button>
-                            </div>
-                            {promoError && (
-                                <p className="text-[11px] text-danger-fg">{promoError}</p>
                             )}
                         </div>
                     )}
-                </div>
 
-                {/* Dynamic Price Summary Box */}
-                {calculatedPricing.hasAdjustments && (
-                    <div className=" border border-accent/20 bg-accent-soft/30 p-3 text-xs space-y-1.5">
-                        <div className="flex justify-between font-medium text-ink">
-                            <span>Base Ticket:</span>
-                            <span>{formatMoney(basePrice, event.currency)}</span>
-                        </div>
-                        {calculatedPricing.breakdown.map((item, idx) => (
-                            <div
-                                key={idx}
-                                className={`flex justify-between ${
-                                    item.isDiscount
-                                        ? 'font-medium text-success-fg'
-                                        : 'text-ink-secondary'
-                                }`}
+                    {/* Promo / Discount Code Input Section */}
+                    <div className="border-t border-border/60 pt-3">
+                        {appliedPromo ? (
+                            <div className="flex items-center justify-between  border border-success-fg/30 bg-success-bg/40 px-3 py-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-block h-2 w-2 rounded-full bg-success-fg animate-pulse"></span>
+                                    <span className="font-semibold text-ink">
+                                        Code: {appliedPromo.code}
+                                    </span>
+                                    <span className="text-[11px] text-success-fg">
+                                        (
+                                        {appliedPromo.discount_type === 'complimentary'
+                                            ? 'Complimentary pass (100% OFF)'
+                                            : appliedPromo.discount_type === 'percentage'
+                                              ? `${appliedPromo.discount_value}% OFF`
+                                              : `-${formatMoney(appliedPromo.discount_value, event.currency)}`}
+                                        )
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleRemovePromo}
+                                    className="text-[11px] text-danger-fg hover:underline"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        ) : !showPromoInput ? (
+                            <button
+                                type="button"
+                                onClick={() => setShowPromoInput(true)}
+                                className="text-[12px] text-ink-secondary hover:text-accent underline transition-colors"
                             >
-                                <span>{item.label}:</span>
+                                Have a promo code?
+                            </button>
+                        ) : (
+                            <div className=" border border-border p-2.5 bg-surface-alt/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[11.5px] font-medium text-ink">
+                                        Promo Code:
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPromoInput(false)}
+                                        className="text-[11px] text-ink-muted hover:text-ink"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={promoCodeInput}
+                                        onChange={(e) =>
+                                            setPromoCodeInput(e.target.value.toUpperCase())
+                                        }
+                                        placeholder="e.g. EARLYBIRD20"
+                                        className="flex-1 uppercase font-mono text-xs border border-border px-2.5 py-1.5 bg-surface text-ink focus:border-accent focus:outline-none"
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={handleApplyPromo}
+                                        disabled={validatingPromo || !promoCodeInput.trim()}
+                                    >
+                                        {validatingPromo ? 'Checking...' : 'Apply'}
+                                    </Button>
+                                </div>
+                                {promoError && (
+                                    <p className="text-[11px] text-danger-fg">{promoError}</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Dynamic Price Summary Box */}
+                    {calculatedPricing.hasAdjustments && (
+                        <div className=" border border-accent/20 bg-accent-soft/30 p-3 text-xs space-y-1.5">
+                            <div className="flex justify-between font-medium text-ink">
+                                <span>Base Ticket:</span>
+                                <span>{formatMoney(basePrice, event.currency)}</span>
+                            </div>
+                            {calculatedPricing.breakdown.map((item, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`flex justify-between ${
+                                        item.isDiscount
+                                            ? 'font-medium text-success-fg'
+                                            : 'text-ink-secondary'
+                                    }`}
+                                >
+                                    <span>{item.label}:</span>
+                                    <span>
+                                        {item.isDiscount
+                                            ? `-${formatMoney(item.amount, event.currency)}`
+                                            : item.isOverride
+                                              ? 'Overrides to '
+                                              : '+'}
+                                        {!item.isDiscount &&
+                                            formatMoney(item.amount, event.currency)}
+                                    </span>
+                                </div>
+                            ))}
+                            <div className="border-t border-accent/20 pt-1.5 flex justify-between font-bold text-sm text-accent">
+                                <span>Total Payable:</span>
                                 <span>
-                                    {item.isDiscount
-                                        ? `-${formatMoney(item.amount, event.currency)}`
-                                        : item.isOverride
-                                          ? 'Overrides to '
-                                          : '+'}
-                                    {!item.isDiscount && formatMoney(item.amount, event.currency)}
+                                    {calculatedPricing.total > 0
+                                        ? formatMoney(calculatedPricing.total, event.currency)
+                                        : 'FREE (Complimentary)'}
                                 </span>
                             </div>
-                        ))}
-                        <div className="border-t border-accent/20 pt-1.5 flex justify-between font-bold text-sm text-accent">
-                            <span>Total Payable:</span>
-                            <span>
-                                {calculatedPricing.total > 0
-                                    ? formatMoney(calculatedPricing.total, event.currency)
-                                    : 'FREE (Complimentary)'}
-                            </span>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                <Button
-                    type="submit"
-                    disabled={processing}
-                    variant="primary"
-                    className="w-full justify-center"
-                >
-                    {selectedTicketType?.is_sold_out
-                        ? 'Join waitlist'
-                        : calculatedPricing.total > 0
-                          ? `Continue to payment (${formatMoney(calculatedPricing.total, event.currency)})`
-                          : appliedPromo?.discount_type === 'complimentary'
-                            ? 'Complete Free Registration'
-                            : 'Register'}
-                </Button>
-            </form>
+                    <Button
+                        type="submit"
+                        disabled={processing}
+                        variant="primary"
+                        className="w-full justify-center"
+                    >
+                        {selectedTicketType?.is_sold_out
+                            ? 'Join waitlist'
+                            : calculatedPricing.total > 0
+                              ? `Continue to payment (${formatMoney(calculatedPricing.total, event.currency)})`
+                              : appliedPromo?.discount_type === 'complimentary'
+                                ? 'Complete Free Registration'
+                                : 'Register'}
+                    </Button>
+                </form>
 
-            <p className="mt-3.5 text-[11.5px] leading-relaxed text-ink-secondary">
-                Card and mobile money accepted where connected. Your entry code arrives by email the
-                moment payment clears.
-            </p>
-
-            <FindMyTicket event={event} />
-        </aside>
+                <p className="mt-3.5 text-[11.5px] leading-relaxed text-ink-secondary">
+                    Card and mobile money accepted where connected. Your entry code arrives by email
+                    the moment payment clears.
+                </p>
+            </Modal>
+        </>
     );
 }
 
@@ -1731,7 +1903,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
     };
     const calendarUrl = route('public.events.schedule.ics', { event: event.slug });
     const isVirtual = event.location_type === 'virtual';
-    const sectionHeading = 'mb-6 text-2xl font-medium tracking-tight text-ink sm:text-[28px]';
+    const sectionHeading = 'mb-5 text-[23px] font-medium tracking-tight text-ink';
 
     return (
         <PublicLayout
@@ -1741,9 +1913,9 @@ export default function Show({ event, org, isPrivate = false, community = null }
                 </a>
             }
         >
-            <article className="pb-16 [&_button]:rounded-none [&_input:not([type=radio]):not([type=checkbox])]:rounded-none [&_select]:rounded-none [&_textarea]:rounded-none [&_[role=dialog]]:rounded-none">
+            <article className="pb-16 [&_a]:rounded-none [&_button]:rounded-none [&_input:not([type=radio]):not([type=checkbox])]:rounded-none [&_select]:rounded-none [&_textarea]:rounded-none [&_[role=dialog]]:rounded-none">
                 <div
-                    className="mx-auto mt-5 w-[calc(100%-2rem)] overflow-hidden sm:mt-8 lg:w-[80vw]"
+                    className="mx-auto mt-3 w-[calc(100%-2rem)] overflow-hidden sm:mt-4 lg:w-[80vw]"
                     data-event-hero
                 >
                     {event.hero_image_url ? (
@@ -1757,13 +1929,104 @@ export default function Show({ event, org, isPrivate = false, community = null }
                         <CoverBars height={280} />
                     )}
                 </div>
-                <div className="mx-auto mt-8 w-[calc(100%-3rem)] max-w-[1100px] lg:mt-12 lg:w-[76vw]">
-                    <div className="grid min-w-0 gap-x-12 gap-y-9 lg:grid-cols-[minmax(0,1fr)_340px] xl:gap-x-16">
+                <div className="mx-auto w-[calc(100%-3rem)] max-w-[1100px] lg:w-[72vw]">
+                    <section
+                        aria-label="Event organiser"
+                        className="relative flex flex-wrap items-center gap-3 pb-6 pt-5"
+                    >
+                        {org.logo_url ? (
+                            <img
+                                src={org.logo_url}
+                                alt=""
+                                className="h-11 w-11 shrink-0 border border-border bg-white object-contain p-1"
+                            />
+                        ) : (
+                            <div
+                                aria-hidden="true"
+                                className="flex h-11 w-11 shrink-0 items-center justify-center border border-border bg-surface text-lg font-medium text-accent"
+                            >
+                                {org.name?.slice(0, 1)}
+                            </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                            <span className="block text-[10px] text-ink-tertiary">Hosted by</span>
+                            <a
+                                href="#event-organiser"
+                                className="text-[13px] font-medium hover:text-accent"
+                            >
+                                {org.name}
+                            </a>
+                        </div>
+                        {community?.followingEnabled && (
+                            <details className="group">
+                                <summary className="cursor-pointer list-none border border-border bg-surface px-4 py-2 text-xs text-ink [&::-webkit-details-marker]:hidden">
+                                    + Follow
+                                </summary>
+                                <div className="absolute inset-x-0 top-full z-20 border border-border bg-surface p-5 shadow-lg sm:inset-x-auto sm:right-0 sm:w-80">
+                                    <FollowControl
+                                        identity={community.identity}
+                                        initialFollowing={community.following}
+                                        followUrl={community.followUrl}
+                                        signInUrl={community.signInUrl}
+                                        sourceEventId={event.id}
+                                    />
+                                </div>
+                            </details>
+                        )}
+                        {Object.keys(org.links || {}).length > 0 && (
+                            <div className="w-full sm:w-auto">
+                                <OrganiserLinks links={org.links} />
+                            </div>
+                        )}
+                    </section>
+                    <div className="grid min-w-0 gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:gap-x-12">
                         <header className="min-w-0 lg:col-start-1 lg:row-start-1">
-                            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-secondary">
-                                <span className="inline-flex items-center gap-2 uppercase tracking-[0.12em]">
-                                    {isPrivate && <Lock className="h-3.5 w-3.5" />}
-                                    {isPrivate ? 'Private event' : 'You’re invited'}
+                            <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
+                                {isPrivate && <Lock className="h-3 w-3" />}
+                                {isPrivate
+                                    ? 'Private event'
+                                    : isVirtual
+                                      ? 'Online event'
+                                      : event.location_type === 'hybrid'
+                                        ? 'Hybrid event'
+                                        : 'In-person event'}
+                            </p>
+                            <h1 className="mt-3 break-words text-[clamp(32px,3.4vw,46px)] font-medium leading-[1.1] tracking-[-0.04em] text-ink">
+                                {event.name}
+                            </h1>
+                            {event.description && (
+                                <p className="mt-4 max-w-xl text-[15px] leading-7 text-ink-secondary">
+                                    {event.description.split(/\n\s*\n/)[0].length > 220
+                                        ? `${event.description.split(/\n\s*\n/)[0].slice(0, 217)}…`
+                                        : event.description.split(/\n\s*\n/)[0]}
+                                </p>
+                            )}
+                            {isPrivate && (
+                                <p className="mt-3 text-xs leading-relaxed text-ink-secondary">
+                                    The speakers, programme and materials for this event are shown
+                                    to registered guests only.
+                                </p>
+                            )}
+                            {event.is_recurring && event.recurrence_summary && (
+                                <p className="mt-3 flex items-center gap-2 text-xs text-accent">
+                                    <Repeat className="h-3.5 w-3.5 shrink-0" />
+                                    {event.recurrence_summary}
+                                </p>
+                            )}
+                            <div className="mt-5 flex flex-wrap items-start gap-x-5 gap-y-3 text-xs text-ink-secondary">
+                                <span className="inline-flex items-start gap-2">
+                                    <CalendarDays className="h-4 w-4 shrink-0" />
+                                    {formatDateRange(
+                                        event.starts_at,
+                                        event.ends_at,
+                                        event.timezone
+                                    )}
+                                </span>
+                                <span className="inline-flex items-start gap-2">
+                                    <MapPin className="h-4 w-4 shrink-0" />
+                                    {isVirtual
+                                        ? 'Online'
+                                        : event.address || 'Venue to be announced'}
                                 </span>
                                 <button
                                     type="button"
@@ -1773,134 +2036,37 @@ export default function Show({ event, org, isPrivate = false, community = null }
                                         setCopyError(false);
                                         setDialog('share');
                                     }}
-                                    className="inline-flex items-center gap-2 border border-border px-3 py-2 hover:border-accent hover:text-accent"
+                                    className="inline-flex items-center gap-2 text-accent hover:underline"
                                 >
                                     <Share2 className="h-3.5 w-3.5" />
-                                    Share
+                                    Share event
                                 </button>
                             </div>
-                            <h1 className="break-words text-[clamp(32px,3.8vw,54px)] font-medium leading-[1.08] tracking-[-0.04em] text-ink">
-                                {event.name}
-                            </h1>
-                            <p className="mt-4 text-sm text-ink-secondary">
-                                Hosted by{' '}
-                                <a
-                                    href="#event-organiser"
-                                    className="font-medium text-ink underline decoration-border underline-offset-4 hover:text-accent"
-                                >
-                                    {org.name}
-                                </a>
-                            </p>
-                            {isPrivate && (
-                                <p className="mt-4 text-sm leading-relaxed text-ink-secondary">
-                                    The speakers, programme and materials for this event are shown
-                                    to registered guests only.
-                                </p>
-                            )}
-                            {event.is_recurring && event.recurrence_summary && (
-                                <p className="mt-4 flex items-start gap-2 text-sm text-accent">
-                                    <Repeat className="mt-0.5 h-4 w-4 shrink-0" />
-                                    {event.recurrence_summary}
-                                </p>
-                            )}
-                            <dl className="mt-7 divide-y divide-border border-y border-border">
-                                <div className="flex gap-4 py-4">
-                                    <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-                                    <div className="min-w-0">
-                                        <dt className="text-sm font-medium">
-                                            {formatDateRange(
-                                                event.starts_at,
-                                                event.ends_at,
-                                                event.timezone
-                                            )}
-                                        </dt>
-                                        <dd className="mt-1 text-xs text-ink-secondary">
-                                            {new Date(event.starts_at).toLocaleTimeString(
-                                                undefined,
-                                                {
-                                                    timeZone: event.timezone,
-                                                    hour: 'numeric',
-                                                    minute: '2-digit',
-                                                }
-                                            )}{' '}
-                                            –{' '}
-                                            {new Date(event.ends_at).toLocaleTimeString(undefined, {
-                                                timeZone: event.timezone,
-                                                hour: 'numeric',
-                                                minute: '2-digit',
-                                            })}{' '}
-                                            · {event.timezone}
-                                        </dd>
-                                        {!isPrivate && (
-                                            <dd className="mt-2">
-                                                <a
-                                                    href={calendarUrl}
-                                                    className="text-xs text-accent underline underline-offset-4"
-                                                >
-                                                    Add to calendar
-                                                </a>
-                                            </dd>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex gap-4 py-4">
-                                    <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-                                    <div className="min-w-0">
-                                        <dt className="break-words text-sm font-medium">
-                                            {isVirtual
-                                                ? 'Online event'
-                                                : event.address || 'Venue to be announced'}
-                                        </dt>
-                                        <dd className="mt-1 text-xs text-ink-secondary">
-                                            {isVirtual
-                                                ? 'Join from wherever you are'
-                                                : event.location_type === 'hybrid'
-                                                  ? 'In person and online'
-                                                  : 'In person'}
-                                        </dd>
-                                        {!isVirtual && event.address && (
-                                            <dd className="mt-2">
-                                                <a
-                                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs text-accent underline underline-offset-4"
-                                                >
-                                                    Get directions
-                                                </a>
-                                            </dd>
-                                        )}
-                                    </div>
-                                </div>
-                            </dl>
-                            {!isPrivate && Number.isInteger(event.going_count) && (
-                                <div className="mt-5 flex items-center gap-2 text-sm text-ink-secondary">
-                                    <Users className="h-4 w-4 text-accent" />
-                                    <span>
-                                        <b className="font-medium text-ink">
-                                            {event.going_count.toLocaleString()} going
-                                        </b>{' '}
-                                        · confirmed attendees
-                                    </span>
-                                </div>
-                            )}
+                            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-accent">
+                                {!isPrivate && (
+                                    <a href={calendarUrl} className="underline underline-offset-4">
+                                        Add to calendar
+                                    </a>
+                                )}
+                                {!isVirtual && event.address && (
+                                    <a
+                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline underline-offset-4"
+                                    >
+                                        Get directions
+                                    </a>
+                                )}
+                            </div>
                         </header>
                         <div className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-                            <div className="mb-3 flex items-baseline justify-between gap-3">
-                                <span className="text-xs uppercase tracking-wider text-ink-tertiary">
-                                    Your place at the event
-                                </span>
-                                <span className="font-mono text-sm text-ink">
-                                    {price > 0 ? 'From ' : ''}
-                                    {formatMoney(price, event.currency)}
-                                </span>
-                            </div>
                             <RegistrationPanel event={event} />
                         </div>
                         <main className="min-w-0 lg:col-start-1 lg:row-start-2">
                             <nav
                                 aria-label="Event sections"
-                                className="mb-9 flex max-w-full gap-6 overflow-x-auto border-b border-border"
+                                className="mb-7 flex max-w-full gap-6 overflow-x-auto border-b border-border"
                             >
                                 {sections.map((section) => (
                                     <button
@@ -1931,7 +2097,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
                                     )}
                                 </section>
                             )}
-                            <section id="event-about" className="scroll-mt-6 pb-10">
+                            <section id="event-about" className="scroll-mt-6 pb-8">
                                 <h2 className={sectionHeading}>About the event</h2>
                                 <p className="whitespace-pre-line text-[15px] leading-7 text-ink-secondary">
                                     {event.description ||
@@ -1961,10 +2127,23 @@ export default function Show({ event, org, isPrivate = false, community = null }
                                     </div>
                                 )}
                             </section>
+                            {!isPrivate && Number.isInteger(event.going_count) && (
+                                <div className="mb-8 flex items-center gap-3 border-y border-border py-4 text-sm text-ink-secondary">
+                                    <Users className="h-5 w-5 text-accent" />
+                                    <span>
+                                        <b className="font-medium text-ink">
+                                            {event.going_count.toLocaleString()} going
+                                        </b>
+                                        <span className="mt-0.5 block text-xs">
+                                            Confirmed attendees
+                                        </span>
+                                    </span>
+                                </div>
+                            )}
                             {event.sessions.length > 0 && (
                                 <section
                                     id="event-schedule"
-                                    className="scroll-mt-6 border-t border-border py-10"
+                                    className="scroll-mt-6 border-t border-border py-8"
                                 >
                                     <h2 className={sectionHeading}>Programme</h2>
                                     <ScheduleSection
@@ -1985,7 +2164,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
                             {event.speakers.length > 0 && (
                                 <section
                                     id="event-speakers"
-                                    className="scroll-mt-6 border-t border-border py-10"
+                                    className="scroll-mt-6 border-t border-border py-8"
                                 >
                                     <h2 className={sectionHeading}>Meet the speakers</h2>
                                     <SpeakersSection speakers={event.speakers} />
@@ -1994,7 +2173,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
                             {workshops.length > 0 && (
                                 <section
                                     id="event-workshops"
-                                    className="scroll-mt-6 border-t border-border py-10"
+                                    className="scroll-mt-6 border-t border-border py-8"
                                 >
                                     <h2 className={sectionHeading}>Workshops</h2>
                                     <ScheduleSection
@@ -2006,7 +2185,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
                             {event.plan_your_visit_content && (
                                 <section
                                     id="event-visit"
-                                    className="scroll-mt-6 border-t border-border py-10"
+                                    className="scroll-mt-6 border-t border-border py-8"
                                 >
                                     <h2 className={sectionHeading}>Plan your visit</h2>
                                     <p className="whitespace-pre-line text-[15px] leading-7 text-ink-secondary">
@@ -2016,7 +2195,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
                             )}
                             <section
                                 id="event-organiser"
-                                className="scroll-mt-6 border-t border-border py-10"
+                                className="scroll-mt-6 border-t border-border py-8"
                             >
                                 <p className="mb-5 text-xs uppercase tracking-[0.12em] text-ink-tertiary">
                                     Your organiser
@@ -2048,9 +2227,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
                                         )}
                                     </div>
                                 </div>
-                                <div className="mt-5">
-                                    <OrganiserLinks links={org.links} />
-                                </div>
+
                                 {org.contact_email && (
                                     <button
                                         type="button"
@@ -2062,15 +2239,6 @@ export default function Show({ event, org, isPrivate = false, community = null }
                                 )}
                                 {community && (
                                     <div className="mt-6 flex flex-col items-start gap-4 border-t border-border pt-5">
-                                        {community.followingEnabled && (
-                                            <FollowControl
-                                                identity={community.identity}
-                                                initialFollowing={community.following}
-                                                followUrl={community.followUrl}
-                                                signInUrl={community.signInUrl}
-                                                sourceEventId={event.id}
-                                            />
-                                        )}
                                         <a
                                             href={community.organisation.about_url}
                                             className="inline-block text-sm text-accent underline underline-offset-4"
