@@ -42,3 +42,11 @@ it('never resumes held SMS announcements through member preferences with Followi
     $this->withSession($this->session->all())->patchJson($this->base.'/preferences/'.$this->tenant->slug, ['channel' => 'sms', 'marketing_enabled' => true, 'resume_marketing' => true])->assertUnprocessable();
     expect(app(MessagingPreferences::class)->allowsMarketing($this->tenant, 'sms', $this->member->phone))->toBeFalse();
 });
+
+it('resumes independently authorised member SMS with Following on without creating a phone follower', function (): void {
+    $this->tenant->features()->create(['feature_key' => 'community_following', 'enabled' => true]);
+    $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => $this->member->phone, 'expires_at' => now()->addHour()->timestamp]);
+    app(MessagingPreferences::class)->disableMarketing($this->tenant, 'sms', $this->member->phone);
+    $this->withSession($this->session->all())->patchJson($this->base.'/preferences/'.$this->tenant->slug, ['channel' => 'sms', 'marketing_enabled' => true, 'resume_marketing' => true])->assertOk();
+    expect(App\Models\CommunityFollower::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count())->toBe(0);
+});

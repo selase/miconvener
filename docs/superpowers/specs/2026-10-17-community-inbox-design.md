@@ -219,7 +219,7 @@ Enumerating what a person can see reuses the history queries `/my` already has (
 5. **Placement:** Home card plus per-organisation list from Communities; no sixth tab.
 6. **Cancelled messages:** cancelling mid-send withdraws what was already in inboxes.
 
-**To confirm when planning:** whether a member should also see the delivery outcome of a notice ("emailed", "texted", "SMS not sent"); this design shows the notice itself only, not its delivery outcome.
+**Owner confirmed2026-10-17:** delivery outcomes stay in staff screens. Members see the notice itself, not “emailed”, “texted” or “SMS not sent”; transport acceptance is not receipt/read proof.
 
 ## 14. Where it fits
 

@@ -114,21 +114,10 @@ final class CommunityHistory
         return ['claims' => $claims, 'joins' => $joins];
     }
 
-    /**
-     * @param  array<string, mixed>  $filters
-     * @return Builder<Member>
-     */
-    private function moneyMemberQuery(Session $session, array $filters): Builder
-    {
-        return $this->memberQuery($session)->whereHas('tenant', fn ($q) => $q->where('status', '!=', \App\Enum\TenantStatusEnum::BANNED))
-            ->when(! empty($filters['tenant_slug']), fn ($q) => $q->whereHas('tenant', fn ($t) => $t->where('slug', $filters['tenant_slug'])))
-            ->when(! empty($filters['member_id']), fn ($q) => $q->where('id', $filters['member_id']));
-    }
-
     /** Only exact email matches or independently valid member credentials enter the SQL query.
      * @return Builder<Member>
      */
-    private function memberQuery(Session $session): Builder
+    public function memberQuery(Session $session): Builder
     {
         $email = $this->emails->verifiedEmail($session);
         $phone = $this->phones->verifiedPhone($session);
@@ -155,18 +144,21 @@ final class CommunityHistory
     }
 
     /** @return Builder<CommunityFollower> */
-    private function followerQuery(Session $session): Builder
+    public function followerQuery(Session $session): Builder
     {
         $email = $this->emails->verifiedEmail($session);
-        $phone = $this->phones->verifiedPhone($session);
 
-        return CommunityFollower::withoutGlobalScope(TenantScope::class)->whereNull('unfollowed_at')->where(function ($query) use ($email, $phone): void {
-            $query->whereRaw('1=0');
-            foreach (['email' => $email, 'sms' => $phone] as $channel => $address) {
-                if ($address !== null) {
-                    $query->orWhere(fn ($match) => $match->where('channel', $channel)->where('address_hash', $this->preferences->hash($channel, $address)));
-                }
-            }
-        });
+        return CommunityFollower::withoutGlobalScope(TenantScope::class)->where('channel', 'email')->whereNull('unfollowed_at')->when($email === null, fn ($q) => $q->whereRaw('1=0'), fn ($q) => $q->where('address_hash', $this->preferences->hash('email', $email)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Member>
+     */
+    private function moneyMemberQuery(Session $session, array $filters): Builder
+    {
+        return $this->memberQuery($session)->whereHas('tenant', fn ($q) => $q->where('status', '!=', \App\Enum\TenantStatusEnum::BANNED))
+            ->when(! empty($filters['tenant_slug']), fn ($q) => $q->whereHas('tenant', fn ($t) => $t->where('slug', $filters['tenant_slug'])))
+            ->when(! empty($filters['member_id']), fn ($q) => $q->where('id', $filters['member_id']));
     }
 }

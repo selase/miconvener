@@ -45,14 +45,17 @@ final class AttendeePreferencesController extends Controller
         abort_if($address === null, 403, 'Verify this contact first.');
         if ($request->boolean('marketing_enabled')) {
             abort_unless($tenant->status === \App\Enum\TenantStatusEnum::ACTIVE, 404);
-            if ($tenant->followingEnabled()) {
+            if ($tenant->followingEnabled() && ! ($channel === 'sms' && $history->memberQuery($request->session())->where('tenant_id', $tenant->id)->exists())) {
                 $following->follow($tenant, $request->session(), $channel, $request->boolean('resume_marketing'));
             } else {
                 $connection = $tenant->getConnection();
-                $connection->transaction(function () use ($connection, $tenant, $channel, $address, $preferences): void {
+                $connection->transaction(function () use ($connection, $tenant, $channel, $address, $preferences, $request): void {
                     $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['community-follow:'.$tenant->id.':'.$channel.':'.$preferences->hash($channel, $address)]);
                     if ($channel === 'sms' && app(\App\Services\Community\WrongNumberReports::class)->isBlocked($tenant, $channel, $address)) {
                         throw \Illuminate\Validation\ValidationException::withMessages(['channel' => 'This number needs an independent review before SMS announcements can resume.']);
+                    }
+                    if (! $preferences->allowsMarketing($tenant, $channel, $address) && ! $request->boolean('resume_marketing')) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['resume_marketing' => 'Confirm you want announcements again.']);
                     }
                     $preferences->enableMarketing($tenant, $channel, $address);
                 });

@@ -35,6 +35,8 @@ it('stops SMS marketing on a confirmed wrong-number report and requires fresh co
     $session = app('session.store');
     $session->put(App\Services\Community\PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
     $following = app(Following::class);
+    $session->put(PlatformAttendeeVerification::SESSION_KEY, ['email' => 'sms-owner@example.test', 'expires_at' => now()->addHour()->timestamp]);
+    $following->follow($tenant, $session, 'email', true);
     $following->follow($tenant, $session, 'sms', false);
     $reports = app(App\Services\Community\WrongNumberReports::class);
     $report = $reports->report($tenant, $session, 'Messages are intended for someone else.');

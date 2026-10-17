@@ -35,7 +35,7 @@ it('scopes consent to each proven contact and each organisation', function (): v
     expect($following->isFollowing($other, $this->session, 'email'))->toBeFalse();
     $this->session->put(PhoneVerification::SESSION_KEY, ['phone' => '+233241234567', 'expires_at' => now()->addHour()->timestamp]);
     $following->follow($this->tenant, $this->session, 'sms', false, null);
-    expect(CommunityFollower::query()->where('tenant_id', $this->tenant->id)->count())->toBe(2);
+    expect(CommunityFollower::query()->where('tenant_id', $this->tenant->id)->count())->toBe(1);
 });
 
 it('rejects a foreign event source and disabled Following', function (): void {
