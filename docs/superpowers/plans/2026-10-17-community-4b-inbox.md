@@ -290,3 +290,12 @@ Is there anything I have overlooked? Is the solution optimal? Let me take a step
 **Not gaps:** five main navigation items retained; messages are a Communities page within the app. Delivery outcomes remain staff-only. No finance, consent, eligibility, transport, retention or production-data changes.
 
 **Evidence:** baseline27/27; expected RED for new page/navigation/card behavior; final385 JavaScript tests across58files passed (41.73s),37 PHP tests/130assertions passed (66.3s: inbox access, announcements, attendee history). ESLint/Pint passed; production assets rebuilt successfully. Existing bundle-size warning retained. One fresh independent review completed and findings fixed; no duplicate review cycle or full PHP rerun for this frontend-only follow-up. Local QA uses only existing synthetic records and normal logged-email verification; no production session bypass.
+
+
+### Usability release acceptance —2026-10-17
+
+Owner explicitly approved merge/deploy and Purpledot verification. PR34 merged source `a42a0b5` as `1a87328e713ae8656318c866630f30a61ae89221`; merge tree equality verified. CI39044673915 green:2963 PHP/14250assertions,385 JS/58files, quality/PHPStan0. Cloud deployment `depl-a3011836-d68f-4011-8bb3-045ee928bf72` ran15:29:25–15:31:12UTC, monitor exit0; no duplicate deploy.
+
+Live normal verified follower session: one organisation card and prominent messages action; settings collapsed; inbox/list/detail in page with no dialog; message read cleared unread1→0; backend pilot read_count1. Phone390px view/document390 with list hidden during reading and normal back navigation. Public page/assets200; signed-out JSON inbox overview/list/detail401 with private/no-store, GET on read action405; no private pilot body exposed. Read-only rollout check confirms enabled inbox organisations=[purpledot], Following remains enabled. No new message was sent and no money/settlement/other-tenant setting was changed. The only pilot data mutation was the normal read receipt. Original and Claude checkouts remain unchanged.
+
+Actual200%, physical-device cold offline and dedicated member/representative production sessions remain separate acceptance items. These local release notes do not trigger a second deployment.
