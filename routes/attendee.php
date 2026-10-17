@@ -7,6 +7,7 @@ use App\Http\Controllers\Public\PlatformAttendeeWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('my')->group(function (): void {
+    Route::get('/join/{event}', [PlatformAttendeeWorkspaceController::class, 'join'])->whereUuid('event')->name('attendee.my.join');
     Route::get('/', [PlatformAttendeeAccessController::class, 'page'])->name('attendee.my');
     Route::get('/manifest.json', [PlatformAttendeeAccessController::class, 'manifest'])->name('attendee.my.manifest');
     Route::post('/verify/phone/send', [App\Http\Controllers\Public\CommunityPhoneAccessController::class, 'send'])->name('attendee.my.phone.send');

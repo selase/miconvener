@@ -15,6 +15,17 @@ afterEach(() => {
     vi.useRealTimers();
     delete window.turnstile;
 });
+it('keeps live event entry email-first without offering phone verification as a ticket credential', () => {
+    const previous = window.location.href;
+    window.history.replaceState({}, '', '/my?return_to=%2Fmy%2Fjoin%2Fevent-id%3Ftab%3Dforms');
+    try {
+        render(<MyPortal />);
+        expect(screen.queryByRole('button', { name: 'Use a phone number instead' })).toBeNull();
+        expect(screen.getByText(/Verify your registration email/)).toBeTruthy();
+    } finally {
+        window.history.replaceState({}, '', previous);
+    }
+});
 it('offers additive phone proof after email sign-in without discarding the email identity', () => {
     render(
         <MyPortal

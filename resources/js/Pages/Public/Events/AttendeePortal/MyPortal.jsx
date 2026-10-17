@@ -54,6 +54,9 @@ export default function MyPortal({
             ? new URLSearchParams(window.location.search).get('tab') || 'events'
             : 'events';
     const [activeTab, setActiveTab] = useState(initialTab);
+    const joiningEvent =
+        typeof window !== 'undefined' &&
+        /^\/my\/join\//.test(new URLSearchParams(window.location.search).get('return_to') || '');
 
     useEffect(() => {
         registerAttendeeServiceWorker();
@@ -318,19 +321,34 @@ export default function MyPortal({
             <div className="mx-auto max-w-2xl px-6 py-16 sm:px-10">
                 <div className="space-y-1 mb-8">
                     <h1 className="text-2xl font-normal tracking-tight text-ink">
-                        {selectedOrganiser?.name
-                            ? `Your events with ${selectedOrganiser.name}`
-                            : phoneVerified && !verifiedEmail
-                              ? 'Your MiConvener Communities'
-                              : 'Your MiConvener events'}
+                        {joiningEvent && !verifiedEmail
+                            ? 'Verify your registration email'
+                            : selectedOrganiser?.name
+                              ? `Your events with ${selectedOrganiser.name}`
+                              : phoneVerified && !verifiedEmail
+                                ? 'Your MiConvener Communities'
+                                : 'Your MiConvener events'}
                     </h1>
                     <p className="text-[13.5px] text-ink-secondary">
-                        {phoneVerified && !verifiedEmail
-                            ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
-                            : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
+                        {joiningEvent && !verifiedEmail
+                            ? 'Use the email you registered with to open the programme, polls, Q&A and surveys. Phone verification does not unlock event tickets.'
+                            : phoneVerified && !verifiedEmail
+                              ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
+                              : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
                     </p>
                 </div>
 
+                {new URLSearchParams(window.location.search).get('event_access') ===
+                    'not_found' && (
+                    <p
+                        role="status"
+                        className="mb-6 border-l-2 border-accent bg-accent/5 p-4 text-sm text-ink-secondary"
+                    >
+                        No available registration for this event matches your verified email. If you
+                        registered with another address, sign out and verify that address, or return
+                        to the event page to register.
+                    </p>
+                )}
                 {communityReturnUrl && (verifiedEmail || phoneVerified) && (
                     <a
                         href={communityReturnUrl}
@@ -540,7 +558,10 @@ export default function MyPortal({
                                 Sign out
                             </button>
                         </div>
-                        <details className="rounded-lg border border-border p-4">
+                        <details
+                            open={joiningEvent}
+                            className="rounded-lg border border-border p-4"
+                        >
                             <summary className="cursor-pointer text-sm text-ink">
                                 Verify email for tickets and event history
                             </summary>
@@ -558,6 +579,7 @@ export default function MyPortal({
                         <VerifyPrompt
                             onVerified={handleVerified}
                             organiserSlug={selectedOrganiser?.slug}
+                            allowPhone={!joiningEvent}
                         />
                     </div>
                 )}

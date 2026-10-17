@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Show from '@/Pages/Public/Events/Show';
+import LiveEventAccess from '@/Pages/Public/Events/LiveEventAccess';
+import { router } from '@inertiajs/react';
 
 const { submitted } = vi.hoisted(() => ({ submitted: vi.fn() }));
 vi.mock('@inertiajs/react', () => ({
+    router: { reload: vi.fn() },
     Link: ({ href, children, ...props }) => (
         <a href={href} {...props}>
             {children}
@@ -69,6 +72,82 @@ const org = {
 };
 
 describe('public event presentation', { timeout: 30000 }, () => {
+    it('refreshes activity availability only while visible and online and stops after leaving', () => {
+        vi.useFakeTimers();
+        const visible = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+        const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+        try {
+            const view = render(
+                <LiveEventAccess participation={{ entry_url: '/my/join/event-1' }} />
+            );
+            act(() => vi.advanceTimersByTime(30000));
+            expect(router.reload).not.toHaveBeenCalled();
+            online.mockReturnValue(true);
+            act(() => vi.advanceTimersByTime(30000));
+            expect(router.reload).toHaveBeenCalledTimes(1);
+            expect(router.reload).toHaveBeenCalledWith({ only: ['participation'] });
+            visible.mockReturnValue(true);
+            act(() => vi.advanceTimersByTime(30000));
+            expect(router.reload).toHaveBeenCalledTimes(1);
+            view.unmount();
+            visible.mockReturnValue(false);
+            act(() => vi.advanceTimersByTime(30000));
+            expect(router.reload).toHaveBeenCalledTimes(1);
+        } finally {
+            visible.mockRestore();
+            online.mockRestore();
+            vi.useRealTimers();
+        }
+    });
+    it('makes attendee activities discoverable without exposing their contents', () => {
+        render(
+            <Show
+                event={event}
+                org={org}
+                participation={{
+                    entry_url: '/my/join/event-1',
+                    is_live: true,
+                    has_live_poll: true,
+                    has_forms: true,
+                }}
+            />
+        );
+        const access = within(screen.getByRole('region', { name: 'Join the live event' }));
+        expect(access.getByText('Happening now')).toBeTruthy();
+        expect(access.getByRole('link', { name: /Join the live event/ }).getAttribute('href')).toBe(
+            '/my/join/event-1?tab=agenda'
+        );
+        expect(access.getByRole('link', { name: /Live poll/ }).getAttribute('href')).toBe(
+            '/my/join/event-1?tab=poll'
+        );
+        expect(access.getByRole('link', { name: /Surveys & feedback/ }).getAttribute('href')).toBe(
+            '/my/join/event-1?tab=forms'
+        );
+        expect(access.getByRole('link', { name: /Ask a question/ }).getAttribute('href')).toBe(
+            '/my/join/event-1?tab=forum'
+        );
+        expect(screen.queryByRole('textbox', { name: 'Your question' })).toBeNull();
+    });
+
+    it('does not advertise an active poll or survey when nothing has been opened', () => {
+        render(
+            <Show
+                event={event}
+                org={org}
+                participation={{
+                    entry_url: '/my/join/event-1',
+                    is_live: false,
+                    has_live_poll: false,
+                    has_forms: false,
+                }}
+            />
+        );
+        const access = within(screen.getByRole('region', { name: 'Join the live event' }));
+        expect(access.queryByText('Happening now')).toBeNull();
+        expect(access.queryByText('Active')).toBeNull();
+        expect(access.queryByRole('link', { name: /Surveys/ })).toBeNull();
+        expect(access.getByRole('link', { name: /Open attendee area/ })).toBeTruthy();
+    });
     it('shows the real programme, faculty, organiser and anonymous attendance together', () => {
         render(<Show event={event} org={org} />);
         expect(screen.getByText('Opening session')).toBeTruthy();

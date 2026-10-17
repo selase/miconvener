@@ -1,4 +1,5 @@
 import FollowControl from '@/Pages/Public/Community/FollowControl';
+import LiveEventAccess from './LiveEventAccess';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
 import {
@@ -1851,7 +1852,13 @@ function OrganiserLinks({ links = {} }) {
     );
 }
 
-export default function Show({ event, org, isPrivate = false, community = null }) {
+export default function Show({
+    event,
+    org,
+    isPrivate = false,
+    community = null,
+    participation = null,
+}) {
     const workshops = useMemo(
         () => event.sessions.filter((session) => session.type === 'workshop'),
         [event.sessions]
@@ -1979,6 +1986,7 @@ export default function Show({ event, org, isPrivate = false, community = null }
                             </div>
                         )}
                     </section>
+                    <LiveEventAccess participation={participation} />
                     <div className="grid min-w-0 gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:gap-x-12">
                         <header className="min-w-0 lg:col-start-1 lg:row-start-1">
                             <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
