@@ -33,7 +33,9 @@ test('the homepage promises offline scanning, which staff links do', function ()
     $this->get('/')
         ->assertOk()
         ->assertSee('without signal', false)
-        ->assertSee('Door scanning that works offline', false);
+        ->assertSee('Offline door scanning', false);
+
+    $this->get(route('features'))->assertOk()->assertSee('Door scanning that works offline', false);
 
     // The page's promises are the ones StaffLinkOfflineTest holds the code to.
     expect(file_exists(base_path('resources/js/lib/staffDoor/store.js')))->toBeTrue()

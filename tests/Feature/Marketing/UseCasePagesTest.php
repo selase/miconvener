@@ -95,3 +95,19 @@ test('the live classroom page says live polling is included from Growth, and the
 test('the navigation and footer link to the use cases', function (): void {
     $this->get(route('home'))->assertOk()->assertSee(route('use-cases.index'), false);
 });
+
+test('each use case page opens with a black hero, its own line illustration and no buttons', function (string $slug): void {
+    $html = $this->get(route('use-cases.show', $slug))->assertOk()->getContent();
+
+    $document = new DOMDocument;
+    @$document->loadHTML($html);
+    $xpath = new DOMXPath($document);
+    $hero = $xpath->query('//*[@data-use-case-hero]')->item(0);
+
+    expect($hero)->not->toBeNull()
+        ->and(view()->exists("product.use-cases.art.{$slug}"))->toBeTrue()
+        ->and($xpath->query('.//svg[@data-use-case-art]', $hero)->length)->toBe(1)
+        ->and($xpath->query('.//svg[@data-use-case-art]', $hero)->item(0)->getAttribute('aria-hidden'))->toBe('true')
+        ->and($xpath->query('.//a[contains(@href, "/register")]', $hero)->length)->toBe(0)
+        ->and(str_contains($hero->textContent, config("use-cases.cases.{$slug}.headline")))->toBeTrue();
+})->with(fn () => array_keys((require __DIR__.'/../../../config/use-cases.php')['cases']));

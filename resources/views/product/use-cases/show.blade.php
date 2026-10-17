@@ -3,17 +3,16 @@
 @section('title', $case['title'].' - '.config('product-page.brand.name'))
 
 @section('content')
-    <section class="pt-20 md:pt-28 pb-14">
-        <div class="mx-auto max-w-7xl px-6">
-            <a href="{{ route('use-cases.index') }}" class="text-sm text-slate-500 hover:text-slate-900">&larr; All use cases</a>
-            <div class="mt-8 max-w-3xl">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">{{ $case['eyebrow'] }}</p>
-                <h1 class="mt-4 text-[40px] leading-[44px] font-bold tracking-[-0.025em] text-slate-900 md:text-[56px] md:leading-[60px]">{{ $case['headline'] }}</h1>
-                <p class="mt-6 text-[19px] leading-[30px] text-slate-500">{{ $case['intro'] }}</p>
-                <div class="mt-8 flex flex-wrap gap-3">
-                    <a href="{{ route('register', ['plan' => 'free']) }}" class="rounded-lg bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">Start free</a>
-                    <a href="{{ route('product.enterprise') }}" class="rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50">Talk to us</a>
-                </div>
+    <section class="mb-16 bg-[#08090b] text-white" data-use-case-hero>
+        <div class="mx-auto grid max-w-7xl items-center gap-10 px-6 py-16 md:py-24 lg:grid-cols-[1.15fr_.85fr]">
+            <div>
+                <a href="{{ route('use-cases.index') }}" class="text-sm text-slate-400 hover:text-white">&larr; All use cases</a>
+                <p class="mt-8 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $case['eyebrow'] }}</p>
+                <h1 class="mt-4 text-[40px] leading-[44px] font-semibold tracking-[-0.025em] text-white md:text-[56px] md:leading-[60px]">{{ $case['headline'] }}</h1>
+                <p class="mt-6 max-w-2xl text-[19px] leading-[30px] text-slate-300">{{ $case['intro'] }}</p>
+            </div>
+            <div class="order-first mx-auto w-full max-w-sm lg:order-none lg:max-w-none [&>svg]:block [&>svg]:h-auto [&>svg]:w-full [&>svg]:overflow-visible">
+                @include('product.use-cases.art.'.$case['slug'])
             </div>
         </div>
     </section>

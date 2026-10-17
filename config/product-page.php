@@ -223,6 +223,22 @@ return [
     ],
 
     /*
+     * The homepage feature map: each area is one capability group above (a test
+     * pins them together), with three key features. The full list with
+     * descriptions lives on the Full features page.
+     */
+    'feature_map' => [
+        'areas' => [
+            ['group' => 'Programme & coordination', 'icon' => 'programme', 'side' => 'left', 'features' => ['Programme & rooms', 'Speaker portal', 'Team tasks']],
+            ['group' => 'Registration & participation', 'icon' => 'registration', 'side' => 'left', 'features' => ['Event pages', 'Tickets & payments', 'Attendee portal']],
+            ['group' => 'Engagement & communication', 'icon' => 'engagement', 'side' => 'left', 'features' => ['Offline door scanning', 'SMS & email', 'Live polling & Q&A']],
+            ['group' => 'Recognition & academic events', 'icon' => 'recognition', 'side' => 'right', 'features' => ['Badges & certificates', 'Certificate verification', 'Abstracts & peer review']],
+            ['group' => 'Giving & finance', 'icon' => 'finance', 'side' => 'right', 'features' => ['Giving & tributes', 'Settlement', 'Payouts']],
+            ['group' => 'Venue operations', 'icon' => 'venue', 'side' => 'right', 'features' => ['Spaces', 'Venue calendar', 'Inquiries & quotes']],
+        ],
+    ],
+
+    /*
      * Each card quotes the EventLexicon wording for its event category, so a
      * change there is a change to be made here too (MarketingClaimsTest pins it).
      */
@@ -291,6 +307,7 @@ return [
                 ['label' => 'Pricing', 'href' => '/#pricing'],
                 ['label' => 'Enterprise', 'href' => '/product-enterprise'],
                 ['label' => 'Marketplace', 'href' => '/marketplace', 'route' => 'marketplace.index', 'target' => '_blank'],
+                ['label' => 'Full features', 'href' => '/features', 'route' => 'features'],
             ],
             'Company' => [
                 ['label' => 'Terms', 'href' => '/terms'],
