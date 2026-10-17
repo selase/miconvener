@@ -94,6 +94,11 @@ final class WebhookController extends Controller
 
         try {
             switch ($event->type) {
+                case 'refund.created':
+                case 'refund.updated':
+                case 'charge.refunded':
+                    app(\App\Services\Giving\GivingRefunds::class)->handleStripeNotification($event->data->object, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway));
+                    break;
                 case 'checkout.session.completed':
                 case 'checkout.session.async_payment_succeeded':
                     $session = $event->data->object;
@@ -147,6 +152,9 @@ final class WebhookController extends Controller
         $data = $request->input('data');
 
         try {
+            if (is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Giving\GivingRefunds::class)->handlePaystackNotification((array) $data, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway))) {
+                return response()->json(['status' => 'success']);
+            }
             if ($event === 'charge.success') {
                 $metadata = \App\Http\Controllers\Billing\WebhookController::metadata($data['metadata'] ?? null);
                 if (($metadata['type'] ?? null) === 'community_gift') {

@@ -59,6 +59,9 @@ final class SettlementWebhookController extends Controller
         $data = $request->input('data');
 
         $metadata = BillingWebhookController::metadata($data['metadata'] ?? null);
+        if ($settlementMatches && is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Giving\GivingRefunds::class)->handlePaystackNotification((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
+            return response()->json(['status' => 'success']);
+        }
 
         // The platform's Paystack account is shared with other applications, so
         // this one webhook URL receives their events too. Acting on a charge that
@@ -315,6 +318,15 @@ final class SettlementWebhookController extends Controller
         }
 
         $payout = EventPayout::where('provider_reference', $reference)->first();
+        if ($payout?->category === LedgerCategoryEnum::Giving) {
+            if ($event === 'transfer.success') {
+                app(\App\Services\Finance\CommunityPayouts::class)->settleTransfer($payout, $reference);
+            } else {
+                EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', EventPayout::STATUS_PROCESSING)->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => (string) ($data['reason'] ?? 'Transfer failed')]);
+            }
+
+            return;
+        }
         if (! $payout || $payout->status !== EventPayout::STATUS_PROCESSING) {
             // Already processed (idempotent redelivery) or not a payout this
             // webhook is tracking — a no-op either way.

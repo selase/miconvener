@@ -21,11 +21,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $reason
  * @property int $principal
  * @property int $commission_reversal
+ * @property int $credit_restored
+ * @property int $commission_returned
  * @property int $gateway_credit
  * @property string $kind
  * @property string $status
  * @property int|null $actor_id
  * @property string $operation_key
+ * @property string|null $provider_refund_key
  * @property string|null $provider_refund_reference
  * @property \Carbon\CarbonImmutable|null $confirmed_at
  */
@@ -40,11 +43,11 @@ final class GivingAdjustment extends Model
 
     protected $connection = 'landlord';
 
-    protected $fillable = ['tenant_id', 'fund_id', 'gift_id', 'event_contribution_id', 'reason', 'principal', 'commission_reversal', 'gateway_credit', 'kind', 'status', 'actor_id', 'operation_key', 'provider_refund_reference', 'confirmed_at'];
+    protected $fillable = ['tenant_id', 'fund_id', 'gift_id', 'event_contribution_id', 'reason', 'principal', 'commission_reversal', 'commission_returned', 'credit_restored', 'gateway_credit', 'kind', 'status', 'actor_id', 'operation_key', 'provider_refund_reference', 'provider_refund_key', 'confirmed_at'];
 
     protected $hidden = [];
 
-    protected $casts = ['principal' => 'integer', 'commission_reversal' => 'integer', 'gateway_credit' => 'integer', 'confirmed_at' => 'immutable_datetime'];
+    protected $casts = ['credit_restored' => 'integer', 'commission_returned' => 'integer', 'principal' => 'integer', 'commission_reversal' => 'integer', 'gateway_credit' => 'integer', 'confirmed_at' => 'immutable_datetime'];
 
     /** @return BelongsTo<GivingFund, $this> */
     public function fund(): BelongsTo

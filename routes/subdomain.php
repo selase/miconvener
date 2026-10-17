@@ -318,6 +318,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
+    Route::post('finance/giving/refunds/{adjustment}/reconcile', [App\Http\Controllers\Tenant\GivingRefundController::class, 'reconcile'])->name('tenant.community.giving.refunds.reconcile');
+    Route::get('finance/giving/{type}/{source}/refunds/preview', [App\Http\Controllers\Tenant\GivingRefundController::class, 'preview'])->name('tenant.community.giving.refunds.preview');
+    Route::post('finance/giving/{type}/{source}/refunds', [App\Http\Controllers\Tenant\GivingRefundController::class, 'store'])->name('tenant.community.giving.refunds.store');
+
     Route::post('community/money/giving/funds/{fund}/gifts', [App\Http\Controllers\Tenant\GivingGiftController::class, 'store'])->name('tenant.community.giving.gifts.store');
     Route::post('community/money/giving/gifts/{gift}/corrections', [App\Http\Controllers\Tenant\GivingGiftController::class, 'correct'])->name('tenant.community.giving.gifts.correct');
 

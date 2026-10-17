@@ -100,11 +100,14 @@ return new class extends Migration
             $t->bigInteger('principal');
             $t->bigInteger('commission_reversal')->default(0);
             $t->bigInteger('gateway_credit')->default(0);
+            $t->bigInteger('commission_returned')->default(0);
+            $t->bigInteger('credit_restored')->default(0);
             $t->string('kind', 24);
             $t->string('status', 16)->default('requested');
             $t->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();
             $t->uuid('operation_key');
             $t->string('provider_refund_reference')->nullable();
+            $t->string('provider_refund_key', 64)->nullable()->unique();
             $t->timestampTz('confirmed_at')->nullable();
             $t->unique(['tenant_id', 'operation_key']);
         });

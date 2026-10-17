@@ -246,6 +246,32 @@ final class StripeGateway implements PaymentGateway
             'session_id' => $session->id, 'provider_reference' => $intent->id];
     }
 
+    /** @return array{reference:string, status:string} */
+    public function requestGivingRefund(string $reference, int $amount, string $operationKey): array
+    {
+        $refund = $this->stripe->refunds->create(['payment_intent' => $reference, 'amount' => $amount,
+            'refund_application_fee' => true, 'metadata' => ['giving_operation_key' => $operationKey]], $this->accountOptions() + ['idempotency_key' => $operationKey]);
+
+        return ['reference' => $refund->id, 'status' => $refund->status];
+    }
+
+    /** @return array<string, mixed> */
+    public function verifyGivingRefund(string $refundId, string $reference, string $operationKey): array
+    {
+        $refund = $this->stripe->refunds->retrieve($refundId, ['expand' => ['balance_transaction']], $this->accountOptions());
+        if ($refund->payment_intent !== $reference || ($refund->metadata?->giving_operation_key ?? '') !== $operationKey) {
+            return ['status' => 'unknown'];
+        }
+        $intent = $this->stripe->paymentIntents->retrieve($reference, ['expand' => ['latest_charge']], $this->accountOptions());
+        $feeId = is_object($intent->latest_charge) ? ($intent->latest_charge->application_fee ?? null) : null;
+        $returned = $feeId === null ? 0 : (int) $this->stripe->applicationFees->retrieve($feeId)->amount_refunded;
+        $balance = $refund->balance_transaction;
+        $credit = is_object($balance) && mb_strtoupper((string) $balance->currency) === mb_strtoupper((string) $refund->currency) ? max(0, -(int) $balance->fee) : 0;
+
+        return ['status' => $refund->status, 'amount' => (int) $refund->amount, 'currency' => mb_strtoupper((string) $refund->currency),
+            'gateway_credit' => $credit, 'commission_returned_cumulative' => $returned];
+    }
+
     public function verifyTransaction(string $reference): array
     {
         try {

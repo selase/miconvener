@@ -25,11 +25,15 @@ final class FinanceOverviewController extends Controller
         $waiting = EventPayout::query()->withoutGlobalScopes()
             ->whereIn('status', [EventPayout::STATUS_AWAITING_OTP, EventPayout::STATUS_FAILED]);
 
+        $paidByCurrency = EventPayout::query()->withoutGlobalScopes()->where('status', EventPayout::STATUS_PAID)->where('paid_at', '>=', now()->subDays(30))
+            ->selectRaw('currency, sum(amount) as total')->groupBy('currency')->orderBy('currency')->pluck('total', 'currency')->map(fn ($amount): int => (int) $amount);
+
         return view('admin.finance.overview', [
             'earnings' => $earnings->between(now()->startOfMonth(), now()),
             'payoutsAwaitingCode' => (clone $waiting)->where('status', EventPayout::STATUS_AWAITING_OTP)->count(),
             'payoutsFailed' => (clone $waiting)->where('status', EventPayout::STATUS_FAILED)->count(),
-            'paid30' => (int) EventPayout::query()->withoutGlobalScopes()->where('status', EventPayout::STATUS_PAID)->where('paid_at', '>=', now()->subDays(30))->sum('amount'),
+            'paid30' => $paidByCurrency->get('GHS', 0),
+            'paid30ByCurrency' => $paidByCurrency,
             'creditsOwed' => TenantCommissionCredit::query()->withoutGlobalScopes()->where('amount', '>', 0)
                 ->selectRaw('currency, sum(amount) as total, count(*) as organisations')
                 ->groupBy('currency')->orderBy('currency')->get(),

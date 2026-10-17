@@ -42,7 +42,7 @@ final class PayoutRelease
      */
     public function release(EventPayout $payout, string $otp): array
     {
-        return DB::transaction(function () use ($payout, $otp): array {
+        return DB::connection('landlord')->transaction(function () use ($payout, $otp): array {
             // Same lock as sending: two submissions of the same code must not
             // both release the transfer.
             $payoutModel = EventPayout::query()->whereKey($payout->getKey())->lockForUpdate()->firstOrFail();
@@ -108,6 +108,70 @@ final class PayoutRelease
 
             return ['released' => true, 'message' => 'Payout released.', 'http_status' => 200];
         });
+    }
+
+    /** Claim once, then call the provider outside the lock; an uncertain release stays reserved.
+     * @return array{released:bool, message:string, http_status:int}
+     */
+    public function releaseWithoutLock(EventPayout $payout, string $otp): array
+    {
+        $claim = $payout->getConnection()->transaction(function () use ($payout): array {
+            $locked = EventPayout::withoutGlobalScopes()->lockForUpdate()->findOrFail($payout->id);
+            if ($locked->status !== EventPayout::STATUS_AWAITING_OTP || ! $locked->provider_transfer_code) {
+                return ['error' => ['released' => false, 'message' => 'This payout is not waiting for a one-time code.', 'http_status' => 422]];
+            }
+            $locked->update(['status' => EventPayout::STATUS_PROCESSING]);
+
+            return ['payout' => $locked];
+        });
+        if (isset($claim['error'])) {
+            return $claim['error'];
+        }
+        $locked = $claim['payout'];
+        try {
+            $transfer = $this->settlementGateway->finalizeTransfer($locked->provider_transfer_code, $otp);
+        } catch (PaymentFailedException $exception) {
+            if ($locked->fresh()->status === EventPayout::STATUS_PAID) {
+                return ['released' => true, 'message' => 'Payout confirmed.', 'http_status' => 200];
+            }
+            if ($this->transferIsDead($locked)) {
+                $this->changeProcessing($locked, ['status' => EventPayout::STATUS_FAILED, 'failure_reason' => self::OTP_EXPIRED_REASON]);
+
+                return ['released' => false, 'message' => self::OTP_EXPIRED_REASON, 'http_status' => 422];
+            }
+            $previous = $exception->getPrevious();
+            if ($previous instanceof \Illuminate\Http\Client\RequestException && $previous->response->status() >= 400 && $previous->response->status() < 500) {
+                $message = 'The one-time code was not accepted: '.$exception->providerMessage();
+                $this->changeProcessing($locked, ['status' => EventPayout::STATUS_AWAITING_OTP, 'failure_reason' => $message]);
+
+                return ['released' => false, 'message' => $message, 'http_status' => 422];
+            }
+            $message = 'The release outcome is uncertain. Check its provider status before trying again.';
+            $this->changeProcessing($locked, ['failure_reason' => $message]);
+
+            return ['released' => false, 'message' => $message, 'http_status' => 502];
+        }
+        if ($locked->fresh()->status === EventPayout::STATUS_PAID) {
+            return ['released' => true, 'message' => 'Payout confirmed.', 'http_status' => 200];
+        }
+        $status = $transfer['status'];
+        if (! in_array($status, ['success', 'pending', 'queued'], true)) {
+            $message = 'The payment provider did not release the transfer (status: '.$status.').';
+            $this->changeProcessing($locked, ['status' => in_array($status, self::DEAD_TRANSFER_STATUSES, true) ? EventPayout::STATUS_FAILED : EventPayout::STATUS_AWAITING_OTP, 'failure_reason' => $message]);
+
+            return ['released' => false, 'message' => $message, 'http_status' => 502];
+        }
+        $scheduledFee = $locked->requested_transfer_fee_amount ?? $this->transferFeeSchedule->feeFor($locked->payoutAccount->type);
+        $this->changeProcessing($locked, ['failure_reason' => null, 'transfer_fee_amount' => $this->transferFeeSchedule->feeFromProviderResponse($transfer) ?? $scheduledFee,
+            'net_paid_amount' => $locked->requested_net_amount ?? $locked->amount - $scheduledFee]);
+
+        return ['released' => true, 'message' => 'Payout released.', 'http_status' => 200];
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function changeProcessing(EventPayout $payout, array $attributes): void
+    {
+        EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', EventPayout::STATUS_PROCESSING)->update($attributes);
     }
 
     /**

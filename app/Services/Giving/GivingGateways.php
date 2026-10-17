@@ -109,6 +109,24 @@ final class GivingGateways
             'provider_reference' => $attempt->provider === 'stripe' ? ($data['provider_reference'] ?? null) : ($data['reference'] ?? null)];
     }
 
+    /** @return array{reference:string, status:string} */
+    public function requestRefund(GivingPaymentAttempt $attempt, \App\Models\GivingAdjustment $adjustment): array
+    {
+        $gateway = $this->forAttempt($attempt);
+
+        return $gateway->requestGivingRefund((string) $attempt->provider_reference, $adjustment->principal, $adjustment->operation_key);
+    }
+
+    /** @return array<string, mixed> */
+    public function verifyRefund(GivingPaymentAttempt $attempt, \App\Models\GivingAdjustment $adjustment): array
+    {
+        $gateway = $this->forAttempt($attempt);
+        $data = $gateway->verifyGivingRefund((string) $adjustment->provider_refund_reference, (string) $attempt->provider_reference, $adjustment->operation_key);
+
+        return [...$data, 'provider' => $attempt->provider, 'account_identity' => $attempt->account_identity,
+            'payment_reference' => $attempt->provider_reference, 'provider_refund_reference' => $adjustment->provider_refund_reference];
+    }
+
     private function originalRow(GivingPaymentAttempt $attempt): TenantPaymentGateway
     {
         $parts = explode(':', $attempt->account_identity, 3);

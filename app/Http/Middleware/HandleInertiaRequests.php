@@ -85,7 +85,7 @@ final class HandleInertiaRequests extends Middleware
                     'community_inbox' => $tenant->communityEnabled() && app(\App\Services\Community\InboxRollout::class)->enabled($tenant),
                     'community_messages' => $tenant->communityEnabled() && $tenant->featureEnabled('community_messages'),
                     // Payouts stay in the menu while dues money is held, even with Community off.
-                    'dues_payouts' => $tenant->communityEnabled() || $tenant->hasDuesMoney(),
+                    'dues_payouts' => $tenant->communityEnabled() || $tenant->hasDuesMoney() || $tenant->hasGivingMoney(),
                 ],
             ] : null,
             'flash' => [

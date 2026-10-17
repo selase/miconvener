@@ -65,4 +65,23 @@ final class GivingScenario
                 'local_reference' => $attempt->reference, 'source' => config('services.paystack.metadata_source')],
         ], $overrides);
     }
+
+    /** @return array{Tenant, User, GivingFund, \App\Models\GivingPaymentAttempt, \App\Services\Giving\GivingSource} */
+    public static function paid(bool $own = false): array
+    {
+        [$tenant, $user, $fund, $attempt] = self::online($own);
+        app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($attempt->reference, self::verified($attempt));
+        $user->givePermissionTo(['process refunds', 'manage payouts']);
+        $source = app(\App\Services\Giving\GivingSources::class)->find($tenant, 'gift', $attempt->gift_id);
+
+        return [$tenant, $user, $fund, $attempt->fresh(), $source];
+    }
+
+    /** @return array<string, mixed> */
+    public static function refunded(\App\Models\GivingAdjustment $adjustment, \App\Models\GivingPaymentAttempt $attempt, string $status = 'processed'): array
+    {
+        return ['status' => $status, 'provider' => $attempt->provider, 'account_identity' => $attempt->account_identity,
+            'provider_refund_reference' => $adjustment->provider_refund_reference, 'payment_reference' => $attempt->provider_reference,
+            'amount' => $adjustment->principal, 'currency' => $attempt->currency, 'gateway_credit' => 0, 'commission_returned' => 0];
+    }
 }

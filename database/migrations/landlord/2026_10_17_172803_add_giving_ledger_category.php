@@ -12,6 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         $this->constraints(true);
+        Schema::connection('landlord')->table('event_payouts', function (Blueprint $t): void {
+            $t->bigInteger('requested_transfer_fee_amount')->nullable();
+            $t->bigInteger('requested_net_amount')->nullable();
+        });
         Schema::connection('landlord')->table('ledger_transactions', function (Blueprint $t): void {
             $t->foreignUuid('giving_fund_id')->nullable()->constrained('giving_funds')->restrictOnDelete();
         });
@@ -24,6 +28,10 @@ return new class extends Migration
                 throw new RuntimeException('Giving financial records exist; category support cannot be removed.');
             }
         }
+        if (DB::connection('landlord')->table('event_payouts')->whereNotNull('requested_net_amount')->exists()) {
+            throw new RuntimeException('Payout request snapshots exist; use a forward fix.');
+        }
+        Schema::connection('landlord')->table('event_payouts', fn (Blueprint $t) => $t->dropColumn(['requested_transfer_fee_amount', 'requested_net_amount']));
         Schema::connection('landlord')->table('ledger_transactions', fn (Blueprint $t) => $t->dropConstrainedForeignId('giving_fund_id'));
         $this->constraints(false);
     }

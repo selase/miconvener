@@ -56,6 +56,36 @@ final class CommercialTerms
         return max(0, $terms->capAmount === null ? $commission : min($commission, $terms->capAmount));
     }
 
+    /** Integer cumulative proportional refund, including amounts whose product would overflow. */
+    public function refundedCommission(int $originalPrincipal, int $originalCommission, int $cumulativeRefundedPrincipal): int
+    {
+        if ($originalPrincipal <= 0 || $originalCommission < 0 || $originalCommission > $originalPrincipal || $cumulativeRefundedPrincipal < 0 || $cumulativeRefundedPrincipal > $originalPrincipal) {
+            throw new InvalidArgumentException('Invalid original or cumulative refund amount.');
+        }
+        $quotient = 0;
+        $remainder = 0;
+        $partQuotient = intdiv($originalCommission, $originalPrincipal);
+        $partRemainder = $originalCommission % $originalPrincipal;
+        $remaining = $cumulativeRefundedPrincipal;
+        while ($remaining > 0) {
+            if ($remaining % 2 === 1) {
+                $quotient += $partQuotient;
+                $remainder += $partRemainder;
+                $quotient += intdiv($remainder, $originalPrincipal);
+                $remainder %= $originalPrincipal;
+            }
+            $remaining = intdiv($remaining, 2);
+            if ($remaining > 0) {
+                $partQuotient *= 2;
+                $partRemainder *= 2;
+                $partQuotient += intdiv($partRemainder, $originalPrincipal);
+                $partRemainder %= $originalPrincipal;
+            }
+        }
+
+        return min($originalCommission, $quotient + ($remainder >= intdiv($originalPrincipal, 2) + $originalPrincipal % 2 ? 1 : 0));
+    }
+
     public function setOverride(Tenant $tenant, CommercialStreamEnum $stream, ?float $rate, ?int $cap, string $reason, User $by): void
     {
         Gate::forUser($by)->authorize('access-superadmin-dashboard');

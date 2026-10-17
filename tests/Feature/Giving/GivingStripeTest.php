@@ -43,3 +43,29 @@ test('own Stripe checkout binds session account and idempotency and posts only a
         expect($request['headers'])->toContain('Stripe-Account: acct_giving');
     }
 });
+
+test('Stripe refunds return only actual application fees and never take principal from the platform', function () {
+    [$tenant, $user, $fund] = GivingScenario::make(['visibility' => 'public']);
+    $tenant->update(['package_id' => App\Models\Package::factory()->create()->id, 'settlement_mode' => Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
+    $tenant->features()->where('feature_key', 'community_giving')->update(['meta' => ['online_enabled' => true]]);
+    $user->givePermissionTo('process refunds');
+    config(['services.stripe.secret' => 'sk_test_giving_stripe', 'services.stripe.connect.client_id' => 'ca_giving']);
+    TenantPaymentGateway::factory()->create(['tenant_id' => $tenant->id, 'provider' => 'stripe', 'provider_account_id' => 'acct_giving', 'api_key_encrypted' => null, 'is_active' => true]);
+    $fake = new GivingStripeHttp;
+    ApiRequestor::setHttpClient($fake);
+    app(GivingCheckout::class)->start($fund, ['amount_minor' => 10000, 'currency' => 'GHS', 'provider' => 'stripe'], app('session.store'), (string) Str::uuid());
+    $attempt = GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->sole();
+    app(GivingPaymentConfirmer::class)->confirm($attempt->reference, app(GivingGateways::class)->verify($attempt));
+    $attempt->refresh();
+    $source = app(App\Services\Giving\GivingSources::class)->find($tenant, 'gift', $attempt->gift_id);
+    $refunds = app(App\Services\Giving\GivingRefunds::class);
+    $key = (string) Str::uuid();
+    $adjustment = $refunds->request($source, $user, 2000, 'Partial refund', $key);
+    $fake->feeRefunded = 20;
+    $refunds->reconcile($adjustment);
+    expect($adjustment->fresh()->status)->toBe('confirmed')->and($adjustment->fresh()->commission_returned)->toBe(20)
+        ->and(app(App\Services\Giving\GivingBalance::class)->payable($tenant, 'GHS'))->toBe(0);
+    $request = collect($fake->requests)->first(fn ($request) => $request['method'] === 'post' && str_ends_with($request['url'], '/refunds'));
+    expect($request['headers'])->toContain('Stripe-Account: acct_giving', 'Idempotency-Key: '.$key)
+        ->and($request['params']['payment_intent'])->toBe('pi_giving')->and($request['params']['amount'])->toBe(2000);
+});

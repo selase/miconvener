@@ -551,6 +551,55 @@ final class LedgerService
             $entries, null, $attempt->currency, LedgerCategoryEnum::Giving, $source->fund);
     }
 
+    public function recordGivingRefund(Tenant $tenant, \App\Services\Giving\GivingSource $source, \App\Models\GivingAdjustment $adjustment): ?LedgerTransaction
+    {
+        $attempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('fund_id', $source->fund->id)->where($source->type === 'gift' ? 'gift_id' : 'event_contribution_id', $source->id)->where('state', 'confirmed')->firstOrFail();
+        if ($adjustment->tenant_id !== $tenant->id || $adjustment->fund_id !== $source->fund->id || $adjustment->gift_id !== $source->columns()['gift_id'] || $adjustment->event_contribution_id !== $source->columns()['event_contribution_id']) {
+            throw new InvalidArgumentException('Refund must match the original Giving source.');
+        }
+        $reversal = $adjustment->commission_reversal;
+        if ($attempt->settlement_mode === Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT) {
+            $net = $adjustment->principal - $reversal - $adjustment->gateway_credit;
+            $entries = [
+                ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => max(0, $net)],
+                ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $reversal],
+                ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $adjustment->principal - $adjustment->gateway_credit],
+            ];
+            if ($net < 0) {
+                $entries[] = ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => -$net];
+            }
+        } else {
+            if ($reversal === 0 && $adjustment->commission_returned === 0) {
+                return null;
+            }
+            $entries = [
+                ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $reversal],
+                ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $adjustment->commission_returned],
+                ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => max(0, $reversal - $adjustment->commission_returned)],
+            ];
+        }
+        if ($attempt->settlement_mode !== Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT && $adjustment->commission_returned > $reversal) {
+            $entries[] = ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $adjustment->commission_returned - $reversal];
+        }
+        $entries = array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] !== 0));
+        $transaction = $this->postTransaction($tenant, null, LedgerTransaction::TYPE_REFUND, 'Giving refund: '.$source->key(), 'giving_refund_'.$adjustment->id, $entries, null, $source->currency, LedgerCategoryEnum::Giving, $source->fund);
+        if ($transaction->wasRecentlyCreated && $adjustment->credit_restored > 0) {
+            app(CommissionCredit::class)->grant($tenant, $source->currency, $adjustment->credit_restored);
+        }
+
+        return $transaction;
+    }
+
+    public function recordGivingPayout(Tenant $tenant, EventPayout $payout, string $reference, int $transferFee): LedgerTransaction
+    {
+        if ($payout->tenant_id !== $tenant->id || $payout->category !== LedgerCategoryEnum::Giving || $payout->event_id !== null) {
+            throw new InvalidArgumentException('Payout must belong to the organisation Giving pool.');
+        }
+
+        return $this->postTransaction($tenant, null, LedgerTransaction::TYPE_PAYOUT, 'Giving payout', $reference,
+            $this->payoutEntries($payout->amount, $transferFee, false), null, $payout->currency, LedgerCategoryEnum::Giving);
+    }
+
     /**
      * Record a dues payment collected through the platform's gateway, entry
      * for entry as a contribution, in the dues category with no event:

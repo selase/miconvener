@@ -76,7 +76,7 @@ final class GivingPaymentConfirmer
                 ? [...$common, 'commission_amount' => $attempt->commission_amount]
                 : [...$common, 'platform_fee_amount' => $attempt->commission_amount, 'payment_reference' => $providerReference,
                     'paystack_reference' => $attempt->provider === 'paystack' ? $providerReference : null, 'provider' => $attempt->provider]);
-            $attempt->update(['state' => 'confirmed', 'confirmed_at' => now(), 'provider_reference' => $providerReference, 'review_reason' => null]);
+            $attempt->update(['commission_settlement' => [...$attempt->commission_settlement, 'actual_received' => $settlement['received'], 'actual_credit_used' => $settlement['credit']], 'state' => 'confirmed', 'confirmed_at' => now(), 'provider_reference' => $providerReference, 'review_reason' => null]);
             $this->progress->closeIfTargetReached($fund);
 
             return $attempt;

@@ -97,6 +97,12 @@ final class ReconcileStuckPayouts extends Command
 
     private function resolve(EventPayout $payout, string $status): void
     {
+        if ($status === 'success' && $payout->category === LedgerCategoryEnum::Giving) {
+            app(\App\Services\Finance\CommunityPayouts::class)->settleTransfer($payout, (string) $payout->provider_reference);
+
+            return;
+        }
+
         if ($payout->status === EventPayout::STATUS_AWAITING_OTP) {
             if (in_array($status, PayoutRelease::DEAD_TRANSFER_STATUSES, true)
                 && $this->markFailed($payout, EventPayout::STATUS_AWAITING_OTP, PayoutRelease::OTP_EXPIRED_REASON)) {

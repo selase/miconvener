@@ -32,7 +32,7 @@ final class PayoutSender
     /**
      * @return array{message: string, http_status: int, status?: string, transfer_code?: mixed}
      */
-    public function send(EventPayout $payoutModel, string $currency): array
+    public function send(EventPayout $payoutModel, string $currency, ?string $reservedReference = null): array
     {
         $account = $payoutModel->payoutAccount;
 
@@ -64,12 +64,20 @@ final class PayoutSender
                 ];
             }
 
-            $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
+            $payoutModel->update(['requested_transfer_fee_amount' => $transferFee, 'requested_net_amount' => $netToSend]);
+            $reference = $reservedReference ?? 'payout_'.$payoutModel->id.'_'.Str::random(8);
             $transfer = $this->settlementGateway->initiateTransfer($account->recipient_code, $netToSend, $currency, $reference);
         } catch (PaymentFailedException $e) {
+            if ($payoutModel->fresh()->status === EventPayout::STATUS_PAID) {
+                return ['message' => 'Payout confirmed.', 'http_status' => 200];
+            }
+
             return ['message' => 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
         }
 
+        if ($payoutModel->fresh()->status === EventPayout::STATUS_PAID) {
+            return ['message' => 'Payout confirmed.', 'http_status' => 200];
+        }
         $transferStatus = (string) ($transfer['status'] ?? '');
 
         /*
@@ -88,7 +96,7 @@ final class PayoutSender
              * it instead, which keeps it re-sendable.
              */
             if ($transferCode === '') {
-                $payoutModel->update([
+                $this->updateIfUnpaid($payoutModel, [
                     'status' => EventPayout::STATUS_FAILED,
                     'failure_reason' => 'The payment provider asked for a one-time code but returned no transfer to release. Send this payout again.',
                 ]);
@@ -96,7 +104,7 @@ final class PayoutSender
                 return ['message' => $payoutModel->failure_reason, 'http_status' => 502];
             }
 
-            $payoutModel->update([
+            $this->updateIfUnpaid($payoutModel, [
                 'status' => EventPayout::STATUS_AWAITING_OTP,
                 'provider_reference' => $reference,
                 'provider_transfer_code' => $transferCode,
@@ -111,7 +119,7 @@ final class PayoutSender
         }
 
         if (! in_array($transferStatus, ['success', 'pending', 'queued'], true)) {
-            $payoutModel->update([
+            $this->updateIfUnpaid($payoutModel, [
                 'status' => EventPayout::STATUS_FAILED,
                 'failure_reason' => "The payment provider did not release the transfer (status: {$transferStatus}).",
             ]);
@@ -122,7 +130,7 @@ final class PayoutSender
             ];
         }
 
-        $payoutModel->update([
+        $this->updateIfUnpaid($payoutModel, [
             'status' => EventPayout::STATUS_PROCESSING,
             'provider_reference' => $reference,
             'provider_transfer_code' => (string) ($transfer['transfer_code'] ?? ''),
@@ -132,5 +140,12 @@ final class PayoutSender
         ]);
 
         return ['message' => 'Payout sent.', 'transfer_code' => $transfer['transfer_code'], 'http_status' => 200];
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function updateIfUnpaid(EventPayout $payout, array $attributes): void
+    {
+        EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', '!=', EventPayout::STATUS_PAID)->update($attributes);
+        $payout->refresh();
     }
 }

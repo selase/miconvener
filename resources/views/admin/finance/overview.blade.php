@@ -18,7 +18,7 @@
                 <div class="col-md-3"><div class="card h-100"><div class="card-body">
                     <div class="text-muted fw-bold fs-7 text-uppercase">Payouts waiting</div>
                     <div class="fs-2hx fw-bolder {{ ($payoutsAwaitingCode + $payoutsFailed) > 0 ? 'text-danger' : '' }}">{{ $payoutsAwaitingCode + $payoutsFailed }}</div>
-                    <div class="text-muted fs-8">{{ $payoutsAwaitingCode }} need a one-time code · {{ $payoutsFailed }} failed · paid out in 30 days {{ $money($paid30) }}</div>
+                    <div class="text-muted fs-8">{{ $payoutsAwaitingCode }} need a one-time code · {{ $payoutsFailed }} failed · paid out in 30 days @forelse($paid30ByCurrency as $currency => $amount){{ $money($amount, $currency) }}@if(!$loop->last) · @endif @empty none @endforelse</div>
                     <a class="fs-8" href="{{ route('admin.billing.payouts.index') }}">Open payouts &amp; refunds</a>
                 </div></div></div>
             @endcan
