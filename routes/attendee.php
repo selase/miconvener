@@ -21,6 +21,11 @@ Route::prefix('my')->group(function (): void {
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::get('/inbox', [App\Http\Controllers\Public\MyInboxController::class, 'index'])->name('attendee.my.inbox.index');
+        Route::get('/communities/{tenantSlug}/inbox', [App\Http\Controllers\Public\MyInboxController::class, 'organisation'])->name('attendee.my.inbox.organisation');
+        Route::post('/communities/{tenantSlug}/inbox/read-all', [App\Http\Controllers\Public\MyInboxController::class, 'readAll'])->name('attendee.my.inbox.read-all');
+        Route::get('/communities/{tenantSlug}/inbox/{item}', [App\Http\Controllers\Public\MyInboxController::class, 'show'])->whereUuid('item')->name('attendee.my.inbox.show');
+        Route::post('/communities/{tenantSlug}/inbox/{item}/read', [App\Http\Controllers\Public\MyInboxController::class, 'read'])->whereUuid('item')->name('attendee.my.inbox.read');
         Route::get('/preferences', [App\Http\Controllers\Public\AttendeePreferencesController::class, 'index'])->name('attendee.my.preferences');
         Route::patch('/preferences/{tenantSlug}', [App\Http\Controllers\Public\AttendeePreferencesController::class, 'update'])->name('attendee.my.preferences.update');
         Route::delete('/identity/email', [PlatformAttendeeAccessController::class, 'removeEmail'])->name('attendee.my.identity.email.remove');
