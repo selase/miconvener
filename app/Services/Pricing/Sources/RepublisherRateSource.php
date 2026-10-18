@@ -28,7 +28,7 @@ final class RepublisherRateSource implements ExchangeRateSource
         }
 
         try {
-            $response = Http::timeout(10)->acceptJson()
+            $response = Http::connectTimeout(3)->timeout(6)->acceptJson()
                 ->withHeaders(array_filter(['Authorization' => config('pricing.fx.republisher_key') ? 'Bearer '.config('pricing.fx.republisher_key') : null]))
                 ->get($url, ['base' => 'USD', 'quote' => 'GHS']);
         } catch (Throwable) {

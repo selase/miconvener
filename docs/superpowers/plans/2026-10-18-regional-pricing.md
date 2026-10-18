@@ -60,9 +60,12 @@
 
 **Files:** `resources/views/livewire/pricing-table.blade.php` (use `PriceBook` + `VisitorCurrency`; USD shows "billed in GHS at checkout"; currency switch control), marketing footer or pricing section (switch), `Billing\BillingController` and the controllers feeding `resources/js/Pages/Billing/{Pricing,Addons}.jsx` and the AI token packs page (`LlmUsageController`): pass `currency`, formatted `price` and, for USD, `charge_ghs` ("charged as GHS 223.63 at today's Bank of Ghana rate"), so the person sees the GHS amount before clicking. Tests: extend `tests/Feature/Marketing/LandingPageTest.php` (GH vs US header), billing page props tests.
 
-- [ ] **Step 1: Failing tests:** homepage pricing shows GHS for `CF-IPCountry: GH` and US$ with the GHS note for `US`; switch cookie overrides; console pricing/add-ons/token props carry currency, price and charge note; an item without a USD price shows GHS.
-- [ ] **Step 2–4:** Implement (Livewire, Blade, JSX), lint, build, run.
-- [ ] **Step 5: Commit** `feat(pricing): show prices in the visitor's currency with the GHS charge note`.
+- [x] **Step 1: Failing tests:** homepage pricing shows GHS for `CF-IPCountry: GH` and US$ with the GHS note for `US`; switch cookie overrides; console pricing/add-ons/token props carry currency, price and charge note; an item without a USD price shows GHS.
+- [x] **Step 2–4:** Implement (Livewire, Blade, JSX), lint, build, run.
+  Ruling: the console currency follows the same switch (cookie) as the marketing pages instead of a separate organisation "pin" setting (spec 4.3) — one control, and an existing USD subscription renews in its stored `billing_currency` regardless. Cost if wrong: a small Billing-settings field later.
+  Ruling: the rate refresh runs hourly every day (not weekdays only) and an empty `FX_BOG_URL` disables fetching (set in phpunit.xml) — a cold cache on weekends would otherwise make page views fetch from the Bank of Ghana, and tests must never call it. Cost if wrong: 48 extra harmless requests a weekend.
+  Ruling: the add-ons page looked up `catalog[key]` on a list, so the event pass never sent its event; fixed to find by key while touching the page.
+- [x] **Step 5: Commit** `feat(pricing): show prices in the visitor's currency with the GHS charge note`.
 
 ### Task 4: Every platform checkout charges GHS from the right price
 

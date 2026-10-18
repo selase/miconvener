@@ -59,7 +59,7 @@ final class Kernel extends ConsoleKernel
 
         // Own-gateway Paystack tenants route the platform commission through a
         // subaccount they own; confirm it still points at us before it costs a sale.
-        $schedule->command('fx:refresh')->hourly()->weekdays()->withoutOverlapping();
+        $schedule->command('fx:refresh')->hourly()->withoutOverlapping();
         $schedule->command('payments:verify-commission-splits')->dailyAt('05:30')->withoutOverlapping();
 
         // Invoicing

@@ -16,26 +16,6 @@ use Throwable;
  */
 final class BankOfGhanaRateSource implements ExchangeRateSource
 {
-    public function name(): string
-    {
-        return 'bank_of_ghana';
-    }
-
-    public function fetchUsdGhs(): ?array
-    {
-        try {
-            $response = Http::timeout(10)->withUserAgent('MiConvener exchange-rate check')->get((string) config('pricing.fx.bog_url'));
-        } catch (Throwable) {
-            return null;
-        }
-
-        if (! $response->successful()) {
-            return null;
-        }
-
-        return self::parse($response->body());
-    }
-
     /**
      * @return array{rate: float, as_of: string}|null
      */
@@ -51,7 +31,7 @@ final class BankOfGhanaRateSource implements ExchangeRateSource
             }
 
             preg_match_all('/<t[dh][^>]*>(.*?)<\/t[dh]>/is', $row, $cells);
-            $values = array_map(fn (string $cell): string => trim(html_entity_decode(strip_tags($cell))), $cells[1]);
+            $values = array_map(fn (string $cell): string => mb_trim(html_entity_decode(strip_tags($cell))), $cells[1]);
             $pairAt = array_search('USDGHS', $values, true);
 
             if ($pairAt === false || ! isset($values[$pairAt + 3]) || ! is_numeric($values[$pairAt + 3])) {
@@ -70,5 +50,31 @@ final class BankOfGhanaRateSource implements ExchangeRateSource
         }
 
         return null;
+    }
+
+    public function name(): string
+    {
+        return 'bank_of_ghana';
+    }
+
+    public function fetchUsdGhs(): ?array
+    {
+        $url = (string) config('pricing.fx.bog_url');
+
+        if ($url === '') {
+            return null;
+        }
+
+        try {
+            $response = Http::connectTimeout(3)->timeout(6)->withUserAgent('MiConvener exchange-rate check')->get($url);
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return self::parse($response->body());
     }
 }

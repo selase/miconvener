@@ -39,10 +39,10 @@ test('the AI usage page offers the packs with their cedi prices', function (): v
     makeTenantOwner($user, $tenant);
 
     $this->actingAs($user)
-        ->get(route('tenant.llm-usage.index', ['subdomain' => $tenant->slug]))
+        ->get(route('tenant.llm-usage.index', ['subdomain' => $tenant->slug]), ['CF-IPCountry' => 'GH'])
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Tenant/LlmUsage/Index')
             ->has('tokenPacks', 3)
-            ->where('tokenPacks.0', ['key' => 'starter', 'name' => 'Starter Pack', 'tokens' => 500000, 'price' => 'GHS 60.00']));
+            ->where('tokenPacks.0', ['key' => 'starter', 'name' => 'Starter Pack', 'tokens' => 500000, 'price' => 'GHS 60', 'charge_note' => null]));
 });

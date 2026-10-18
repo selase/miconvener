@@ -8,6 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\TenantAddon;
 use App\Services\Billing\TenantAddonService;
+use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\PriceBook;
+use App\Services\Pricing\VisitorCurrency;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -60,8 +63,16 @@ final class TenantAddonController extends Controller
                 'date' => $e->starts_at->format('M d, Y'),
             ]);
 
+        $currency = app(VisitorCurrency::class)->resolve($request);
+        $priceBook = app(PriceBook::class);
+        $quotes = app(ChargeQuote::class);
+
         return Inertia::render('Billing/Addons', [
-            'catalog' => $this->addonService->getCatalog(),
+            'catalog' => array_map(function (array $item) use ($priceBook, $quotes, $currency): array {
+                $display = $quotes->for($priceBook->addon($item['key'], $currency))->display();
+
+                return [...$item, 'display_price' => $display['price'], 'charge_note' => $display['charge_note']];
+            }, $this->addonService->getCatalog()),
             'activeAddons' => $activeAddons,
             'summary' => [
                 'current_plan' => $tenant->package->name ?? 'Free',
@@ -75,7 +86,7 @@ final class TenantAddonController extends Controller
                 'email_balance' => app(\App\Services\Billing\EmailAllowance::class)->packRemaining($tenant),
             ],
             'events' => $events,
-            'currency' => (string) config('services.paystack.currency', 'GHS'),
+            'currency' => $currency,
         ]);
     }
 
