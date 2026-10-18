@@ -35,11 +35,11 @@
 
 **Interfaces:** `ExchangeRates::usdToGhs(): ?Rate` (cached latest stored rate; refreshes via sources only when the cache expired; returns null only when no rate has ever been stored); `ExchangeRates::refresh(bool $force = false): ?Rate`; `ExchangeRates::usdPaused(): bool` (no rate, or older than the pause threshold).
 
-- [ ] **Step 1:** Read the live Bank of Ghana interbank page once (`curl`) to learn its structure; save it as the fixture. If it has no parseable USD/GHS figure, rule on the backup as primary and record it.
-- [ ] **Step 2: Failing tests:** parses the fixture into a rate and date; stores one row per new published date; a second call within 90 minutes makes no HTTP request (`Http::assertSentCount`); primary failure uses the backup; both failing keeps the last stored rate; `ageDays` counts calendar days; older than 4 days logs an operational alert once per day; older than 10 days `usdPaused()` is true; no rate at all returns null and pauses USD; `fx:refresh` command stores and reports.
-- [ ] **Step 3: Implement.** HTTP with short timeouts and a user agent; never throw to callers.
-- [ ] **Step 4:** Run `tests/Feature/Pricing`; pint; phpstan.
-- [ ] **Step 5: Commit** `feat(pricing): Bank of Ghana exchange rate with cache, history and staleness rules`.
+- [x] **Step 1:** Read the live Bank of Ghana interbank page once (`curl`) to learn its structure; save it as the fixture. If it has no parseable USD/GHS figure, rule on the backup as primary and record it.
+- [x] **Step 2: Failing tests:** parses the fixture into a rate and date; stores one row per new published date; a second call within 90 minutes makes no HTTP request (`Http::assertSentCount`); primary failure uses the backup; both failing keeps the last stored rate; `ageDays` counts calendar days; older than 4 days logs an operational alert once per day; older than 10 days `usdPaused()` is true; no rate at all returns null and pauses USD; `fx:refresh` command stores and reports.
+- [x] **Step 3: Implement.** HTTP with short timeouts and a user agent; never throw to callers.
+- [x] **Step 4:** Run `tests/Feature/Pricing`; pint; phpstan.
+- [x] **Step 5: Commit** `feat(pricing): Bank of Ghana exchange rate with cache, history and staleness rules`.
 
 ### Task 2: Visitor currency, USD prices and the price book
 
