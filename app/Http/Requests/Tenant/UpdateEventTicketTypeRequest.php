@@ -4,4 +4,4 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tenant;
 
-final class UpdateEventTicketTypeRequest extends StoreEventTicketTypeRequest {}
+final class UpdateEventTicketTypeRequest extends EventTicketTypeRequest {}

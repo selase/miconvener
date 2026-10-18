@@ -560,6 +560,11 @@ Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.e
 Route::get('/e/{event}/calendar.ics', [PublicEventController::class, 'calendarFeed'])->name('public.events.calendar.ics');
 Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');
 Route::post('/e/{event}/unlock-tickets', [PublicEventController::class, 'unlockTicketTypes'])->name('public.events.unlock-tickets');
+Route::post('/e/{event}/member-benefits', [PublicEventController::class, 'memberBenefits'])->middleware('throttle:public-registration')->name('public.events.member-benefits');
+Route::post('/e/{event}/member-verify/email/send', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'send'])->name('public.events.member-verify.send');
+Route::post('/e/{event}/member-verify/email/confirm', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'confirm'])->name('public.events.member-verify.confirm');
+Route::post('/e/{event}/checkout/{registration}/member', [EventCheckoutController::class, 'startMemberPayment'])->middleware('throttle:public-registration')->name('public.events.member-checkout');
+Route::get('/e/{event}/checkout/{registration}/member-callback', [EventCheckoutController::class, 'memberCallback'])->name('public.events.member-callback');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->block(15, 15)->name('public.events.contribute');
 Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');

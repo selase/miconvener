@@ -57,6 +57,7 @@ it('validates nullable and zero member prices on ticket types without bypassing 
     $url = 'http://'.eventSubdomainHost('benefits').'/events/'.$event->id.'/ticket-types';
     $response = $this->postJson($url, ['name' => 'Member admission', 'price' => 0, 'member_price' => 0])->assertSuccessful();
     expect($response->json('member_price'))->toBe(0);
+    $this->putJson($url.'/'.$response->json('id'), ['name' => 'Updated', 'price' => 0, 'member_price' => 0])->assertSuccessful();
     $this->postJson($url, ['name' => 'Invalid', 'price' => 0, 'member_price' => 1])->assertUnprocessable();
     $tenant->features()->where('feature_key', 'community_event_benefits')->update(['enabled' => false]);
     $this->postJson($url, ['name' => 'Off', 'price' => 0, 'member_price' => 0])->assertUnprocessable();

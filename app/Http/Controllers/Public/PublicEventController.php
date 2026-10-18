@@ -169,6 +169,16 @@ final class PublicEventController extends Controller
         );
 
         $ticketType = $usesTicketTypes ? $activeTicketTypes->firstWhere('id', $validated['ticket_type_id']) : null;
+        $benefits = app(\App\Services\Events\MemberBenefitEligibility::class);
+        $benefitsEnabled = $benefits->enabled($tenant);
+        $benefitMember = $benefitsEnabled ? $benefits->resolve($request->session(), $eventModel, $validated['email']) : null;
+        if ($eventModel->members_only && (! $benefitsEnabled || $benefitMember === null)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['membership' => 'Verify your active personal membership before registering for this event.']);
+        }
+        $configuredMemberPrice = $ticketType !== null ? $ticketType->member_price : $eventModel->member_ticket_price;
+        $memberBase = $benefitMember !== null ? $configuredMemberPrice : null;
+        $benefitRequired = $benefitsEnabled && $benefitMember !== null && ($eventModel->members_only || $memberBase !== null);
+        $benefitIdentity = $benefitRequired ? app(\App\Services\Events\MemberBenefitIdentity::class)->capture($request->session(), $benefitMember) : null;
 
         if ($ticketType && $ticketType->isInviteOnly()) {
             $providedAccessCode = mb_strtoupper(mb_trim((string) ($validated['access_code'] ?? '')));
@@ -220,7 +230,8 @@ final class PublicEventController extends Controller
         $pricing = app(RegistrationPricingService::class)->calculatePrice(
             $eventModel,
             $ticketType,
-            $cleanedFormAnswers
+            $cleanedFormAnswers,
+            $memberBase
         );
         $amount = $pricing['amount'];
 
@@ -278,6 +289,8 @@ final class PublicEventController extends Controller
             : mb_trim(($title ? $title.' ' : '')."{$firstName} {$lastName}");
 
         $registration = EventRegistration::create([
+            'member_benefit_required' => $benefitRequired,
+            'member_benefit_identity' => $benefitIdentity,
             'title' => $title,
             'first_name' => $firstName,
             'last_name' => $lastName,
@@ -465,6 +478,19 @@ final class PublicEventController extends Controller
         ]);
     }
 
+    public function memberBenefits(\App\Http\Requests\Public\EventMemberEligibilityRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $model = Event::query()->where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+        $service = app(\App\Services\Events\MemberBenefitEligibility::class);
+        $eligible = $service->resolve($request->session(), $model, $request->validated('email')) !== null;
+
+        return response()->json(['enabled' => $service->enabled($tenant), 'members_only' => $model->members_only, 'eligible' => $eligible,
+            'member_ticket_price' => $eligible ? $model->member_ticket_price : null,
+            'ticket_prices' => $eligible ? $model->ticketTypes()->active()->whereNull('access_code')->get(['id', 'member_price'])->toArray() : []])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
     public function validatePromo(Request $request, string $subdomain, string $event): JsonResponse
     {
         $tenant = $this->getTenant();
@@ -481,7 +507,14 @@ final class PublicEventController extends Controller
             ? $eventModel->ticketTypes()->where('id', $validated['ticket_type_id'])->first()
             : null;
 
-        $amount = (int) ($validated['amount'] ?? ($ticketType ? $ticketType->price : $eventModel->ticket_price));
+        $member = app(\App\Services\Events\MemberBenefitEligibility::class)->resolve($request->session(), $eventModel, (string) ($validated['email'] ?? ''));
+        $base = $member !== null ? ($ticketType !== null ? $ticketType->member_price : $eventModel->member_ticket_price) : null;
+        if ($base !== null || ($member !== null && $eventModel->members_only)) {
+            $answers = app(RegistrationPricingService::class)->validateAndCleanAnswers($eventModel, (array) $request->input('form_answers', []));
+            $amount = app(RegistrationPricingService::class)->calculatePrice($eventModel, $ticketType, $answers, $base)['amount'];
+        } else {
+            $amount = (int) ($validated['amount'] ?? ($ticketType ? $ticketType->price : $eventModel->ticket_price));
+        }
 
         $result = app(\App\Services\Events\PromoCodeService::class)->validateCode(
             $eventModel,

@@ -48,6 +48,10 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        if ($registrationModel->member_benefit_required) {
+            abort_unless($registrationModel->event->slug === $event && $this->canClaimWorkspace($registrationModel), 403);
+        }
+
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
@@ -64,7 +68,7 @@ final class EventCheckoutController extends Controller
 
         // With more than one way to pay, the attendee picks; with exactly one
         // online way and no offline option there is nothing to choose.
-        $offersChoice = $eventModel->allowsOfflinePayments()
+        $offersChoice = $registrationModel->member_benefit_required || $eventModel->allowsOfflinePayments()
             || $registrationModel->offline_payment_status !== null
             || ($paystackAvailable && $stripeAvailable);
 
@@ -114,6 +118,7 @@ final class EventCheckoutController extends Controller
                         'description' => $registrationModel->ticketType->description,
                     ] : null,
                 ],
+                'member_benefit' => $registrationModel->member_benefit_required ? $this->memberContext($registrationModel) : null,
                 'paystack_available' => $paystackAvailable,
                 'stripe_available' => $stripeAvailable,
                 'workspace_url' => $workspaceUrl,
@@ -142,6 +147,8 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        abort_if($registrationModel->member_benefit_required, 422, 'Review and accept the member checkout total before starting payment.');
+
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
@@ -166,6 +173,8 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        abort_if($registrationModel->member_benefit_required, 422, 'Review and accept the member checkout total before starting payment.');
+
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
@@ -177,6 +186,18 @@ final class EventCheckoutController extends Controller
         }
 
         return $this->startStripeCheckout($tenant, $registrationModel, $workspaceUrl);
+    }
+
+    public function startMemberPayment(\App\Http\Requests\Public\StartEventMemberCheckoutRequest $request, string $subdomain, string $event, string $registration): Response|RedirectResponse
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        abort_unless($tenant, 404);
+        $model = EventRegistration::query()->where('tenant_id', $tenant->id)->whereHas('event', fn ($q) => $q->where('slug', $event))->findOrFail($registration);
+        abort_unless($this->canClaimWorkspace($model), 403);
+        $url = app(\App\Services\Events\MemberBenefitCheckout::class)->start($request->session(), $model,
+            $request->validated('provider'), (int) $request->validated('expected_amount'), $request->validated('currency'));
+
+        return Inertia::location($url);
     }
 
     public function submitOfflineProof(Request $request, string $subdomain, string $event, string $registration): RedirectResponse
@@ -293,6 +314,26 @@ final class EventCheckoutController extends Controller
                 'Cache-Control' => 'private, no-store',
             ]
         );
+    }
+
+    /** @return array<string, mixed> */
+    private function memberContext(EventRegistration $registration): array
+    {
+        $eligible = app(\App\Services\Events\MemberBenefitEligibility::class)->resolve(request()->session(), $registration->event, $registration->email) !== null;
+        $quote = \App\Models\EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
+        $attempt = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->latest()->first();
+        $pricing = null;
+        if ($eligible && $attempt === null) {
+            try {
+                $pricing = app(\App\Services\Events\MemberBenefitQuotes::class)->pricing($registration);
+            } catch (\Illuminate\Validation\ValidationException) {
+                $eligible = false;
+            }
+        }
+
+        return ['required' => true, 'eligible' => $eligible, 'payment_state' => $attempt?->state, 'review_reason' => $attempt?->review_reason,
+            'current_total' => $quote?->expires_at->isFuture() ? $quote->charged_amount : ($pricing['fees']['charged_amount'] ?? $registration->effectiveChargedAmount()),
+            'currency' => $registration->currency, 'expires_at' => $quote?->expires_at->toIso8601String()];
     }
 
     /**
