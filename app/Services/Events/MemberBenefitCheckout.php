@@ -30,6 +30,9 @@ final class MemberBenefitCheckout
             if (EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->where('is_extra_capture', true)->where('state', '!=', 'refunded')->exists()) {
                 $this->refuse('An additional captured payment needs refund or reconciliation. Do not pay again.');
             }
+            if ($registration->offline_payment_status !== null && $registration->offline_payment_status !== EventRegistration::OFFLINE_STATUS_REJECTED) {
+                $this->refuse('Your offline payment proof needs organiser review before another payment method can be used.');
+            }
             $old = EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
             $existing = EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->whereNotIn('state', ['failed', 'refunded'])->first();
             if ($existing !== null) {

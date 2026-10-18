@@ -319,7 +319,7 @@ final class PublicEventController extends Controller
         // own registration through to payment and its ticket without being
         // asked to prove an address it has not yet been mailed at.
         app(PlatformAttendeeWorkspaceAuthorizer::class)
-            ->rememberRegistered(request()->session(), $registration->id);
+            ->rememberRegistered(request()->session(), $registration->id, $registration->member_benefit_required ? $registration->memberBenefitRecipientToken() : null);
 
         if ($promoCodeModel) {
             app(\App\Services\Events\PromoCodeService::class)->recordRedemption($promoCodeModel);
@@ -386,46 +386,57 @@ final class PublicEventController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
-        $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
+        return $registrationModel->getConnection()->transaction(function () use ($registrationModel, $tenant): RedirectResponse {
+            $registrationModel = EventRegistration::query()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($registrationModel->id);
+            $registrationModel->event()->lockForUpdate()->firstOrFail();
+            abort_if($registrationModel->member_benefit_required && ! hash_equals($registrationModel->memberBenefitRecipientToken(), (string) request()->query('recipient')), 403);
+            $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
 
-        // Following this link opens the ticket it belongs to, and nothing else.
-        // It is tempting to treat it as proof of the address -- it was signed
-        // and mailed there -- but it stays valid for seven days and a link can
-        // be forwarded, archived or read over a shoulder, where a typed code
-        // cannot. Platform proof would turn any of those into a tour of every
-        // event this person has ever attended, across every organiser. A grant
-        // scoped to this one registration spares them a second challenge to see
-        // their own ticket without spending their whole history on it.
-        $authorizer->grantCheckoutAccess(
-            request()->session(),
-            $registrationModel->id,
-            PlatformAttendeeVerification::VERIFIED_HOURS * 60,
-        );
+            // Following this link opens the ticket it belongs to, and nothing else.
+            // It is tempting to treat it as proof of the address -- it was signed
+            // and mailed there -- but it stays valid for seven days and a link can
+            // be forwarded, archived or read over a shoulder, where a typed code
+            // cannot. Platform proof would turn any of those into a tour of every
+            // event this person has ever attended, across every organiser. A grant
+            // scoped to this one registration spares them a second challenge to see
+            // their own ticket without spending their whole history on it.
+            $authorizer->grantCheckoutAccess(
+                request()->session(),
+                $registrationModel->id,
+                PlatformAttendeeVerification::VERIFIED_HOURS * 60,
+            );
 
-        $workspace = $authorizer->workspaceUrl($registrationModel);
+            $workspace = $authorizer->workspaceUrl($registrationModel);
 
-        // Clicking twice -- a mail client prefetching, a forwarded link -- must
-        // not issue a second ticket or send a second email.
-        if ($registrationModel->hasVerifiedEmail()) {
-            return redirect()->away($workspace);
-        }
+            // Clicking twice -- a mail client prefetching, a forwarded link -- must
+            // not issue a second ticket or send a second email.
+            if ($registrationModel->hasVerifiedEmail()) {
+                return redirect()->away($workspace);
+            }
 
-        $registrationModel->email_verified_at = now();
+            $registrationModel->email_verified_at = now();
+            if ($registrationModel->member_benefit_required && $registrationModel->ticket_code === null && $registrationModel->isConfirmed()
+                && (! app(\App\Services\Events\MemberBenefitLifecycle::class)->eligible($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->hasCapacity($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->priceMatches($registrationModel))) {
+                app(\App\Services\Events\MemberBenefitLifecycle::class)->hold($registrationModel, 'verified');
 
-        if ($registrationModel->isConfirmed() && ! $registrationModel->ticket_code) {
-            $registrationModel->issueTicket();
-        }
+                return redirect()->away($workspace)->with('error', 'Verify your active personal membership again before receiving this ticket.');
+            }
 
-        $registrationModel->save();
+            if ($registrationModel->isConfirmed() && ! $registrationModel->ticket_code) {
+                $registrationModel->issueTicket();
+            }
 
-        if ($registrationModel->isConfirmed()) {
-            app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
-            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-            Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
-        }
+            $registrationModel->save();
 
-        return redirect()->away($workspace)
-            ->with('success', 'Email confirmed. Your ticket is on its way.');
+            if ($registrationModel->isConfirmed()) {
+                app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
+                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+                Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
+            }
+
+            return redirect()->away($workspace)
+                ->with('success', 'Email confirmed. Your ticket is on its way.');
+        });
     }
 
     /**

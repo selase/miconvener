@@ -10,7 +10,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdateEventRegistrationRequest;
 use App\Mail\Events\EventRegistrationConfirmed;
 use App\Mail\Events\EventRegistrationOfflineRejected;
-use App\Mail\Events\EventRegistrationPaymentInvite;
 use App\Mail\Events\EventRegistrationRejected;
 use App\Mail\Events\EventRegistrationVerifyEmail;
 use App\Models\Event;
@@ -57,15 +56,21 @@ final class EventRegistrationController extends Controller
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
-        $registrationModel = $eventModel->registrations()->where('id', $registration)->firstOrFail();
 
-        if ($registrationModel->status !== EventRegistration::STATUS_PENDING_APPROVAL) {
-            return response()->json(['message' => 'This registration is not awaiting approval.'], 422);
-        }
+        return $eventModel->getConnection()->transaction(function () use ($eventModel, $registration): JsonResponse {
+            $registrationModel = $eventModel->registrations()->where('id', $registration)->lockForUpdate()->firstOrFail();
 
-        $this->confirmOrInviteToPay($registrationModel, 'approved');
+            Event::query()->whereKey($eventModel->id)->lockForUpdate()->firstOrFail();
+            app(\App\Services\Events\MemberBenefitLifecycle::class)->assertEligible($registrationModel);
 
-        return response()->json(['message' => 'Registration approved.']);
+            if ($registrationModel->status !== EventRegistration::STATUS_PENDING_APPROVAL) {
+                return response()->json(['message' => 'This registration is not awaiting approval.'], 422);
+            }
+
+            $this->confirmOrInviteToPay($registrationModel, 'approved');
+
+            return response()->json(['message' => 'Registration approved.']);
+        });
     }
 
     public function reject(Request $request, string $subdomain, string $event, string $registration): JsonResponse
@@ -114,6 +119,11 @@ final class EventRegistrationController extends Controller
                 return response()->json(['message' => 'A cancelled registration cannot be approved.'], 422);
             }
 
+            Event::query()->whereKey($eventModel->id)->lockForUpdate()->firstOrFail();
+            app(\App\Services\Events\MemberBenefitLifecycle::class)->assertEligible($registrationModel);
+
+            app(\App\Services\Events\MemberBenefitLifecycle::class)->assertOfflineAvailable($registrationModel);
+
             $effectiveAmount = $registrationModel->effectiveChargedAmount();
             if ($effectiveAmount <= 0) {
                 return response()->json(['message' => 'Free registrations do not require offline payment approval.'], 422);
@@ -129,6 +139,13 @@ final class EventRegistrationController extends Controller
 
             $fees = app(FeeCalculator::class)->for($eventModel, $effectiveAmount);
             $platformFee = $fees->platformFee;
+            if ($registrationModel->member_benefit_required) {
+                $lifecycle = app(\App\Services\Events\MemberBenefitLifecycle::class);
+                if (! $lifecycle->hasCapacity($registrationModel) || ! $lifecycle->priceMatches($registrationModel)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['membership' => 'The member price or available capacity changed. Review the recorded offline amount before approving; no extra payment has been taken.']);
+                }
+                $platformFee = app(\App\Services\Events\MemberBenefitQuotes::class)->pricing($registrationModel)['fees']['platform_fee'];
+            }
 
             $reference = $registrationModel->payment_reference ?: 'OFFLINE-'.$registrationModel->id;
 
@@ -286,6 +303,17 @@ final class EventRegistrationController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
+        $memberRegistration = $eventModel->registrations()->whereKey($registration)->firstOrFail();
+        if ($memberRegistration->member_benefit_required && ! $memberRegistration->isOfflinePayment()) {
+            $source = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('registration_id', $memberRegistration->id)
+                ->where('is_extra_capture', false)->whereIn('state', ['fulfilled', 'paid_review', 'refund_pending', 'refund_unknown', 'refunded'])->first();
+            if ($source !== null) {
+                $source = app(\App\Services\Events\MemberBenefitRefunds::class)->request($source);
+
+                return response()->json(['state' => $source->state, 'message' => 'The member ticket is cancelled and its original payment refund is awaiting provider confirmation.']);
+            }
+        }
+
         return DB::transaction(function () use ($tenant, $eventModel, $registration): JsonResponse {
             // Lock the row for the whole check-refund-write sequence so a
             // concurrent cancel request on the same registration (double
@@ -340,16 +368,30 @@ final class EventRegistrationController extends Controller
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        $registrationModel = $eventModel->registrations()->where('id', $registration)->firstOrFail();
+        return $eventModel->getConnection()->transaction(function () use ($request, $tenant, $eventModel, $registration): JsonResponse {
+            $registrationModel = $eventModel->registrations()->where('id', $registration)->lockForUpdate()->firstOrFail();
 
-        $previousEmail = $registrationModel->email;
-        $registrationModel->update($request->validated());
+            Event::query()->whereKey($eventModel->id)->lockForUpdate()->firstOrFail();
 
-        if ($registrationModel->email !== $previousEmail) {
-            $this->followTheAddress($tenant, $registrationModel);
-        }
+            $emailChanged = mb_strtolower(mb_trim($request->validated('email'))) !== mb_strtolower(mb_trim($registrationModel->email));
+            if ($registrationModel->member_benefit_required && $emailChanged) {
+                $hasPayment = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('registration_id', $registrationModel->id)->whereNotIn('state', ['failed', 'refunded'])->exists();
+                if ($registrationModel->ticket_code !== null || $hasPayment) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['email' => 'A member-benefit recipient cannot be replaced after ticket issuance or while payment is unresolved. Resolve the original ticket or payment first.']);
+                }
+                \App\Models\EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('registration_id', $registrationModel->id)->where('state', 'quoted')->update(['state' => 'invalidated']);
+                $registrationModel->fill(['member_benefit_access_version' => $registrationModel->member_benefit_access_version + 1, 'member_benefit_identity' => null, 'member_benefit_quote_id' => null, 'email_verified_at' => null]);
+            }
 
-        return response()->json(['message' => 'Registration updated.']);
+            $previousEmail = $registrationModel->email;
+            $registrationModel->update($request->validated());
+
+            if ($registrationModel->email !== $previousEmail) {
+                $this->followTheAddress($tenant, $registrationModel);
+            }
+
+            return response()->json(['message' => 'Registration updated.']);
+        });
     }
 
     /**
@@ -542,39 +584,12 @@ final class EventRegistrationController extends Controller
 
     private function confirmOrInviteToPay(EventRegistration $registration, string $reason): void
     {
-        if ($registration->amount === 0) {
-            $registration->update(['status' => EventRegistration::STATUS_CONFIRMED, 'waitlist_position' => null]);
-            // Added or approved by the organizer, who is vouching for the
-            // guest -- there is nothing for the guest to confirm.
-            $registration->email_verified_at ??= now();
-            $registration->issueTicket();
-            $registration->save();
-            app(EventRuleTriggerService::class)->registrationCompleted($registration);
-            Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
-
-            return;
-        }
-
-        $registration->update(['status' => EventRegistration::STATUS_PENDING_PAYMENT, 'waitlist_position' => null]);
-        Mail::to($registration->email)->queue(new EventRegistrationPaymentInvite($registration, $reason));
+        app(\App\Services\Events\MemberBenefitLifecycle::class)->release($registration, $reason);
     }
 
     private function promoteFromWaitlist(Event $event, ?string $ticketTypeId): void
     {
-        $waitlistQuery = fn () => $ticketTypeId
-            ? EventRegistration::where('ticket_type_id', $ticketTypeId)
-            : EventRegistration::where('event_id', $event->id)->whereNull('ticket_type_id');
-
-        $next = $waitlistQuery()->waitlisted()->orderBy('waitlist_position')->first();
-        if (! $next) {
-            return;
-        }
-
-        $promotedPosition = $next->waitlist_position;
-        $this->confirmOrInviteToPay($next, 'promoted');
-
-        // Close the gap so remaining waitlisted positions stay contiguous.
-        $waitlistQuery()->waitlisted()->where('waitlist_position', '>', $promotedPosition)->decrement('waitlist_position');
+        app(\App\Services\Events\MemberBenefitLifecycle::class)->promoteWaiting($event, $ticketTypeId);
     }
 
     private function findEvent(string $tenantId, string $eventId): Event

@@ -62,3 +62,18 @@ it('validates nullable and zero member prices on ticket types without bypassing 
     $tenant->features()->where('feature_key', 'community_event_benefits')->update(['enabled' => false]);
     $this->postJson($url, ['name' => 'Off', 'price' => 0, 'member_price' => 0])->assertUnprocessable();
 });
+
+it('rejects lowering a ticket standard price below a retained member price', function (): void {
+    [$tenant, , $event] = benefitSettingsManager();
+    $type = App\Models\EventTicketType::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'price' => 10000, 'member_price' => 5000]);
+    $this->putJson('http://'.eventSubdomainHost($tenant->slug).'/events/'.$event->id.'/ticket-types/'.$type->id, ['name' => $type->name, 'price' => 1000])->assertUnprocessable()->assertJsonValidationErrors('member_price');
+});
+
+it('keeps an event currency immutable after member-benefit registrations begin', function (): void {
+    [$tenant, , $event] = benefitSettingsManager();
+    App\Models\EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'member_benefit_required' => true]);
+    $this->putJson('http://'.eventSubdomainHost($tenant->slug).'/events/'.$event->id, [
+        'name' => $event->name, 'starts_at' => now()->addDay()->toIso8601String(), 'ends_at' => now()->addDays(2)->toIso8601String(),
+        'timezone' => 'Africa/Accra', 'location_type' => 'in_person', 'address' => 'Accra', 'ticket_price' => 0, 'currency' => 'USD', 'status' => 'draft',
+    ])->assertUnprocessable()->assertJsonValidationErrors('currency');
+});

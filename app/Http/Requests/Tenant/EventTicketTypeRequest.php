@@ -30,6 +30,20 @@ abstract class EventTicketTypeRequest extends FormRequest
         ];
     }
 
+    final public function after(): array
+    {
+        return [function (\Illuminate\Validation\Validator $validator): void {
+            if ($validator->errors()->isNotEmpty() || array_key_exists('member_price', $this->all())) {
+                return;
+            }
+            $tenant = app(TenantContext::class)->getTenant();
+            $type = EventTicketType::query()->where('tenant_id', $tenant?->id)->where('event_id', $this->route('event'))->find($this->route('ticketType'));
+            if ($type?->member_price !== null && $type->member_price > (int) $this->input('price')) {
+                $validator->errors()->add('member_price', 'Update or clear the member price before lowering the standard price below it.');
+            }
+        }];
+    }
+
     final public function messages(): array
     {
         return ['member_price.prohibited' => 'Member pricing is not enabled for this organisation.', 'member_price.integer' => 'Enter a whole number of minor currency units.', 'member_price.lte' => 'The member price cannot exceed the standard ticket price.', 'member_price.min' => 'The member price cannot be negative.'];

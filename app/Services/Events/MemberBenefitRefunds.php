@@ -23,6 +23,7 @@ final class MemberBenefitRefunds
         if (in_array($candidate->fresh()->state, ['refund_pending', 'refund_unknown', 'refunded'], true)) {
             return $candidate->fresh();
         }
+        $releasedTicket = ! $candidate->is_extra_capture && $candidate->registration->isConfirmed();
         $gateway = $this->gateways->forAttempt($candidate);
         [$attempt, $new] = $candidate->getConnection()->transaction(function () use ($candidate): array {
             $registration = EventRegistration::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->registration_id);
@@ -52,6 +53,10 @@ final class MemberBenefitRefunds
         } catch (Throwable) {
             EventMemberBenefitAttempt::withoutGlobalScopes()->whereKey($attempt->id)->where('refund_operation_key', $attempt->refund_operation_key)->where('state', 'refund_pending')
                 ->update(['state' => 'refund_unknown', 'review_reason' => 'refund_unknown']);
+        }
+
+        if ($releasedTicket) {
+            app(MemberBenefitLifecycle::class)->promoteWaiting($candidate->registration->event, $candidate->registration->ticket_type_id);
         }
 
         return $attempt->fresh();

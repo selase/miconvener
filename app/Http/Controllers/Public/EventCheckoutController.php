@@ -55,7 +55,7 @@ final class EventCheckoutController extends Controller
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
-            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
+            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id, PlatformAttendeeWorkspaceAuthorizer::DEFAULT_GRANT_TTL_MINUTES, $registrationModel->member_benefit_required ? $registrationModel->memberBenefitRecipientToken() : null);
         }
 
         if ($registrationModel->isConfirmed()) {
@@ -152,7 +152,7 @@ final class EventCheckoutController extends Controller
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
-            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
+            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id, PlatformAttendeeWorkspaceAuthorizer::DEFAULT_GRANT_TTL_MINUTES, $registrationModel->member_benefit_required ? $registrationModel->memberBenefitRecipientToken() : null);
         }
 
         if ($registrationModel->isConfirmed()) {
@@ -178,7 +178,7 @@ final class EventCheckoutController extends Controller
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
-            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
+            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id, PlatformAttendeeWorkspaceAuthorizer::DEFAULT_GRANT_TTL_MINUTES, $registrationModel->member_benefit_required ? $registrationModel->memberBenefitRecipientToken() : null);
         }
 
         if ($registrationModel->isConfirmed()) {
@@ -198,6 +198,18 @@ final class EventCheckoutController extends Controller
             $request->validated('provider'), (int) $request->validated('expected_amount'), $request->validated('currency'));
 
         return Inertia::location($url);
+    }
+
+    public function reverifyMemberRegistration(Request $request, string $subdomain, string $event, string $registration): \Illuminate\Http\JsonResponse
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        abort_unless($tenant !== null, 404);
+        $record = EventRegistration::query()->where('tenant_id', $tenant->id)->where('member_benefit_required', true)
+            ->whereHas('event', fn ($query) => $query->where('slug', $event))->findOrFail($registration);
+        abort_unless($this->canClaimWorkspace($record), 403);
+        $resolved = app(\App\Services\Events\MemberBenefitLifecycle::class)->reverify($record, $request->session());
+
+        return response()->json(['verified' => true, 'resolved' => $resolved, 'message' => $resolved ? 'Your ticket is ready.' : 'Your membership has been reverified. Any required organiser approval or payment review remains separate.']);
     }
 
     public function reassessMemberPayment(Request $request, string $subdomain, string $event, string $registration): \Illuminate\Http\JsonResponse
@@ -243,6 +255,65 @@ final class EventCheckoutController extends Controller
             abort(403, 'Unauthorized to submit payment proof for this registration.');
         }
 
+        if ($registrationModel->member_benefit_required) {
+            return $registrationModel->getConnection()->transaction(function () use ($request, $registrationModel, $tenant, $event): RedirectResponse {
+                $registrationModel = EventRegistration::query()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($registrationModel->id);
+                $registrationModel->event()->lockForUpdate()->firstOrFail();
+                abort_unless($this->canClaimWorkspace($registrationModel), 403);
+                app(\App\Services\Events\MemberBenefitLifecycle::class)->assertOfflineAvailable($registrationModel);
+
+                return $this->storeOfflineProof($request, $registrationModel, $tenant, $event);
+            });
+        }
+
+        return $this->storeOfflineProof($request, $registrationModel, $tenant, $event);
+    }
+
+    public function downloadProof(string $subdomain, string $event, string $registration): Response
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        if (! $tenant) {
+            abort(404);
+        }
+
+        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('id', $registration)
+            ->whereHas('event', fn ($query) => $query->where('slug', $event))
+            ->firstOrFail();
+
+        if (! $this->canClaimWorkspace($registrationModel)) {
+            abort(403, 'Unauthorized to view this payment proof.');
+        }
+
+        if (! $registrationModel->offline_payment_proof_path) {
+            abort(404, 'No payment proof uploaded.');
+        }
+
+        $expectedPrefix = "events/{$registrationModel->event_id}/proofs/";
+        if (! str_starts_with($registrationModel->offline_payment_proof_path, $expectedPrefix) || str_contains($registrationModel->offline_payment_proof_path, '..')) {
+            abort(403, 'Invalid proof storage path.');
+        }
+
+        $disk = Event::uploadDisk();
+        if (! Storage::disk($disk)->exists($registrationModel->offline_payment_proof_path)) {
+            abort(404, 'Proof file not found on storage.');
+        }
+
+        $mime = Storage::disk($disk)->mimeType($registrationModel->offline_payment_proof_path) ?: 'application/octet-stream';
+        $ext = pathinfo($registrationModel->offline_payment_proof_path, PATHINFO_EXTENSION);
+
+        return Storage::disk($disk)->response(
+            $registrationModel->offline_payment_proof_path,
+            "payment-proof-{$registrationModel->id}.{$ext}",
+            [
+                'Content-Type' => $mime,
+                'Cache-Control' => 'private, no-store',
+            ]
+        );
+    }
+
+    private function storeOfflineProof(Request $request, EventRegistration $registrationModel, Tenant $tenant, string $event): RedirectResponse
+    {
         $eventModel = $registrationModel->event;
         if (! $eventModel || $eventModel->slug !== $event || ! $eventModel->allowsOfflinePayments()) {
             abort(403, 'Offline payments are not enabled for this event.');
@@ -299,49 +370,6 @@ final class EventCheckoutController extends Controller
         }
 
         return redirect()->back()->with('success', 'Your proof of payment has been submitted. The organizer will review your payment and email your confirmed ticket.');
-    }
-
-    public function downloadProof(string $subdomain, string $event, string $registration): Response
-    {
-        $tenant = app(TenantContext::class)->getTenant();
-        if (! $tenant) {
-            abort(404);
-        }
-
-        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
-            ->where('id', $registration)
-            ->whereHas('event', fn ($query) => $query->where('slug', $event))
-            ->firstOrFail();
-
-        if (! $this->canClaimWorkspace($registrationModel)) {
-            abort(403, 'Unauthorized to view this payment proof.');
-        }
-
-        if (! $registrationModel->offline_payment_proof_path) {
-            abort(404, 'No payment proof uploaded.');
-        }
-
-        $expectedPrefix = "events/{$registrationModel->event_id}/proofs/";
-        if (! str_starts_with($registrationModel->offline_payment_proof_path, $expectedPrefix) || str_contains($registrationModel->offline_payment_proof_path, '..')) {
-            abort(403, 'Invalid proof storage path.');
-        }
-
-        $disk = Event::uploadDisk();
-        if (! Storage::disk($disk)->exists($registrationModel->offline_payment_proof_path)) {
-            abort(404, 'Proof file not found on storage.');
-        }
-
-        $mime = Storage::disk($disk)->mimeType($registrationModel->offline_payment_proof_path) ?: 'application/octet-stream';
-        $ext = pathinfo($registrationModel->offline_payment_proof_path, PATHINFO_EXTENSION);
-
-        return Storage::disk($disk)->response(
-            $registrationModel->offline_payment_proof_path,
-            "payment-proof-{$registrationModel->id}.{$ext}",
-            [
-                'Content-Type' => $mime,
-                'Cache-Control' => 'private, no-store',
-            ]
-        );
     }
 
     /** @return array<string, mixed> */
@@ -456,7 +484,7 @@ final class EventCheckoutController extends Controller
             return true;
         }
 
-        if (request()->hasValidSignature()) {
+        if (request()->hasValidSignature() && (! $registration->member_benefit_required || hash_equals($registration->memberBenefitRecipientToken(), (string) request()->query('recipient')))) {
             return true;
         }
 

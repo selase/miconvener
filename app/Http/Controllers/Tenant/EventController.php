@@ -168,7 +168,7 @@ final class EventController extends Controller
         return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', 'Event created successfully.');
     }
 
-    public function update(Request $request, string $subdomain, string $event): RedirectResponse|JsonResponse
+    public function update(\App\Http\Requests\Tenant\UpdateEventCommercialTermsRequest $request, string $subdomain, string $event): RedirectResponse|JsonResponse
     {
         $this->authorize('update event');
         $tenant = $this->getTenant();

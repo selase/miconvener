@@ -81,11 +81,14 @@ return new class extends Migration
         });
         $schema->table('event_registrations', function (Blueprint $table): void {
             $table->boolean('member_benefit_required')->default(false);
+            $table->unsignedInteger('member_benefit_access_version')->default(1);
             $table->uuid('member_benefit_quote_id')->nullable();
             $table->jsonb('member_benefit_identity')->nullable();
             $table->foreign(['tenant_id', 'member_benefit_quote_id'])->references(['tenant_id', 'id'])->on('event_member_benefit_quotes')->restrictOnDelete();
         });
         $connection = $schema->getConnection();
+        $connection->statement('ALTER TABLE events ADD CONSTRAINT event_member_price_range CHECK (member_ticket_price IS NULL OR (member_ticket_price >= 0 AND member_ticket_price <= ticket_price))');
+        $connection->statement('ALTER TABLE event_ticket_types ADD CONSTRAINT ticket_member_price_range CHECK (member_price IS NULL OR (member_price >= 0 AND member_price <= price))');
         $connection->statement("CREATE UNIQUE INDEX benefit_one_unresolved_registration ON event_member_benefit_attempts (registration_id) WHERE state IN ('preparing', 'open', 'unknown')");
         $connection->statement("CREATE UNIQUE INDEX benefit_one_unresolved_quote ON event_member_benefit_attempts (quote_id) WHERE state IN ('preparing', 'open', 'unknown')");
         foreach (['event_member_benefit_quotes', 'event_member_benefit_attempts'] as $name) {
@@ -102,7 +105,7 @@ return new class extends Migration
         }
         $schema->table('event_registrations', function (Blueprint $table): void {
             $table->dropForeign(['tenant_id', 'member_benefit_quote_id']);
-            $table->dropColumn(['member_benefit_required', 'member_benefit_quote_id', 'member_benefit_identity']);
+            $table->dropColumn(['member_benefit_required', 'member_benefit_access_version', 'member_benefit_quote_id', 'member_benefit_identity']);
         });
         $schema->drop('event_member_benefit_attempts');
         $schema->drop('event_member_benefit_quotes');

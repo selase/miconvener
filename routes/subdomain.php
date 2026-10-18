@@ -566,6 +566,7 @@ Route::post('/e/{event}/member-benefits', [PublicEventController::class, 'member
 Route::post('/e/{event}/member-verify/email/send', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'send'])->name('public.events.member-verify.send');
 Route::post('/e/{event}/member-verify/email/confirm', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'confirm'])->name('public.events.member-verify.confirm');
 Route::post('/e/{event}/checkout/{registration}/member', [EventCheckoutController::class, 'startMemberPayment'])->middleware('throttle:public-registration')->name('public.events.member-checkout');
+Route::post('/e/{event}/checkout/{registration}/member-benefits/reverify', [EventCheckoutController::class, 'reverifyMemberRegistration'])->middleware('throttle:public-registration')->block()->name('public.events.member-benefits.reverify');
 Route::post('/e/{event}/checkout/{registration}/member-benefits/reassess', [EventCheckoutController::class, 'reassessMemberPayment'])->middleware('throttle:public-registration')->block()->name('public.events.member-benefits.reassess');
 Route::get('/e/{event}/checkout/{registration}/member-callback', [EventCheckoutController::class, 'memberCallback'])->name('public.events.member-callback');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');

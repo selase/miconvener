@@ -64,6 +64,9 @@ final class AttendeePortalController extends Controller
     {
         $tenant = $this->getTenant();
         $registrationModel = $this->findRegistration($tenant->id, $event, $registration);
+        if ($registrationModel->member_benefit_required) {
+            return response()->json(['message' => 'Member-benefit tickets are personal and cannot be transferred. Contact the organiser for help.'], 422);
+        }
 
         if ($registrationModel->status === EventRegistration::STATUS_CHECKED_IN) {
             return response()->json(['message' => 'This ticket has already been checked in and can no longer be transferred.'], 422);
@@ -113,6 +116,9 @@ final class AttendeePortalController extends Controller
     {
         $tenant = $this->getTenant();
         $registrationModel = $this->findRegistration($tenant->id, $event, $registration);
+        if ($registrationModel->member_benefit_required) {
+            return response()->json(['message' => 'Member-benefit tickets are personal and cannot be transferred. Contact the organiser for help.'], 422);
+        }
 
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:12'],

@@ -27,6 +27,8 @@ final class EventRegistration extends Model
     use HasUuids;
     use LogsActivity;
 
+    public const string STATUS_PENDING_MEMBER_VERIFICATION = 'pending_member_verification';
+
     public const string STATUS_PENDING_BENEFIT_REVIEW = 'pending_benefit_review';
 
     public const string STATUS_PENDING_PAYMENT = 'pending_payment';
@@ -61,9 +63,10 @@ final class EventRegistration extends Model
 
     protected $connection = 'landlord';
 
-    protected $attributes = ['member_benefit_required' => false];
+    protected $attributes = ['member_benefit_required' => false, 'member_benefit_access_version' => 1];
 
     protected $fillable = [
+        'member_benefit_access_version',
         'member_benefit_required',
         'member_benefit_quote_id',
         'member_benefit_identity',
@@ -108,6 +111,7 @@ final class EventRegistration extends Model
     ];
 
     protected $casts = [
+        'member_benefit_access_version' => 'integer',
         'member_benefit_required' => 'boolean',
         'member_benefit_identity' => 'array',
         'amount' => 'integer',
@@ -126,6 +130,7 @@ final class EventRegistration extends Model
     protected $hidden = [
         'qr_token',
         'member_benefit_identity',
+        'member_benefit_access_version',
         'member_benefit_quote_id',
     ];
 
@@ -151,6 +156,11 @@ final class EventRegistration extends Model
         $payload = $salt !== null ? "{$registrationId}:{$salt}" : $registrationId;
 
         return hash_hmac('sha256', $payload, (string) config('app.key'));
+    }
+
+    public function memberBenefitRecipientToken(): string
+    {
+        return hash_hmac('sha256', $this->id.'|'.mb_strtolower(mb_trim($this->email)).'|'.$this->member_benefit_access_version, (string) config('app.key'));
     }
 
     /**

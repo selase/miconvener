@@ -16,6 +16,8 @@ final class PlatformAttendeeWorkspaceAuthorizer
 
     public const int DEFAULT_GRANT_TTL_MINUTES = 30;
 
+    private const string RECIPIENTS_SESSION_KEY = 'member_ticket_recipients';
+
     public function __construct(
         private readonly PlatformAttendeeVerification $verification,
         private readonly TenantHostMatcher $hostMatcher,
@@ -24,17 +26,18 @@ final class PlatformAttendeeWorkspaceAuthorizer
     /**
      * Issue a short-lived checkout grant for a specific registration.
      */
-    public function grantCheckoutAccess(Session $session, string $registrationId, int $ttlMinutes = self::DEFAULT_GRANT_TTL_MINUTES): void
+    public function grantCheckoutAccess(Session $session, string $registrationId, int $ttlMinutes = self::DEFAULT_GRANT_TTL_MINUTES, ?string $recipientToken = null): void
     {
         $grants = $session->get(self::CHECKOUT_GRANTS_SESSION_KEY, []);
         $grants[$registrationId] = now()->addMinutes($ttlMinutes)->getTimestamp();
         $session->put(self::CHECKOUT_GRANTS_SESSION_KEY, $grants);
+        $this->rememberRecipient($session, $registrationId, $recipientToken);
     }
 
     /**
      * Check if the current session has an unexpired checkout grant for this registration.
      */
-    public function hasCheckoutGrant(Session $session, string $registrationId): bool
+    public function hasCheckoutGrant(Session $session, string $registrationId, ?EventRegistration $registration = null): bool
     {
         $grants = $session->get(self::CHECKOUT_GRANTS_SESSION_KEY, []);
 
@@ -49,7 +52,7 @@ final class PlatformAttendeeWorkspaceAuthorizer
             return false;
         }
 
-        return true;
+        return $this->recipientIsCurrent($session, $registrationId, $registration);
     }
 
     /**
@@ -57,11 +60,12 @@ final class PlatformAttendeeWorkspaceAuthorizer
      * just filled in the form keeps reaching their own ticket without proving
      * an address they have not been asked for yet.
      */
-    public function rememberRegistered(Session $session, string $registrationId): void
+    public function rememberRegistered(Session $session, string $registrationId, ?string $recipientToken = null): void
     {
         $owned = $session->get(self::REGISTERED_SESSION_KEY, []);
         $owned[$registrationId] = now()->getTimestamp();
         $session->put(self::REGISTERED_SESSION_KEY, $owned);
+        $this->rememberRecipient($session, $registrationId, $recipientToken);
     }
 
     /**
@@ -69,7 +73,7 @@ final class PlatformAttendeeWorkspaceAuthorizer
      */
     public function registeredInThisSession(Session $session, string $registrationId): bool
     {
-        return array_key_exists($registrationId, $session->get(self::REGISTERED_SESSION_KEY, []));
+        return array_key_exists($registrationId, $session->get(self::REGISTERED_SESSION_KEY, [])) && $this->recipientIsCurrent($session, $registrationId);
     }
 
     /**
@@ -90,7 +94,7 @@ final class PlatformAttendeeWorkspaceAuthorizer
      */
     public function canAccess(Session $session, EventRegistration $registration): bool
     {
-        if ($this->hasCheckoutGrant($session, $registration->id)) {
+        if ($this->hasCheckoutGrant($session, $registration->id, $registration)) {
             return true;
         }
 
@@ -111,5 +115,39 @@ final class PlatformAttendeeWorkspaceAuthorizer
         $scheme = request()->getScheme();
 
         return "{$scheme}://{$baseDomain}/my/events/{$registration->id}";
+    }
+
+    private function rememberRecipient(Session $session, string $registrationId, ?string $recipientToken = null): void
+    {
+        if (! \Illuminate\Support\Str::isUuid($registrationId)) {
+            return;
+        }
+        if ($recipientToken !== null) {
+            $tokens = $session->get(self::RECIPIENTS_SESSION_KEY, []);
+            $tokens[$registrationId] = $recipientToken;
+            $session->put(self::RECIPIENTS_SESSION_KEY, $tokens);
+
+            return;
+        }
+        $registration = EventRegistration::withoutGlobalScopes()->find($registrationId);
+        if ($registration?->member_benefit_required) {
+            $tokens = $session->get(self::RECIPIENTS_SESSION_KEY, []);
+            $tokens[$registrationId] = $registration->memberBenefitRecipientToken();
+            $session->put(self::RECIPIENTS_SESSION_KEY, $tokens);
+        }
+    }
+
+    private function recipientIsCurrent(Session $session, string $registrationId, ?EventRegistration $registration = null): bool
+    {
+        if ($registration === null && ! \Illuminate\Support\Str::isUuid($registrationId)) {
+            return true;
+        }
+        $registration ??= EventRegistration::withoutGlobalScopes()->find($registrationId);
+        if (! $registration?->member_benefit_required) {
+            return true;
+        }
+        $token = $session->get(self::RECIPIENTS_SESSION_KEY, [])[$registrationId] ?? null;
+
+        return is_string($token) && hash_equals($registration->memberBenefitRecipientToken(), $token);
     }
 }
