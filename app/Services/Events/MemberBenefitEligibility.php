@@ -35,6 +35,20 @@ final class MemberBenefitEligibility
         return $this->resolveExisting($session, $event, $registrationEmail);
     }
 
+    /** Revalidate the personal entitlement after acquiring the member row lock. */
+    public function resolveLocked(Session $session, Event $event, string $registrationEmail, bool $existingPayment = false): ?Member
+    {
+        $candidate = $existingPayment ? $this->resolveExisting($session, $event, $registrationEmail) : $this->resolve($session, $event, $registrationEmail);
+        if ($candidate === null) {
+            return null;
+        }
+        $member = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $event->tenant_id)->lockForUpdate()->find($candidate->id);
+
+        return $member !== null && $member->status === MemberStatusEnum::Active
+            && $this->identity->normaliseEmail($member->email) === $this->identity->normaliseEmail($registrationEmail)
+            && $this->access->role($session, $member) === 'self' ? $member : null;
+    }
+
     /** Existing paid registrations retain self-service recovery after rollout is disabled. */
     public function resolveExisting(Session $session, Event $event, string $registrationEmail): ?Member
     {

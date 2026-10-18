@@ -122,6 +122,245 @@ final class PublicEventController extends Controller
     public function register(Request $request, string $subdomain, string $event): SymfonyResponse
     {
         $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        return $eventModel->getConnection()->transaction(function () use ($request, $subdomain, $event, $eventModel): SymfonyResponse {
+            Event::whereKey($eventModel->id)->lockForUpdate()->firstOrFail();
+
+            return $this->registerLocked($request, $subdomain, $event);
+        }, 3);
+    }
+
+    /**
+     * Confirms the address a free registration was made with, and only then
+     * issues the ticket. Reached from a signed link, so the URL cannot be forged
+     * and expires without anything needing to be stored or cleaned up.
+     */
+    public function verify(string $subdomain, string $event, string $registration): RedirectResponse
+    {
+        $tenant = $this->getTenant();
+
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('event_id', $eventModel->id)
+            ->where('id', $registration)
+            ->firstOrFail();
+
+        return $registrationModel->getConnection()->transaction(function () use ($registrationModel, $tenant): RedirectResponse {
+            $registrationModel = EventRegistration::query()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($registrationModel->id);
+            $registrationModel->event()->lockForUpdate()->firstOrFail();
+            abort_if($registrationModel->member_benefit_required && ! hash_equals($registrationModel->memberBenefitRecipientToken(), (string) request()->query('recipient')), 403);
+            $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
+
+            // Following this link opens the ticket it belongs to, and nothing else.
+            // It is tempting to treat it as proof of the address -- it was signed
+            // and mailed there -- but it stays valid for seven days and a link can
+            // be forwarded, archived or read over a shoulder, where a typed code
+            // cannot. Platform proof would turn any of those into a tour of every
+            // event this person has ever attended, across every organiser. A grant
+            // scoped to this one registration spares them a second challenge to see
+            // their own ticket without spending their whole history on it.
+            $authorizer->grantCheckoutAccess(
+                request()->session(),
+                $registrationModel->id,
+                PlatformAttendeeVerification::VERIFIED_HOURS * 60,
+            );
+
+            $workspace = $authorizer->workspaceUrl($registrationModel);
+
+            // Clicking twice -- a mail client prefetching, a forwarded link -- must
+            // not issue a second ticket or send a second email.
+            if ($registrationModel->hasVerifiedEmail()) {
+                return redirect()->away($workspace);
+            }
+
+            $registrationModel->email_verified_at = now();
+            if ($registrationModel->member_benefit_required && $registrationModel->ticket_code === null && $registrationModel->isConfirmed()
+                && (! app(\App\Services\Events\MemberBenefitLifecycle::class)->eligible($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->hasCapacity($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->priceMatches($registrationModel))) {
+                app(\App\Services\Events\MemberBenefitLifecycle::class)->hold($registrationModel, 'verified');
+
+                return redirect()->away($workspace)->with('error', 'Verify your active personal membership again before receiving this ticket.');
+            }
+
+            if ($registrationModel->isConfirmed() && ! $registrationModel->ticket_code) {
+                $registrationModel->issueTicket();
+            }
+
+            $registrationModel->save();
+
+            if ($registrationModel->isConfirmed()) {
+                app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
+                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+                Mail::to($registrationModel->email)->queue((new EventRegistrationConfirmed($registrationModel))->afterCommit());
+            }
+
+            return redirect()->away($workspace)
+                ->with('success', 'Email confirmed. Your ticket is on its way.');
+        });
+    }
+
+    /**
+     * Every confirmation and ticket email ever sent links here, so the URL and
+     * route name never change. What it does changed: knowing a registration
+     * UUID is no longer a credential, so this hands the visitor to the one
+     * canonical workspace, which asks them to prove their address if the
+     * browser cannot already.
+     */
+    public function confirmation(string $subdomain, string $event, string $registration): RedirectResponse
+    {
+        $tenant = $this->getTenant();
+
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->firstOrFail();
+        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('event_id', $eventModel->id)
+            ->where('id', $registration)
+            ->firstOrFail();
+
+        return redirect()->away(
+            app(PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($registrationModel)
+        );
+    }
+
+    /**
+     * Static preview of the attendee-facing "my ticket" portal — not wired
+     * to a real registration yet, just a design preview for the host.
+     */
+    public function attendeePortalPreview(string $subdomain, string $event): Response
+    {
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->firstOrFail();
+
+        return Inertia::render('Public/Events/AttendeePortalPreview', [
+            'event' => ['name' => $eventModel->name],
+        ]);
+    }
+
+    /**
+     * Static preview of the speaker-facing confirmation/materials portal —
+     * not wired to a real speaker yet, just a design preview for the host.
+     */
+    public function speakerPortalPreview(string $subdomain, string $event): Response
+    {
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->firstOrFail();
+
+        return Inertia::render('Public/Events/SpeakerPortalPreview', [
+            'event' => ['name' => $eventModel->name],
+        ]);
+    }
+
+    public function memberBenefits(\App\Http\Requests\Public\EventMemberEligibilityRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $model = Event::query()->where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+        $service = app(\App\Services\Events\MemberBenefitEligibility::class);
+        $member = $service->resolve($request->session(), $model, $request->validated('email'));
+        $eligible = $member !== null;
+        $proof = $member !== null ? app(\App\Services\Events\MemberBenefitIdentity::class)->capture($request->session(), $member) : null;
+        $types = $model->ticketTypes()->active()->get(['id', 'member_price', 'access_code'])->filter(function ($type) use ($request): bool {
+            return ! $type->isInviteOnly() || ($type->id === $request->validated('ticket_type_id')
+                && hash_equals(mb_strtoupper($type->access_code), mb_strtoupper(mb_trim((string) $request->validated('access_code')))));
+        });
+
+        return response()->json(['enabled' => $service->enabled($tenant), 'members_only' => $model->members_only, 'eligible' => $eligible,
+            'verified_until' => $proof !== null ? \Carbon\CarbonImmutable::createFromTimestampUTC((int) $proof['expires_at'])->toIso8601String() : null,
+            'member_ticket_price' => $eligible ? $model->member_ticket_price : null,
+            'ticket_prices' => $eligible ? $types->map(fn ($type): array => ['id' => $type->id, 'member_price' => $type->member_price])->values()->all() : []])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function validatePromo(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        $validated = $request->validate([
+            'code' => ['required', 'string'],
+            'ticket_type_id' => ['nullable', 'string'],
+            'email' => ['nullable', 'email'],
+            'amount' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $ticketType = ! empty($validated['ticket_type_id'])
+            ? $eventModel->ticketTypes()->where('id', $validated['ticket_type_id'])->first()
+            : null;
+
+        $member = app(\App\Services\Events\MemberBenefitEligibility::class)->resolve($request->session(), $eventModel, (string) ($validated['email'] ?? ''));
+        $base = $member !== null ? ($ticketType !== null ? $ticketType->member_price : $eventModel->member_ticket_price) : null;
+        if ($base !== null || ($member !== null && $eventModel->members_only)) {
+            $answers = app(RegistrationPricingService::class)->validateAndCleanAnswers($eventModel, (array) $request->input('form_answers', []));
+            $amount = app(RegistrationPricingService::class)->calculatePrice($eventModel, $ticketType, $answers, $base)['amount'];
+        } else {
+            $amount = (int) ($validated['amount'] ?? ($ticketType ? $ticketType->price : $eventModel->ticket_price));
+        }
+
+        $result = app(\App\Services\Events\PromoCodeService::class)->validateCode(
+            $eventModel,
+            $validated['code'],
+            $ticketType,
+            (string) ($validated['email'] ?? ''),
+            $amount
+        );
+
+        if (! $result['valid']) {
+            return response()->json([
+                'valid' => false,
+                'message' => $result['error'],
+            ], 422);
+        }
+
+        $promo = $result['promo_code'];
+
+        return response()->json([
+            'valid' => true,
+            'code' => $promo->code,
+            'discount_type' => $promo->discount_type,
+            'discount_value' => $promo->discount_value,
+            'discount_amount' => $result['discount_amount'],
+            'final_amount' => $result['final_amount'],
+            'message' => $promo->discount_type === \App\Models\EventPromoCode::TYPE_COMPLIMENTARY
+                ? 'Complimentary pass applied!'
+                : 'Promo code applied successfully!',
+        ]);
+    }
+
+    public function unlockTicketTypes(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+
+        $validated = $request->validate(['access_code' => ['required', 'string']]);
+        $code = mb_strtoupper(mb_trim($validated['access_code']));
+
+        $unlocked = $eventModel->ticketTypes()->active()
+            ->whereNotNull('access_code')
+            ->whereRaw('UPPER(access_code) = ?', [$code])
+            ->get()
+            ->map(fn (EventTicketType $t): array => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'description' => $t->description,
+                'price' => $t->price,
+                'is_free' => $t->isFree(),
+                'is_sold_out' => $t->isSoldOut(),
+                'is_invite_only' => true,
+                'access_code' => $code,
+            ]);
+
+        if ($unlocked->isEmpty()) {
+            return response()->json(['message' => 'No ticket types match this access code.'], 404);
+        }
+
+        return response()->json([
+            'message' => 'Access code accepted.',
+            'ticket_types' => $unlocked,
+        ]);
+    }
+
+    private function registerLocked(Request $request, string $subdomain, string $event): SymfonyResponse
+    {
+        $tenant = $this->getTenant();
 
         $eventModel = Event::where('tenant_id', $tenant->id)
             ->where('slug', $event)
@@ -333,7 +572,7 @@ final class PublicEventController extends Controller
             // type any address and be handed a valid ticket at it. The ticket is
             // withheld until the address is confirmed. A paid registration needs
             // no such step -- the payment itself was made against this address.
-            Mail::to($registration->email)->queue(new EventRegistrationVerifyEmail($registration));
+            Mail::to($registration->email)->queue((new EventRegistrationVerifyEmail($registration))->afterCommit());
         } elseif ($status === EventRegistration::STATUS_WAITLISTED) {
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
             Mail::to($registration->email)->queue(new EventRegistrationWaitlisted($registration));
@@ -371,233 +610,6 @@ final class PublicEventController extends Controller
     }
 
     /**
-     * Confirms the address a free registration was made with, and only then
-     * issues the ticket. Reached from a signed link, so the URL cannot be forged
-     * and expires without anything needing to be stored or cleaned up.
-     */
-    public function verify(string $subdomain, string $event, string $registration): RedirectResponse
-    {
-        $tenant = $this->getTenant();
-
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
-
-        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
-            ->where('event_id', $eventModel->id)
-            ->where('id', $registration)
-            ->firstOrFail();
-
-        return $registrationModel->getConnection()->transaction(function () use ($registrationModel, $tenant): RedirectResponse {
-            $registrationModel = EventRegistration::query()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($registrationModel->id);
-            $registrationModel->event()->lockForUpdate()->firstOrFail();
-            abort_if($registrationModel->member_benefit_required && ! hash_equals($registrationModel->memberBenefitRecipientToken(), (string) request()->query('recipient')), 403);
-            $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
-
-            // Following this link opens the ticket it belongs to, and nothing else.
-            // It is tempting to treat it as proof of the address -- it was signed
-            // and mailed there -- but it stays valid for seven days and a link can
-            // be forwarded, archived or read over a shoulder, where a typed code
-            // cannot. Platform proof would turn any of those into a tour of every
-            // event this person has ever attended, across every organiser. A grant
-            // scoped to this one registration spares them a second challenge to see
-            // their own ticket without spending their whole history on it.
-            $authorizer->grantCheckoutAccess(
-                request()->session(),
-                $registrationModel->id,
-                PlatformAttendeeVerification::VERIFIED_HOURS * 60,
-            );
-
-            $workspace = $authorizer->workspaceUrl($registrationModel);
-
-            // Clicking twice -- a mail client prefetching, a forwarded link -- must
-            // not issue a second ticket or send a second email.
-            if ($registrationModel->hasVerifiedEmail()) {
-                return redirect()->away($workspace);
-            }
-
-            $registrationModel->email_verified_at = now();
-            if ($registrationModel->member_benefit_required && $registrationModel->ticket_code === null && $registrationModel->isConfirmed()
-                && (! app(\App\Services\Events\MemberBenefitLifecycle::class)->eligible($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->hasCapacity($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->priceMatches($registrationModel))) {
-                app(\App\Services\Events\MemberBenefitLifecycle::class)->hold($registrationModel, 'verified');
-
-                return redirect()->away($workspace)->with('error', 'Verify your active personal membership again before receiving this ticket.');
-            }
-
-            if ($registrationModel->isConfirmed() && ! $registrationModel->ticket_code) {
-                $registrationModel->issueTicket();
-            }
-
-            $registrationModel->save();
-
-            if ($registrationModel->isConfirmed()) {
-                app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
-                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-                Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
-            }
-
-            return redirect()->away($workspace)
-                ->with('success', 'Email confirmed. Your ticket is on its way.');
-        });
-    }
-
-    /**
-     * Every confirmation and ticket email ever sent links here, so the URL and
-     * route name never change. What it does changed: knowing a registration
-     * UUID is no longer a credential, so this hands the visitor to the one
-     * canonical workspace, which asks them to prove their address if the
-     * browser cannot already.
-     */
-    public function confirmation(string $subdomain, string $event, string $registration): RedirectResponse
-    {
-        $tenant = $this->getTenant();
-
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->firstOrFail();
-        $registrationModel = EventRegistration::where('tenant_id', $tenant->id)
-            ->where('event_id', $eventModel->id)
-            ->where('id', $registration)
-            ->firstOrFail();
-
-        return redirect()->away(
-            app(PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($registrationModel)
-        );
-    }
-
-    /**
-     * Static preview of the attendee-facing "my ticket" portal — not wired
-     * to a real registration yet, just a design preview for the host.
-     */
-    public function attendeePortalPreview(string $subdomain, string $event): Response
-    {
-        $tenant = $this->getTenant();
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->firstOrFail();
-
-        return Inertia::render('Public/Events/AttendeePortalPreview', [
-            'event' => ['name' => $eventModel->name],
-        ]);
-    }
-
-    /**
-     * Static preview of the speaker-facing confirmation/materials portal —
-     * not wired to a real speaker yet, just a design preview for the host.
-     */
-    public function speakerPortalPreview(string $subdomain, string $event): Response
-    {
-        $tenant = $this->getTenant();
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->firstOrFail();
-
-        return Inertia::render('Public/Events/SpeakerPortalPreview', [
-            'event' => ['name' => $eventModel->name],
-        ]);
-    }
-
-    public function memberBenefits(\App\Http\Requests\Public\EventMemberEligibilityRequest $request, string $subdomain, string $event): JsonResponse
-    {
-        $tenant = $this->getTenant();
-        $model = Event::query()->where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
-        $service = app(\App\Services\Events\MemberBenefitEligibility::class);
-        $member = $service->resolve($request->session(), $model, $request->validated('email'));
-        $eligible = $member !== null;
-        $proof = $member !== null ? app(\App\Services\Events\MemberBenefitIdentity::class)->capture($request->session(), $member) : null;
-        $types = $model->ticketTypes()->active()->get(['id', 'member_price', 'access_code'])->filter(function ($type) use ($request): bool {
-            return ! $type->isInviteOnly() || ($type->id === $request->validated('ticket_type_id')
-                && hash_equals(mb_strtoupper($type->access_code), mb_strtoupper(mb_trim((string) $request->validated('access_code')))));
-        });
-
-        return response()->json(['enabled' => $service->enabled($tenant), 'members_only' => $model->members_only, 'eligible' => $eligible,
-            'verified_until' => $proof !== null ? \Carbon\CarbonImmutable::createFromTimestampUTC((int) $proof['expires_at'])->toIso8601String() : null,
-            'member_ticket_price' => $eligible ? $model->member_ticket_price : null,
-            'ticket_prices' => $eligible ? $types->map(fn ($type): array => ['id' => $type->id, 'member_price' => $type->member_price])->values()->all() : []])
-            ->header('Cache-Control', 'private, no-store');
-    }
-
-    public function validatePromo(Request $request, string $subdomain, string $event): JsonResponse
-    {
-        $tenant = $this->getTenant();
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
-
-        $validated = $request->validate([
-            'code' => ['required', 'string'],
-            'ticket_type_id' => ['nullable', 'string'],
-            'email' => ['nullable', 'email'],
-            'amount' => ['nullable', 'integer', 'min:0'],
-        ]);
-
-        $ticketType = ! empty($validated['ticket_type_id'])
-            ? $eventModel->ticketTypes()->where('id', $validated['ticket_type_id'])->first()
-            : null;
-
-        $member = app(\App\Services\Events\MemberBenefitEligibility::class)->resolve($request->session(), $eventModel, (string) ($validated['email'] ?? ''));
-        $base = $member !== null ? ($ticketType !== null ? $ticketType->member_price : $eventModel->member_ticket_price) : null;
-        if ($base !== null || ($member !== null && $eventModel->members_only)) {
-            $answers = app(RegistrationPricingService::class)->validateAndCleanAnswers($eventModel, (array) $request->input('form_answers', []));
-            $amount = app(RegistrationPricingService::class)->calculatePrice($eventModel, $ticketType, $answers, $base)['amount'];
-        } else {
-            $amount = (int) ($validated['amount'] ?? ($ticketType ? $ticketType->price : $eventModel->ticket_price));
-        }
-
-        $result = app(\App\Services\Events\PromoCodeService::class)->validateCode(
-            $eventModel,
-            $validated['code'],
-            $ticketType,
-            (string) ($validated['email'] ?? ''),
-            $amount
-        );
-
-        if (! $result['valid']) {
-            return response()->json([
-                'valid' => false,
-                'message' => $result['error'],
-            ], 422);
-        }
-
-        $promo = $result['promo_code'];
-
-        return response()->json([
-            'valid' => true,
-            'code' => $promo->code,
-            'discount_type' => $promo->discount_type,
-            'discount_value' => $promo->discount_value,
-            'discount_amount' => $result['discount_amount'],
-            'final_amount' => $result['final_amount'],
-            'message' => $promo->discount_type === \App\Models\EventPromoCode::TYPE_COMPLIMENTARY
-                ? 'Complimentary pass applied!'
-                : 'Promo code applied successfully!',
-        ]);
-    }
-
-    public function unlockTicketTypes(Request $request, string $subdomain, string $event): JsonResponse
-    {
-        $tenant = $this->getTenant();
-        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
-
-        $validated = $request->validate(['access_code' => ['required', 'string']]);
-        $code = mb_strtoupper(mb_trim($validated['access_code']));
-
-        $unlocked = $eventModel->ticketTypes()->active()
-            ->whereNotNull('access_code')
-            ->whereRaw('UPPER(access_code) = ?', [$code])
-            ->get()
-            ->map(fn (EventTicketType $t): array => [
-                'id' => $t->id,
-                'name' => $t->name,
-                'description' => $t->description,
-                'price' => $t->price,
-                'is_free' => $t->isFree(),
-                'is_sold_out' => $t->isSoldOut(),
-                'is_invite_only' => true,
-                'access_code' => $code,
-            ]);
-
-        if ($unlocked->isEmpty()) {
-            return response()->json(['message' => 'No ticket types match this access code.'], 404);
-        }
-
-        return response()->json([
-            'message' => 'Access code accepted.',
-            'ticket_types' => $unlocked,
-        ]);
-    }
-
-    /**
      * Re-sends the status-appropriate registration email to an address that
      * already holds a live registration for this event. The link is delivered
      * to the inbox that owns it, never through the HTTP response, so merely
@@ -611,7 +623,7 @@ final class PublicEventController extends Controller
         // useless, so they get the verification link again.
         if ($registration->isConfirmed() && ! $registration->hasVerifiedEmail() && ! $registration->ticket_code) {
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-            Mail::to($registration->email)->queue(new EventRegistrationVerifyEmail($registration));
+            Mail::to($registration->email)->queue((new EventRegistrationVerifyEmail($registration))->afterCommit());
 
             return;
         }

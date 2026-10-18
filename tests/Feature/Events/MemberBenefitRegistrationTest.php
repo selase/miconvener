@@ -67,3 +67,17 @@ it('returns only private session eligibility and never membership records for a 
     expect($response->headers->get('Cache-Control'))->toContain('no-store');
     $response->assertJsonMissingPath('member')->assertJsonMissingPath('member_id')->assertJsonMissingPath('status');
 });
+
+it('review serializes ordinary registration creation with member inventory changes', function (): void {
+    [$tenant, $event] = Tests\Support\MemberBenefitScenario::make();
+    $event->update(['members_only' => false]);
+    $locks = [];
+    Illuminate\Support\Facades\DB::listen(function (Illuminate\Database\Events\QueryExecuted $query) use (&$locks): void {
+        if (preg_match('/from "events".*for update/i', $query->sql)) {
+            $locks[] = $query->sql;
+        }
+    });
+    $host = eventSubdomainHost($tenant->slug);
+    $this->withServerVariables(['HTTP_HOST' => $host])->post('http://'.$host.'/e/'.$event->slug.'/register', ['full_name' => 'Standard Guest', 'email' => 'standard-lock@example.test'])->assertRedirect();
+    expect($locks)->not->toBeEmpty();
+});

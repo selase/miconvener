@@ -164,6 +164,12 @@ final class EventRegistration extends Model
         return hash_hmac('sha256', $payload, (string) config('app.key'));
     }
 
+    /** @return HasMany<EventMemberBenefitQuote, $this> */
+    public function memberBenefitQuotes(): HasMany
+    {
+        return $this->hasMany(EventMemberBenefitQuote::class, 'registration_id');
+    }
+
     /** @return HasMany<EventMemberBenefitAttempt, $this> */
     public function memberBenefitAttempts(): HasMany
     {

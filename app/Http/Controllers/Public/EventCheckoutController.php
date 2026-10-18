@@ -53,6 +53,10 @@ final class EventCheckoutController extends Controller
             abort_unless($registrationModel->event->slug === $event && $this->canClaimWorkspace($registrationModel), 403);
         }
 
+        $ordinaryPaymentReview = ! $registrationModel->member_benefit_required && $registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW;
+        if ($ordinaryPaymentReview) {
+            abort_unless($this->canClaimWorkspace($registrationModel), 403);
+        }
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
@@ -69,7 +73,7 @@ final class EventCheckoutController extends Controller
 
         // With more than one way to pay, the attendee picks; with exactly one
         // online way and no offline option there is nothing to choose.
-        $offersChoice = $registrationModel->member_benefit_required || $eventModel->allowsOfflinePayments()
+        $offersChoice = $ordinaryPaymentReview || $registrationModel->member_benefit_required || $eventModel->allowsOfflinePayments()
             || $registrationModel->offline_payment_status !== null
             || ($paystackAvailable && $stripeAvailable);
 
@@ -119,6 +123,7 @@ final class EventCheckoutController extends Controller
                         'description' => $registrationModel->ticketType->description,
                     ] : null,
                 ],
+                'payment_review' => $ordinaryPaymentReview,
                 'member_benefit' => $registrationModel->member_benefit_required ? $this->memberContext($registrationModel) : null,
                 'paystack_available' => $paystackAvailable,
                 'stripe_available' => $stripeAvailable,
@@ -148,6 +153,9 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        if ($registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'Your recorded payment needs organiser review. Do not pay again.']);
+        }
         abort_if($registrationModel->member_benefit_required, 422, 'Review and accept the member checkout total before starting payment.');
 
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
@@ -174,6 +182,9 @@ final class EventCheckoutController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
+        if ($registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'Your recorded payment needs organiser review. Do not pay again.']);
+        }
         abort_if($registrationModel->member_benefit_required, 422, 'Review and accept the member checkout total before starting payment.');
 
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
@@ -201,14 +212,14 @@ final class EventCheckoutController extends Controller
         return Inertia::location($url);
     }
 
-    public function reverifyMemberRegistration(Request $request, string $subdomain, string $event, string $registration): \Illuminate\Http\JsonResponse
+    public function reverifyMemberRegistration(\App\Http\Requests\Public\ReverifyEventMemberBenefitsRequest $request, string $subdomain, string $event, string $registration): \Illuminate\Http\JsonResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
         abort_unless($tenant !== null, 404);
         $record = EventRegistration::query()->where('tenant_id', $tenant->id)->where('member_benefit_required', true)
             ->whereHas('event', fn ($query) => $query->where('slug', $event))->findOrFail($registration);
         abort_unless($this->canClaimWorkspace($record), 403);
-        $resolved = app(\App\Services\Events\MemberBenefitLifecycle::class)->reverify($record, $request->session());
+        $resolved = app(\App\Services\Events\MemberBenefitLifecycle::class)->reverify($record, $request->session(), $request->filled('expected_amount') ? $request->integer('expected_amount') : null, $request->filled('currency') ? $request->string('currency')->toString() : null);
 
         return response()->json(['verified' => true, 'resolved' => $resolved, 'message' => $resolved ? 'Your ticket is ready.' : 'Your membership has been reverified. Any required organiser approval or payment review remains separate.']);
     }
@@ -264,6 +275,9 @@ final class EventCheckoutController extends Controller
                 $registrationModel = EventRegistration::query()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($registrationModel->id);
                 $registrationModel->event()->lockForUpdate()->firstOrFail();
                 abort_unless($this->canClaimWorkspace($registrationModel), 403);
+                if ($registrationModel->status !== EventRegistration::STATUS_PENDING_PAYMENT) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'This registration must be approved or promoted before submitting offline payment proof.']);
+                }
                 app(\App\Services\Events\MemberBenefitLifecycle::class)->assertOfflineAvailable($registrationModel);
 
                 return $this->storeOfflineProof($request, $registrationModel, $tenant, $event);
@@ -318,6 +332,9 @@ final class EventCheckoutController extends Controller
 
     private function storeOfflineProof(Request $request, EventRegistration $registrationModel, Tenant $tenant, string $event): RedirectResponse
     {
+        if ($registrationModel->status === EventRegistration::STATUS_PENDING_BENEFIT_REVIEW) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['payment' => 'Your recorded payment needs organiser review. Do not pay again.']);
+        }
         $eventModel = $registrationModel->event;
         if (! $eventModel || $eventModel->slug !== $event || ! $eventModel->allowsOfflinePayments()) {
             abort(403, 'Offline payments are not enabled for this event.');
@@ -395,7 +412,8 @@ final class EventCheckoutController extends Controller
         }
 
         return ['extra_captures' => \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->where('is_extra_capture', true)->where('state', '!=', 'refunded')->count(), 'required' => true, 'quote_id' => $quote?->id, 'reference' => $attempt?->reference, 'provider' => $attempt?->provider, 'eligible' => $eligible, 'payment_state' => $attempt?->state, 'review_reason' => $attempt?->review_reason,
-            'current_total' => $quote?->expires_at->isFuture() ? $quote->charged_amount : ($pricing['fees']['charged_amount'] ?? $registration->effectiveChargedAmount()),
+            'current_amount' => $pricing['amount'] ?? $quote->amount ?? $registration->amount,
+            'current_total' => $pricing['fees']['charged_amount'] ?? $quote->charged_amount ?? $registration->effectiveChargedAmount(),
             'currency' => $registration->currency, 'expires_at' => $quote?->expires_at->toIso8601String()];
     }
 

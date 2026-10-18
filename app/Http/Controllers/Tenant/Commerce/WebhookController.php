@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant\Commerce;
 
 use App\Http\Controllers\Controller;
-use App\Mail\Events\EventRegistrationConfirmed;
 use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
@@ -13,7 +12,6 @@ use App\Models\TenantPaymentGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 final class WebhookController extends Controller
@@ -330,57 +328,7 @@ final class WebhookController extends Controller
             return;
         }
 
-        $eventModel = $registration->event;
-        /*
-         * $amount is what the gateway actually collected. When the organizer
-         * bears the commission that is exactly the ticket price, but when the
-         * attendee bears it the receipt is larger by the commission — so the
-         * ticket price comes from the registration rather than the receipt,
-         * and must not be overwritten with it.
-         */
-        $ticketAmount = $eventModel->effectiveFeeBearer() === \App\Services\Finance\PlatformFeeResolver::BEARER_ATTENDEE
-            ? (int) $registration->amount
-            : $amount;
-
-        $commissionAmount = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $ticketAmount)->platformFee;
-
-        // Payment stands in for email verification: the checkout link was sent
-        // to this address and the gateway receipts it there too.
-        $registration->email_verified_at ??= now();
-        $registration->issueTicket();
-        $registration->fill([
-            'status' => EventRegistration::STATUS_CONFIRMED,
-            'payment_reference' => $reference,
-            'amount' => $ticketAmount,
-            'charged_amount' => $amount,
-            'gateway_fee_amount' => $gatewayFeeAmount,
-            'currency' => $currency,
-        ]);
-        $registration->save();
-        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
-
-        // The organizer holds the money, so the books carry only the commission:
-        // what reached us with the payment, what was netted against credit we
-        // owed them, and any remainder they owe. Checkout recorded the first
-        // two in the metadata it sent to the gateway.
-        $settlement = self::commissionSettlement($tenant, $currency, $provider, $metadata, $commissionAmount, $splitReceived);
-
-        app(\App\Services\Finance\LedgerService::class)->recordOwnGatewayTicketSale(
-            $eventModel,
-            $registration,
-            $amount,
-            $commissionAmount,
-            $reference,
-            $gatewayFeeAmount,
-            $provider,
-            $settlement['received'],
-            $settlement['credit'],
-        );
-
-        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
-        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-
-        Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
+        app(\App\Services\Events\StandardEventPaymentConfirmer::class)->confirm($registration, $reference, $amount, $gatewayFeeAmount, $currency, $provider, false, $metadata, $splitReceived);
     }
 
     /**

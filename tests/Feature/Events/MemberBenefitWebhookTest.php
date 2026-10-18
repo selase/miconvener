@@ -139,3 +139,41 @@ it('retires a signed terminal Stripe session failure without initiating another 
     app(App\Services\Events\MemberBenefitNotifications::class)->stripe($tenant, $gateway, $session, null, true);
     expect($attempt->fresh()->state)->toBe('failed')->and($registration->fresh()->ticket_code)->toBeNull()->and($fake->requests)->toBeEmpty();
 });
+
+it('review serializes standard and member captures against the same final place and retains both payments', function (bool $memberFirst): void {
+    config(['services.settlement.paystack.secret_key' => 'sk_test_shared_inventory']);
+    [$tenant, $event, , $memberRegistration, , $attempt] = MemberBenefitScenario::make();
+    $event->update(['members_only' => false, 'capacity' => 1]);
+    $standard = App\Models\EventRegistration::factory()->pendingPayment()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'member_benefit_required' => false, 'amount' => 10000, 'charged_amount' => 10000, 'platform_fee_amount' => 200, 'currency' => 'GHS', 'ticket_code' => null, 'qr_token' => null]);
+    $eventLocks = [];
+    Illuminate\Support\Facades\DB::listen(function (Illuminate\Database\Events\QueryExecuted $query) use (&$eventLocks): void {
+        if (preg_match('/from "events".*for update/i', $query->sql)) {
+            $eventLocks[] = $query->sql;
+        }
+    });
+    $memberCapture = fn () => app(App\Services\Events\MemberBenefitPayments::class)->confirm($attempt, MemberBenefitScenario::payment($attempt));
+    $body = json_encode(['event' => 'charge.success', 'data' => ['id' => 900, 'reference' => 'standard_'.$standard->id, 'amount' => 10000, 'currency' => 'GHS', 'fees' => 200, 'metadata' => ['source' => config('services.paystack.metadata_source'), 'type' => 'event_ticket', 'tenant_id' => $tenant->id, 'event_registration_id' => $standard->id]]]);
+    $signature = hash_hmac('sha512', $body, 'sk_test_shared_inventory');
+    $standardCapture = fn () => $this->withServerVariables(['HTTP_HOST' => 'miconvener.test'])->call('POST', '/webhooks/settlement/paystack', [], [], [], ['HTTP_x-paystack-signature' => $signature, 'CONTENT_TYPE' => 'application/json'], $body)->assertSuccessful();
+    $memberFirst ? $memberCapture() : $standardCapture();
+    $memberFirst ? $standardCapture() : $memberCapture();
+    expect($event->registrations()->confirmed()->count())->toBe(1)->and(count($eventLocks))->toBeGreaterThanOrEqual(2)
+        ->and(EventLedgerEntry::query()->where('event_id', $event->id)->where('type', 'charge')->count())->toBe(2);
+    $held = $memberFirst ? $standard->fresh() : $memberRegistration->fresh();
+    expect($held->status)->toBe('pending_benefit_review')->and($held->ticket_code)->toBeNull()->and($held->payment_reference)->not->toBeNull();
+    expect(app(App\Services\Events\MemberBenefitBalance::class)->available($event))->toBe($memberFirst ? 4600 : 9500);
+    $standardCapture();
+    expect(EventLedgerEntry::query()->where('event_id', $event->id)->where('type', 'charge')->count())->toBe(2);
+    if ($memberFirst) {
+        Http::preventStrayRequests();
+        $host = eventSubdomainHost($tenant->slug);
+        $session = [App\Services\Events\PlatformAttendeeVerification::SESSION_KEY => ['email' => $standard->email, 'expires_at' => now()->addHour()->timestamp]];
+        $checkout = 'http://'.$host.'/e/'.$event->slug.'/checkout/'.$standard->id;
+        $this->withServerVariables(['HTTP_HOST' => $host])->withSession($session)->get($checkout)->assertSuccessful()->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->where('payment_review', true));
+        foreach (['paystack', 'stripe'] as $provider) {
+            $this->postJson($checkout.'/'.$provider)->assertUnprocessable()->assertJsonValidationErrors('payment');
+        }
+        Http::assertNothingSent();
+    }
+
+})->with([false, true]);

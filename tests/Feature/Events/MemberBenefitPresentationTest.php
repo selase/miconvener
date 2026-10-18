@@ -94,3 +94,14 @@ it('does not show a scannable member QR after a refund is requested', function (
     $this->withSession($session->all())->get('http://miconvener.test/my/events/'.$registration->id)->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page->where('registration.status', 'cancelled')->where('registration.qr_image', null)->has('registration.member_payment_review_url'));
 });
+
+it('review shows and accepts the fresh zero total after a failed previous attempt', function (): void {
+    [$tenant, $event, , $registration, , $attempt, $session] = MemberBenefitScenario::make();
+    $attempt->update(['state' => 'failed']);
+    $event->update(['member_ticket_price' => 0]);
+    $host = eventSubdomainHost($tenant->slug);
+    $url = 'http://'.$host.'/e/'.$event->slug.'/checkout/'.$registration->id;
+    $this->withServerVariables(['HTTP_HOST' => $host])->withSession($session->all())->get($url)->assertSuccessful()->assertInertia(fn (Assert $page) => $page->where('member_benefit.current_total', 0)->where('member_benefit.current_amount', 0));
+    $this->postJson($url.'/member-benefits/reverify', ['expected_amount' => 0, 'currency' => 'GHS'])->assertSuccessful()->assertJsonPath('resolved', true);
+    expect($registration->fresh()->status)->toBe('confirmed')->and($registration->fresh()->ticket_code)->not->toBeNull();
+});

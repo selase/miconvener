@@ -81,3 +81,24 @@ it('shows an issued-ticket receipt without another payment action', () => {
     expect(screen.queryByRole('button', { name: 'Pay with Paystack' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Payment confirmed' })).toBeTruthy();
 });
+
+it.each([0, 6000])('accepts a refreshed total of %s for free or offline completion', (amount) => {
+    const accept = vi.fn();
+    render(
+        <MemberBenefitPayment
+            benefit={{ ...benefit, current_total: amount }}
+            paystackAvailable
+            onAcceptPrice={accept}
+            onPay={vi.fn()}
+        />
+    );
+    const button = screen.getByRole('button', {
+        name: amount === 0 ? 'Complete free registration' : 'Use this total for offline payment',
+    });
+    expect(button.disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(button);
+    expect(accept).toHaveBeenCalledOnce();
+    if (amount === 0)
+        expect(screen.queryByRole('button', { name: 'Pay with Paystack' })).toBeNull();
+});

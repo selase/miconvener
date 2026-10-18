@@ -43,11 +43,10 @@ final class MemberBenefitQuotes
             if (! $registration->member_benefit_required || $registration->status !== EventRegistration::STATUS_PENDING_PAYMENT) {
                 $this->refuse('This registration is not ready for member payment.');
             }
-            $member = $this->eligibility->resolve($session, $registration->event, $registration->email);
+            $member = $this->eligibility->resolveLocked($session, $registration->event, $registration->email);
             if ($member === null) {
                 $this->refuse('Verify your active personal membership before continuing.');
             }
-            $member = Member::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->lockForUpdate()->findOrFail($member->id);
             $identity = $this->identity->capture($session, $member);
             $old = EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
             if ($old !== null && $old->state === 'quoted' && $old->expires_at->isFuture()) {

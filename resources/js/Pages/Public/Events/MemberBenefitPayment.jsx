@@ -7,6 +7,7 @@ export default function MemberBenefitPayment({
     stripeAvailable,
     busy = false,
     onPay,
+    onAcceptPrice,
     onVerify,
     onReassess,
     error,
@@ -53,6 +54,8 @@ export default function MemberBenefitPayment({
         quoteExpired ||
         ['paid_review', 'paid_extra', 'unknown', 'preparing'].includes(state) ||
         benefit.extra_captures > 0;
+    const canAcceptPrice =
+        !fulfilled && !refund && !held && benefit.eligible && Boolean(onAcceptPrice);
     const canPay = !fulfilled && !refund && !held && benefit.eligible && benefit.current_total > 0;
     return (
         <section
@@ -128,7 +131,7 @@ export default function MemberBenefitPayment({
                     accept the current total to start a new checkout.
                 </p>
             )}
-            {canPay && (
+            {(canPay || canAcceptPrice) && (
                 <div className="mt-4 space-y-4">
                     <label className="flex items-start gap-3 text-sm">
                         <input
@@ -141,7 +144,24 @@ export default function MemberBenefitPayment({
                         I accept the total of {total}.
                     </label>
                     <div className="flex flex-wrap gap-3">
-                        {paystackAvailable && (
+                        {canAcceptPrice && (
+                            <Button
+                                type="button"
+                                disabled={busy || localBusy || acceptedKey !== key}
+                                onClick={() => {
+                                    if (submitting.current) return;
+                                    submitting.current = true;
+                                    setLocalBusy(true);
+                                    onAcceptPrice();
+                                }}
+                            >
+                                {benefit.current_total === 0
+                                    ? 'Complete free registration'
+                                    : 'Use this total for offline payment'}
+                            </Button>
+                        )}
+
+                        {canPay && paystackAvailable && (
                             <Button
                                 type="button"
                                 disabled={busy || localBusy || acceptedKey !== key}
@@ -150,7 +170,7 @@ export default function MemberBenefitPayment({
                                 Pay with Paystack
                             </Button>
                         )}
-                        {stripeAvailable && (
+                        {canPay && stripeAvailable && (
                             <Button
                                 type="button"
                                 disabled={busy || localBusy || acceptedKey !== key}

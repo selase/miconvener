@@ -34,10 +34,10 @@ final class PayoutSender
     {
         $event = $payoutModel->event_id !== null ? \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $payoutModel->tenant_id)->find($payoutModel->event_id) : null;
         $balance = app(\App\Services\Events\MemberBenefitBalance::class);
-        if ($event !== null && $balance->applies($event)) {
+        if ($event !== null) {
             return $payoutModel->getConnection()->transaction(function () use ($payoutModel, $currency, $reservedReference, $event, $balance): array {
                 $locked = \App\Models\Event::withoutGlobalScopes()->whereKey($event->id)->lockForUpdate()->firstOrFail();
-                if ($currency !== $payoutModel->currency || $currency !== $locked->currency || $payoutModel->amount > $balance->available($locked, $payoutModel->id)) {
+                if ($balance->applies($locked) && ($currency !== $payoutModel->currency || $currency !== $locked->currency || $payoutModel->amount > $balance->available($locked, $payoutModel->id))) {
                     return ['message' => 'This payout exceeds the funds available after member-payment and refund holds.', 'http_status' => 422];
                 }
 

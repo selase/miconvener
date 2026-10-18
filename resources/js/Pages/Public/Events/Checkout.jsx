@@ -38,7 +38,10 @@ export default function Checkout({
     stripe_available,
     workspace_url,
     member_benefit = null,
+    payment_review = false,
 }) {
+    const shownAmount = member_benefit?.current_amount ?? registration.amount;
+    const shownTotal = member_benefit?.current_total ?? registration.charged_amount;
     const [memberError, setMemberError] = useState(null);
     const [reassessing, setReassessing] = useState(false);
     const memberForm = useForm({
@@ -46,6 +49,10 @@ export default function Checkout({
         expected_amount: 0,
         currency: registration.currency,
     });
+    const afterMemberChange = (result) => {
+        if (result?.resolved) window.location.assign(workspace_url);
+        else router.reload();
+    };
     const startMemberPayment = (provider) => {
         if (memberForm.processing) return;
         memberForm.transform(() => ({
@@ -73,7 +80,7 @@ export default function Checkout({
                 { method: 'POST' }
             );
             const json = await response.json();
-            if (response.ok) router.reload();
+            if (response.ok) afterMemberChange(json);
             else
                 setMemberError(
                     json.message ??
@@ -86,8 +93,41 @@ export default function Checkout({
             setReassessing(false);
         }
     };
+    const acceptCurrentPrice = async () => {
+        if (reassessing) return;
+        setReassessing(true);
+        setMemberError(null);
+        try {
+            const response = await csrfFetch(
+                route('public.events.member-benefits.reverify', {
+                    event: event.slug,
+                    registration: registration.id,
+                }),
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        expected_amount: member_benefit.current_total,
+                        currency: member_benefit.currency,
+                    }),
+                }
+            );
+            const json = await response.json();
+            if (!response.ok)
+                throw new Error(
+                    Object.values(json.errors ?? {}).flat()[0] ??
+                        'The total could not be accepted. Refresh and try again.'
+                );
+            afterMemberChange(json);
+        } catch (error) {
+            setMemberError(error.message || 'Could not reach the server. Try again.');
+        } finally {
+            setReassessing(false);
+        }
+    };
     const memberOfflineAllowed =
         member_benefit?.eligible &&
+        member_benefit.current_total > 0 &&
+        registration.charged_amount === member_benefit.current_total &&
         event.allow_offline_payments &&
         registration.status === 'pending_payment' &&
         [null, 'failed'].includes(member_benefit.payment_state) &&
@@ -201,6 +241,21 @@ export default function Checkout({
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                     {/* Main Checkout Interaction Column */}
                     <div className="lg:col-span-7 space-y-6">
+                        {payment_review && (
+                            <section
+                                className="border border-border bg-surface p-6 text-ink"
+                                aria-label="Payment review"
+                            >
+                                <h2 className="text-lg font-semibold">
+                                    Payment received · place under review
+                                </h2>
+                                <p className="mt-3 text-sm leading-6 text-ink-secondary">
+                                    Your payment is recorded, but a ticket could not be issued.
+                                    Contact the organiser to resolve your place or request a refund.
+                                    Do not pay again.
+                                </p>
+                            </section>
+                        )}
                         {member_benefit && (
                             <>
                                 {member_benefit.payment_state !== 'fulfilled' && (
@@ -211,7 +266,7 @@ export default function Checkout({
                                         recoverPayment={
                                             member_benefit.payment_state === 'paid_review'
                                         }
-                                        onRefreshed={() => router.reload()}
+                                        onRefreshed={afterMemberChange}
                                     />
                                 )}
                                 {!isPendingVerification && (
@@ -221,6 +276,13 @@ export default function Checkout({
                                         stripeAvailable={stripe_available}
                                         busy={memberForm.processing || reassessing}
                                         onPay={startMemberPayment}
+                                        onAcceptPrice={
+                                            registration.status === 'pending_payment' &&
+                                            (member_benefit.current_total === 0 ||
+                                                event.allow_offline_payments)
+                                                ? acceptCurrentPrice
+                                                : undefined
+                                        }
                                         onReassess={reassess}
                                         error={
                                             memberError ||
@@ -228,6 +290,14 @@ export default function Checkout({
                                         }
                                     />
                                 )}
+                                <a
+                                    href={workspace_url}
+                                    className="inline-block text-sm font-medium text-accent underline"
+                                >
+                                    {['confirmed', 'checked_in'].includes(registration.status)
+                                        ? 'View your ticket'
+                                        : 'Open ticket workspace'}
+                                </a>
                                 {memberOfflineAllowed && (
                                     <p className="text-sm leading-6 text-ink-secondary">
                                         Choose one payment route. If you start an online payment,
@@ -315,474 +385,501 @@ export default function Checkout({
                         )}
 
                         {/* If NOT pending verification, show the payment options */}
-                        {!isPendingVerification && (!member_benefit || memberOfflineAllowed) && (
-                            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-                                <h2 className="text-lg font-semibold text-ink">
-                                    Choose Payment Method
-                                </h2>
-                                <p className="mt-1 text-sm text-ink-muted">
-                                    Select how you would like to complete your registration payment.
-                                </p>
+                        {!payment_review &&
+                            !isPendingVerification &&
+                            (!member_benefit || memberOfflineAllowed) && (
+                                <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                                    <h2 className="text-lg font-semibold text-ink">
+                                        Choose Payment Method
+                                    </h2>
+                                    <p className="mt-1 text-sm text-ink-muted">
+                                        Select how you would like to complete your registration
+                                        payment.
+                                    </p>
 
-                                {/* Method Switcher Tabs */}
-                                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {paystack_available && !member_benefit && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedGateway('paystack')}
-                                            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
-                                                selectedGateway === 'paystack'
-                                                    ? 'border-accent bg-accent-soft/40 ring-1 ring-accent'
-                                                    : 'border-border bg-surface hover:bg-surface-hover'
-                                            }`}
-                                        >
-                                            <div className="rounded-md bg-accent-soft p-2 text-accent">
-                                                <CreditCard className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-ink flex items-center gap-1.5">
-                                                    Pay Online
-                                                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                                        Instant
-                                                    </span>
-                                                </div>
-                                                <p className="mt-1 text-xs text-ink-muted">
-                                                    Card, Mobile Money & Bank via Paystack
-                                                </p>
-                                            </div>
-                                        </button>
-                                    )}
-
-                                    {stripe_available && !member_benefit && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedGateway('stripe')}
-                                            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
-                                                selectedGateway === 'stripe'
-                                                    ? 'border-accent bg-accent-soft/40 ring-1 ring-accent'
-                                                    : 'border-border bg-surface hover:bg-surface-hover'
-                                            }`}
-                                        >
-                                            <div className="rounded-md bg-accent-soft p-2 text-accent">
-                                                <CreditCard className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-ink">
-                                                    Pay by Card
-                                                </div>
-                                                <p className="mt-1 text-xs text-ink-muted">
-                                                    International cards via Stripe
-                                                </p>
-                                            </div>
-                                        </button>
-                                    )}
-
-                                    {event.allow_offline_payments && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedGateway('offline')}
-                                            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
-                                                selectedGateway === 'offline'
-                                                    ? 'border-accent bg-accent-soft/40 ring-1 ring-accent'
-                                                    : 'border-border bg-surface hover:bg-surface-hover'
-                                            }`}
-                                        >
-                                            <div className="rounded-md bg-accent-soft p-2 text-accent">
-                                                <Building2 className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-ink flex items-center gap-1.5">
-                                                    Direct Transfer
-                                                    <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-                                                        Manual
-                                                    </span>
-                                                </div>
-                                                <p className="mt-1 text-xs text-ink-muted">
-                                                    Direct Bank / MoMo / Cash on site
-                                                </p>
-                                            </div>
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Gateway 1: Paystack Online Flow */}
-                                {selectedGateway === 'paystack' &&
-                                    paystack_available &&
-                                    !member_benefit && (
-                                        <div className="mt-6 rounded-lg border border-border bg-canvas/40 p-5">
-                                            <div className="flex items-center gap-2 text-sm font-medium text-ink">
-                                                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                                                Secure automated processing
-                                            </div>
-                                            <p className="mt-2 text-xs text-ink-muted leading-relaxed">
-                                                You will be redirected to the secure Paystack portal
-                                                to pay{' '}
-                                                {formatMoney(
-                                                    registration.charged_amount,
-                                                    registration.currency
-                                                )}{' '}
-                                                via Mastercard, Visa, or your preferred Mobile Money
-                                                provider (MTN, Telecel, AT). Once authorized, your
-                                                ticket code will activate instantly.
-                                            </p>
-                                            <div className="mt-5">
-                                                <Button
-                                                    variant="primary"
-                                                    onClick={handlePaystackCheckout}
-                                                    disabled={paystackProcessing}
-                                                    className="w-full justify-center py-2.5 text-sm"
-                                                >
-                                                    {paystackProcessing
-                                                        ? 'Redirecting to payment...'
-                                                        : `Pay ${formatMoney(registration.charged_amount, registration.currency)} Online`}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                {selectedGateway === 'stripe' &&
-                                    stripe_available &&
-                                    !member_benefit && (
-                                        <div className="mt-6 rounded-lg border border-border bg-canvas/40 p-5">
-                                            <div className="flex items-center gap-2 text-sm font-medium text-ink">
-                                                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                                                Secure card payment
-                                            </div>
-                                            <p className="mt-2 text-xs text-ink-muted leading-relaxed">
-                                                You will be redirected to Stripe to pay{' '}
-                                                {formatMoney(
-                                                    registration.charged_amount,
-                                                    registration.currency
-                                                )}{' '}
-                                                by card. Once the payment goes through, your ticket
-                                                code will activate.
-                                            </p>
-                                            <div className="mt-5">
-                                                <Button
-                                                    variant="primary"
-                                                    onClick={handleStripeCheckout}
-                                                    disabled={stripeProcessing}
-                                                    className="w-full justify-center py-2.5 text-sm"
-                                                >
-                                                    {stripeProcessing
-                                                        ? 'Redirecting to payment...'
-                                                        : `Pay ${formatMoney(registration.charged_amount, registration.currency)} by Card`}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                {/* Gateway 2: Direct Offline Payment Flow */}
-                                {selectedGateway === 'offline' && event.allow_offline_payments && (
-                                    <div className="mt-6 space-y-6">
-                                        {/* Sub-method radio toggles */}
-                                        <div className="flex flex-wrap gap-2">
-                                            {event.offline_payment_bank_name && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setOfflineMethod('offline_bank');
-                                                        setProofData(
-                                                            'payment_method',
-                                                            'offline_bank'
-                                                        );
-                                                    }}
-                                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                                                        offlineMethod === 'offline_bank'
-                                                            ? 'border-accent bg-accent text-accent-ink'
-                                                            : 'border-border bg-surface text-ink hover:bg-surface-hover'
-                                                    }`}
-                                                >
-                                                    <Building2 className="h-3.5 w-3.5" />
-                                                    Bank Transfer
-                                                </button>
-                                            )}
-
-                                            {event.offline_payment_momo_number && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setOfflineMethod('offline_momo');
-                                                        setProofData(
-                                                            'payment_method',
-                                                            'offline_momo'
-                                                        );
-                                                    }}
-                                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                                                        offlineMethod === 'offline_momo'
-                                                            ? 'border-accent bg-accent text-accent-ink'
-                                                            : 'border-border bg-surface text-ink hover:bg-surface-hover'
-                                                    }`}
-                                                >
-                                                    <Smartphone className="h-3.5 w-3.5" />
-                                                    Mobile Money
-                                                </button>
-                                            )}
-
+                                    {/* Method Switcher Tabs */}
+                                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {paystack_available && !member_benefit && (
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    setOfflineMethod('offline_cash');
-                                                    setProofData('payment_method', 'offline_cash');
-                                                }}
-                                                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                                                    offlineMethod === 'offline_cash'
-                                                        ? 'border-accent bg-accent text-accent-ink'
-                                                        : 'border-border bg-surface text-ink hover:bg-surface-hover'
+                                                onClick={() => setSelectedGateway('paystack')}
+                                                className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
+                                                    selectedGateway === 'paystack'
+                                                        ? 'border-accent bg-accent-soft/40 ring-1 ring-accent'
+                                                        : 'border-border bg-surface hover:bg-surface-hover'
                                                 }`}
                                             >
-                                                <Banknote className="h-3.5 w-3.5" />
-                                                Cash on Site / Other
+                                                <div className="rounded-md bg-accent-soft p-2 text-accent">
+                                                    <CreditCard className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-ink flex items-center gap-1.5">
+                                                        Pay Online
+                                                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                                            Instant
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs text-ink-muted">
+                                                        Card, Mobile Money & Bank via Paystack
+                                                    </p>
+                                                </div>
                                             </button>
-                                        </div>
+                                        )}
 
-                                        {/* Banking Details Box */}
-                                        {offlineMethod === 'offline_bank' &&
-                                            event.offline_payment_bank_name && (
-                                                <div className="rounded-lg border border-border bg-canvas/40 p-4 space-y-3">
-                                                    <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                                                        Organizer Bank Account
-                                                    </div>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                                                        <div>
-                                                            <span className="block text-xs text-ink-muted">
-                                                                Bank Name
-                                                            </span>
-                                                            <span className="font-medium text-ink">
-                                                                {event.offline_payment_bank_name}
-                                                            </span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="block text-xs text-ink-muted">
-                                                                Account Name
-                                                            </span>
-                                                            <span className="font-medium text-ink">
-                                                                {event.offline_payment_account_name ||
-                                                                    'N/A'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="sm:col-span-2 flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
-                                                            <div>
-                                                                <span className="block text-[11px] text-ink-muted">
-                                                                    Account Number / IBAN
-                                                                </span>
-                                                                <span className="font-mono font-semibold text-ink">
-                                                                    {
-                                                                        event.offline_payment_account_number
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    copyToClipboard(
-                                                                        event.offline_payment_account_number,
-                                                                        'bank'
-                                                                    )
-                                                                }
-                                                                className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-ink hover:bg-surface-hover"
-                                                            >
-                                                                {copiedField === 'bank' ? (
-                                                                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                                                                ) : (
-                                                                    <Copy className="h-3.5 w-3.5" />
-                                                                )}
-                                                                {copiedField === 'bank'
-                                                                    ? 'Copied'
-                                                                    : 'Copy'}
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                        {stripe_available && !member_benefit && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedGateway('stripe')}
+                                                className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
+                                                    selectedGateway === 'stripe'
+                                                        ? 'border-accent bg-accent-soft/40 ring-1 ring-accent'
+                                                        : 'border-border bg-surface hover:bg-surface-hover'
+                                                }`}
+                                            >
+                                                <div className="rounded-md bg-accent-soft p-2 text-accent">
+                                                    <CreditCard className="h-5 w-5" />
                                                 </div>
-                                            )}
-
-                                        {/* MoMo Details Box */}
-                                        {offlineMethod === 'offline_momo' &&
-                                            event.offline_payment_momo_number && (
-                                                <div className="rounded-lg border border-border bg-canvas/40 p-4 space-y-3">
-                                                    <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                                                        Organizer Mobile Money Line
+                                                <div>
+                                                    <div className="font-medium text-ink">
+                                                        Pay by Card
                                                     </div>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                                                        <div>
-                                                            <span className="block text-xs text-ink-muted">
-                                                                Network
-                                                            </span>
-                                                            <span className="font-medium text-ink">
-                                                                {event.offline_payment_momo_network ||
-                                                                    'MoMo / Telecel'}
-                                                            </span>
-                                                        </div>
-                                                        <div>
-                                                            <span className="block text-xs text-ink-muted">
-                                                                Recipient / Name
-                                                            </span>
-                                                            <span className="font-medium text-ink">
-                                                                {event.offline_payment_account_name ||
-                                                                    event.name}
-                                                            </span>
-                                                        </div>
-                                                        <div className="sm:col-span-2 flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
-                                                            <div>
-                                                                <span className="block text-[11px] text-ink-muted">
-                                                                    MoMo Number / Merchant ID
-                                                                </span>
-                                                                <span className="font-mono font-semibold text-ink">
-                                                                    {
-                                                                        event.offline_payment_momo_number
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    copyToClipboard(
-                                                                        event.offline_payment_momo_number,
-                                                                        'momo'
-                                                                    )
-                                                                }
-                                                                className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-ink hover:bg-surface-hover"
-                                                            >
-                                                                {copiedField === 'momo' ? (
-                                                                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                                                                ) : (
-                                                                    <Copy className="h-3.5 w-3.5" />
-                                                                )}
-                                                                {copiedField === 'momo'
-                                                                    ? 'Copied'
-                                                                    : 'Copy'}
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                                    <p className="mt-1 text-xs text-ink-muted">
+                                                        International cards via Stripe
+                                                    </p>
                                                 </div>
-                                            )}
+                                            </button>
+                                        )}
 
-                                        {/* Custom Instructions */}
-                                        {event.offline_payment_instructions && (
-                                            <div className="rounded-lg border border-border/80 bg-canvas/30 p-3.5 text-xs text-ink leading-relaxed">
-                                                <span className="font-semibold block mb-1">
-                                                    Instructions from Organizer:
-                                                </span>
-                                                <p className="whitespace-pre-line text-ink-muted">
-                                                    {event.offline_payment_instructions}
+                                        {event.allow_offline_payments && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedGateway('offline')}
+                                                className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-all ${
+                                                    selectedGateway === 'offline'
+                                                        ? 'border-accent bg-accent-soft/40 ring-1 ring-accent'
+                                                        : 'border-border bg-surface hover:bg-surface-hover'
+                                                }`}
+                                            >
+                                                <div className="rounded-md bg-accent-soft p-2 text-accent">
+                                                    <Building2 className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-ink flex items-center gap-1.5">
+                                                        Direct Transfer
+                                                        <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                                                            Manual
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs text-ink-muted">
+                                                        Direct Bank / MoMo / Cash on site
+                                                    </p>
+                                                </div>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Gateway 1: Paystack Online Flow */}
+                                    {selectedGateway === 'paystack' &&
+                                        paystack_available &&
+                                        !member_benefit && (
+                                            <div className="mt-6 rounded-lg border border-border bg-canvas/40 p-5">
+                                                <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                                                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                                    Secure automated processing
+                                                </div>
+                                                <p className="mt-2 text-xs text-ink-muted leading-relaxed">
+                                                    You will be redirected to the secure Paystack
+                                                    portal to pay{' '}
+                                                    {formatMoney(
+                                                        registration.charged_amount,
+                                                        registration.currency
+                                                    )}{' '}
+                                                    via Mastercard, Visa, or your preferred Mobile
+                                                    Money provider (MTN, Telecel, AT). Once
+                                                    authorized, your ticket code will activate
+                                                    instantly.
                                                 </p>
+                                                <div className="mt-5">
+                                                    <Button
+                                                        variant="primary"
+                                                        onClick={handlePaystackCheckout}
+                                                        disabled={paystackProcessing}
+                                                        className="w-full justify-center py-2.5 text-sm"
+                                                    >
+                                                        {paystackProcessing
+                                                            ? 'Redirecting to payment...'
+                                                            : `Pay ${formatMoney(registration.charged_amount, registration.currency)} Online`}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
 
-                                        {/* Proof Upload Form */}
-                                        <form
-                                            onSubmit={handleProofSubmit}
-                                            className="space-y-4 pt-2"
-                                        >
-                                            <div>
-                                                <label className="block text-xs font-medium text-ink mb-1.5">
-                                                    Upload Payment Slip / Screenshot / Receipt{' '}
-                                                    <span className="text-rose-500">*</span>
-                                                </label>
-                                                <div className="mt-1 flex justify-center rounded-lg border border-dashed border-border px-6 pt-5 pb-6 hover:border-border-strong transition-colors bg-canvas/20">
-                                                    <div className="space-y-2 text-center">
-                                                        <UploadCloud className="mx-auto h-8 w-8 text-ink-muted" />
-                                                        <div className="flex text-xs text-ink-muted">
-                                                            <label
-                                                                htmlFor="proof-upload"
-                                                                className="relative cursor-pointer rounded font-medium text-accent hover:underline focus-within:outline-none"
-                                                            >
-                                                                <span>Click to select file</span>
-                                                                <input
-                                                                    id="proof-upload"
-                                                                    name="proof_file"
-                                                                    type="file"
-                                                                    accept="image/png,image/jpeg,image/webp,application/pdf"
-                                                                    onChange={handleFileChange}
-                                                                    className="sr-only"
-                                                                />
-                                                            </label>
-                                                            <p className="pl-1">or drag and drop</p>
-                                                        </div>
-                                                        <p className="text-[11px] text-ink-muted">
-                                                            PNG, JPG, WebP, or PDF up to 10MB
-                                                        </p>
-                                                        {proofData.proof_file && (
-                                                            <div className="mt-2 inline-flex items-center gap-1.5 rounded bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent">
-                                                                <FileText className="h-3.5 w-3.5" />
-                                                                {proofData.proof_file.name} (
-                                                                {(
-                                                                    proofData.proof_file.size / 1024
-                                                                ).toFixed(0)}{' '}
-                                                                KB)
+                                    {selectedGateway === 'stripe' &&
+                                        stripe_available &&
+                                        !member_benefit && (
+                                            <div className="mt-6 rounded-lg border border-border bg-canvas/40 p-5">
+                                                <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                                                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                                    Secure card payment
+                                                </div>
+                                                <p className="mt-2 text-xs text-ink-muted leading-relaxed">
+                                                    You will be redirected to Stripe to pay{' '}
+                                                    {formatMoney(
+                                                        registration.charged_amount,
+                                                        registration.currency
+                                                    )}{' '}
+                                                    by card. Once the payment goes through, your
+                                                    ticket code will activate.
+                                                </p>
+                                                <div className="mt-5">
+                                                    <Button
+                                                        variant="primary"
+                                                        onClick={handleStripeCheckout}
+                                                        disabled={stripeProcessing}
+                                                        className="w-full justify-center py-2.5 text-sm"
+                                                    >
+                                                        {stripeProcessing
+                                                            ? 'Redirecting to payment...'
+                                                            : `Pay ${formatMoney(registration.charged_amount, registration.currency)} by Card`}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                    {/* Gateway 2: Direct Offline Payment Flow */}
+                                    {selectedGateway === 'offline' &&
+                                        event.allow_offline_payments && (
+                                            <div className="mt-6 space-y-6">
+                                                {/* Sub-method radio toggles */}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {event.offline_payment_bank_name && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setOfflineMethod('offline_bank');
+                                                                setProofData(
+                                                                    'payment_method',
+                                                                    'offline_bank'
+                                                                );
+                                                            }}
+                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                                                                offlineMethod === 'offline_bank'
+                                                                    ? 'border-accent bg-accent text-accent-ink'
+                                                                    : 'border-border bg-surface text-ink hover:bg-surface-hover'
+                                                            }`}
+                                                        >
+                                                            <Building2 className="h-3.5 w-3.5" />
+                                                            Bank Transfer
+                                                        </button>
+                                                    )}
+
+                                                    {event.offline_payment_momo_number && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setOfflineMethod('offline_momo');
+                                                                setProofData(
+                                                                    'payment_method',
+                                                                    'offline_momo'
+                                                                );
+                                                            }}
+                                                            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                                                                offlineMethod === 'offline_momo'
+                                                                    ? 'border-accent bg-accent text-accent-ink'
+                                                                    : 'border-border bg-surface text-ink hover:bg-surface-hover'
+                                                            }`}
+                                                        >
+                                                            <Smartphone className="h-3.5 w-3.5" />
+                                                            Mobile Money
+                                                        </button>
+                                                    )}
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setOfflineMethod('offline_cash');
+                                                            setProofData(
+                                                                'payment_method',
+                                                                'offline_cash'
+                                                            );
+                                                        }}
+                                                        className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                                                            offlineMethod === 'offline_cash'
+                                                                ? 'border-accent bg-accent text-accent-ink'
+                                                                : 'border-border bg-surface text-ink hover:bg-surface-hover'
+                                                        }`}
+                                                    >
+                                                        <Banknote className="h-3.5 w-3.5" />
+                                                        Cash on Site / Other
+                                                    </button>
+                                                </div>
+
+                                                {/* Banking Details Box */}
+                                                {offlineMethod === 'offline_bank' &&
+                                                    event.offline_payment_bank_name && (
+                                                        <div className="rounded-lg border border-border bg-canvas/40 p-4 space-y-3">
+                                                            <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                                                                Organizer Bank Account
                                                             </div>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                                                <div>
+                                                                    <span className="block text-xs text-ink-muted">
+                                                                        Bank Name
+                                                                    </span>
+                                                                    <span className="font-medium text-ink">
+                                                                        {
+                                                                            event.offline_payment_bank_name
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="block text-xs text-ink-muted">
+                                                                        Account Name
+                                                                    </span>
+                                                                    <span className="font-medium text-ink">
+                                                                        {event.offline_payment_account_name ||
+                                                                            'N/A'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="sm:col-span-2 flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
+                                                                    <div>
+                                                                        <span className="block text-[11px] text-ink-muted">
+                                                                            Account Number / IBAN
+                                                                        </span>
+                                                                        <span className="font-mono font-semibold text-ink">
+                                                                            {
+                                                                                event.offline_payment_account_number
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            copyToClipboard(
+                                                                                event.offline_payment_account_number,
+                                                                                'bank'
+                                                                            )
+                                                                        }
+                                                                        className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-ink hover:bg-surface-hover"
+                                                                    >
+                                                                        {copiedField === 'bank' ? (
+                                                                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                                                        ) : (
+                                                                            <Copy className="h-3.5 w-3.5" />
+                                                                        )}
+                                                                        {copiedField === 'bank'
+                                                                            ? 'Copied'
+                                                                            : 'Copy'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                {/* MoMo Details Box */}
+                                                {offlineMethod === 'offline_momo' &&
+                                                    event.offline_payment_momo_number && (
+                                                        <div className="rounded-lg border border-border bg-canvas/40 p-4 space-y-3">
+                                                            <div className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                                                                Organizer Mobile Money Line
+                                                            </div>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                                                <div>
+                                                                    <span className="block text-xs text-ink-muted">
+                                                                        Network
+                                                                    </span>
+                                                                    <span className="font-medium text-ink">
+                                                                        {event.offline_payment_momo_network ||
+                                                                            'MoMo / Telecel'}
+                                                                    </span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="block text-xs text-ink-muted">
+                                                                        Recipient / Name
+                                                                    </span>
+                                                                    <span className="font-medium text-ink">
+                                                                        {event.offline_payment_account_name ||
+                                                                            event.name}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="sm:col-span-2 flex items-center justify-between rounded-md border border-border bg-surface p-2.5">
+                                                                    <div>
+                                                                        <span className="block text-[11px] text-ink-muted">
+                                                                            MoMo Number / Merchant
+                                                                            ID
+                                                                        </span>
+                                                                        <span className="font-mono font-semibold text-ink">
+                                                                            {
+                                                                                event.offline_payment_momo_number
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            copyToClipboard(
+                                                                                event.offline_payment_momo_number,
+                                                                                'momo'
+                                                                            )
+                                                                        }
+                                                                        className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-ink hover:bg-surface-hover"
+                                                                    >
+                                                                        {copiedField === 'momo' ? (
+                                                                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                                                        ) : (
+                                                                            <Copy className="h-3.5 w-3.5" />
+                                                                        )}
+                                                                        {copiedField === 'momo'
+                                                                            ? 'Copied'
+                                                                            : 'Copy'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                {/* Custom Instructions */}
+                                                {event.offline_payment_instructions && (
+                                                    <div className="rounded-lg border border-border/80 bg-canvas/30 p-3.5 text-xs text-ink leading-relaxed">
+                                                        <span className="font-semibold block mb-1">
+                                                            Instructions from Organizer:
+                                                        </span>
+                                                        <p className="whitespace-pre-line text-ink-muted">
+                                                            {event.offline_payment_instructions}
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Proof Upload Form */}
+                                                <form
+                                                    onSubmit={handleProofSubmit}
+                                                    className="space-y-4 pt-2"
+                                                >
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-ink mb-1.5">
+                                                            Upload Payment Slip / Screenshot /
+                                                            Receipt{' '}
+                                                            <span className="text-rose-500">*</span>
+                                                        </label>
+                                                        <div className="mt-1 flex justify-center rounded-lg border border-dashed border-border px-6 pt-5 pb-6 hover:border-border-strong transition-colors bg-canvas/20">
+                                                            <div className="space-y-2 text-center">
+                                                                <UploadCloud className="mx-auto h-8 w-8 text-ink-muted" />
+                                                                <div className="flex text-xs text-ink-muted">
+                                                                    <label
+                                                                        htmlFor="proof-upload"
+                                                                        className="relative cursor-pointer rounded font-medium text-accent hover:underline focus-within:outline-none"
+                                                                    >
+                                                                        <span>
+                                                                            Click to select file
+                                                                        </span>
+                                                                        <input
+                                                                            id="proof-upload"
+                                                                            name="proof_file"
+                                                                            type="file"
+                                                                            accept="image/png,image/jpeg,image/webp,application/pdf"
+                                                                            onChange={
+                                                                                handleFileChange
+                                                                            }
+                                                                            className="sr-only"
+                                                                        />
+                                                                    </label>
+                                                                    <p className="pl-1">
+                                                                        or drag and drop
+                                                                    </p>
+                                                                </div>
+                                                                <p className="text-[11px] text-ink-muted">
+                                                                    PNG, JPG, WebP, or PDF up to
+                                                                    10MB
+                                                                </p>
+                                                                {proofData.proof_file && (
+                                                                    <div className="mt-2 inline-flex items-center gap-1.5 rounded bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent">
+                                                                        <FileText className="h-3.5 w-3.5" />
+                                                                        {proofData.proof_file.name}{' '}
+                                                                        (
+                                                                        {(
+                                                                            proofData.proof_file
+                                                                                .size / 1024
+                                                                        ).toFixed(0)}{' '}
+                                                                        KB)
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {proofErrors.proof_file && (
+                                                            <p className="mt-1 text-xs text-rose-500">
+                                                                {proofErrors.proof_file}
+                                                            </p>
                                                         )}
                                                     </div>
-                                                </div>
-                                                {proofErrors.proof_file && (
-                                                    <p className="mt-1 text-xs text-rose-500">
-                                                        {proofErrors.proof_file}
-                                                    </p>
-                                                )}
-                                            </div>
 
-                                            <div>
-                                                <label className="block text-xs font-medium text-ink mb-1">
-                                                    Transaction ID / Bank Reference / Memo
-                                                    (Optional)
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={proofData.offline_payment_reference}
-                                                    onChange={(e) =>
-                                                        setProofData(
-                                                            'offline_payment_reference',
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    placeholder="e.g. 1029384756 or MoMo Transaction ID"
-                                                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
-                                                />
-                                                {proofErrors.offline_payment_reference && (
-                                                    <p className="mt-1 text-xs text-rose-500">
-                                                        {proofErrors.offline_payment_reference}
-                                                    </p>
-                                                )}
-                                            </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-ink mb-1">
+                                                            Transaction ID / Bank Reference / Memo
+                                                            (Optional)
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={
+                                                                proofData.offline_payment_reference
+                                                            }
+                                                            onChange={(e) =>
+                                                                setProofData(
+                                                                    'offline_payment_reference',
+                                                                    e.target.value
+                                                                )
+                                                            }
+                                                            placeholder="e.g. 1029384756 or MoMo Transaction ID"
+                                                            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+                                                        />
+                                                        {proofErrors.offline_payment_reference && (
+                                                            <p className="mt-1 text-xs text-rose-500">
+                                                                {
+                                                                    proofErrors.offline_payment_reference
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
 
-                                            <div>
-                                                <label className="block text-xs font-medium text-ink mb-1">
-                                                    Notes for Organizer (Optional)
-                                                </label>
-                                                <textarea
-                                                    rows={2}
-                                                    value={proofData.offline_payment_notes}
-                                                    onChange={(e) =>
-                                                        setProofData(
-                                                            'offline_payment_notes',
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    placeholder="Any additional details regarding your payment or institution name..."
-                                                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
-                                                />
-                                                {proofErrors.offline_payment_notes && (
-                                                    <p className="mt-1 text-xs text-rose-500">
-                                                        {proofErrors.offline_payment_notes}
-                                                    </p>
-                                                )}
-                                            </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-ink mb-1">
+                                                            Notes for Organizer (Optional)
+                                                        </label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={proofData.offline_payment_notes}
+                                                            onChange={(e) =>
+                                                                setProofData(
+                                                                    'offline_payment_notes',
+                                                                    e.target.value
+                                                                )
+                                                            }
+                                                            placeholder="Any additional details regarding your payment or institution name..."
+                                                            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+                                                        />
+                                                        {proofErrors.offline_payment_notes && (
+                                                            <p className="mt-1 text-xs text-rose-500">
+                                                                {proofErrors.offline_payment_notes}
+                                                            </p>
+                                                        )}
+                                                    </div>
 
-                                            <Button
-                                                variant="primary"
-                                                type="submit"
-                                                disabled={proofProcessing || !proofData.proof_file}
-                                                className="w-full justify-center py-2.5 text-sm"
-                                            >
-                                                {proofProcessing
-                                                    ? 'Uploading proof...'
-                                                    : 'Submit Payment Proof'}
-                                            </Button>
-                                        </form>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                                    <Button
+                                                        variant="primary"
+                                                        type="submit"
+                                                        disabled={
+                                                            proofProcessing || !proofData.proof_file
+                                                        }
+                                                        className="w-full justify-center py-2.5 text-sm"
+                                                    >
+                                                        {proofProcessing
+                                                            ? 'Uploading proof...'
+                                                            : 'Submit Payment Proof'}
+                                                    </Button>
+                                                </form>
+                                            </div>
+                                        )}
+                                </div>
+                            )}
                     </div>
 
                     {/* Order Summary & Registration Details Column */}
@@ -812,7 +909,7 @@ export default function Checkout({
                                         </div>
                                     </div>
                                     <div className="font-medium text-ink">
-                                        {formatMoney(registration.amount, registration.currency)}
+                                        {formatMoney(shownAmount, registration.currency)}
                                     </div>
                                 </div>
 
@@ -827,28 +924,26 @@ export default function Checkout({
                                 <div className="flex justify-between text-sm">
                                     <span className="text-ink-muted">Subtotal</span>
                                     <span className="text-ink font-medium">
-                                        {formatMoney(registration.amount, registration.currency)}
+                                        {formatMoney(shownAmount, registration.currency)}
                                     </span>
                                 </div>
                                 <div className="flex justify-between text-base font-semibold pt-2 border-t border-border/60">
                                     <span className="text-ink">
-                                        {member_benefit &&
-                                        [
-                                            'fulfilled',
-                                            'paid_review',
-                                            'paid_extra',
-                                            'refund_pending',
-                                            'refund_unknown',
-                                            'refunded',
-                                        ].includes(member_benefit.payment_state)
+                                        {payment_review ||
+                                        (member_benefit &&
+                                            [
+                                                'fulfilled',
+                                                'paid_review',
+                                                'paid_extra',
+                                                'refund_pending',
+                                                'refund_unknown',
+                                                'refunded',
+                                            ].includes(member_benefit.payment_state))
                                             ? 'Recorded payment'
                                             : 'Total Due'}
                                     </span>
                                     <span className="text-accent font-bold">
-                                        {formatMoney(
-                                            registration.charged_amount,
-                                            registration.currency
-                                        )}
+                                        {formatMoney(shownTotal, registration.currency)}
                                     </span>
                                 </div>
                             </div>

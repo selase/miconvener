@@ -103,7 +103,7 @@ export default function MemberBenefitVerification({
                     Object.values(json.errors ?? {}).flat()[0] ??
                     'Membership could not be reverified.'
             );
-            if (response.ok) callbacks.current.onRefreshed?.();
+            if (response.ok) callbacks.current.onRefreshed?.(json);
         } catch {
             setMessage('Could not reach the server. Please try again.');
         } finally {

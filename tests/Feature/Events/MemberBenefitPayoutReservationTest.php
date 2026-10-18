@@ -52,3 +52,17 @@ it('rechecks a scheduled payout after a refund hold before contacting the provid
     expect(app(App\Services\Finance\PayoutSender::class)->send($payout, 'GHS')['http_status'])->toBe(422)
         ->and($payout->fresh()->status)->toBe('scheduled');
 });
+
+it('review keeps a parked OTP transfer when a later refund hold consumes its balance', function (): void {
+    [$tenant, $event, , , , $attempt] = MemberBenefitScenario::make();
+    app(MemberBenefitPayments::class)->confirm($attempt, MemberBenefitScenario::payment($attempt));
+    $account = App\Models\TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id]);
+    $payout = EventPayout::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'payout_account_id' => $account->id, 'currency' => 'GHS', 'amount' => 1000, 'status' => 'awaiting_otp', 'provider_transfer_code' => 'TRF_parked']);
+    $attempt->update(['state' => 'refund_pending']);
+    $gateway = Mockery::mock(App\Contracts\SettlementGateway::class);
+    $gateway->shouldNotReceive('finalizeTransfer');
+    $gateway->shouldNotReceive('transfer');
+    app()->instance(App\Contracts\SettlementGateway::class, $gateway);
+    expect(app(App\Services\Finance\PayoutRelease::class)->release($payout, '123456')['http_status'])->toBe(422);
+    expect($payout->fresh()->status)->toBe('awaiting_otp')->and($payout->fresh()->provider_transfer_code)->toBe('TRF_parked');
+});

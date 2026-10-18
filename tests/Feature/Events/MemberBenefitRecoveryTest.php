@@ -207,3 +207,19 @@ it('refunds an issued archived event ticket without promoting archived waitlists
     expect($attempt->fresh()->state)->toBe('refund_pending')->and($registration->fresh()->status)->toBe('cancelled');
     Illuminate\Support\Facades\Http::assertSentCount(1);
 });
+
+it('review locks and rechecks active status before paid reassessment', function (): void {
+    [, , $member, $registration, $quote, $attempt, $session] = MemberBenefitScenario::make();
+    $payment = MemberBenefitScenario::payment($attempt);
+    $payment['paid_at'] = $quote->expires_at;
+    app(MemberBenefitPayments::class)->confirm($attempt, $payment);
+    $changed = false;
+    App\Models\Member::retrieved(function (App\Models\Member $read) use ($member, &$changed): void {
+        if (! $changed && $read->id === $member->id) {
+            $changed = true;
+            App\Models\Member::withoutGlobalScopes()->whereKey($read->id)->update(['status' => 'lapsed']);
+        }
+    });
+    expect(app(MemberBenefitPayments::class)->reassess($registration, $session))->toBeFalse();
+    expect($attempt->fresh()->state)->toBe('paid_review')->and($registration->fresh()->ticket_code)->toBeNull();
+});

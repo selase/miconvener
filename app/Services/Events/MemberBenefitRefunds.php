@@ -57,7 +57,7 @@ final class MemberBenefitRefunds
 
         if ($releasedTicket) {
             $event = Event::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->findOrFail($candidate->registration->event_id);
-            if (! $event->trashed()) {
+            if (! $event->trashed() && $event->isPublished()) {
                 app(MemberBenefitLifecycle::class)->promoteWaiting($event, $candidate->registration->ticket_type_id);
             }
         }

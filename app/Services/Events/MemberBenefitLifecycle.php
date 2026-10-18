@@ -44,6 +44,11 @@ final class MemberBenefitLifecycle
         }
     }
 
+    public function sharesInventory(\App\Models\Event $event): bool
+    {
+        return $this->eligibility->enabled($event->tenant) || $event->registrations()->where('member_benefit_required', true)->exists();
+    }
+
     public function hasCapacity(EventRegistration $registration): bool
     {
         $event = $registration->event;
@@ -59,20 +64,34 @@ final class MemberBenefitLifecycle
         return $event->capacity === null || $count->count() < $event->capacity;
     }
 
-    public function reverify(EventRegistration $candidate, \Illuminate\Contracts\Session\Session $session): bool
+    public function reverify(EventRegistration $candidate, \Illuminate\Contracts\Session\Session $session, ?int $expectedAmount = null, ?string $currency = null): bool
     {
-        return $candidate->getConnection()->transaction(function () use ($candidate, $session): bool {
+        return $candidate->getConnection()->transaction(function () use ($candidate, $session, $expectedAmount, $currency): bool {
             $registration = EventRegistration::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->id);
             $event = $registration->event()->lockForUpdate()->firstOrFail();
-            $member = $this->eligibility->resolve($session, $event, $registration->email);
+            $member = $this->eligibility->resolveLocked($session, $event, $registration->email);
             if (! $registration->member_benefit_required || $member === null) {
                 throw ValidationException::withMessages(['membership' => 'Verify your own active membership before continuing.']);
             }
-            $member = Member::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->lockForUpdate()->findOrFail($member->id);
             $reason = $registration->member_benefit_identity['release_reason'] ?? null;
             $registration->member_benefit_identity = $this->identity->capture($session, $member);
             $this->assertEligible($registration);
             $registration->save();
+            if ($expectedAmount !== null && $registration->status === EventRegistration::STATUS_PENDING_PAYMENT) {
+                $this->assertOfflineAvailable($registration);
+                if ($registration->offline_payment_status !== null && $registration->offline_payment_status !== EventRegistration::OFFLINE_STATUS_REJECTED) {
+                    throw ValidationException::withMessages(['payment' => 'Existing offline payment evidence needs review before changing the payable total.']);
+                }
+                $pricing = app(MemberBenefitQuotes::class)->pricing($registration);
+                if ($expectedAmount !== $pricing['fees']['charged_amount'] || $currency !== $registration->currency) {
+                    throw ValidationException::withMessages(['payment' => 'The total changed. Review and accept the current total again.']);
+                }
+                $registration->memberBenefitQuotes()->where('state', 'quoted')->update(['state' => 'invalidated']);
+                $registration->fill(['member_benefit_quote_id' => null, 'amount' => $pricing['amount'], 'discount_amount' => $pricing['discount_amount'], 'charged_amount' => $pricing['fees']['charged_amount'], 'platform_fee_amount' => $pricing['fees']['platform_fee']])->save();
+                if ($registration->amount === 0) {
+                    $this->release($registration, 'repriced');
+                }
+            }
             if ($registration->status === EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION && in_array($reason, ['verified', 'approved', 'promoted'], true)) {
                 $pricing = app(MemberBenefitQuotes::class)->pricing($registration);
                 $registration->fill(['amount' => $pricing['amount'], 'discount_amount' => $pricing['discount_amount'], 'charged_amount' => $pricing['fees']['charged_amount'], 'platform_fee_amount' => $pricing['fees']['platform_fee']]);
@@ -90,9 +109,12 @@ final class MemberBenefitLifecycle
 
     public function release(EventRegistration $registration, string $reason): void
     {
-        if (! $this->eligible($registration) || ($registration->member_benefit_required && ! $this->hasCapacity($registration))) {
+        if (! $registration->member_benefit_required && $this->sharesInventory($registration->event) && ! $this->hasCapacity($registration)) {
+            return;
+        }
+        if (! $this->eligible($registration) || ($registration->member_benefit_required && (! $this->hasCapacity($registration) || ! $this->priceMatches($registration)))) {
             $this->hold($registration, $reason);
-            \Illuminate\Support\Facades\Mail::to($registration->email)->queue(new \App\Mail\Events\EventRegistrationVerifyEmail($registration));
+            \Illuminate\Support\Facades\Mail::to($registration->email)->queue((new \App\Mail\Events\EventRegistrationVerifyEmail($registration))->afterCommit());
 
             return;
         }
@@ -105,12 +127,12 @@ final class MemberBenefitLifecycle
                 app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($registration->event->tenant, 'event_registrations');
             }
             app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
-            \Illuminate\Support\Facades\Mail::to($registration->email)->queue(new \App\Mail\Events\EventRegistrationConfirmed($registration));
+            \Illuminate\Support\Facades\Mail::to($registration->email)->queue((new \App\Mail\Events\EventRegistrationConfirmed($registration))->afterCommit());
 
             return;
         }
         $registration->update(['status' => EventRegistration::STATUS_PENDING_PAYMENT, 'waitlist_position' => null]);
-        \Illuminate\Support\Facades\Mail::to($registration->email)->queue(new \App\Mail\Events\EventRegistrationPaymentInvite($registration, $reason));
+        \Illuminate\Support\Facades\Mail::to($registration->email)->queue((new \App\Mail\Events\EventRegistrationPaymentInvite($registration, $reason))->afterCommit());
     }
 
     public function promoteWaiting(\App\Models\Event $event, ?string $ticketTypeId): void
@@ -123,13 +145,18 @@ final class MemberBenefitLifecycle
         }
         $next->getConnection()->transaction(function () use ($next, $event, $query): void {
             $next = EventRegistration::query()->lockForUpdate()->findOrFail($next->id);
-            $event->newQuery()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+            $lockedEvent = $event->newQuery()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+            if ($lockedEvent->status === \App\Models\Event::STATUS_CANCELLED || $lockedEvent->trashed()) {
+                return;
+            }
             if ($next->status !== EventRegistration::STATUS_WAITLISTED) {
                 return;
             }
             $position = $next->waitlist_position;
             $this->release($next, 'promoted');
-            $query()->waitlisted()->where('waitlist_position', '>', $position)->decrement('waitlist_position');
+            if ($next->status !== EventRegistration::STATUS_WAITLISTED) {
+                $query()->waitlisted()->where('waitlist_position', '>', $position)->decrement('waitlist_position');
+            }
         });
     }
 

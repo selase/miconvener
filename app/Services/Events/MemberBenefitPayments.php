@@ -146,7 +146,7 @@ final class MemberBenefitPayments
             if ($attempt === null) {
                 return false;
             }
-            $member = $this->eligibility->resolveExisting($recipientSession, $event, $registration->email);
+            $member = $this->eligibility->resolveLocked($recipientSession, $event, $registration->email, true);
             if ($member === null) {
                 return false;
             }
@@ -235,7 +235,7 @@ final class MemberBenefitPayments
         app(FeatureMeteringService::class)->recordUsage($event->tenant, 'event_registrations');
         app(FeatureMeteringService::class)->recordUsage($event->tenant, 'email_credits');
         app(EventRuleTriggerService::class)->registrationCompleted($registration);
-        Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
+        Mail::to($registration->email)->queue((new EventRegistrationConfirmed($registration))->afterCommit());
     }
 
     private function refuse(string $message): never

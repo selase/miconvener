@@ -115,10 +115,10 @@ Persist quote tenant/event/registration/member, identity kind, email/phone diges
 
 - [x] Write failing UI tests: organiser can enable members-only and nullable/zero member prices; attendee sees standard/member prices clearly, verifies email first, sees precise final total and expiration, cannot double-submit, and gets reverify/requote or paid-review guidance. Staff sees captured payment separately from ticket state and an authorised recovery/refund route. Transfer restriction is explained before attempting it. No fake countdown/seat reservation promise. Mobile/dark/loading/error/keyboard states are explicit.
 - [x] Run the added UI tests, then implement with current React/console primitives and accessible labels. Add links from Community overview into the existing Events area only where needed; ensure no-dues members see benefits and read-only roles cannot edit. Rebuild and commit assets with the corresponding source, ticking steps.
-- [ ] Perform self-review against all five Review Focus items and every state transition. One fresh whole-branch reviewer checks identity/payment/race boundaries and UI touchpoints; fix Important/Critical findings with focused regressions. Record honest manual/provider limitations and any deferred minor; do not start a second blanket review without design changes.
-- [ ] Run focused PHP/JS checks while integrating, Pint --dirty, PHPStan0/no baseline growth, lint/build. After approved push, one full CI gate; avoid a redundant blanket local run if CI supplies that gate. Read-only finance:verify-categories must pass. Verify existing Finance, Payments, Dues, Giving, Community, Events and attendee-portal coverage plus PayoutOtpFlowTest. Never overlap refreshing database suites.
+- [x] Perform self-review against all five Review Focus items and every state transition. One fresh whole-branch reviewer checks identity/payment/race boundaries and UI touchpoints; fix Important/Critical findings with focused regressions. Record honest manual/provider limitations and any deferred minor; do not start a second blanket review without design changes.
+- [x] Run focused PHP/JS checks while integrating, Pint --dirty, PHPStan0/no baseline growth, lint/build. After approved push, one full CI gate; avoid a redundant blanket local run if CI supplies that gate. Read-only finance:verify-categories must pass. Verify existing Finance, Payments, Dues, Giving, Community, Events and attendee-portal coverage plus PayoutOtpFlowTest. Never overlap refreshing database suites.
 - [x] Browser-test on disposable local QA only: active no-dues member, lapsed member, non-member, representative, delayed paid result, free/paid/review UI and settings at320/390px, desktop, dark/light, keyboard and actual200% if browser control supports it. No real payment or outbound message. Separately approved provider sandbox sessions are still needed; mocks do not prove hosted timing behaviour.
-- [ ] Update roadmap to built with exact evidence, retain feature branch and request merge review. No production flag change/deployment until approved; approved rollout enables Purpledot only, preserves existing settings and other organisations, and verifies schema/permissions/assets/queue plus recovery visibility. Roll back new issuance by switching off, not dropping paid records or stripping quote-reader support.
+- [ ] After approved upload and green full CI, update roadmap to built with exact evidence and request merge review. Local implementation and review are complete; retain the feature branch pending upload approval. No production flag change/deployment until approved; approved rollout enables Purpledot only, preserves existing settings and other organisations, and verifies schema/permissions/assets/queue plus recovery visibility. Roll back new issuance by switching off, not dropping paid records or stripping quote-reader support.
 
 ## Plan self-review
 
@@ -136,3 +136,122 @@ No application code or tests were changed/run for this documentation-only draft.
 - Actual200% browser zoom could not be applied: keyboard shortcut left devicePixelRatio and viewport unchanged. Narrow-width checks are not represented as a zoom test. Provider sandbox/captured-time/refund behaviour still needs separately approved hosted acceptance.
 - Browser findings fixed: hide cancelled member QR; explicit receipt and safe recovery links; fee/charged-amount fingerprint normalisation; terminal failure recovery; unknown Stripe session binding; explicit Stripe refund-fee evidence; archived receipt/refund recovery. No new dependencies, permissions, environment variables or production settings.
 - Self-review question: “Is there anything I have overlooked? Is the solution optimal? Let me take a step back.” Final independent branch review and its findings will be recorded below before requesting integration.
+
+
+## Self-Review Report — final local review, 2026-10-18
+
+Is there anything I have overlooked? Is the solution optimal? Let me take a step back.
+
+### Touchpoints updated
+
+- [x] AGENTS.md: existing finance and Community invariants followed; no new global convention requiring an edit. Roadmap, parent spec and this plan carry milestone decisions.
+- [x] Memory files: N/A; repository documents are the shared handover, no private memory dependency.
+- [x] Seeders: N/A; no new permission, role or production demo data. Disposable browser fixtures stay outside the repository.
+- [x] Navigation: native Event settings and Ticket Types expose member access/prices; Guests and private payment history expose recovery; checkout and personal tickets expose owner verification/status/receipt links, including archived payment recovery.
+- [x] Permissions: existing read-event/update-event permissions, tenant boundaries and exact recipient ownership checked server-side; no new permission to propagate.
+- [x] `.env.example`: N/A; no new environment variables or dependencies.
+- [x] Config: default-off `community_event_benefits` requires Community; recovery retains historical-source access when new issuance is disabled. No production switch changed.
+- [x] Tests: eligibility, prices, initiation, provider evidence, idempotence, refunds, payout reserve/OTP, lifecycle, recipient correction, UI and existing finance/registration contracts covered. Controller signature change has no direct test callers.
+
+### UI Gap Analysis
+
+- Discoverability: present through existing event settings, ticket types, guest management, checkout and personal-ticket entry points.
+- Empty state: present for private source history, unavailable membership/price and verification; no fabricated source or member identity shown.
+- Permission gating: present; source details require read-event, mutations require update-event, public ownership is verified independently. Disabled rollout blocks new benefit starts while preserving historical money recovery.
+- Loading + errors: present; actions disable while submitting and show server errors. Uncertain/captured money shows review status and prevents a second payment route; no ticket is issued speculatively.
+- Responsive: checked at320/390/1280px in disposable QA, including settings/history and checkout. No horizontal overflow observed.
+- Accessibility: keyboard focus and native controls checked; light/dark field contrast checked. Actual200% zoom and physical-device acceptance remain unverified, because the automation shortcut did not change zoom.
+
+### Solved (auto-fixed)
+
+One fresh whole-branch review against b4ad5211..d1069411 reported zero Critical, seven Important and zero Minor. All seven were addressed in one grouped test-first pass; no second blanket review was commissioned.
+
+1. Recheck authoritative current price before approval/promotion; stale zero prices cannot issue free tickets (`app/Services/Events/MemberBenefitLifecycle.php`, release).
+2. Explicitly accept changed offline/free totals with fresh eligibility, preserve unresolved payment evidence, and align sidebar/current total (`MemberBenefitLifecycle.php`, reverify; `EventCheckoutController.php`, member context; `resources/js/Pages/Public/Events/Checkout.jsx`). Browser caught a cross-domain background-navigation failure after successful issuance: completed transitions now use normal page navigation, and verification forwards the server outcome.
+3. Offline proof/approval require the correct released pending-payment state; pending approval, rejected and waitlisted rows cannot bypass admission (`PublicEventController.php`, `Tenant/EventRegistrationController.php`).
+4. Recheck refund reserves under the event lock immediately before finalising a parked OTP transfer; retain the original transfer when blocked (`app/Services/Finance/PayoutRelease.php:43`, `PayoutSender.php`).
+5. Recheck active personal status and exact current recipient after acquiring the member lock for new quotes and reassessment (`app/Services/Events/MemberBenefitEligibility.php:39`). Original on-time captured-quote lapse exception stays confined to confirmation.
+6. Serialize ordinary and member issuance on shared inventory; preserve actual captured money without QR when no place remains, reserve real platform credits, and block second-payment entry points (`app/Services/Events/StandardEventPaymentConfirmer.php:24`, webhook delegates, `MemberBenefitBalance.php`, checkout review UI).
+7. Cancelled/archived events never promote; member refunds also refuse draft promotion. Preserve the existing unrestricted administrator draft-waitlist workflow, explicitly covered by legacy tests (`MemberBenefitLifecycle.php:138`, `MemberBenefitRefunds.php`).
+
+Earlier browser/review fixes also retained archived receipts, hid cancelled member QR codes, froze corrected-recipient browser/mail access versions, recovered terminal/unknown provider sources conservatively, required actual Stripe fee/refund evidence, and normalised accepted charged/fee amounts before quote fingerprints.
+
+### Final validation evidence
+
+- Post-review broad PHP gate:320 passed/1 failed,1262 assertions. The sole failure was the existing draft administrator workflow; fixed compatibly rather than weakening its assertion. All affected files then passed107/107,481 assertions. Do not represent the broad run as321/321.
+- Full frontend suite430/430 across68 files; after final navigation fix, affected member-payment/verification tests14/14. Lint and tracked production build passed after that last change. PHPStan0 errors, no baseline growth; Pint passed. Finance category verification exited0; console component usage5/5 and build-manifest references4/4 passed.
+- Latest disposable browser acceptance: changed price50→0 explicitly accepted, confirmed ticket opened at central `/my/events/...`, zero console errors; changed price50→60 explicitly accepted, order summary60 and offline proof form shown. No proof submitted, real gateway payment or external message sent. A wait for a nonexistent literal “Offline payment” label timed out after the successful action; reading the actual page confirmed the native “Choose Payment Method” form and correct total.
+- Earlier local browser coverage: active no-dues Volunteer, changed contact, lapsed denial, native signed email verification, free confirmed QR, personal transfer restriction, paid-review reassessment, safe receipt/settings/history. Representatives, provider uncertainty and race boundaries have automated coverage. Local QA changes only; original/Claude checkouts remain untouched.
+
+### Recommended for user decision
+
+- Approve pushing `codex/community-6` and opening a PR for the required full remote CI gate. This is the next integration step; full CI has not yet run for this branch. Merge/deployment remain separate approval decisions.
+- Before promoting online member prices, approve hosted Paystack/Stripe sandbox acceptance for capture timing, original-account recovery and refunds (one focused session per provider; duration depends on account access). Automated transport tests do not prove hosted behaviour.
+- Complete actual200% zoom and physical-device acceptance in a supported browser session before broad rollout (short manual session). No result is claimed here.
+
+### Not gaps
+
+- Churches/volunteer groups do not need dues: active personal membership is enough, including a zero-dues membership type and members in arrears.
+- Followers and representatives are deliberately ineligible; no family discounts, phone-only event registration or personal-ticket transfer in this approved milestone.
+- Quotes last15minutes and do not reserve inventory. Unknown or late captured money remains recoverable without speculative admission.
+- No dependency was added unused; no new production data/flag, permission or environment setting was introduced. Hosted acceptance remains open rather than represented by mocks.
+
+### Rulings I made
+
+The following is the exhaustive ordered ruling record from implementation, retained here before deleting only this plan's temporary workspace. Costs describe what would need reconsideration if a ruling proves wrong.
+
+1. existing isolated artifact-completion worktree reused on codex/community-6; original and Claude checkouts untouched. Cost if wrong: Relocate only the owned branch; never reset another checkout.
+
+2. migration belongs in database/migrations/landlord, matching all event/community tables; plan root migration path corrected to existing convention. Cost if wrong: Move the migration discovery path before deployment.
+
+3. preserve ticket type request fields on pre-existing callers; no new permissions or seeder grants introduced because update event already gates these settings. Cost if wrong: A separately approved permission would need seeder/role propagation.
+
+4. add focused MemberBenefitIdentity service for hidden proof snapshots shared by quote/free/offline checks; preserve current contact/grant versions and non-sliding proof expiry, never secrets. Quote and attempt FK enforce tenant boundaries and DB partial unique indexes prevent unresolved duplicates across registration and quote. Cost if wrong: Change the shared proof contract and schema together.
+
+5. existing promo reservation is reused for its same registration without incrementing/redenying its own redemption; recheck active/date/ticket applicability and calculateDiscount through existing model when refreshing price. Cost if wrong: needs explicit promo-reservation expiry policy, already absent from legacy registration. Cost if wrong: Define promo-reservation expiry explicitly.
+
+6. dedicated local database miconvener_community6_testing created2026-10-18; all further tests use DB_DATABASE environment override. One combined regression command ended exit1 with an empty report; no pass is claimed. Separate database prevents interference with tests from other checkouts; it does not assert a proven cause for the empty report. Cost if wrong: Revisit local runner isolation; no production database is involved.
+
+7. MemberBenefitGateways reuses existing GivingGateways pure account identity functions and native gateway/commission adapters, without creating Giving records or depending on Giving rollout. Original-account loss requires review rather than selecting a replacement account. Cost if wrong: Extract a separate pure identity helper if Giving coupling becomes undesirable.
+
+8. use abstract EventTicketTypeRequest with final store/update leaves, matching existing MembershipTypeRequest pattern; add explicit update endpoint regression and keep PAO_DISABLE=1 on further test commands so fatal errors remain visible. Cost if wrong: Adjust both leaf request classes and their tests.
+
+9. gateway_fee may be null in provider evidence. Preserve verified captured principal in attempt paid_review/gateway_fee_pending with no QR/payable/guessed zero ledger fee; post original-reference ledger once after exact provider fee arrives. Cost if wrong: finance UI must distinguish captured-awaiting-bookkeeping from payable and expose original-account reconcile. Cost if wrong: Add financial reconciliation evidence before any payable posting.
+
+10. online confirmation ignores proof expiry only for an already initiated quote but still checks current contact/access/grant versions. Fresh paid-review reassessment uses resolveExisting personal eligibility even after rollout off; no new quote can use that recovery method. Cost if wrong: Revisit the documented captured-quote expiry exception without weakening identity revocation.
+
+11. DB uniqueness protects unresolved initialization states preparing/open/unknown only; authenticated extra captures must be durably bookable. Added is_extra_capture/paid_extra, reserved for refund, never overwritten into the current ticket or issued a second QR. Refunding an extra capture must not cancel a valid current ticket. No new initialization is allowed while any captured/unresolved money remains; actual old capture is an operational exception, not permission to charge twice. Need test/refund extra path end-to-end and show held capture count in private checkout. Cost if wrong: Reconcile every real extra capture without double issuance or cancelling the valid ticket.
+
+12. retain an unbound original-account amount/currency mismatch as unknown plus whitelisted hidden observed_payment; do not book guessed expected amounts or automatically attribute a different account/reference. Operator reconciliation exposes evidence, and source stays blocked from new charge. Final broad Task4 contract will re-run serially after commit; no other DB suite may overlap it. Cost if wrong: Operator evidence remains necessary to attribute mismatched money safely.
+
+13. shared lifecycle release/promote helpers preserve legacy approval/waitlist actions and allow new bound-ticket refunds to release queue capacity without running a legacy refund. Failed waitlist member proof becomes pending_member_verification with server-only release_reason on existing hidden proof, never a transferable or global email grant. Recipient fresh proof can reprice/release that prior approval/promotion; pending staff approval and offline review remain separate. No new status field or public member ID introduced. Currency freezes once any benefit-bound registration exists; DB member-price ranges and request validation prevent retained member price exceeding a newly lowered standard price. This is conservative for cancelled historical registrations; separate event needed for another currency. Cost if wrong: A new currency policy would require migration/explicit owner agreement.
+
+14. add member_benefit_access_version default1 (hidden), increment on a bound-recipient correction, bind only new member checkout/registered grants and mail verification/payment links to HMAC(registration,email,version). Exact independently verified current email still authorises; old unrestricted grants/links retain their existing contract. Mail constructs freeze recipient token when queued, not when rendered after a correction. This prevents restoring an old email from reviving an earlier grant. Pending focused recipient/lifecycle/checkout/legacy-verification gate /tmp/m6-task5-recipient-green.log session58204; await exit before another DB run. Comments relocated after Pint's class-element ordering; no functional edits to legacy QR signing. Cost if wrong: Rework revocation tokens/mail snapshots consistently; old unrestricted links remain separate.
+
+15. preserve independent ticket-type capacity, including unlimited types; do not impose Event.capacity across typed tickets, matching existing EventTicketTypeTest. Correct initial overly strict lifecycle/fallback check and reject known full capacity before initialization. Watched payment RED1fail/1pass /tmp/m6-capacity-contract-red.log. Cost if wrong: any future shared room-capacity policy needs its own explicit feature. Cost if wrong: A new shared room-capacity policy needs explicit design.
+
+16. terminal original-provider failure closes only uncaptured sources, retaining original quote expiry/history and requiring a fresh deliberate quote; never downgrade captured or authenticated mismatched-success evidence. Unknown Stripe captured sessions are located by metadata, authorised via original account API and full expected metadata, and bound atomically after exact money assertion. Foreign non-UUID metadata is ignored. Cost if wrong: Provider recovery must remain reference/account-bound; uncertain sources cannot be charged again.
+
+17. Stripe refund remains pending after principal/application-fee return until same-currency provider balance fee evidence exists; no guessed zero fee credit. Existing Giving transport response is extended with an evidence flag, its existing behaviour unchanged. Holdback already debits organizer_payable in LedgerService, so canonical balance retains it without subtracting it twice. Cost if wrong: Refund reconciliation must obtain actual fees instead of inventing credits.
+
+18. normalise charged_amount and platform_fee_amount to the accepted current breakdown before freezing the cart fingerprint; effective legacy null charged amount and stale fee splits must not cause a valid captured payment to be incorrectly held. Initial null-fee test violated nonnull schema, corrected to stale0 and watched real RED; final quote gate passed. Staff recipient recovery link exists in Guests, not Overview; regression corrected to actual section URL,1/1,19assertions passed. Cost if wrong: Rebuild quote fingerprints consistently with accepted authoritative prices.
+
+19. archived benefit receipts retain exact-owner access via explicit archived Event lookup; callback still verifies original account and reference, no new issuance. Original-source refunds on archived events do not promote waitlists. Other unrestricted relation/public visibility untouched. Cost if wrong: Revisit archived ownership lookup without publishing archived events.
+
+20. Task6 includes the final whole-branch review, so commit its verified UI/build first and perform that one review before its final completion line; no per-task reviewer or second blanket post-review. Remote fullCI remains gated on approved upload per plan; status remains locally implemented awaiting review/CI, not deployed. Cost if wrong: Obtain approved remote CI before marking built; do not imply deployment.
+
+21. standard-price recipients do not acquire member proofs/discount/transfer restrictions merely because inventory is shared. Their existing provider/commission/refund flows remain native; captured no-place money is held in pending_benefit_review, its true platform credit is reserved through ledger-entry classification (own merchant gross is excluded). Normal old captures retain behaviour outside shared inventory; a general unrestricted checkout redesign stays outside scope. Cost if wrong: legacy pre-capture duplicate checkout handling remains an existing separate hardening task, not a new member quote fabricated for nonmembers. Cost if wrong: Legacy pre-capture duplicate checkout remains a separate hardening scope.
+
+22. explicit accepted repricing reuses the owned, session-blocked reverify endpoint with a typed FormRequest; positive offline totals must be accepted before submitting new proof, zero totals issue only under fresh identity+event/capacity checks. Existing unresolved offline proof is retained for staff review rather than discarded or treated as an online refund. Cost if wrong: New offline evidence cannot be discarded to simplify repricing.
+
+23. review is complete, all7Important enter this singlefixpass; noMinor. Hosted sandbox/actualzoom/physicaldevice remain recorded manual limits; family/representative discounts/phone-only registration/transfers are explicitly deferred; unrestricted legacy changes are limited to shared inventory/payment-hold guarantees, not a broad redesign. Cost if wrong: Manual provider/device acceptance and deliberately deferred features stay visible.
+
+24. preserve this existing unrestricted admin workflow. Globally prohibit cancelled/archived queue promotion; member-refund-triggered promotion additionally requires published, and every new member-bound release still requires published. This fixes reviewer7 without silently removing legacy draft administration. Cost if wrong: a future global draft-admission policy requires an explicit change, not an incidental member-benefit rollout. Add draft+cancelled refund regression; rerun all affected approval/lifecycle/recovery tests instead of another nine-minute blanket local repeat; full remote CI remains required after approved push. Never label broad local run321/321. Cost if wrong: A future global draft-admission policy needs an explicit compatibility change.
+
+25. Completed member transitions use a normal browser navigation to the central ticket workspace; outcome data is forwarded from verification. Cost if wrong: rework the cross-domain transition contract rather than retrying an Inertia background request that cannot follow it.
+
+### Deferred minors
+
+None reported by the independent review. Manual acceptance limits and approved feature deferrals are recorded above, not treated as passed checks.
+
+Local status: implementation and one whole-branch review completed; commit retained on `codex/community-6`. Required remote CI, upload approval, merge approval and deployment remain pending.

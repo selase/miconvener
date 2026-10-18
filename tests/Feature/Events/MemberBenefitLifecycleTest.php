@@ -238,3 +238,72 @@ it('cannot turn a stale checkout authorisation into a grant for a corrected memb
     $authorizer->grantCheckoutAccess($session, $registration->id, 30, $oldToken);
     expect($authorizer->canAccess($session, $registration->fresh()))->toBeFalse();
 });
+
+it('review holds stale zero prices on both approval and waitlist promotion', function (string $reason): void {
+    [$tenant, $event, , $registration, , $attempt] = MemberBenefitScenario::make();
+    $attempt->update(['state' => 'failed']);
+    $registration->update(['amount' => 0, 'charged_amount' => 0, 'status' => $reason === 'approved' ? 'pending_approval' : 'waitlisted', 'waitlist_position' => $reason === 'promoted' ? 1 : null]);
+    if ($reason === 'approved') {
+        lifecycleStaff($tenant);
+        $this->postJson('http://'.eventSubdomainHost($tenant->slug).'/events/'.$event->id.'/registrations/'.$registration->id.'/approve')->assertSuccessful();
+    } else {
+        app(App\Services\Events\MemberBenefitLifecycle::class)->promoteWaiting($event, null);
+    }
+    expect($registration->fresh()->status)->toBe('pending_member_verification')->and($registration->fresh()->ticket_code)->toBeNull();
+    Mail::assertNotQueued(App\Mail\Events\EventRegistrationConfirmed::class);
+})->with(['approved', 'promoted']);
+
+it('review explicitly accepts repriced free and offline registrations without another charge', function (int $total): void {
+    [$tenant, $event, , $registration, , $attempt, $session] = MemberBenefitScenario::make();
+    $attempt->update(['state' => 'failed']);
+    $event->update(['member_ticket_price' => $total, 'allow_offline_payments' => true]);
+    app(App\Services\Events\MemberBenefitLifecycle::class)->reverify($registration->fresh(), $session, $total, 'GHS');
+    expect($registration->fresh()->amount)->toBe($total)->and($registration->fresh()->effectiveChargedAmount())->toBe($total);
+    if ($total === 0) {
+        expect($registration->fresh()->status)->toBe('confirmed')->and($registration->fresh()->ticket_code)->not->toBeNull();
+    } else {
+        lifecycleStaff($tenant);
+        $registration->fresh()->update(['offline_payment_status' => 'pending_verification', 'payment_method' => 'offline_cash']);
+        $this->postJson('http://'.eventSubdomainHost($tenant->slug).'/events/'.$event->id.'/registrations/'.$registration->id.'/approve-offline')->assertSuccessful();
+        expect($registration->fresh()->status)->toBe('confirmed');
+    }
+})->with([0, 6000]);
+
+it('review refuses an unaccepted repriced amount or unresolved original source', function (string $reason): void {
+    [, $event, , $registration, , $attempt, $session] = MemberBenefitScenario::make();
+    if ($reason === 'amount') {
+        $attempt->update(['state' => 'failed']);
+    }
+    $event->update(['member_ticket_price' => 6000]);
+    expect(fn () => app(App\Services\Events\MemberBenefitLifecycle::class)->reverify($registration->fresh(), $session, $reason === 'amount' ? 5000 : 6000, 'GHS'))->toThrow(Illuminate\Validation\ValidationException::class);
+    expect($registration->fresh()->amount)->toBe(5000)->and($registration->fresh()->ticket_code)->toBeNull();
+})->with(['amount', 'unresolved']);
+
+it('review blocks offline admission bypass for unreleased registrations', function (string $status, string $action): void {
+    [$tenant, $event, , $registration, , $attempt, $session] = MemberBenefitScenario::make();
+    $attempt->update(['state' => 'failed']);
+    $event->update(['allow_offline_payments' => true]);
+    $registration->update(['status' => $status, 'offline_payment_status' => $action === 'approve' ? 'pending_verification' : null, 'payment_method' => 'offline_cash']);
+    $host = eventSubdomainHost($tenant->slug);
+    if ($action === 'approve') {
+        lifecycleStaff($tenant);
+        $this->postJson('http://'.$host.'/events/'.$event->id.'/registrations/'.$registration->id.'/approve-offline')->assertUnprocessable();
+    } else {
+        Illuminate\Support\Facades\Storage::fake(App\Models\Event::uploadDisk());
+        $this->withServerVariables(['HTTP_HOST' => $host])->withSession($session->all())->post('http://'.$host.'/e/'.$event->slug.'/checkout/'.$registration->id.'/offline-proof', ['proof_file' => Illuminate\Http\UploadedFile::fake()->create('proof.pdf', 1, 'application/pdf'), 'payment_method' => 'offline_cash'], ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('registration');
+    }
+    expect($registration->fresh()->status)->toBe($status)->and($registration->fresh()->ticket_code)->toBeNull()->and(App\Models\EventLedgerEntry::query()->count())->toBe(0);
+})->with(['pending_approval', 'waitlisted', 'rejected'])->with(['upload', 'approve']);
+
+it('review does not promote an unrestricted old waitlist after closure and member refund', function (string $closedStatus): void {
+    config(['services.settlement.paystack.secret_key' => 'sk_test_cancelled_waitlist']);
+    [$tenant, $event, , , , $attempt] = MemberBenefitScenario::make();
+    $attempt->update(['account_key' => app(App\Services\Giving\GivingGateways::class)->platformIdentity()]);
+    app(App\Services\Events\MemberBenefitPayments::class)->confirm($attempt, MemberBenefitScenario::payment($attempt));
+    $waiting = EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'member_benefit_required' => false, 'status' => 'waitlisted', 'waitlist_position' => 1, 'amount' => 0, 'ticket_code' => null, 'qr_token' => null]);
+    $event->update(['status' => $closedStatus]);
+    Illuminate\Support\Facades\Http::fake(['api.paystack.co/refund' => Illuminate\Support\Facades\Http::response(['data' => ['id' => 42, 'status' => 'pending']])]);
+    app(App\Services\Events\MemberBenefitRefunds::class)->request($attempt->fresh());
+    expect($waiting->fresh()->status)->toBe('waitlisted')->and($waiting->fresh()->ticket_code)->toBeNull();
+    Mail::assertQueued(App\Mail\Events\EventRegistrationConfirmed::class, 1);
+})->with(['cancelled', 'draft']);

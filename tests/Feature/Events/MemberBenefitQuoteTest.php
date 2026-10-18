@@ -121,3 +121,16 @@ it('normalises the accepted fee breakdown before freezing a fulfilment fingerpri
     app(App\Services\Events\MemberBenefitPayments::class)->confirm($attempt, Tests\Support\MemberBenefitScenario::payment($attempt));
     expect($attempt->fresh()->state)->toBe('fulfilled')->and($registration->fresh()->platform_fee_amount)->toBe($quote->platform_fee_amount);
 });
+
+it('review rechecks a fresh member after a pre-lock lapse', function (): void {
+    [, , $member, $registration, $session] = memberQuoteFixture();
+    $changed = false;
+    Member::retrieved(function (Member $read) use ($member, &$changed): void {
+        if (! $changed && $read->id === $member->id) {
+            $changed = true;
+            Member::withoutGlobalScopes()->whereKey($read->id)->update(['status' => 'lapsed']);
+        }
+    });
+    expect(fn () => app(MemberBenefitQuotes::class)->start($session, $registration))->toThrow(ValidationException::class);
+    expect(EventMemberBenefitQuote::query()->count())->toBe(0);
+});
