@@ -16,6 +16,8 @@ use App\Models\Package;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
+use App\Services\Pricing\Money;
+use App\Services\Pricing\Rate;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
 
@@ -59,6 +61,24 @@ final class BillingNotifier
             'bank', 'bank_transfer', 'dedicated_nuban' => 'Bank transfer',
             default => ucfirst(str_replace('_', ' ', (string) $provider['channel'])),
         };
+    }
+
+    /**
+     * For a payment priced in USD and charged in GHS: the USD price and the
+     * rate it was converted at ("US$ 19 at the Bank of Ghana rate of 11.77 (16 Oct 2026)").
+     */
+    public static function priceReference(mixed $pricing): ?string
+    {
+        if (! is_array($pricing) || ($pricing['display_currency'] ?? null) !== 'USD' || ! isset($pricing['fx_rate'], $pricing['fx_as_of'])) {
+            return null;
+        }
+
+        return sprintf(
+            '%s at the Bank of Ghana rate of %s (%s)',
+            (new Money((int) $pricing['display_amount_minor'], 'USD'))->format(),
+            Rate::describe((float) $pricing['fx_rate']),
+            CarbonImmutable::parse((string) $pricing['fx_as_of'])->format('j M Y'),
+        );
     }
 
     /**
@@ -265,6 +285,7 @@ final class BillingNotifier
             paymentMethod: self::paymentMethod($provider),
             activePlan: $plan?->name,
             billingUrl: $this->billingUrl($tenant),
+            priceReference: self::priceReference($meta['pricing'] ?? null),
         );
 
         return $this->sender->send($tenant, BillingEmail::TYPE_PAYMENT_RECEIPT, "receipt:{$reference}", [$payerEmail, $tenant->email], $mail);

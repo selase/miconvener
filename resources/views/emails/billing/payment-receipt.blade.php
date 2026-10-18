@@ -5,6 +5,9 @@ Thank you. We've received your payment for **{{ $tenant->name }}**.
 
 <x-mail::panel>
 **{{ $amountDisplay }}**<br>
+@if ($priceReference)
+{{ $priceReference }}<br>
+@endif
 {{ $description }}
 </x-mail::panel>
 

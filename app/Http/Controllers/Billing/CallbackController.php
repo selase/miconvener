@@ -138,6 +138,7 @@ final class CallbackController extends Controller
             'interval' => $interval,
             'authorization' => (array) ($result['authorization'] ?? []),
             'customer_email' => $result['customer_email'] ?? auth()->user()?->email,
+            'pricing' => data_get($result, 'metadata.pricing'),
         ];
 
         $provisioningService->provision($tenant, $dto);
@@ -259,6 +260,7 @@ final class CallbackController extends Controller
             $tenant,
             $result['reference'],
             (array) data_get($result, 'metadata', []),
+            isset($result['amount']) ? (int) $result['amount'] : null,
         );
         $this->sendReceipt($tenant, $result);
 

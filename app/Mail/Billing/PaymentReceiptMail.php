@@ -30,6 +30,7 @@ final class PaymentReceiptMail extends Mailable implements ShouldQueue
         public readonly ?string $paymentMethod,
         public readonly ?string $activePlan,
         public readonly string $billingUrl,
+        public readonly ?string $priceReference = null,
     ) {}
 
     public function envelope(): Envelope

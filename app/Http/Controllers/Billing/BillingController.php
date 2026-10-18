@@ -15,6 +15,9 @@ use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PlanChangeWarnings;
 use App\Services\Billing\RenewalScheduler;
 use App\Services\Billing\SubscriptionRenewalService;
+use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\PriceBook;
+use App\Services\Pricing\VisitorCurrency;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -95,6 +98,9 @@ final class BillingController extends Controller
         $packages = Package::where('is_active', true)->with('features')->orderBy('sort_order')->get();
         $planWarnings = app(PlanChangeWarnings::class);
         $catalogPlans = collect(config()->array('product-page.plans'))->keyBy('slug');
+        $currency = app(VisitorCurrency::class)->resolve($request);
+        $priceBook = app(PriceBook::class);
+        $quotes = app(ChargeQuote::class);
 
         return Inertia::render('Billing/Pricing', [
             'packages' => $packages->map(fn (Package $package): array => [
@@ -103,6 +109,7 @@ final class BillingController extends Controller
                 'name' => $package->name,
                 'price' => (float) $package->price,
                 'yearly_price' => (float) ($package->yearly_price ?? $package->price * 10),
+                ...$this->planPriceLabels($priceBook, $quotes, $package, $currency),
                 'is_free' => $package->isFree(),
                 'is_custom' => $package->slug === 'enterprise' || (! $package->isFree() && (float) $package->price === 0.0),
                 'features' => $catalogPlans->get($package->slug)['features'] ?? $package->features->pluck('name'),
@@ -113,8 +120,27 @@ final class BillingController extends Controller
                     : $planWarnings->for($tenant, $package),
             ]),
             'currentPackageSlug' => $tenant->package?->slug,
-            'currency' => (string) config('services.paystack.currency', 'GHS'),
+            'currency' => $currency,
         ]);
+    }
+
+    /**
+     * A plan's monthly and yearly price in the visitor's currency and, for USD,
+     * the GHS amount each is charged as.
+     *
+     * @return array{price_label: string, yearly_price_label: string, charge_note: string|null, yearly_charge_note: string|null}
+     */
+    private function planPriceLabels(PriceBook $priceBook, ChargeQuote $quotes, Package $package, string $currency): array
+    {
+        $monthly = $quotes->for($priceBook->plan($package, 'month', $currency))->display();
+        $yearly = $quotes->for($priceBook->plan($package, 'year', $currency))->display();
+
+        return [
+            'price_label' => $monthly['price'],
+            'yearly_price_label' => $yearly['price'],
+            'charge_note' => $monthly['charge_note'],
+            'yearly_charge_note' => $yearly['charge_note'],
+        ];
     }
 
     /**
