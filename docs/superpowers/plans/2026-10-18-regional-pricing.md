@@ -87,6 +87,8 @@
 
 ### Task 6: Verification
 
-- [ ] Full suite, pint, phpstan, lint, build.
+- [x] Full suite, pint, phpstan, lint, build. PHP 3183/3183 (parallel); JS tests pass, with a few unrelated editor tests timing out only under another agent's machine load (load average ~150) and passing when rerun alone.
+  Final: self-review (no subagent dispatched; the session's tool rules forbid spawning agents unasked).
+  Final: fixed the hourly refresh only fetching after the 90-minute cache expired, which left page views to fetch from the Bank of Ghana for ~30 minutes every two hours — schedule now runs `fx:refresh --force`; test `the scheduler fetches a fresh rate every hour…` RED→GREEN, Pricing 39/39.
 - [ ] After deploy (owner go-ahead): confirm `CF-IPCountry` reaches the app in production (a temporary log line or a superadmin-only diagnostics read), run `fx:refresh` on production, check the homepage from a Ghana and a non-Ghana request.
 - [ ] Update this plan's checkboxes and the memory notes.

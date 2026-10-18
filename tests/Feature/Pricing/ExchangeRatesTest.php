@@ -121,3 +121,13 @@ test('fx:refresh stores the published rate', function () {
 
     expect(ExchangeRate::query()->where('source', 'bank_of_ghana')->value('rate'))->toEqual('11.665000');
 });
+
+test('the scheduler fetches a fresh rate every hour, inside the cache lifetime, so page views never fetch', function () {
+    $events = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+        ->filter(fn ($event): bool => str_contains((string) $event->command, 'fx:refresh'));
+
+    expect($events)->toHaveCount(1)
+        ->and($events->first()->expression)->toBe('0 * * * *')
+        ->and((string) $events->first()->command)->toContain('--force')
+        ->and((int) config('pricing.fx.cache_minutes'))->toBeGreaterThan(60);
+});
