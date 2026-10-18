@@ -303,3 +303,7 @@ An unset dues amount means no dues; a member zero override still records an expl
 4. Preserve paid→paid catch-up and existing charges; the new member floor applies only to no-dues→paid moves. Cost if wrong: a general dues-rate effective-dating redesign is a separate requirement.
 5. Default trusted programmatic no-dues conversion to local today while respecting an unchanged future boundary; staff UI/API still requires an explicit valid date. Cost if wrong: strengthen trusted-service input contracts without weakening the staff endpoint.
 6. A narrow review and affected tests verify this fix; full remote CI remains pending rather than repeating an expensive full local milestone suite. Cost if wrong: any integration failure must be resolved before merge; no full-suite claim here.
+
+## Approved release completed —2026-10-18
+
+Deployed through PR39 merge `a37b162d` after final CI39147674226 passed3439 PHP/16520assertions and449 JS plus quality/build gates. Cloud target `depl-a3034038-7712-4470-9aed-9b1c8647a1e7` succeeded17:14:44UTC. ExactlyPurpledot enabled; schema, permissions, assets, finance categories and signed-out privacy checks passed. Original/Claude checkouts, other organisations and settlement unchanged. See roadmap release evidence for command IDs and remaining actual-device/200%, aggregate storage and live financial acceptance limits. Earlier pending-approval text is historical and superseded by this release note.
