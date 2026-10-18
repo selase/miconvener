@@ -27,6 +27,8 @@ final class EventRegistration extends Model
     use HasUuids;
     use LogsActivity;
 
+    public const string STATUS_PENDING_BENEFIT_REVIEW = 'pending_benefit_review';
+
     public const string STATUS_PENDING_PAYMENT = 'pending_payment';
 
     public const string STATUS_CONFIRMED = 'confirmed';

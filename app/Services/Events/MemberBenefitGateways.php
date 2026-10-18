@@ -14,6 +14,7 @@ use App\Services\Payment\PaystackGateway;
 use App\Services\Payment\StripeConnect;
 use App\Services\Payment\StripeGateway;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 final class MemberBenefitGateways
 {
@@ -70,6 +71,57 @@ final class MemberBenefitGateways
         }
 
         return ['gateway' => $gateway, 'settlement' => $settlement];
+    }
+
+    /** @return array<string, mixed> */
+    public function verify(EventMemberBenefitAttempt $attempt, ?\Carbon\CarbonImmutable $completionTime = null): array
+    {
+        $gateway = $this->forAttempt($attempt);
+        $data = $gateway instanceof StripeGateway ? $gateway->verifyConnectedGivingSession((string) $attempt->provider_session_id) : $gateway->verifyTransaction($attempt->reference);
+        if (($data['status'] ?? null) !== 'success') {
+            return ['status' => $data['status'] ?? 'pending'];
+        }
+        $metadata = \App\Http\Controllers\Billing\WebhookController::metadata($data['metadata'] ?? null);
+        if (($gateway instanceof PaystackGateway && (! ($data['reference_reported'] ?? false) || ($data['reference'] ?? null) !== $attempt->reference))
+            || ($gateway instanceof StripeGateway && ($data['session_id'] ?? null) !== $attempt->provider_session_id)
+            || (isset($metadata['member_benefit_attempt_id']) && $metadata['member_benefit_attempt_id'] !== $attempt->id)) {
+            $this->refuse();
+        }
+        $time = $gateway instanceof PaystackGateway ? $this->completionTime($data['paid_at'] ?? null) : $completionTime;
+
+        return ['status' => 'success', 'provider' => $attempt->provider, 'account_key' => $attempt->account_key, 'reference' => $attempt->reference,
+            'provider_reference' => $gateway instanceof StripeGateway ? ($data['provider_reference'] ?? null) : $data['reference'],
+            'amount' => $data['amount'] ?? null, 'currency' => mb_strtoupper((string) ($data['currency'] ?? '')),
+            'gateway_fee' => $gateway instanceof PaystackGateway && ! ($data['fees_reported'] ?? false) ? null : ($data['fees'] ?? null),
+            'commission_received' => $gateway instanceof StripeGateway ? ($data['commission_received'] ?? 0) : (int) ($data['fees_split']['subaccount'] ?? 0), 'paid_at' => $time];
+    }
+
+    /** @return array<string, mixed> */
+    public function verifyRefund(EventMemberBenefitAttempt $attempt): array
+    {
+        $gateway = $this->forAttempt($attempt);
+        $data = $gateway->verifyGivingRefund((string) $attempt->refund_reference, (string) $attempt->provider_reference, (string) $attempt->refund_operation_key);
+        if ($gateway instanceof PaystackGateway && in_array($data['status'] ?? '', ['processed', 'succeeded'], true)) {
+            $payment = $gateway->verifyTransaction((string) $attempt->provider_reference);
+            if (! ($payment['reference_reported'] ?? false) || $payment['reference'] !== $attempt->provider_reference
+                || (string) ($payment['transaction_id'] ?? '') === '' || (string) ($data['transaction_id'] ?? '') !== (string) $payment['transaction_id']) {
+                return ['status' => 'unknown'];
+            }
+        }
+
+        return $data;
+    }
+
+    public function completionTime(mixed $value): ?\Carbon\CarbonImmutable
+    {
+        if (! is_string($value) || ! preg_match('/^\d{4}-\d{2}-\d{2}T/', $value)) {
+            return null;
+        }
+        try {
+            return \Carbon\CarbonImmutable::parse($value)->utc();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function originalRow(EventMemberBenefitAttempt $attempt): TenantPaymentGateway

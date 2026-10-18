@@ -250,6 +250,36 @@ final class EventRegistrationController extends Controller
         );
     }
 
+    public function refundMemberPayment(\App\Http\Requests\Tenant\ReconcileEventMemberPaymentRequest $request, string $subdomain, string $event, string $attempt): JsonResponse
+    {
+        $this->authorize('update event');
+        $eventModel = $this->findEvent($this->getTenant()->id, $event);
+        $source = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $eventModel->tenant_id)
+            ->whereHas('registration', fn ($query) => $query->where('event_id', $eventModel->id))->findOrFail($attempt);
+        $source = app(\App\Services\Events\MemberBenefitRefunds::class)->request($source);
+
+        return response()->json(['state' => $source->state, 'message' => 'Refund requested on the original payment. It remains held until the provider confirms the outcome.']);
+    }
+
+    public function reconcileMemberPayment(\App\Http\Requests\Tenant\ReconcileEventMemberPaymentRequest $request, string $subdomain, string $event, string $attempt): JsonResponse
+    {
+        $this->authorize('update event');
+        $eventModel = $this->findEvent($this->getTenant()->id, $event);
+        $source = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $eventModel->tenant_id)
+            ->whereHas('registration', fn ($query) => $query->where('event_id', $eventModel->id))->findOrFail($attempt);
+        if (in_array($source->state, ['refund_pending', 'refund_unknown', 'refunded'], true)) {
+            $source = app(\App\Services\Events\MemberBenefitRefunds::class)->reconcile($source, $request->validated('provider_refund_id'));
+        } else {
+            $verified = app(\App\Services\Events\MemberBenefitGateways::class)->verify($source);
+            if (($verified['status'] ?? null) === 'success') {
+                app(\App\Services\Events\MemberBenefitPayments::class)->confirm($source, $verified);
+            }
+            $source->refresh();
+        }
+
+        return response()->json(['state' => $source->state, 'review_reason' => $source->review_reason, 'message' => 'The original provider was checked. No new charge or refund was sent.']);
+    }
+
     public function cancel(string $subdomain, string $event, string $registration): JsonResponse
     {
         $this->authorize('update event');

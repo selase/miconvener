@@ -27,6 +27,9 @@ final class MemberBenefitCheckout
                 || ! in_array($provider, ['paystack', 'stripe'], true) || ! $this->eligibility->enabled($event->tenant)) {
                 $this->refuse('This member registration is not ready for online payment.');
             }
+            if (EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->where('is_extra_capture', true)->where('state', '!=', 'refunded')->exists()) {
+                $this->refuse('An additional captured payment needs refund or reconciliation. Do not pay again.');
+            }
             $old = EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
             $existing = EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->whereNotIn('state', ['failed', 'refunded'])->first();
             if ($existing !== null) {
@@ -73,7 +76,7 @@ final class MemberBenefitCheckout
             $gateway = $prepared['gateway'];
             $registration = $attempt->registration;
             $event = $registration->event;
-            $callback = route('public.events.member-callback', ['subdomain' => $event->tenant->slug, 'event' => $event->slug, 'registration' => $registration->id]);
+            $callback = route('public.events.member-callback', ['subdomain' => $event->tenant->slug, 'event' => $event->slug, 'registration' => $registration->id, 'attempt' => $attempt->id]);
             $metadata = ['type' => 'event_ticket', 'source' => config('services.paystack.metadata_source'), 'tenant_id' => $attempt->tenant_id,
                 'event_registration_id' => $registration->id, 'member_benefit_attempt_id' => $attempt->id, 'member_benefit_reference' => $attempt->reference,
                 ...$prepared['settlement']];

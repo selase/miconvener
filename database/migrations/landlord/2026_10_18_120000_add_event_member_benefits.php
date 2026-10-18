@@ -64,6 +64,13 @@ return new class extends Migration
             $table->text('checkout_url')->nullable();
             $table->string('state', 24)->default('preparing');
             $table->string('review_reason')->nullable();
+            $table->boolean('is_extra_capture')->default(false);
+            $table->jsonb('observed_payment')->nullable();
+            $table->uuid('refund_operation_key')->nullable()->unique();
+            $table->string('refund_reference')->nullable();
+            $table->bigInteger('refund_gateway_credit')->nullable();
+            $table->bigInteger('refund_commission_returned')->nullable();
+            $table->timestampTz('booked_at')->nullable();
             $table->timestampTz('paid_at')->nullable();
             $table->timestampTz('fulfilled_at')->nullable();
             $table->timestampTz('refunded_at')->nullable();
@@ -79,8 +86,8 @@ return new class extends Migration
             $table->foreign(['tenant_id', 'member_benefit_quote_id'])->references(['tenant_id', 'id'])->on('event_member_benefit_quotes')->restrictOnDelete();
         });
         $connection = $schema->getConnection();
-        $connection->statement("CREATE UNIQUE INDEX benefit_one_unresolved_registration ON event_member_benefit_attempts (registration_id) WHERE state NOT IN ('failed', 'refunded')");
-        $connection->statement("CREATE UNIQUE INDEX benefit_one_unresolved_quote ON event_member_benefit_attempts (quote_id) WHERE state NOT IN ('failed', 'refunded')");
+        $connection->statement("CREATE UNIQUE INDEX benefit_one_unresolved_registration ON event_member_benefit_attempts (registration_id) WHERE state IN ('preparing', 'open', 'unknown')");
+        $connection->statement("CREATE UNIQUE INDEX benefit_one_unresolved_quote ON event_member_benefit_attempts (quote_id) WHERE state IN ('preparing', 'open', 'unknown')");
         foreach (['event_member_benefit_quotes', 'event_member_benefit_attempts'] as $name) {
             $connection->statement("ALTER TABLE {$name} ADD CONSTRAINT {$name}_amounts CHECK (amount >= 0 AND platform_fee_amount >= 0 AND charged_amount >= 0)");
         }

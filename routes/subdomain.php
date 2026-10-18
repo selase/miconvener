@@ -190,6 +190,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/registrations/{registration}/approve-offline', [EventRegistrationController::class, 'approveOfflinePayment'])->name('tenant.events.registrations.approve-offline');
     Route::post('events/{event}/registrations/{registration}/reject-offline', [EventRegistrationController::class, 'rejectOfflinePayment'])->name('tenant.events.registrations.reject-offline');
     Route::get('events/{event}/registrations/{registration}/offline-proof', [EventRegistrationController::class, 'downloadProof'])->name('tenant.events.registrations.offline-proof');
+    Route::post('events/{event}/member-payments/{attempt}/refund', [EventRegistrationController::class, 'refundMemberPayment'])->name('tenant.events.member-payments.refund');
+    Route::post('events/{event}/member-payments/{attempt}/reconcile', [EventRegistrationController::class, 'reconcileMemberPayment'])->name('tenant.events.member-payments.reconcile');
     Route::post('events/{event}/registrations/{registration}/cancel', [EventRegistrationController::class, 'cancel'])->name('tenant.events.registrations.cancel');
     Route::patch('events/{event}/registrations/{registration}', [EventRegistrationController::class, 'update'])->name('tenant.events.registrations.update');
     Route::get('events/{event}/checkin/search', [EventCheckInController::class, 'search'])->name('tenant.events.checkin.search');
@@ -564,6 +566,7 @@ Route::post('/e/{event}/member-benefits', [PublicEventController::class, 'member
 Route::post('/e/{event}/member-verify/email/send', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'send'])->name('public.events.member-verify.send');
 Route::post('/e/{event}/member-verify/email/confirm', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'confirm'])->name('public.events.member-verify.confirm');
 Route::post('/e/{event}/checkout/{registration}/member', [EventCheckoutController::class, 'startMemberPayment'])->middleware('throttle:public-registration')->name('public.events.member-checkout');
+Route::post('/e/{event}/checkout/{registration}/member-benefits/reassess', [EventCheckoutController::class, 'reassessMemberPayment'])->middleware('throttle:public-registration')->block()->name('public.events.member-benefits.reassess');
 Route::get('/e/{event}/checkout/{registration}/member-callback', [EventCheckoutController::class, 'memberCallback'])->name('public.events.member-callback');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->block(15, 15)->name('public.events.contribute');

@@ -104,7 +104,7 @@ final class WebhookController extends Controller
                     $session = $event->data->object;
 
                     if (($session->payment_status ?? null) === 'paid' && $tenant) {
-                        $this->confirmStripeSession($tenant, $gateway, $session);
+                        $this->confirmStripeSession($tenant, $gateway, $session, isset($event->created) ? (int) $event->created : null);
                     }
                     break;
 
@@ -156,6 +156,9 @@ final class WebhookController extends Controller
                 return response()->json(['status' => 'success']);
             }
             if ($event === 'charge.success') {
+                if (app(\App\Services\Events\MemberBenefitNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway), $tenant)) {
+                    return response()->json(['status' => 'success']);
+                }
                 $metadata = \App\Http\Controllers\Billing\WebhookController::metadata($data['metadata'] ?? null);
                 if (($metadata['type'] ?? null) === 'community_gift') {
                     $reference = (string) ($data['reference'] ?? '');
@@ -213,8 +216,11 @@ final class WebhookController extends Controller
      * The charge reference is the PaymentIntent, because that is what a refund
      * is issued against.
      */
-    private function confirmStripeSession(Tenant $tenant, TenantPaymentGateway $gateway, object $session): void
+    private function confirmStripeSession(Tenant $tenant, TenantPaymentGateway $gateway, object $session, ?int $completionTimestamp = null): void
     {
+        if (app(\App\Services\Events\MemberBenefitNotifications::class)->stripe($tenant, $gateway, $session, $completionTimestamp)) {
+            return;
+        }
         $givingMetadata = $session->metadata ? $session->metadata->toArray() : [];
         if (($givingMetadata['type'] ?? null) === 'community_gift') {
             $attempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('provider', 'stripe')->where('provider_session_id', $session->id)->find($givingMetadata['giving_attempt_id'] ?? null);

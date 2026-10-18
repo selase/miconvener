@@ -200,6 +200,34 @@ final class EventCheckoutController extends Controller
         return Inertia::location($url);
     }
 
+    public function reassessMemberPayment(Request $request, string $subdomain, string $event, string $registration): \Illuminate\Http\JsonResponse
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        abort_unless($tenant !== null, 404);
+        $record = EventRegistration::query()->where('tenant_id', $tenant->id)->where('member_benefit_required', true)
+            ->whereHas('event', fn ($query) => $query->where('slug', $event))->findOrFail($registration);
+        abort_unless($this->canClaimWorkspace($record), 403);
+        $resolved = app(\App\Services\Events\MemberBenefitPayments::class)->reassess($record, $request->session());
+
+        return response()->json(['resolved' => $resolved, 'message' => $resolved ? 'Your existing payment has been applied. No new payment was taken.' : 'Verify your active personal membership. Your payment remains held for review.'], $resolved ? 200 : 422);
+    }
+
+    public function memberCallback(Request $request, string $subdomain, string $event, string $registration): RedirectResponse
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        abort_unless($tenant !== null, 404);
+        $record = EventRegistration::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('member_benefit_required', true)
+            ->whereHas('event', fn ($query) => $query->where('slug', $event))->findOrFail($registration);
+        $attempt = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('registration_id', $record->id)
+            ->findOrFail($request->query('attempt'));
+        $verified = app(\App\Services\Events\MemberBenefitGateways::class)->verify($attempt);
+        if (($verified['status'] ?? null) === 'success') {
+            app(\App\Services\Events\MemberBenefitPayments::class)->confirm($attempt, $verified);
+        }
+
+        return redirect()->route('public.events.checkout', ['subdomain' => $tenant->slug, 'event' => $event, 'registration' => $record->id]);
+    }
+
     public function submitOfflineProof(Request $request, string $subdomain, string $event, string $registration): RedirectResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -321,7 +349,7 @@ final class EventCheckoutController extends Controller
     {
         $eligible = app(\App\Services\Events\MemberBenefitEligibility::class)->resolve(request()->session(), $registration->event, $registration->email) !== null;
         $quote = \App\Models\EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
-        $attempt = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->latest()->first();
+        $attempt = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->latest()->orderByDesc('id')->first();
         $pricing = null;
         if ($eligible && $attempt === null) {
             try {
@@ -331,7 +359,7 @@ final class EventCheckoutController extends Controller
             }
         }
 
-        return ['required' => true, 'eligible' => $eligible, 'payment_state' => $attempt?->state, 'review_reason' => $attempt?->review_reason,
+        return ['extra_captures' => \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->where('is_extra_capture', true)->where('state', '!=', 'refunded')->count(), 'required' => true, 'eligible' => $eligible, 'payment_state' => $attempt?->state, 'review_reason' => $attempt?->review_reason,
             'current_total' => $quote?->expires_at->isFuture() ? $quote->charged_amount : ($pricing['fees']['charged_amount'] ?? $registration->effectiveChargedAmount()),
             'currency' => $registration->currency, 'expires_at' => $quote?->expires_at->toIso8601String()];
     }

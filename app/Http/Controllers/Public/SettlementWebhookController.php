@@ -71,6 +71,10 @@ final class SettlementWebhookController extends Controller
         // never bought. Transfers are exempt because ownership is already proven
         // by the payout reference, which only matches a payout this platform
         // created.
+        if ($settlementMatches && $event === 'charge.success' && app(\App\Services\Events\MemberBenefitNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
+            return response()->json(['status' => 'success']);
+        }
+
         if (! $this->isOurs($event, $metadata)) {
             Log::info('Ignoring Paystack event belonging to another application', [
                 'event' => $event,

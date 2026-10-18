@@ -86,3 +86,13 @@ it('renders benefit checkout without initiating a payment and requires workspace
     Http::assertNothingSent();
     $this->postJson($url.'/member', ['provider' => 'paystack', 'expected_amount' => 5000, 'currency' => 'GHS'])->assertRedirect('https://checkout.paystack.com/member');
 });
+
+it('does not resume a checkout while an additional captured payment needs refund or reconciliation', function (): void {
+    [, , , $registration, $session] = memberCheckoutFixture();
+    $service = app(MemberBenefitCheckout::class);
+    $service->start($session, $registration, 'paystack', 5000, 'GHS');
+    $current = EventMemberBenefitAttempt::query()->firstOrFail();
+    EventMemberBenefitAttempt::factory()->forQuote($current->quote)->create(['state' => 'paid_extra', 'is_extra_capture' => true]);
+    expect(fn () => $service->start($session, $registration->fresh(), 'paystack', 5000, 'GHS'))->toThrow(ValidationException::class);
+    Http::assertSentCount(3);
+});

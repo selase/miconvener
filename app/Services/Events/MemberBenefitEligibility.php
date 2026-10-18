@@ -27,9 +27,20 @@ final class MemberBenefitEligibility
 
     public function resolve(Session $session, Event $event, string $registrationEmail): ?Member
     {
-        $email = $this->identity->normaliseEmail($registrationEmail);
         $tenant = Tenant::query()->find($event->tenant_id);
-        if ($email === null || $tenant === null || ! $this->enabled($tenant)) {
+        if ($tenant === null || ! $this->enabled($tenant)) {
+            return null;
+        }
+
+        return $this->resolveExisting($session, $event, $registrationEmail);
+    }
+
+    /** Existing paid registrations retain self-service recovery after rollout is disabled. */
+    public function resolveExisting(Session $session, Event $event, string $registrationEmail): ?Member
+    {
+        $email = $this->identity->normaliseEmail($registrationEmail);
+        $tenant = Tenant::query()->where('status', TenantStatusEnum::ACTIVE)->find($event->tenant_id);
+        if ($email === null || $tenant === null) {
             return null;
         }
         foreach (Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)
