@@ -20,7 +20,7 @@ use InvalidArgumentException;
 final class TenantAddonService
 {
     /**
-     * @var array<string, array{key: string, name: string, description: string, addon_type: string, unit_price: int, billing_interval: string, quantity: int, category: string, available: bool}>
+     * @var array<string, array{key: string, name: string, description: string, addon_type: string, unit_price: int, usd_unit_price: int, billing_interval: string, quantity: int, category: string, available: bool}>
      *
      * An entry marked unavailable stays listed, so the offer is visible, but it
      * cannot be bought until what it sells is delivered. SMS packs are also off
@@ -33,6 +33,7 @@ final class TenantAddonService
             'description' => 'Full workspace console seat for team coordinators, finance, and event planners.',
             'addon_type' => TenantAddon::TYPE_TEAM_SEAT,
             'unit_price' => 7500, // GHS 75.00
+            'usd_unit_price' => 600, // US$ 6.00
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1,
             'category' => 'team',
@@ -44,6 +45,7 @@ final class TenantAddonService
             'description' => 'Five more staff links at a time: ushers and floor crew scan tickets and answer attendee requests from their phones, with no account and no team seat.',
             'addon_type' => TenantAddon::TYPE_USHER_PACK,
             'unit_price' => 6000, // GHS 60.00
+            'usd_unit_price' => 500, // US$ 5.00
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1, // 1 pack = 5 passes
             'category' => 'operations',
@@ -55,6 +57,7 @@ final class TenantAddonService
             'description' => 'Unlock real-time interactive presenter deck, audience polls, and moderated Q&A across all events.',
             'addon_type' => TenantAddon::TYPE_LIVE_POLLING,
             'unit_price' => 8500, // GHS 85.00
+            'usd_unit_price' => 700, // US$ 7.00
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1,
             'category' => 'engagement',
@@ -66,6 +69,7 @@ final class TenantAddonService
             'description' => 'Unlock live polling and Q&A for a single scheduled event.',
             'addon_type' => TenantAddon::TYPE_LIVE_POLLING,
             'unit_price' => 5000, // GHS 50.00
+            'usd_unit_price' => 400, // US$ 4.00
             'billing_interval' => TenantAddon::INTERVAL_EVENT_PASS,
             'quantity' => 1,
             'category' => 'engagement',
@@ -77,6 +81,7 @@ final class TenantAddonService
             'description' => 'Send SMS registration confirmations, tickets, and reminders directly to attendees.',
             'addon_type' => TenantAddon::TYPE_SMS_PACK,
             'unit_price' => 3500, // GHS 35.00
+            'usd_unit_price' => 300, // US$ 3.00
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 500,
             'category' => 'messaging',
@@ -88,6 +93,7 @@ final class TenantAddonService
             'description' => 'High-volume SMS pack with discounted per-message rate.',
             'addon_type' => TenantAddon::TYPE_SMS_PACK,
             'unit_price' => 9500, // GHS 95.00
+            'usd_unit_price' => 800, // US$ 8.00
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 1500,
             'category' => 'messaging',
@@ -99,6 +105,7 @@ final class TenantAddonService
             'description' => 'Large conference and summit SMS pack for bulk blasts.',
             'addon_type' => TenantAddon::TYPE_SMS_PACK,
             'unit_price' => 29000, // GHS 290.00
+            'usd_unit_price' => 2400, // US$ 24.00
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 5000,
             'category' => 'messaging',
@@ -110,6 +117,7 @@ final class TenantAddonService
             'description' => 'Additional transactional and marketing email broadcast credits.',
             'addon_type' => TenantAddon::TYPE_EMAIL_PACK,
             'unit_price' => 2500, // GHS 25.00
+            'usd_unit_price' => 200, // US$ 2.00
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 5000,
             'category' => 'messaging',
@@ -121,6 +129,7 @@ final class TenantAddonService
             'description' => 'Enterprise email capacity for mass newsletters and multi-stage reminders.',
             'addon_type' => TenantAddon::TYPE_EMAIL_PACK,
             'unit_price' => 9000, // GHS 90.00
+            'usd_unit_price' => 800, // US$ 8.00
             'billing_interval' => TenantAddon::INTERVAL_ONE_OFF,
             'quantity' => 25000,
             'category' => 'messaging',
@@ -134,6 +143,7 @@ final class TenantAddonService
             'description' => 'Our team checks your business, including past clients and events you have served. Once approved, your page shows a verified tick for a year.',
             'addon_type' => TenantAddon::TYPE_SHOP_VERIFICATION,
             'unit_price' => 15000, // GHS 150.00
+            'usd_unit_price' => 1300, // US$ 13.00
             'billing_interval' => TenantAddon::INTERVAL_YEARLY,
             'quantity' => 1,
             'category' => 'marketplace',
@@ -145,6 +155,7 @@ final class TenantAddonService
             'description' => 'Your listings appear first in marketplace search results for a week.',
             'addon_type' => TenantAddon::TYPE_SHOP_BOOST,
             'unit_price' => 5000, // GHS 50.00
+            'usd_unit_price' => 400, // US$ 4.00
             'billing_interval' => TenantAddon::INTERVAL_WEEKLY,
             'quantity' => 1,
             'category' => 'marketplace',
@@ -156,6 +167,7 @@ final class TenantAddonService
             'description' => 'Your listings lead the marketplace home page, marked Featured, for a month.',
             'addon_type' => TenantAddon::TYPE_SHOP_FEATURED,
             'unit_price' => 20000, // GHS 200.00
+            'usd_unit_price' => 1700, // US$ 17.00
             'billing_interval' => TenantAddon::INTERVAL_MONTHLY,
             'quantity' => 1,
             'category' => 'marketplace',

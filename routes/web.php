@@ -52,6 +52,7 @@ Route::get('/sample-product', fn (): Factory|View => view('sample-product-page')
 Route::permanentRedirect('/product-template', '/')->name('product.template');
 Route::get('/product-enterprise', fn (): Factory|View => view('product.enterprise'))->name('product.enterprise');
 Route::get('/features', fn (): Factory|View => view('product.features'))->name('features');
+Route::post('/currency', [App\Http\Controllers\Marketing\CurrencyController::class, 'update'])->middleware('throttle:30,1')->name('currency.update');
 Route::get('/use-cases', [App\Http\Controllers\Marketing\UseCaseController::class, 'index'])->name('use-cases.index');
 Route::get('/use-cases/{slug}', [App\Http\Controllers\Marketing\UseCaseController::class, 'show'])
     ->where('slug', '[a-z-]+')

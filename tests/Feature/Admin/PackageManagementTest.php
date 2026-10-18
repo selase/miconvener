@@ -57,3 +57,16 @@ test('package index returns datatables json', function () {
     $response->assertStatus(200)
         ->assertJsonFragment(['name' => 'Silver Plan']);
 });
+
+test('superadmin sets the fixed USD prices shown outside Ghana', function () {
+    $superadmin = User::factory()->create();
+    $superadmin->assignRole(Role::create(['name' => 'Superadmin', 'guard_name' => 'web']));
+    $package = Package::create(['name' => 'Gold', 'slug' => 'gold', 'price' => 249, 'interval' => 'month', 'billing_model' => 'flat_rate', 'is_active' => true]);
+
+    $this->actingAs($superadmin)->put(route('packages.update', $package->id), [
+        'name' => 'Gold', 'slug' => 'gold', 'price' => 249, 'interval' => 'month', 'billing_model' => 'flat_rate', 'is_active' => '1',
+        'price_usd' => '19', 'yearly_price_usd' => '190',
+    ])->assertRedirect();
+
+    expect((float) $package->fresh()->price_usd)->toBe(19.0)->and((float) $package->fresh()->yearly_price_usd)->toBe(190.0);
+});

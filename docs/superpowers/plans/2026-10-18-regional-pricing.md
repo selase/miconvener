@@ -50,9 +50,11 @@
 - `PriceBook::plan(Package $p, string $interval, string $currency): Money`, `PriceBook::addon(string $key, string $currency, int $multiplier = 1): Money`, `PriceBook::tokenPack(string $key, string $currency): Money` — USD falls back to GHS when no USD price or `ExchangeRates::usdPaused()`.
 - `ChargeQuote::for(Money $price): ChargeQuote` with `ghsMinor(): int`, `meta(): array{display_currency: string, display_amount_minor: int, fx_rate: ?float, fx_as_of: ?string, fx_source: ?string}`. GHS prices pass through unchanged with null fx fields.
 
-- [ ] **Step 1: Failing tests:** country GH → GHS, NG/US/missing → USD, cookie wins; untrusted proxy header ignored; `PriceBook` returns list prices in each currency, falls back to GHS when a USD price is missing or USD is paused; `ChargeQuote` converts 1900 cents at 11.77 to 22363 pesewas (round half up) and returns meta; switch endpoint sets the cookie and validates input; seeder sets USD prices without overwriting existing ones.
-- [ ] **Step 2–4:** Implement, run, pint, phpstan.
-- [ ] **Step 5: Commit** `feat(pricing): visitor currency, USD price list and a single price book`.
+- [x] **Step 1: Failing tests:** country GH → GHS, NG/US/missing → USD, cookie wins; untrusted proxy header ignored; `PriceBook` returns list prices in each currency, falls back to GHS when a USD price is missing or USD is paused; `ChargeQuote` converts 1900 cents at 11.77 to 22363 pesewas (round half up) and returns meta; switch endpoint sets the cookie and validates input; seeder sets USD prices without overwriting existing ones.
+- [x] **Step 2–4:** Implement, run, pint, phpstan.
+  Ruling: the `CF-IPCountry` header is read without a trusted-proxy check — it only chooses which list price is displayed and the switch already lets anyone pick either currency, so spoofing gains nothing; charges never trust it beyond that choice. Cost if wrong: none to money.
+  Ruling: the planned VisitorCurrencyTest, PriceBookTest and CurrencySwitchTest cases live in one file, `tests/Feature/Pricing/PriceBookTest.php`.
+- [x] **Step 5: Commit** `feat(pricing): visitor currency, USD price list and a single price book`.
 
 ### Task 3: Prices shown in the visitor's currency
 
