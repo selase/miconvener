@@ -150,19 +150,19 @@ test('example ticket prices follow the visitor: GHS in Ghana, USD elsewhere', fu
         ->assertSee('US$ 150', false)->assertDontSee('GHS 1,500', false);
 });
 
-test('the hub opens with a black band showing all seven motifs, each linking to its page', function (): void {
+test('the hub opens with a black band and one illustration of the seven gatherings around a common core', function (): void {
     $html = $this->get(route('use-cases.index'))->assertOk()->getContent();
     $document = new DOMDocument;
     @$document->loadHTML($html);
     $xpath = new DOMXPath($document);
     $hero = $xpath->query('//*[@data-use-case-hub-hero]')->item(0);
+    $art = $xpath->query('.//svg[@data-use-case-hub-art]', $hero);
 
     expect($hero)->not->toBeNull()
-        ->and($xpath->query('.//svg[@data-use-case-art]', $hero)->length)->toBe(7)
+        ->and($art->length)->toBe(1)
+        ->and($art->item(0)->getAttribute('aria-hidden'))->toBe('true')
+        ->and($xpath->query('.//svg[@data-use-case-art]', $art->item(0))->length)->toBe(7)
+        ->and($xpath->query('.//a', $hero)->length)->toBe(0)
         ->and($xpath->query('//*[@data-use-case-group]')->length)->toBe(2)
         ->and($xpath->query('//*[@data-use-case-cta]//a[contains(@href, "/register")]')->length)->toBe(1);
-
-    foreach (array_keys(config('use-cases.cases')) as $slug) {
-        expect($xpath->query('.//a[@href="'.route('use-cases.show', $slug).'"]', $hero)->length)->toBe(1);
-    }
 });

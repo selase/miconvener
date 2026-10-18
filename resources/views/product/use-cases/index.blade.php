@@ -3,22 +3,16 @@
 @section('title', $hub['title'].' - '.config('product-page.brand.name'))
 
 @section('content')
-    {{-- Hero: black band with the seven motifs, one per use case, each a way in. --}}
+    {{-- Hero: black band, the words on the left, the seven gatherings around one core on the right. --}}
     <section class="bg-[#08090b] text-white" data-use-case-hub-hero>
-        <div class="mx-auto max-w-7xl px-6 pb-14 pt-16 md:pb-20 md:pt-24">
-            <p class="mono text-[11px] uppercase tracking-[0.18em] text-[#6f9bff]">{{ $hub['eyebrow'] }}</p>
-            <h1 class="display mt-5 max-w-3xl text-[40px] leading-[44px] tracking-[-0.03em] text-white md:text-[48px] md:leading-[54px]">{{ $hub['title'] }}</h1>
-            <p class="mt-6 max-w-2xl text-[18px] leading-[29px] text-slate-300">{{ $hub['intro'] }}</p>
-
-            <div class="mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 sm:grid-cols-4 lg:grid-cols-7">
-                @foreach ($cases as $item)
-                    <a href="{{ route('use-cases.show', $item['slug']) }}" class="group flex flex-col bg-[#08090b] p-3 transition hover:bg-[#10131a] {{ $loop->last ? 'col-span-2 sm:col-span-1' : '' }}">
-                        <div class="aspect-[4/3] w-full [&>svg]:h-full [&>svg]:w-full [&>svg]:overflow-visible">
-                            @include('product.use-cases.art.'.$item['slug'])
-                        </div>
-                        <span class="mt-2 text-xs text-slate-400 group-hover:text-white">{{ $item['eyebrow'] }}</span>
-                    </a>
-                @endforeach
+        <div class="mx-auto grid max-w-7xl items-center gap-10 px-6 py-12 md:py-16 lg:grid-cols-[.9fr_1.1fr]">
+            <div>
+                <p class="mono text-[11px] uppercase tracking-[0.18em] text-[#6f9bff]">{{ $hub['eyebrow'] }}</p>
+                <h1 class="display mt-4 text-[34px] leading-[40px] tracking-[-0.03em] text-white md:text-[48px] md:leading-[54px]">{{ $hub['title'] }}</h1>
+                <p class="mt-5 max-w-xl text-[17px] leading-[27px] text-slate-300">{{ $hub['intro'] }}</p>
+            </div>
+            <div class="w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full">
+                @include('product.use-cases.art.hub')
             </div>
         </div>
     </section>
