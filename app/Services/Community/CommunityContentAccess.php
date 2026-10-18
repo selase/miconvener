@@ -29,6 +29,24 @@ final readonly class CommunityContentAccess
             ->filter(fn (Member $member): bool => $this->members->role($session, $member) !== null)->values();
     }
 
+    /** @return \Illuminate\Database\Eloquent\Builder<CommunityLibraryItem> */
+    public function visibleItems(Session $session, Tenant $tenant): \Illuminate\Database\Eloquent\Builder
+    {
+        $readers = $this->readers($session, $tenant, ['kind' => 'all_members']);
+        $groupIds = $readers->load(['groups' => fn ($q) => $q->where('community_groups.tenant_id', $tenant->id)->whereNull('archived_at')])->flatMap(fn ($member) => $member->groups->whereNull('archived_at')->pluck('id'))->unique()->values()->all();
+
+        return CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('state', 'published')
+            ->whereRaw("(audience - 'kind' - 'group_ids') = '{}'::jsonb")
+            ->where(fn ($q) => $q->whereNull('release_at')->orWhere('release_at', '<=', now()))
+            ->when($readers->isEmpty(), fn ($q) => $q->whereRaw('1=0'))
+            ->where(function ($q) use ($groupIds): void {
+                $q->where('audience->kind', 'all_members');
+                foreach ($groupIds as $id) {
+                    $q->orWhere(fn ($groups) => $groups->where('audience->kind', 'groups')->whereRaw("jsonb_typeof(audience->'group_ids') = 'array'")->whereJsonContains('audience->group_ids', $id));
+                }
+            });
+    }
+
     public function canRead(Session $session, CommunityLibraryItem $item): bool
     {
         return $this->readable($session, $item) !== null;
@@ -40,6 +58,10 @@ final readonly class CommunityContentAccess
         $current = CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $item->tenant_id)->find($item->id);
         $tenant = Tenant::query()->find($item->tenant_id);
         if ($current === null || $tenant === null || ! $this->rollout->available($tenant) || $current->state !== 'published' || $current->release_at?->isFuture()) {
+            return null;
+        }
+
+        if ($current->kind === 'service_note' && ! app(CommunityServices::class)->occurrences($tenant)->where('event_id', $current->event_id)->whereKey($current->session_id)->exists()) {
             return null;
         }
 

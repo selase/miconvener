@@ -24,15 +24,8 @@ final class CommunityLibraryController extends Controller
         abort_unless(app(CommunityLibraryRollout::class)->available($tenant), 404);
         $readers = $access->readers($request->session(), $tenant, ['kind' => 'all_members']);
         abort_if($readers->isEmpty(), 404);
-        $groupIds = $readers->load('groups')->flatMap(fn ($reader) => $reader->groups->whereNull('archived_at')->pluck('id'))->unique()->values()->all();
-        $items = CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('state', 'published')->where('kind', 'document')
-            ->where(fn ($q) => $q->whereNull('release_at')->orWhere('release_at', '<=', now()))
-            ->where(function ($q) use ($groupIds): void {
-                $q->where('audience->kind', 'all_members');
-                foreach ($groupIds as $id) {
-                    $q->orWhere(fn ($groups) => $groups->where('audience->kind', 'groups')->whereJsonContains('audience->group_ids', $id));
-                }
-            })->when($request->filled('search'), fn ($q) => $q->where('title', 'ilike', '%'.$request->validated('search').'%'))
+        $items = $access->visibleItems($request->session(), $tenant)->where('kind', 'document')
+            ->when($request->filled('search'), fn ($q) => $q->where('title', 'ilike', '%'.$request->validated('search').'%'))
             ->with(['currentVersion', 'tenant'])->orderBy('title')->orderBy('id')->paginate(25);
 
         return response()->json(['organisation' => ['name' => $tenant->name, 'slug' => $tenant->slug], 'entries' => $items->through(fn ($item) => $library->payload($item)), 'contexts' => $readers->map(fn ($member) => ['id' => $member->id, 'name' => $member->name, 'role' => app(\App\Services\Community\MemberAccess::class)->role($request->session(), $member)])->values()])->header('Cache-Control', 'private, no-store');

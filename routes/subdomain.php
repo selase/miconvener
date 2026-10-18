@@ -322,6 +322,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
+    Route::post('community/library/service-notes', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'store'])->name('tenant.community.service-notes.store');
+    Route::get('community/library/service-options', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'options'])->name('tenant.community.service-notes.options');
     Route::get('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'index'])->name('tenant.community.library.index');
     Route::post('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'store'])->name('tenant.community.library.store');
     Route::post('community/library/{item}', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'update'])->whereUuid('item')->name('tenant.community.library.update');

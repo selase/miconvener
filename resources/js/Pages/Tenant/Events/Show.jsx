@@ -495,7 +495,11 @@ export default function Show({
     contributionsStats = {},
 }) {
     const [editing, setEditing] = useState(false);
-    const canManageEvent = Boolean(usePage().props.auth?.can?.update_event);
+    const page = usePage().props;
+    const canManageEvent = Boolean(page.auth?.can?.update_event);
+    const canPublishCommunityNotes = Boolean(
+        page.auth?.can?.manage_community_library && page.tenant?.features?.community_library_publish
+    );
     const current = section ?? 'overview';
     const hrefFor = (slug) => sectionHref(event.id, slug);
     const reloadEvent = () => router.reload({ only: ['event'] });
@@ -549,6 +553,7 @@ export default function Show({
                 event={event}
                 sessions={event.sessions}
                 speakers={event.speakers}
+                canPublishCommunityNotes={canPublishCommunityNotes}
                 onChange={reloadEvent}
             />
         ),

@@ -21,6 +21,8 @@ Route::prefix('my')->group(function (): void {
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::get('/communities/{tenantSlug}/services', [App\Http\Controllers\Public\CommunityServicesController::class, 'index'])->name('attendee.my.services.index');
+        Route::get('/communities/{tenantSlug}/services/{session}', [App\Http\Controllers\Public\CommunityServicesController::class, 'show'])->whereUuid('session')->name('attendee.my.services.show');
         Route::get('/communities/{tenantSlug}/library', [App\Http\Controllers\Public\CommunityLibraryController::class, 'index'])->name('attendee.my.library.index');
         Route::get('/communities/{tenantSlug}/library/{item}', [App\Http\Controllers\Public\CommunityLibraryController::class, 'show'])->whereUuid('item')->name('attendee.my.library.show');
         Route::get('/communities/{tenantSlug}/library/{item}/file', [App\Http\Controllers\Public\CommunityLibraryController::class, 'file'])->whereUuid('item')->name('attendee.my.library.file');

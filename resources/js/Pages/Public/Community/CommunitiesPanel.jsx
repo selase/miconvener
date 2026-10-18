@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { communityRequest } from '@/lib/community';
 import LibraryPanel from './LibraryPanel';
+import ServicesPanel from './ServicesPanel';
 import FollowControl from './FollowControl';
 import Join from './Join';
 import MemberClaim from './MemberClaim';
@@ -218,10 +219,24 @@ export default function CommunitiesPanel({
     }
     if (
         appPage &&
-        contentLocation.searchParams.get('community_view') === 'library' &&
+        ['library', 'services'].includes(contentLocation.searchParams.get('community_view')) &&
         contentLocation.searchParams.get('organiser')
     ) {
         const slug = contentLocation.searchParams.get('organiser');
+        if (contentLocation.searchParams.get('community_view') === 'services')
+            return (
+                <ServicesPanel
+                    key={slug}
+                    tenantSlug={slug}
+                    serviceId={contentLocation.searchParams.get('service')}
+                    onExpired={onExpired}
+                    onClose={() =>
+                        window.location.assign(
+                            `/my?organiser=${encodeURIComponent(slug)}&section=communities`
+                        )
+                    }
+                />
+            );
         return (
             <LibraryPanel
                 key={slug}
@@ -357,6 +372,14 @@ export default function CommunitiesPanel({
                                             )}
                                         </div>
                                         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2">
+                                            {community.actions?.services && (
+                                                <a
+                                                    className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-medium text-ink hover:text-accent"
+                                                    href={`/my?organiser=${encodeURIComponent(community.slug)}&section=communities&community_view=services`}
+                                                >
+                                                    Services
+                                                </a>
+                                            )}
                                             {community.actions?.library && (
                                                 <a
                                                     className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-medium text-ink hover:text-accent"

@@ -61,6 +61,7 @@ it('never serves an old edition when the current pointer changes during lookup',
 it('lists only released documents belonging to the current member audience', function () {
     [$tenant, $member, $item] = libraryReader();
     App\Models\CommunityLibraryItem::factory()->create(['tenant_id' => $tenant->id, 'state' => 'draft']);
+    App\Models\CommunityLibraryItem::factory()->create(['tenant_id' => $tenant->id, 'audience' => ['kind' => 'all_members', 'unsupported' => true]]);
     App\Models\CommunityLibraryItem::factory()->create(['tenant_id' => $tenant->id, 'audience' => ['kind' => 'groups', 'group_ids' => []]]);
     $this->withSession([PlatformAttendeeVerification::SESSION_KEY => ['email' => $member->email, 'expires_at' => now()->addHour()->timestamp]])
         ->getJson(route('attendee.my.library.index', ['tenantSlug' => $tenant->slug]).'?search=')->assertOk()->assertJsonCount(1, 'entries.data')->assertJsonPath('entries.data.0.id', $item->id);
