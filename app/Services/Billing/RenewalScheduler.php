@@ -162,6 +162,7 @@ final class RenewalScheduler
         }
 
         $attempt = $subscription->renewal_attempts + 1;
+        $pricing = $subscription->chargeQuoteFor($package)->meta();
         $reference = "renew-{$subscription->id}-{$periodEnd->format('Ymd')}-{$attempt}";
         $display = BillingNotifier::money($amount, (string) config('services.paystack.currency', 'GHS'));
 
@@ -186,6 +187,7 @@ final class RenewalScheduler
                     'tenant_id' => $tenant->id,
                     'subscription_id' => $subscription->id,
                     'package_id' => $package->id,
+                    'pricing' => $pricing,
                 ],
             );
         } catch (PaymentFailedException $e) {
@@ -207,7 +209,7 @@ final class RenewalScheduler
         }
 
         if ($result['status'] === 'success') {
-            $this->renewals->recordRenewal($subscription, $package, $result['reference'], $result['amount'], $result['currency'], $result + ['customer_email' => $subscription->authorization_email]);
+            $this->renewals->recordRenewal($subscription, $package, $result['reference'], $result['amount'], $result['currency'], $result + ['customer_email' => $subscription->authorization_email, 'pricing' => $pricing]);
             $this->notifier->paymentReceived($tenant, $result['reference'], $subscription->authorization_email, $result);
 
             return "charged {$display} (attempt {$attempt})";

@@ -71,9 +71,11 @@
 
 **Files:** `Billing\CheckoutController` (plan, renew, invoice), `RenewalScheduler` (auto-charge), `Subscription::priceMinorFor` (becomes currency-aware via `PriceBook` + `billing_currency`), `TenantAddonService::initializeCheckout` and fulfilment, `LlmCheckoutController`, `SubscriptionProvisioningService` (stores `billing_currency` from metadata), `PaymentFulfillmentService` and the billing callback/webhook (persist quote `meta` on the transaction). Tests: `tests/Feature/Pricing/CheckoutConversionTest.php` plus existing billing suites.
 
-- [ ] **Step 1: Failing tests:** for a USD visitor each path initialises Paystack in GHS with `ghsMinor` and metadata including the quote; the resulting transaction `meta` records display currency, USD amount, rate, date, source; the subscription stores `billing_currency = USD`; a USD auto-renewal converts at the rate stored on the renewal day (freeze time, change the stored rate); GHS visitors are charged exactly as before (existing tests unchanged); Enterprise agreed prices stay GHS; USD paused → charged GHS list price.
-- [ ] **Step 2–4:** Implement, run Billing, Finance, Marketplace and Pricing suites.
-- [ ] **Step 5: Commit** `feat(pricing): convert USD prices to GHS at checkout and record the rate`.
+- [x] **Step 1: Failing tests:** for a USD visitor each path initialises Paystack in GHS with `ghsMinor` and metadata including the quote; the resulting transaction `meta` records display currency, USD amount, rate, date, source; the subscription stores `billing_currency = USD`; a USD auto-renewal converts at the rate stored on the renewal day (freeze time, change the stored rate); GHS visitors are charged exactly as before (existing tests unchanged); Enterprise agreed prices stay GHS; USD paused → charged GHS list price.
+- [x] **Step 2–4:** Implement, run Billing, Finance, Marketplace and Pricing suites.
+  Ruling: the quote travels in Paystack metadata under `pricing`, so the callback and the webhook both record it without a lookup; `billing_currency` is USD only when the charge was actually converted (USD paused or Enterprise agreed price gives GHS). Cost if wrong: none to amounts, which come from Paystack.
+  Ruling: the invoice payment paths (`CheckoutController::handleInvoiceCheckout`, `InvoicePaymentController`) move to Task 5 with the invoice currency fix. Marketplace quote deposits are vendor money (out of scope, spec 8).
+- [x] **Step 5: Commit** `feat(pricing): convert USD prices to GHS at checkout and record the rate`.
 
 ### Task 5: Invoices show the currency charged
 

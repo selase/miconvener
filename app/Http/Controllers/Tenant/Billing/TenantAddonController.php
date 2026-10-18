@@ -108,6 +108,7 @@ final class TenantAddonController extends Controller
             [
                 'multiplier' => (int) ($validated['multiplier'] ?? 1),
                 'event_id' => $validated['event_id'] ?? null,
+                'currency' => app(VisitorCurrency::class)->resolve($request),
             ]
         );
 

@@ -10,6 +10,8 @@ use App\Models\Tenant;
 use App\Models\TenantAddon;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\PriceBook;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -228,7 +230,8 @@ final class TenantAddonService
             Event::where('tenant_id', $tenant->id)->where('id', $eventId)->firstOrFail();
         }
 
-        $totalPricePesewas = $config['unit_price'] * $multiplier;
+        $quote = app(ChargeQuote::class)->for(app(PriceBook::class)->addon($addonKey, (string) ($options['currency'] ?? 'GHS'), $multiplier));
+        $totalPricePesewas = $quote->ghsMinor();
         $totalQuantity = $config['quantity'] * $multiplier;
         $reference = 'ADDON-'.mb_strtoupper(Str::random(12));
 
@@ -264,6 +267,7 @@ final class TenantAddonService
                 'quantity' => $totalQuantity,
                 'event_id' => $eventId,
                 'total_price' => $totalPricePesewas,
+                'pricing' => $quote->meta(),
             ]
         );
 
@@ -311,7 +315,9 @@ final class TenantAddonService
         $eventId = ! empty($metadata['event_id']) ? (string) $metadata['event_id'] : null;
 
         try {
-            return $this->activate($tenant, $reference, $config, $quantity, $totalPrice, $eventId, []);
+            $pricing = is_array($metadata['pricing'] ?? null) ? ['pricing' => $metadata['pricing']] : [];
+
+            return $this->activate($tenant, $reference, $config, $quantity, $totalPrice, $eventId, $pricing);
         } catch (UniqueConstraintViolationException) {
             return TenantAddon::where('paystack_reference', $reference)->first();
         }
@@ -450,6 +456,7 @@ final class TenantAddonService
                     'addon_id' => $addon->id,
                     'addon_type' => $addon->addon_type,
                     'addon_name' => $addon->name,
+                    'pricing' => $extraMeta['pricing'] ?? null,
                 ],
             ]);
 

@@ -212,6 +212,8 @@ final class SubscriptionProvisioningService
                 'grace_ends_at' => null,
                 'renewal_attempts' => 0,
                 'interval' => $dto['interval'] ?? null,
+                // A plan bought at a USD price renews at its USD price, converted on the renewal day.
+                'billing_currency' => ($dto['pricing']['display_currency'] ?? 'GHS') === 'USD' ? 'USD' : 'GHS',
                 ...self::authorizationAttributes($dto['authorization'] ?? null, $dto['customer_email'] ?? null),
             ]
         );
