@@ -37,7 +37,7 @@ final class EventPackageSeeder extends Seeder
     ];
 
     /**
-     * @var array<string, array{name: string, description: string, monthly: float, yearly: float, sort: int, is_free: bool, default_fee: float|null, default_cap: int|null, default_bearer: string, features: array<string, int|bool>}>
+     * @var array<string, array{name: string, description: string, monthly: float, yearly: float, monthly_usd?: int, yearly_usd?: int, sort: int, is_free: bool, default_fee: float|null, default_cap: int|null, default_bearer: string, features: array<string, int|bool>}>
      */
     private array $packages = [
         'free' => [
@@ -78,6 +78,8 @@ final class EventPackageSeeder extends Seeder
             'description' => 'For teams running regular professional events and workshops.',
             'monthly' => 249,
             'yearly' => 2490,
+            'monthly_usd' => 19,
+            'yearly_usd' => 190,
             'sort' => 1,
             'is_free' => false,
             'default_fee' => 3.5,
@@ -111,6 +113,8 @@ final class EventPackageSeeder extends Seeder
             'description' => 'For organizations and agencies running conferences and summits at scale.',
             'monthly' => 499,
             'yearly' => 4990,
+            'monthly_usd' => 39,
+            'yearly_usd' => 390,
             'sort' => 2,
             'is_free' => false,
             'default_fee' => 2.0,
@@ -216,6 +220,16 @@ final class EventPackageSeeder extends Seeder
                     'default_fee_bearer' => $config['default_bearer'],
                 ]
             );
+
+            // USD prices are set once; a superadmin's later edit is kept.
+            $usd = array_filter([
+                'price_usd' => $package->price_usd === null ? ($config['monthly_usd'] ?? null) : null,
+                'yearly_price_usd' => $package->yearly_price_usd === null ? ($config['yearly_usd'] ?? null) : null,
+            ], fn (mixed $value): bool => $value !== null);
+
+            if ($usd !== []) {
+                $package->update($usd);
+            }
 
             $syncData = [];
             foreach ($config['features'] as $featureSlug => $value) {

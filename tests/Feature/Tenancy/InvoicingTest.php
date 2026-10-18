@@ -113,3 +113,9 @@ test('it applies taxes to invoice', function () {
     expect((float) $invoice->tax_total)->toEqual(5.0);
     expect((float) $invoice->total)->toEqual(55.0);
 });
+
+test('a generated invoice is in the currency checkout charges, not USD', function () {
+    $invoice = $this->invoicingService->generate($this->tenant, now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth());
+
+    expect($invoice->currency)->toBe('GHS');
+});

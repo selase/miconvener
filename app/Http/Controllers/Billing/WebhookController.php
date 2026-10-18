@@ -199,7 +199,7 @@ final class WebhookController extends Controller
         $sendReceipt = fn () => app(BillingNotifier::class)->paymentReceived($tenant, $reference, $customerEmail, $data);
 
         if ($metaType === 'llm_token_purchase') {
-            if (app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase($tenant, $reference, $metadata)) {
+            if (app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase($tenant, $reference, $metadata, isset($data['amount']) ? (int) $data['amount'] : null)) {
                 Log::info("Paystack: fulfilled token purchase for tenant {$tenant->id} via webhook");
             }
 
@@ -263,6 +263,7 @@ final class WebhookController extends Controller
                         'interval' => $interval,
                         'authorization' => (array) ($data['authorization'] ?? []),
                         'customer_email' => $customerEmail,
+                        'pricing' => $metadata['pricing'] ?? null,
                     ];
 
                     if ($provisioningService->provision($tenant, $dto)) {

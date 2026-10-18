@@ -54,7 +54,7 @@ final class RateCardController extends Controller
                 [
                     'unit_price' => $data['unit_price'] ?? 0,
                     'unit_quantity' => $data['unit_quantity'] ?? 1,
-                    'currency' => 'USD',
+                    'currency' => (string) config('services.paystack.currency', 'GHS'),
                 ]
             );
         }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\Money;
+use App\Services\Pricing\PriceBook;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +41,7 @@ final class Subscription extends Model
         'authorization_email',
         'authorization_label',
         'grace_ends_at',
+        'billing_currency',
         'renewal_attempts',
         'renewal_attempted_at',
     ];
@@ -116,26 +120,27 @@ final class Subscription extends Model
     }
 
     /**
-     * What one period of this subscription costs on the given package now.
-     */
-    /**
-     * What the next period of this plan costs, in minor units: the
-     * organisation's agreed price when it has one (Enterprise), otherwise the
-     * plan's list price for this subscription's interval.
+     * What the next period of this plan costs, in GHS minor units (what
+     * Paystack charges): the organisation's agreed price when it has one
+     * (Enterprise), otherwise the plan's list price for this subscription's
+     * interval in its billing currency, a USD price converted at today's rate.
      */
     public function priceMinorFor(Package $package): int
     {
+        return $this->chargeQuoteFor($package)->ghsMinor();
+    }
+
+    /**
+     * The price of the next period and what it is charged as, with the rate.
+     */
+    public function chargeQuoteFor(Package $package): ChargeQuote
+    {
         $agreed = $this->tenant?->agreedPriceFor($package);
+        $price = $agreed !== null
+            ? new Money($agreed['amount'], 'GHS')
+            : app(PriceBook::class)->plan($package, $this->billingInterval(), (string) ($this->billing_currency ?: 'GHS'));
 
-        if ($agreed !== null) {
-            return $agreed['amount'];
-        }
-
-        $price = $this->billingInterval() === 'year'
-            ? ($package->yearly_price ?? (float) $package->price * 10)
-            : $package->price;
-
-        return (int) round((float) $price * 100);
+        return app(ChargeQuote::class)->for($price);
     }
 
     public function onGracePeriod(): bool

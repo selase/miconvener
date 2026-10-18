@@ -77,6 +77,7 @@ final class SubscriptionRenewalService
                         'package_id' => $package->id,
                         'provider_plan_id' => $package->slug.'_'.$interval,
                         'current_period_end' => $periodEnd->toIso8601String(),
+                        'pricing' => self::pricing($provider),
                     ],
                 ]);
 
@@ -104,6 +105,25 @@ final class SubscriptionRenewalService
         $current = Package::query()->find($subscription->tenant()->value('package_id'));
 
         return $current && ! $current->isFree() ? $current : null;
+    }
+
+    /**
+     * The price and exchange rate the renewal was charged at: passed directly
+     * by the scheduler, or carried in Paystack's metadata (an array, or JSON).
+     *
+     * @param  array<string, mixed>  $provider
+     * @return array<string, mixed>|null
+     */
+    private static function pricing(array $provider): ?array
+    {
+        if (is_array($provider['pricing'] ?? null)) {
+            return $provider['pricing'];
+        }
+
+        $metadata = $provider['metadata'] ?? null;
+        $metadata = is_string($metadata) ? json_decode($metadata, true) : $metadata;
+
+        return is_array($metadata) && is_array($metadata['pricing'] ?? null) ? $metadata['pricing'] : null;
     }
 
     /**

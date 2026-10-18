@@ -37,6 +37,18 @@
 
                         <div class="row mb-7">
                             <div class="col-md-4">
+                                <label class="fw-bold fs-6 mb-2">Monthly price in USD</label>
+                                <input type="number" step="0.01" min="0" name="price_usd" class="form-control form-control-solid" value="{{ old('price_usd', $package->price_usd) }}" />
+                                <div class="form-text">Shown to visitors outside Ghana and charged in GHS at the Bank of Ghana rate. Leave empty to show GHS.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="fw-bold fs-6 mb-2">Yearly price in USD</label>
+                                <input type="number" step="0.01" min="0" name="yearly_price_usd" class="form-control form-control-solid" value="{{ old('yearly_price_usd', $package->yearly_price_usd) }}" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-7">
+                            <div class="col-md-4">
                                 <label class="required fw-bold fs-6 mb-2">Price</label>
                                 <input type="number" step="0.01" name="price" class="form-control form-control-solid"
                                     value="{{ old('price', $package->price) }}" required />

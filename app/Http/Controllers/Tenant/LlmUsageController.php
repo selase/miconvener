@@ -6,6 +6,9 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\LlmTokenUsage;
+use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\PriceBook;
+use App\Services\Pricing\VisitorCurrency;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
@@ -43,6 +46,8 @@ final class LlmUsageController extends Controller
                 'created_at' => $usage->created_at->format('Y-m-d H:i'),
             ]);
 
+        $currency = app(VisitorCurrency::class)->resolve($request);
+
         return Inertia::render('Tenant/LlmUsage/Index', [
             'totalUsage' => [
                 'total_tokens' => (int) ($totalUsage->total_tokens ?? 0),
@@ -53,12 +58,17 @@ final class LlmUsageController extends Controller
             'recentUsage' => $recentUsage,
             'topupBalance' => $tenant->llm_topup_balance,
             'tokenPacks' => ! $request->user()->can('manage billing') ? [] : collect(Config::array('llm.token_packs', []))
-                ->map(fn (array $pack, string $key): array => [
-                    'key' => $key,
-                    'name' => $pack['name'],
-                    'tokens' => (int) $pack['tokens'],
-                    'price' => $pack['currency'].' '.number_format((float) $pack['price'], 2),
-                ])
+                ->map(function (array $pack, string $key) use ($currency): array {
+                    $display = app(ChargeQuote::class)->for(app(PriceBook::class)->tokenPack($key, $currency))->display();
+
+                    return [
+                        'key' => $key,
+                        'name' => $pack['name'],
+                        'tokens' => (int) $pack['tokens'],
+                        'price' => $display['price'],
+                        'charge_note' => $display['charge_note'],
+                    ];
+                })
                 ->values()
                 ->all(),
         ]);

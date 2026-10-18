@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task using the owner's established native approach. Steps use checkbox (`- [ ]`) syntax. One fresh whole-branch review at the end; no per-task reviewers or redundant second blanket review.
 
-**Status:** Implemented and reviewed locally on `codex/community-7` (owner-approved native approach). Owner acceptance and approved upload/full remote CI remain before merge/deployment. No production change or rollout.
+**Status:** Implemented and reviewed locally on `codex/community-7` (owner-approved native approach). Owner accepted and approved push/merge/deploy2026-10-18; full remote CI is the remaining pre-merge gate. No production change or rollout yet.
 
 **Goal:** Let associations share standing documents, churches publish notes for individual recurring services, and organisations ask their audience questions through the existing `/my` app, without requiring dues or event registration for organisation-owned content.
 
