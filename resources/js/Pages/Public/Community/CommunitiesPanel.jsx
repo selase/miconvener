@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { communityRequest } from '@/lib/community';
 import LibraryPanel from './LibraryPanel';
 import ServicesPanel from './ServicesPanel';
+import QuestionnairesPanel from './QuestionnairesPanel';
 import FollowControl from './FollowControl';
 import Join from './Join';
 import MemberClaim from './MemberClaim';
@@ -219,10 +220,26 @@ export default function CommunitiesPanel({
     }
     if (
         appPage &&
-        ['library', 'services'].includes(contentLocation.searchParams.get('community_view')) &&
+        ['library', 'services', 'polls'].includes(
+            contentLocation.searchParams.get('community_view')
+        ) &&
         contentLocation.searchParams.get('organiser')
     ) {
         const slug = contentLocation.searchParams.get('organiser');
+        if (contentLocation.searchParams.get('community_view') === 'polls')
+            return (
+                <QuestionnairesPanel
+                    key={slug}
+                    tenantSlug={slug}
+                    questionnaireId={contentLocation.searchParams.get('questionnaire')}
+                    onExpired={onExpired}
+                    onClose={() =>
+                        window.location.assign(
+                            `/my?organiser=${encodeURIComponent(slug)}&section=communities`
+                        )
+                    }
+                />
+            );
         if (contentLocation.searchParams.get('community_view') === 'services')
             return (
                 <ServicesPanel
@@ -372,6 +389,14 @@ export default function CommunitiesPanel({
                                             )}
                                         </div>
                                         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2">
+                                            {community.actions?.polls && (
+                                                <a
+                                                    className="min-h-11 text-accent underline"
+                                                    href={`/my?organiser=${encodeURIComponent(community.slug)}&section=communities&community_view=polls`}
+                                                >
+                                                    Polls &amp; surveys
+                                                </a>
+                                            )}
                                             {community.actions?.services && (
                                                 <a
                                                     className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-medium text-ink hover:text-accent"

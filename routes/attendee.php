@@ -23,6 +23,9 @@ Route::prefix('my')->group(function (): void {
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
         Route::get('/communities/{tenantSlug}/services', [App\Http\Controllers\Public\CommunityServicesController::class, 'index'])->name('attendee.my.services.index');
         Route::get('/communities/{tenantSlug}/services/{session}', [App\Http\Controllers\Public\CommunityServicesController::class, 'show'])->whereUuid('session')->name('attendee.my.services.show');
+        Route::get('/communities/{tenantSlug}/polls', [App\Http\Controllers\Public\CommunityQuestionnaireController::class, 'index'])->name('attendee.my.polls.index');
+        Route::get('/communities/{tenantSlug}/polls/{questionnaire}', [App\Http\Controllers\Public\CommunityQuestionnaireController::class, 'show'])->whereUuid('questionnaire')->name('attendee.my.polls.show');
+        Route::post('/communities/{tenantSlug}/polls/{questionnaire}/responses', [App\Http\Controllers\Public\CommunityQuestionnaireController::class, 'submit'])->whereUuid('questionnaire')->middleware('throttle:30,1')->name('attendee.my.polls.submit');
         Route::get('/communities/{tenantSlug}/library', [App\Http\Controllers\Public\CommunityLibraryController::class, 'index'])->name('attendee.my.library.index');
         Route::get('/communities/{tenantSlug}/library/{item}', [App\Http\Controllers\Public\CommunityLibraryController::class, 'show'])->whereUuid('item')->name('attendee.my.library.show');
         Route::get('/communities/{tenantSlug}/library/{item}/file', [App\Http\Controllers\Public\CommunityLibraryController::class, 'file'])->whereUuid('item')->name('attendee.my.library.file');

@@ -111,9 +111,9 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 
 **Interfaces:** GET member list/detail; POST bounded answer payload uses Task4 submit; staff create/edit/open/close/results publication requires manage permission, attributable results/CSV requires separate results permission. Paginate response detail25; aggregate server-side; stream bounded exports and neutralise CSV formulas. `CommunityQuestionnaireResults::summary(CommunityQuestionnaire $questionnaire): array` exposes counts/distributions only to permitted audience after explicit results publication; no emails/phone/member IDs in reader results. Preserve hidden results while accepting answers.
 
-- [ ] Write failing tests for staff permission separation, unpublished result denial, raw export privacy, CSV formula neutralisation, duplicate submit notice, partially completed form on validation errors, proof expiry, withdrawn questionnaire and cross-tenant URLs.
-- [ ] Implement native editor/member form, explicit selected context, confirmation, open/closed/responded state, empty/error/loading views, result publication and export. No automatic notifications, inbox copies, SMS or event broadcasts.
-- [ ] Run affected PHP/Vitest, event poll regression suites and app privacy/cache tests; keyboard/narrow/light/dark acceptance, rebuild, tick and commit.
+- [x] Write failing tests for staff permission separation, unpublished result denial, raw export privacy, CSV formula neutralisation, duplicate submit notice, partially completed form on validation errors, proof expiry, withdrawn questionnaire and cross-tenant URLs.
+- [x] Implement native editor/member form, explicit selected context, confirmation, open/closed/responded state, empty/error/loading views, result publication and export. No automatic notifications, inbox copies, SMS or event broadcasts.
+- [x] Run affected PHP/Vitest, event poll regression suites and app privacy/cache tests; keyboard/narrow/light/dark acceptance, rebuild, tick and commit.
 
 ### Task 6: Final integration, one review and controlled rollout proposal
 

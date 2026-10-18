@@ -85,6 +85,7 @@ final class HandleInertiaRequests extends Middleware
                     'community_following' => $tenant->followingEnabled(),
                     'community' => $tenant->communityEnabled(),
                     'giving_history' => $tenant->hasGivingMoney() || app(\App\Services\Giving\GivingRollout::class)->enabled($tenant),
+                    'community_polls_history' => $tenant->features()->where('feature_key', 'community_polls')->where('enabled', true)->exists() || \App\Models\CommunityQuestionnaire::withoutGlobalScopes()->where('tenant_id', $tenant->id)->exists(),
                     'community_library_publish' => app(\App\Services\Community\CommunityLibraryRollout::class)->canPublish($tenant),
                     'community_library_history' => $tenant->features()->where('feature_key', 'community_library')->where('enabled', true)->exists() || \App\Models\CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $tenant->id)->exists(),
                     'community_event_benefits' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($tenant),

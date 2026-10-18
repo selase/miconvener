@@ -324,6 +324,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::post('community/library/service-notes', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'store'])->name('tenant.community.service-notes.store');
     Route::get('community/library/service-options', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'options'])->name('tenant.community.service-notes.options');
+    Route::get('community/polls', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'index'])->name('tenant.community.polls.index');
+    Route::post('community/polls', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'store'])->name('tenant.community.polls.store');
+    Route::post('community/polls/{questionnaire}', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'update'])->whereUuid('questionnaire')->name('tenant.community.polls.update');
+    Route::post('community/polls/{questionnaire}/state', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'state'])->whereUuid('questionnaire')->name('tenant.community.polls.state');
+    Route::get('community/polls/{questionnaire}/results', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'results'])->whereUuid('questionnaire')->name('tenant.community.polls.results');
+    Route::get('community/polls/{questionnaire}/export', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'export'])->whereUuid('questionnaire')->name('tenant.community.polls.export');
     Route::get('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'index'])->name('tenant.community.library.index');
     Route::post('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'store'])->name('tenant.community.library.store');
     Route::post('community/library/{item}', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'update'])->whereUuid('item')->name('tenant.community.library.update');
