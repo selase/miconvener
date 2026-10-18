@@ -82,6 +82,7 @@ final class HandleInertiaRequests extends Middleware
                     'community_following' => $tenant->followingEnabled(),
                     'community' => $tenant->communityEnabled(),
                     'giving_history' => $tenant->hasGivingMoney() || app(\App\Services\Giving\GivingRollout::class)->enabled($tenant),
+                    'community_event_benefits' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($tenant),
                     'community_giving' => app(\App\Services\Giving\GivingRollout::class)->enabled($tenant),
                     'community_inbox' => $tenant->communityEnabled() && app(\App\Services\Community\InboxRollout::class)->enabled($tenant),
                     'community_messages' => $tenant->communityEnabled() && $tenant->featureEnabled('community_messages'),

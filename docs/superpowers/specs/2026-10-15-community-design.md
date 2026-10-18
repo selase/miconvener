@@ -162,9 +162,9 @@ Owner's reference designs (2026-10-15): event and ticket apps with a greeting he
 - **Member statuses:** `pending` (requested, not approved; no charges), `active` (charged and eligible for member benefits), `lapsed` (set by an admin; no new charges; not eligible for member-only benefits), `exited` (left; no charges; history kept).
 
 
-### 6.4 Member benefits in Events — proposed milestone6 rules (2026-10-18)
+### 6.4 Member benefits in Events — owner-approved milestone6 rules (2026-10-18)
 
-**Draft for owner review; not yet binding approval to build or change production.** See [milestone6 plan](../plans/2026-10-18-community-6-member-benefits.md) for exact proposed state transitions and acceptance tests. Existing §§6.1/6.3 and milestone10 item8 remain binding until this proposal is approved.
+**Owner approved native implementation2026-10-18; merge/deploy still need approval.** See [milestone6 plan](../plans/2026-10-18-community-6-member-benefits.md) for exact state transitions and acceptance tests. The bounded price-honouring exception below clarifies the confirmation eligibility check; existing identity safeguards remain binding.
 
 - Extend existing Events with members-only registration and optional member base prices. Eligible means active personal membership at that organisation, authorised through exact email or a valid member-specific self grant. Followers, representatives alone and pending/lapsed/exited members do not qualify. Dues configuration/payment/arrears do not decide eligibility. Preserve existing event email requirements; no fake email, mailbox inference or new phone-only registration.
 - Proposed online quote duration:15minutes from explicit payment initiation after approval/waitlist release. Freeze accepted price, identity evidence, original provider/account/reference and commercial terms on the server. Check again at confirmation; honour lapse/exit/type changes only if verified provider evidence proves capture before expiry and identity/context remain valid. Delayed webhooks do not expire an on-time capture. Do not waive identity revocation, event cancellation or capacity checks.

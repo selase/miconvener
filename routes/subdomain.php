@@ -169,6 +169,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     // Events (host console)
     Route::resource('events', EventController::class)->names('tenant.events')->except(['create', 'edit']);
+    Route::patch('events/{event}/member-benefits', [EventController::class, 'updateMemberBenefits'])->name('tenant.events.member-benefits');
     Route::post('events/{event}/restore', [EventController::class, 'restore'])->name('tenant.events.restore');
     Route::delete('events/{event}/force-purge', [EventController::class, 'forcePurge'])->name('tenant.events.force-purge');
     // Each section of an event's workspace has its own address, so refresh, the back

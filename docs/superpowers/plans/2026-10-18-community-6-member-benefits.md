@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-community-design.md` §§2,6.1,6.3,10 item8; proposed §6.4 below that spec. Roadmap milestone6 and `AGENTS.md` finance invariants apply.
 
-**Baseline:** production/main `b4ad5211c741da0b20d4b18d74d0a90208eae14b` (Giving PR37), verified against fetched main2026-10-18. This planning branch also carries Giving release documentation `4a346e84`. **Draft for owner review; implementation, push, merge, deployment and production changes are not authorised by preparation of this plan.**
+**Baseline:** production/main `b4ad5211c741da0b20d4b18d74d0a90208eae14b` (Giving PR37), verified against fetched main2026-10-18. This planning branch also carries Giving release documentation `4a346e84`. **Owner approved native implementation2026-10-18. Push, merge, deployment and production changes still require approval.**
 
 ## Decisions proposed for review
 
@@ -50,18 +50,18 @@ Confirmed existing files: `app/Services/Community/MemberAccess.php`, `MemberIden
 
 New focused services under `app/Services/Events/`: `MemberBenefitEligibility`, `MemberBenefitQuotes`, `MemberBenefitPayments`. New records: `EventMemberBenefitQuote` and `EventMemberBenefitAttempt`, with factories; no production demo seeder. Added request classes live under existing `app/Http/Requests/Tenant/` and `Public/` directories. Create `database/migrations/2026_10_18_120000_add_event_member_benefits.php` to extend Event/EventTicketType/EventRegistration and create quote/attempt tables, with tenant-bounded foreign keys, unique attempt reference/provider IDs, bigint nonnegative amounts and indexes for unresolved review. Down migration must refuse while benefit quotes/attempts exist; disabling new issuance is the operational rollback, never deleting paid history. Existing member-benefit-free payment branches stay unchanged; do not refactor the whole event payments subsystem.
 
-### Task1: Authoritative personal eligibility and settings
+### Task 1: Authoritative personal eligibility and settings
 
 **Files:** create `app/Services/Events/MemberBenefitEligibility.php`; modify Event/EventTicketType models, existing event/ticket settings controllers and `HandleInertiaRequests`; create `UpdateEventMemberBenefitsRequest.php`, `StoreEventTicketTypeRequest.php`, `UpdateEventTicketTypeRequest.php`; migration/factories; test `tests/Feature/Events/MemberBenefitEligibilityTest.php`, `MemberBenefitSettingsTest.php`.
 
 **Interfaces:** `MemberBenefitEligibility::resolve(Session $session, Event $event, string $registrationEmail): ?Member` returns only an active, same-tenant self member bound to that email. Multiple matching eligible records choose the lowest UUID deterministically, without expanding access. `enabled(Tenant $tenant): bool` requires Community plus `community_event_benefits`. Event fields `members_only:boolean=false`, `member_ticket_price:?int=null`; ticket field `member_price:?int=null`.
 
-- [ ] Write failing datasets: active self with no dues/arrears/waiver allowed; pending/lapsed/exited denied; follower, representative, unverified email, bare phone and cross-tenant IDs denied; revoked/suspended/expired grants denied; email proof must match submitted attendee email. An approved phone self grant qualifies only for its exact member and current recorded registration email; an email-less member gets an actionable email requirement, not an invented address. Public failures have generic copy without membership disclosure.
-- [ ] Run `php artisan test --compact tests/Feature/Events/MemberBenefitEligibilityTest.php tests/Feature/Events/MemberBenefitSettingsTest.php`; observe missing-behaviour failures.
-- [ ] Add default-off fields/flag and tenant-bounded eligibility using existing proof/services. Add Form Request validation, existing permission checks and ticket-price bounds; reject setting paid member prices when the existing event cannot sell paid tickets. Scope any new route to its actual event and tenant. Keep email/self access-version checks on each eligibility request.
-- [ ] Run both test files plus `tests/Feature/Community/MemberAccessTest.php` and `MemberAccessRevocationTest.php`; all pass. Run Pint; tick and commit `feat(events): define verified member benefits`.
+- [x] Write failing datasets: active self with no dues/arrears/waiver allowed; pending/lapsed/exited denied; follower, representative, unverified email, bare phone and cross-tenant IDs denied; revoked/suspended/expired grants denied; email proof must match submitted attendee email. An approved phone self grant qualifies only for its exact member and current recorded registration email; an email-less member gets an actionable email requirement, not an invented address. Public failures have generic copy without membership disclosure.
+- [x] Run `php artisan test --compact tests/Feature/Events/MemberBenefitEligibilityTest.php tests/Feature/Events/MemberBenefitSettingsTest.php`; observe missing-behaviour failures.
+- [x] Add default-off fields/flag and tenant-bounded eligibility using existing proof/services. Add Form Request validation, existing permission checks and ticket-price bounds; reject setting paid member prices when the existing event cannot sell paid tickets. Scope any new route to its actual event and tenant. Keep email/self access-version checks on each eligibility request.
+- [x] Run both test files plus `tests/Feature/Community/MemberAccessTest.php` and `MemberAccessRevocationTest.php`; all pass. Run Pint; tick and commit `feat(events): define verified member benefits`.
 
-### Task2: Server-side pricing and durable quote contracts
+### Task 2: Server-side pricing and durable quote contracts
 
 **Files:** create quote/attempt models/factories and `MemberBenefitQuotes.php`; extend migration, EventRegistration and RegistrationPricingService; test `tests/Feature/Events/MemberBenefitQuoteTest.php`.
 
@@ -74,7 +74,7 @@ Persist quote tenant/event/registration/member, identity kind, email/phone diges
 - [ ] Implement the interfaces and additive constraints on the landlord connection. Use current pricing/promo/fee services; no discount arithmetic in controllers. Creation of a quote does not reserve capacity. New approval/waitlist rows carry the benefit requirement but get their payment quote only when permitted to pay.
 - [ ] Run quote and existing registration/promo pricing tests discovered under `tests/Feature/Events`; verify unchanged unrestricted callers. Pint, tick and commit `feat(events): snapshot member checkout quotes`.
 
-### Task3: Public registration and explicit payment initiation
+### Task 3: Public registration and explicit payment initiation
 
 **Files:** modify PublicEventController, EventCheckoutController, routes/subdomain.php and existing verification integrations; new `StartEventMemberCheckoutRequest.php`; test `tests/Feature/Events/MemberBenefitRegistrationTest.php`, `MemberBenefitCheckoutTest.php`.
 
@@ -85,7 +85,7 @@ Persist quote tenant/event/registration/member, identity kind, email/phone diges
 - [ ] Integrate server eligibility/pricing at register and each provider start. Bind quote/attempt to Paystack original reference and Stripe idempotent session/account using existing adapters; preserve legacy metadata handlers. Retry/failed-initiation never extends a quote or starts a second unknown charge. Before a fresh price starts payment, show and require acceptance of that precise new amount. Fail closed with an actionable reverify/requote message.
 - [ ] Run new registration/checkout tests plus EventRegistrationTest, RegistrationEmailVerificationTest, EventRegistrationIdempotencyTest, PlatformDefaultCheckoutTest and EventCheckoutGatewayMessageTest. Pint, tick and commit `feat(events): apply member benefits at verified checkout`.
 
-### Task4: Payment confirmation, delayed webhooks and paid recovery
+### Task 4: Payment confirmation, delayed webhooks and paid recovery
 
 **Files:** create `MemberBenefitPayments.php`; modify platform SettlementWebhookController and tenant Commerce/WebhookController, EventRegistration payment/review fields, existing staff refund/recovery actions and their request validation. Tests: `tests/Feature/Events/MemberBenefitPaymentTest.php`, `MemberBenefitRecoveryTest.php`.
 
@@ -96,7 +96,7 @@ Persist quote tenant/event/registration/member, identity kind, email/phone diges
 - [ ] Route only benefit-bound attempts through the confirmer; preserve legacy confirmation branches. Lock attempt/registration/member/event in a consistent order; verify current identity versions, immutable quote and authoritative completion time. Before issuance recheck capacity and approval; issue one QR/confirmation/usage event only after fulfilment. Record a held payment truthfully with reason and authorised full refund/reconciliation actions; do not recalculate paid amounts or retry an unknown refund.
 - [ ] Run both new tests plus PlatformSettlementGuardTest, existing platform/own/Stripe webhook and registration cancel/refund suites discovered in `tests/Feature`. Confirm existing ledger idempotency and event payouts unaffected. Pint, tick and commit `feat(events): verify and recover member ticket payments`.
 
-### Task5: Close approval, offline, transfer and identity-edit paths
+### Task 5: Close approval, offline, transfer and identity-edit paths
 
 **Files:** modify Tenant/EventRegistrationController, Public/AttendeePortalController, Public/PublicEventController::verifyEmail, relevant existing models and UpdateEventRegistrationRequest; tests `tests/Feature/Events/MemberBenefitLifecycleTest.php`.
 
@@ -107,7 +107,7 @@ Persist quote tenant/event/registration/member, identity kind, email/phone diges
 - [ ] Add eligibility checks at each listed transition and useful staff explanations, preserving existing approval/waitlist ordering, notification dedupe and offline accounting. Block new member quotes when rollout is off; continue verifying/recovering previously initiated payments using frozen terms.
 - [ ] Run lifecycle plus EventRegistrationApprovalTest, EventOfflinePaymentTest, TicketTransferVerificationTest, TransferredTicketRecordsTest and relevant cancel/refund/scan tests. Pint, tick and commit `fix(events): enforce member benefits across ticket lifecycle`.
 
-### Task6: Native UI, self-review and release handover
+### Task 6: Native UI, self-review and release handover
 
 **Files:** modify the confirmed React event/ticket settings, public Show/Checkout, MyTicketPanel and staff EditRegistrationModal; existing staff registration list/detail and checkout payload serializers as discovered by imports; add tests under `resources/js/test/` for member-benefit settings/checkout/review. Update parent spec proposed §6.4 to approved text, milestone6 row, relevant factories and this plan; public/build with each UI commit.
 

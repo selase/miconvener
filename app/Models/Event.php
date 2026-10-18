@@ -99,6 +99,7 @@ final class Event extends Model
      * an unsaved instance answers isPrivate() correctly rather than null.
      */
     protected $attributes = [
+        'members_only' => false,
         'visibility' => self::VISIBILITY_PUBLIC,
         'event_category' => self::CATEGORY_GENERAL,
         'speaker_slide_policy' => self::SPEAKER_POLICY_AFTER,
@@ -125,6 +126,8 @@ final class Event extends Model
         'capacity',
         'requires_approval',
         'ticket_price',
+        'members_only',
+        'member_ticket_price',
         'currency',
         'hero_image_path',
         'visibility',
@@ -173,6 +176,8 @@ final class Event extends Model
         'requires_approval' => 'boolean',
         'allows_self_check_in' => 'boolean',
         'ticket_price' => 'integer',
+        'members_only' => 'boolean',
+        'member_ticket_price' => 'integer',
         'platform_fee_percentage' => 'float',
         'platform_fee_cap_amount' => 'integer',
         'registration_settings' => 'array',

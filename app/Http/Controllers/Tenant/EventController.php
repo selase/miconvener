@@ -598,6 +598,14 @@ final class EventController extends Controller
         ]);
     }
 
+    public function updateMemberBenefits(\App\Http\Requests\Tenant\UpdateEventMemberBenefitsRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $model = Event::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($event);
+        $model->update($request->validated());
+
+        return response()->json(['members_only' => $model->members_only, 'member_ticket_price' => $model->member_ticket_price]);
+    }
+
     protected function getTenant(): Tenant
     {
         $tenant = app(TenantContext::class)->getTenant();
