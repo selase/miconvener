@@ -72,3 +72,70 @@ it('uses signed Stripe completion evidence on the original connected account', f
     $this->withServerVariables(['HTTP_HOST' => 'miconvener.test'])->call('POST', '/webhooks/stripe/connect', [], [], [], ['HTTP_STRIPE_SIGNATURE' => $signature, 'CONTENT_TYPE' => 'application/json'], $body)->assertSuccessful();
     expect($registration->fresh()->status)->toBe('confirmed');
 });
+
+it('ignores foreign provider metadata containing a non UUID registration', function (): void {
+    expect(app(App\Services\Events\MemberBenefitNotifications::class)->paystack(['reference' => 'foreign', 'metadata' => ['event_registration_id' => 'external-123']], 'other-account'))->toBeFalse();
+});
+
+it('recovers a signed paid Stripe session after an unknown initialization response', function (): void {
+    config(['services.stripe.secret' => 'sk_test_member_recovery']);
+    [$tenant, , , $registration, $quote, $attempt] = MemberBenefitScenario::make('stripe');
+    $gateway = TenantPaymentGateway::factory()->create(['tenant_id' => $tenant->id, 'provider' => 'stripe', 'provider_account_id' => 'acct_member_recovery', 'is_active' => true]);
+    $attempt->update(['state' => 'unknown', 'account_key' => app(GivingGateways::class)->identityForRow($gateway), 'gateway_id' => $gateway->id, 'provider_session_id' => null]);
+    $metadata = ['member_benefit_attempt_id' => $attempt->id, 'member_benefit_reference' => $attempt->reference, 'tenant_id' => $tenant->id, 'event_registration_id' => $registration->id];
+    $fake = new Tests\Support\GivingStripeHttp;
+    $fake->amount = 5000;
+    $fake->metadata = $metadata;
+    Stripe\ApiRequestor::setHttpClient($fake);
+    $session = Stripe\Checkout\Session::constructFrom(['id' => 'cs_giving', 'metadata' => $metadata]);
+    app(App\Services\Events\MemberBenefitNotifications::class)->stripe($tenant, $gateway, $session, $quote->expires_at->subSecond()->timestamp);
+    expect($attempt->fresh()->provider_session_id)->toBe('cs_giving')->and($attempt->fresh()->state)->toBe('fulfilled')->and($registration->fresh()->ticket_code)->not->toBeNull();
+});
+
+it('checks failed provider references before allowing a fresh deliberate checkout', function (bool $wrongReference): void {
+    config(['services.settlement.paystack.secret_key' => 'sk_test_failure']);
+    [, , , $registration, , $attempt, $session] = MemberBenefitScenario::make();
+    $attempt->update(['account_key' => app(GivingGateways::class)->platformIdentity()]);
+    Http::fake(['api.paystack.co/transaction/verify/*' => Http::response(['data' => ['id' => 7, 'status' => 'failed', 'reference' => $wrongReference ? 'other' : $attempt->reference]])]);
+    if ($wrongReference) {
+        expect(fn () => app(App\Services\Events\MemberBenefitGateways::class)->verify($attempt->fresh()))->toThrow(Illuminate\Validation\ValidationException::class);
+        expect($attempt->fresh()->state)->toBe('open');
+
+        return;
+    }
+    $failure = app(App\Services\Events\MemberBenefitGateways::class)->verify($attempt->fresh());
+    app(App\Services\Events\MemberBenefitPayments::class)->recordFailure($attempt->fresh(), $failure);
+    $newQuote = app(App\Services\Events\MemberBenefitQuotes::class)->start($session, $registration->fresh());
+    expect($newQuote->id)->not->toBe($attempt->quote_id)->and($attempt->fresh()->state)->toBe('failed');
+})->with([false, true]);
+
+it('consumes a signed failed member charge before legacy merchant handling', function (string $provider): void {
+    config(['services.settlement.paystack.secret_key' => 'sk_test_member_failed']);
+    [$tenant, , , , , $attempt] = MemberBenefitScenario::make($provider);
+    $account = app(GivingGateways::class)->platformIdentity();
+    $path = '/webhooks/settlement/paystack';
+    if ($provider === 'own-paystack') {
+        $row = TenantPaymentGateway::factory()->create(['tenant_id' => $tenant->id, 'provider' => 'paystack', 'api_key_encrypted' => 'sk_test_member_failed', 'is_active' => true]);
+        $attempt->gateway_id = $row->id;
+        $account = app(GivingGateways::class)->identityForRow($row);
+        $path = '/webhooks/merchant/paystack/'.$tenant->id;
+    }
+    $attempt->fill(['account_key' => $account])->save();
+    $body = json_encode(['event' => 'charge.failed', 'data' => ['reference' => $attempt->reference, 'status' => 'failed', 'metadata' => []]]);
+    $signature = hash_hmac('sha512', $body, 'sk_test_member_failed');
+    $this->withServerVariables(['HTTP_HOST' => 'miconvener.test'])->call('POST', $path, [], [], [], ['HTTP_x-paystack-signature' => $signature, 'CONTENT_TYPE' => 'application/json'], $body)->assertSuccessful();
+    expect($attempt->fresh()->state)->toBe('failed');
+})->with(['platform', 'own-paystack']);
+
+it('retires a signed terminal Stripe session failure without initiating another checkout', function (): void {
+    config(['services.stripe.secret' => 'sk_test_stripe_failed']);
+    [$tenant, , , $registration, , $attempt] = MemberBenefitScenario::make('stripe');
+    $gateway = TenantPaymentGateway::factory()->create(['tenant_id' => $tenant->id, 'provider' => 'stripe', 'provider_account_id' => 'acct_failed', 'is_active' => true]);
+    $attempt->update(['gateway_id' => $gateway->id, 'account_key' => app(GivingGateways::class)->identityForRow($gateway), 'provider_session_id' => 'cs_giving']);
+    $fake = new Tests\Support\GivingStripeHttp;
+    $fake->amount = 5000;
+    Stripe\ApiRequestor::setHttpClient($fake);
+    $session = Stripe\Checkout\Session::constructFrom(['id' => 'cs_giving', 'payment_status' => 'unpaid', 'metadata' => []]);
+    app(App\Services\Events\MemberBenefitNotifications::class)->stripe($tenant, $gateway, $session, null, true);
+    expect($attempt->fresh()->state)->toBe('failed')->and($registration->fresh()->ticket_code)->toBeNull()->and($fake->requests)->toBeEmpty();
+});

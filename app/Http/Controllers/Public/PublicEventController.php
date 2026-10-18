@@ -494,11 +494,18 @@ final class PublicEventController extends Controller
         $tenant = $this->getTenant();
         $model = Event::query()->where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
         $service = app(\App\Services\Events\MemberBenefitEligibility::class);
-        $eligible = $service->resolve($request->session(), $model, $request->validated('email')) !== null;
+        $member = $service->resolve($request->session(), $model, $request->validated('email'));
+        $eligible = $member !== null;
+        $proof = $member !== null ? app(\App\Services\Events\MemberBenefitIdentity::class)->capture($request->session(), $member) : null;
+        $types = $model->ticketTypes()->active()->get(['id', 'member_price', 'access_code'])->filter(function ($type) use ($request): bool {
+            return ! $type->isInviteOnly() || ($type->id === $request->validated('ticket_type_id')
+                && hash_equals(mb_strtoupper($type->access_code), mb_strtoupper(mb_trim((string) $request->validated('access_code')))));
+        });
 
         return response()->json(['enabled' => $service->enabled($tenant), 'members_only' => $model->members_only, 'eligible' => $eligible,
+            'verified_until' => $proof !== null ? \Carbon\CarbonImmutable::createFromTimestampUTC((int) $proof['expires_at'])->toIso8601String() : null,
             'member_ticket_price' => $eligible ? $model->member_ticket_price : null,
-            'ticket_prices' => $eligible ? $model->ticketTypes()->active()->whereNull('access_code')->get(['id', 'member_price'])->toArray() : []])
+            'ticket_prices' => $eligible ? $types->map(fn ($type): array => ['id' => $type->id, 'member_price' => $type->member_price])->values()->all() : []])
             ->header('Cache-Control', 'private, no-store');
     }
 
@@ -690,6 +697,7 @@ final class PublicEventController extends Controller
         $withhold = $event->isPrivate() && ! $revealDetails;
 
         return [
+            'member_benefits' => ['enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant), 'members_only' => $event->members_only],
             'name' => $event->name,
             'slug' => $event->slug,
             'description' => $event->description,

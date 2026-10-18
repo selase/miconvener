@@ -96,3 +96,11 @@ it('does not resume a checkout while an additional captured payment needs refund
     expect(fn () => $service->start($session, $registration->fresh(), 'paystack', 5000, 'GHS'))->toThrow(ValidationException::class);
     Http::assertSentCount(3);
 });
+
+it('refuses a known exhausted capacity before initiating a new member payment', function (): void {
+    [$tenant, $event, , $registration, $session] = memberCheckoutFixture();
+    $event->update(['capacity' => 1]);
+    EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'status' => 'confirmed']);
+    expect(fn () => app(MemberBenefitCheckout::class)->start($session, $registration, 'paystack', 5000, 'GHS'))->toThrow(ValidationException::class);
+    Http::assertNothingSent();
+});

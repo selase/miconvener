@@ -16,11 +16,13 @@ final class UpdateEventCommercialTermsRequest extends FormRequest
         return $this->user()?->can('update event') ?? false;
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['ticket_price' => ['required', 'integer', 'min:0'], 'currency' => ['required', 'string', 'size:3']];
+        return ['ticket_price' => ['required', 'integer', 'min:0'], 'currency' => ['required', 'string', 'size:3'], 'member_ticket_price' => ['nullable', 'integer', 'min:0', 'lte:ticket_price']];
     }
 
+    /** @return list<callable(Validator): void> */
     public function after(): array
     {
         return [function (Validator $validator): void {
@@ -28,7 +30,8 @@ final class UpdateEventCommercialTermsRequest extends FormRequest
                 return;
             }
             $event = Event::query()->where('tenant_id', app(TenantContext::class)->getTenant()?->id)->findOrFail($this->route('event'));
-            if ($event->member_ticket_price !== null && $event->member_ticket_price > (int) $this->input('ticket_price')) {
+            $memberPrice = array_key_exists('member_ticket_price', $this->all()) ? $this->input('member_ticket_price') : $event->member_ticket_price;
+            if ($memberPrice !== null && (int) $memberPrice > (int) $this->input('ticket_price')) {
                 $validator->errors()->add('ticket_price', 'Update or clear the member price before lowering the standard price below it.');
             }
             if (mb_strtoupper($this->input('currency')) !== mb_strtoupper($event->currency) && $event->registrations()->where('member_benefit_required', true)->exists()) {

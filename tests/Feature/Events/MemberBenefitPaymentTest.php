@@ -104,3 +104,31 @@ it('does not hide a valid current ticket when an old extra capture has no fee ev
     expect($old->fresh()->state)->toBe('paid_extra')->and($old->fresh()->is_extra_capture)->toBeTrue()
         ->and($registration->fresh()->status)->toBe('confirmed')->and($registration->fresh()->ticket_code)->toBe($ticket);
 });
+
+it('preserves independent and unlimited ticket type capacity for member payments', function (bool $unlimited): void {
+    [$tenant, $event, , $registration, , $attempt] = MemberBenefitScenario::make('platform', true);
+    $event->update(['capacity' => 1]);
+    if ($unlimited) {
+        $registration->ticketType->update(['capacity' => null]);
+        $other = $registration->ticketType;
+    } else {
+        $other = App\Models\EventTicketType::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id]);
+    }
+    App\Models\EventRegistration::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'ticket_type_id' => $other->id, 'status' => 'confirmed']);
+    app(MemberBenefitPayments::class)->confirm($attempt, MemberBenefitScenario::payment($attempt));
+    expect($attempt->fresh()->state)->toBe('fulfilled')->and($registration->fresh()->ticket_code)->not->toBeNull();
+})->with([false, true]);
+
+it('retires only a proven uncaptured failed attempt and never downgrades captured evidence', function (string $state): void {
+    [, , , $registration, , $attempt] = MemberBenefitScenario::make();
+    if ($state === 'fulfilled') {
+        app(MemberBenefitPayments::class)->confirm($attempt, MemberBenefitScenario::payment($attempt));
+    } elseif ($state === 'observed') {
+        $attempt->update(['state' => 'unknown', 'observed_payment' => ['amount' => 5000]]);
+    }
+    app(MemberBenefitPayments::class)->recordFailure($attempt->fresh(), ['status' => 'failed', 'provider' => $attempt->provider, 'account_key' => $attempt->account_key, 'reference' => $attempt->reference]);
+    expect($attempt->fresh()->state)->toBe(match ($state) {
+        'fulfilled' => 'fulfilled', 'observed' => 'unknown', default => 'failed'
+    });
+    expect($registration->fresh()->ticket_code !== null)->toBe($state === 'fulfilled');
+})->with(['open', 'fulfilled', 'observed']);

@@ -34,6 +34,12 @@ final class MemberBenefitPayments
                 $attempt = EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->id);
                 $quote = EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $attempt->tenant_id)->findOrFail($attempt->quote_id);
                 $this->assertPayment($attempt, $quote, $registration, $verifiedPayment);
+                if ($attempt->provider === 'stripe' && isset($verifiedPayment['provider_session_id'])) {
+                    if ($attempt->provider_session_id !== null && $attempt->provider_session_id !== $verifiedPayment['provider_session_id']) {
+                        $this->refuse('The captured session does not match its checkout.');
+                    }
+                    $attempt->provider_session_id = $verifiedPayment['provider_session_id'];
+                }
                 if (in_array($attempt->state, ['fulfilled', 'refunded', 'refund_pending', 'refund_unknown'], true)) {
                     return $registration;
                 }
@@ -110,6 +116,25 @@ final class MemberBenefitPayments
             }
             throw $exception;
         }
+    }
+
+    /** @param array<string, mixed> $failure */
+    public function recordFailure(EventMemberBenefitAttempt $candidate, array $failure): void
+    {
+        if (($failure['status'] ?? null) !== 'failed' || ($failure['provider'] ?? null) !== $candidate->provider
+            || ($failure['account_key'] ?? null) !== $candidate->account_key || ($failure['reference'] ?? null) !== $candidate->reference) {
+            $this->refuse('The failed payment does not match its original checkout.');
+        }
+        $candidate->getConnection()->transaction(function () use ($candidate): void {
+            $registration = EventRegistration::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->registration_id);
+            Event::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($registration->event_id);
+            $attempt = EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->lockForUpdate()->findOrFail($candidate->id);
+            if (! in_array($attempt->state, ['preparing', 'open', 'unknown'], true) || $attempt->paid_at !== null || $attempt->booked_at !== null || $attempt->observed_payment !== null) {
+                return;
+            }
+            $attempt->update(['state' => 'failed', 'review_reason' => 'provider_failed']);
+            $attempt->quote->update(['state' => 'failed']);
+        });
     }
 
     public function reassess(EventRegistration $candidate, Session $recipientSession): bool
@@ -195,13 +220,8 @@ final class MemberBenefitPayments
         if ($type !== null && (! $type->is_active || $type->event_id !== $event->id || $type->tenant_id !== $event->tenant_id)) {
             return 'ticket_unavailable';
         }
-        $confirmed = $event->registrations()->confirmed()->where('id', '!=', $registration->id);
-        if ($type !== null) {
-            $confirmed->where('ticket_type_id', $type->id);
-        }
-        $capacity = $type?->capacity ?? $event->capacity;
 
-        return $capacity !== null && $confirmed->count() >= $capacity ? 'capacity_unavailable' : null;
+        return app(MemberBenefitLifecycle::class)->hasCapacity($registration) ? null : 'capacity_unavailable';
     }
 
     private function fulfil(Event $event, EventRegistration $registration, EventMemberBenefitAttempt $attempt): void

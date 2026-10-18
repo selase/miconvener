@@ -10,6 +10,40 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $quote_id
+ * @property string $registration_id
+ * @property string $provider
+ * @property string $account_key
+ * @property string $settlement_mode
+ * @property string $reference
+ * @property string $currency
+ * @property string $state
+ * @property string|null $gateway_id
+ * @property string|null $provider_session_id
+ * @property string|null $provider_reference
+ * @property string|null $checkout_url
+ * @property string|null $review_reason
+ * @property string|null $refund_operation_key
+ * @property string|null $refund_reference
+ * @property int $amount
+ * @property int $charged_amount
+ * @property int $platform_fee_amount
+ * @property int|null $gateway_fee_amount
+ * @property int|null $refund_gateway_credit
+ * @property int|null $refund_commission_returned
+ * @property bool $is_extra_capture
+ * @property array<string, mixed>|null $commission_settlement
+ * @property array<string, mixed>|null $observed_payment
+ * @property \Carbon\CarbonImmutable|null $paid_at
+ * @property \Carbon\CarbonImmutable|null $fulfilled_at
+ * @property \Carbon\CarbonImmutable|null $refunded_at
+ * @property \Carbon\CarbonImmutable|null $booked_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 final class EventMemberBenefitAttempt extends Model
 {
     use BelongsToTenant;

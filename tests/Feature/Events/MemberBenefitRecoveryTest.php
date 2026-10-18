@@ -155,6 +155,13 @@ it('reconciles connected Stripe refunds with actual returned commission and fina
     $refunds->reconcile($attempt->fresh());
     expect($attempt->fresh()->state)->toBe('refund_pending')->and($attempt->fresh()->review_reason)->toBe('refund_commission_pending');
     $fake->feeRefunded = $attempt->platform_fee_amount;
+    $pendingFeeEvidence = app(App\Services\Events\MemberBenefitRefunds::class)->reconcile($attempt->fresh());
+    expect($pendingFeeEvidence->state)->toBe('refund_pending')->and($pendingFeeEvidence->review_reason)->toBe('refund_fee_pending');
+    foreach ($fake->refunds as &$refund) {
+        $refund['balance_transaction'] = ['object' => 'balance_transaction', 'id' => 'txn_refund_member', 'currency' => 'ghs', 'fee' => 0];
+    }
+    unset($refund);
+
     $refunds->reconcile($attempt->fresh());
     $refunds->reconcile($attempt->fresh());
     expect($attempt->fresh()->state)->toBe('refunded')->and($registration->fresh()->status)->toBe('cancelled')
@@ -186,5 +193,17 @@ it('routes an existing finance refund through the original member payment withou
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => $host])->post($url)->assertRedirect();
     $this->post($url)->assertRedirect();
     expect($attempt->fresh()->state)->toBe('refund_pending')->and($transaction->fresh()->status)->toBe('succeeded');
+    Illuminate\Support\Facades\Http::assertSentCount(1);
+});
+
+it('refunds an issued archived event ticket without promoting archived waitlists', function (): void {
+    config(['services.settlement.paystack.secret_key' => 'sk_test_archived_refund']);
+    [, $event, , $registration, , $attempt] = MemberBenefitScenario::make();
+    $attempt->update(['account_key' => app(App\Services\Giving\GivingGateways::class)->platformIdentity()]);
+    app(MemberBenefitPayments::class)->confirm($attempt, MemberBenefitScenario::payment($attempt));
+    $event->delete();
+    Illuminate\Support\Facades\Http::fake(['api.paystack.co/refund' => Illuminate\Support\Facades\Http::response(['data' => ['id' => 42, 'status' => 'pending']])]);
+    app(App\Services\Events\MemberBenefitRefunds::class)->request($attempt->fresh());
+    expect($attempt->fresh()->state)->toBe('refund_pending')->and($registration->fresh()->status)->toBe('cancelled');
     Illuminate\Support\Facades\Http::assertSentCount(1);
 });

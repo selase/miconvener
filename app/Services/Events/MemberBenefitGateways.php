@@ -74,22 +74,36 @@ final class MemberBenefitGateways
     }
 
     /** @return array<string, mixed> */
-    public function verify(EventMemberBenefitAttempt $attempt, ?\Carbon\CarbonImmutable $completionTime = null): array
+    public function verify(EventMemberBenefitAttempt $attempt, ?\Carbon\CarbonImmutable $completionTime = null, ?string $candidateSessionId = null): array
     {
         $gateway = $this->forAttempt($attempt);
-        $data = $gateway instanceof StripeGateway ? $gateway->verifyConnectedGivingSession((string) $attempt->provider_session_id) : $gateway->verifyTransaction($attempt->reference);
-        if (($data['status'] ?? null) !== 'success') {
-            return ['status' => $data['status'] ?? 'pending'];
+        $sessionId = $attempt->provider_session_id ?? $candidateSessionId;
+        if ($gateway instanceof StripeGateway && ! filled($sessionId)) {
+            return ['status' => 'pending'];
+        }
+        $data = $gateway instanceof StripeGateway ? $gateway->verifyConnectedGivingSession((string) $sessionId) : $gateway->verifyTransaction($attempt->reference);
+        if (($data['status'] ?? null) === 'pending') {
+            return ['status' => 'pending'];
         }
         $metadata = \App\Http\Controllers\Billing\WebhookController::metadata($data['metadata'] ?? null);
         if (($gateway instanceof PaystackGateway && (! ($data['reference_reported'] ?? false) || ($data['reference'] ?? null) !== $attempt->reference))
-            || ($gateway instanceof StripeGateway && ($data['session_id'] ?? null) !== $attempt->provider_session_id)
+            || ($gateway instanceof StripeGateway && ($data['session_id'] ?? null) !== $sessionId)
             || (isset($metadata['member_benefit_attempt_id']) && $metadata['member_benefit_attempt_id'] !== $attempt->id)) {
             $this->refuse();
         }
+        if ($gateway instanceof StripeGateway && $attempt->provider_session_id === null) {
+            foreach (['member_benefit_attempt_id' => $attempt->id, 'member_benefit_reference' => $attempt->reference, 'tenant_id' => $attempt->tenant_id, 'event_registration_id' => $attempt->registration_id] as $key => $expected) {
+                if (($metadata[$key] ?? null) !== $expected) {
+                    $this->refuse();
+                }
+            }
+        }
+        if (($data['status'] ?? null) !== 'success') {
+            return ['status' => $data['status'] ?? 'pending', 'provider' => $attempt->provider, 'account_key' => $attempt->account_key, 'reference' => $attempt->reference];
+        }
         $time = $gateway instanceof PaystackGateway ? $this->completionTime($data['paid_at'] ?? null) : $completionTime;
 
-        return ['status' => 'success', 'provider' => $attempt->provider, 'account_key' => $attempt->account_key, 'reference' => $attempt->reference,
+        return ['status' => 'success', 'provider_session_id' => $gateway instanceof StripeGateway ? $sessionId : null, 'provider' => $attempt->provider, 'account_key' => $attempt->account_key, 'reference' => $attempt->reference,
             'provider_reference' => $gateway instanceof StripeGateway ? ($data['provider_reference'] ?? null) : $data['reference'],
             'amount' => $data['amount'] ?? null, 'currency' => mb_strtoupper((string) ($data['currency'] ?? '')),
             'gateway_fee' => $gateway instanceof PaystackGateway && ! ($data['fees_reported'] ?? false) ? null : ($data['fees'] ?? null),

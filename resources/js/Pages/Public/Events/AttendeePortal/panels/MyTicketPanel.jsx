@@ -34,7 +34,11 @@ export default function MyTicketPanel({
     );
     const [showOfflineModal, setShowOfflineModal] = useState(false);
 
-    const canTransfer = registration.status !== 'checked_in' && isOnline;
+    const canTransfer =
+        !registration.member_benefit_required &&
+        registration.can_transfer !== false &&
+        registration.status !== 'checked_in' &&
+        isOnline;
     const [checkingIn, setCheckingIn] = useState(false);
     const [checkedIn, setCheckedIn] = useState(Boolean(registration.checked_in));
 
@@ -145,6 +149,33 @@ export default function MyTicketPanel({
 
     return (
         <div className="flex flex-col gap-6 sm:flex-row">
+            {registration.member_benefit_required && (
+                <div className="border border-border bg-surface-alt p-4 text-sm text-ink-secondary">
+                    <p>Member-benefit registrations are personal. Tickets cannot be transferred.</p>
+                    {registration.checkout_url && (
+                        <a
+                            href={registration.checkout_url}
+                            className="mt-2 inline-block text-accent underline"
+                        >
+                            Verify membership or review payment
+                        </a>
+                    )}
+                    {registration.member_payment_review_url && (
+                        <a
+                            href={registration.member_payment_review_url}
+                            className="mt-2 block text-accent underline"
+                        >
+                            View payment receipt or status
+                        </a>
+                    )}
+                    {registration.member_extra_payments > 0 && (
+                        <p role="status" className="mt-2">
+                            An additional payment needs review. Contact the organiser about the
+                            excess payment. Do not pay again.
+                        </p>
+                    )}
+                </div>
+            )}
             {registration.qr_image && (
                 <img
                     src={registration.qr_image}
@@ -232,7 +263,9 @@ export default function MyTicketPanel({
                         >
                             Transfer
                         </button>
-                    ) : !isOnline && registration.status !== 'checked_in' ? (
+                    ) : !registration.member_benefit_required &&
+                      !isOnline &&
+                      registration.status !== 'checked_in' ? (
                         <span
                             className="inline-flex h-control items-center gap-1 border border-border/60 bg-surface-subtle px-3 text-xs text-ink-secondary cursor-not-allowed"
                             title="Internet connection required to transfer this ticket"

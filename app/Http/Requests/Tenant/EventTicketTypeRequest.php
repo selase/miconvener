@@ -17,6 +17,7 @@ abstract class EventTicketTypeRequest extends FormRequest
         return (bool) $this->user()?->can('update event');
     }
 
+    /** @return array<string, mixed> */
     final public function rules(): array
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -30,6 +31,7 @@ abstract class EventTicketTypeRequest extends FormRequest
         ];
     }
 
+    /** @return list<callable(\Illuminate\Validation\Validator): void> */
     final public function after(): array
     {
         return [function (\Illuminate\Validation\Validator $validator): void {

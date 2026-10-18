@@ -99,6 +99,12 @@ final class WebhookController extends Controller
                 case 'charge.refunded':
                     app(\App\Services\Giving\GivingRefunds::class)->handleStripeNotification($event->data->object, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway));
                     break;
+                case 'checkout.session.async_payment_failed':
+                case 'checkout.session.expired':
+                    if ($tenant !== null) {
+                        app(\App\Services\Events\MemberBenefitNotifications::class)->stripe($tenant, $gateway, $event->data->object, null, true);
+                    }
+                    break;
                 case 'checkout.session.completed':
                 case 'checkout.session.async_payment_succeeded':
                     $session = $event->data->object;
@@ -153,6 +159,9 @@ final class WebhookController extends Controller
 
         try {
             if (is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Giving\GivingRefunds::class)->handlePaystackNotification((array) $data, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway))) {
+                return response()->json(['status' => 'success']);
+            }
+            if ($event === 'charge.failed' && app(\App\Services\Events\MemberBenefitNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway), $tenant, true)) {
                 return response()->json(['status' => 'success']);
             }
             if ($event === 'charge.success') {

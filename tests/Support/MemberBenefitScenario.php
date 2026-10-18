@@ -16,7 +16,7 @@ use Carbon\CarbonImmutable;
 
 final class MemberBenefitScenario
 {
-    public static function make(string $provider = 'platform'): array
+    public static function make(string $provider = 'platform', bool $typed = false): array
     {
         $tenant = Tenant::factory()->create(['settlement_mode' => $provider === 'platform' ? 'platform_default' : 'own_gateway']);
         foreach (['community', 'community_event_benefits'] as $key) {
@@ -25,7 +25,8 @@ final class MemberBenefitScenario
         $event = Event::factory()->published()->paid(10000)->create(['tenant_id' => $tenant->id, 'members_only' => true, 'member_ticket_price' => 5000, 'platform_fee_percentage' => 2, 'fee_bearer' => 'organizer', 'grandfathered_at' => now()]);
         $member = Member::factory()->create(['tenant_id' => $tenant->id]);
         $fees = app(FeeCalculator::class)->for($event, 5000);
-        $registration = EventRegistration::factory()->pendingPayment()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'email' => $member->email, 'member_benefit_required' => true, 'amount' => 5000, 'charged_amount' => $fees->chargedAmount, 'platform_fee_amount' => $fees->platformFee, 'currency' => 'GHS', 'ticket_code' => null, 'qr_token' => null]);
+        $type = $typed ? \App\Models\EventTicketType::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'price' => 10000, 'member_price' => 5000, 'capacity' => 100]) : null;
+        $registration = EventRegistration::factory()->pendingPayment()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'ticket_type_id' => $type?->id, 'email' => $member->email, 'member_benefit_required' => true, 'amount' => 5000, 'charged_amount' => $fees->chargedAmount, 'platform_fee_amount' => $fees->platformFee, 'currency' => 'GHS', 'ticket_code' => null, 'qr_token' => null]);
         $session = app('session.store');
         $session->put(PlatformAttendeeVerification::SESSION_KEY, ['email' => $member->email, 'expires_at' => now()->addHour()->timestamp]);
         $quote = app(MemberBenefitQuotes::class)->start($session, $registration);

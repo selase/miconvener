@@ -14,6 +14,7 @@ final class StartEventMemberCheckoutRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return ['provider' => ['required', Rule::in(['paystack', 'stripe'])], 'expected_amount' => ['required', 'integer', 'min:0'], 'currency' => ['required', 'string', 'size:3']];

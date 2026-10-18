@@ -13,6 +13,7 @@ final class ReconcileEventMemberPaymentRequest extends FormRequest
         return $this->user()?->can('update event') ?? false;
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return ['provider_refund_id' => ['nullable', 'string', 'max:255']];

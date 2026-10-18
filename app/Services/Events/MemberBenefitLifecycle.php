@@ -52,11 +52,11 @@ final class MemberBenefitLifecycle
             return false;
         }
         $count = $event->registrations()->confirmed()->where('id', '!=', $registration->id);
-        if ($event->capacity !== null && (clone $count)->count() >= $event->capacity) {
-            return false;
+        if ($type !== null) {
+            return $type->capacity === null || $count->where('ticket_type_id', $type->id)->count() < $type->capacity;
         }
 
-        return $type?->capacity === null || (clone $count)->where('ticket_type_id', $type->id)->count() < $type->capacity;
+        return $event->capacity === null || $count->count() < $event->capacity;
     }
 
     public function reverify(EventRegistration $candidate, \Illuminate\Contracts\Session\Session $session): bool

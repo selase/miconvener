@@ -267,10 +267,38 @@ final class EventRegistrationController extends Controller
         );
     }
 
+    public function memberPayments(Request $request, string $subdomain, string $event): JsonResponse|\Inertia\Response
+    {
+        $this->authorize('read event');
+        $tenant = $this->getTenant();
+        $eventModel = Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($event);
+        if (! $request->wantsJson()) {
+            return \Inertia\Inertia::render('Tenant/Events/MemberPaymentReview', [
+                'event' => ['id' => $eventModel->id, 'name' => $eventModel->name, 'slug' => $eventModel->slug, 'archived' => $eventModel->trashed()],
+                'can_manage' => $request->user()->can('update event'),
+            ]);
+        }
+        $sources = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)
+            ->whereHas('registration', fn ($query) => $query->where('event_id', $eventModel->id))
+            ->with('registration:id,full_name')->latest()->orderByDesc('id')->paginate(10)->withQueryString()
+            ->through(fn ($source): array => [
+                'id' => $source->id, 'registration_id' => $source->registration_id, 'registration_name' => $source->registration->full_name,
+                'recipient_url' => app(\App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($source->registration),
+                'reference' => $source->reference, 'provider' => $source->provider, 'settlement_mode' => $source->settlement_mode,
+                'amount' => $source->charged_amount, 'currency' => $source->currency, 'state' => $source->state, 'review_reason' => $source->review_reason,
+                'is_extra_capture' => $source->is_extra_capture, 'paid_at' => $source->paid_at?->toIso8601String(), 'created_at' => $source->created_at->toIso8601String(),
+                'refund_reference' => $source->refund_reference,
+                'can_refund' => in_array($source->state, ['fulfilled', 'paid_review', 'paid_extra'], true) && $source->booked_at !== null && $source->gateway_fee_amount !== null,
+                'observed_payment' => $source->observed_payment,
+            ]);
+
+        return response()->json($sources)->header('Cache-Control', 'private, no-store');
+    }
+
     public function refundMemberPayment(\App\Http\Requests\Tenant\ReconcileEventMemberPaymentRequest $request, string $subdomain, string $event, string $attempt): JsonResponse
     {
         $this->authorize('update event');
-        $eventModel = $this->findEvent($this->getTenant()->id, $event);
+        $eventModel = Event::withoutGlobalScopes()->where('tenant_id', $this->getTenant()->id)->findOrFail($event);
         $source = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $eventModel->tenant_id)
             ->whereHas('registration', fn ($query) => $query->where('event_id', $eventModel->id))->findOrFail($attempt);
         $source = app(\App\Services\Events\MemberBenefitRefunds::class)->request($source);
@@ -281,7 +309,7 @@ final class EventRegistrationController extends Controller
     public function reconcileMemberPayment(\App\Http\Requests\Tenant\ReconcileEventMemberPaymentRequest $request, string $subdomain, string $event, string $attempt): JsonResponse
     {
         $this->authorize('update event');
-        $eventModel = $this->findEvent($this->getTenant()->id, $event);
+        $eventModel = Event::withoutGlobalScopes()->where('tenant_id', $this->getTenant()->id)->findOrFail($event);
         $source = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $eventModel->tenant_id)
             ->whereHas('registration', fn ($query) => $query->where('event_id', $eventModel->id))->findOrFail($attempt);
         if (in_array($source->state, ['refund_pending', 'refund_unknown', 'refunded'], true)) {
@@ -290,6 +318,8 @@ final class EventRegistrationController extends Controller
             $verified = app(\App\Services\Events\MemberBenefitGateways::class)->verify($source);
             if (($verified['status'] ?? null) === 'success') {
                 app(\App\Services\Events\MemberBenefitPayments::class)->confirm($source, $verified);
+            } elseif (($verified['status'] ?? null) === 'failed') {
+                app(\App\Services\Events\MemberBenefitPayments::class)->recordFailure($source, $verified);
             }
             $source->refresh();
         }

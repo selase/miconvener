@@ -33,6 +33,9 @@ final class MemberBenefitCheckout
             if ($registration->offline_payment_status !== null && $registration->offline_payment_status !== EventRegistration::OFFLINE_STATUS_REJECTED) {
                 $this->refuse('Your offline payment proof needs organiser review before another payment method can be used.');
             }
+            if (! app(MemberBenefitLifecycle::class)->hasCapacity($registration)) {
+                $this->refuse('This ticket has no available places. No new payment has been started.');
+            }
             $old = EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
             $existing = EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->whereNotIn('state', ['failed', 'refunded'])->first();
             if ($existing !== null) {

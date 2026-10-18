@@ -20,6 +20,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
+/**
+ * @property bool $members_only
+ * @property int|null $member_ticket_price
+ */
 final class Event extends Model
 {
     use BelongsToTenant;
@@ -554,6 +558,7 @@ final class Event extends Model
         return $this->hasMany(EventSponsor::class)->orderBy('sort_order');
     }
 
+    /** @return HasMany<EventTicketType, $this> */
     public function ticketTypes(): HasMany
     {
         return $this->hasMany(EventTicketType::class)->orderBy('sort_order');

@@ -112,3 +112,12 @@ it('freezes the correct fee bearer and respects an explicit commission waiver', 
     expect($quote->charged_amount)->toBe($charged)->and($quote->platform_fee_amount)->toBe($percentage === 0.0 ? 0 : 500)
         ->and($quote->pricing['fees']['bearer'])->toBe($bearer);
 })->with([['organizer', 10.0, 5000], ['attendee', 10.0, 5500], ['attendee', 0.0, 5000]]);
+
+it('normalises the accepted fee breakdown before freezing a fulfilment fingerprint', function (): void {
+    [, , , $registration, $session] = memberQuoteFixture();
+    $registration->update(['platform_fee_amount' => 0]);
+    $quote = app(MemberBenefitQuotes::class)->start($session, $registration->fresh());
+    $attempt = EventMemberBenefitAttempt::factory()->forQuote($quote)->create(['provider' => 'paystack', 'account_key' => 'platform:synthetic', 'settlement_mode' => 'platform_default', 'state' => 'open']);
+    app(App\Services\Events\MemberBenefitPayments::class)->confirm($attempt, Tests\Support\MemberBenefitScenario::payment($attempt));
+    expect($attempt->fresh()->state)->toBe('fulfilled')->and($registration->fresh()->platform_fee_amount)->toBe($quote->platform_fee_amount);
+});

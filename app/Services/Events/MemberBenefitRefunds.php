@@ -47,7 +47,7 @@ final class MemberBenefitRefunds
         }
         try {
             $result = $gateway->requestGivingRefund($attempt->provider_reference, $attempt->charged_amount, $attempt->refund_operation_key);
-            $reference = (string) ($result['reference'] ?? '');
+            $reference = (string) ($result['reference']);
             EventMemberBenefitAttempt::withoutGlobalScopes()->whereKey($attempt->id)->where('refund_operation_key', $attempt->refund_operation_key)->where('state', 'refund_pending')
                 ->update(['refund_reference' => $reference !== '' ? $reference : null, 'state' => $reference !== '' ? 'refund_pending' : 'refund_unknown', 'review_reason' => $reference !== '' ? 'refund_awaiting_confirmation' : 'refund_unknown']);
         } catch (Throwable) {
@@ -56,7 +56,10 @@ final class MemberBenefitRefunds
         }
 
         if ($releasedTicket) {
-            app(MemberBenefitLifecycle::class)->promoteWaiting($candidate->registration->event, $candidate->registration->ticket_type_id);
+            $event = Event::withoutGlobalScopes()->where('tenant_id', $candidate->tenant_id)->findOrFail($candidate->registration->event_id);
+            if (! $event->trashed()) {
+                app(MemberBenefitLifecycle::class)->promoteWaiting($event, $candidate->registration->ticket_type_id);
+            }
         }
 
         return $attempt->fresh();
@@ -100,6 +103,11 @@ final class MemberBenefitRefunds
             }
             if ($attempt->provider === 'stripe' && $returned !== $received) {
                 $attempt->update(['state' => 'refund_pending', 'review_reason' => 'refund_commission_pending', 'refund_reference' => $candidate->refund_reference]);
+
+                return $attempt;
+            }
+            if ($attempt->provider === 'stripe' && ! ($data['gateway_credit_reported'] ?? false)) {
+                $attempt->update(['state' => 'refund_pending', 'review_reason' => 'refund_fee_pending', 'refund_reference' => $candidate->refund_reference]);
 
                 return $attempt;
             }

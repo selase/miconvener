@@ -50,7 +50,7 @@ final class MemberBenefitQuotes
             $member = Member::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->lockForUpdate()->findOrFail($member->id);
             $identity = $this->identity->capture($session, $member);
             $old = EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
-            if ($old !== null && $old->expires_at->isFuture()) {
+            if ($old !== null && $old->state === 'quoted' && $old->expires_at->isFuture()) {
                 $this->assertUsable($old, $registration);
 
                 return $old;
@@ -62,6 +62,7 @@ final class MemberBenefitQuotes
             if ($pricing['amount'] !== $registration->amount || $pricing['fees']['charged_amount'] !== $registration->effectiveChargedAmount()) {
                 $this->refuse('The price has changed. Review and accept the current total before paying.');
             }
+            $registration->fill(['charged_amount' => $pricing['fees']['charged_amount'], 'platform_fee_amount' => $pricing['fees']['platform_fee']]);
             $quote = EventMemberBenefitQuote::query()->create([
                 'tenant_id' => $registration->tenant_id, 'event_id' => $registration->event_id, 'registration_id' => $registration->id,
                 'member_id' => $member->id, 'identity' => $identity, 'pricing' => $pricing, 'amount' => $registration->amount,

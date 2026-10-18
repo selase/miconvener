@@ -19,6 +19,12 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
+/**
+ * @property bool $member_benefit_required
+ * @property int $member_benefit_access_version
+ * @property string|null $member_benefit_quote_id
+ * @property array<string, mixed>|null $member_benefit_identity
+ */
 #[ObservedBy(RegistrationWebhookObserver::class)]
 final class EventRegistration extends Model
 {
@@ -158,6 +164,12 @@ final class EventRegistration extends Model
         return hash_hmac('sha256', $payload, (string) config('app.key'));
     }
 
+    /** @return HasMany<EventMemberBenefitAttempt, $this> */
+    public function memberBenefitAttempts(): HasMany
+    {
+        return $this->hasMany(EventMemberBenefitAttempt::class, 'registration_id');
+    }
+
     public function memberBenefitRecipientToken(): string
     {
         return hash_hmac('sha256', $this->id.'|'.mb_strtolower(mb_trim($this->email)).'|'.$this->member_benefit_access_version, (string) config('app.key'));
@@ -196,11 +208,13 @@ final class EventRegistration extends Model
     /**
      * @return BelongsTo<EventTicketType, $this>
      */
+    /** @return BelongsTo<EventTicketType, $this> */
     public function ticketType(): BelongsTo
     {
         return $this->belongsTo(EventTicketType::class, 'ticket_type_id');
     }
 
+    /** @return BelongsTo<EventPromoCode, $this> */
     public function promoCode(): BelongsTo
     {
         return $this->belongsTo(EventPromoCode::class, 'promo_code_id');

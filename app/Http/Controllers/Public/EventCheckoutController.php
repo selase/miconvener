@@ -49,6 +49,7 @@ final class EventCheckoutController extends Controller
             ->firstOrFail();
 
         if ($registrationModel->member_benefit_required) {
+            $registrationModel->setRelation('event', Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($registrationModel->event_id));
             abort_unless($registrationModel->event->slug === $event && $this->canClaimWorkspace($registrationModel), 403);
         }
 
@@ -58,7 +59,7 @@ final class EventCheckoutController extends Controller
             $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id, PlatformAttendeeWorkspaceAuthorizer::DEFAULT_GRANT_TTL_MINUTES, $registrationModel->member_benefit_required ? $registrationModel->memberBenefitRecipientToken() : null);
         }
 
-        if ($registrationModel->isConfirmed()) {
+        if ($registrationModel->isConfirmed() && ! ($registrationModel->member_benefit_required && (request()->boolean('review') || $registrationModel->event->trashed()))) {
             return redirect($workspaceUrl);
         }
 
@@ -152,7 +153,7 @@ final class EventCheckoutController extends Controller
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
-            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id, PlatformAttendeeWorkspaceAuthorizer::DEFAULT_GRANT_TTL_MINUTES, $registrationModel->member_benefit_required ? $registrationModel->memberBenefitRecipientToken() : null);
+            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
         }
 
         if ($registrationModel->isConfirmed()) {
@@ -178,7 +179,7 @@ final class EventCheckoutController extends Controller
         $workspaceUrl = $this->workspaceAuthorizer->workspaceUrl($registrationModel);
 
         if ($this->canClaimWorkspace($registrationModel)) {
-            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id, PlatformAttendeeWorkspaceAuthorizer::DEFAULT_GRANT_TTL_MINUTES, $registrationModel->member_benefit_required ? $registrationModel->memberBenefitRecipientToken() : null);
+            $this->workspaceAuthorizer->grantCheckoutAccess(request()->session(), $registrationModel->id);
         }
 
         if ($registrationModel->isConfirmed()) {
@@ -191,7 +192,7 @@ final class EventCheckoutController extends Controller
     public function startMemberPayment(\App\Http\Requests\Public\StartEventMemberCheckoutRequest $request, string $subdomain, string $event, string $registration): Response|RedirectResponse
     {
         $tenant = app(TenantContext::class)->getTenant();
-        abort_unless($tenant, 404);
+        abort_unless($tenant !== null, 404);
         $model = EventRegistration::query()->where('tenant_id', $tenant->id)->whereHas('event', fn ($q) => $q->where('slug', $event))->findOrFail($registration);
         abort_unless($this->canClaimWorkspace($model), 403);
         $url = app(\App\Services\Events\MemberBenefitCheckout::class)->start($request->session(), $model,
@@ -229,12 +230,15 @@ final class EventCheckoutController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         abort_unless($tenant !== null, 404);
         $record = EventRegistration::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('member_benefit_required', true)
-            ->whereHas('event', fn ($query) => $query->where('slug', $event))->findOrFail($registration);
+            ->whereHas('event', fn ($query) => $query->withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class)->where('slug', $event))->findOrFail($registration);
+        abort_unless(is_string($request->query('attempt')) && \Illuminate\Support\Str::isUuid($request->query('attempt')), 404);
         $attempt = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('registration_id', $record->id)
             ->findOrFail($request->query('attempt'));
         $verified = app(\App\Services\Events\MemberBenefitGateways::class)->verify($attempt);
         if (($verified['status'] ?? null) === 'success') {
             app(\App\Services\Events\MemberBenefitPayments::class)->confirm($attempt, $verified);
+        } elseif (($verified['status'] ?? null) === 'failed') {
+            app(\App\Services\Events\MemberBenefitPayments::class)->recordFailure($attempt, $verified);
         }
 
         return redirect()->route('public.events.checkout', ['subdomain' => $tenant->slug, 'event' => $event, 'registration' => $record->id]);
@@ -375,11 +379,14 @@ final class EventCheckoutController extends Controller
     /** @return array<string, mixed> */
     private function memberContext(EventRegistration $registration): array
     {
-        $eligible = app(\App\Services\Events\MemberBenefitEligibility::class)->resolve(request()->session(), $registration->event, $registration->email) !== null;
         $quote = \App\Models\EventMemberBenefitQuote::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->find($registration->member_benefit_quote_id);
         $attempt = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->latest()->orderByDesc('id')->first();
+        $eligibility = app(\App\Services\Events\MemberBenefitEligibility::class);
+        $eligible = in_array($attempt?->state, ['paid_review', 'fulfilled'], true)
+            ? $eligibility->resolveExisting(request()->session(), $registration->event, $registration->email) !== null
+            : $eligibility->resolve(request()->session(), $registration->event, $registration->email) !== null;
         $pricing = null;
-        if ($eligible && $attempt === null) {
+        if ($eligible && ($attempt === null || $attempt->state === 'failed')) {
             try {
                 $pricing = app(\App\Services\Events\MemberBenefitQuotes::class)->pricing($registration);
             } catch (\Illuminate\Validation\ValidationException) {
@@ -387,7 +394,7 @@ final class EventCheckoutController extends Controller
             }
         }
 
-        return ['extra_captures' => \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->where('is_extra_capture', true)->where('state', '!=', 'refunded')->count(), 'required' => true, 'eligible' => $eligible, 'payment_state' => $attempt?->state, 'review_reason' => $attempt?->review_reason,
+        return ['extra_captures' => \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $registration->tenant_id)->where('registration_id', $registration->id)->where('is_extra_capture', true)->where('state', '!=', 'refunded')->count(), 'required' => true, 'quote_id' => $quote?->id, 'reference' => $attempt?->reference, 'provider' => $attempt?->provider, 'eligible' => $eligible, 'payment_state' => $attempt?->state, 'review_reason' => $attempt?->review_reason,
             'current_total' => $quote?->expires_at->isFuture() ? $quote->charged_amount : ($pricing['fees']['charged_amount'] ?? $registration->effectiveChargedAmount()),
             'currency' => $registration->currency, 'expires_at' => $quote?->expires_at->toIso8601String()];
     }

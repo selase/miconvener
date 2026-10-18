@@ -11,6 +11,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $event_id
+ * @property string $registration_id
+ * @property string $member_id
+ * @property string $currency
+ * @property string $cart_fingerprint
+ * @property string $state
+ * @property int $amount
+ * @property int $platform_fee_amount
+ * @property int $charged_amount
+ * @property array<string, mixed> $identity
+ * @property array<string, mixed> $pricing
+ * @property \Carbon\CarbonImmutable $expires_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 final class EventMemberBenefitQuote extends Model
 {
     use BelongsToTenant;

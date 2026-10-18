@@ -187,7 +187,6 @@ final class PaystackGateway implements PaymentGateway
         return [
             'status' => (string) ($data['status'] ?? 'failed'),
             'reference' => (string) ($data['reference'] ?? $reference),
-            'reference_reported' => isset($data['reference']) && is_string($data['reference']),
             'gateway_response' => $data['gateway_response'] ?? null,
             'authorization' => (array) ($data['authorization'] ?? []),
             'channel' => $data['channel'] ?? null,

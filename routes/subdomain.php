@@ -190,6 +190,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/registrations/{registration}/approve-offline', [EventRegistrationController::class, 'approveOfflinePayment'])->name('tenant.events.registrations.approve-offline');
     Route::post('events/{event}/registrations/{registration}/reject-offline', [EventRegistrationController::class, 'rejectOfflinePayment'])->name('tenant.events.registrations.reject-offline');
     Route::get('events/{event}/registrations/{registration}/offline-proof', [EventRegistrationController::class, 'downloadProof'])->name('tenant.events.registrations.offline-proof');
+    Route::get('events/{event}/member-payments', [EventRegistrationController::class, 'memberPayments'])->name('tenant.events.member-payments.index');
     Route::post('events/{event}/member-payments/{attempt}/refund', [EventRegistrationController::class, 'refundMemberPayment'])->name('tenant.events.member-payments.refund');
     Route::post('events/{event}/member-payments/{attempt}/reconcile', [EventRegistrationController::class, 'reconcileMemberPayment'])->name('tenant.events.member-payments.reconcile');
     Route::post('events/{event}/registrations/{registration}/cancel', [EventRegistrationController::class, 'cancel'])->name('tenant.events.registrations.cancel');

@@ -18,6 +18,7 @@ final class UpdateEventMemberBenefitsRequest extends FormRequest
         return $tenant !== null && (bool) $this->user()?->can('update event') && app(MemberBenefitEligibility::class)->enabled($tenant);
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         $tenant = app(TenantContext::class)->getTenant();
