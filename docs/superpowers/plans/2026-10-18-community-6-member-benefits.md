@@ -178,6 +178,7 @@ Earlier browser/review fixes also retained archived receipts, hid cancelled memb
 
 ### Final validation evidence
 
+- Final focused review/legacy compatibility gate on committed `d2fd3ccd`:26/26 passed,138 assertions,62.19seconds. Task6 local contract recorded for ccdde7da..d2fd3ccd; required full remote CI remains pending.
 - Post-review broad PHP gate:320 passed/1 failed,1262 assertions. The sole failure was the existing draft administrator workflow; fixed compatibly rather than weakening its assertion. All affected files then passed107/107,481 assertions. Do not represent the broad run as321/321.
 - Full frontend suite430/430 across68 files; after final navigation fix, affected member-payment/verification tests14/14. Lint and tracked production build passed after that last change. PHPStan0 errors, no baseline growth; Pint passed. Finance category verification exited0; console component usage5/5 and build-manifest references4/4 passed.
 - Latest disposable browser acceptance: changed price50→0 explicitly accepted, confirmed ticket opened at central `/my/events/...`, zero console errors; changed price50→60 explicitly accepted, order summary60 and offline proof form shown. No proof submitted, real gateway payment or external message sent. A wait for a nonexistent literal “Offline payment” label timed out after the successful action; reading the actual page confirmed the native “Choose Payment Method” form and correct total.
