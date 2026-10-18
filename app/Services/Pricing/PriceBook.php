@@ -28,6 +28,7 @@ final class PriceBook
     public function addon(string $key, string $currency, int $multiplier = 1): Money
     {
         $config = TenantAddonService::CATALOG[$key];
+
         return $this->pick($config['unit_price'] * $multiplier, $config['usd_unit_price'] * $multiplier, $currency);
     }
 

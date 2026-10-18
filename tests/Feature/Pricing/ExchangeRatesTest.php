@@ -123,7 +123,7 @@ test('fx:refresh stores the published rate', function () {
 });
 
 test('the scheduler fetches a fresh rate every hour, inside the cache lifetime, so page views never fetch', function () {
-    $events = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+    $events = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
         ->filter(fn ($event): bool => str_contains((string) $event->command, 'fx:refresh'));
 
     expect($events)->toHaveCount(1)
