@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task using the owner's established native approach. Steps use checkbox (`- [ ]`) syntax. One fresh whole-branch review at the end; no per-task reviewers or redundant second blanket review.
 
-**Status:** Proposed for owner review, 2026-10-18. No milestone 7 application code, migration, rollout or production change is authorised by this document.
+**Status:** Owner approved native implementation and all recommendations2026-10-18. Implementation in progress on `codex/community-7`; no push, merge, deployment or production change authorised.
 
 **Goal:** Let associations share standing documents, churches publish notes for individual recurring services, and organisations ask their audience questions through the existing `/my` app, without requiring dues or event registration for organisation-owned content.
 
@@ -10,7 +10,7 @@
 
 **Tech Stack:** Laravel13/PHP8.5, PostgreSQL landlord connection, Inertia/React, existing Console components and Tailwind4, Pest/Vitest. No new dependency or frontend framework.
 
-**Spec:** `docs/superpowers/specs/2026-10-15-community-design.md` §§2,4,6.1–6.3,13; roadmap milestone7; owner request2026-10-18 for organisation library and individual church-service notes. The recommendations below are proposed decisions for review, not prior owner approval.
+**Spec:** `docs/superpowers/specs/2026-10-15-community-design.md` §§2,4,6.1–6.3,13; roadmap milestone7; owner request2026-10-18 for organisation library and individual church-service notes. The recommendations below were approved by the owner2026-10-18.
 
 ## Proposed member experience
 
@@ -20,7 +20,7 @@
 - Community → **Polls & surveys** shows open questions and completed responses. These remain distinct from a conference's live polls and Q&A.
 - Keep Home/Tickets/Communities/Money/Me as the five app destinations. Library/Services/Polls are organisation sections inside Communities, with real page state/deep links, browser back/forward and no inbox-style oversized modal.
 
-## Recommendations needing owner review
+## Owner-approved recommendations
 
 1. **Restricted audience first:** active members and selected active groups. Approved representatives may read on behalf of an eligible member, visibly labelled; dues balance is irrelevant. Pending/lapsed/exited records and followers alone do not unlock member documents. No anonymous public files in this release. A later public/follower publication option would need an explicit audience decision, not a file URL bypass.
 2. **Service notes independent of attendance:** an eligible church member can read the organisation's published notes without booking every Sunday. This never grants access to attendee-only EventMaterial files, tickets, speaker decks or live-event responses.
@@ -57,7 +57,7 @@ Existing integration points: `app/Services/Community/MemberAccess.php`, `MemberA
 
 New classes stay in existing Models, Services/Community, Http/Controllers/{Public,Tenant}, Http/Requests/{Attendee,Tenant/Community}, and Pages/{Public,Tenant}/Community directories. Generate PHP skeletons with Artisan. Name migrations under `database/migrations/landlord`. Do not create any of them until this plan is approved.
 
-### Task1: Content foundations, audience policy and rollout (7a)
+### Task 1: Content foundations, audience policy and rollout (7a)
 
 **Files:** Create `CommunityLibraryItem`, `CommunityLibraryVersion` models/factories; landlord migration `create_community_library_tables`; `Services/Community/CommunityContentAccess.php`, `CommunityLibraryRollout.php`; `tests/Feature/Community/LibraryAccessTest.php`, `LibraryRolloutTest.php`. Modify config/filesystems.php, seeders/RolePermissions, actual entitlement definitions and tenant/community navigation.
 
@@ -67,12 +67,12 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 - `CommunityLibraryRollout::canPublish(Tenant $tenant): bool` combines rollout+plan; retained-reading path explicitly separate.
 - Items: tenant,id,kind(document/service_note),title,description,plain_text,audience selector,draft/published/withdrawn,release_at,current_version_id,optional event_id+session_id,created_by. Tenant-bounded foreign keys; both context IDs null for documents, both present for notes. Versions: tenant,item,id,edition,disk,path,mime,size,checksum,created_by,created_at. Files immutable; no nullable event IDs on event tables.
 
-- [ ] Write failing access tests: no-dues active member allowed; foreign/unverified/pending/lapsed/exited/follower denied; approved representative read allowed then immediate revoke; shared phone denied without grant; groups enforce tenant and current membership; draft/future/withdrawn hidden; downgrade retains safe history but refuses publishing.
-- [ ] Run `php artisan test --compact tests/Feature/Community/LibraryAccessTest.php tests/Feature/Community/LibraryRolloutTest.php`; watch missing behaviour fail.
-- [ ] Implement schema, policies, rollouts, private disk and seeded permissions; add downgrade/retained-content affordance. Assert no unauthorised field/file key in JSON and no public-disk write.
-- [ ] Run tests green, permission/seeder invariants and Pint; tick steps and commit together.
+- [x] Write failing access tests: no-dues active member allowed; foreign/unverified/pending/lapsed/exited/follower denied; approved representative read allowed then immediate revoke; shared phone denied without grant; groups enforce tenant and current membership; draft/future/withdrawn hidden; downgrade retains safe history but refuses publishing.
+- [x] Run `php artisan test --compact tests/Feature/Community/LibraryAccessTest.php tests/Feature/Community/LibraryRolloutTest.php`; watch missing behaviour fail.
+- [x] Implement schema, policies, rollouts, private disk and seeded permissions; add downgrade/retained-content affordance. Assert no unauthorised field/file key in JSON and no public-disk write.
+- [x] Run tests green, permission/seeder invariants and Pint; tick steps and commit together.
 
-### Task2: Staff library, versions and private member reading (7a)
+### Task 2: Staff library, versions and private member reading (7a)
 
 **Files:** Create `Services/Community/CommunityContentStorage.php`, tenant/public `CommunityLibraryController.php`, `Tenant/Community/StoreLibraryItemRequest.php`, `UpdateLibraryItemRequest.php`; `Pages/Tenant/Community/Library.jsx`, `Pages/Public/Community/LibraryPanel.jsx`; `tests/Feature/Community/LibraryPublishingTest.php`, `LibraryDownloadTest.php`, `resources/js/test/CommunityLibrary.test.jsx`. Modify Task1 models, native navigation/CommunitiesPanel and routes.
 
@@ -83,7 +83,7 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 - [ ] Implement validated APIs, actual Library navigation, staff editor and page-level member list/detail. Show edition/date/type/size, search title, empty CTA for staff and neutral reader empty state, loading/retry403/404 handling. Link from Communities without adding a sixth app tab.
 - [ ] Run affected PHP/Vitest and existing MemberAccess/app/inbox suites; verify390px/desktop, light/dark and keyboard. Build assets; tick and commit.
 
-### Task3: Notes for a particular recurring church service (7b)
+### Task 3: Notes for a particular recurring church service (7b)
 
 **Files:** Create tenant `CommunityServiceNoteController.php`, attendee `CommunityServicesController.php`, `StoreServiceNoteRequest.php`, `Pages/Public/Community/ServicesPanel.jsx`, `Pages/Tenant/Community/ServiceNoteEditor.jsx`; tests `CommunityServiceNotesTest.php`, `resources/js/test/CommunityServices.test.jsx`. Modify Task1 item model/context constraints; Events/Programme editor entry point; Communities library navigation and central routes.
 
@@ -95,7 +95,7 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 - [ ] Keep EventMaterial downloads, release policy, speaker decks, limits, attendee verification and live poll gates unchanged. A link to attendee-only materials starts the existing attendee journey; it cannot proxy around it through Community membership.
 - [ ] Run all above green plus app navigation tests, local browser morning/evening service, build, tick and commit.
 
-### Task4: Organisation polls/surveys and pure engine reuse (7c)
+### Task 4: Organisation polls/surveys and pure engine reuse (7c)
 
 **Files:** Create `CommunityQuestionnaire`, `CommunityQuestion`, `CommunityQuestionOption`, `CommunitySubmission`, `CommunityAnswer` models/factories and migration; `Services/Community/CommunityQuestionnaires.php`; extract pure `Services/Events/QuestionAnswerValidator.php` from `PollAnswer.php` only if needed while retaining `PollAnswer::read(Request,EventPoll): array` unchanged as adapter. Create `tests/Feature/Community/CommunityQuestionnairesTest.php`; modify event question tests only to add adapter parity assertions.
 
@@ -105,7 +105,7 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 - [ ] Watch failures, implement own records plus minimal pure extraction, then run event `PollQuestionTypesTest`, `PollScaleTest`, `PollVotingGateTest`, `PollPresentationTest` and new tests green. No existing EventPoll table/foreign-key/identity change.
 - [ ] Tick and commit schema/engine changes together. No live sending or production flags.
 
-### Task5: Poll/survey staff and member UI, results and exports (7c)
+### Task 5: Poll/survey staff and member UI, results and exports (7c)
 
 **Files:** Create `Services/Community/CommunityQuestionnaireResults.php`, tenant/public `CommunityQuestionnaireController.php`, Form Requests, `Pages/Tenant/Community/Polls.jsx`, `Pages/Public/Community/QuestionnairesPanel.jsx`, tests `CommunityQuestionnaireEndpointsTest.php`, `CommunityQuestionnaireExportTest.php`, `resources/js/test/CommunityQuestionnaires.test.jsx`. Modify native Community navigation, Task4 service and routes.
 
@@ -115,7 +115,7 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 - [ ] Implement native editor/member form, explicit selected context, confirmation, open/closed/responded state, empty/error/loading views, result publication and export. No automatic notifications, inbox copies, SMS or event broadcasts.
 - [ ] Run affected PHP/Vitest, event poll regression suites and app privacy/cache tests; keyboard/narrow/light/dark acceptance, rebuild, tick and commit.
 
-### Task6: Final integration, one review and controlled rollout proposal
+### Task 6: Final integration, one review and controlled rollout proposal
 
 **Files:** Modify parent spec, roadmap and this plan; all slice-owned tests and assets as needed.
 
