@@ -7,22 +7,14 @@
 
     {{-- Hero: black band, the page's words on the left, what the product shows on the right. --}}
     <section class="bg-[#08090b] text-white" data-use-case-hero>
-        <div class="mx-auto grid max-w-7xl items-center gap-12 px-6 py-16 md:py-24 lg:grid-cols-[1.05fr_.95fr]">
+        <div class="mx-auto grid max-w-7xl items-center gap-10 px-6 py-12 md:py-16 lg:grid-cols-[1.05fr_.95fr]">
             <div>
                 <p class="mono text-[11px] uppercase tracking-[0.18em] text-[#6f9bff]">{{ $case['eyebrow'] }}</p>
-                <h1 class="display mt-5 text-[40px] leading-[44px] tracking-[-0.03em] text-white md:text-[56px] md:leading-[60px]">{{ $case['headline'] }}</h1>
-                <p class="mt-6 max-w-xl text-[18px] leading-[29px] text-slate-300">{{ $case['intro'] }}</p>
+                <h1 class="display mt-4 text-[34px] leading-[40px] tracking-[-0.03em] text-white md:text-[44px] md:leading-[50px]">{{ $case['headline'] }}</h1>
+                <p class="mt-5 max-w-xl text-[17px] leading-[27px] text-slate-300">{{ $case['intro'] }}</p>
                 <div class="mt-8 flex flex-wrap gap-3">
                     <a href="{{ route('register', ['plan' => 'free']) }}" class="rounded-md bg-[var(--field)] px-5 py-3 text-sm font-semibold text-white hover:bg-[var(--field-deep)]">Start for free</a>
                     <a href="{{ route('product.enterprise') }}" class="rounded-md border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/5">Book an enterprise walkthrough</a>
-                </div>
-                <div class="mt-10 border-t border-white/10 pt-6">
-                    <p class="mono text-[10px] uppercase tracking-[0.16em] text-slate-500">Built for</p>
-                    <ul class="mt-3 flex flex-wrap gap-2">
-                        @foreach ($case['for'] as $audience)
-                            <li class="rounded border border-white/15 px-2.5 py-1 text-xs text-slate-300">{{ $audience }}</li>
-                        @endforeach
-                    </ul>
                 </div>
             </div>
             <div class="w-full">

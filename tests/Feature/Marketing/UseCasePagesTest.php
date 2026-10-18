@@ -27,7 +27,6 @@ test('each use case has its own page with its headline, features and timeline', 
 
     $page = $this->get(route('use-cases.show', $slug))->assertOk()
         ->assertSee($case['headline'])
-        ->assertSee('Built for')
         ->assertSee('What you get')
         ->assertSee('How it runs')
         ->assertSee($case['value']['title']);
@@ -108,6 +107,7 @@ test('each use case page opens with a black hero carrying its product panel and 
         ->and(view()->exists("product.use-cases.panels.{$slug}"))->toBeTrue()
         ->and($xpath->query('.//*[@data-use-case-panel]', $hero)->length)->toBe(1)
         ->and($xpath->query('.//a[contains(@href, "/register")]', $hero)->length)->toBe(1)
+        ->and(str_contains($hero->textContent, 'Built for'))->toBeFalse()
         ->and(str_contains($hero->textContent, config("use-cases.cases.{$slug}.headline")))->toBeTrue();
 })->with(fn () => array_keys((require __DIR__.'/../../../config/use-cases.php')['cases']));
 

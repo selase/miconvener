@@ -7,7 +7,7 @@
     <section class="bg-[#08090b] text-white" data-use-case-hub-hero>
         <div class="mx-auto max-w-7xl px-6 pb-14 pt-16 md:pb-20 md:pt-24">
             <p class="mono text-[11px] uppercase tracking-[0.18em] text-[#6f9bff]">{{ $hub['eyebrow'] }}</p>
-            <h1 class="display mt-5 max-w-3xl text-[40px] leading-[44px] tracking-[-0.03em] text-white md:text-[60px] md:leading-[64px]">{{ $hub['title'] }}</h1>
+            <h1 class="display mt-5 max-w-3xl text-[40px] leading-[44px] tracking-[-0.03em] text-white md:text-[48px] md:leading-[54px]">{{ $hub['title'] }}</h1>
             <p class="mt-6 max-w-2xl text-[18px] leading-[29px] text-slate-300">{{ $hub['intro'] }}</p>
 
             <div class="mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 sm:grid-cols-4 lg:grid-cols-7">

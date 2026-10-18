@@ -56,12 +56,6 @@ return [
             'eyebrow' => 'Academic events',
             'headline' => 'From the call for abstracts to the certificate in hand',
             'intro' => 'Symposia, conferences, seminars, vivas and thesis defences. Collect and review abstracts, publish the programme, register delegates and send certificates, all from one workspace.',
-            'for' => [
-                'Universities, faculties and departments',
-                'Research institutes and learned societies',
-                'Graduate schools running defences and seminar series',
-                'Professional bodies with an annual scientific meeting',
-            ],
             'features' => [
                 ['tag' => 'Abstracts', 'title' => 'Call for abstracts', 'text' => 'Authors submit abstracts online, reviewers score them, and authors are emailed the decision.'],
                 ['tag' => 'Programme', 'title' => 'A programme people can follow', 'text' => 'Sessions, tracks and speakers on a public event page, with times and rooms.'],
@@ -110,12 +104,6 @@ return [
             'eyebrow' => 'International gatherings',
             'headline' => 'Many delegations, many days, one registration desk',
             'intro' => 'Agencies, institutes and networks that bring people together from many places: summits, assemblies, regional meetings and training weeks.',
-            'for' => [
-                'International and regional organisations',
-                'Government agencies and institutes',
-                'NGOs and professional networks',
-                'Companies with multi-day conferences',
-            ],
             'features' => [
                 ['tag' => 'Delegations', 'title' => 'Delegations and groups', 'text' => 'Group attendees by country, branch or delegation so you can see and address each one.'],
                 ['tag' => 'Ticketing', 'title' => 'A ticket type for every attendee', 'text' => 'Delegates, observers, speakers and guests each get their own ticket type, price and rules.'],
@@ -165,11 +153,6 @@ return [
             'eyebrow' => 'Delegate conferences',
             'headline' => 'Accredit delegates, collect their fees, run the floor',
             'intro' => 'Annual general meetings, national congresses and delegate conferences for associations, unions and professional bodies. Register delegates by branch, take their fees and keep order at the door.',
-            'for' => [
-                'Associations, unions and professional bodies',
-                'Federations with branches or regions',
-                'Societies holding congresses and general meetings',
-            ],
             'features' => [
                 ['tag' => 'Approval', 'title' => 'Registration with approval', 'text' => 'Require approval so only accredited delegates are confirmed, and tell everyone the outcome.'],
                 ['tag' => 'Payments', 'title' => 'Paying delegates', 'text' => 'Delegate fees by card or mobile money, with promo codes for sponsored or subsidised delegates.'],
@@ -217,12 +200,6 @@ return [
             'eyebrow' => 'Live classrooms',
             'headline' => 'Hear from the whole room, not just the front row',
             'intro' => 'Lectures, workshops and training sessions where the audience takes part. Ask a poll, watch the answers arrive, and take questions without a microphone going round.',
-            'for' => [
-                'Lecturers and trainers',
-                'Workshop and bootcamp organisers',
-                'Conference session chairs',
-                'Corporate learning teams',
-            ],
             'features' => [
                 ['tag' => 'Polls', 'title' => 'Live polls', 'text' => 'Put a question to the room and show the results as people answer.'],
                 ['tag' => 'Q&A', 'title' => 'Audience questions', 'text' => 'People send questions from their phones, and a moderator chooses what goes on screen.'],
@@ -271,12 +248,6 @@ return [
             'eyebrow' => 'Communities',
             'headline' => 'Set it once; every meeting takes care of itself',
             'intro' => 'Services, chapter meetings, branch gatherings and old-school reunions repeat. Create the event once, and each occurrence is scheduled, announced and remembered for you.',
-            'for' => [
-                'Churches, mosques and faith groups',
-                'Trade unions and associations',
-                'Old-school and alumni groups',
-                'Clubs, societies and community organisations',
-            ],
             'features' => [
                 ['tag' => 'Recurring', 'title' => 'Recurring events', 'text' => 'Daily, weekly or monthly gatherings that appear on their own, so you never rebuild the same event.'],
                 ['tag' => 'Reminders', 'title' => 'Reminders and notifications', 'text' => 'Automatic reminders before each occurrence, without anyone having to remember to send them.'],
@@ -325,11 +296,6 @@ return [
             'eyebrow' => 'Legacy',
             'headline' => 'A dignified place to honour a life',
             'intro' => 'A funeral, a memorial or a celebration of life brings family and friends together from near and far. Share the order of service, gather tributes and receive support, all in one gentle place.',
-            'for' => [
-                'Families arranging a funeral or memorial',
-                'Funeral committees and community groups',
-                'Churches and organisations marking a member\'s passing',
-            ],
             'features' => [
                 ['tag' => 'Programme', 'title' => 'Order of service', 'text' => 'Publish the programme for the day, with the sessions in their proper order, for everyone to follow.'],
                 ['tag' => 'Tributes', 'title' => 'Tributes and condolences', 'text' => 'A wall where friends and family leave words of remembrance, moderated by the family.'],
@@ -377,12 +343,6 @@ return [
             'eyebrow' => 'Social gatherings',
             'headline' => 'The invitation, the guest list and the door, handled',
             'intro' => 'Reunions, anniversary dinners, meetups, fundraisers and parties. Invite people, see who is coming, and welcome them at the door, free or ticketed.',
-            'for' => [
-                'Friends and family organising a reunion or celebration',
-                'Clubs and meetup groups',
-                'Fundraising committees',
-                'Anyone hosting a ticketed evening',
-            ],
             'features' => [
                 ['tag' => 'Tickets', 'title' => 'Free or ticketed', 'text' => 'Open sign-up, or sell tickets by card or mobile money, with promo codes if you want them.'],
                 ['tag' => 'Event page', 'title' => 'A page worth sharing', 'text' => 'One public page with the details, the location and a sign-up button.'],
