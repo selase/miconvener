@@ -62,7 +62,7 @@ final class ChargeQuote
         return sprintf(
             'Charged as %s at the Bank of Ghana rate of %s (%s).',
             $this->charged()->format(),
-            mb_rtrim(mb_rtrim(number_format($this->rate->rate, 4, '.', ''), '0'), '.'),
+            Rate::describe($this->rate->rate),
             $this->rate->asOf->format('j M Y'),
         );
     }

@@ -81,7 +81,9 @@
 
 **Files:** `InvoicingService` (default currency from the charge, GHS), `Admin\RateCardController`, invoice views (`resources/js/Pages/Billing/Invoice.jsx`, admin invoice Blade, invoice emails): show GHS charged and, when present, "US$ 19.00 at 11.77 (17 Oct 2026)". Tests: invoice tests.
 
-- [ ] Steps: failing tests → implement → run → commit `fix(billing): invoices carry the currency actually charged, with the USD reference`.
+- [x] Steps: failing tests → implement → run → commit `fix(billing): invoices carry the currency actually charged, with the USD reference`.
+  Ruling: the USD reference ("US$ 19 at the Bank of Ghana rate of 11.77 (16 Oct 2026)") goes on the payment receipt email, where USD-priced payments land; metered invoices are generated from GHS plan prices and never carry a USD price, so they are now labelled GHS and paid in GHS. Existing invoices labelled USD are not rewritten (no production data change); they are paid in GHS, which is what their amounts are.
+  Ruling: `InvoicePaymentController` has no route (dead code); its currency was corrected anyway rather than deleted without asking.
 
 ### Task 6: Verification
 

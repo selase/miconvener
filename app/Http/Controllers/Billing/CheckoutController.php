@@ -104,7 +104,9 @@ final class CheckoutController extends Controller
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(
             $customerId,
             $amount,
-            $invoice->currency ?: 'USD',
+            // Invoices were once labelled USD although their amounts are GHS;
+            // Paystack takes GHS only, so they are paid in GHS.
+            (string) config('services.paystack.currency', 'GHS'),
             $redirectUrl,
             [
                 'invoice_id' => $invoice->id,
