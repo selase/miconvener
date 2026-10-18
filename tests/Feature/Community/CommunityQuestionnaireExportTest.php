@@ -45,5 +45,5 @@ it('aggregates fixed choices and multi-select without exposing option or respond
     app(App\Services\Community\CommunityQuestionnaires::class)->submit($tenant, app('session.store'), $form->id, $member->id, [$question->id => $input], 1);
     $summary = app(App\Services\Community\CommunityQuestionnaireResults::class)->summary($form->fresh());
     expect($summary['questions'][0]['distribution'][0])->toBe(['label' => 'Welcome', 'count' => 1]);
-    expect(json_encode($summary))->not->toContain($member->id,$ids[0],$member->email);
+    expect(json_encode($summary))->not->toContain($member->id, $ids[0], $member->email);
 })->with(['multiple_choice', 'multi_select']);

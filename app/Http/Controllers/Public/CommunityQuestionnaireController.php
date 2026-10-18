@@ -56,6 +56,6 @@ final class CommunityQuestionnaireController extends Controller
 
     private function form(Tenant $tenant, string $id): CommunityQuestionnaire
     {
-        return CommunityQuestionnaire::withoutGlobalScopes()->where('tenant_id',$tenant->id)->findOrFail($id);
+        return CommunityQuestionnaire::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($id);
     }
 }
