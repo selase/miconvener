@@ -36,6 +36,20 @@ import { getOfflineTicket, purgeExpiredOfflineTickets } from '@/lib/offlineTicke
 import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
 
 const STATUS_NOTICE = {
+    pending_benefit_review: {
+        icon: Clock,
+        color: 'text-warning-fg',
+        title: 'Payment received · place under review',
+        description: () =>
+            'Your payment is recorded. Contact the organiser to resolve your place or request a refund. Do not pay again.',
+    },
+    pending_member_verification: {
+        icon: Clock,
+        color: 'text-warning-fg',
+        title: 'Verify your membership',
+        description: () =>
+            'Refresh your personal membership and current registration total before receiving a ticket. Any organiser approval remains separate.',
+    },
     pending_payment: {
         icon: Clock,
         color: 'text-warning-fg',

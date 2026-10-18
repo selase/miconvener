@@ -82,6 +82,14 @@ final class FinanceController extends Controller
             return back()->with('error', 'This transaction has already been refunded or is not eligible for a refund.');
         }
 
+        $memberPayment = \App\Models\EventMemberBenefitAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('provider', $transaction->provider)
+            ->where('provider_reference', $transaction->provider_transaction_id)->first();
+        if ($memberPayment !== null) {
+            app(\App\Services\Events\MemberBenefitRefunds::class)->request($memberPayment);
+
+            return back()->with('success', 'Refund requested on the original payment. Check its event payment review for provider confirmation.');
+        }
+
         $merchantGateway = $this->resolveTenantGatewayFor($tenant, $transaction);
 
         if (! $merchantGateway) {

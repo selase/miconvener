@@ -19,6 +19,12 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
+/**
+ * @property bool $member_benefit_required
+ * @property int $member_benefit_access_version
+ * @property string|null $member_benefit_quote_id
+ * @property array<string, mixed>|null $member_benefit_identity
+ */
 #[ObservedBy(RegistrationWebhookObserver::class)]
 final class EventRegistration extends Model
 {
@@ -26,6 +32,10 @@ final class EventRegistration extends Model
     use HasFactory;
     use HasUuids;
     use LogsActivity;
+
+    public const string STATUS_PENDING_MEMBER_VERIFICATION = 'pending_member_verification';
+
+    public const string STATUS_PENDING_BENEFIT_REVIEW = 'pending_benefit_review';
 
     public const string STATUS_PENDING_PAYMENT = 'pending_payment';
 
@@ -59,7 +69,13 @@ final class EventRegistration extends Model
 
     protected $connection = 'landlord';
 
+    protected $attributes = ['member_benefit_required' => false, 'member_benefit_access_version' => 1];
+
     protected $fillable = [
+        'member_benefit_access_version',
+        'member_benefit_required',
+        'member_benefit_quote_id',
+        'member_benefit_identity',
         'tenant_id',
         'event_id',
         'ticket_type_id',
@@ -101,6 +117,9 @@ final class EventRegistration extends Model
     ];
 
     protected $casts = [
+        'member_benefit_access_version' => 'integer',
+        'member_benefit_required' => 'boolean',
+        'member_benefit_identity' => 'array',
         'amount' => 'integer',
         'discount_amount' => 'integer',
         'platform_fee_amount' => 'integer',
@@ -116,6 +135,9 @@ final class EventRegistration extends Model
 
     protected $hidden = [
         'qr_token',
+        'member_benefit_identity',
+        'member_benefit_access_version',
+        'member_benefit_quote_id',
     ];
 
     /**
@@ -140,6 +162,23 @@ final class EventRegistration extends Model
         $payload = $salt !== null ? "{$registrationId}:{$salt}" : $registrationId;
 
         return hash_hmac('sha256', $payload, (string) config('app.key'));
+    }
+
+    /** @return HasMany<EventMemberBenefitQuote, $this> */
+    public function memberBenefitQuotes(): HasMany
+    {
+        return $this->hasMany(EventMemberBenefitQuote::class, 'registration_id');
+    }
+
+    /** @return HasMany<EventMemberBenefitAttempt, $this> */
+    public function memberBenefitAttempts(): HasMany
+    {
+        return $this->hasMany(EventMemberBenefitAttempt::class, 'registration_id');
+    }
+
+    public function memberBenefitRecipientToken(): string
+    {
+        return hash_hmac('sha256', $this->id.'|'.mb_strtolower(mb_trim($this->email)).'|'.$this->member_benefit_access_version, (string) config('app.key'));
     }
 
     /**
@@ -175,11 +214,13 @@ final class EventRegistration extends Model
     /**
      * @return BelongsTo<EventTicketType, $this>
      */
+    /** @return BelongsTo<EventTicketType, $this> */
     public function ticketType(): BelongsTo
     {
         return $this->belongsTo(EventTicketType::class, 'ticket_type_id');
     }
 
+    /** @return BelongsTo<EventPromoCode, $this> */
     public function promoCode(): BelongsTo
     {
         return $this->belongsTo(EventPromoCode::class, 'promo_code_id');

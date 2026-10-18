@@ -14,6 +14,8 @@ final class EventPackageSeeder extends Seeder
      * @var array<string, array{name: string, type: string, description: string}>
      */
     private array $features = [
+        'community_library_access' => ['name' => 'Community Library', 'type' => 'boolean', 'description' => 'Publish organisation documents and service notes.'],
+        'community_polls_access' => ['name' => 'Community Polls and Surveys', 'type' => 'boolean', 'description' => 'Publish organisation questionnaires.'],
         'community_message_scheduling' => ['name' => 'Scheduled Community Messages', 'type' => 'boolean', 'description' => 'Schedule Community announcements.'],
         'community_group_messaging' => ['name' => 'Group Community Messages', 'type' => 'boolean', 'description' => 'Send Community announcements to member groups.'],
         'events_in_flight' => ['name' => 'Concurrent Live Events', 'type' => 'limit', 'description' => 'Maximum non-archived events at a time.'],
@@ -49,6 +51,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => 2000,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => false,
+                'community_polls_access' => false,
                 'community_message_scheduling' => false,
                 'community_group_messaging' => false,
                 'events_in_flight' => 1,
@@ -82,6 +86,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => 2500,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => true,
+                'community_polls_access' => false,
                 'community_message_scheduling' => true,
                 'community_group_messaging' => false,
                 'events_in_flight' => 3,
@@ -115,6 +121,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => 2000,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => true,
+                'community_polls_access' => true,
                 'community_message_scheduling' => true,
                 'community_group_messaging' => true,
                 'events_in_flight' => 15,
@@ -146,6 +154,8 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => true,
+                'community_polls_access' => true,
                 'community_message_scheduling' => true,
                 'community_group_messaging' => true,
                 'events_in_flight' => -1,

@@ -287,7 +287,8 @@ final class PaystackGateway implements PaymentGateway
         }
 
         return ['status' => (string) ($data['status'] ?? 'unknown'), 'amount' => (int) ($data['amount'] ?? 0),
-            'currency' => mb_strtoupper((string) ($data['currency'] ?? '')), 'gateway_credit' => 0, 'commission_returned' => 0];
+            'currency' => mb_strtoupper((string) ($data['currency'] ?? '')), 'gateway_credit' => 0, 'commission_returned' => 0,
+            'transaction_id' => is_array($data['transaction'] ?? null) ? (string) ($data['transaction']['id'] ?? '') : (string) ($data['transaction'] ?? '')];
     }
 
     public function verifyTransaction(string $reference): array
@@ -301,6 +302,7 @@ final class PaystackGateway implements PaymentGateway
                 'metadata' => $data['metadata'] ?? [],
                 'transaction_id' => $data['id'],
                 'reference' => (string) ($data['reference'] ?? $reference),
+                'reference_reported' => isset($data['reference']) && is_string($data['reference']),
                 'type' => isset($data['plan']) && $data['plan'] ? 'subscription' : 'payment',
                 'amount' => $data['amount'] ?? 0,
                 'fees' => (int) ($data['fees'] ?? 0),

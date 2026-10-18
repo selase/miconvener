@@ -53,6 +53,20 @@ export const NAV_GROUPS = [
                 permission: 'send_community_messages',
             },
             {
+                label: 'Polls & surveys',
+                href: 'tenant.community.polls.index',
+                icon: 'BarChart3',
+                feature: 'community_polls_history',
+                anyPermissions: ['manage_community_polls', 'read_community_poll_results'],
+            },
+            {
+                label: 'Library',
+                href: 'tenant.community.library.index',
+                icon: 'FileText',
+                feature: 'community_library_history',
+                permission: 'manage_community_library',
+            },
+            {
                 label: 'Giving',
                 href: 'tenant.community.money.giving.index',
                 icon: 'HandCoins',

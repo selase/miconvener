@@ -1,3 +1,5 @@
+import MemberPaymentReviewPanel from './MemberPaymentReviewPanel';
+import MemberBenefitsPanel from './MemberBenefitsPanel';
 import { useState, useMemo } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import Button from '@/Components/Console/Button';
@@ -304,7 +306,19 @@ function GuestsTab({ event, registrations }) {
                     <tbody>
                         {filteredRegistrations.map((registration) => (
                             <Tr key={registration.id}>
-                                <Td>{registration.full_name}</Td>
+                                <Td>
+                                    {registration.full_name}
+                                    {registration.member_verification_url && (
+                                        <a
+                                            href={registration.member_verification_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-1 block text-xs text-accent underline"
+                                        >
+                                            Recipient verification and payment status
+                                        </a>
+                                    )}
+                                </Td>
                                 <Td muted>{registration.email}</Td>
                                 <Td>
                                     <StatusPill status={STATUS_VARIANT[registration.status]}>
@@ -481,7 +495,11 @@ export default function Show({
     contributionsStats = {},
 }) {
     const [editing, setEditing] = useState(false);
-    const canManageEvent = Boolean(usePage().props.auth?.can?.update_event);
+    const page = usePage().props;
+    const canManageEvent = Boolean(page.auth?.can?.update_event);
+    const canPublishCommunityNotes = Boolean(
+        page.auth?.can?.manage_community_library && page.tenant?.features?.community_library_publish
+    );
     const current = section ?? 'overview';
     const hrefFor = (slug) => sectionHref(event.id, slug);
     const reloadEvent = () => router.reload({ only: ['event'] });
@@ -502,11 +520,23 @@ export default function Show({
         ),
         guests: () => <GuestsTab event={event} registrations={registrations} />,
         tickets: () => (
-            <TicketTypesPanel
-                event={event}
-                ticketTypes={event.ticket_types}
-                onChange={reloadEvent}
-            />
+            <div className="space-y-6">
+                <MemberBenefitsPanel
+                    event={event}
+                    enabled={event.member_benefits_enabled}
+                    canEdit={canManageEvent}
+                    onChange={reloadEvent}
+                />
+                <TicketTypesPanel
+                    event={event}
+                    ticketTypes={event.ticket_types}
+                    canEdit={canManageEvent}
+                    onChange={reloadEvent}
+                />
+                {event.has_member_benefit_history && (
+                    <MemberPaymentReviewPanel event={event} canManage={canManageEvent} />
+                )}
+            </div>
         ),
         contributions: () => (
             <ContributionsPanel
@@ -523,6 +553,7 @@ export default function Show({
                 event={event}
                 sessions={event.sessions}
                 speakers={event.speakers}
+                canPublishCommunityNotes={canPublishCommunityNotes}
                 onChange={reloadEvent}
             />
         ),

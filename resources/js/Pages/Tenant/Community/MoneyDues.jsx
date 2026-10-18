@@ -30,7 +30,9 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
         amount: toMajorUnits(membershipType?.amount),
         currency: membershipType?.currency ?? 'GHS',
         period: membershipType?.period ?? 'monthly',
+        dues_start_on: membershipType?.dues_start_on ?? '',
     });
+    const introducingDues = editing && membershipType.amount === null && form.hasDues;
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
     const showToast = useToast();
@@ -50,6 +52,7 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
             currency: form.currency,
             amount,
             period: form.hasDues ? form.period : null,
+            ...(introducingDues ? { dues_start_on: form.dues_start_on } : {}),
         };
         const result = editing
             ? await sendJson(
@@ -132,6 +135,18 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
                             </option>
                         ))}
                     </Select>
+                )}
+                {(introducingDues || membershipType?.dues_start_on) && (
+                    <Input
+                        label="Dues start date"
+                        type="date"
+                        value={form.dues_start_on}
+                        onChange={(e) => setForm({ ...form, dues_start_on: e.target.value })}
+                        error={errors.dues_start_on}
+                        required={introducingDues}
+                        disabled={!introducingDues}
+                        hint="Dues begin with the first full billing period on or after this date. Earlier membership periods remain free of dues. Existing charges are unchanged."
+                    />
                 )}
                 {locked && (
                     <p className="text-sm text-ink-secondary">

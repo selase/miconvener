@@ -113,3 +113,18 @@ it('giving staff can reach Overview without member management', () => {
     expect(community.items.map((i) => i.href)).toContain('tenant.community.overview');
     expect(community.items.map((i) => i.href)).not.toContain('tenant.community.people.index');
 });
+
+it('keeps Library reachable for authorised staff with retained documents', () => {
+    const groups = visibleGroups(NAV_GROUPS, {
+        features: { community: false, community_library_history: true },
+        can: { manage_community_library: true },
+    });
+    expect(
+        groups.find((group) => group.key === 'community').items.map((item) => item.label)
+    ).toContain('Library');
+    const hidden = visibleGroups(NAV_GROUPS, {
+        features: { community_library_history: true },
+        can: {},
+    });
+    expect(hidden.find((group) => group.key === 'community')).toBeUndefined();
+});

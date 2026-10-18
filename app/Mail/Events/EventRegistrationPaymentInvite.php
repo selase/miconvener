@@ -20,10 +20,15 @@ final class EventRegistrationPaymentInvite extends Mailable
     use Queueable;
     use SerializesModels;
 
+    private readonly ?string $recipientToken;
+
     /**
      * @param  'approved'|'promoted'  $reason
      */
-    public function __construct(public EventRegistration $registration, public string $reason) {}
+    public function __construct(public EventRegistration $registration, public string $reason)
+    {
+        $this->recipientToken = $registration->member_benefit_required ? $registration->memberBenefitRecipientToken() : null;
+    }
 
     public function envelope(): Envelope
     {
@@ -46,6 +51,7 @@ final class EventRegistrationPaymentInvite extends Mailable
                     'subdomain' => $this->registration->tenant->slug,
                     'event' => $this->registration->event->slug,
                     'registration' => $this->registration->id,
+                    ...($this->recipientToken !== null ? ['recipient' => $this->recipientToken] : []),
                 ]),
             ],
         );

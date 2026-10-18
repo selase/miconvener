@@ -133,6 +133,12 @@ final class EventSession extends Model
         'reminder_sent_at' => 'datetime',
     ];
 
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<CommunityLibraryItem,$this> */
+    public function communityNotes(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CommunityLibraryItem::class, 'session_id');
+    }
+
     public function isCancelled(): bool
     {
         return $this->occurrence_status === self::STATUS_CANCELLED;
@@ -158,6 +164,7 @@ final class EventSession extends Model
         return $this->belongsTo(EventAbstract::class, 'abstract_id');
     }
 
+    /** @return BelongsTo<Event,$this> */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);

@@ -32,6 +32,13 @@ return [
 
     'disks' => [
 
+        'community-library-local' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/community-library'),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app'),

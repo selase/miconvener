@@ -55,6 +55,14 @@ final class PayoutRelease
                 return ['released' => false, 'message' => 'This payout has no transfer to release. Send it again.', 'http_status' => 422];
             }
 
+            if ($payoutModel->event_id !== null) {
+                $event = \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $payoutModel->tenant_id)->lockForUpdate()->findOrFail($payoutModel->event_id);
+                $balance = app(\App\Services\Events\MemberBenefitBalance::class);
+                if ($balance->applies($event) && ($event->currency !== $payoutModel->currency || $payoutModel->amount > $balance->available($event, $payoutModel->id))) {
+                    return ['released' => false, 'message' => 'This parked transfer exceeds the funds available after payment and refund holds. Reconcile the holds before releasing it.', 'http_status' => 422];
+                }
+            }
+
             try {
                 $transfer = $this->settlementGateway->finalizeTransfer($payoutModel->provider_transfer_code, $otp);
             } catch (PaymentFailedException $e) {

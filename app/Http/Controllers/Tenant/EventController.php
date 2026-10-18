@@ -168,7 +168,7 @@ final class EventController extends Controller
         return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', 'Event created successfully.');
     }
 
-    public function update(Request $request, string $subdomain, string $event): RedirectResponse|JsonResponse
+    public function update(\App\Http\Requests\Tenant\UpdateEventCommercialTermsRequest $request, string $subdomain, string $event): RedirectResponse|JsonResponse
     {
         $this->authorize('update event');
         $tenant = $this->getTenant();
@@ -598,6 +598,14 @@ final class EventController extends Controller
         ]);
     }
 
+    public function updateMemberBenefits(\App\Http\Requests\Tenant\UpdateEventMemberBenefitsRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $model = Event::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($event);
+        $model->update($request->validated());
+
+        return response()->json(['members_only' => $model->members_only, 'member_ticket_price' => $model->member_ticket_price]);
+    }
+
     protected function getTenant(): Tenant
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -734,10 +742,13 @@ final class EventController extends Controller
     private function registrationRows(Event $event): array
     {
         return $event->registrations()
-            ->with(['ticketType:id,name', 'seatAssignment.room:id,name'])
+            ->with(['ticketType:id,name', 'seatAssignment.room:id,name', 'memberBenefitAttempts' => fn ($query) => $query->latest()->orderByDesc('id')->limit(1)])
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (EventRegistration $registration): array => [
+                'member_benefit_required' => $registration->member_benefit_required,
+                'member_verification_url' => $registration->member_benefit_required ? route('public.events.checkout', ['subdomain' => $event->tenant->slug, 'event' => $event->slug, 'registration' => $registration->id, 'review' => 1]) : null,
+                'member_payment_unresolved' => $registration->memberBenefitAttempts->contains(fn ($source): bool => ! in_array($source->state, ['failed', 'refunded'], true)),
                 'id' => $registration->id,
                 'full_name' => $registration->full_name,
                 'email' => $registration->email,
@@ -791,6 +802,7 @@ final class EventController extends Controller
      */
     private function validateEvent(Request $request): array
     {
+        $memberBenefitsEnabled = app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($this->getTenant());
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -819,6 +831,8 @@ final class EventController extends Controller
             'contact_email' => ['nullable', 'email', 'max:255'],
             'capacity' => ['nullable', 'integer', 'min:1'],
             'requires_approval' => ['sometimes', 'boolean'],
+            'members_only' => $memberBenefitsEnabled ? ['sometimes', 'boolean'] : ['prohibited'],
+            'member_ticket_price' => [$memberBenefitsEnabled ? 'nullable' : 'prohibited', 'integer', 'min:0', 'lte:ticket_price'],
             'ticket_price' => ['required', 'integer', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
             'plan_your_visit_content' => ['nullable', 'string'],
@@ -882,6 +896,9 @@ final class EventController extends Controller
     private function toPayload(Event $event): array
     {
         return [
+            'members_only' => $event->members_only, 'member_ticket_price' => $event->member_ticket_price,
+            'member_benefits_enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant),
+            'has_member_benefit_history' => $event->registrations()->where('member_benefit_required', true)->exists(),
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,
@@ -910,7 +927,7 @@ final class EventController extends Controller
                 'name' => $t->name,
                 'description' => $t->description,
                 'badge_tier' => $t->badge_tier,
-                'price' => $t->price,
+                'price' => $t->price, 'member_price' => $t->member_price,
                 'capacity' => $t->capacity,
                 'is_active' => $t->is_active,
                 'confirmed_count' => $t->confirmedCount(),

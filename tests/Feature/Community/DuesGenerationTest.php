@@ -249,3 +249,90 @@ test('a stale active member cannot create a manual charge after exit or lapse', 
         expect($member->charges()->count())->toBe(0);
     }
 });
+
+test('introducing dues never bills the earlier no-dues membership periods', function () {
+    [$tenant, $member] = generationMember('monthly', ['charge_current_period_on_join' => true], ['joined_on' => '2026-01-01']);
+    $member->membershipType->update(['amount' => null, 'period' => null]);
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 12:00', 'Africa/Accra'));
+    $member->membershipType->update(['amount' => 2000, 'period' => 'monthly', 'dues_start_on' => '2026-11-01']);
+    $scheduler = app(DuesScheduler::class);
+    expect($scheduler->generateFor($tenant, CarbonImmutable::parse('2026-10-31')))->toBe(0)
+        ->and($scheduler->generateFor($tenant, CarbonImmutable::parse('2026-12-01')))->toBe(2)
+        ->and($scheduler->generateFor($tenant, CarbonImmutable::parse('2026-12-01')))->toBe(0)
+        ->and($member->charges()->orderBy('period_start')->pluck('period_start')->map->toDateString()->all())->toBe(['2026-11-01', '2026-12-01']);
+});
+
+test('dues introduced mid-period start with the first full period even with current-period joining enabled', function (string $period, string $first) {
+    [$tenant, $member] = generationMember($period, ['charge_current_period_on_join' => true], ['joined_on' => '2026-01-01']);
+    $member->membershipType->update(['amount' => null, 'period' => null]);
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 12:00', 'Africa/Accra'));
+    $member->membershipType->update(['amount' => 2000, 'period' => $period, 'dues_start_on' => '2026-10-18']);
+    expect(app(DuesScheduler::class)->generateFor($tenant, CarbonImmutable::parse($first)))->toBe(1)
+        ->and($member->charges()->firstOrFail()->period_start->toDateString())->toBe($first);
+})->with([['daily', '2026-10-18'], ['weekly', '2026-10-19'], ['monthly', '2026-11-01'], ['quarterly', '2027-01-01'], ['yearly', '2027-01-01']]);
+
+test('manual charges cannot bypass a dues start date', function () {
+    [$tenant, $member] = generationMember('monthly', member: ['joined_on' => '2026-01-01']);
+    $member->membershipType->update(['dues_start_on' => '2026-11-01']);
+    expect(fn () => app(DuesCharges::class)->createFor($member->fresh(), CarbonImmutable::parse('2026-10-01')))
+        ->toThrow(DomainException::class, 'This period starts before dues begin.');
+    expect($member->charges()->count())->toBe(0);
+});
+
+test('moving an existing member to a dues type cannot backfill their former membership periods', function () {
+    [$tenant, $member] = generationMember('monthly', ['charge_current_period_on_join' => true], ['joined_on' => '2026-01-01']);
+    $member->membershipType->update(['amount' => null, 'period' => null]);
+    $paidType = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'period' => 'monthly']);
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 12:00', 'Africa/Accra'));
+    $member->update(['membership_type_id' => $paidType->id]);
+    expect(app(DuesScheduler::class)->generateFor($tenant, CarbonImmutable::parse('2026-11-01')))->toBe(1)
+        ->and($member->charges()->firstOrFail()->period_start->toDateString())->toBe('2026-11-01');
+});
+
+test('direct no-dues conversion defaults to the organisation local date', function () {
+    [$tenant, $member] = generationMember('daily', ['timezone' => 'America/New_York'], ['joined_on' => '2026-01-01']);
+    $member->membershipType->update(['amount' => null, 'period' => null]);
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 01:00', 'UTC'));
+    $member->membershipType->update(['amount' => 2000, 'period' => 'daily']);
+    expect(app(DuesScheduler::class)->generateFor($tenant, CarbonImmutable::parse('2026-10-17', 'America/New_York')))->toBe(1)
+        ->and($member->charges()->firstOrFail()->period_start->toDateString())->toBe('2026-10-17');
+});
+
+test('a new dues boundary preserves existing paid open waived and void charges', function () {
+    [$tenant, $member] = generationMember('monthly', ['charge_current_period_on_join' => true], ['joined_on' => '2026-01-01']);
+    $service = app(DuesCharges::class);
+    $past = $service->createFor($member, CarbonImmutable::parse('2026-01-01'));
+    $service->recordOffline($past, (int) App\Models\User::factory()->create()->id, 'Already paid');
+    $open = $service->createFor($member, CarbonImmutable::parse('2026-02-01'));
+    $waived = $service->waive($service->createFor($member, CarbonImmutable::parse('2026-03-01')), 'Waived');
+    $void = $service->void($service->createFor($member, CarbonImmutable::parse('2026-04-01')), 'Cancelled');
+    $before = $member->charges()->orderBy('period_start')->get()->toArray();
+    $member->membershipType->update(['dues_start_on' => '2026-11-01']);
+    expect($service->createFor($member->fresh(), CarbonImmutable::parse('2026-01-01'))->id)->toBe($past->id)
+        ->and(app(DuesScheduler::class)->generateFor($tenant, CarbonImmutable::parse('2026-11-01')))->toBe(1)
+        ->and($member->charges()->whereIn('id', [$past->id, $open->id, $waived->id, $void->id])->orderBy('period_start')->get()->toArray())->toBe($before);
+});
+
+test('stale member relations cannot bypass a newly introduced dues boundary', function () {
+    [, $member] = generationMember('monthly', member: ['joined_on' => '2026-01-01']);
+    $stale = $member->fresh(['membershipType']);
+    $member->membershipType->update(['dues_start_on' => '2026-11-01']);
+    expect(fn () => app(DuesCharges::class)->createFor($stale, CarbonImmutable::parse('2026-10-01')))
+        ->toThrow(DomainException::class, 'This period starts before dues begin.');
+});
+
+test('manual billing uses the same local calendar start as the scheduler', function () {
+    [, $member] = generationMember('daily', ['timezone' => 'America/New_York'], ['joined_on' => '2026-01-01']);
+    $member->membershipType->update(['dues_start_on' => '2026-10-18']);
+    $charge = app(DuesCharges::class)->createFor($member->fresh(), CarbonImmutable::parse('2026-10-18', 'UTC'));
+    expect($charge->period_start->toDateString())->toBe('2026-10-18');
+});
+
+test('switching between paid types preserves legitimate catch up periods', function () {
+    [$tenant, $member] = generationMember('monthly', ['charge_current_period_on_join' => true], ['joined_on' => '2026-01-01']);
+    $paidType = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'period' => 'monthly', 'amount' => 2000]);
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 12:00', 'Africa/Accra'));
+    $member->update(['membership_type_id' => $paidType->id]);
+    expect(app(DuesScheduler::class)->generateFor($tenant, CarbonImmutable::parse('2026-10-18')))->toBe(10)
+        ->and($member->charges()->orderBy('period_start')->firstOrFail()->period_start->toDateString())->toBe('2026-01-01');
+});

@@ -122,239 +122,13 @@ final class PublicEventController extends Controller
     public function register(Request $request, string $subdomain, string $event): SymfonyResponse
     {
         $tenant = $this->getTenant();
+        $eventModel = Event::where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
 
-        $eventModel = Event::where('tenant_id', $tenant->id)
-            ->where('slug', $event)
-            ->published()
-            ->with('ticketTypes')
-            ->firstOrFail();
-        $eventModel->setRelation('tenant', $tenant);
+        return $eventModel->getConnection()->transaction(function () use ($request, $subdomain, $event, $eventModel): SymfonyResponse {
+            Event::whereKey($eventModel->id)->lockForUpdate()->firstOrFail();
 
-        $activeTicketTypes = $eventModel->ticketTypes->where('is_active', true);
-        $usesTicketTypes = $activeTicketTypes->isNotEmpty();
-        $settings = $eventModel->effectiveRegistrationSettings();
-
-        $validated = $request->validate([
-            'email' => ['required', 'email', 'max:255'],
-            'title' => ['required_without:full_name', 'nullable', 'string', 'max:32'],
-            'first_name' => ['required_without:full_name', 'nullable', 'string', 'max:255'],
-            'last_name' => ['required_without:full_name', 'nullable', 'string', 'max:255'],
-            'full_name' => ['nullable', 'string', 'max:255'],
-            'phone' => [
-                $settings['require_phone'] ? 'required' : 'nullable',
-                'string',
-                'max:32',
-            ],
-            'dietary_requirements' => [
-                $settings['require_dietary'] ? 'required' : 'nullable',
-                'string',
-                'max:255',
-            ],
-            'accessibility_needs' => [
-                $settings['require_accessibility'] ? 'required' : 'nullable',
-                'string',
-                'max:255',
-            ],
-            'ticket_type_id' => $usesTicketTypes
-                ? ['required', Rule::in($activeTicketTypes->pluck('id')->all())]
-                : ['nullable'],
-            'form_answers' => ['nullable', 'array'],
-            'promo_code' => ['nullable', 'string', 'max:64'],
-            'access_code' => ['nullable', 'string', 'max:64'],
-        ]);
-
-        $cleanedFormAnswers = app(RegistrationPricingService::class)->validateAndCleanAnswers(
-            $eventModel,
-            (array) $request->input('form_answers', [])
-        );
-
-        $ticketType = $usesTicketTypes ? $activeTicketTypes->firstWhere('id', $validated['ticket_type_id']) : null;
-
-        if ($ticketType && $ticketType->isInviteOnly()) {
-            $providedAccessCode = mb_strtoupper(mb_trim((string) ($validated['access_code'] ?? '')));
-            if ($providedAccessCode !== mb_strtoupper(mb_trim((string) $ticketType->access_code))) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'access_code' => ['Invalid access code for this ticket type.'],
-                ]);
-            }
-        }
-
-        // The plan's registration ceiling. Checked before the registration row is
-        // written: usage only increments on confirmation, so an organizer at the
-        // ceiling is turned away rather than accumulating rows they cannot honour.
-        // An event that was live when its organizer moved to a smaller plan keeps
-        // registering until it ends; the smaller ceiling applies to new events.
-        $registrationLimit = $eventModel->isGrandfathered() ? null : $tenant->featureLimitValue('event_registrations');
-        if ($registrationLimit !== null && ! app(FeatureMeteringService::class)->canUse($tenant, 'event_registrations')) {
-            Log::warning('Registration refused: tenant is at its plan registration limit', [
-                'tenant_id' => $tenant->id,
-                'event_id' => $eventModel->id,
-                'limit' => $registrationLimit,
-            ]);
-
-            return back()->with(
-                'error',
-                'Registration for this event is closed. Please contact the organizer.'
-            );
-        }
-
-        $existingRegistration = EventRegistration::where('tenant_id', $tenant->id)
-            ->where('event_id', $eventModel->id)
-            ->forEmail($validated['email'])
-            ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED])
-            ->first();
-
-        if ($existingRegistration) {
-            $this->resendRegistrationLink($tenant, $existingRegistration);
-
-            return back()->with(
-                'success',
-                'A registration already exists for this email address. We have re-sent the link to that inbox — please check your email.'
-            );
-        }
-
-        $isFull = $usesTicketTypes
-            ? $ticketType->isSoldOut()
-            : ($eventModel->capacity !== null && $eventModel->registrations()->confirmed()->count() >= $eventModel->capacity);
-
-        $pricing = app(RegistrationPricingService::class)->calculatePrice(
-            $eventModel,
-            $ticketType,
-            $cleanedFormAnswers
-        );
-        $amount = $pricing['amount'];
-
-        $promoCodeModel = null;
-        $discountAmount = 0;
-
-        if (! empty($validated['promo_code'])) {
-            $promoResult = app(\App\Services\Events\PromoCodeService::class)->validateCode(
-                $eventModel,
-                (string) $validated['promo_code'],
-                $ticketType,
-                (string) $validated['email'],
-                $amount
-            );
-
-            if (! $promoResult['valid']) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'promo_code' => [$promoResult['error']],
-                ]);
-            }
-
-            $promoCodeModel = $promoResult['promo_code'];
-            $discountAmount = $promoResult['discount_amount'];
-            $amount = $promoResult['final_amount'];
-        }
-
-        $isFree = $amount === 0;
-
-        if (! $isFree && ! $eventModel->sellsPaidTickets()) {
-            return back()->with('error', 'This event is not selling paid tickets right now. Please contact the organizer.');
-        }
-
-        $fees = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $isFree ? 0 : $amount);
-        $platformFeeAmount = $fees->platformFee;
-
-        $status = match (true) {
-            $isFull => EventRegistration::STATUS_WAITLISTED,
-            $eventModel->requires_approval => EventRegistration::STATUS_PENDING_APPROVAL,
-            $isFree => EventRegistration::STATUS_CONFIRMED,
-            default => EventRegistration::STATUS_PENDING_PAYMENT,
-        };
-
-        $title = $validated['title'] ?? null;
-        $firstName = $validated['first_name'] ?? null;
-        $lastName = $validated['last_name'] ?? null;
-
-        if ((! $firstName || ! $lastName) && ! empty($validated['full_name'])) {
-            $parts = explode(' ', mb_trim((string) $validated['full_name']), 2);
-            $firstName = $firstName ?: ($parts[0] ?? '');
-            $lastName = $lastName ?: ($parts[1] ?? '');
-        }
-
-        $fullName = ! empty($validated['full_name'])
-            ? $validated['full_name']
-            : mb_trim(($title ? $title.' ' : '')."{$firstName} {$lastName}");
-
-        $registration = EventRegistration::create([
-            'title' => $title,
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'full_name' => $fullName,
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
-            'dietary_requirements' => $validated['dietary_requirements'] ?? null,
-            'accessibility_needs' => $validated['accessibility_needs'] ?? null,
-            'form_answers' => ! empty($cleanedFormAnswers) ? $cleanedFormAnswers : null,
-            'tenant_id' => $tenant->id,
-            'event_id' => $eventModel->id,
-            'ticket_type_id' => $ticketType?->id,
-            'promo_code_id' => $promoCodeModel?->id,
-            'amount' => $amount,
-            'discount_amount' => $discountAmount,
-            'platform_fee_amount' => $platformFeeAmount,
-            'charged_amount' => $fees->chargedAmount,
-            'currency' => $eventModel->currency,
-            'status' => $status,
-            'waitlist_position' => $status === EventRegistration::STATUS_WAITLISTED
-                ? $this->nextWaitlistPosition($eventModel, $ticketType)
-                : null,
-        ]);
-
-        // The browser that just filled in this form is allowed to follow its
-        // own registration through to payment and its ticket without being
-        // asked to prove an address it has not yet been mailed at.
-        app(PlatformAttendeeWorkspaceAuthorizer::class)
-            ->rememberRegistered(request()->session(), $registration->id);
-
-        if ($promoCodeModel) {
-            app(\App\Services\Events\PromoCodeService::class)->recordRedemption($promoCodeModel);
-        }
-
-        if ($status === EventRegistration::STATUS_CONFIRMED) {
-            app(FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
-            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-
-            // A free registration costs nothing and proves nothing: anyone can
-            // type any address and be handed a valid ticket at it. The ticket is
-            // withheld until the address is confirmed. A paid registration needs
-            // no such step -- the payment itself was made against this address.
-            Mail::to($registration->email)->queue(new EventRegistrationVerifyEmail($registration));
-        } elseif ($status === EventRegistration::STATUS_WAITLISTED) {
-            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-            Mail::to($registration->email)->queue(new EventRegistrationWaitlisted($registration));
-        } elseif ($status === EventRegistration::STATUS_PENDING_APPROVAL) {
-            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-            Mail::to($registration->email)->queue(new EventRegistrationPendingApproval($registration));
-
-            // The registrant has just been promised a review. Tell whoever has
-            // to do it -- nothing else did, and the console only surfaced
-            // pending approvals once the event was running, far too late.
-            $organizers = $tenant->organizerNotificationEmails();
-            if ($organizers !== []) {
-                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-                Mail::to($organizers)->queue(new EventRegistrationNeedsApproval($registration));
-            }
-        }
-
-        if ($status === EventRegistration::STATUS_PENDING_PAYMENT) {
-            return redirect()->route('public.events.checkout', [
-                'subdomain' => $tenant->slug,
-                'event' => $eventModel->slug,
-                'registration' => $registration->id,
-            ]);
-        }
-
-        // Straight to the canonical workspace on the platform host. Going via
-        // public.events.confirmation would work in a browser but not here: this
-        // response answers an Inertia form submission, which follows redirects
-        // with XHR, and that route now redirects to another origin -- which CORS
-        // blocks. Inertia's location response asks the client for a full page
-        // visit instead, and degrades to an ordinary 302 for everything else.
-        return Inertia::location(
-            app(PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($registration)
-        );
+            return $this->registerLocked($request, $subdomain, $event);
+        }, 3);
     }
 
     /**
@@ -373,46 +147,57 @@ final class PublicEventController extends Controller
             ->where('id', $registration)
             ->firstOrFail();
 
-        $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
+        return $registrationModel->getConnection()->transaction(function () use ($registrationModel, $tenant): RedirectResponse {
+            $registrationModel = EventRegistration::query()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($registrationModel->id);
+            $registrationModel->event()->lockForUpdate()->firstOrFail();
+            abort_if($registrationModel->member_benefit_required && ! hash_equals($registrationModel->memberBenefitRecipientToken(), (string) request()->query('recipient')), 403);
+            $authorizer = app(PlatformAttendeeWorkspaceAuthorizer::class);
 
-        // Following this link opens the ticket it belongs to, and nothing else.
-        // It is tempting to treat it as proof of the address -- it was signed
-        // and mailed there -- but it stays valid for seven days and a link can
-        // be forwarded, archived or read over a shoulder, where a typed code
-        // cannot. Platform proof would turn any of those into a tour of every
-        // event this person has ever attended, across every organiser. A grant
-        // scoped to this one registration spares them a second challenge to see
-        // their own ticket without spending their whole history on it.
-        $authorizer->grantCheckoutAccess(
-            request()->session(),
-            $registrationModel->id,
-            PlatformAttendeeVerification::VERIFIED_HOURS * 60,
-        );
+            // Following this link opens the ticket it belongs to, and nothing else.
+            // It is tempting to treat it as proof of the address -- it was signed
+            // and mailed there -- but it stays valid for seven days and a link can
+            // be forwarded, archived or read over a shoulder, where a typed code
+            // cannot. Platform proof would turn any of those into a tour of every
+            // event this person has ever attended, across every organiser. A grant
+            // scoped to this one registration spares them a second challenge to see
+            // their own ticket without spending their whole history on it.
+            $authorizer->grantCheckoutAccess(
+                request()->session(),
+                $registrationModel->id,
+                PlatformAttendeeVerification::VERIFIED_HOURS * 60,
+            );
 
-        $workspace = $authorizer->workspaceUrl($registrationModel);
+            $workspace = $authorizer->workspaceUrl($registrationModel);
 
-        // Clicking twice -- a mail client prefetching, a forwarded link -- must
-        // not issue a second ticket or send a second email.
-        if ($registrationModel->hasVerifiedEmail()) {
-            return redirect()->away($workspace);
-        }
+            // Clicking twice -- a mail client prefetching, a forwarded link -- must
+            // not issue a second ticket or send a second email.
+            if ($registrationModel->hasVerifiedEmail()) {
+                return redirect()->away($workspace);
+            }
 
-        $registrationModel->email_verified_at = now();
+            $registrationModel->email_verified_at = now();
+            if ($registrationModel->member_benefit_required && $registrationModel->ticket_code === null && $registrationModel->isConfirmed()
+                && (! app(\App\Services\Events\MemberBenefitLifecycle::class)->eligible($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->hasCapacity($registrationModel) || ! app(\App\Services\Events\MemberBenefitLifecycle::class)->priceMatches($registrationModel))) {
+                app(\App\Services\Events\MemberBenefitLifecycle::class)->hold($registrationModel, 'verified');
 
-        if ($registrationModel->isConfirmed() && ! $registrationModel->ticket_code) {
-            $registrationModel->issueTicket();
-        }
+                return redirect()->away($workspace)->with('error', 'Verify your active personal membership again before receiving this ticket.');
+            }
 
-        $registrationModel->save();
+            if ($registrationModel->isConfirmed() && ! $registrationModel->ticket_code) {
+                $registrationModel->issueTicket();
+            }
 
-        if ($registrationModel->isConfirmed()) {
-            app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
-            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-            Mail::to($registrationModel->email)->queue(new EventRegistrationConfirmed($registrationModel));
-        }
+            $registrationModel->save();
 
-        return redirect()->away($workspace)
-            ->with('success', 'Email confirmed. Your ticket is on its way.');
+            if ($registrationModel->isConfirmed()) {
+                app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registrationModel);
+                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+                Mail::to($registrationModel->email)->queue((new EventRegistrationConfirmed($registrationModel))->afterCommit());
+            }
+
+            return redirect()->away($workspace)
+                ->with('success', 'Email confirmed. Your ticket is on its way.');
+        });
     }
 
     /**
@@ -465,6 +250,26 @@ final class PublicEventController extends Controller
         ]);
     }
 
+    public function memberBenefits(\App\Http\Requests\Public\EventMemberEligibilityRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $model = Event::query()->where('tenant_id', $tenant->id)->where('slug', $event)->published()->firstOrFail();
+        $service = app(\App\Services\Events\MemberBenefitEligibility::class);
+        $member = $service->resolve($request->session(), $model, $request->validated('email'));
+        $eligible = $member !== null;
+        $proof = $member !== null ? app(\App\Services\Events\MemberBenefitIdentity::class)->capture($request->session(), $member) : null;
+        $types = $model->ticketTypes()->active()->get(['id', 'member_price', 'access_code'])->filter(function ($type) use ($request): bool {
+            return ! $type->isInviteOnly() || ($type->id === $request->validated('ticket_type_id')
+                && hash_equals(mb_strtoupper($type->access_code), mb_strtoupper(mb_trim((string) $request->validated('access_code')))));
+        });
+
+        return response()->json(['enabled' => $service->enabled($tenant), 'members_only' => $model->members_only, 'eligible' => $eligible,
+            'verified_until' => $proof !== null ? \Carbon\CarbonImmutable::createFromTimestampUTC((int) $proof['expires_at'])->toIso8601String() : null,
+            'member_ticket_price' => $eligible ? $model->member_ticket_price : null,
+            'ticket_prices' => $eligible ? $types->map(fn ($type): array => ['id' => $type->id, 'member_price' => $type->member_price])->values()->all() : []])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
     public function validatePromo(Request $request, string $subdomain, string $event): JsonResponse
     {
         $tenant = $this->getTenant();
@@ -481,7 +286,14 @@ final class PublicEventController extends Controller
             ? $eventModel->ticketTypes()->where('id', $validated['ticket_type_id'])->first()
             : null;
 
-        $amount = (int) ($validated['amount'] ?? ($ticketType ? $ticketType->price : $eventModel->ticket_price));
+        $member = app(\App\Services\Events\MemberBenefitEligibility::class)->resolve($request->session(), $eventModel, (string) ($validated['email'] ?? ''));
+        $base = $member !== null ? ($ticketType !== null ? $ticketType->member_price : $eventModel->member_ticket_price) : null;
+        if ($base !== null || ($member !== null && $eventModel->members_only)) {
+            $answers = app(RegistrationPricingService::class)->validateAndCleanAnswers($eventModel, (array) $request->input('form_answers', []));
+            $amount = app(RegistrationPricingService::class)->calculatePrice($eventModel, $ticketType, $answers, $base)['amount'];
+        } else {
+            $amount = (int) ($validated['amount'] ?? ($ticketType ? $ticketType->price : $eventModel->ticket_price));
+        }
 
         $result = app(\App\Services\Events\PromoCodeService::class)->validateCode(
             $eventModel,
@@ -546,6 +358,257 @@ final class PublicEventController extends Controller
         ]);
     }
 
+    private function registerLocked(Request $request, string $subdomain, string $event): SymfonyResponse
+    {
+        $tenant = $this->getTenant();
+
+        $eventModel = Event::where('tenant_id', $tenant->id)
+            ->where('slug', $event)
+            ->published()
+            ->with('ticketTypes')
+            ->firstOrFail();
+        $eventModel->setRelation('tenant', $tenant);
+
+        $activeTicketTypes = $eventModel->ticketTypes->where('is_active', true);
+        $usesTicketTypes = $activeTicketTypes->isNotEmpty();
+        $settings = $eventModel->effectiveRegistrationSettings();
+
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'title' => ['required_without:full_name', 'nullable', 'string', 'max:32'],
+            'first_name' => ['required_without:full_name', 'nullable', 'string', 'max:255'],
+            'last_name' => ['required_without:full_name', 'nullable', 'string', 'max:255'],
+            'full_name' => ['nullable', 'string', 'max:255'],
+            'phone' => [
+                $settings['require_phone'] ? 'required' : 'nullable',
+                'string',
+                'max:32',
+            ],
+            'dietary_requirements' => [
+                $settings['require_dietary'] ? 'required' : 'nullable',
+                'string',
+                'max:255',
+            ],
+            'accessibility_needs' => [
+                $settings['require_accessibility'] ? 'required' : 'nullable',
+                'string',
+                'max:255',
+            ],
+            'ticket_type_id' => $usesTicketTypes
+                ? ['required', Rule::in($activeTicketTypes->pluck('id')->all())]
+                : ['nullable'],
+            'form_answers' => ['nullable', 'array'],
+            'promo_code' => ['nullable', 'string', 'max:64'],
+            'access_code' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $cleanedFormAnswers = app(RegistrationPricingService::class)->validateAndCleanAnswers(
+            $eventModel,
+            (array) $request->input('form_answers', [])
+        );
+
+        $ticketType = $usesTicketTypes ? $activeTicketTypes->firstWhere('id', $validated['ticket_type_id']) : null;
+        $benefits = app(\App\Services\Events\MemberBenefitEligibility::class);
+        $benefitsEnabled = $benefits->enabled($tenant);
+        $benefitMember = $benefitsEnabled ? $benefits->resolve($request->session(), $eventModel, $validated['email']) : null;
+        if ($eventModel->members_only && (! $benefitsEnabled || $benefitMember === null)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['membership' => 'Verify your active personal membership before registering for this event.']);
+        }
+        $configuredMemberPrice = $ticketType !== null ? $ticketType->member_price : $eventModel->member_ticket_price;
+        $memberBase = $benefitMember !== null ? $configuredMemberPrice : null;
+        $benefitRequired = $benefitsEnabled && $benefitMember !== null && ($eventModel->members_only || $memberBase !== null);
+        $benefitIdentity = $benefitRequired ? app(\App\Services\Events\MemberBenefitIdentity::class)->capture($request->session(), $benefitMember) : null;
+
+        if ($ticketType && $ticketType->isInviteOnly()) {
+            $providedAccessCode = mb_strtoupper(mb_trim((string) ($validated['access_code'] ?? '')));
+            if ($providedAccessCode !== mb_strtoupper(mb_trim((string) $ticketType->access_code))) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'access_code' => ['Invalid access code for this ticket type.'],
+                ]);
+            }
+        }
+
+        // The plan's registration ceiling. Checked before the registration row is
+        // written: usage only increments on confirmation, so an organizer at the
+        // ceiling is turned away rather than accumulating rows they cannot honour.
+        // An event that was live when its organizer moved to a smaller plan keeps
+        // registering until it ends; the smaller ceiling applies to new events.
+        $registrationLimit = $eventModel->isGrandfathered() ? null : $tenant->featureLimitValue('event_registrations');
+        if ($registrationLimit !== null && ! app(FeatureMeteringService::class)->canUse($tenant, 'event_registrations')) {
+            Log::warning('Registration refused: tenant is at its plan registration limit', [
+                'tenant_id' => $tenant->id,
+                'event_id' => $eventModel->id,
+                'limit' => $registrationLimit,
+            ]);
+
+            return back()->with(
+                'error',
+                'Registration for this event is closed. Please contact the organizer.'
+            );
+        }
+
+        $existingRegistration = EventRegistration::where('tenant_id', $tenant->id)
+            ->where('event_id', $eventModel->id)
+            ->forEmail($validated['email'])
+            ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED])
+            ->first();
+
+        if ($existingRegistration) {
+            $this->resendRegistrationLink($tenant, $existingRegistration);
+
+            return back()->with(
+                'success',
+                'A registration already exists for this email address. We have re-sent the link to that inbox — please check your email.'
+            );
+        }
+
+        $isFull = $usesTicketTypes
+            ? $ticketType->isSoldOut()
+            : ($eventModel->capacity !== null && $eventModel->registrations()->confirmed()->count() >= $eventModel->capacity);
+
+        $pricing = app(RegistrationPricingService::class)->calculatePrice(
+            $eventModel,
+            $ticketType,
+            $cleanedFormAnswers,
+            $memberBase
+        );
+        $amount = $pricing['amount'];
+
+        $promoCodeModel = null;
+        $discountAmount = 0;
+
+        if (! empty($validated['promo_code'])) {
+            $promoResult = app(\App\Services\Events\PromoCodeService::class)->validateCode(
+                $eventModel,
+                (string) $validated['promo_code'],
+                $ticketType,
+                (string) $validated['email'],
+                $amount
+            );
+
+            if (! $promoResult['valid']) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'promo_code' => [$promoResult['error']],
+                ]);
+            }
+
+            $promoCodeModel = $promoResult['promo_code'];
+            $discountAmount = $promoResult['discount_amount'];
+            $amount = $promoResult['final_amount'];
+        }
+
+        $isFree = $amount === 0;
+
+        if (! $isFree && ! $eventModel->sellsPaidTickets()) {
+            return back()->with('error', 'This event is not selling paid tickets right now. Please contact the organizer.');
+        }
+
+        $fees = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $isFree ? 0 : $amount);
+        $platformFeeAmount = $fees->platformFee;
+
+        $status = match (true) {
+            $isFull => EventRegistration::STATUS_WAITLISTED,
+            $eventModel->requires_approval => EventRegistration::STATUS_PENDING_APPROVAL,
+            $isFree => EventRegistration::STATUS_CONFIRMED,
+            default => EventRegistration::STATUS_PENDING_PAYMENT,
+        };
+
+        $title = $validated['title'] ?? null;
+        $firstName = $validated['first_name'] ?? null;
+        $lastName = $validated['last_name'] ?? null;
+
+        if ((! $firstName || ! $lastName) && ! empty($validated['full_name'])) {
+            $parts = explode(' ', mb_trim((string) $validated['full_name']), 2);
+            $firstName = $firstName ?: ($parts[0] ?? '');
+            $lastName = $lastName ?: ($parts[1] ?? '');
+        }
+
+        $fullName = ! empty($validated['full_name'])
+            ? $validated['full_name']
+            : mb_trim(($title ? $title.' ' : '')."{$firstName} {$lastName}");
+
+        $registration = EventRegistration::create([
+            'member_benefit_required' => $benefitRequired,
+            'member_benefit_identity' => $benefitIdentity,
+            'title' => $title,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'full_name' => $fullName,
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'dietary_requirements' => $validated['dietary_requirements'] ?? null,
+            'accessibility_needs' => $validated['accessibility_needs'] ?? null,
+            'form_answers' => ! empty($cleanedFormAnswers) ? $cleanedFormAnswers : null,
+            'tenant_id' => $tenant->id,
+            'event_id' => $eventModel->id,
+            'ticket_type_id' => $ticketType?->id,
+            'promo_code_id' => $promoCodeModel?->id,
+            'amount' => $amount,
+            'discount_amount' => $discountAmount,
+            'platform_fee_amount' => $platformFeeAmount,
+            'charged_amount' => $fees->chargedAmount,
+            'currency' => $eventModel->currency,
+            'status' => $status,
+            'waitlist_position' => $status === EventRegistration::STATUS_WAITLISTED
+                ? $this->nextWaitlistPosition($eventModel, $ticketType)
+                : null,
+        ]);
+
+        // The browser that just filled in this form is allowed to follow its
+        // own registration through to payment and its ticket without being
+        // asked to prove an address it has not yet been mailed at.
+        app(PlatformAttendeeWorkspaceAuthorizer::class)
+            ->rememberRegistered(request()->session(), $registration->id, $registration->member_benefit_required ? $registration->memberBenefitRecipientToken() : null);
+
+        if ($promoCodeModel) {
+            app(\App\Services\Events\PromoCodeService::class)->recordRedemption($promoCodeModel);
+        }
+
+        if ($status === EventRegistration::STATUS_CONFIRMED) {
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+
+            // A free registration costs nothing and proves nothing: anyone can
+            // type any address and be handed a valid ticket at it. The ticket is
+            // withheld until the address is confirmed. A paid registration needs
+            // no such step -- the payment itself was made against this address.
+            Mail::to($registration->email)->queue((new EventRegistrationVerifyEmail($registration))->afterCommit());
+        } elseif ($status === EventRegistration::STATUS_WAITLISTED) {
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            Mail::to($registration->email)->queue(new EventRegistrationWaitlisted($registration));
+        } elseif ($status === EventRegistration::STATUS_PENDING_APPROVAL) {
+            app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+            Mail::to($registration->email)->queue(new EventRegistrationPendingApproval($registration));
+
+            // The registrant has just been promised a review. Tell whoever has
+            // to do it -- nothing else did, and the console only surfaced
+            // pending approvals once the event was running, far too late.
+            $organizers = $tenant->organizerNotificationEmails();
+            if ($organizers !== []) {
+                app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
+                Mail::to($organizers)->queue(new EventRegistrationNeedsApproval($registration));
+            }
+        }
+
+        if ($status === EventRegistration::STATUS_PENDING_PAYMENT) {
+            return redirect()->route('public.events.checkout', [
+                'subdomain' => $tenant->slug,
+                'event' => $eventModel->slug,
+                'registration' => $registration->id,
+            ]);
+        }
+
+        // Straight to the canonical workspace on the platform host. Going via
+        // public.events.confirmation would work in a browser but not here: this
+        // response answers an Inertia form submission, which follows redirects
+        // with XHR, and that route now redirects to another origin -- which CORS
+        // blocks. Inertia's location response asks the client for a full page
+        // visit instead, and degrades to an ordinary 302 for everything else.
+        return Inertia::location(
+            app(PlatformAttendeeWorkspaceAuthorizer::class)->workspaceUrl($registration)
+        );
+    }
+
     /**
      * Re-sends the status-appropriate registration email to an address that
      * already holds a live registration for this event. The link is delivered
@@ -560,7 +623,7 @@ final class PublicEventController extends Controller
         // useless, so they get the verification link again.
         if ($registration->isConfirmed() && ! $registration->hasVerifiedEmail() && ! $registration->ticket_code) {
             app(FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-            Mail::to($registration->email)->queue(new EventRegistrationVerifyEmail($registration));
+            Mail::to($registration->email)->queue((new EventRegistrationVerifyEmail($registration))->afterCommit());
 
             return;
         }
@@ -646,6 +709,7 @@ final class PublicEventController extends Controller
         $withhold = $event->isPrivate() && ! $revealDetails;
 
         return [
+            'member_benefits' => ['enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant), 'members_only' => $event->members_only],
             'name' => $event->name,
             'slug' => $event->slug,
             'description' => $event->description,

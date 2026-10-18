@@ -180,13 +180,18 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'initial_tab' => $this->workspaceTab($request, 'ticket'),
             'event' => $this->buildEventPayload($event, revealDetails: $registrationModel->isConfirmed(), registration: $registrationModel),
             'registration' => [
+                'member_benefit_required' => $registrationModel->member_benefit_required,
+                'member_payment_review_url' => $registrationModel->member_benefit_required && $registrationModel->tenant !== null
+                    ? route('public.events.checkout', ['subdomain' => $registrationModel->tenant->slug, 'event' => $event->slug, 'registration' => $registrationModel->id, 'review' => 1]) : null,
+                'can_transfer' => ! $registrationModel->member_benefit_required && $registrationModel->status !== EventRegistration::STATUS_CHECKED_IN,
+                'member_extra_payments' => $registrationModel->member_benefit_required ? $registrationModel->memberBenefitAttempts()->where('is_extra_capture', true)->where('state', '!=', 'refunded')->count() : 0,
                 'id' => $registrationModel->id,
                 'full_name' => $registrationModel->full_name,
                 'email' => ContactMask::email($registrationModel->email),
                 'status' => $registrationModel->status,
                 'ticket_code' => $registrationModel->ticket_code,
                 'ticket_type_name' => $registrationModel->ticketType?->name,
-                'qr_image' => $registrationModel->qr_token
+                'qr_image' => $registrationModel->qr_token && (! $registrationModel->member_benefit_required || $registrationModel->isConfirmed())
                     ? QrCodeGenerator::svgDataUri($registrationModel->qr_token)
                     : null,
                 'agenda_session_ids' => $registrationModel->sessions->pluck('id')->values(),
@@ -197,9 +202,9 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'checked_in' => $registrationModel->isPresent(),
                 'self_check_in_available' => app(SelfCheckIn::class)->isAvailableFor($registrationModel),
                 'email_verified' => $registrationModel->hasVerifiedEmail(),
-                'awaiting_checkout' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
-                    && blank($registrationModel->payment_reference),
-                'checkout_url' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT && $registrationModel->tenant !== null
+                'awaiting_checkout' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true)
+                    && ($registrationModel->member_benefit_required || blank($registrationModel->payment_reference)),
+                'checkout_url' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true) && $registrationModel->tenant !== null
                     ? route('public.events.checkout', [
                         'subdomain' => $registrationModel->tenant->slug,
                         'event' => $event->slug,
@@ -246,7 +251,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'status' => $registrationModel->status,
             'is_confirmed' => $registrationModel->isConfirmed(),
             'ticket_code' => $registrationModel->ticket_code,
-            'qr_image' => $registrationModel->qr_token
+            'qr_image' => $registrationModel->qr_token && (! $registrationModel->member_benefit_required || $registrationModel->isConfirmed())
                 ? QrCodeGenerator::svgDataUri($registrationModel->qr_token)
                 : null,
             'checked_in' => $registrationModel->checked_in_at !== null,
