@@ -59,7 +59,12 @@ final class EventRegistration extends Model
 
     protected $connection = 'landlord';
 
+    protected $attributes = ['member_benefit_required' => false];
+
     protected $fillable = [
+        'member_benefit_required',
+        'member_benefit_quote_id',
+        'member_benefit_identity',
         'tenant_id',
         'event_id',
         'ticket_type_id',
@@ -101,6 +106,8 @@ final class EventRegistration extends Model
     ];
 
     protected $casts = [
+        'member_benefit_required' => 'boolean',
+        'member_benefit_identity' => 'array',
         'amount' => 'integer',
         'discount_amount' => 'integer',
         'platform_fee_amount' => 'integer',
@@ -116,6 +123,8 @@ final class EventRegistration extends Model
 
     protected $hidden = [
         'qr_token',
+        'member_benefit_identity',
+        'member_benefit_quote_id',
     ];
 
     /**
