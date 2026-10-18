@@ -155,3 +155,5 @@ An initial aggregate diagnostic referenced an undeclared read-item relationship 
 ## Milestones6–7 release approval (2026-10-18)
 
 Owner accepted the implementation and explicitly approved push, merge and deployment, including Purpledot activation under the standing policy. Release branch codex/community-7 includes reviewed M6, the dues start-date safeguard and M7. Reconcile already-merged regional pricing from main before full remote CI; no changes to Claude/original checkouts. Actual-device/zoom and aggregate storage allowance limitations remain disclosed, not falsely marked passed. No online-Giving readiness, historical cutover or marketplace-booking enablement is authorised by this release.
+
+Release gate note: first full PHP run passed3439tests/16520assertions; after two formatting-only corrections, the next run passed3438 and exposed the pre-existing SMS batch assertion’s unspecified database row ordering. The regression now asserts the exact phone-to-personalised-text mapping independently of order; no SMS runtime behaviour changed. Final CI must pass before merge.
