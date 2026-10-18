@@ -47,6 +47,6 @@ final readonly class CommunityServices
         $timezone = CommunitySettings::for($tenant)->timezone;
         $event = Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($session->event_id);
 
-        return ['id' => $session->id, 'event_id' => $event->id, 'event_title' => $event->title, 'title' => $session->title, 'starts_at' => $session->starts_at->toImmutable()->setTimezone($timezone)->toIso8601String(), 'ends_at' => $session->ends_at?->toImmutable()->setTimezone($timezone)->toIso8601String(), 'timezone' => $timezone, 'status' => $session->occurrence_status ?? 'scheduled', 'notes_count' => $session->getAttribute('community_notes_count')];
+        return ['id' => $session->id, 'event_id' => $event->id, 'event_title' => $event->title, 'title' => $session->title, 'starts_at' => $session->starts_at->toImmutable()->setTimezone($timezone)->toIso8601String(), 'ends_at' => $session->ends_at->toImmutable()->setTimezone($timezone)->toIso8601String(), 'timezone' => $timezone, 'status' => $session->occurrence_status ?? 'scheduled', 'notes_count' => $session->getAttribute('community_notes_count')];
     }
 }

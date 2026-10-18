@@ -113,5 +113,12 @@ it('rechecks removal from the selected active group before submission', function
     $form->update(['audience' => ['kind' => 'groups', 'group_ids' => [$group->id]]]);
     expect(app(CommunityQuestionnaires::class)->readers(app('session.store'), $tenant, $form))->toHaveCount(1);
     $member->groups()->detach($group->id);
-    expect(fn () => app(CommunityQuestionnaires::class)->submit($tenant,app('session.store'),$form->id,$member->id,[$form->questions->first()->id => ['response_text' => 'No']],1))->toThrow(HttpException::class);
+    expect(fn () => app(CommunityQuestionnaires::class)->submit($tenant, app('session.store'), $form->id, $member->id, [$form->questions->first()->id => ['response_text' => 'No']], 1))->toThrow(HttpException::class);
+});
+
+it('enforces the one-response database constraint even if a second writer bypasses the engine', function () {
+    [$tenant,$member,$form] = questionnaireReader();
+    $values = ['tenant_id' => $tenant->id, 'member_id' => $member->id, 'revision' => 1];
+    $form->submissions()->create($values);
+    expect(fn () => $form->submissions()->create($values))->toThrow(Illuminate\Database\QueryException::class);
 });

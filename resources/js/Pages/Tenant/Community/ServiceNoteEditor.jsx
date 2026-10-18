@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { libraryWriteKey } from '@/lib/libraryWriteKey';
 import Modal from '@/Components/Console/Modal';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
@@ -9,6 +10,7 @@ import LibraryItemFields from './LibraryItemFields';
 import { serviceDate } from '@/Pages/Public/Community/ServicesPanel';
 
 export default function ServiceNoteEditor({ initial = {}, groups, onClose, onSaved }) {
+    const writeAttempt = useRef(null);
     const [eventId, setEventId] = useState(initial.event_id || '');
     const [sessionId, setSessionId] = useState(initial.session_id || '');
     const [search, setSearch] = useState('');
@@ -55,6 +57,7 @@ export default function ServiceNoteEditor({ initial = {}, groups, onClose, onSav
         setBusy(true);
         setError('');
         const data = new FormData();
+        data.append('write_key', libraryWriteKey(writeAttempt, { eventId, sessionId, form }, file));
         ['title', 'description', 'plain_text', 'state', 'edition'].forEach((key) =>
             data.append(key, form[key])
         );

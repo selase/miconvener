@@ -126,7 +126,19 @@ export default function QuestionnairesPanel({
             const result = await communityRequest(
                 `${base}/${encodeURIComponent(selected)}/responses`,
                 'POST',
-                { member_id: context, revision: data.questionnaire.revision, answers }
+                {
+                    member_id: context,
+                    revision: data.questionnaire.revision,
+                    answers: Object.fromEntries(
+                        Object.entries(answers).filter(([, value]) =>
+                            Object.values(value).some((part) =>
+                                Array.isArray(part)
+                                    ? part.some((entry) => String(entry ?? '').trim() !== '')
+                                    : part !== null && String(part).trim() !== ''
+                            )
+                        )
+                    ),
+                }
             );
             setReceipt(
                 result.already_received

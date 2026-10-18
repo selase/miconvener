@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Community;
 
+use App\Models\CommunityQuestion;
 use App\Models\CommunityQuestionnaire;
 use App\Models\CommunitySubmission;
 use App\Models\Member;
@@ -105,7 +106,7 @@ final readonly class CommunityQuestionnaires
         $form->loadMissing(['questions' => fn ($q) => $q->orderBy('position'), 'questions.options' => fn ($q) => $q->orderBy('position')]);
 
         return ['id' => $form->id, 'title' => $form->title, 'description' => $form->description, 'kind' => $form->kind, 'state' => $form->state, 'revision' => $form->revision, 'opens_at' => $form->opens_at?->toIso8601String(), 'closes_at' => $form->closes_at?->toIso8601String(), 'results_published' => $form->results_published_at !== null,
-            'questions' => $form->questions->map(fn ($q) => ['id' => $q->id, 'title' => $q->title, 'type' => $q->type, 'required' => $q->required, 'settings' => $q->settings ?? [], 'options' => $q->options->map(fn ($o) => ['id' => $o->id, 'label' => $o->label])->values()])->values(),
+            'questions' => $form->questions->map($this->questionPayload(...))->values()->all(),
             ...($staff ? ['audience' => $form->audience, 'frozen' => $form->submissions()->exists()] : [])];
     }
 
@@ -149,5 +150,12 @@ final readonly class CommunityQuestionnaires
 
             return $submission;
         });
+    }
+
+    /** @return array<string,mixed> */
+    private function questionPayload(CommunityQuestion $question): array
+    {
+        return ['id' => $question->id, 'title' => $question->title, 'type' => $question->type, 'required' => $question->required, 'settings' => $question->settings ?? [],
+            'options' => $question->options->map(fn ($option) => ['id' => $option->id, 'label' => $option->label])->values()->all()];
     }
 }

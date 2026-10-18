@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Community;
 
 use App\Models\CommunityLibraryItem;
+use App\Models\CommunityLibraryWrite;
 use App\Models\Tenant;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,16 @@ final readonly class CommunityLibrary
             return DB::connection('landlord')->transaction(function () use ($tenant, $data, $file, $candidate, $actor, &$stored): CommunityLibraryItem {
                 $lockedTenant = Tenant::query()->lockForUpdate()->findOrFail($tenant->id);
                 abort_unless($this->rollout->canPublish($lockedTenant), 403, 'Publishing requires the Library feature and an eligible plan. Existing documents remain readable.');
+                $writeKey = $data['write_key'] ?? null;
+                $fingerprint = $writeKey === null ? null : $this->fingerprint($data, $file, $candidate);
+                if ($writeKey !== null) {
+                    $previous = CommunityLibraryWrite::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('actor_id', $actor)->where('write_key', $writeKey)->first();
+                    if ($previous !== null) {
+                        abort_unless(hash_equals($previous->fingerprint, $fingerprint), 409, 'This save key was already used for different content. Reopen the editor before saving changed content.');
+
+                        return CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $tenant->id)->with('currentVersion')->findOrFail($previous->item_id);
+                    }
+                }
                 $item = $candidate === null ? new CommunityLibraryItem(['tenant_id' => $tenant->id, 'created_by' => $actor])
                     : CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $tenant->id)->lockForUpdate()->findOrFail($candidate->id);
                 if ($file === null && $item->current_version_id === null && blank($data['plain_text'] ?? null)) {
@@ -36,6 +47,10 @@ final readonly class CommunityLibrary
                     $stored = $this->storage->put($lockedTenant, $file);
                     $version = $item->versions()->create([...$stored, 'tenant_id' => $tenant->id, 'edition' => $data['edition'] ?? now()->toDateString(), 'created_by' => $actor]);
                     $item->update(['current_version_id' => $version->id]);
+                }
+
+                if ($writeKey !== null) {
+                    CommunityLibraryWrite::query()->create(['tenant_id' => $tenant->id, 'actor_id' => $actor, 'write_key' => $writeKey, 'fingerprint' => $fingerprint, 'item_id' => $item->id]);
                 }
 
                 return $item->load('currentVersion');
@@ -58,5 +73,26 @@ final readonly class CommunityLibrary
 
         return ['id' => $item->id, 'kind' => $item->kind, 'title' => $item->title, 'description' => $item->description, 'plain_text' => $item->plain_text, 'state' => $item->state, 'release_at' => $item->release_at?->toIso8601String(), 'updated_at' => $item->updated_at->toIso8601String(), 'file' => $file,
             ...($staff ? ['audience' => $item->audience, 'event_id' => $item->event_id, 'session_id' => $item->session_id] : [])];
+    }
+
+    /** @param array<string,mixed> $data */
+    private function fingerprint(array $data, ?UploadedFile $file, ?CommunityLibraryItem $candidate): string
+    {
+        $attributes = [];
+        foreach (['title', 'description', 'plain_text', 'audience', 'state', 'release_at', 'kind', 'event_id', 'session_id', 'edition'] as $key) {
+            $attributes[$key] = $data[$key] ?? null;
+        }
+        $canonical = function (mixed $value) use (&$canonical): mixed {
+            if (! is_array($value)) {
+                return $value;
+            }
+            if (! array_is_list($value)) {
+                ksort($value);
+            }
+
+            return array_map($canonical, $value);
+        };
+
+        return hash('sha256', json_encode(['item' => $candidate?->id, 'data' => $canonical($attributes), 'file' => $file === null ? null : ['checksum' => hash_file('sha256', $file->getRealPath()), 'mime' => $file->getMimeType(), 'size' => $file->getSize()]], JSON_THROW_ON_ERROR));
     }
 }

@@ -10,6 +10,7 @@ use App\Http\Requests\Tenant\Community\QuestionnaireStateRequest;
 use App\Http\Requests\Tenant\Community\SaveQuestionnaireRequest;
 use App\Models\CommunityGroup;
 use App\Models\CommunityQuestionnaire;
+use App\Models\CommunitySubmission;
 use App\Models\Tenant;
 use App\Services\Community\CommunityQuestionnaireResults;
 use App\Services\Community\CommunityQuestionnaires;
@@ -69,7 +70,7 @@ final class CommunityQuestionnaireController extends Controller
         $form = $this->form($questionnaire);
         $responses = $form->submissions()->where('tenant_id', $form->tenant_id)->with(['member', 'answers'])->latest()->paginate(25);
 
-        return response()->json(['summary' => $results->summary($form), 'responses' => $responses->through(fn ($s) => ['member' => ['id' => $s->member_id, 'name' => $s->member?->name, 'email' => $s->member?->email], 'created_at' => $s->created_at->toIso8601String(), 'answers' => $s->answers->map(fn ($a) => ['question_id' => $a->question_id, 'option_id' => $a->option_id, 'response_text' => $a->response_text, 'response_number' => $a->response_number, 'response_payload' => $a->response_payload])->values()])])->header('Cache-Control', 'private, no-store');
+        return response()->json(['summary' => $results->summary($form), 'responses' => $responses->through($this->submissionPayload(...))])->header('Cache-Control', 'private, no-store');
     }
 
     public function export(string $subdomain, string $questionnaire, CommunityQuestionnaireResults $results): StreamedResponse
@@ -79,6 +80,14 @@ final class CommunityQuestionnaireController extends Controller
         return $results->export($this->form($questionnaire));
     }
 
+    /** @return array<string,mixed> */
+    private function submissionPayload(CommunitySubmission $submission): array
+    {
+        return ['member' => ['id' => $submission->member_id, 'name' => $submission->member->name, 'email' => $submission->member->email],
+            'created_at' => $submission->created_at->toIso8601String(),
+            'answers' => $submission->answers->map(fn ($answer) => ['question_id' => $answer->question_id, 'option_id' => $answer->option_id, 'response_text' => $answer->response_text, 'response_number' => $answer->response_number, 'response_payload' => $answer->response_payload])->values()->all()];
+    }
+
     private function tenant(): Tenant
     {
         return app(TenantContext::class)->getTenant() ?? abort(404);
@@ -86,6 +95,6 @@ final class CommunityQuestionnaireController extends Controller
 
     private function form(string $id): CommunityQuestionnaire
     {
-        return CommunityQuestionnaire::withoutGlobalScopes()->where('tenant_id',$this->tenant()->id)->findOrFail($id);
+        return CommunityQuestionnaire::withoutGlobalScopes()->where('tenant_id', $this->tenant()->id)->findOrFail($id);
     }
 }

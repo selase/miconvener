@@ -14,6 +14,6 @@ final class CommunityQuestionFactory extends Factory
     /** @return array<string,mixed> */
     public function definition(): array
     {
-        return ['questionnaire_id' => \App\Models\CommunityQuestionnaire::factory(), 'tenant_id' => fn (array $a) => \App\Models\CommunityQuestionnaire::withoutGlobalScopes()->findOrFail($a['questionnaire_id'])->tenant_id, 'title' => fake()->sentence(), 'type' => 'open', 'position' => 0, 'required' => true, 'settings' => []];
+        return ['questionnaire_id' => \App\Models\CommunityQuestionnaire::factory(), 'tenant_id' => fn (array $a) => \App\Models\CommunityQuestionnaire::withoutGlobalScopes()->whereKey($a['questionnaire_id'])->firstOrFail()->tenant_id, 'title' => fake()->sentence(), 'type' => 'open', 'position' => 0, 'required' => true, 'settings' => []];
     }
 }

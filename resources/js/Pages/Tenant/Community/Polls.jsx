@@ -146,7 +146,6 @@ export default function Polls({ forms, groups = [], canPublish }) {
         <ConsoleLayout>
             <PageHeader
                 title="Polls & surveys"
-                description="Hear from your members, with responses kept separate from event live polls."
                 actions={
                     manage && canPublish ? (
                         <Button onClick={() => open(null)}>Create questionnaire</Button>
@@ -345,7 +344,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                                         </div>
                                                         {q.options.length > 2 && (
                                                             <Button
-                                                                variant="secondary"
+                                                                variant="default"
                                                                 type="button"
                                                                 onClick={() =>
                                                                     changeQuestion(index, {
@@ -363,7 +362,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                             </div>
                                             {q.options.length < 12 && (
                                                 <Button
-                                                    variant="secondary"
+                                                    variant="default"
                                                     type="button"
                                                     onClick={() =>
                                                         changeQuestion(index, {
@@ -424,7 +423,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                     )}
                                     {form.questions.length > 1 && (
                                         <Button
-                                            variant="secondary"
+                                            variant="default"
                                             type="button"
                                             onClick={() =>
                                                 setForm({
@@ -443,7 +442,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                             {form.kind === 'survey' && form.questions.length < 30 && (
                                 <Button
                                     type="button"
-                                    variant="secondary"
+                                    variant="default"
                                     onClick={() =>
                                         setForm({
                                             ...form,
@@ -464,7 +463,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                 </Button>
                                 <Button
                                     type="button"
-                                    variant="secondary"
+                                    variant="default"
                                     onClick={() => setEditing(null)}
                                 >
                                     Cancel
@@ -502,7 +501,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                             <div className="flex flex-wrap gap-3">
                                 {manage && canPublish && !item.frozen && (
                                     <Button
-                                        variant="secondary"
+                                        variant="default"
                                         disabled={busy}
                                         onClick={() => open(item)}
                                     >
@@ -519,7 +518,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                 )}
                                 {manage && item.state === 'open' && (
                                     <Button
-                                        variant="secondary"
+                                        variant="default"
                                         disabled={busy}
                                         onClick={() => transition(item, { state: 'closed' })}
                                     >
@@ -528,7 +527,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                 )}
                                 {manage && item.state !== 'withdrawn' && (
                                     <Button
-                                        variant="secondary"
+                                        variant="default"
                                         disabled={busy}
                                         onClick={() => transition(item, { state: 'withdrawn' })}
                                     >
@@ -537,7 +536,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                 )}
                                 {manage && (
                                     <Button
-                                        variant="secondary"
+                                        variant="default"
                                         disabled={busy}
                                         onClick={() =>
                                             transition(item, {
@@ -552,7 +551,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                 )}
                                 {readResults && (
                                     <Button
-                                        variant="secondary"
+                                        variant="default"
                                         disabled={busy}
                                         onClick={() => loadResults(item)}
                                     >
@@ -565,7 +564,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                 </div>
                 <div className="flex flex-wrap gap-4">
                     {forms.prev_page_url && (
-                        <Button variant="secondary" onClick={() => router.get(forms.prev_page_url)}>
+                        <Button variant="default" onClick={() => router.get(forms.prev_page_url)}>
                             Previous
                         </Button>
                     )}
@@ -573,7 +572,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                         Page {forms.current_page} of {forms.last_page}
                     </p>
                     {forms.next_page_url && (
-                        <Button variant="secondary" onClick={() => router.get(forms.next_page_url)}>
+                        <Button variant="default" onClick={() => router.get(forms.next_page_url)}>
                             Next
                         </Button>
                     )}
@@ -585,7 +584,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                 Responses · {resultsForm.title}
                             </h2>
                             <Button
-                                variant="secondary"
+                                variant="default"
                                 onClick={() => {
                                     setResults(null);
                                     setResultsForm(null);
@@ -654,7 +653,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                 <div className="flex flex-wrap gap-4">
                                     {results.responses.prev_page_url && (
                                         <Button
-                                            variant="secondary"
+                                            variant="default"
                                             onClick={() =>
                                                 loadResults(
                                                     resultsForm,
@@ -671,7 +670,7 @@ export default function Polls({ forms, groups = [], canPublish }) {
                                     </p>
                                     {results.responses.next_page_url && (
                                         <Button
-                                            variant="secondary"
+                                            variant="default"
                                             onClick={() =>
                                                 loadResults(
                                                     resultsForm,

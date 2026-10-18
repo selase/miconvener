@@ -23,12 +23,11 @@ final class QuestionAnswerValidator
     public const int MAX_WORDS = 3;
 
     /**
-     * @return array{option_id: ?string, response_text: ?string, response_number: ?float, response_payload: ?list<string>}
+     * @param  list<string>  $optionIds
+     * @param  array<string,mixed>  $settings
+     * @return array{option_id:?string,response_text:?string,response_number:?float,response_payload:?list<string>}
      *
      * @throws ValidationException
-     */
-    /** @param list<string> $optionIds
-     * @param  array<string,mixed>  $settings
      */
     public function read(Request $request, string $type, array $optionIds, array $settings = []): array
     {

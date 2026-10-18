@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { libraryWriteKey } from '@/lib/libraryWriteKey';
 import { router } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
@@ -10,6 +11,7 @@ import { csrfFetchFormData } from '@/lib/csrfFetch';
 import { communityRequest } from '@/lib/community';
 
 export default function Library({ items, groups = [], canPublish, initialService = null }) {
+    const writeAttempt = useRef(null);
     const [serviceEditor, setServiceEditor] = useState(canPublish ? initialService : null);
     const [editing, setEditing] = useState(null);
     const [form, setForm] = useState({});
@@ -18,6 +20,7 @@ export default function Library({ items, groups = [], canPublish, initialService
     const [error, setError] = useState('');
     const [versions, setVersions] = useState(null);
     const open = (item) => {
+        writeAttempt.current = null;
         setFile(null);
         setError('');
         setEditing(item || {});
@@ -44,6 +47,10 @@ export default function Library({ items, groups = [], canPublish, initialService
         setBusy(true);
         setError('');
         const data = new FormData();
+        data.append(
+            'write_key',
+            libraryWriteKey(writeAttempt, { item: editing.id || null, form }, file)
+        );
         ['title', 'description', 'plain_text', 'state', 'edition'].forEach((key) =>
             data.append(key, form[key])
         );

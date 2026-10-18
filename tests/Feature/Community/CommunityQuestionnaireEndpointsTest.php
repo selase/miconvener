@@ -95,5 +95,18 @@ it('rejects malformed question definitions, foreign groups and cross-tenant link
     $data['audience'] = ['kind' => 'groups', 'group_ids' => [App\Models\CommunityGroup::factory()->create()->id]];
     $this->postJson(route('tenant.community.polls.store', ['subdomain' => $tenant->slug]), $data)->assertUnprocessable();
     $foreign = CommunityQuestionnaire::factory()->create();
-    $this->postJson(route('tenant.community.polls.state',['subdomain' => $tenant->slug, 'questionnaire' => $foreign->id]),['state' => 'open'])->assertNotFound();
+    $this->postJson(route('tenant.community.polls.state', ['subdomain' => $tenant->slug, 'questionnaire' => $foreign->id]), ['state' => 'open'])->assertNotFound();
+});
+
+it('rejects associative question arrays and accepts an independent closing date', function () {
+    [$tenant,$user] = libraryStaff();
+    foreach (['community_polls', 'community_polls_access'] as $key) {
+        $tenant->features()->create(['feature_key' => $key, 'enabled' => true]);
+    }
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost($tenant->slug)]);
+    $data = questionnaireDefinition();
+    $data['questions'] = ['unexpected' => $data['questions'][0]];
+    $url = route('tenant.community.polls.store', ['subdomain' => $tenant->slug]);
+    $this->postJson($url, $data)->assertUnprocessable();
+    $this->postJson($url, [...questionnaireDefinition(), 'closes_at' => now()->addDay()->toIso8601String()])->assertCreated();
 });

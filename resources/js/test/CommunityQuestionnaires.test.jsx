@@ -122,3 +122,32 @@ it('shows all ten supported native answer controls', async () => {
         unmount();
     }
 });
+
+it('omits an optional multi-select answer after the member clears every choice', async () => {
+    communityRequest.mockResolvedValue({
+        ...detail,
+        questionnaire: {
+            ...form,
+            questions: [
+                {
+                    id: 'optional',
+                    title: 'Optional help',
+                    type: 'multi_select',
+                    required: false,
+                    options: [{ id: 'choice', label: 'Welcome team' }],
+                },
+            ],
+        },
+    });
+    render(<QuestionnairesPanel tenantSlug="local" questionnaireId="form" />);
+    await screen.findByText('Volunteer survey');
+    fireEvent.change(screen.getByLabelText('Answering as'), { target: { value: 'member' } });
+    fireEvent.click(screen.getByLabelText('Welcome team'));
+    fireEvent.click(screen.getByLabelText('Welcome team'));
+    communityRequest.mockResolvedValue({ received: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Send response' }));
+    await waitFor(() =>
+        expect(communityRequest.mock.calls.some((call) => call[1] === 'POST')).toBe(true)
+    );
+    expect(communityRequest.mock.calls.find((call) => call[1] === 'POST')[2].answers).toEqual({});
+});

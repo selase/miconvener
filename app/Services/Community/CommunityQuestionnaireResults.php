@@ -41,7 +41,7 @@ final class CommunityQuestionnaireResults
                 }
                 $distribution = $question->options->map(fn ($option) => ['label' => $option->label, 'average_rank' => round($totals[$option->id] / max(1, $count), 2)])->values()->all();
             } elseif (in_array($question->type, ['scale', 'number'], true) && $count >= EventPoll::SUPPRESS_BELOW) {
-                $row = (clone $query)->selectRaw('min(response_number) AS minimum, max(response_number) AS maximum, avg(response_number) AS average')->first();
+                $row = (clone $query)->toBase()->selectRaw('min(response_number) AS minimum, max(response_number) AS maximum, avg(response_number) AS average')->first();
                 $statistics = ['minimum' => (float) $row->minimum, 'maximum' => (float) $row->maximum, 'average' => round((float) $row->average, 4)];
             }
             $questions[] = ['title' => $question->title, 'type' => $question->type, 'responses' => $count, 'distribution' => $distribution, 'statistics' => $statistics];
@@ -68,7 +68,7 @@ final class CommunityQuestionnaireResults
                     if ($answer->response_payload !== null && $answer->response_text === null) {
                         $value = implode(' | ', array_map(fn ($id) => $options[$id] ?? $id, $answer->response_payload));
                     }
-                    $row = [$submission->member_id, $submission->member?->name ?? 'Former member', $submission->member?->email ?? '', $submission->created_at->toIso8601String(), $question->title, (string) $value];
+                    $row = [$submission->member_id, $submission->member->name, $submission->member->email ?? '', $submission->created_at->toIso8601String(), $question->title, (string) $value];
                     fputcsv($handle, array_map($this->safeCell(...), $row), ',', '"', '');
                 }
             }
@@ -78,6 +78,6 @@ final class CommunityQuestionnaireResults
 
     private function safeCell(string $value): string
     {
-        return preg_match('/^[\s]*[=+@\-\t\r\n]/u', $value) === 1 || preg_match('/^[\t\r\n]/',$value) === 1 ? "'".$value : $value;
+        return preg_match('/^[\s]*[=+@\-\t\r\n]/u', $value) === 1 || preg_match('/^[\t\r\n]/', $value) === 1 ? "'".$value : $value;
     }
 }

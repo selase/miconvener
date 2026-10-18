@@ -13,8 +13,7 @@ return new class extends Migration
 
     public function up(): void
     {
-        $schema = Schema::connection('landlord');
-        $schema->create('community_questionnaires', function (Blueprint $t): void {
+        Schema::connection('landlord')->create('community_questionnaires', function (Blueprint $t): void {
             $t->uuid('id')->primary();
             $t->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $t->string('title');
@@ -31,7 +30,7 @@ return new class extends Migration
             $t->unique(['tenant_id', 'id'], 'cq_tenant_id');
             $t->index(['tenant_id', 'state']);
         });
-        $schema->create('community_questions', function (Blueprint $t): void {
+        Schema::connection('landlord')->create('community_questions', function (Blueprint $t): void {
             $t->uuid('id')->primary();
             $t->uuid('tenant_id');
             $t->uuid('questionnaire_id');
@@ -44,7 +43,7 @@ return new class extends Migration
             $t->foreign(['tenant_id', 'questionnaire_id'], 'cquestion_form')->references(['tenant_id', 'id'])->on('community_questionnaires')->cascadeOnDelete();
             $t->unique(['tenant_id', 'questionnaire_id', 'id'], 'cquestion_context');
         });
-        $schema->create('community_question_options', function (Blueprint $t): void {
+        Schema::connection('landlord')->create('community_question_options', function (Blueprint $t): void {
             $t->uuid('id')->primary();
             $t->uuid('tenant_id');
             $t->uuid('questionnaire_id');
@@ -55,7 +54,7 @@ return new class extends Migration
             $t->foreign(['tenant_id', 'questionnaire_id', 'question_id'], 'coption_question')->references(['tenant_id', 'questionnaire_id', 'id'])->on('community_questions')->cascadeOnDelete();
             $t->unique(['tenant_id', 'questionnaire_id', 'question_id', 'id'], 'coption_context');
         });
-        $schema->create('community_submissions', function (Blueprint $t): void {
+        Schema::connection('landlord')->create('community_submissions', function (Blueprint $t): void {
             $t->uuid('id')->primary();
             $t->uuid('tenant_id');
             $t->uuid('questionnaire_id');
@@ -67,7 +66,7 @@ return new class extends Migration
             $t->unique(['questionnaire_id', 'member_id'], 'csubmission_once');
             $t->unique(['tenant_id', 'questionnaire_id', 'id'], 'csubmission_context');
         });
-        $schema->create('community_answers', function (Blueprint $t): void {
+        Schema::connection('landlord')->create('community_answers', function (Blueprint $t): void {
             $t->uuid('id')->primary();
             $t->uuid('tenant_id');
             $t->uuid('questionnaire_id');
