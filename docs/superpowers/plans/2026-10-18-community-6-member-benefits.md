@@ -256,3 +256,50 @@ The following is the exhaustive ordered ruling record from implementation, retai
 None reported by the independent review. Manual acceptance limits and approved feature deferrals are recorded above, not treated as passed checks.
 
 Local status: implementation and one whole-branch review completed; commit retained on `codex/community-6`. Required remote CI, upload approval, merge approval and deployment remain pending.
+
+
+## Dues start-date follow-up — Self-Review Report, 2026-10-18
+
+Separate owner-approved safeguard after M6; implemented on local `codex/community-dues-start-date`, stacked on reviewed M6 `2bcad057`. No M6 remote integration or M7 implementation is inferred.
+
+Is there anything I have overlooked? Is the solution optimal? Let me take a step back.
+
+### Touchpoints updated
+
+- AGENTS.md/memory: existing finance rules retained; the parent spec §7 and roadmap are the shared decision record. No new global convention/private memory needed.
+- Seeders/permissions: no new permission or role; existing manage-members and tenant checks remain. A synthetic QA staff grant was scoped to its disposable tenant for browser testing only, never production.
+- Navigation: existing Money → Dues → Edit membership type; introducing dues reveals a required date with first-full-period explanation; persisted paid boundary is visible and disabled on subsequent ordinary edits.
+- Config/env/dependencies: none added. Two nullable columns on landlord membership_types/members preserve legacy rows without inventing a historical boundary; no data backfill or ledger change.
+- Tests: watched10 new cases fail before implementation; later watched3 review cases fail before their fixes. Final six-file affected PHP gate105/105,386 assertions,70.83seconds; focused frontend17/17; Pint, ESLint, build and PHPStan0 passed. Baseline unchanged. Complete project CI has not run for this follow-up; no full-suite pass is claimed.
+
+### UI Gap Analysis
+
+Discoverability/empty/loading/error/permission states: reused existing native membership-type page/form, including field validation and disabled submitting button. No new page or duplicate navigation. Required date has an associated native label, error association and explanatory hint. Local browser: successful no-dues→GHS20 monthly conversion saved2026-11-01; fresh page shows fixed date2026-11-01. At390×844 the dialog is358px wide atx16 and610px high, within viewport. No claim of actual200% zoom or physical-device acceptance.
+
+One browser reopen ran ahead of the existing asynchronous list refresh and inspected the old no-dues row; the test waited for a date field absent in that stale edit snapshot. A fresh page load verified persisted server state and correct controls. No server save failure or missing stored boundary. This pre-existing reload timing is not represented as a successful immediate-reopen test.
+
+### Solved (auto-fixed)
+
+- Scheduler and manual creation share Member::firstDuesPeriod: max(type,member) local-calendar floor rounded up to the first full billing anchor. Current-period-on-join never overrides it. Manual caller dates are normalised as tenant calendar dates, preventing UTC/New York midnight mismatch.
+- No-dues→paid type update requires explicit nonhistorical date in the staff endpoint, rechecked under the type lock. Missing/date-format/impossible/past/reset attempts fail. Existing paid schedules cannot silently clear/change the boundary. Direct trusted conversion has conservative local-date default, preserving an already-selected future date.
+- No-dues member→paid type switch gets an internal current-local-date boundary; paid→paid retains legitimate catch-up. Existing member identity/active dates, pay links and history remain.
+- Existing paid/open/waived/void records stay byte-for-byte unchanged; querying an existing pre-boundary charge returns it idempotently. New manual pre-boundary charge rejected. Stale member/type relations are refreshed under member-then-type locks. Locked type update rechecks period/currency history restrictions.
+- One focused independent review of this safeguard only found two Important edge cases (calendar mismatch and unchanged future date), plus paid→paid compatibility concern and one redundant-loop calculation. All fixed; no second independent review and no deferred reviewer findings. Important fixes have watched RED→GREEN regression coverage.
+- Rebuilt tracked public/build. No production schema, data, settings, messages, payments, remote push, merge or deployment changed. Original and Claude checkouts remain clean and untouched.
+
+### Recommended for user decision
+
+Review the separate milestone7 plan's audience/representative/poll-identity/file-format proposals before authorising M7 implementation. Approve remote upload/full CI and integration separately when ready; this branch includes unmerged M6 ancestry. No production migration run is implied by the successful disposable QA migration.
+
+### Not gaps
+
+An unset dues amount means no dues; a member zero override still records an explicit waiver. Daily/weekly/monthly/quarterly/yearly anchors are retained, and the organisation-local date governs the new floor. The floor is an eligibility date, not a new debt or ledger balance. Real earlier dues from paid membership are preserved; no automatic waiver/void/import rewrite is performed.
+
+### Rulings I made
+
+1. Reuse the owned isolated checkout on a new branch stacked on M6, retaining the reviewed M6 branch and all Claude checkouts. Cost if wrong: split/cherry-pick the small safeguard for an independent PR before remote integration.
+2. First full billing period begins on/after the selected local date, with no proration or implicit retrospective billing. Cost if wrong: a separately approved partial-period policy and tests are needed.
+3. Keep old columns null on migration and protect future no-dues transitions, including member moves; do not infer or rewrite historical liability. Cost if wrong: production inventory and an owner-approved reconciliation would be required, never an automatic backfill.
+4. Preserve paid→paid catch-up and existing charges; the new member floor applies only to no-dues→paid moves. Cost if wrong: a general dues-rate effective-dating redesign is a separate requirement.
+5. Default trusted programmatic no-dues conversion to local today while respecting an unchanged future boundary; staff UI/API still requires an explicit valid date. Cost if wrong: strengthen trusted-service input contracts without weakening the staff endpoint.
+6. A narrow review and affected tests verify this fix; full remote CI remains pending rather than repeating an expensive full local milestone suite. Cost if wrong: any integration failure must be resolved before merge; no full-suite claim here.

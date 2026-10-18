@@ -36,6 +36,9 @@ final class DuesCharges
             $locked = Member::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)
                 ->with('membershipType')->lockForUpdate()->findOrFail($member->id);
 
+            $locked->setRelation('membershipType', \App\Models\MembershipType::withoutGlobalScopes()
+                ->where('tenant_id', $locked->tenant_id)->lockForUpdate()->findOrFail($locked->membership_type_id));
+
             return $this->createLocked($locked, $periodStart, $settings);
         });
     }
@@ -122,7 +125,15 @@ final class DuesCharges
         }
 
         $settings ??= CommunitySettings::for($member->tenant);
-        $start = $class->period->periodStartFor($periodStart, $settings);
+        $start = $class->period->periodStartFor(CarbonImmutable::parse($periodStart->toDateString(), $settings->timezone), $settings);
+        $duesStart = $member->firstDuesPeriod($settings);
+        if ($duesStart !== null && $start->lt($duesStart)) {
+            $existing = $member->charges()->whereDate('period_start', $start->toDateString())->first();
+            if ($existing !== null) {
+                return $existing;
+            }
+            throw new DomainException('This period starts before dues begin.');
+        }
         $amount = (int) $member->effectiveAmount();
 
         if ($amount > 0 && $amount < DuesCharge::MINIMUM_AMOUNT) {
