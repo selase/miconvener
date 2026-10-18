@@ -19,6 +19,9 @@ export default function ServicesPanel({ tenantSlug, serviceId = null, onExpired,
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     const [page, setPage] = useState(1);
+    const [seriesPage, setSeriesPage] = useState(1);
+    const [seriesSearch, setSeriesSearch] = useState('');
+    const [seriesQuery, setSeriesQuery] = useState('');
     const [filters, setFilters] = useState({ from: '', until: '', event: '' });
     const [applied, setApplied] = useState(filters);
     const [revision, setRevision] = useState(0);
@@ -46,7 +49,12 @@ export default function ServicesPanel({ tenantSlug, serviceId = null, onExpired,
         const controller = new AbortController();
         setResult(null);
         setError('');
-        const query = new URLSearchParams({ page: String(page), ...applied });
+        const query = new URLSearchParams({
+            page: String(page),
+            series_page: String(seriesPage),
+            series_search: seriesQuery,
+            ...applied,
+        });
         communityRequest(
             selected ? `${base}/${encodeURIComponent(selected)}` : `${base}?${query}`,
             'GET',
@@ -66,7 +74,7 @@ export default function ServicesPanel({ tenantSlug, serviceId = null, onExpired,
             disposed = true;
             controller.abort();
         };
-    }, [base, selected, page, applied, revision]);
+    }, [base, selected, page, applied, revision, seriesPage, seriesQuery]);
     const open = (id) => {
         setResult(null);
         setSelected(id);
@@ -80,7 +88,10 @@ export default function ServicesPanel({ tenantSlug, serviceId = null, onExpired,
     const timezone = result?.timezone || result?.organisation?.timezone || 'UTC';
     const series = Array.from(
         new Map(
-            (result?.services?.data || []).map((service) => [service.event_id, service.event_title])
+            [
+                ...(result?.series?.data || []),
+                ...(result?.selected_series ? [result.selected_series] : []),
+            ].map((event) => [event.id, event.title])
         ).entries()
     );
     return (
@@ -159,7 +170,7 @@ export default function ServicesPanel({ tenantSlug, serviceId = null, onExpired,
                                         href={note.file.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="mt-2 inline-flex min-h-11 items-center bg-accent px-5 py-2 font-medium text-white"
+                                        className="mt-2 inline-flex min-h-11 items-center bg-accent px-5 py-2 font-medium text-accent-ink"
                                     >
                                         Open attachment
                                     </a>
@@ -171,6 +182,49 @@ export default function ServicesPanel({ tenantSlug, serviceId = null, onExpired,
             )}
             {result?.services && (
                 <>
+                    <form
+                        className="flex flex-wrap items-end gap-3"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            setSeriesQuery(seriesSearch);
+                            setSeriesPage(1);
+                        }}
+                    >
+                        <label className="flex-1 text-sm text-ink">
+                            Find a series
+                            <input
+                                className="mt-1 block min-h-11 w-full border border-border bg-surface px-3 text-ink"
+                                value={seriesSearch}
+                                maxLength={160}
+                                onChange={(event) => setSeriesSearch(event.target.value)}
+                            />
+                        </label>
+                        <button className="min-h-11 border border-border px-4 text-ink">
+                            Find series
+                        </button>
+                    </form>
+                    {result.series && (
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-ink-secondary">
+                            <button
+                                disabled={result.series.current_page <= 1}
+                                className="min-h-11 text-accent underline disabled:opacity-40"
+                                onClick={() => setSeriesPage((n) => n - 1)}
+                            >
+                                Previous series choices
+                            </button>
+                            <span>
+                                Choices page {result.series.current_page} of{' '}
+                                {result.series.last_page}
+                            </span>
+                            <button
+                                disabled={result.series.current_page >= result.series.last_page}
+                                className="min-h-11 text-accent underline disabled:opacity-40"
+                                onClick={() => setSeriesPage((n) => n + 1)}
+                            >
+                                More series choices
+                            </button>
+                        </div>
+                    )}
                     <form
                         className="grid gap-3 sm:grid-cols-4"
                         onSubmit={(event) => {

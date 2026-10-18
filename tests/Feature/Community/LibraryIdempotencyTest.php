@@ -47,3 +47,22 @@ it('rejects reuse of a write key with changed content or a different item', func
     expect(fn () => $engine->save($tenant, $data, null, $item, (int) $actor->id))->toThrow(HttpException::class);
     expect($item->fresh()->title)->toBe('First');
 });
+
+it('retains a committed edition when the transaction acknowledgement is lost', function () {
+    [$tenant,$actor] = libraryStaff();
+    Storage::fake('community-library-local');
+    $connection = Illuminate\Support\Facades\DB::connection('landlord');
+    $wrapper = Mockery::mock(Illuminate\Database\Connection::class);
+    $wrapper->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) use ($connection) {
+        $connection->transaction($callback);
+        throw new RuntimeException('Commit acknowledgement lost');
+    });
+    Illuminate\Support\Facades\DB::shouldReceive('connection')->with('landlord')->once()->andReturn($wrapper);
+    $data = ['title' => 'Constitution', 'state' => 'published', 'audience' => ['kind' => 'all_members'], 'write_key' => (string) Str::uuid()];
+    $file = fn () => UploadedFile::fake()->createWithContent('constitution.pdf', "%PDF-1.4\nCommitted bytes");
+    expect(fn () => app(CommunityLibrary::class)->save($tenant, $data, $file(), null, (int) $actor->id))->toThrow(RuntimeException::class, 'Commit acknowledgement lost');
+    Illuminate\Support\Facades\DB::shouldReceive('connection')->with('landlord')->andReturn($connection);
+    $retried = app(CommunityLibrary::class)->save($tenant, $data, $file(), null, (int) $actor->id);
+    expect($retried->versions()->count())->toBe(1);
+    expect(Storage::disk('community-library-local')->get($retried->currentVersion->path))->toBe("%PDF-1.4\nCommitted bytes");
+});

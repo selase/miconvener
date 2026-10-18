@@ -164,6 +164,7 @@ final class EventSession extends Model
         return $this->belongsTo(EventAbstract::class, 'abstract_id');
     }
 
+    /** @return BelongsTo<Event,$this> */
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);

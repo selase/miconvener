@@ -33,6 +33,19 @@ final readonly class CommunityServices
             ->orderByDesc('starts_at')->orderByDesc('id')->paginate(20);
     }
 
+    /** @param array<string,mixed> $filters
+     * @return array<string,mixed>
+     */
+    public function series(Tenant $tenant, Session $session, array $filters): array
+    {
+        $notes = $this->access->visibleItems($session, $tenant)->where('kind', 'service_note');
+        $events = Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereIn('id', $this->occurrences($tenant)->whereHas('communityNotes', fn ($q) => $q->whereIn('id', $notes->select('id')))->select('event_id'));
+        $selected = empty($filters['event']) ? null : (clone $events)->whereKey($filters['event'])->first();
+        $page = $events->when(! empty($filters['series_search']), fn ($q) => $q->where('name', 'ilike', '%'.$filters['series_search'].'%'))->orderBy('name')->orderBy('id')->paginate(25, ['id', 'name'], 'series_page');
+
+        return ['series' => $page->through(fn ($event) => ['id' => $event->id, 'title' => $event->title]), 'selected_series' => $selected === null ? null : ['id' => $selected->id, 'title' => $selected->title]];
+    }
+
     /** @return Builder<EventSession> */
     public function occurrences(Tenant $tenant): Builder
     {
@@ -45,7 +58,8 @@ final readonly class CommunityServices
     public function payload(Tenant $tenant, EventSession $session): array
     {
         $timezone = CommunitySettings::for($tenant)->timezone;
-        $event = Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($session->event_id);
+        $session->loadMissing(['event' => fn ($query) => $query->withTrashed()->where('tenant_id', $tenant->id)]);
+        $event = $session->event;
 
         return ['id' => $session->id, 'event_id' => $event->id, 'event_title' => $event->title, 'title' => $session->title, 'starts_at' => $session->starts_at->toImmutable()->setTimezone($timezone)->toIso8601String(), 'ends_at' => $session->ends_at->toImmutable()->setTimezone($timezone)->toIso8601String(), 'timezone' => $timezone, 'status' => $session->occurrence_status ?? 'scheduled', 'notes_count' => $session->getAttribute('community_notes_count')];
     }

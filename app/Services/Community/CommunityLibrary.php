@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Community;
 
 use App\Models\CommunityLibraryItem;
+use App\Models\CommunityLibraryVersion;
 use App\Models\CommunityLibraryWrite;
 use App\Models\Tenant;
 use Illuminate\Http\UploadedFile;
@@ -57,7 +58,14 @@ final readonly class CommunityLibrary
             });
         } catch (Throwable $exception) {
             if (is_array($stored)) {
-                Storage::disk($stored['disk'])->delete($stored['path']);
+                try {
+                    $referenced = CommunityLibraryVersion::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('disk', $stored['disk'])->where('path', $stored['path'])->exists();
+                    if (! $referenced) {
+                        Storage::disk($stored['disk'])->delete($stored['path']);
+                    }
+                } catch (Throwable) {
+                    // An uncertain commit must never erase a possibly committed edition.
+                }
             }
             throw $exception;
         }

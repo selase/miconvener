@@ -23,7 +23,7 @@ final class CommunityServicesController extends Controller
         abort_unless(app(CommunityLibraryRollout::class)->available($tenant) && $access->readers($request->session(), $tenant, ['kind' => 'all_members'])->isNotEmpty(), 404);
         $entries = $services->entries($tenant, $request->session(), $request->validated());
 
-        return response()->json(['organisation' => ['name' => $tenant->name, 'timezone' => \App\Models\CommunitySettings::for($tenant)->timezone], 'services' => $entries->through(fn ($entry) => $services->payload($tenant, $entry))])->header('Cache-Control', 'private, no-store');
+        return response()->json([...$services->series($tenant, $request->session(), $request->validated()), 'organisation' => ['name' => $tenant->name, 'timezone' => \App\Models\CommunitySettings::for($tenant)->timezone], 'services' => $entries->through(fn ($entry) => $services->payload($tenant, $entry))])->header('Cache-Control', 'private, no-store');
     }
 
     public function show(Request $request, string $tenantSlug, string $session, CommunityServices $services, CommunityContentAccess $access, CommunityLibrary $library): JsonResponse

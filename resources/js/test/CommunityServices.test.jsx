@@ -70,3 +70,18 @@ it('offers an authorised programme shortcut for the exact service occurrence', a
         'service=session-1'
     );
 });
+
+it('keeps accessible series options when the date filter has no services', async () => {
+    request.mockResolvedValue({
+        organisation: { name: 'Church', timezone: 'Africa/Accra' },
+        services: { data: [], current_page: 1, last_page: 1 },
+        series: {
+            data: [{ id: 'old-series', title: 'Older Sunday services' }],
+            current_page: 1,
+            last_page: 1,
+        },
+        selected_series: { id: 'old-series', title: 'Older Sunday services' },
+    });
+    render(<ServicesPanel tenantSlug="church" />);
+    expect(await screen.findByRole('option', { name: 'Older Sunday services' })).toBeTruthy();
+});

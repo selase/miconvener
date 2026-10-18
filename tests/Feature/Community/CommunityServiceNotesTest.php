@@ -96,3 +96,58 @@ it('offers only the tenant recurring series and preserves an explicitly preselec
         ->getJson(route('tenant.community.service-notes.options', ['subdomain' => $tenant->slug, 'event' => $event->id, 'session' => $session->id]))
         ->assertOk()->assertJsonPath('selected_occurrence.id', $session->id)->assertJsonCount(1, 'events.data');
 });
+
+it('bounds parent-event queries when a church lists several dated services', function () {
+    [$tenant,, $event] = serviceReader();
+    for ($i = 0; $i < 3; $i++) {
+        $occurrence = EventSession::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'is_occurrence' => true]);
+        CommunityLibraryItem::factory()->create(['tenant_id' => $tenant->id, 'kind' => 'service_note', 'event_id' => $event->id, 'session_id' => $occurrence->id]);
+    }
+    $connection = Illuminate\Support\Facades\DB::connection('landlord');
+    $connection->enableQueryLog();
+    $service = app(App\Services\Community\CommunityServices::class);
+    $entries = $service->entries($tenant, app('session.store'), []);
+    foreach ($entries as $entry) {
+        $service->payload($tenant, $entry);
+    }
+    $queries = collect($connection->getQueryLog())->filter(fn ($entry) => preg_match('/^select\s+(?:"events"\.)?\* from "events"/i', $entry['query']) === 1);
+    $connection->disableQueryLog();
+    expect($entries->count())->toBe(4)->and($queries->count())->toBeLessThanOrEqual(1);
+});
+
+it('preserves existing event assets when library history blocks permanent purge', function (string $path) {
+    [$tenant,$user] = libraryStaff();
+    Illuminate\Support\Facades\Storage::fake('public');
+    $event = Event::factory()->published()->create(['tenant_id' => $tenant->id, 'is_recurring' => true, 'hero_image_path' => 'events/hero/history.jpg', 'purge_at' => now()->subHour()]);
+    $session = EventSession::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'is_occurrence' => true]);
+    CommunityLibraryItem::factory()->create(['tenant_id' => $tenant->id, 'kind' => 'service_note', 'event_id' => $event->id, 'session_id' => $session->id]);
+    $material = App\Models\EventMaterial::factory()->create(['tenant_id' => $tenant->id, 'event_id' => $event->id, 'file_path' => 'event-materials/history.pdf']);
+    $disk = Illuminate\Support\Facades\Storage::disk('public');
+    $disk->put($event->hero_image_path, 'original-hero');
+    $disk->put($material->file_path, 'original-deck');
+    $event->delete();
+    if ($path === 'manual') {
+        $host = eventSubdomainHost($tenant->slug);
+        $this->actingAs($user)->deleteJson('http://'.$host.'/events/'.$event->id.'/force-purge', ['confirm_name' => $event->name], ['HTTP_HOST' => $host])->assertUnprocessable();
+    } elseif ($path === 'scheduled') {
+        $this->artisan('events:purge-deleted')->assertSuccessful();
+    } else {
+        $connection = $event->getConnection();
+        $connection->beginTransaction();
+        try {
+            $event->forceDelete();
+            $this->fail('The retained history FK must reject direct purge.');
+        } catch (Illuminate\Database\QueryException) {
+        } finally {
+            $connection->rollBack();
+        }
+    }
+    expect(Event::withTrashed()->find($event->id))->not->toBeNull()->and($disk->get($event->hero_image_path))->toBe('original-hero')->and($disk->get($material->file_path))->toBe('original-deck');
+})->with(['manual', 'scheduled', 'direct']);
+
+it('keeps series choices discoverable outside the dated services result page', function () {
+    [$tenant,$member,$event] = serviceReader();
+    $this->withSession([PlatformAttendeeVerification::SESSION_KEY => ['email' => $member->email, 'expires_at' => now()->addHour()->timestamp]])
+        ->getJson(route('attendee.my.services.index', ['tenantSlug' => $tenant->slug, 'from' => '2099-01-01', 'event' => $event->id]))
+        ->assertOk()->assertJsonCount(0, 'services.data')->assertJsonPath('series.data.0.id', $event->id)->assertJsonPath('selected_series.id', $event->id);
+});

@@ -204,6 +204,9 @@ final class Event extends Model
     /** @var list<array{string, string}> */
     protected array $artifactAssetsForDeletion = [];
 
+    /** @var list<array{string,string}> */
+    protected array $uploadAssetsForDeletion = [];
+
     /**
      * The disk event uploads live on, matching the convention used at every
      * upload site.
@@ -794,6 +797,12 @@ final class Event extends Model
      */
     public function canBeDeleted(?string &$reason = null): bool
     {
+        if ($this->trashed() && CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->where('event_id', $this->id)->exists()) {
+            $reason = 'This archived event has retained community service notes and cannot be permanently purged.';
+
+            return false;
+        }
+
         $inFlightPayouts = $this->payouts()
             ->whereIn('status', [
                 EventPayout::STATUS_PROCESSING,
@@ -833,6 +842,12 @@ final class Event extends Model
         // up when force-deleting permanently.
         self::forceDeleted(function (self $event): void {
             app(\App\Services\Design\ArtifactArtworkCleanup::class)->afterDeletionCommit($event, $event->artifactAssetsForDeletion);
+            $assets = $event->uploadAssetsForDeletion;
+            $event->getConnection()->afterCommit(static function () use ($assets): void {
+                foreach ($assets as [$disk,$path]) {
+                    Helper::deleteFile($path, $disk);
+                }
+            });
         });
         self::deleting(function (self $event): void {
             if (! $event->isForceDeleting()) {
@@ -850,12 +865,12 @@ final class Event extends Model
 
             foreach ($event->materials()->pluck('file_path') as $path) {
                 if ($path) {
-                    Helper::deleteFile($path, $disk);
+                    $event->uploadAssetsForDeletion[] = [$disk, $path];
                 }
             }
 
             if ($event->hero_image_path) {
-                Helper::deleteFile($event->hero_image_path, $disk);
+                $event->uploadAssetsForDeletion[] = [$disk, $event->hero_image_path];
             }
         });
     }

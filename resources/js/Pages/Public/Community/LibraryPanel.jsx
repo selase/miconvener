@@ -129,7 +129,7 @@ export default function LibraryPanel({ tenantSlug, itemId = null, onExpired, onC
                                 {Math.ceil(detail.file.size / 1024)}KB
                             </p>
                             <a
-                                className="mt-3 inline-flex min-h-11 items-center bg-accent px-5 py-2 font-medium text-white"
+                                className="mt-3 inline-flex min-h-11 items-center bg-accent px-5 py-2 font-medium text-accent-ink"
                                 href={detail.file.url}
                                 target="_blank"
                                 rel="noopener noreferrer"

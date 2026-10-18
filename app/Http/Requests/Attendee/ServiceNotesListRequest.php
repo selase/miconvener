@@ -16,6 +16,6 @@ final class ServiceNotesListRequest extends FormRequest
     /** @return array<string,mixed> */
     public function rules(): array
     {
-        return ['page' => ['nullable', 'integer', 'min:1', 'max:100000'], 'event' => ['nullable', 'uuid'], 'from' => ['nullable', 'date_format:Y-m-d'], 'until' => ['nullable', 'date_format:Y-m-d', ...($this->filled('from') ? ['after_or_equal:from'] : [])]];
+        return ['series_page' => ['nullable', 'integer', 'min:1', 'max:100000'], 'series_search' => ['nullable', 'string', 'max:160'], 'page' => ['nullable', 'integer', 'min:1', 'max:100000'], 'event' => ['nullable', 'uuid'], 'from' => ['nullable', 'date_format:Y-m-d'], 'until' => ['nullable', 'date_format:Y-m-d', ...($this->filled('from') ? ['after_or_equal:from'] : [])]];
     }
 }

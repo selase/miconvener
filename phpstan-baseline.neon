@@ -67,18 +67,6 @@ parameters:
 			path: app/Console/Commands/ReconcilePayoutSchedulesCommand.php
 
 		-
-			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$tenant.
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/SendOccurrenceRemindersCommand.php
-
-		-
-			rawMessage: 'Parameter #1 $event of class App\Mail\Events\OccurrenceReminderMail constructor expects App\Models\Event, Illuminate\Database\Eloquent\Model given.'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/SendOccurrenceRemindersCommand.php
-
-		-
 			rawMessage: Using nullsafe method call on non-nullable type Carbon\CarbonImmutable. Use -> instead.
 			identifier: nullsafe.neverNull
 			count: 1
@@ -3525,12 +3513,6 @@ parameters:
 
 		-
 			rawMessage: 'Method App\Models\EventSession::activeAttendances() return type with generic class Illuminate\Database\Eloquent\Relations\HasMany does not specify its types: TRelatedModel, TDeclaringModel'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/EventSession.php
-
-		-
-			rawMessage: 'Method App\Models\EventSession::event() return type with generic class Illuminate\Database\Eloquent\Relations\BelongsTo does not specify its types: TRelatedModel, TDeclaringModel'
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/EventSession.php

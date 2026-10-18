@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { communityRequest } from '@/lib/community';
 import Select from '@/Components/Console/Select';
+import Button from '@/Components/Console/Button';
 import QuestionnaireFields from './QuestionnaireFields';
 
 export function QuestionnaireSummary({ summary, staff = false }) {
@@ -301,13 +302,9 @@ export default function QuestionnairesPanel({
                                 }
                             />
                         ))}
-                        <button
-                            disabled={!canAnswer || busy}
-                            className="min-h-11 bg-accent px-5 py-3 text-white disabled:opacity-40"
-                            type="submit"
-                        >
+                        <Button variant="primary" disabled={!canAnswer || busy} type="submit">
                             {busy ? 'Sending…' : 'Send response'}
-                        </button>
+                        </Button>
                     </form>
                     <QuestionnaireSummary summary={data.results} />
                 </>

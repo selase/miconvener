@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task using the owner's established native approach. Steps use checkbox (`- [ ]`) syntax. One fresh whole-branch review at the end; no per-task reviewers or redundant second blanket review.
 
-**Status:** Owner approved native implementation and all recommendations2026-10-18. Implementation in progress on `codex/community-7`; no push, merge, deployment or production change authorised.
+**Status:** Implemented and reviewed locally on `codex/community-7` (owner-approved native approach). Owner acceptance and approved upload/full remote CI remain before merge/deployment. No production change or rollout.
 
 **Goal:** Let associations share standing documents, churches publish notes for individual recurring services, and organisations ask their audience questions through the existing `/my` app, without requiring dues or event registration for organisation-owned content.
 
@@ -119,14 +119,66 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 
 **Files:** Modify parent spec, roadmap and this plan; all slice-owned tests and assets as needed.
 
-- [ ] Self-review all Review Focus cases and touchpoints (permissions/seeding/entitlements/storage/routes/app/navigation/empty/errors/cache/docs). Record a Self-Review Report in this plan.
-- [ ] One fresh whole-branch review of implemented slices against their approved base. Fix Important/Critical findings with failing regressions in one grouped pass. No second blanket review; record manual limits and deferred minors honestly.
-- [ ] Run affected suites, Pint, static0/no baseline growth, lint/test/build, event material/recurrence/poll and attendee-portal guards. After authorised push, one full remote CI gate. No overlapping DB suites and no duplicate full local run just to repeat CI.
+- [x] Self-review all Review Focus cases and touchpoints (permissions/seeding/entitlements/storage/routes/app/navigation/empty/errors/cache/docs). Record a Self-Review Report in this plan.
+- [x] One fresh whole-branch review of implemented slices against their approved base. Fix Important/Critical findings with failing regressions in one grouped pass. No second blanket review; record manual limits and deferred minors honestly.
+- [ ] External gate: one full remote CI after authorised upload. Local affected suites, Pint, static0/no baseline growth, lint/test/build, event material/recurrence/poll and attendee-portal guards completed; exact evidence below. Do not repeat a full local run just to duplicate CI.
 - [ ] Owner reviews staff upload/publication, association constitution, church morning/evening notes, no-dues member/representative/member-context poll, revoke/expired proof and actual device/zoom behaviour. Use approved local QA fixtures only; real recipients and production content need separate authorisation.
 - [ ] Update roadmap state with exact evidence and request merge/deploy approval. If approved later, enable the deployed slice for Purpledot under standing rollout instruction, preserve all other organisations, verify private storage and permissions before any real upload. Disabling starts must preserve history; never delete private documents or responses as rollback.
 
+## Self-Review Report
+
+### Touchpoints updated
+
+- [x] AGENTS.md — organisation content, current access, private streams, replay keys and questionnaire ownership rules recorded.
+- [x] Seeders — three permissions in PermissionsSeeder/RolePermissions/TENANT_SAFE; distinct package entitlements and missing-only migration propagation. Existing prices, administrator removals and rollout switches preserved.
+- [x] Navigation — authorised staff Library/Polls sidebar entries, occurrence-level Programme shortcut and organisation Library/Services/Polls page-level links inside the same five app destinations.
+- [x] Permissions — separate staff publishing/results/export permissions; member reads always use current active membership/group and native verified contexts. Representative read-only labels and self-only responses.
+- [x] Config — private named local disk; immutable stored production private disk/path and tenant prefix. No public object links.
+- [x] Tests — access/download/version/upload/retry/permission/rollout, dated notes, ten answer types, privacy and unchanged event/app contracts. Exact final evidence below.
+- Memory files: N/A; the approved roadmap/spec/plan and execution ledger are the repository handover. No separate undocumented memory dependency.
+- .env.example: N/A; no new environment variable or dependency. Existing production private storage must be verified before real-document rollout.
+
+### UI Gap Analysis
+
+- Discoverability: present from native console and Communities; Programme shortcut reuses the same service-note editor.
+- Empty state: present; staff creation controls, neutral member empty state and retained-history guidance.
+- Permission gating: present in both UI and direct endpoints. Poll results/export require their own permission.
+- Loading/errors: present with request cancellation, retry, 403/404 handling and proof-expiry clearing. Validation retains typed questionnaire answers; clearing optional choices omits an empty response.
+- Responsive: native local browser exercised390px and1280px without horizontal overflow. Actual physical devices and actual200% browser zoom remain owner acceptance, not claimed passed.
+- Accessibility: associated native labels, fieldsets, keyboard focus and semantic status/alerts present. All accent actions use native contrast ink after the review fix. This is focused acceptance, not a complete assistive-technology certification.
+
+### Solved (auto-fixed)
+
+- Current-version authorised snapshot prevents replaced editions being served from stale models. Malformed audience selectors fail closed in list/detail/file paths.
+- Empty native search query, create kind default, direct representative label and exact occurrence preselection corrected with regressions.
+- Library lost-response replays use durable tenant/actor-scoped keys and content fingerprints. Changed reuse is409; old retries do not revert later edits or duplicate storage.
+- Review Important1: archived events with any library history refuse manual/scheduled purge; event upload cleanup runs only after successful deletion commit. Rejected/direct FK-raced deletion retains material/hero bytes. Archiving/restoring remains available.
+- Review Important2: transaction-error cleanup deletes only a confirmed unreferenced object. A committed edition survives a lost acknowledgement; unavailable database outcome deliberately retains the private object for reconciliation.
+- Review Important3: Library/Services attachments use text-accent-ink; questionnaire submit uses native primary Button.
+- Review minors: service lists consume the eager-loaded archived-safe event; independent bounded/searchable series choices survive empty date results and include the selected series.
+- Native Console props, nullable date validation, question-array list validation and explicit payload/factory types corrected without baseline growth or new packages.
+
+### Recommended for user decision
+
+- Before real-document rollout, choose aggregate storage allowances for packages; current20MiB/file and any configured storage_bytes limit are enforced. No allowance or price was invented. Recommendation: configure explicit tier byte limits before inviting real uploads; entitlement configuration/acceptance is a small follow-up once amounts are chosen.
+- Actual-device/zoom acceptance and the owner’s staff/member walkthrough remain. Recommendation: review the local Library, two service occurrences and volunteer questionnaire before authorising upload/CI and merge.
+- When a database commit outcome cannot be established, retaining a private object is safer than deleting a committed edition. There is no automatic orphan pruning in this milestone. Recommendation: an explicit dry reconciliation/audit before deleting any uncertain object; defer a dedicated sweeper until operational volume warrants it.
+
+### Not gaps
+
+- No dues or weekly event registration is required for organisation content; existing attendee-only material/poll verification is unchanged.
+- No public/follower library, anonymous ballots, elections, rich HTML, hosted audio/video or automatic message sending: deliberately outside the approved scope.
+- Downloaded files cannot be remotely erased; subsequent reads recheck access and private content never enters the ticket-only offline cache.
+- Remote CI, production private-storage verification and rollout remain pending approval. The branch contains the reviewed, still-unmerged M6 and dues-safeguard ancestry; integration must account for that stack.
+
+### Verification and review evidence
+
+- Native implementation, one fresh whole-M7 review of bd04734b..90aedd19. Reviewer found no Critical issues, three Important and two Minor; all addressed in one grouped fix pass. No second blanket review.
+- Before grouped fixes: broad affected PHP204pass/2 native-component failures,835assertions; both corrected and focused Console5/5. Final payload/service/replay25/25,80assertions. Full JavaScript447/447; optional-answer regression subsequently6/6. Full static0 without baseline growth. Pint/lint/build pass; rebuilt assets tracked.
+- Grouped fixes: PHP43/43,181assertions,148.13s covering manual/scheduled/direct purge bytes, normal file cleanup/deletion, uncertain commit, upload/version cleanup, series scope and N+1 budget. Console5/5,6assertions after final native Button integration. Affected JS15/15; lint/build/Pint pass. Final full static check is recorded in the roadmap. The EventSession-to-Event relationship contract also removes three obsolete baseline entries; no new suppression.
+- Final local browser: selected service series remains available when a2099 date filter yields no rows;1280px no overflow. Native primary palette measured9.44:1 before disabled opacity (the pilot membership has already answered); no claim about disabled contrast/physical-device certification. One browser locator used an overly strict wrapping-label selector and timed out; actual role-based selection and filter journey passed.
+- Local QA only: synthetic benefits-qa constitution, distinct morning/evening notes and volunteer survey. Staff published/opened; current no-dues member explicitly answered; staff saw identifiable response; member results hidden then aggregate publication verified. No real recipients, external sends, payments, production data, rollout or settlement changes.
+
 ## Plan self-review
 
-Parent-spec organisation Library and polls/surveys remain covered; service notes add occurrence context without replacing existing event tools. Each Review Focus case maps to tests in its owning task. Shared interfaces are named once and consumed by later tasks; storage/version/privacy rules apply to service attachments too. No dues/Giving/payment path is used to authorise content.
-
-Open decisions are explicitly the seven recommendations above. In particular, active-only content, representative reading, member-scoped identified polling, file formats and archived-note retention are proposed policies, not implementation assumptions hidden in code. If broader follower/public access or anonymous surveys are wanted, revise audience/identity tests before building. Draft plan only: no M7 tests/application code run or changed.
+The parent organisation Library/polls vision and individual service-note request are implemented through separate organisation records and shared native policies. Existing event tables, verification and money paths were preserved. Owner-approved recommendations are now implementation contracts in the parent spec. Remaining external gates are owner acceptance, authorised upload/full CI and later integration/deployment approval.
