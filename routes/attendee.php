@@ -21,6 +21,9 @@ Route::prefix('my')->group(function (): void {
     Route::get('/session', [PlatformAttendeeAccessController::class, 'session'])->middleware('platform_attendee_verified')->name('attendee.my.session');
 
     Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+        Route::get('/communities/{tenantSlug}/library', [App\Http\Controllers\Public\CommunityLibraryController::class, 'index'])->name('attendee.my.library.index');
+        Route::get('/communities/{tenantSlug}/library/{item}', [App\Http\Controllers\Public\CommunityLibraryController::class, 'show'])->whereUuid('item')->name('attendee.my.library.show');
+        Route::get('/communities/{tenantSlug}/library/{item}/file', [App\Http\Controllers\Public\CommunityLibraryController::class, 'file'])->whereUuid('item')->name('attendee.my.library.file');
         Route::get('/inbox', [App\Http\Controllers\Public\MyInboxController::class, 'index'])->name('attendee.my.inbox.index');
         Route::get('/communities/{tenantSlug}/inbox', [App\Http\Controllers\Public\MyInboxController::class, 'organisation'])->name('attendee.my.inbox.organisation');
         Route::post('/communities/{tenantSlug}/inbox/read-all', [App\Http\Controllers\Public\MyInboxController::class, 'readAll'])->name('attendee.my.inbox.read-all');

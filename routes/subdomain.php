@@ -322,6 +322,13 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
 
+    Route::get('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'index'])->name('tenant.community.library.index');
+    Route::post('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'store'])->name('tenant.community.library.store');
+    Route::post('community/library/{item}', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'update'])->whereUuid('item')->name('tenant.community.library.update');
+    Route::post('community/library/{item}/withdraw', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'withdraw'])->whereUuid('item')->name('tenant.community.library.withdraw');
+    Route::get('community/library/{item}/versions', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'history'])->whereUuid('item')->name('tenant.community.library.history');
+    Route::get('community/library/{item}/versions/{version}/file', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'version'])->whereUuid(['item', 'version'])->name('tenant.community.library.version');
+
     Route::get('community/money/giving', [App\Http\Controllers\Tenant\GivingFundController::class, 'index'])->name('tenant.community.money.giving.index');
     Route::get('community/money/giving/report', [App\Http\Controllers\Tenant\GivingReportController::class, 'index'])->name('tenant.community.money.giving.report');
 

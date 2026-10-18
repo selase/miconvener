@@ -53,6 +53,13 @@ export const NAV_GROUPS = [
                 permission: 'send_community_messages',
             },
             {
+                label: 'Library',
+                href: 'tenant.community.library.index',
+                icon: 'FileText',
+                feature: 'community_library_history',
+                permission: 'manage_community_library',
+            },
+            {
                 label: 'Giving',
                 href: 'tenant.community.money.giving.index',
                 icon: 'HandCoins',

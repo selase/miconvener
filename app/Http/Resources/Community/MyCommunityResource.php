@@ -40,6 +40,7 @@ final class MyCommunityResource extends JsonResource
         return ['id' => $this->id, 'slug' => $this->slug, 'name' => $this->name, 'logo_url' => $this->logo_url,
             'following' => ['email' => $following->isFollowing($this->resource, $session, 'email'), 'sms' => $following->isFollowing($this->resource, $session, 'sms')],
             'actions' => ['follow' => $this->followingEnabled(), 'join' => $canJoin,
+                'library' => app(\App\Services\Community\CommunityLibraryRollout::class)->available($this->resource) && app(\App\Services\Community\CommunityContentAccess::class)->readers($session, $this->resource, ['kind' => 'all_members'])->isNotEmpty(),
                 'join_mode' => $settings->join_mode]];
     }
 }

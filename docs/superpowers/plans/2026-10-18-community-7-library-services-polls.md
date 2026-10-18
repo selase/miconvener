@@ -78,10 +78,10 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 
 **Interfaces:** Storage `put(Tenant $tenant, UploadedFile $file): array{disk:string,path:string,mime:string,size:int,checksum:string}` uses server-owned prefix/quota; `stream(CommunityLibraryVersion $version): StreamedResponse` only called after policy. GET `/my/communities/{tenant}/library`, `/library/{item}`, `/library/{item}/file`; list paginated25, current published version only. Staff create/edit/publish/withdraw and upload a new immutable edition; transaction changes current-version pointer atomically, records operator, cleans only own failed uploads, never deletes the prior edition on failure. No automatic announcement send.
 
-- [ ] Write failing tests for MIME/20MiB/quota, cross-tenant selector/file ID, absent file, streamed private headers, version replacement/revocation between list+download, signed-out/proof expiry, safe PDF filename and attachment disposition. Test malicious HTML as text; missing permission; expired proof clears UI.
-- [ ] Run the three new suites; confirm failure for the intended missing surface.
-- [ ] Implement validated APIs, actual Library navigation, staff editor and page-level member list/detail. Show edition/date/type/size, search title, empty CTA for staff and neutral reader empty state, loading/retry403/404 handling. Link from Communities without adding a sixth app tab.
-- [ ] Run affected PHP/Vitest and existing MemberAccess/app/inbox suites; verify390px/desktop, light/dark and keyboard. Build assets; tick and commit.
+- [x] Write failing tests for MIME/20MiB/quota, cross-tenant selector/file ID, absent file, streamed private headers, version replacement/revocation between list+download, signed-out/proof expiry, safe PDF filename and attachment disposition. Test malicious HTML as text; missing permission; expired proof clears UI.
+- [x] Run the three new suites; confirm failure for the intended missing surface.
+- [x] Implement validated APIs, actual Library navigation, staff editor and page-level member list/detail. Show edition/date/type/size, search title, empty CTA for staff and neutral reader empty state, loading/retry403/404 handling. Link from Communities without adding a sixth app tab.
+- [x] Run affected PHP/Vitest and existing MemberAccess/app/inbox suites; verify390px/desktop, light/dark and keyboard. Build assets; tick and commit.
 
 ### Task 3: Notes for a particular recurring church service (7b)
 

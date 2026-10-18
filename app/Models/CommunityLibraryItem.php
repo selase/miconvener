@@ -22,6 +22,8 @@ final class CommunityLibraryItem extends Model
 
     protected $connection = 'landlord';
 
+    protected $attributes = ['kind' => 'document', 'state' => 'draft'];
+
     protected $fillable = ['tenant_id', 'kind', 'title', 'description', 'plain_text', 'audience', 'state', 'release_at', 'current_version_id', 'event_id', 'session_id', 'created_by'];
 
     protected $hidden = ['created_by'];

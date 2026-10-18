@@ -15,6 +15,6 @@ final class CommunityLibraryVersionFactory extends Factory
 
     public function definition(): array
     {
-        return ['item_id' => CommunityLibraryItem::factory(), 'tenant_id' => fn (array $attributes) => CommunityLibraryItem::withoutGlobalScopes()->findOrFail($attributes['item_id'])->tenant_id, 'edition' => '2026 edition', 'disk' => 'community-library-local', 'path' => 'community-library/'.fake()->uuid().'.pdf', 'mime' => 'application/pdf', 'size' => 20, 'checksum' => hash('sha256', 'test file')];
+        return ['item_id' => CommunityLibraryItem::factory(), 'tenant_id' => fn (array $attributes) => CommunityLibraryItem::withoutGlobalScopes()->findOrFail($attributes['item_id'])->tenant_id, 'edition' => '2026 edition', 'disk' => 'community-library-local', 'path' => fn (array $attributes) => 'community-library/'.$attributes['tenant_id'].'/'.fake()->uuid().'.pdf', 'mime' => 'application/pdf', 'size' => 20, 'checksum' => hash('sha256', 'test file')];
     }
 }

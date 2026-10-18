@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { communityRequest } from '@/lib/community';
+import LibraryPanel from './LibraryPanel';
 import FollowControl from './FollowControl';
 import Join from './Join';
 import MemberClaim from './MemberClaim';
@@ -15,6 +16,12 @@ export default function CommunitiesPanel({
     onExpired,
     onPhoneRemoved,
 }) {
+    const [contentLocation, setContentLocation] = useState(() => new URL(window.location.href));
+    useEffect(() => {
+        const changed = () => setContentLocation(new URL(window.location.href));
+        window.addEventListener('popstate', changed);
+        return () => window.removeEventListener('popstate', changed);
+    }, []);
     const [revision, setRevision] = useState(0);
     const [confirmPhoneRemoval, setConfirmPhoneRemoval] = useState(false);
     const [open, setOpen] = useState(initiallyOpen);
@@ -209,6 +216,27 @@ export default function CommunitiesPanel({
             setBusy(false);
         }
     }
+    if (
+        appPage &&
+        contentLocation.searchParams.get('community_view') === 'library' &&
+        contentLocation.searchParams.get('organiser')
+    ) {
+        const slug = contentLocation.searchParams.get('organiser');
+        return (
+            <LibraryPanel
+                key={slug}
+                tenantSlug={slug}
+                itemId={contentLocation.searchParams.get('library_item')}
+                onExpired={onExpired}
+                onClose={() => {
+                    window.location.assign(
+                        `/my?organiser=${encodeURIComponent(slug)}&section=communities`
+                    );
+                }}
+            />
+        );
+    }
+
     return (
         <section
             ref={section}
@@ -329,6 +357,14 @@ export default function CommunitiesPanel({
                                             )}
                                         </div>
                                         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2">
+                                            {community.actions?.library && (
+                                                <a
+                                                    className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-medium text-ink hover:text-accent"
+                                                    href={`/my?organiser=${encodeURIComponent(community.slug)}&section=communities&community_view=library`}
+                                                >
+                                                    Library
+                                                </a>
+                                            )}
                                             {inbox && (
                                                 <button
                                                     type="button"
