@@ -105,6 +105,13 @@ export const NAV_GROUPS = [
                 permission: 'manage_venue',
             },
             {
+                label: 'Staff bookings',
+                href: 'tenant.venue.internal-bookings.index',
+                icon: 'UserCheck',
+                feature: 'staff_room_booking',
+                permission: 'manage_room_bookings',
+            },
+            {
                 label: 'Inquiries & leads',
                 href: 'tenant.venue.inquiries.index',
                 icon: 'Inbox',

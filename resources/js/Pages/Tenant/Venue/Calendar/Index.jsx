@@ -324,6 +324,10 @@ export default function VenueCalendarIndex({
                                 <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
                                 <span>Blackout Block</span>
                             </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+                                <span>Staff booking</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -378,7 +382,9 @@ export default function VenueCalendarIndex({
                                             const isBlocked = ev.is_blocked;
 
                                             let badgeStyle = 'bg-amber-500/10 text-amber-700 border-amber-300 dark:border-amber-800 dark:text-amber-400';
-                                            if (isConfirmed) {
+                                            if (ev.kind === 'internal') {
+                                                badgeStyle = `bg-sky-500/10 text-sky-700 border-sky-300 dark:border-sky-800 dark:text-sky-400${isConfirmed ? '' : ' border-dashed'}`;
+                                            } else if (isConfirmed) {
                                                 badgeStyle = 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:border-emerald-800 dark:text-emerald-400';
                                             } else if (isBlocked) {
                                                 badgeStyle = 'bg-slate-500/10 text-slate-700 border-slate-300 dark:border-slate-700 dark:text-slate-300 border-dashed';
@@ -396,7 +402,7 @@ export default function VenueCalendarIndex({
                                                         <span className="truncate">{ev.space_title}</span>
                                                     </div>
                                                     <div className="truncate text-[10px] opacity-80">
-                                                        {ev.title}
+                                                        {ev.kind === 'internal' ? [ev.department, ev.purpose].filter(Boolean).join(' · ') || ev.title : ev.title}
                                                     </div>
                                                 </button>
                                             );
@@ -449,6 +455,17 @@ export default function VenueCalendarIndex({
                                 {selectedEvent.status.replace('_', ' ')}
                             </StatusPill>
                         </div>
+                        {selectedEvent.kind === 'internal' && (
+                            <div className="rounded-lg border border-border bg-surface-sunken/30 p-3 text-xs space-y-1">
+                                <div className="font-semibold text-ink">Staff booking, free of charge</div>
+                                <div className="text-ink">{selectedEvent.planner_name}</div>
+                                {selectedEvent.department && <div className="text-ink-secondary">{selectedEvent.department}</div>}
+                                {selectedEvent.purpose && <div className="text-ink-secondary">{selectedEvent.purpose}</div>}
+                                <a className="text-accent underline" href={route('tenant.venue.internal-bookings.index')}>
+                                    Manage staff bookings
+                                </a>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-3 text-xs">
                             <div className="rounded-lg border border-border bg-surface-sunken/40 p-2.5">

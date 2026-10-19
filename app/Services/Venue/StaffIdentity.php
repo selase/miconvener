@@ -63,6 +63,31 @@ final class StaffIdentity
         ], MemberStatusEnum::Active);
     }
 
+    /**
+     * Tag an existing member of this organisation with this address as Staff,
+     * or add them as a member without dues. For a team member booking on
+     * behalf of someone who is not tagged yet.
+     */
+    public function tagOrEnrol(Tenant $tenant, string $name, string $email): Member
+    {
+        $email = mb_strtolower(mb_trim($email));
+        $member = Member::query()->where('tenant_id', $tenant->id)->whereRaw('lower(btrim(email)) = ?', [$email])->orderBy('id')->first();
+
+        if ($member !== null) {
+            $member->update(['is_staff' => true]);
+
+            return $member;
+        }
+
+        return $this->enrollment->create($tenant, [
+            'name' => $name,
+            'email' => $email,
+            'is_staff' => true,
+            'membership_type_id' => $this->staffType($tenant)->id,
+            'joined_on' => now()->toDateString(),
+        ], MemberStatusEnum::Active);
+    }
+
     private function taggedMember(Tenant $tenant, Session $session): ?Member
     {
         if (! $tenant->featureEnabled(FeatureService::FEATURE_STAFF_ROOM_BOOKING)) {

@@ -113,6 +113,9 @@ final class VenueCalendarController extends Controller
                 'total_amount_pesewas' => $b->total_amount_pesewas,
                 'deposit_required_pesewas' => $b->deposit_required_pesewas,
                 'is_blocked' => $isBlocked,
+                'kind' => $b->kind,
+                'department' => $b->department,
+                'purpose' => $b->purpose,
                 'host_notes' => $b->host_notes,
                 'quote_valid_until' => $b->quote_valid_until?->toIso8601String(),
             ];

@@ -135,10 +135,11 @@
 - Consumes: `InternalBookings` (Task 6). Every route requires `manage room bookings` and the feature.
 - Produces: routes `tenant.venue.internal-bookings.{index,store,approve,decline,cancel}`; room settings fields `audience` and `requires_approval`; calendar colours internal bookings and shows department and purpose; filters by room and kind; a member search limited to Staff-tagged members; a "Staff" toggle on the members list and import.
 
-- [ ] **Step 1: Failing tests:** a permitted team member lists, creates on behalf, approves and declines; a user without the permission gets 403 on each; an organisation without the feature gets 403; the room form saves `audience` and `requires_approval`; the calendar payload includes internal bookings with `kind`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement controllers, requests and pages following the existing venue console patterns; run `npm run lint`, `npm run test`, `npm run build` and commit `public/build`.
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(bookings): console for internal bookings and room audience`.
+- [x] **Step 1: Failing tests:** a permitted team member lists, creates on behalf, approves and declines; a user without the permission gets 403 on each; an organisation without the feature gets 403; the room form saves `audience` and `requires_approval`; the calendar payload includes internal bookings with `kind`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement controllers, requests and pages following the existing venue console patterns; run `npm run lint`, `npm run test`, `npm run build` and commit `public/build`.
+- [x] **Step 4:** Rerun; PASS. Commit `feat(bookings): console for internal bookings and room audience`.
+  Ruling: the Staff tag is managed on the Staff bookings page (add by name and email, remove) through `InternalBookingController::storeStaff/destroyStaff`, not as a checkbox on the Community People form or its import. Those pages have their own duplicate-review flow and tests and belong to the shipped Community milestones; touching them for one checkbox risked regressions. A Staff column on the People page and a staff column in the import remain possible follow-ups. Room audience and approval are on the existing space form, shown only on a plan with the feature (or when a room is already staff-only, so an organisation that left Enterprise can make it public).
 
 ### Task 8: Organisation email domains
 
