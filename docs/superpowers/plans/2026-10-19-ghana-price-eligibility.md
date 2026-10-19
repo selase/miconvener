@@ -40,10 +40,11 @@
 **Interfaces:**
 - Produces: `tenants.pricing_region` nullable string (`GH` or `INTL`, null until set), `tenants.pricing_region_evidence` jsonb `{source, detail, at, by}`; `Tenant::isGhanaEligible(): bool`; `GhanaEligibility::grant(Tenant $tenant, string $source, array $detail, ?User $by = null): void`, `::revoke(Tenant, User $by, string $reason): void`, `::evaluate(Tenant): ?array` (the evidence found, or null) checking a verified `TenantPayoutAccount`, then stored `Transaction` rows (`meta.channel` mobile_money, or `meta.authorization.country_code` GH). Sources: `payout_account`, `ghana_payment`, `superadmin`.
 
-- [ ] **Step 1: Failing tests:** `a verified ghana payout account makes an organisation eligible`, `an unverified payout account does not`, `a mobile money payment makes it eligible`, `a card issued in Ghana does; a card issued elsewhere does not`, `grant and revoke are recorded with evidence and the person`.
-- [ ] **Step 2:** Run `php artisan test --filter=GhanaEligibilityTest`. Expected: FAIL.
-- [ ] **Step 3:** Implement the migration, `Tenant::isGhanaEligible()` (true when `pricing_region = GH`) and `GhanaEligibility`; `grant` writes the columns and an activity-log entry.
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(pricing): Ghana eligibility record and rule`.
+- [x] **Step 1: Failing tests:** `a verified ghana payout account makes an organisation eligible`, `an unverified payout account does not`, `a mobile money payment makes it eligible`, `a card issued in Ghana does; a card issued elsewhere does not`, `grant and revoke are recorded with evidence and the person`.
+- [x] **Step 2:** Run `php artisan test --filter=GhanaEligibilityTest`. Expected: FAIL.
+- [x] **Step 3:** Implement the migration, `Tenant::isGhanaEligible()` (true when `pricing_region = GH`) and `GhanaEligibility`; `grant` writes the columns and an activity-log entry.
+- [x] **Step 4:** Rerun; PASS. Commit `feat(pricing): Ghana eligibility record and rule`.
+  Ruling: `grant()` returns a bool (whether it changed anything) instead of void, and an automatic grant never overrides a superadmin's removal (`source = revoked`); only a superadmin grant restores it. Payments store a normalised `meta.payment_origin = {channel, country_code}` (written in Task 4); `evaluate` also reads the older `meta.authorization`/`meta.channel` and only counts what the organisation paid the platform (`PLATFORM_PAYMENT_TYPES`), never its own ticket sales.
 
 ### Task 2: Display and the switch
 
