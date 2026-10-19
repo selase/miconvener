@@ -125,6 +125,90 @@ function StaffList({ staff }) {
     );
 }
 
+function DomainList({ domains }) {
+    const form = useForm({ domain: '' });
+
+    const add = (event) => {
+        event.preventDefault();
+        form.post(route('tenant.venue.internal-bookings.domains.store'), {
+            preserveScroll: true,
+            onSuccess: () => form.reset(),
+        });
+    };
+
+    const check = (domain) =>
+        router.post(
+            route('tenant.venue.internal-bookings.domains.verify'),
+            { domain },
+            { preserveScroll: true }
+        );
+
+    const remove = (domain) => {
+        if (!window.confirm(`Remove ${domain}? Addresses there will no longer count as staff.`)) {
+            return;
+        }
+        router.delete(route('tenant.venue.internal-bookings.domains.destroy'), {
+            data: { domain },
+            preserveScroll: true,
+        });
+    };
+
+    return (
+        <div className="space-y-4">
+            {domains.map((entry) => (
+                <div
+                    key={entry.domain}
+                    className="rounded-lg border border-border bg-surface p-4 text-sm"
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <span className="font-medium text-ink">{entry.domain}</span>
+                            <span
+                                className={`ml-2 rounded-full px-2 py-0.5 text-xs ${entry.verified ? 'bg-success-soft text-success-fg' : 'bg-warning-soft text-warning-fg'}`}
+                            >
+                                {entry.verified ? 'Verified' : 'Waiting for the record'}
+                            </span>
+                        </div>
+                        <div className="flex gap-2">
+                            {!entry.verified && (
+                                <Button onClick={() => check(entry.domain)}>Check</Button>
+                            )}
+                            <Button onClick={() => remove(entry.domain)}>Remove</Button>
+                        </div>
+                    </div>
+                    {!entry.verified && (
+                        <dl className="mt-3 space-y-1 text-xs text-ink-secondary">
+                            <div>Add a TXT record at your DNS provider:</div>
+                            <div>
+                                <dt className="inline font-medium text-ink">Name </dt>
+                                <dd className="inline break-all font-mono">{entry.record_name}</dd>
+                            </div>
+                            <div>
+                                <dt className="inline font-medium text-ink">Value </dt>
+                                <dd className="inline break-all font-mono">{entry.record_value}</dd>
+                            </div>
+                        </dl>
+                    )}
+                </div>
+            ))}
+            <form onSubmit={add} className="flex flex-wrap items-start gap-2">
+                <div className="min-w-[14rem] flex-1">
+                    <Input
+                        aria-label="Email domain"
+                        placeholder="ugmc.edu.gh"
+                        value={form.data.domain}
+                        onChange={(e) => form.setData('domain', e.target.value)}
+                        error={form.errors.domain}
+                    />
+                </div>
+                <Button type="submit" disabled={form.processing}>
+                    Add domain
+                </Button>
+            </form>
+        </div>
+    );
+}
+
 function BookForStaff({ rooms, staff, limits }) {
     const [mode, setMode] = useState(staff.length > 0 ? 'existing' : 'new');
     const form = useForm({
@@ -286,7 +370,14 @@ function BookForStaff({ rooms, staff, limits }) {
     );
 }
 
-export default function InternalBookingsIndex({ pending, upcoming, rooms, staff, limits }) {
+export default function InternalBookingsIndex({
+    pending,
+    upcoming,
+    rooms,
+    staff,
+    domains,
+    limits,
+}) {
     const [declining, setDeclining] = useState(null);
 
     const act = (name, booking) =>
@@ -413,6 +504,18 @@ export default function InternalBookingsIndex({ pending, upcoming, rooms, staff,
                         Staff who can book your rooms
                     </h2>
                     <StaffList staff={staff} />
+                </section>
+
+                <section aria-labelledby="domain-heading" className="space-y-3">
+                    <h2 id="domain-heading" className="text-sm font-semibold text-ink">
+                        Your email domain (optional)
+                    </h2>
+                    <p className="text-sm text-ink-secondary">
+                        If your organisation has its own email domain, people who verify an address
+                        there count as staff without being added one by one. You prove you own the
+                        domain by publishing a record first.
+                    </p>
+                    <DomainList domains={domains} />
                 </section>
 
                 <section aria-labelledby="book-heading" className="space-y-3">

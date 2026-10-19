@@ -150,10 +150,11 @@
 **Interfaces:**
 - Produces: `StaffDomains::add(Tenant, string $domain): array` (returns the TXT record to publish: name `_miconvener-staff.<domain>`, value a random token), `::verify(Tenant, string $domain): bool` (DNS TXT lookup via an injectable resolver so tests fake it), `::remove(Tenant, string $domain): void`, `::matches(Tenant $tenant, string $email): bool` (true only for a **verified** domain and an exact domain match, not a subdomain suffix trick such as `evilugmc.edu.gh`).
 
-- [ ] **Step 1: Failing tests:** `an unverified domain grants nothing`, `a verified domain matches its addresses`, `lookalike domains and subdomains do not match`, `verification fails when the TXT record is missing or wrong`, `removing a domain stops granting staff at once`, `a domain claimed by another organisation cannot be added`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement the service and settings UI; replace Task 4's stub.
-- [ ] **Step 4:** Rerun with `StaffIdentityTest`; PASS. Commit `feat(bookings): DNS-proven staff email domains`.
+- [x] **Step 1: Failing tests:** `an unverified domain grants nothing`, `a verified domain matches its addresses`, `lookalike domains and subdomains do not match`, `verification fails when the TXT record is missing or wrong`, `removing a domain stops granting staff at once`, `a domain claimed by another organisation cannot be added`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement the service and settings UI; replace Task 4's stub.
+- [x] **Step 4:** Rerun with `StaffIdentityTest`; PASS. Commit `feat(bookings): DNS-proven staff email domains`.
+  Ruling: the DNS lookup sits behind a contract (`App\Contracts\DnsTxtResolver`, native implementation `NativeDnsTxtResolver`, bound in `AppServiceProvider`) so tests fake the network; the domain management UI lives on the Staff bookings page with the Staff list, consistent with Task 7's ruling. The proof record is `_miconvener-staff.<domain>` TXT `miconvener-staff-verification=<token>`. A domain proved by another organisation is refused at add time and at verify time (whoever proves it first keeps it).
 
 ### Task 9: Staff in `/my`
 

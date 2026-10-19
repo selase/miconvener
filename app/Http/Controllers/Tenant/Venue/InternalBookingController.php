@@ -15,6 +15,7 @@ use App\Models\VenueBooking;
 use App\Services\Tenancy\FeatureService;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Venue\InternalBookings;
+use App\Services\Venue\StaffDomains;
 use App\Services\Venue\StaffIdentity;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -31,7 +32,7 @@ final class InternalBookingController extends Controller
 {
     public function __construct(private readonly TenantContext $tenantContext, private readonly InternalBookings $bookings) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request, StaffDomains $domains): Response
     {
         $tenant = $this->tenant();
         $this->authorizeAccess($request, $tenant);
@@ -59,6 +60,12 @@ final class InternalBookingController extends Controller
                 ->map(fn (StoreListing $room): array => ['id' => $room->id, 'title' => $room->title, 'audience' => $room->audience])->values(),
             'staff' => Member::query()->where('tenant_id', $tenant->id)->where('is_staff', true)->where('status', '!=', MemberStatusEnum::Exited->value)
                 ->orderBy('name')->get(['id', 'name', 'email'])->map(fn (Member $m): array => ['id' => $m->id, 'name' => $m->name, 'email' => $m->email])->values(),
+            'domains' => collect($tenant->staff_email_domains ?? [])->map(fn (array $entry): array => [
+                'domain' => $entry['domain'],
+                'verified' => ($entry['verified_at'] ?? null) !== null,
+                'record_name' => $domains->record($entry)['name'],
+                'record_value' => $domains->record($entry)['value'],
+            ])->values(),
             'limits' => [...config('bookings.staff.defaults'), ...($tenant->booking_limits ?? [])],
         ]);
     }
@@ -109,6 +116,35 @@ final class InternalBookingController extends Controller
         $this->bookings->cancel($this->find($booking), $request->user());
 
         return back()->with('success', 'Booking cancelled.');
+    }
+
+    public function storeDomain(Request $request, StaffDomains $domains): RedirectResponse
+    {
+        $tenant = $this->tenant();
+        $this->authorizeAccess($request, $tenant);
+        $record = $domains->add($tenant, (string) $request->validate(['domain' => ['required', 'string', 'max:253']])['domain']);
+
+        return back()->with('success', "Publish a TXT record named {$record['name']} with the value shown below, then choose Check.");
+    }
+
+    public function verifyDomain(Request $request, StaffDomains $domains): RedirectResponse
+    {
+        $tenant = $this->tenant();
+        $this->authorizeAccess($request, $tenant);
+        $domain = (string) $request->validate(['domain' => ['required', 'string', 'max:253']])['domain'];
+
+        return $domains->verify($tenant, $domain)
+            ? back()->with('success', "{$domain} is verified. People who verify an address there now count as staff.")
+            : back()->with('error', 'We could not find that record yet. DNS changes can take a while to spread; try again shortly.');
+    }
+
+    public function destroyDomain(Request $request, StaffDomains $domains): RedirectResponse
+    {
+        $tenant = $this->tenant();
+        $this->authorizeAccess($request, $tenant);
+        $domains->remove($tenant, (string) $request->validate(['domain' => ['required', 'string', 'max:253']])['domain']);
+
+        return back()->with('success', 'Domain removed. Addresses there no longer count as staff.');
     }
 
     /** Tag someone as staff, or add them as a member without dues. */
