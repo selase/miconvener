@@ -219,6 +219,12 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'manage commercial terms',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'manage payment settings',
                 'guard_name' => 'web',
                 'category' => 'finance',

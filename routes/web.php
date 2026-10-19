@@ -147,6 +147,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::group(['prefix' => 'tenants', 'as' => 'tenants.'], function (): void {
         Route::post('{tenant:uuid}/commercial-terms', [TenantController::class, 'updateCommercialTerms'])
             ->name('commercial-terms.update');
+        Route::post('{tenant:uuid}/ticket-terms', [TenantController::class, 'updateTicketTerms'])
+            ->name('ticket-terms.update');
         Route::get('reset', [TenantController::class, 'resetTenant'])
             ->name('reset');
         Route::post('all', [TenantController::class, 'getAllTenants'])

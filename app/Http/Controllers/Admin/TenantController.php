@@ -10,6 +10,7 @@ use App\Enum\UsageMetric;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\CreateTenantRequest;
 use App\Http\Requests\Tenant\UpdateCommercialTermsRequest;
+use App\Http\Requests\Tenant\UpdateTicketTermsRequest;
 use App\Libraries\Helper;
 use App\Models\CommercialTermsOverride;
 use App\Models\Tenant;
@@ -272,9 +273,35 @@ final class TenantController extends Controller
         return back()->with('success', 'Commercial terms saved and audited.');
     }
 
+    /**
+     * Ticket commission for one organisation: no plan caps it, so a cap (or a
+     * different rate) here is a deal. Events already selling keep the terms
+     * they locked; this applies to sales on events that have not locked yet.
+     */
+    public function updateTicketTerms(UpdateTicketTermsRequest $request, Tenant $tenant): RedirectResponse
+    {
+        $rate = $request->validated('rate');
+        $cap = $request->validated('cap');
+        $before = ['rate' => $tenant->platform_fee_percentage, 'cap' => $tenant->platform_fee_cap_amount];
+
+        $tenant->update([
+            'platform_fee_percentage' => $rate === null ? null : (float) $rate,
+            'platform_fee_cap_amount' => $cap === null ? null : (int) round((float) $cap * 100),
+        ]);
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($tenant)
+            ->withProperties(['before' => $before, 'after' => ['rate' => $tenant->platform_fee_percentage, 'cap' => $tenant->platform_fee_cap_amount], 'reason' => $request->validated('reason')])
+            ->log("Set ticket terms for {$tenant->name}");
+
+        return back()->with('success', 'Ticket terms saved and recorded.');
+    }
+
     public function show(Request $request, string $id): View
     {
-        $this->authorize('read tenant');
+        // Staff who may set an organisation's commission need to open it to do so.
+        abort_unless($request->user()->can('read tenant') || $request->user()->can('manage-commercial-terms'), 403);
 
         $tenant = Tenant::findByUuidOrFail($id);
 
@@ -323,10 +350,10 @@ final class TenantController extends Controller
         return view('admin.tenants.show', [
             'breadcrumbs' => $breadcrumbs,
             'tenant' => $tenant,
-            'commercialTerms' => $request->user()->can('access-superadmin-dashboard')
+            'commercialTerms' => $request->user()->can('manage-commercial-terms')
                 ? collect(CommercialStreamEnum::cases())->mapWithKeys(fn (CommercialStreamEnum $stream): array => [$stream->value => app(CommercialTerms::class)->for($tenant, $stream)])
                 : collect(),
-            'commercialOverrides' => $request->user()->can('access-superadmin-dashboard')
+            'commercialOverrides' => $request->user()->can('manage-commercial-terms')
                 ? CommercialTermsOverride::query()->withoutGlobalScopes()->where('tenant_id', $tenant->id)->get()->keyBy(fn (CommercialTermsOverride $override): string => $override->stream->value)
                 : collect(),
             'days' => $days,

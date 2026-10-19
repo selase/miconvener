@@ -42,7 +42,7 @@ final class PaymentSettingsController extends Controller
 
         $gateways = TenantPaymentGateway::where('tenant_id', $tenant->id)->get()->keyBy('provider');
         $stripe = $gateways->get('stripe');
-        $canSetPlatformFee = Gate::allows('access-superadmin-dashboard');
+        $canSetPlatformFee = Gate::allows('manage-commercial-terms');
 
         return Inertia::render('Tenant/Settings/Payments', [
             'ticketPaymentsAvailable' => $tenant->handlesTicketMoney(),
@@ -203,19 +203,19 @@ final class PaymentSettingsController extends Controller
     }
 
     /**
-     * Application-superadmin only: set a tenant's commission terms from the
-     * UI, writing the same columns php artisan events:set-platform-fee writes.
+     * Platform staff only: set a tenant's commission terms from the UI,
+     * writing the same columns php artisan events:set-platform-fee writes.
      * The CLI command remains for scripted and bulk use.
      *
-     * Authorization is the access-superadmin-dashboard gate, which requires
-     * the global Superadmin role with a null tenant_id. It deliberately does
-     * NOT key off the email column: tenant admins can set team members'
+     * Authorization is the manage-commercial-terms gate: the permission held
+     * through a platform role (null tenant_id), the Superadmin's by default.
+     * It deliberately does NOT key off the email column: tenant admins can set team members'
      * email addresses, and users.email is unique globally rather than per
      * tenant, so an address allowlist is a value the tenant controls.
      */
     public function updatePlatformFee(Request $request): RedirectResponse
     {
-        Gate::authorize('access-superadmin-dashboard');
+        Gate::authorize('manage-commercial-terms');
 
         $tenant = $this->tenantContext->getTenant();
 

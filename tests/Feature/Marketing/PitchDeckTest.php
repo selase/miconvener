@@ -97,11 +97,11 @@ test('the deck prices ticketing from the seeded plans rather than invented compe
         expect($html)->not->toContain($claim);
     }
 
-    // The calculator is fed the commission billing applies, cap in cedis.
+    // The calculator is fed the commission billing applies; no plan caps it.
     foreach (['starter', 'growth'] as $slug) {
         $package = Package::query()->where('slug', $slug)->firstOrFail();
 
         expect($html)->toContain('"name":"'.$package->name.'"')
-            ->toContain('"cap":'.($package->default_platform_fee_cap_amount / 100));
+            ->toContain('"percentage":'.json_encode((float) $package->default_platform_fee_percentage).',"cap":null');
     }
 });
