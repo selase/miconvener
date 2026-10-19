@@ -20,6 +20,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
+/**
+ * @property bool $members_only
+ * @property int|null $member_ticket_price
+ */
 final class Event extends Model
 {
     use BelongsToTenant;
@@ -99,6 +103,7 @@ final class Event extends Model
      * an unsaved instance answers isPrivate() correctly rather than null.
      */
     protected $attributes = [
+        'members_only' => false,
         'visibility' => self::VISIBILITY_PUBLIC,
         'event_category' => self::CATEGORY_GENERAL,
         'speaker_slide_policy' => self::SPEAKER_POLICY_AFTER,
@@ -125,6 +130,8 @@ final class Event extends Model
         'capacity',
         'requires_approval',
         'ticket_price',
+        'members_only',
+        'member_ticket_price',
         'currency',
         'hero_image_path',
         'visibility',
@@ -173,6 +180,8 @@ final class Event extends Model
         'requires_approval' => 'boolean',
         'allows_self_check_in' => 'boolean',
         'ticket_price' => 'integer',
+        'members_only' => 'boolean',
+        'member_ticket_price' => 'integer',
         'platform_fee_percentage' => 'float',
         'platform_fee_cap_amount' => 'integer',
         'registration_settings' => 'array',
@@ -194,6 +203,9 @@ final class Event extends Model
 
     /** @var list<array{string, string}> */
     protected array $artifactAssetsForDeletion = [];
+
+    /** @var list<array{string,string}> */
+    protected array $uploadAssetsForDeletion = [];
 
     /**
      * The disk event uploads live on, matching the convention used at every
@@ -549,6 +561,7 @@ final class Event extends Model
         return $this->hasMany(EventSponsor::class)->orderBy('sort_order');
     }
 
+    /** @return HasMany<EventTicketType, $this> */
     public function ticketTypes(): HasMany
     {
         return $this->hasMany(EventTicketType::class)->orderBy('sort_order');
@@ -784,6 +797,12 @@ final class Event extends Model
      */
     public function canBeDeleted(?string &$reason = null): bool
     {
+        if ($this->trashed() && CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->where('event_id', $this->id)->exists()) {
+            $reason = 'This archived event has retained community service notes and cannot be permanently purged.';
+
+            return false;
+        }
+
         $inFlightPayouts = $this->payouts()
             ->whereIn('status', [
                 EventPayout::STATUS_PROCESSING,
@@ -823,6 +842,12 @@ final class Event extends Model
         // up when force-deleting permanently.
         self::forceDeleted(function (self $event): void {
             app(\App\Services\Design\ArtifactArtworkCleanup::class)->afterDeletionCommit($event, $event->artifactAssetsForDeletion);
+            $assets = $event->uploadAssetsForDeletion;
+            $event->getConnection()->afterCommit(static function () use ($assets): void {
+                foreach ($assets as [$disk,$path]) {
+                    Helper::deleteFile($path, $disk);
+                }
+            });
         });
         self::deleting(function (self $event): void {
             if (! $event->isForceDeleting()) {
@@ -840,12 +865,12 @@ final class Event extends Model
 
             foreach ($event->materials()->pluck('file_path') as $path) {
                 if ($path) {
-                    Helper::deleteFile($path, $disk);
+                    $event->uploadAssetsForDeletion[] = [$disk, $path];
                 }
             }
 
             if ($event->hero_image_path) {
-                Helper::deleteFile($event->hero_image_path, $disk);
+                $event->uploadAssetsForDeletion[] = [$disk, $event->hero_image_path];
             }
         });
     }

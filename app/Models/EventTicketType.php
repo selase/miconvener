@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int|null $member_price
+ */
 final class EventTicketType extends Model
 {
     use BelongsToTenant;
@@ -42,6 +45,7 @@ final class EventTicketType extends Model
         'description',
         'badge_tier',
         'price',
+        'member_price',
         'capacity',
         'is_active',
         'access_code',
@@ -50,6 +54,7 @@ final class EventTicketType extends Model
 
     protected $casts = [
         'price' => 'integer',
+        'member_price' => 'integer',
         'capacity' => 'integer',
         'is_active' => 'boolean',
         'sort_order' => 'integer',

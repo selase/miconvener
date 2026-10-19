@@ -25,7 +25,7 @@ final class PitchDeckController extends Controller
     /**
      * The commission each self-serve paid plan charges, for the calculator.
      *
-     * @return list<array{name: string, percentage: float, cap: float}>
+     * @return list<array{name: string, percentage: float, cap: float|null}>
      */
     private function commissionPlans(): array
     {
@@ -36,7 +36,8 @@ final class PitchDeckController extends Controller
             ->map(fn (Package $package): array => [
                 'name' => $package->name,
                 'percentage' => (float) $package->default_platform_fee_percentage,
-                'cap' => $package->default_platform_fee_cap_amount / 100,
+                // Null: no plan caps ticket commission.
+                'cap' => $package->default_platform_fee_cap_amount === null ? null : $package->default_platform_fee_cap_amount / 100,
             ])
             ->all();
     }

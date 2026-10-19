@@ -68,7 +68,11 @@ final class EventSessionController extends Controller
         $tenant = $this->getTenant();
         $eventModel = Event::where('tenant_id', $tenant->id)->where('id', $event)->firstOrFail();
 
-        $eventModel->sessions()->where('id', $session)->firstOrFail()->delete();
+        $model = $eventModel->sessions()->where('id', $session)->firstOrFail();
+        if (\App\Models\CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('session_id', $model->id)->exists()) {
+            return response()->json(['message' => 'This service has library history. Cancel this occurrence instead of deleting it.'], 409);
+        }
+        $model->delete();
 
         return response()->json(['message' => 'Session deleted.']);
     }

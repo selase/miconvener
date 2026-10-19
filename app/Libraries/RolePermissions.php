@@ -121,6 +121,9 @@ final class RolePermissions
         return [
             ...self::platformFinancePermissions(),
             ...self::platformMarketingPermissions(),
+            // Commission rates and caps for one organisation. Superadmin by
+            // default; a superadmin may grant it to another platform role.
+            'manage commercial terms',
             'create setting',
             'read setting',
             'update setting',
@@ -226,6 +229,9 @@ final class RolePermissions
             'manage members',
             'manage giving',
             'send community messages',
+            'manage community library',
+            'manage community polls',
+            'read community poll results',
             'manage payment settings',
             'manage api keys',
             'create role',
@@ -290,6 +296,9 @@ final class RolePermissions
             'manage members',
             'manage giving',
             'send community messages',
+            'manage community library',
+            'manage community polls',
+            'read community poll results',
             'manage api keys',
             'create role',
             'read role',

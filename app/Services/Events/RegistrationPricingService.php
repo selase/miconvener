@@ -76,9 +76,9 @@ final class RegistrationPricingService
      * @param  array<string, mixed>  $cleanedAnswers
      * @return array{amount: int, is_free: bool, currency: string, breakdown: array<string, mixed>}
      */
-    public function calculatePrice(Event $event, ?EventTicketType $ticketType, array $cleanedAnswers): array
+    public function calculatePrice(Event $event, ?EventTicketType $ticketType, array $cleanedAnswers, ?int $memberBasePrice = null): array
     {
-        $basePrice = $ticketType ? $ticketType->price : (int) ($event->ticket_price ?? 0);
+        $basePrice = $memberBasePrice ?? ($ticketType ? $ticketType->price : (int) ($event->ticket_price ?? 0));
         $fields = $event->formFields()->ordered()->get();
 
         $priceModifierTotal = 0;

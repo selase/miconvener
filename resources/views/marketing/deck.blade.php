@@ -1028,7 +1028,7 @@
             },
             11: {
                 title: "What Ticketing Costs",
-                pm: "Be plain about the cost: one commission per paid ticket, capped, and shown before the first sale.",
+                pm: "Be plain about the cost: one commission per paid ticket, a fixed percentage, shown before the first sale.",
                 sales: "Let the prospect move the sliders to see the commission on their own event, on each plan."
             },
             12: {
@@ -1281,11 +1281,11 @@
             document.getElementById('calc-attendees-val').innerText = attendees.toLocaleString();
             document.getElementById('calc-price-val').innerText = currency + ' ' + price.toLocaleString();
 
-            const perTicket = (plan) => Math.min(price * plan.percentage / 100, plan.cap);
+            const perTicket = (plan) => plan.cap === null ? price * plan.percentage / 100 : Math.min(price * plan.percentage / 100, plan.cap);
 
             document.getElementById('calc-results').innerHTML = commissionPlans.map((plan) => `
                 <div class="bg-white/5 p-2.5 rounded text-center">
-                    <div class="text-[10px] uppercase text-slate-400">${plan.name} · ${plan.percentage}%, ${currency} ${plan.cap} cap</div>
+                    <div class="text-[10px] uppercase text-slate-400">${plan.name} · ${plan.percentage}%${plan.cap === null ? '' : `, ${currency} ${plan.cap} cap`}</div>
                     <div class="text-base font-extrabold text-emerald-400 font-mono mt-0.5">${currency} ${Math.round(perTicket(plan) * attendees).toLocaleString()}</div>
                 </div>`).join('');
         }

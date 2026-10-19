@@ -78,3 +78,35 @@ test('advertised prices match the seeded package prices', function (): void {
         expect((float) $package->yearly_price)->toBe((float) $plan['yearly_price']);
     }
 });
+
+test('no plan advertises a commission cap, and the pricing says processing fees are separate', function (): void {
+    foreach (config('product-page.plans') as $plan) {
+        foreach ($plan['features'] as $feature) {
+            expect(mb_strtolower($feature))->not->toContain('cap)');
+        }
+    }
+
+    $this->get('/')->assertSee('It does not include card and mobile money processing fees', false);
+});
+
+test('your own domain is advertised only on Enterprise, which is the only plan that has it', function (): void {
+    foreach (config('product-page.plans') as $plan) {
+        $package = Package::query()->where('slug', $plan['slug'])->firstOrFail();
+        $hasDomain = (bool) $package->features()->where('slug', 'custom-domains')->first()?->pivot->value;
+
+        expect(in_array('Your own domain', $plan['features'], true))->toBe($plan['slug'] === 'enterprise')
+            ->and($hasDomain)->toBe($plan['slug'] === 'enterprise');
+    }
+});
+
+test('advertised team seats and registrations match what the seeder enforces', function (): void {
+    foreach (['starter' => [2, 500], 'growth' => [4, 1500]] as $slug => [$seats, $registrations]) {
+        $plan = collect(config('product-page.plans'))->firstWhere('slug', $slug);
+        $package = Package::query()->where('slug', $slug)->firstOrFail();
+
+        expect((int) $package->features()->where('slug', 'team_seats')->first()->pivot->value)->toBe($seats)
+            ->and((int) $package->features()->where('slug', 'event_registrations')->first()->pivot->value)->toBe($registrations)
+            ->and($plan['features'])->toContain("{$seats} team seats")
+            ->and($plan['features'])->toContain(number_format($registrations).' registrations per month');
+    }
+});

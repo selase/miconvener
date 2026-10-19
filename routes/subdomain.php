@@ -169,6 +169,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     // Events (host console)
     Route::resource('events', EventController::class)->names('tenant.events')->except(['create', 'edit']);
+    Route::patch('events/{event}/member-benefits', [EventController::class, 'updateMemberBenefits'])->name('tenant.events.member-benefits');
     Route::post('events/{event}/restore', [EventController::class, 'restore'])->name('tenant.events.restore');
     Route::delete('events/{event}/force-purge', [EventController::class, 'forcePurge'])->name('tenant.events.force-purge');
     // Each section of an event's workspace has its own address, so refresh, the back
@@ -189,6 +190,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/registrations/{registration}/approve-offline', [EventRegistrationController::class, 'approveOfflinePayment'])->name('tenant.events.registrations.approve-offline');
     Route::post('events/{event}/registrations/{registration}/reject-offline', [EventRegistrationController::class, 'rejectOfflinePayment'])->name('tenant.events.registrations.reject-offline');
     Route::get('events/{event}/registrations/{registration}/offline-proof', [EventRegistrationController::class, 'downloadProof'])->name('tenant.events.registrations.offline-proof');
+    Route::get('events/{event}/member-payments', [EventRegistrationController::class, 'memberPayments'])->name('tenant.events.member-payments.index');
+    Route::post('events/{event}/member-payments/{attempt}/refund', [EventRegistrationController::class, 'refundMemberPayment'])->name('tenant.events.member-payments.refund');
+    Route::post('events/{event}/member-payments/{attempt}/reconcile', [EventRegistrationController::class, 'reconcileMemberPayment'])->name('tenant.events.member-payments.reconcile');
     Route::post('events/{event}/registrations/{registration}/cancel', [EventRegistrationController::class, 'cancel'])->name('tenant.events.registrations.cancel');
     Route::patch('events/{event}/registrations/{registration}', [EventRegistrationController::class, 'update'])->name('tenant.events.registrations.update');
     Route::get('events/{event}/checkin/search', [EventCheckInController::class, 'search'])->name('tenant.events.checkin.search');
@@ -317,6 +321,21 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     });
 
     Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
+
+    Route::post('community/library/service-notes', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'store'])->name('tenant.community.service-notes.store');
+    Route::get('community/library/service-options', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'options'])->name('tenant.community.service-notes.options');
+    Route::get('community/polls', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'index'])->name('tenant.community.polls.index');
+    Route::post('community/polls', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'store'])->name('tenant.community.polls.store');
+    Route::post('community/polls/{questionnaire}', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'update'])->whereUuid('questionnaire')->name('tenant.community.polls.update');
+    Route::post('community/polls/{questionnaire}/state', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'state'])->whereUuid('questionnaire')->name('tenant.community.polls.state');
+    Route::get('community/polls/{questionnaire}/results', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'results'])->whereUuid('questionnaire')->name('tenant.community.polls.results');
+    Route::get('community/polls/{questionnaire}/export', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'export'])->whereUuid('questionnaire')->name('tenant.community.polls.export');
+    Route::get('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'index'])->name('tenant.community.library.index');
+    Route::post('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'store'])->name('tenant.community.library.store');
+    Route::post('community/library/{item}', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'update'])->whereUuid('item')->name('tenant.community.library.update');
+    Route::post('community/library/{item}/withdraw', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'withdraw'])->whereUuid('item')->name('tenant.community.library.withdraw');
+    Route::get('community/library/{item}/versions', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'history'])->whereUuid('item')->name('tenant.community.library.history');
+    Route::get('community/library/{item}/versions/{version}/file', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'version'])->whereUuid(['item', 'version'])->name('tenant.community.library.version');
 
     Route::get('community/money/giving', [App\Http\Controllers\Tenant\GivingFundController::class, 'index'])->name('tenant.community.money.giving.index');
     Route::get('community/money/giving/report', [App\Http\Controllers\Tenant\GivingReportController::class, 'index'])->name('tenant.community.money.giving.report');
@@ -559,6 +578,13 @@ Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.e
 Route::get('/e/{event}/calendar.ics', [PublicEventController::class, 'calendarFeed'])->name('public.events.calendar.ics');
 Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');
 Route::post('/e/{event}/unlock-tickets', [PublicEventController::class, 'unlockTicketTypes'])->name('public.events.unlock-tickets');
+Route::post('/e/{event}/member-benefits', [PublicEventController::class, 'memberBenefits'])->middleware('throttle:public-registration')->name('public.events.member-benefits');
+Route::post('/e/{event}/member-verify/email/send', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'send'])->name('public.events.member-verify.send');
+Route::post('/e/{event}/member-verify/email/confirm', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'confirm'])->name('public.events.member-verify.confirm');
+Route::post('/e/{event}/checkout/{registration}/member', [EventCheckoutController::class, 'startMemberPayment'])->middleware('throttle:public-registration')->name('public.events.member-checkout');
+Route::post('/e/{event}/checkout/{registration}/member-benefits/reverify', [EventCheckoutController::class, 'reverifyMemberRegistration'])->middleware('throttle:public-registration')->block()->name('public.events.member-benefits.reverify');
+Route::post('/e/{event}/checkout/{registration}/member-benefits/reassess', [EventCheckoutController::class, 'reassessMemberPayment'])->middleware('throttle:public-registration')->block()->name('public.events.member-benefits.reassess');
+Route::get('/e/{event}/checkout/{registration}/member-callback', [EventCheckoutController::class, 'memberCallback'])->name('public.events.member-callback');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
 Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->block(15, 15)->name('public.events.contribute');
 Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');

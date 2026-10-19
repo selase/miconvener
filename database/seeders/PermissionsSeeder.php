@@ -141,6 +141,24 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'manage community library',
+                'guard_name' => 'web',
+                'category' => 'community',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage community polls',
+                'guard_name' => 'web',
+                'category' => 'community',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'read community poll results',
+                'guard_name' => 'web',
+                'category' => 'community',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'send community messages',
                 'guard_name' => 'web',
                 'category' => 'community',
@@ -196,6 +214,12 @@ final class PermissionsSeeder extends Seeder
             [
                 'uuid' => Str::uuid(),
                 'name' => 'manage commission destinations',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage commercial terms',
                 'guard_name' => 'web',
                 'category' => 'finance',
             ],

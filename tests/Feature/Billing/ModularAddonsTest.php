@@ -38,7 +38,7 @@ final class ModularAddonsTest extends TestCase
         expect((float) $starter->price)->toEqual(249.0);
         expect((float) $starter->yearly_price)->toEqual(2490.0);
         expect($starter->features()->where('slug', 'live_polling')->first()->pivot->value)->toBeFalsy();
-        expect($starter->features()->where('slug', 'team_seats')->first()->pivot->value)->toEqual(3);
+        expect($starter->features()->where('slug', 'team_seats')->first()->pivot->value)->toEqual(2);
         expect($starter->features()->where('slug', 'sms_credits')->first()->pivot->value)->toEqual(150);
         expect($starter->features()->where('slug', 'email_credits')->first()->pivot->value)->toEqual(3000);
 
@@ -46,7 +46,7 @@ final class ModularAddonsTest extends TestCase
         expect((float) $growth->price)->toEqual(499.0);
         expect((float) $growth->yearly_price)->toEqual(4990.0);
         expect($growth->features()->where('slug', 'live_polling')->first()->pivot->value)->toBeTruthy();
-        expect($growth->features()->where('slug', 'team_seats')->first()->pivot->value)->toEqual(6);
+        expect($growth->features()->where('slug', 'team_seats')->first()->pivot->value)->toEqual(4);
         expect($growth->features()->where('slug', 'sms_credits')->first()->pivot->value)->toEqual(500);
         expect($growth->features()->where('slug', 'email_credits')->first()->pivot->value)->toEqual(15000);
     }
@@ -133,8 +133,8 @@ final class ModularAddonsTest extends TestCase
     {
         [$tenant, $admin, $host] = $this->createTenantOnPackage('starter', 'starter-seats-test');
 
-        expect($tenant->featureLimitValue('team_seats'))->toBe(3);
-        expect($tenant->totalTeamSeatLimit())->toBe(3);
+        expect($tenant->featureLimitValue('team_seats'))->toBe(2);
+        expect($tenant->totalTeamSeatLimit())->toBe(2);
 
         $role = Role::findByName('Org Admin', 'web');
 
@@ -151,20 +151,7 @@ final class ModularAddonsTest extends TestCase
         $res1->assertSessionHasNoErrors();
         expect($tenant->users()->count())->toBe(2);
 
-        // Add 3rd user -> Success
-        $res2 = $this->actingAs($admin)
-            ->post("http://{$host}/users", [
-                'first_name' => 'Jane',
-                'last_name' => 'Smith',
-                'email' => 'jane@test.com',
-                'phone_no' => '+233241234568',
-                'status' => 'active',
-                'role' => $role->id,
-            ], ['HTTP_HOST' => $host]);
-        $res2->assertSessionHasNoErrors();
-        expect($tenant->users()->count())->toBe(3);
-
-        // Attempt 4th user -> Blocked by seat limit!
+        // Attempt 3rd user -> Blocked by seat limit!
         $res3 = $this->actingAs($admin)
             ->post("http://{$host}/users", [
                 'first_name' => 'Max',
@@ -175,18 +162,18 @@ final class ModularAddonsTest extends TestCase
                 'role' => $role->id,
             ], ['HTTP_HOST' => $host]);
         $res3->assertSessionHasErrors('email');
-        expect($tenant->users()->count())->toBe(3);
+        expect($tenant->users()->count())->toBe(2);
 
         // Purchase 2 additional team seats
         TenantAddon::factory()->teamSeat(2)->create([
             'tenant_id' => $tenant->id,
         ]);
 
-        // Capacity expanded to 5!
+        // Capacity expanded to 4!
         expect($tenant->purchasedTeamSeatsCount())->toBe(2);
-        expect($tenant->totalTeamSeatLimit())->toBe(5);
+        expect($tenant->totalTeamSeatLimit())->toBe(4);
 
-        // Now adding 4th user succeeds!
+        // Now adding the 3rd user succeeds!
         $res4 = $this->actingAs($admin)
             ->post("http://{$host}/users", [
                 'first_name' => 'Max',
@@ -197,7 +184,7 @@ final class ModularAddonsTest extends TestCase
                 'role' => $role->id,
             ], ['HTTP_HOST' => $host]);
         $res4->assertSessionHasNoErrors();
-        expect($tenant->users()->count())->toBe(4);
+        expect($tenant->users()->count())->toBe(3);
     }
 
     public function test_addon_service_initializes_checkout_and_fulfills_idempotently(): void

@@ -278,7 +278,7 @@ final class StripeGateway implements PaymentGateway
         $credit = is_object($balance) && mb_strtoupper((string) $balance->currency) === mb_strtoupper((string) $refund->currency) ? max(0, -(int) $balance->fee) : 0;
 
         return ['status' => $refund->status, 'amount' => (int) $refund->amount, 'currency' => mb_strtoupper((string) $refund->currency),
-            'gateway_credit' => $credit, 'commission_returned_cumulative' => $returned];
+            'gateway_credit' => $credit, 'gateway_credit_reported' => is_object($balance) && mb_strtoupper((string) $balance->currency) === mb_strtoupper((string) $refund->currency) && (int) $balance->fee <= 0, 'commission_returned_cumulative' => $returned];
     }
 
     public function verifyTransaction(string $reference): array

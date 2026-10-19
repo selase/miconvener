@@ -33,6 +33,6 @@ final class StorageMeter
             ]);
         }
 
-        return $totalSize;
+        return $totalSize + (int) \App\Models\CommunityLibraryVersion::withoutGlobalScopes()->where('tenant_id', $tenant->id)->sum('size');
     }
 }

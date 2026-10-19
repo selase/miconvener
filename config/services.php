@@ -137,10 +137,10 @@ return [
         /*
          * Commission ceiling per ticket, in minor units, as a last resort.
          *
-         * Null — uncapped — is deliberate. The paid tiers carry their own
-         * GHS 20 ceiling as a package default, so the only packages reaching
-         * this line are Enterprise, whose terms are negotiated on the tenant
-         * row. A number here would silently cap those negotiated deals.
+         * Null — uncapped — is deliberate (owner, 2026-10-19): no plan caps
+         * ticket commission. A cap is a deal for one organisation, set on the
+         * tenant row by staff with the manage commercial terms permission. A
+         * number here would silently cap every organisation.
          */
         'default_fee_cap_amount' => env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT') !== null
             ? (int) env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT')

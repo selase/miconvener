@@ -40,6 +40,9 @@ final class DuesScheduler
                         $created += DB::connection('landlord')->transaction(function () use ($member, $localToday, $settings): int {
                             $locked = Member::query()->with('membershipType')->lockForUpdate()->findOrFail($member->id);
 
+                            $locked->setRelation('membershipType', \App\Models\MembershipType::withoutGlobalScopes()
+                                ->where('tenant_id', $locked->tenant_id)->lockForUpdate()->findOrFail($locked->membership_type_id));
+
                             return $this->generateMember($locked, $localToday, $settings);
                         });
                     }
@@ -68,6 +71,10 @@ final class DuesScheduler
         $first = $period->periodStartFor(CarbonImmutable::parse($since->toDateString(), $settings->timezone), $settings);
         if (! $settings->charge_current_period_on_join || $member->rejoined_on !== null || $member->lapsed_on !== null) {
             $first = $period->nextStart($first, $settings);
+        }
+        $duesStart = $member->firstDuesPeriod($settings);
+        if ($duesStart !== null && $duesStart->gt($first)) {
+            $first = $duesStart;
         }
         $cursor = $period->periodStartFor($today->addDays($settings->generate_days_ahead), $settings);
         $starts = [];

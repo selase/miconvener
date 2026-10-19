@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 
 /**
  * @property int|null $amount_override Minor currency units; 0 waives the dues.
+ * @property CarbonImmutable|null $dues_start_on Earliest dues eligibility after a membership-type change.
  * @property MemberStatusEnum $status
  * @property string $membership_type_id Renamed from dues_class_id; static analysis cannot follow the rename.
  */
@@ -61,6 +62,7 @@ final class Member extends Model
         'joined_on' => 'date',
         'exited_on' => 'date',
         'active_since' => 'date',
+        'dues_start_on' => 'immutable_date',
         'lapsed_on' => 'date',
         'rejoined_on' => 'date',
     ];
@@ -111,6 +113,23 @@ final class Member extends Model
         return $this->pay_token;
     }
 
+    /** First full period permitted by both the type and this member's dues boundary. */
+    public function firstDuesPeriod(CommunitySettings $settings): ?CarbonImmutable
+    {
+        $type = $this->membershipType;
+        if ($type->period === null) {
+            return null;
+        }
+        $dates = array_filter([$type->dues_start_on?->toDateString(), $this->dues_start_on?->toDateString()]);
+        if ($dates === []) {
+            return null;
+        }
+        $date = CarbonImmutable::parse(max($dates), $settings->timezone);
+        $start = $type->period->periodStartFor($date, $settings);
+
+        return $start->lt($date) ? $type->period->nextStart($start, $settings) : $start;
+    }
+
     protected static function booted(): void
     {
         self::creating(function (Member $member): void {
@@ -126,6 +145,15 @@ final class Member extends Model
                 || $identity->normalisePhone($member->phone) !== $identity->normalisePhone($member->getOriginal('phone'));
             if ($changed) {
                 $member->access_version = ((int) $member->getOriginal('access_version')) + 1;
+            }
+
+            if ($member->isDirty('membership_type_id')) {
+                $type = MembershipType::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)->findOrFail($member->membership_type_id);
+                $previousType = MembershipType::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)->findOrFail($member->getOriginal('membership_type_id'));
+                if (! $previousType->hasDues() && $type->hasDues()) {
+                    $member->dues_start_on = CarbonImmutable::now(CommunitySettings::for($member->tenant)->timezone)->startOfDay();
+                }
+                $member->setRelation('membershipType', $type);
             }
 
             if (! $member->isDirty('status')) {

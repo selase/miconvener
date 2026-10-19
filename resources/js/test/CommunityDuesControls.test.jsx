@@ -91,3 +91,49 @@ it('shows unlimited membership without a cap warning', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('button', { name: 'Add member' }).disabled).toBe(false);
 });
+
+it('requires a visible start date when introducing dues to an existing no-dues type', () => {
+    render(
+        <MoneyDues
+            membershipTypes={[
+                {
+                    id: 'church',
+                    name: 'Church member',
+                    amount: null,
+                    currency: 'GHS',
+                    period: null,
+                    is_active: true,
+                    member_count: 20,
+                    has_charges: false,
+                },
+            ]}
+        />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Dues' }), { target: { value: 'yes' } });
+    expect(screen.getByLabelText('Dues start date').required).toBe(true);
+    expect(screen.getByText(/first full billing period on or after this date/)).toBeTruthy();
+});
+
+it('displays the fixed dues start date on an existing paid type', () => {
+    render(
+        <MoneyDues
+            membershipTypes={[
+                {
+                    id: 'paid',
+                    name: 'Association member',
+                    amount: 2000,
+                    currency: 'GHS',
+                    period: 'monthly',
+                    dues_start_on: '2026-11-01',
+                    is_active: true,
+                    member_count: 20,
+                    has_charges: true,
+                },
+            ]}
+        />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByLabelText('Dues start date').disabled).toBe(true);
+    expect(screen.getByLabelText('Dues start date').value).toBe('2026-11-01');
+});

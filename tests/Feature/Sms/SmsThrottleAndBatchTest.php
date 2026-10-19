@@ -119,7 +119,10 @@ test('a batch of personalised texts is one request, each person with their own t
 
     Http::assertSentCount(1);
     Http::assertSent(fn ($request): bool => collect($request->data()[0]['users'])
-        ->pluck('placeholder.0.{{1}}')->all() === ['Ticket TKT-1', 'Ticket TKT-2']);
+        ->pluck('placeholder.0.{{1}}', 'phone_number')->sortKeys()->all() === [
+            '233241111111' => 'Ticket TKT-1',
+            '233242222222' => 'Ticket TKT-2',
+        ]);
 });
 
 test('a batch larger than the credits left sends what is covered and suppresses the rest', function (): void {

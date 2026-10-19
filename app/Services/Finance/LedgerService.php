@@ -590,6 +590,48 @@ final class LedgerService
         return $transaction;
     }
 
+    /** Full member-ticket refund using the original captured amounts, never current commercial terms. */
+    public function recordMemberBenefitRefund(\App\Models\EventMemberBenefitAttempt $attempt, int $gatewayCredit, int $commissionReturned): ?LedgerTransaction
+    {
+        $registration = $attempt->registration;
+        $event = Event::withoutGlobalScopes()->where('tenant_id', $attempt->tenant_id)->findOrFail($registration->event_id);
+        $tenant = $attempt->tenant;
+        if ($registration->tenant_id !== $attempt->tenant_id || $gatewayCredit < 0 || $gatewayCredit > (int) $attempt->gateway_fee_amount || $commissionReturned < 0 || $commissionReturned > $attempt->platform_fee_amount) {
+            throw new InvalidArgumentException('Refund amounts and ownership must match the original member payment.');
+        }
+        $commission = $attempt->platform_fee_amount;
+        $reference = 'member_refund_'.$attempt->id;
+        $platform = $attempt->settlement_mode === Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT;
+        $entries = $platform ? [
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $attempt->charged_amount - $commission - $gatewayCredit],
+            ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $commission],
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $attempt->charged_amount - $gatewayCredit],
+        ] : [
+            ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $commission],
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commissionReturned],
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commission - $commissionReturned],
+        ];
+        if ($platform && $attempt->charged_amount - $commission - $gatewayCredit < 0) {
+            $entries[0]['amount'] = 0;
+            $entries[] = ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commission + $gatewayCredit - $attempt->charged_amount];
+        }
+        $entries = array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] !== 0));
+        $transaction = $entries !== [] ? $this->postTransaction($tenant, $event, LedgerTransaction::TYPE_REFUND, 'Member ticket refund', $reference, $entries, null, $attempt->currency) : null;
+        if ($transaction?->wasRecentlyCreated && ! $platform) {
+            $credit = (int) ($attempt->commission_settlement['actual_credit_used'] ?? 0);
+            if ($attempt->provider === 'paystack') {
+                $credit += (int) ($attempt->commission_settlement['actual_received'] ?? 0);
+            }
+            app(CommissionCredit::class)->grant($tenant, $attempt->currency, min($commission - $commissionReturned, $credit));
+        }
+        EventLedgerEntry::firstOrCreate(['tenant_id' => $tenant->id, 'type' => EventLedgerEntry::TYPE_REFUND, 'provider_reference' => $reference],
+            ['event_id' => $event->id, 'registration_id' => $registration->id, 'gross_amount' => $attempt->charged_amount,
+                'gateway_fee_amount' => $gatewayCredit, 'commission_amount' => $commission,
+                'net_amount' => -($attempt->charged_amount - $commission - $gatewayCredit), 'currency' => $attempt->currency, 'provider' => $attempt->provider]);
+
+        return $transaction;
+    }
+
     public function recordGivingPayout(Tenant $tenant, EventPayout $payout, string $reference, int $transferFee): LedgerTransaction
     {
         if ($payout->tenant_id !== $tenant->id || $payout->category !== LedgerCategoryEnum::Giving || $payout->event_id !== null) {

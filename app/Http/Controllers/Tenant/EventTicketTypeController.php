@@ -14,13 +14,13 @@ use Illuminate\Validation\Rule;
 
 final class EventTicketTypeController extends Controller
 {
-    public function store(Request $request, string $subdomain, string $event): JsonResponse
+    public function store(\App\Http\Requests\Tenant\StoreEventTicketTypeRequest $request, string $subdomain, string $event): JsonResponse
     {
         $this->authorize('update event');
         $tenant = $this->getTenant();
         $eventModel = $this->findEvent($tenant->id, $event);
 
-        $validated = $this->validateTicketType($request);
+        $validated = $request->validated();
 
         if ($validated['price'] > 0 && ! $tenant->planAllows('paid_tickets')) {
             return response()->json(['message' => 'Your plan runs free events only. Upgrade to sell paid tickets.'], 422);
@@ -38,7 +38,7 @@ final class EventTicketTypeController extends Controller
         return response()->json($ticketType);
     }
 
-    public function update(Request $request, string $subdomain, string $event, string $ticketType): JsonResponse
+    public function update(\App\Http\Requests\Tenant\UpdateEventTicketTypeRequest $request, string $subdomain, string $event, string $ticketType): JsonResponse
     {
         $this->authorize('update event');
         $tenant = $this->getTenant();
@@ -46,7 +46,7 @@ final class EventTicketTypeController extends Controller
 
         $ticketTypeModel = $eventModel->ticketTypes()->where('id', $ticketType)->firstOrFail();
 
-        $validated = $this->validateTicketType($request);
+        $validated = $request->validated();
 
         // Editing a ticket that was already on sale when the plan lapsed is
         // allowed; making a free ticket paid on a smaller plan is not.
@@ -102,22 +102,6 @@ final class EventTicketTypeController extends Controller
     private function findEvent(string $tenantId, string $eventId): Event
     {
         return Event::where('tenant_id', $tenantId)->where('id', $eventId)->firstOrFail();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function validateTicketType(Request $request): array
-    {
-        return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'badge_tier' => ['sometimes', Rule::in(EventTicketType::TIERS)],
-            'price' => ['required', 'integer', 'min:0'],
-            'capacity' => ['nullable', 'integer', 'min:1'],
-            'is_active' => ['boolean'],
-            'sort_order' => ['integer'],
-        ]);
     }
 
     private function getTenant()
