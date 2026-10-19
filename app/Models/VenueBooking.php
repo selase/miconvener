@@ -238,7 +238,8 @@ final class VenueBooking extends Model
     public function scopeBlockingCalendar(Builder $query): void
     {
         $query->where(function (Builder $q): void {
-            $q->whereIn('status', [self::STATUS_CONFIRMED, self::STATUS_BLOCKED])
+            // A staff request waiting for approval holds its time, so it cannot be double-booked.
+            $q->whereIn('status', [self::STATUS_CONFIRMED, self::STATUS_BLOCKED, self::STATUS_PENDING_APPROVAL])
                 ->orWhere(function (Builder $pending): void {
                     $pending->where('status', self::STATUS_PENDING_PAYMENT)
                         ->where(function (Builder $valid): void {

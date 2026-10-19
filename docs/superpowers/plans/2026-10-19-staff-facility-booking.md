@@ -102,10 +102,11 @@
 **Interfaces:**
 - Produces: `RoomAvailability::isFree(StoreListing $room, CarbonInterface $from, CarbonInterface $to, ?string $ignoringBookingId = null): bool`. Occupying statuses: confirmed, blocked, pending approval (internal), and unexpired pending payment holds. `::busy(StoreListing $room, CarbonInterface $from, CarbonInterface $to): Collection` returns `[starts_at, ends_at]` pairs only, never booker details.
 
-- [ ] **Step 1: Failing tests:** `a confirmed internal booking blocks a public booking`, `a pending request holds the slot`, `a declined or cancelled request frees it`, `a blackout blocks both kinds`, `busy times carry no booker details`, `back-to-back slots do not overlap`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Move the overlap query out of the calendar controller into the service and have the three call sites use it.
-- [ ] **Step 4:** Rerun the new tests and `tests/Feature/Marketplace`; PASS. Commit `feat(bookings): one availability check for every booking kind`.
+- [x] **Step 1: Failing tests:** `a confirmed internal booking blocks a public booking`, `a pending request holds the slot`, `a declined or cancelled request frees it`, `a blackout blocks both kinds`, `busy times carry no booker details`, `back-to-back slots do not overlap`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Move the overlap query out of the calendar controller into the service and have the three call sites use it.
+- [x] **Step 4:** Rerun the new tests and `tests/Feature/Marketplace`; PASS. Commit `feat(bookings): one availability check for every booking kind`.
+  Ruling: a shared check already existed (`VenueAvailabilityService::isSlotAvailable` / `getBookedSlots` over `VenueBooking::scopeBlockingCalendar`), so no new `RoomAvailability` class was built. Pending staff requests join the scope's occupying statuses, internal bookings are reported to the public as `confirmed`, and the calendar's block creation now calls the service instead of its own copy of the query.
 
 ### Task 6: Internal bookings
 

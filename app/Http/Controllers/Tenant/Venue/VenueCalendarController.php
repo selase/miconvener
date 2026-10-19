@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Shop;
 use App\Models\StoreListing;
 use App\Models\VenueBooking;
+use App\Services\Marketplace\VenueAvailabilityService;
 use App\Services\Tenancy\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -78,6 +79,7 @@ final class VenueCalendarController extends Controller
                 VenueBooking::STATUS_CONFIRMED,
                 VenueBooking::STATUS_PENDING_PAYMENT,
                 VenueBooking::STATUS_PENDING_QUOTE,
+                VenueBooking::STATUS_PENDING_APPROVAL,
                 VenueBooking::STATUS_BLOCKED,
             ])
             ->overlapping($windowStart, $windowEnd);
@@ -156,23 +158,8 @@ final class VenueCalendarController extends Controller
         $startsAt = Carbon::parse((string) $validated['starts_at']);
         $endsAt = Carbon::parse((string) $validated['ends_at']);
 
-        // Check if there is already a confirmed booking, active hold, or existing blackout in this time window
-        $overlap = VenueBooking::query()
-            ->where('store_listing_id', $listing->id)
-            ->where(function ($q): void {
-                $q->whereIn('status', [VenueBooking::STATUS_CONFIRMED, VenueBooking::STATUS_BLOCKED])
-                    ->orWhere(function ($hold): void {
-                        $hold->where('status', VenueBooking::STATUS_PENDING_PAYMENT)
-                            ->where(function ($valid): void {
-                                $valid->whereNull('quote_valid_until')
-                                    ->orWhere('quote_valid_until', '>=', now());
-                            });
-                    });
-            })
-            ->overlapping($startsAt, $endsAt)
-            ->exists();
-
-        if ($overlap) {
+        // A confirmed booking, a hold, a staff request or a blackout already occupying this time blocks it.
+        if (! app(VenueAvailabilityService::class)->isSlotAvailable($listing, $startsAt, $endsAt)) {
             throw ValidationException::withMessages([
                 'starts_at' => ['Cannot block dates: An active reservation, hold, or blackout already occupies this space during this time.'],
             ]);
