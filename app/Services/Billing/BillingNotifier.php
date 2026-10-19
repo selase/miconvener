@@ -95,6 +95,7 @@ final class BillingNotifier
             overdue: false,
             movesToFreeOn: null,
             payUrl: $this->renewUrl($tenant),
+            priceNote: $subscription->renewalNote($package),
         );
 
         $key = "renewal_due:{$subscription->id}:{$subscription->current_period_end->toDateString()}:{$threshold}";
@@ -115,6 +116,7 @@ final class BillingNotifier
             overdue: true,
             movesToFreeOn: $subscription->grace_ends_at ? self::date($subscription->grace_ends_at) : null,
             payUrl: $this->renewUrl($tenant),
+            priceNote: $subscription->renewalNote($package),
         );
 
         $key = "renewal_overdue:{$subscription->id}:{$subscription->current_period_end->toDateString()}:".now()->toDateString();

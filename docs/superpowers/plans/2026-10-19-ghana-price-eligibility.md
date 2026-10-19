@@ -102,10 +102,11 @@
 **Interfaces:**
 - Produces: `Subscription::chargeQuoteFor` uses the Ghana price while the tenant `isGhanaEligible()` and USD otherwise; when eligibility is removed, the next renewal reminder states the new amount and that it is converted from USD on the renewal day.
 
-- [ ] **Step 1: Failing tests:** `an eligible organisation renews at the ghana price`, `after revoke the renewal is the usd price converted on the day`, `the reminder before such a renewal names the new amount`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement; also add the line "converted from USD at the Bank of Ghana rate on the day" to every USD renewal reminder.
-- [ ] **Step 4:** Rerun with `tests/Feature/Billing/RenewalSchedulerTest.php`; PASS. Commit `feat(pricing): renewals follow Ghana eligibility`.
+- [x] **Step 1: Failing tests:** `an eligible organisation renews at the ghana price`, `after revoke the renewal is the usd price converted on the day`, `the reminder before such a renewal names the new amount`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement; also add the line "converted from USD at the Bank of Ghana rate on the day" to every USD renewal reminder.
+- [x] **Step 4:** Rerun with `tests/Feature/Billing/RenewalSchedulerTest.php`; PASS. Commit `feat(pricing): renewals follow Ghana eligibility`.
+  Ruling: `Subscription::renewalCurrency()` prices the next period by where the organisation stands today (Ghana eligible gives GHS, settled in USD gives USD) and falls back to the stored `billing_currency` for an organisation nobody has classified, so existing customers are not repriced until the backfill (Task 6) classifies them. Renewals do not ask for Ghana proof: pay-link and auto-charge renewals keep working for every payment method, and the payment's origin is still recorded as evidence. The reminder carries `priceNote` (USD price, conversion on the day, today's figure, and the change from cedis when there is one). A recorded renewal updates `billing_currency` to the currency it was priced in.
 
 ### Task 6: Existing customers
 
