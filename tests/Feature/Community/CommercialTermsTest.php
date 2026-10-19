@@ -102,7 +102,7 @@ test('the superadmin tenant page displays all streams and only editable communit
     $tenant = Tenant::factory()->create();
     $this->actingAs(termsSuperadmin())->get(route('tenants.show', $tenant->uuid))
         ->assertOk()->assertSee('Commercial terms')->assertSee('Save dues terms')->assertSee('Save giving terms')
-        ->assertSee('Save contributions terms')->assertSee('Managed through existing ticket terms.');
+        ->assertSee('Save contributions terms')->assertSee('Save ticket terms');
     $this->get(route('tenants.show', $tenant->uuid))
         ->assertSee('Future configuration only: these terms do not change existing contribution payments or enable giving.');
 });
