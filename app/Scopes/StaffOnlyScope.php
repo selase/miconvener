@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Models\Scopes;
+namespace App\Scopes;
 
 use App\Models\StoreListing;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,10 +16,14 @@ use Illuminate\Database\Eloquent\Scope;
  * staff rooms by name (the owning console, a verified staff member in /my) sees
  * them. See StoreListing::withStaffOnly() and StoreListing::visibleToStaffOf().
  */
+/**
+ * @implements Scope<StoreListing>
+ */
 final class StaffOnlyScope implements Scope
 {
     /**
-     * @param  Builder<Model>  $builder
+     * @param  Builder<covariant StoreListing>  $builder
+     * @param  StoreListing  $model
      */
     public function apply(Builder $builder, Model $model): void
     {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Models\Scopes\StaffOnlyScope;
+use App\Scopes\StaffOnlyScope;
 use Carbon\CarbonInterface;
 use Database\Factories\VenueBookingFactory;
 use Illuminate\Database\Eloquent\Builder;

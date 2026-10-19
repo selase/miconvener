@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Jobs\EmbedStoreListingJob;
-use App\Models\Scopes\StaffOnlyScope;
+use App\Scopes\StaffOnlyScope;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
