@@ -110,3 +110,42 @@ test('granting again keeps the first evidence', function (): void {
 
     expect($this->tenant->fresh()->pricing_region_evidence['source'])->toBe('payout_account');
 });
+
+test('ensure grants an organisation whose evidence has appeared, once', function (): void {
+    expect($this->eligibility->ensure($this->tenant))->toBeFalse();
+
+    TenantPayoutAccount::factory()->create(['tenant_id' => $this->tenant->id, 'is_verified' => true]);
+    Illuminate\Support\Facades\Cache::flush();
+
+    expect($this->eligibility->ensure($this->tenant))->toBeTrue()
+        ->and($this->tenant->fresh()->pricing_region_evidence['source'])->toBe('payout_account')
+        ->and($this->eligibility->ensure($this->tenant->fresh()))->toBeTrue();
+});
+
+test('an organisation settled in USD is upgraded by a verified Ghana payout account but not by a payment', function (): void {
+    $this->tenant->update(['pricing_region' => 'INTL']);
+    ($this->platformPayment)(['payment_origin' => ['channel' => 'mobile_money', 'country_code' => 'GH']]);
+
+    expect($this->eligibility->ensure($this->tenant->fresh()))->toBeFalse()
+        ->and($this->tenant->fresh()->pricing_region)->toBe('INTL');
+
+    TenantPayoutAccount::factory()->create(['tenant_id' => $this->tenant->id, 'is_verified' => true]);
+    Illuminate\Support\Facades\Cache::flush();
+
+    expect($this->eligibility->ensure($this->tenant->fresh()))->toBeTrue();
+});
+
+test('ensure does not look for evidence on every call when there is none', function (): void {
+    expect($this->eligibility->ensure($this->tenant))->toBeFalse();
+
+    TenantPayoutAccount::factory()->create(['tenant_id' => $this->tenant->id, 'is_verified' => true]);
+
+    expect($this->eligibility->ensure($this->tenant->fresh()))->toBeFalse();
+});
+
+test('a superadmin removal is not undone by ensure', function (): void {
+    TenantPayoutAccount::factory()->create(['tenant_id' => $this->tenant->id, 'is_verified' => true]);
+    $this->eligibility->revoke($this->tenant, User::factory()->create(['tenant_id' => null]), 'Abuse');
+
+    expect($this->eligibility->ensure($this->tenant->fresh()))->toBeFalse();
+});

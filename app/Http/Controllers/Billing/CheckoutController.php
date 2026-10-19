@@ -183,7 +183,7 @@ final class CheckoutController extends Controller
         // Upgrade or new subscription: one-time Paystack transaction with plan
         // metadata, priced in the visitor's currency and charged in GHS.
         $price = app(PriceBook::class)->plan($newPackage, $interval, app(VisitorCurrency::class)->resolve($request, $tenant));
-        $terms = CheckoutTerms::for($tenant, $price);
+        $terms = CheckoutTerms::for($tenant, $price, app(PriceBook::class)->plan($newPackage, $interval, 'USD'));
 
         // A negotiated plan (Enterprise) is charged at the organisation's agreed
         // price and interval; without one there is nothing to charge yet.

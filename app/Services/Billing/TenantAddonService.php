@@ -233,7 +233,7 @@ final class TenantAddonService
 
         $price = app(PriceBook::class)->addon($addonKey, (string) ($options['currency'] ?? 'GHS'), $multiplier);
         $quote = app(ChargeQuote::class)->for($price);
-        $terms = CheckoutTerms::for($tenant, $price);
+        $terms = CheckoutTerms::for($tenant, $price, app(PriceBook::class)->addon($addonKey, 'USD', $multiplier));
         $totalPricePesewas = $quote->ghsMinor();
         $totalQuantity = $config['quantity'] * $multiplier;
         $reference = 'ADDON-'.mb_strtoupper(Str::random(12));

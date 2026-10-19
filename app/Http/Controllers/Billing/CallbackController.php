@@ -14,6 +14,7 @@ use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\SubscriptionRenewalService;
+use App\Services\Pricing\GhanaPaymentProof;
 use App\Services\Tenancy\TenantContext;
 use Carbon\Carbon;
 use Exception;
@@ -298,6 +299,9 @@ final class CallbackController extends Controller
      */
     private function sendReceipt(Tenant $tenant, array $result): void
     {
+        // Where the payment came from decides whether the Ghana price was earned.
+        // It runs on every route that fulfils a priced payment and settles it once.
+        rescue(fn () => app(GhanaPaymentProof::class)->settle($tenant, $result));
         rescue(fn () => app(BillingNotifier::class)->paymentReceived($tenant, $result['reference'], auth()->user()?->email, $result));
     }
 }

@@ -19,11 +19,17 @@ final readonly class CheckoutTerms
     /** The channels that can prove Ghana: Paystack's mobile money and card. */
     public const array PROOF_CHANNELS = ['mobile_money', 'card'];
 
-    private function __construct(public bool $proofRequired) {}
+    private function __construct(public bool $proofRequired, public ?Money $usdAlternative = null) {}
 
-    public static function for(Tenant $tenant, Money $price): self
+    /**
+     * @param  Money|null  $usdAlternative  what the same item costs in USD, when there is one: the price a
+     *                                      foreign card falls back to if it pays the Ghana price
+     */
+    public static function for(Tenant $tenant, Money $price, ?Money $usdAlternative = null): self
     {
-        return new self($price->currency === 'GHS' && ! $tenant->isGhanaEligible());
+        $proofRequired = $price->currency === 'GHS' && ! $tenant->isGhanaEligible();
+
+        return new self($proofRequired, $proofRequired && $usdAlternative?->currency === 'USD' ? $usdAlternative : null);
     }
 
     /** A price someone at MiConvener agreed with this organisation: no proof needed. */
@@ -41,6 +47,10 @@ final readonly class CheckoutTerms
     public function metadata(ChargeQuote $quote): array
     {
         $metadata = ['pricing' => [...$quote->meta(), 'proof_required' => $this->proofRequired]];
+
+        if ($this->usdAlternative !== null) {
+            $metadata['pricing']['usd_alternative_minor'] = $this->usdAlternative->minor;
+        }
 
         if ($this->proofRequired) {
             $metadata['allowed_channels'] = self::PROOF_CHANNELS;

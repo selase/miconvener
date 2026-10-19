@@ -42,7 +42,7 @@ final class LlmCheckoutController extends Controller
 
         $price = app(PriceBook::class)->tokenPack($packKey, app(VisitorCurrency::class)->resolve($request, $tenant));
         $quote = app(ChargeQuote::class)->for($price);
-        $terms = CheckoutTerms::for($tenant, $price);
+        $terms = CheckoutTerms::for($tenant, $price, app(PriceBook::class)->tokenPack($packKey, 'USD'));
         $redirectUrl = route('tenant.llm-usage.index');
 
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(

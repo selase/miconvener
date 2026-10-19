@@ -291,6 +291,11 @@ final class BillingNotifier
         return $this->sender->send($tenant, BillingEmail::TYPE_PAYMENT_RECEIPT, "receipt:{$reference}", [$payerEmail, $tenant->email], $mail);
     }
 
+    public function billingUrl(Tenant $tenant): string
+    {
+        return route('billing.index', ['subdomain' => $tenant->slug]);
+    }
+
     /**
      * @param  array<string, mixed>  $meta
      */
@@ -339,10 +344,5 @@ final class BillingNotifier
     private function renewUrl(Tenant $tenant): string
     {
         return route('billing.renew', ['subdomain' => $tenant->slug]);
-    }
-
-    private function billingUrl(Tenant $tenant): string
-    {
-        return route('billing.index', ['subdomain' => $tenant->slug]);
     }
 }

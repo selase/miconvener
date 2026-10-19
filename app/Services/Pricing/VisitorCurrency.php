@@ -33,8 +33,16 @@ final class VisitorCurrency
     {
         $tenant ??= app(TenantContext::class)->getTenant();
 
-        if ($tenant instanceof Tenant && $tenant->pricing_region !== null) {
-            return $tenant->isGhanaEligible() ? 'GHS' : 'USD';
+        if ($tenant instanceof Tenant) {
+            // Evidence of Ghana (a verified Ghana payout account, a Ghana payment)
+            // is noticed here, so the price shown is the price that will be charged.
+            if (app(GhanaEligibility::class)->ensure($tenant)) {
+                return 'GHS';
+            }
+
+            if ($tenant->pricing_region !== null) {
+                return 'USD';
+            }
         }
 
         return $this->forVisitor($request);
