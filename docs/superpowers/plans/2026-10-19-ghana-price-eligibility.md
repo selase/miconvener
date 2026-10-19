@@ -55,10 +55,11 @@
 **Interfaces:**
 - Produces: `VisitorCurrency::resolve(Request $request): string` ignores any cookie asking for GHS: Ghana country gives GHS, otherwise USD; signed-in console pages use `Tenant::pricing_region` (`GH` gives GHS, `INTL` gives USD) when set. The switch offers only "Show USD" to a visitor in Ghana who is not a customer, and nothing to customers. Registration records `pricing_region` as `INTL` for a USD visitor and leaves it null for a Ghana visitor until evidence exists.
 
-- [ ] **Step 1: Failing tests:** `a cookie asking for GHS from abroad still shows USD`, `a visitor in Ghana sees GHS and may choose to see USD`, `an organisation onboarded in USD sees USD even from a Ghana address`, `a Ghana eligible organisation sees GHS from any country`, `the switch is not rendered for customers`, `the console pages carry the organisation's currency`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Change `VisitorCurrency` and the three console controllers to take the tenant into account; remove the GHS choice from the switch and the controller's validation (`in:USD`); set `pricing_region` at registration.
-- [ ] **Step 4:** Rerun; PASS; run `npm run lint`, `npm run build` and commit `public/build`. Commit `feat(pricing): currency follows the organisation, and nobody can choose GHS`.
+- [x] **Step 1: Failing tests:** `a cookie asking for GHS from abroad still shows USD`, `a visitor in Ghana sees GHS and may choose to see USD`, `an organisation onboarded in USD sees USD even from a Ghana address`, `a Ghana eligible organisation sees GHS from any country`, `the switch is not rendered for customers`, `the console pages carry the organisation's currency`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Change `VisitorCurrency` and the three console controllers to take the tenant into account; remove the GHS choice from the switch and the controller's validation (`in:USD`); set `pricing_region` at registration.
+- [x] **Step 4:** Rerun; PASS; run `npm run lint`, `npm run build` and commit `public/build`. Commit `feat(pricing): currency follows the organisation, and nobody can choose GHS`.
+  Ruling: `VisitorCurrency::resolve(Request, ?Tenant)` falls back to the active tenant context when no tenant is passed, so every console caller follows the organisation without being changed. The console switch is removed entirely (component deleted); on the marketing page only a visitor in Ghana with no organisation sees a single "Show prices in USD / GHS" toggle. Asking for GHS from outside Ghana is accepted and ignored, and asking for GHS from Ghana clears the USD cookie. Registration records `pricing_region = INTL` for a visitor outside Ghana and leaves it null for a visitor in Ghana (`VisitorCurrency::forVisitor`).
 
 ### Task 3: Checkout charges the Ghana price only to eligible organisations
 

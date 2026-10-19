@@ -15,9 +15,13 @@ new class extends Component
     #[Locked]
     public string $currency = 'GHS';
 
+    #[Locked]
+    public bool $canChoose = false;
+
     public function mount(VisitorCurrency $visitorCurrency): void
     {
         $this->currency = $visitorCurrency->resolve(request());
+        $this->canChoose = $visitorCurrency->canChoose(request());
     }
 
     /**
@@ -177,18 +181,15 @@ new class extends Component
             @endforeach
         </div>
 
-        {{-- Currency switch: a Ghanaian abroad, or a visitor on a VPN, can choose --}}
-        <form method="POST" action="{{ route('currency.update') }}" class="mt-10 flex items-center justify-center gap-2 text-sm text-slate-500" data-currency-switch>
-            @csrf
-            <span>Prices in</span>
-            @foreach (['GHS', 'USD'] as $option)
-                <button type="submit" name="currency" value="{{ $option }}"
-                    @if ($currency === $option) aria-current="true" @endif
-                    class="rounded-full px-3 py-1 font-medium transition-colors {{ $currency === $option ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100' }}">
-                    {{ $option }}
+        {{-- Only a visitor in Ghana has anything to choose: GHS is never offered to anyone else --}}
+        @if ($canChoose)
+            <form method="POST" action="{{ route('currency.update') }}" class="mt-10 flex items-center justify-center text-sm" data-currency-switch>
+                @csrf
+                <button type="submit" name="currency" value="{{ $currency === 'GHS' ? 'USD' : 'GHS' }}" class="rounded-full px-3 py-1 font-medium text-slate-600 underline underline-offset-4 hover:bg-slate-100">
+                    Show prices in {{ $currency === 'GHS' ? 'USD' : 'GHS' }}
                 </button>
-            @endforeach
-        </form>
+            </form>
+        @endif
         @if ($currency === 'USD')
             <p class="mt-2 text-center text-xs text-slate-400">
                 Payments are taken in Ghana cedis (GHS) at the Bank of Ghana rate on the day you pay; your bank converts it to your card's currency.
