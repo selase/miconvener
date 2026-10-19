@@ -226,8 +226,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     });
 
     // Enterprise Leads
+    Route::post('admin/lead-recipients', [App\Http\Controllers\Admin\LeadRecipientController::class, 'store'])->name('admin.lead-recipients.store');
+    Route::delete('admin/lead-recipients/{recipient}', [App\Http\Controllers\Admin\LeadRecipientController::class, 'destroy'])->name('admin.lead-recipients.destroy');
     Route::resource('admin/leads', App\Http\Controllers\Admin\LeadController::class)
-        ->only(['index', 'show', 'destroy'])
+        ->only(['index', 'show', 'update', 'destroy'])
         ->names('admin.leads');
 
     // Superadmin Operations: run the allowlisted maintenance commands

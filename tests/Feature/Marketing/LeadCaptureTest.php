@@ -30,8 +30,8 @@ it('captures a lead and sends a notification', function () {
         'company' => 'Doe Inc.',
     ], 'landlord');
 
-    // Verify Mail
-    Mail::assertSent(NewEnterpriseLead::class, function ($mail) {
+    // Verify Mail: queued, so the visitor is not kept waiting on delivery.
+    Mail::assertQueued(NewEnterpriseLead::class, function ($mail) {
         return $mail->lead->email === 'john@example.com';
     });
 });
