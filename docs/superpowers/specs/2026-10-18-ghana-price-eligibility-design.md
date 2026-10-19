@@ -1,6 +1,6 @@
 # Ghana price eligibility: design
 
-Date: 2026-10-18. Status: draft for owner review, to be built later. Follows regional pricing (PR #38, live 2026-10-18).
+Date: 2026-10-18. Status: owner decisions recorded 2026-10-19 (section 7); to be built later. Follows regional pricing (PR #38, live 2026-10-18).
 
 ## 1. Purpose
 
@@ -87,13 +87,15 @@ Coupons and time-limited promotions are not included; they are a separate piece 
 
 Event tickets, dues and giving (organisations set their own prices); countries other than Ghana; checking a person's identity document.
 
-## 7. Questions for the owner
+## 7. Owner decisions (2026-10-19)
 
-1. **Mismatch rule (4.3):** A (top up, recommended), B (refund) or C (mobile money only)?
-2. **The switch:** remove it entirely, or keep "Show prices in USD" for visitors in Ghana?
-3. **Payout account as proof:** should a verified Ghana payout account alone make an organisation eligible (recommended), or must they pay with Ghana money once?
-4. **Visitors outside Ghana:** may an organisation in Ghana whose staff travel or use a VPN still get the Ghana price at checkout, when its payment method proves Ghana (recommended)? Or must the IP also be Ghana?
-5. **Existing customers:** treat organisations that have already paid with mobile money or a Ghana card as eligible from day one? This can be read from stored transactions.
+1. **Foreign card on a Ghana price: option A.** Keep the payment and charge the difference to the same card. If that fails, the plan runs for the period already paid and the organisation moves to USD pricing from the next period; the superadmin is told.
+2. **Currency is settled at onboarding.** The GHS option leaves the switch for everyone. An organisation that onboarded in USD keeps USD prices, including when its people are in Ghana. An organisation that is Ghana-eligible keeps the Ghana price wherever its people are. Visitors who are not yet customers see the currency their country gives them (GHS from Ghana, USD elsewhere).
+3. **Proof by payout account, Ghana only for now.** A verified Ghana payout account (bank or mobile money) makes an organisation Ghana-eligible. For organisations outside Ghana, a verified Stripe account may become the proof once Stripe Connect is finalised; until then it is not.
+4. **Staff abroad: yes.** A Ghana organisation keeps the Ghana price at checkout when its payment method or payout account proves Ghana, even if the person is browsing from elsewhere.
+5. **Existing customers: yes.** Organisations that have already paid with Ghana mobile money or a Ghana-issued card are Ghana-eligible from the day this ships, read from stored transactions.
+
+Eligibility is therefore: a verified Ghana payout account, **or** a successful Ghana mobile-money or Ghana-card payment, **or** a superadmin grant. It is recorded on the organisation as `pricing_region` with the evidence and date.
 
 ## 8. Rough build plan (for the implementation plan)
 

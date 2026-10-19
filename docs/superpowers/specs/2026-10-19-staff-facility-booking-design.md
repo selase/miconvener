@@ -1,6 +1,6 @@
 # Staff facility booking: design
 
-Date: 2026-10-19. Status: draft for owner review. Path: architectural (new booking kind, new visibility rule, new identity rule, plan entitlement).
+Date: 2026-10-19. Status: owner decisions recorded 2026-10-19 (section 6); ready for an implementation plan. Path: architectural (new booking kind, new visibility rule, new identity rule, plan entitlement).
 
 ## 1. Purpose
 
@@ -64,13 +64,13 @@ An institution on MiConvener (a university, a hospital, a church with halls) has
 
 Charging departments internally (cost centres, internal rates), recurring bookings (every Tuesday for a term), equipment and catering orders beyond a free-text setup note, and booking by people who are neither staff nor members of the public marketplace.
 
-## 6. Questions for the owner
+## 6. Owner decisions (2026-10-19)
 
-1. **Public rooms:** when staff book a room that is also rented to the public, is it free for them too (recommended: yes, staff never pay), or only staff-only rooms are free?
-2. **Approval default:** approval required for every staff request (recommended), or confirmed at once unless the room says otherwise?
-3. **Domain staff:** should a verified domain address be enough on its own (recommended, after DNS proof), or must the organisation also tag them before they can book?
-4. **Limits:** a maximum booking length, how far ahead staff may book, and how many open requests one person may hold?
-5. **Recurring bookings** (a weekly lecture for a term): needed in the first version, or later?
+1. **Public rooms are free for staff too.** Staff never pay for any room their organisation owns, public or staff-only.
+2. **Approval is required by default.** Each room may switch approval off so staff requests confirm at once.
+3. **A verified domain address is enough.** After the DNS proof, anyone who verifies an address at the domain counts as staff without being tagged first; on their first request they become a member with the Staff tag.
+4. **Limits are settings, with defaults the owner can change** (owner agreed to the recommendations; no numbers were given): maximum booking length 8 hours, booking window 90 days ahead, 5 open requests per person. Each is set per organisation by a team member with the manage room bookings permission.
+5. **Recurring bookings come later,** not in the first version.
 
 ## 7. Rough build plan
 
