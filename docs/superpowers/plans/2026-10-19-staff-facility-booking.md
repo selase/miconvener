@@ -40,10 +40,10 @@
 **Interfaces:**
 - Produces: feature slug `staff_room_booking` (boolean; Enterprise true, others false) and `FeatureService::FEATURE_STAFF_ROOM_BOOKING`; permission `manage room bookings` (tenant-safe, held by Org Superadmin by default); `config('bookings.staff.defaults')` returning `['max_hours' => 8, 'window_days' => 90, 'open_requests' => 5]`.
 
-- [ ] **Step 1: Write failing tests** named `only enterprise has staff_room_booking`, `manage room bookings is tenant safe and held by the organisation owner role`, and `the booking limit defaults are 8 hours, 90 days and 5 open requests`.
-- [ ] **Step 2:** Run `php artisan test --filter=StaffRoomBookingGateTest`. Expected: FAIL.
-- [ ] **Step 3:** Add the feature to the seeder's feature list and the four package arrays, the permission to the seeder and `TENANT_SAFE`, the owner role's list in `RolePermissions`, and `config/bookings.php` with the defaults.
-- [ ] **Step 4:** Rerun. Expected: PASS. Commit `feat(bookings): staff_room_booking feature, permission and defaults`.
+- [x] **Step 1: Write failing tests** named `only enterprise has staff_room_booking`, `manage room bookings is tenant safe and held by the organisation owner role`, and `the booking limit defaults are 8 hours, 90 days and 5 open requests`.
+- [x] **Step 2:** Run `php artisan test --filter=StaffRoomBookingGateTest`. Expected: FAIL.
+- [x] **Step 3:** Add the feature to the seeder's feature list and the four package arrays, the permission to the seeder and `TENANT_SAFE`, the owner role's list in `RolePermissions`, and `config/bookings.php` with the defaults.
+- [x] **Step 4:** Rerun. Expected: PASS. Commit `feat(bookings): staff_room_booking feature, permission and defaults`.
 
 ### Task 2: Data
 
