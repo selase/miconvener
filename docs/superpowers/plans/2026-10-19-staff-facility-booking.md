@@ -166,10 +166,11 @@
 - Consumes: `StaffIdentity::isStaff`, `RoomAvailability::busy`, `InternalBookings::request`/`cancel`.
 - Produces: JSON `GET /my/communities/{tenant}/rooms` (rooms the person may request, each with busy times for a requested week), `POST .../rooms/{room}/requests`, `DELETE .../requests/{booking}`; 404 for a non-staff person, so a private room's existence is not revealed.
 
-- [ ] **Step 1: Failing tests:** `staff see staff-only and public rooms with busy times`, `a verified person who is not staff gets 404`, `staff request and cancel their own booking`, `a person cannot cancel another's booking`, `rooms of another organisation are never listed`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement the controller and the page; build assets.
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff book rooms from /my`.
+- [x] **Step 1: Failing tests:** `staff see staff-only and public rooms with busy times`, `a verified person who is not staff gets 404`, `staff request and cancel their own booking`, `a person cannot cancel another's booking`, `rooms of another organisation are never listed`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement the controller and the page; build assets.
+- [x] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff book rooms from /my`.
+  Ruling: `GET /my/communities/{tenant}/rooms` also returns the person's own open bookings (`mine`), and `MyCommunityResource` gains `actions.rooms` so the app shows a Book a room button only to staff. Routes sit inside the existing `community.identity` and `community-access` throttle group. The panel follows the existing `community_view` pattern (`community_view=rooms`). The booking summary is returned on create and cancel.
 
 ### Task 10: Verification and handover
 
