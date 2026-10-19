@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 
 beforeEach(function () {
     Mail::fake();
+    App\Models\PlatformNotificationRecipient::query()->firstOrCreate(['topic' => App\Models\PlatformNotificationRecipient::ENTERPRISE_LEADS, 'email' => 'sales@example.com']);
     RateLimiter::clear('lead-submission:127.0.0.1');
 });
 

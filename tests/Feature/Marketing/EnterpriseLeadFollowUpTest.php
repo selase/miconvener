@@ -41,10 +41,6 @@ function submitEnquiry(): void
     ])->assertSessionHas('success');
 }
 
-test('enquiries go to the owner from the start', function (): void {
-    expect(PlatformNotificationRecipient::query()->where('topic', PlatformNotificationRecipient::ENTERPRISE_LEADS)->pluck('email')->all())->toBe(['hiselase@gmail.com']);
-});
-
 test('an enquiry goes to every chosen recipient, with replies going to the enquirer', function (): void {
     PlatformNotificationRecipient::query()->delete();
     PlatformNotificationRecipient::query()->create(['topic' => PlatformNotificationRecipient::ENTERPRISE_LEADS, 'email' => 'sales@example.com']);
