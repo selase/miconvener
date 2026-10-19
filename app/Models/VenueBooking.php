@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Scopes\StaffOnlyScope;
 use Carbon\CarbonInterface;
 use Database\Factories\VenueBookingFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -182,7 +183,8 @@ final class VenueBooking extends Model
      */
     public function listing(): BelongsTo
     {
-        return $this->belongsTo(StoreListing::class, 'store_listing_id');
+        // A booking already names its room, so the room loads even when it is staff-only.
+        return $this->belongsTo(StoreListing::class, 'store_listing_id')->withoutGlobalScope(StaffOnlyScope::class);
     }
 
     /**

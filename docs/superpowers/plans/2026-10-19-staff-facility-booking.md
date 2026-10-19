@@ -70,10 +70,11 @@
 **Interfaces:**
 - Produces: `StaffOnlyScope` excludes `audience = staff`; `StoreListing::withStaffOnly()` removes it; `StoreListing::visibleToStaffOf(Tenant $tenant)` includes staff-only rooms of that organisation's shop only.
 
-- [ ] **Step 1: Failing tests**, one dataset over every public path, each asserting a staff-only room is absent: marketplace home, listing page (404), search (`MarketplaceSearchService`), `checkAvailability`, booking and quote endpoints, the three MCP tools, `VenueEmbeddingService`, `EmbedMarketplaceVenuesCommand`, and the sitemap if one lists listings. One more test: the owning console lists its staff-only rooms.
-- [ ] **Step 2:** Run. Expected: FAIL for staff-only rooms appearing.
-- [ ] **Step 3:** Implement the scope and register it; opt the console and `VenueCalendarController` queries in with `withStaffOnly()`.
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff-only rooms never appear publicly`.
+- [x] **Step 1: Failing tests**, one dataset over every public path, each asserting a staff-only room is absent: marketplace home, listing page (404), search (`MarketplaceSearchService`), `checkAvailability`, booking and quote endpoints, the three MCP tools, `VenueEmbeddingService`, `EmbedMarketplaceVenuesCommand`, and the sitemap if one lists listings. One more test: the owning console lists its staff-only rooms.
+- [x] **Step 2:** Run. Expected: FAIL for staff-only rooms appearing.
+- [x] **Step 3:** Implement the scope and register it; opt the console and `VenueCalendarController` queries in with `withStaffOnly()`.
+- [x] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff-only rooms never appear publicly`.
+  Ruling: the global scope also needed route-model binding changed (`StoreListing::resolveRouteBinding` resolves the owning organisation's staff-only rooms and 404s for everyone else) and the public booking pages (`show`, `checkout`, `callback`) now serve marketplace bookings only, so an internal booking's reference reveals nothing. `VenueBooking::listing` lifts the scope because a booking already names its room. Verified the leak tests fail (11 of 14) with the scope switched off.
 
 ### Task 4: Who is staff
 

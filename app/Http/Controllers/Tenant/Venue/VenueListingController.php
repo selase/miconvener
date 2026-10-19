@@ -46,6 +46,7 @@ final class VenueListingController extends Controller
         }
 
         $spaces = $shop->listings()
+            ->withStaffOnly()
             ->with(['primaryMedia', 'amenities.amenity'])
             ->orderBy('sort_order')
             ->orderByDesc('created_at')

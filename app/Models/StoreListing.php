@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Jobs\EmbedStoreListingJob;
+use App\Models\Scopes\StaffOnlyScope;
+use App\Services\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -325,8 +327,54 @@ final class StoreListing extends Model
         return null;
     }
 
+    /**
+     * Include staff-only rooms. For the organisation's own console and for
+     * code that has already established the person is that organisation's staff.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeWithStaffOnly(Builder $query): void
+    {
+        $query->withoutGlobalScope(StaffOnlyScope::class);
+    }
+
+    /**
+     * Public rooms, plus the staff-only rooms of this organisation's own shop.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeVisibleToStaffOf(Builder $query, Tenant $tenant): void
+    {
+        $query->withoutGlobalScope(StaffOnlyScope::class)->where(function (Builder $rooms) use ($tenant): void {
+            $rooms->where('store_listings.audience', self::AUDIENCE_PUBLIC)
+                ->orWhereHas('shop', fn (Builder $shop) => $shop->where('tenant_id', $tenant->id));
+        });
+    }
+
+    /**
+     * Console routes bind a room by id: the organisation's own staff-only
+     * rooms resolve, every other organisation's (and anyone's when there is
+     * no organisation) are not found, so their existence is not revealed.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        $query = $this->newQuery();
+
+        if ($tenant instanceof Tenant) {
+            $query->visibleToStaffOf($tenant);
+        }
+
+        return $query->where($field ?? $this->getRouteKeyName(), $value)->first();
+    }
+
     protected static function booted(): void
     {
+        self::addGlobalScope(new StaffOnlyScope);
+
         // Search reads the embedding, so a published listing whose searchable
         // content changed is re-embedded. Saving the embedding itself changes
         // none of these fields, so this cannot loop.

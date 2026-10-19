@@ -42,6 +42,7 @@ final class VenueCalendarController extends Controller
         }
 
         $spaces = StoreListing::query()
+            ->withStaffOnly()
             ->where('shop_id', $shop->id)
             ->where('listing_kind', 'venue')
             ->where('status', StoreListing::STATUS_PUBLISHED)
@@ -147,6 +148,7 @@ final class VenueCalendarController extends Controller
         ]);
 
         $listing = StoreListing::query()
+            ->withStaffOnly()
             ->where('shop_id', $shop->id)
             ->where('id', $validated['store_listing_id'])
             ->firstOrFail();
