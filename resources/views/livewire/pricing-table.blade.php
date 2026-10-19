@@ -195,6 +195,10 @@ new class extends Component
             </p>
         @endif
 
+        <p class="mt-4 text-center text-xs text-slate-400" data-commission-note>
+            Commission is charged on ticket sales only. It does not include card and mobile money processing fees, which the payment provider charges and are passed on at cost.
+        </p>
+
         {{-- Enterprise footer note --}}
         <div class="mt-6 text-center">
             <p class="text-sm text-slate-400">

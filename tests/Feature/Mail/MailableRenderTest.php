@@ -14,6 +14,7 @@ use App\Mail\Billing\SubscriptionEndingMail;
 use App\Mail\CommunityMessage;
 use App\Mail\DuesReceipt;
 use App\Mail\DuesReminder;
+use App\Mail\EnterpriseEnquiryReceived;
 use App\Mail\Events\AbstractDecisionNotificationMail;
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Mail\Events\EventBlastMail;
@@ -286,6 +287,7 @@ test('every mailable renders', function (): void {
         'EventTicketTransferred' => fn () => new EventTicketTransferred($registration, 'Ama Serwaa', 'Kofi Mensah', 'kofi@stem.org'),
         'UrgentServiceRequestRaised' => fn () => new UrgentServiceRequestRaised($urgentRequest),
         'NewEnterpriseLead' => fn () => new NewEnterpriseLead($lead),
+        'EnterpriseEnquiryReceived' => fn () => new EnterpriseEnquiryReceived($lead, ['sales@example.com']),
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),
         'WelcomeMail' => fn () => new WelcomeMail($user),

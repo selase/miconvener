@@ -20,13 +20,14 @@ test('EventPackageSeeder creates exactly four packages with the correct feature 
 
     $growth = Package::where('slug', 'growth')->firstOrFail();
     expect((float) $growth->default_platform_fee_percentage)->toEqual(2.0);
-    $customDomains = $growth->features()->where('slug', 'custom-domains')->first();
-    expect($customDomains->pivot->value)->toEqual(true);
+    // Your own domain is Enterprise only (owner, 2026-10-19).
+    expect($growth->features()->where('slug', 'custom-domains')->first()->pivot->value)->toBeFalsy();
 
     $enterprise = Package::where('slug', 'enterprise')->firstOrFail();
     $eventsUnlimited = $enterprise->features()->where('slug', 'events_in_flight')->first();
     expect($eventsUnlimited->pivot->value)->toEqual(-1);
     expect($enterprise->default_platform_fee_percentage)->toBeNull();
+    expect($enterprise->features()->where('slug', 'custom-domains')->first()->pivot->value)->toBeTruthy();
 });
 
 test('EventPackageSeeder creates all eleven catalog features', function () {

@@ -5,7 +5,7 @@
 @section('content')
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
-        @can('access-superadmin-dashboard')
+        @can('manage-commercial-terms')
             <div class="card card-flush mb-6">
                 <div class="card-header"><h2 class="card-title">Commercial terms</h2></div>
                 <div class="card-body">
@@ -18,7 +18,27 @@
                     <p class="text-muted">Rates are percentages. Caps are in minor units. Zero is a waiver; leave the rate blank to remove an override. Existing checkouts keep their frozen terms.</p>
                     @foreach ($commercialTerms as $stream => $terms)
                         @if ($stream === 'tickets')
-                            <p>Tickets: {{ $terms->rate }}% ({{ $terms->source }}). Managed through existing ticket terms.</p>
+                            {{-- No plan caps ticket commission; a rate or cap here is this organisation's deal. --}}
+                            <form method="POST" action="{{ route('tenants.ticket-terms.update', $tenant->uuid) }}" class="border-bottom pb-5 mb-5">
+                                @csrf
+                                <h3 class="fs-5">Tickets <span class="badge badge-light">{{ $terms->rate }}% · {{ $terms->source }}</span></h3>
+                                <p class="text-muted">Ticket commission is uncapped on every plan. Set a rate or a cap only as a deal for this organisation; leave a field blank to use the plan. Events already selling keep their locked terms.</p>
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="ticket-rate">Rate (%)</label>
+                                        <input id="ticket-rate" class="form-control form-control-solid" name="rate" type="number" min="0" max="100" step="0.01" value="{{ old('rate', $tenant->platform_fee_percentage) }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="ticket-cap">Cap per ticket (GHS)</label>
+                                        <input id="ticket-cap" class="form-control form-control-solid" name="cap" type="number" min="0.01" step="0.01" value="{{ old('cap', $tenant->platform_fee_cap_amount === null ? null : number_format($tenant->platform_fee_cap_amount / 100, 2, '.', '')) }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="ticket-reason">Reason</label>
+                                        <input id="ticket-reason" class="form-control form-control-solid" name="reason" required maxlength="2000">
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-3 mt-4"><button class="btn btn-primary" type="submit">Save ticket terms</button></div>
+                            </form>
                         @else
                             @php($override = $commercialOverrides->get($stream))
                             <form method="POST" action="{{ route('tenants.commercial-terms.update', $tenant->uuid) }}" class="border-bottom pb-5 mb-5">

@@ -97,11 +97,16 @@ test('starter tenants cannot see, set, or verify a custom domain', function () {
         ->assertForbidden();
 });
 
-test('growth tenants can configure a custom domain', function () {
+test('enterprise tenants can configure a custom domain, and growth tenants cannot', function () {
+    // Your own domain is Enterprise only (owner, 2026-10-19).
     $this->seed(EventPackageSeeder::class);
+    $growth = Tenant::factory()->create(['slug' => 'growth-only', 'package_id' => App\Models\Package::where('slug', 'growth')->firstOrFail()->id]);
+    $growth->syncFeaturesFromPackage();
+    expect($growth->featureEnabled(App\Services\Tenancy\FeatureService::FEATURE_CUSTOM_DOMAINS))->toBeFalse();
+
     $tenant = Tenant::factory()->create([
         'slug' => 'growth-settings',
-        'package_id' => App\Models\Package::where('slug', 'growth')->firstOrFail()->id,
+        'package_id' => App\Models\Package::where('slug', 'enterprise')->firstOrFail()->id,
     ]);
     $tenant->syncFeaturesFromPackage();
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
