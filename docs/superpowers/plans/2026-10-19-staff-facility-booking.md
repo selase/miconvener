@@ -55,10 +55,10 @@
 **Interfaces:**
 - Produces: `members.is_staff` bool default false; `store_listings.audience` string default `public` (`StoreListing::AUDIENCE_PUBLIC`, `AUDIENCE_STAFF`) and `requires_approval` bool default true; `venue_bookings.kind` default `marketplace` (`VenueBooking::KIND_MARKETPLACE`, `KIND_INTERNAL`), `requested_for_member_id` nullable, `entered_by_user_id` nullable, `department` nullable, `purpose` nullable, and status `VenueBooking::STATUS_PENDING_APPROVAL = 'pending_approval'`, `STATUS_DECLINED`; `tenants.staff_email_domains` jsonb (list of `{domain, token, verified_at}`) and `tenants.booking_limits` jsonb nullable.
 
-- [ ] **Step 1: Failing test** `new columns default to existing behaviour`: an existing listing is `public`, an existing booking is `marketplace`, a member is not staff.
-- [ ] **Step 2:** Run it. Expected: FAIL (unknown columns).
-- [ ] **Step 3:** Write the migration and add constants, `$fillable` entries and casts to the models.
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff booking columns`.
+- [x] **Step 1: Failing test** `new columns default to existing behaviour`: an existing listing is `public`, an existing booking is `marketplace`, a member is not staff.
+- [x] **Step 2:** Run it. Expected: FAIL (unknown columns).
+- [x] **Step 3:** Write the migration and add constants, `$fillable` entries and casts to the models.
+- [x] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff booking columns`.
 
 ### Task 3: Staff-only rooms are hidden by default
 

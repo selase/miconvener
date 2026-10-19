@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\VenueBookingFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -63,9 +65,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 final class VenueBooking extends Model
 {
+    /** @use HasFactory<VenueBookingFactory> */
+    use HasFactory;
+
     use HasUuids;
 
     public const STATUS_PENDING_QUOTE = 'pending_quote';
+
+    /** A staff request waiting for a facility manager. It holds the slot. */
+    public const STATUS_PENDING_APPROVAL = 'pending_approval';
+
+    public const STATUS_DECLINED = 'declined';
+
+    /** Booked and paid for through the marketplace. */
+    public const KIND_MARKETPLACE = 'marketplace';
+
+    /** Free, for the owning organisation's own staff. */
+    public const KIND_INTERNAL = 'internal';
 
     public const STATUS_PENDING_PAYMENT = 'pending_payment';
 
@@ -137,6 +153,12 @@ final class VenueBooking extends Model
         'contract_terms_snapshot',
         'host_notes',
         'quote_valid_until',
+        'kind',
+        'requested_for_member_id',
+        'entered_by_user_id',
+        'department',
+        'purpose',
+        'decline_reason',
     ];
 
     /**

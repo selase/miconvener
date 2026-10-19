@@ -79,6 +79,8 @@ final class Tenant extends Model
         'settlement_mode',
         'agreed_price_pesewas',
         'agreed_price_interval',
+        'staff_email_domains',
+        'booking_limits',
         'created_at',
         'updated_at',
     ];
@@ -87,6 +89,8 @@ final class Tenant extends Model
         'status' => TenantStatusEnum::class,
         'encryption_at_rest' => 'boolean',
         'meta' => 'array',
+        'staff_email_domains' => 'array',
+        'booking_limits' => 'array',
         'onboarding_completed_at' => 'datetime',
         'llm_models_whitelist' => 'array',
         'allowed_ips' => 'array',

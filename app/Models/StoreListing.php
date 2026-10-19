@@ -54,6 +54,12 @@ final class StoreListing extends Model
 
     public const string STATUS_PUBLISHED = 'published';
 
+    /** Anyone may see and book the room (the marketplace). */
+    public const string AUDIENCE_PUBLIC = 'public';
+
+    /** Only the owning organisation's staff may see and request the room. */
+    public const string AUDIENCE_STAFF = 'staff';
+
     public const string STATUS_SUSPENDED = 'suspended';
 
     public const string PRICE_VISIBILITY_PUBLIC = 'public';
@@ -92,6 +98,8 @@ final class StoreListing extends Model
         'sort_order',
         'embedding',
         'is_bookable',
+        'audience',
+        'requires_approval',
     ];
 
     /**
@@ -106,6 +114,7 @@ final class StoreListing extends Model
      */
     protected $casts = [
         'taken_down_at' => 'datetime',
+        'requires_approval' => 'boolean',
         'rental_price_pesewas' => 'integer',
         'security_deposit_pesewas' => 'integer',
         'min_order_pesewas' => 'integer',
