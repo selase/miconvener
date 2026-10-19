@@ -8,6 +8,7 @@ use App\Enum\MemberStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Venue\DeclineInternalBookingRequest;
 use App\Http\Requests\Tenant\Venue\StoreInternalBookingRequest;
+use App\Http\Requests\Tenant\Venue\UpdateBookingLimitsRequest;
 use App\Models\Member;
 use App\Models\StoreListing;
 use App\Models\Tenant;
@@ -116,6 +117,13 @@ final class InternalBookingController extends Controller
         $this->bookings->cancel($this->find($booking), $request->user());
 
         return back()->with('success', 'Booking cancelled.');
+    }
+
+    public function updateLimits(UpdateBookingLimitsRequest $request): RedirectResponse
+    {
+        $this->tenant()->update(['booking_limits' => $request->validated()]);
+
+        return back()->with('success', 'Booking limits saved.');
     }
 
     public function storeDomain(Request $request, StaffDomains $domains): RedirectResponse

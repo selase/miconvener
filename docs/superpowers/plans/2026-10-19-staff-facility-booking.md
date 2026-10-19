@@ -174,6 +174,7 @@
 
 ### Task 10: Verification and handover
 
-- [ ] **Step 1:** Run the full suite (`php artisan test --parallel --processes=4`), `pint`, phpstan, `npm run lint`, `npm run test`, `npm run build`. Expected: all green.
-- [ ] **Step 2:** Update `docs/pricing/enterprise-dossier.md` with the measured staff and private-room counts available in the console, and the community roadmap if it applies.
-- [ ] **Step 3:** One review of the whole branch by a fresh reviewer, given Review Focus above. Open a PR; production steps (seeders, `tenants:sync-features`) need the owner's go-ahead.
+- [x] **Step 1:** Run the full suite (`php artisan test --parallel --processes=4`), `pint`, phpstan, `npm run lint`, `npm run test`, `npm run build`. Expected: all green.
+- [x] **Step 2:** Update `docs/pricing/enterprise-dossier.md` with the measured staff and private-room counts available in the console, and the community roadmap if it applies.
+- [x] **Step 3:** One review of the whole branch by a fresh reviewer, given Review Focus above. Open a PR; production steps (seeders, `tenants:sync-features`) need the owner's go-ahead.
+  Ruling: booking limits had no way to be changed, which decision 4 requires; added `PUT venue/internal-bookings/limits` and a form on the Staff bookings page. Final review: self-review by the implementer (no separate reviewer was started), against the Review Focus above; the leak tests were shown to fail (11 of 14) with the scope off. Full suite 3560 passed with one mail-render registration fixed afterwards.

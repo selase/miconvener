@@ -209,6 +209,56 @@ function DomainList({ domains }) {
     );
 }
 
+function LimitsForm({ limits }) {
+    const form = useForm({
+        max_hours: limits.max_hours,
+        window_days: limits.window_days,
+        open_requests: limits.open_requests,
+    });
+
+    const save = (event) => {
+        event.preventDefault();
+        form.put(route('tenant.venue.internal-bookings.limits.update'), { preserveScroll: true });
+    };
+
+    return (
+        <form onSubmit={save} className="flex flex-wrap items-start gap-4">
+            <Input
+                label="Longest booking (hours)"
+                type="number"
+                min="1"
+                max="24"
+                value={form.data.max_hours}
+                onChange={(e) => form.setData('max_hours', e.target.value)}
+                error={form.errors.max_hours}
+            />
+            <Input
+                label="Book up to (days ahead)"
+                type="number"
+                min="1"
+                max="365"
+                value={form.data.window_days}
+                onChange={(e) => form.setData('window_days', e.target.value)}
+                error={form.errors.window_days}
+            />
+            <Input
+                label="Open requests per person"
+                type="number"
+                min="1"
+                max="50"
+                value={form.data.open_requests}
+                onChange={(e) => form.setData('open_requests', e.target.value)}
+                error={form.errors.open_requests}
+            />
+            <div className="pt-7">
+                <Button type="submit" disabled={form.processing}>
+                    Save limits
+                </Button>
+            </div>
+        </form>
+    );
+}
+
 function BookForStaff({ rooms, staff, limits }) {
     const [mode, setMode] = useState(staff.length > 0 ? 'existing' : 'new');
     const form = useForm({
@@ -516,6 +566,13 @@ export default function InternalBookingsIndex({
                         domain by publishing a record first.
                     </p>
                     <DomainList domains={domains} />
+                </section>
+
+                <section aria-labelledby="limits-heading" className="space-y-3">
+                    <h2 id="limits-heading" className="text-sm font-semibold text-ink">
+                        Booking limits
+                    </h2>
+                    <LimitsForm limits={limits} />
                 </section>
 
                 <section aria-labelledby="book-heading" className="space-y-3">

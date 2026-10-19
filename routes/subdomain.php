@@ -462,6 +462,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
             Route::post('/', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'store'])->name('store');
             Route::post('{booking}/approve', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'approve'])->whereUuid('booking')->name('approve');
             Route::post('{booking}/decline', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'decline'])->whereUuid('booking')->name('decline');
+            Route::put('limits', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'updateLimits'])->name('limits.update');
             Route::post('domains', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'storeDomain'])->name('domains.store');
             Route::post('domains/verify', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'verifyDomain'])->name('domains.verify');
             Route::delete('domains', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'destroyDomain'])->name('domains.destroy');

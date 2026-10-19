@@ -188,3 +188,24 @@ test('a member of another organisation cannot be removed from staff here', funct
     $this->actingAs($this->owner)->delete(($this->route)('staff.destroy', ['member' => $other->id]))->assertNotFound();
     expect($other->fresh()->is_staff)->toBeTrue();
 });
+
+test('an organisation sets its own booking limits, and they are the ones enforced', function (): void {
+    $this->actingAs($this->owner)->put(($this->route)('limits.update'), ['max_hours' => 2, 'window_days' => 30, 'open_requests' => 3])->assertSessionHasNoErrors();
+
+    expect($this->tenant->fresh()->booking_limits)->toBe(['max_hours' => 2, 'window_days' => 30, 'open_requests' => 3]);
+
+    $this->actingAs($this->owner)->post(($this->route)('store'), ($this->payload)(['ends_at' => $this->nine->addHours(3)->toIso8601String()]))->assertSessionHasErrors('ends_at');
+    $this->actingAs($this->owner)->get(($this->route)('index'))->assertInertia(fn ($page) => $page->where('limits.max_hours', 2)->where('limits.window_days', 30)->where('limits.open_requests', 3));
+});
+
+test('booking limits stay within sensible bounds and need the permission', function (): void {
+    $this->actingAs($this->owner)->put(($this->route)('limits.update'), ['max_hours' => 0, 'window_days' => 1000, 'open_requests' => 'many'])->assertSessionHasErrors(['max_hours', 'window_days', 'open_requests']);
+
+    $admin = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($admin->id);
+    setPermissionsTeamId($this->tenant->id);
+    $admin->assignRole('Org Admin');
+    $admin->revokePermissionTo('manage room bookings');
+
+    $this->actingAs($admin)->put(($this->route)('limits.update'), ['max_hours' => 4, 'window_days' => 30, 'open_requests' => 3])->assertForbidden();
+});

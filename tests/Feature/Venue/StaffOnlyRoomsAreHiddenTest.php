@@ -141,3 +141,7 @@ test('another organisation cannot open a staff-only room, and is told it does no
 
     $this->actingAs($user)->get(route('tenant.venue.spaces.edit', ['subdomain' => $tenant->slug, 'listing' => $this->staffOnly->id]))->assertNotFound();
 });
+
+test('the public storefront of the owning shop never lists a staff-only room', function (): void {
+    $this->get('/marketplace/'.$this->shop->slug)->assertOk()->assertSee('Room open-hall')->assertDontSee('Room staff-boardroom');
+});
