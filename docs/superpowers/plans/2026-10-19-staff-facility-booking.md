@@ -86,10 +86,11 @@
 - Consumes: `CommunityHistory::members(Tenant, Session)` (the person's member records) and `PlatformAttendeeVerification::verifiedEmail(Session): ?string`.
 - Produces: `StaffIdentity::isStaff(Tenant $tenant, Session $session): bool` and `::memberFor(Tenant $tenant, Session $session): ?Member` (creates and tags a member on first verified-domain use). Returns false when the organisation lacks the `staff_room_booking` feature.
 
-- [ ] **Step 1: Failing tests:** `a member tagged staff is staff`, `a member not tagged is not`, `staff of one organisation is not staff of another`, `an organisation without the feature has no staff`, `a verified-domain address is staff and becomes a tagged member`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement `isStaff` and `memberFor`; the domain rule defers to Task 8's `StaffDomains::matches(Tenant, string $email): bool` (add a stub returning false here, completed in Task 8).
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff identity`.
+- [x] **Step 1: Failing tests:** `a member tagged staff is staff`, `a member not tagged is not`, `staff of one organisation is not staff of another`, `an organisation without the feature has no staff`, `a verified-domain address is staff and becomes a tagged member`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement `isStaff` and `memberFor`; the domain rule defers to Task 8's `StaffDomains::matches(Tenant, string $email): bool` (add a stub returning false here, completed in Task 8).
+- [x] **Step 4:** Rerun; PASS. Commit `feat(bookings): staff identity`.
+  Ruling: `StaffDomains::matches` (exact match on verified domains stored in `tenants.staff_email_domains`) is built here, not stubbed, because the identity tests need it; Task 8 adds add/verify/remove and the DNS proof around it. A domain-only member is created through `MemberEnrollment` with a `Staff` membership type that has no amount and no period, which the dues scheduler skips (`hasDues()` is false).
 
 ### Task 5: One availability check
 
