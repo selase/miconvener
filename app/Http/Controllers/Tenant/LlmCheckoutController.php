@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Contracts\PaymentGateway;
 use App\Http\Controllers\Controller;
 use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\CheckoutTerms;
 use App\Services\Pricing\PriceBook;
 use App\Services\Pricing\VisitorCurrency;
 use App\Services\Tenancy\TenantContext;
@@ -39,7 +40,9 @@ final class LlmCheckoutController extends Controller
         $pack = $packs[$packKey];
         $customerId = $this->getOrCreateCustomerId($request, $gateway, $tenant);
 
-        $quote = app(ChargeQuote::class)->for(app(PriceBook::class)->tokenPack($packKey, app(VisitorCurrency::class)->resolve($request)));
+        $price = app(PriceBook::class)->tokenPack($packKey, app(VisitorCurrency::class)->resolve($request, $tenant));
+        $quote = app(ChargeQuote::class)->for($price);
+        $terms = CheckoutTerms::for($tenant, $price);
         $redirectUrl = route('tenant.llm-usage.index');
 
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(
@@ -53,7 +56,7 @@ final class LlmCheckoutController extends Controller
                 'type' => 'llm_token_purchase',
                 'source' => config('services.paystack.metadata_source'),
                 'description' => "Purchase: {$pack['name']} ({$pack['tokens']} tokens)",
-                'pricing' => $quote->meta(),
+                ...$terms->metadata($quote),
             ]
         );
 

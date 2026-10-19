@@ -142,6 +142,12 @@ final class PaystackGateway implements PaymentGateway
                 $payload['reference'] = $reference;
             }
 
+            // The channels Paystack may offer, when the checkout restricts them
+            // (a Ghana price that must be paid by Ghana mobile money or card).
+            if (is_array($metadata['allowed_channels'] ?? null) && $metadata['allowed_channels'] !== []) {
+                $payload['channels'] = array_values($metadata['allowed_channels']);
+            }
+
             if ($this->split !== null) {
                 $payload['subaccount'] = $this->split['subaccount'];
                 $payload['transaction_charge'] = $amount - $this->split['platform_share'];

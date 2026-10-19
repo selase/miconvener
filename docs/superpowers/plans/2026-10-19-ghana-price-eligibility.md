@@ -70,10 +70,11 @@
 **Interfaces:**
 - Produces: `PriceBook::currencyFor(Tenant $tenant, Request $request): string` (the single rule: eligible gives GHS; otherwise USD, except a Ghana-country visitor who is not yet eligible, who is offered GHS with proof required); `PaystackGateway::createOneTimeCheckoutSession` sends `channels` when given; checkout metadata gains `pricing.proof_required` (true when a not-yet-eligible organisation is offered the Ghana price) and passes `['mobile_money', 'card']` as channels in that case.
 
-- [ ] **Step 1: Failing tests:** `an eligible organisation is charged the ghana price on every channel`, `an organisation abroad is always charged the USD equivalent in GHS`, `a not yet eligible organisation in Ghana is offered the ghana price with mobile money and card only and proof required`, `a posted currency or price field changes nothing`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement `PriceBook::currencyFor` and use it at the three checkout paths in place of reading `VisitorCurrency` directly; extend the gateway signature with an optional `channels` argument (update the contract and any test doubles).
-- [ ] **Step 4:** Rerun with `tests/Feature/Pricing` and `tests/Feature/Billing`; PASS. Commit `feat(pricing): the Ghana price is charged only to eligible organisations`.
+- [x] **Step 1: Failing tests:** `an eligible organisation is charged the ghana price on every channel`, `an organisation abroad is always charged the USD equivalent in GHS`, `a not yet eligible organisation in Ghana is offered the ghana price with mobile money and card only and proof required`, `a posted currency or price field changes nothing`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement `PriceBook::currencyFor` and use it at the three checkout paths in place of reading `VisitorCurrency` directly; extend the gateway signature with an optional `channels` argument (update the contract and any test doubles).
+- [x] **Step 4:** Rerun with `tests/Feature/Pricing` and `tests/Feature/Billing`; PASS. Commit `feat(pricing): the Ghana price is charged only to eligible organisations`.
+  Ruling: instead of `PriceBook::currencyFor` and a gateway signature change, the currency still comes from `VisitorCurrency::resolve($request, $tenant)` and a new `CheckoutTerms::for($tenant, Money $price)` decides proof from the *price actually charged* (a GHS price to an organisation that is not Ghana eligible), so the fallback GHS price when USD is paused or missing also needs proof. Channels travel in the checkout metadata (`allowed_channels`) and `PaystackGateway` turns them into Paystack's `channels`; the `PaymentGateway` contract is unchanged, so no mock changed. Enterprise agreed prices use `CheckoutTerms::agreed()`. Plan renewals (pay link and auto-charge) are Task 5.
 
 ### Task 4: Proof at payment, and the foreign-card top-up
 

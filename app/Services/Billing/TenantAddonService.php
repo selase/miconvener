@@ -11,6 +11,7 @@ use App\Models\TenantAddon;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\CheckoutTerms;
 use App\Services\Pricing\PriceBook;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -230,7 +231,9 @@ final class TenantAddonService
             Event::where('tenant_id', $tenant->id)->where('id', $eventId)->firstOrFail();
         }
 
-        $quote = app(ChargeQuote::class)->for(app(PriceBook::class)->addon($addonKey, (string) ($options['currency'] ?? 'GHS'), $multiplier));
+        $price = app(PriceBook::class)->addon($addonKey, (string) ($options['currency'] ?? 'GHS'), $multiplier);
+        $quote = app(ChargeQuote::class)->for($price);
+        $terms = CheckoutTerms::for($tenant, $price);
         $totalPricePesewas = $quote->ghsMinor();
         $totalQuantity = $config['quantity'] * $multiplier;
         $reference = 'ADDON-'.mb_strtoupper(Str::random(12));
@@ -267,7 +270,7 @@ final class TenantAddonService
                 'quantity' => $totalQuantity,
                 'event_id' => $eventId,
                 'total_price' => $totalPricePesewas,
-                'pricing' => $quote->meta(),
+                ...$terms->metadata($quote),
             ]
         );
 
