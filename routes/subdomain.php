@@ -457,6 +457,20 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
             ->whereUuid('block')
             ->name('calendar.blocks.destroy');
 
+        Route::prefix('internal-bookings')->name('internal-bookings.')->group(function (): void {
+            Route::get('/', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'index'])->name('index');
+            Route::post('/', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'store'])->name('store');
+            Route::post('{booking}/approve', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'approve'])->whereUuid('booking')->name('approve');
+            Route::post('{booking}/decline', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'decline'])->whereUuid('booking')->name('decline');
+            Route::put('limits', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'updateLimits'])->name('limits.update');
+            Route::post('domains', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'storeDomain'])->name('domains.store');
+            Route::post('domains/verify', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'verifyDomain'])->name('domains.verify');
+            Route::delete('domains', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'destroyDomain'])->name('domains.destroy');
+            Route::post('staff', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'storeStaff'])->name('staff.store');
+            Route::delete('staff/{member}', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'destroyStaff'])->whereUuid('member')->name('staff.destroy');
+            Route::post('{booking}/cancel', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'cancel'])->whereUuid('booking')->name('cancel');
+        });
+
         Route::get('operations', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'index'])->name('operations.index');
         Route::get('operations/{booking}', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'show'])->name('operations.show');
         Route::post('operations/{booking}/tasks', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'createTask'])->name('operations.tasks.store');

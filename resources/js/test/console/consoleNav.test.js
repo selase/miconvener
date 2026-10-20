@@ -24,6 +24,26 @@ describe('visibleGroups', () => {
         expect(finance.items.map((i) => i.label)).toEqual(['Overview', 'Payouts']);
     });
 
+    it('shows Staff bookings only with the plan feature and the permission', () => {
+        const labels = (context) =>
+            visibleGroups(NAV_GROUPS, context)
+                .find((g) => g.key === 'venue')
+                ?.items.map((i) => i.label) ?? [];
+
+        expect(
+            labels({
+                features: { staff_room_booking: true },
+                can: { manage_venue: true, manage_room_bookings: true },
+            })
+        ).toContain('Staff bookings');
+        expect(
+            labels({ features: {}, can: { manage_venue: true, manage_room_bookings: true } })
+        ).not.toContain('Staff bookings');
+        expect(
+            labels({ features: { staff_room_booking: true }, can: { manage_venue: true } })
+        ).not.toContain('Staff bookings');
+    });
+
     it('keeps the order of the spec', () => {
         expect(NAV_GROUPS.map((g) => g.key)).toEqual([
             'top',

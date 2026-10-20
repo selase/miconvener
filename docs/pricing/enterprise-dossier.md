@@ -43,7 +43,7 @@ Each dimension: what it measures, why it matters to price, and how to measure it
 | Dimension | Measures | Why it prices | Cost to us | Measure for a prospect |
 |---|---|---|---|---|
 | Team seats | People with a console login | Value scales with the team running events | Negligible | How many people plan, sell and report? |
-| **Staff (bookers)** | People in the organisation who may book its private rooms (planned, see the staff booking design) | Pivotal for institutions: the number of staff is the size of the internal market the facility serves | Negligible per person; support grows with it | How many staff could book a room? Do they have their own email domain? |
+| **Staff (bookers)** | People tagged Staff, or verified at the organisation's proven email domain, who may book its rooms. Built 2026-10-19: Venue, Staff bookings lists them | Pivotal for institutions: the number of staff is the size of the internal market the facility serves | Negligible per person; support grows with it | How many staff could book a room? Do they have their own email domain? |
 | Staff links | Door and floor crew per event | Large events need many ushers | Negligible | Largest event: how many doors and ushers? |
 | Community members | Members on the books | Communities are priced by size | Storage and messaging | How many members, and how many active? |
 | Followers | People following the organisation | Free to follow; drives messaging volume | Messaging | Expected followers? |
@@ -69,7 +69,7 @@ Each dimension: what it measures, why it matters to price, and how to measure it
 
 | Dimension | Measures | Why it prices | Cost to us | Measure for a prospect |
 |---|---|---|---|---|
-| **Private bookable rooms** | Rooms and spaces only staff can see and book | Pivotal for institutions; Enterprise only | Low | How many rooms, halls, labs and spaces? |
+| **Private bookable rooms** | Rooms and spaces set to Staff only. Built 2026-10-19: Venue, Spaces, audience. Count them per organisation before quoting | Pivotal for institutions; Enterprise only | Low | How many rooms, halls, labs and spaces? |
 | Public listings | Rooms listed on the public marketplace | Marketplace fees (venue 10%) | Low | Which spaces are rented to the public? |
 | Booking volume | Internal bookings a month | Support and calendar load | Low | Bookings a week at peak |
 | Approvers | Facility managers who approve bookings | Seats | Negligible | Who approves, per building? |
@@ -122,4 +122,5 @@ For each dimension above, settle three numbers and record them here: the amount 
 
 - The SMS cost per text from mNotify (to fill in section 2).
 - Whether registration packs should be on sale to Starter and Growth (proposed 2026-10-19), which would give a per-1,000 reference price for Enterprise.
+- Staff booking limits (longest booking, days ahead, open requests per person) are set per organisation; record the agreed values for Enterprise customers who need more than 8 hours, 90 days and 5.
 - SSO and API access are listed as Enterprise features but are not built; either remove them from the plan or plan them.

@@ -23,6 +23,7 @@ import {
     CalendarDays,
     Inbox,
     ClipboardCheck,
+    UserCheck,
     FileText,
     Menu,
     X,
@@ -50,6 +51,7 @@ const ICONS = {
     CalendarDays,
     Inbox,
     ClipboardCheck,
+    UserCheck,
     FileText,
 };
 

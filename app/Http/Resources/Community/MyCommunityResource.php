@@ -42,6 +42,7 @@ final class MyCommunityResource extends JsonResource
             'actions' => ['polls' => app(\App\Services\Community\CommunityQuestionnaires::class)->available($this->resource) && app(\App\Services\Community\CommunityContentAccess::class)->readers($session, $this->resource, ['kind' => 'all_members'])->isNotEmpty(), 'follow' => $this->followingEnabled(), 'join' => $canJoin,
                 'services' => app(\App\Services\Community\CommunityLibraryRollout::class)->available($this->resource) && app(\App\Services\Community\CommunityContentAccess::class)->readers($session, $this->resource, ['kind' => 'all_members'])->isNotEmpty() && \App\Models\CommunityLibraryItem::withoutGlobalScopes()->where('tenant_id', $this->id)->where('kind', 'service_note')->exists(),
                 'library' => app(\App\Services\Community\CommunityLibraryRollout::class)->available($this->resource) && app(\App\Services\Community\CommunityContentAccess::class)->readers($session, $this->resource, ['kind' => 'all_members'])->isNotEmpty(),
+                'rooms' => app(\App\Services\Venue\StaffIdentity::class)->isStaff($this->resource, $session),
                 'join_mode' => $settings->join_mode]];
     }
 }
