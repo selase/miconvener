@@ -35,6 +35,7 @@ final class Member extends Model
     protected $fillable = [
         'tenant_id',
         'membership_type_id',
+        'is_staff',
         'name',
         'email',
         'phone',
@@ -57,6 +58,7 @@ final class Member extends Model
 
     protected $casts = [
         'access_version' => 'integer',
+        'is_staff' => 'boolean',
         'amount_override' => 'integer',
         'status' => MemberStatusEnum::class,
         'joined_on' => 'date',

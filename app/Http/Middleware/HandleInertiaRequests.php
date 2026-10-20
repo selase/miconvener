@@ -64,6 +64,7 @@ final class HandleInertiaRequests extends Middleware
                     'manage_community_polls' => fn (): bool => (bool) $request->user()?->can('manage community polls'),
                     'read_community_poll_results' => fn (): bool => (bool) $request->user()?->can('read community poll results'),
                     'manage_members' => fn (): bool => (bool) $request->user()?->can('manage members'),
+                    'manage_room_bookings' => fn (): bool => (bool) $request->user()?->can('manage room bookings'),
                     'manage_payment_settings' => fn (): bool => (bool) $request->user()?->can('manage payment settings'),
                     'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
                     'update_user' => fn (): bool => (bool) $request->user()?->can('update user'),
@@ -78,6 +79,7 @@ final class HandleInertiaRequests extends Middleware
                 'slug' => $tenant->slug,
                 'features' => [
                     'paid_tickets' => $tenant->planAllows('paid_tickets'),
+                    'staff_room_booking' => $tenant->featureEnabled(\App\Services\Tenancy\FeatureService::FEATURE_STAFF_ROOM_BOOKING),
                     // Gates the Finance link: ticket money (selling now, or still to
                     // refund or pay out), Community, or dues money still held.
                     'finance' => $tenant->showsFinance(),

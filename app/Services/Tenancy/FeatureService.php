@@ -11,6 +11,8 @@ final readonly class FeatureService
 {
     public const string FEATURE_CUSTOM_DOMAINS = 'custom-domains';
 
+    public const string FEATURE_STAFF_ROOM_BOOKING = 'staff_room_booking';
+
     public function __construct(private TenantContext $context) {}
 
     /**

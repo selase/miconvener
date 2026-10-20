@@ -49,6 +49,7 @@ use App\Mail\NewEnterpriseLead;
 use App\Mail\Platform\TenantSignupMail;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
+use App\Mail\Venue\RoomRequestDecided;
 use App\Mail\WelcomeMail;
 use App\Models\Event;
 use App\Models\EventAbstract;
@@ -291,6 +292,7 @@ test('every mailable renders', function (): void {
         'NewEnterpriseLead' => fn () => new NewEnterpriseLead($lead),
         'GhanaPriceAdjusted' => fn () => new GhanaPriceAdjusted($tenant, 'topped_up', 'Starter plan', 'GHS 288.50', 'https://acme.test/billing'),
         'GhanaTopUpFailedAlert' => fn () => new GhanaTopUpFailedAlert($tenant, 'ref_123', 'top_up_failed', 'Insufficient Funds'),
+        'RoomRequestDecided' => fn () => new RoomRequestDecided(VenueBooking::factory()->internal()->create(['purpose' => 'Budget review']), 'declined', 'Closed for maintenance'),
         'EnterpriseEnquiryReceived' => fn () => new EnterpriseEnquiryReceived($lead, ['sales@example.com']),
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),

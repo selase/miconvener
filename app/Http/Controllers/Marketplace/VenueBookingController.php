@@ -196,6 +196,7 @@ final class VenueBookingController extends Controller
         $booking = VenueBooking::query()
             ->with(['listing.primaryMedia', 'shop'])
             ->where('booking_reference', $reference)
+            ->where('kind', VenueBooking::KIND_MARKETPLACE)
             ->firstOrFail();
 
         return Inertia::render('Public/Marketplace/Bookings/Show', [
@@ -255,6 +256,7 @@ final class VenueBookingController extends Controller
         $booking = VenueBooking::query()
             ->with(['shop', 'listing'])
             ->where('booking_reference', $reference)
+            ->where('kind', VenueBooking::KIND_MARKETPLACE)
             ->firstOrFail();
 
         if ($booking->isDepositPaid() || $booking->isConfirmed()) {
@@ -301,6 +303,7 @@ final class VenueBookingController extends Controller
         /** @var VenueBooking $booking */
         $booking = VenueBooking::query()
             ->where('booking_reference', $reference)
+            ->where('kind', VenueBooking::KIND_MARKETPLACE)
             ->firstOrFail();
 
         if ($paystackRef === '') {

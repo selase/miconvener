@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Shop;
 use App\Models\StoreListing;
 use App\Models\VenueBooking;
+use App\Services\Marketplace\VenueAvailabilityService;
 use App\Services\Tenancy\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -42,6 +43,7 @@ final class VenueCalendarController extends Controller
         }
 
         $spaces = StoreListing::query()
+            ->withStaffOnly()
             ->where('shop_id', $shop->id)
             ->where('listing_kind', 'venue')
             ->where('status', StoreListing::STATUS_PUBLISHED)
@@ -77,6 +79,7 @@ final class VenueCalendarController extends Controller
                 VenueBooking::STATUS_CONFIRMED,
                 VenueBooking::STATUS_PENDING_PAYMENT,
                 VenueBooking::STATUS_PENDING_QUOTE,
+                VenueBooking::STATUS_PENDING_APPROVAL,
                 VenueBooking::STATUS_BLOCKED,
             ])
             ->overlapping($windowStart, $windowEnd);
@@ -110,6 +113,9 @@ final class VenueCalendarController extends Controller
                 'total_amount_pesewas' => $b->total_amount_pesewas,
                 'deposit_required_pesewas' => $b->deposit_required_pesewas,
                 'is_blocked' => $isBlocked,
+                'kind' => $b->kind,
+                'department' => $b->department,
+                'purpose' => $b->purpose,
                 'host_notes' => $b->host_notes,
                 'quote_valid_until' => $b->quote_valid_until?->toIso8601String(),
             ];
@@ -147,6 +153,7 @@ final class VenueCalendarController extends Controller
         ]);
 
         $listing = StoreListing::query()
+            ->withStaffOnly()
             ->where('shop_id', $shop->id)
             ->where('id', $validated['store_listing_id'])
             ->firstOrFail();
@@ -154,23 +161,8 @@ final class VenueCalendarController extends Controller
         $startsAt = Carbon::parse((string) $validated['starts_at']);
         $endsAt = Carbon::parse((string) $validated['ends_at']);
 
-        // Check if there is already a confirmed booking, active hold, or existing blackout in this time window
-        $overlap = VenueBooking::query()
-            ->where('store_listing_id', $listing->id)
-            ->where(function ($q): void {
-                $q->whereIn('status', [VenueBooking::STATUS_CONFIRMED, VenueBooking::STATUS_BLOCKED])
-                    ->orWhere(function ($hold): void {
-                        $hold->where('status', VenueBooking::STATUS_PENDING_PAYMENT)
-                            ->where(function ($valid): void {
-                                $valid->whereNull('quote_valid_until')
-                                    ->orWhere('quote_valid_until', '>=', now());
-                            });
-                    });
-            })
-            ->overlapping($startsAt, $endsAt)
-            ->exists();
-
-        if ($overlap) {
+        // A confirmed booking, a hold, a staff request or a blackout already occupying this time blocks it.
+        if (! app(VenueAvailabilityService::class)->isSlotAvailable($listing, $startsAt, $endsAt)) {
             throw ValidationException::withMessages([
                 'starts_at' => ['Cannot block dates: An active reservation, hold, or blackout already occupies this space during this time.'],
             ]);

@@ -81,6 +81,8 @@ final class Tenant extends Model
         'agreed_price_interval',
         'pricing_region',
         'pricing_region_evidence',
+        'staff_email_domains',
+        'booking_limits',
         'created_at',
         'updated_at',
     ];
@@ -90,6 +92,8 @@ final class Tenant extends Model
         'encryption_at_rest' => 'boolean',
         'meta' => 'array',
         'pricing_region_evidence' => 'array',
+        'staff_email_domains' => 'array',
+        'booking_limits' => 'array',
         'onboarding_completed_at' => 'datetime',
         'llm_models_whitelist' => 'array',
         'allowed_ips' => 'array',
