@@ -40,10 +40,10 @@ test('visitors in Ghana see GHS and everyone else sees USD', function () {
         ->and($currency->resolve(visitorRequest()))->toBe('USD');
 });
 
-test('a chosen currency wins over the country', function () {
+test('a visitor can choose USD but never GHS', function () {
     $currency = app(VisitorCurrency::class);
 
-    expect($currency->resolve(visitorRequest(['CF-IPCountry' => 'US'], ['mc_currency' => 'GHS'])))->toBe('GHS')
+    expect($currency->resolve(visitorRequest(['CF-IPCountry' => 'US'], ['mc_currency' => 'GHS'])))->toBe('USD')
         ->and($currency->resolve(visitorRequest(['CF-IPCountry' => 'GH'], ['mc_currency' => 'USD'])))->toBe('USD')
         ->and($currency->resolve(visitorRequest(['CF-IPCountry' => 'GH'], ['mc_currency' => 'EUR'])))->toBe('GHS');
 });
@@ -105,7 +105,7 @@ test('a GHS price passes through unchanged with no rate', function () {
     expect($quote->ghsMinor())->toBe(24900)->and($quote->meta()['fx_rate'])->toBeNull();
 });
 
-test('the currency switch remembers the choice and rejects other currencies', function () {
-    $this->post(route('currency.update'), ['currency' => 'GHS'])->assertRedirect()->assertCookie('mc_currency', 'GHS');
+test('the currency switch remembers USD for a visitor in Ghana and rejects other currencies', function () {
+    $this->post(route('currency.update'), ['currency' => 'USD'], ['CF-IPCountry' => 'GH'])->assertRedirect()->assertCookie('mc_currency', 'USD');
     $this->post(route('currency.update'), ['currency' => 'EUR'])->assertSessionHasErrors('currency');
 });

@@ -60,6 +60,8 @@ final class SubscriptionRenewalService
                     'grace_ends_at' => null,
                     'renewal_attempts' => 0,
                     'pending_package_id' => null,
+                    // What the plan is now billed in: a renewal paid at the USD price keeps renewing in USD.
+                    'billing_currency' => self::billedIn($provider, $subscription),
                     ...$this->refreshedAuthorization($subscription, $provider),
                 ]);
 
@@ -105,6 +107,19 @@ final class SubscriptionRenewalService
         $current = Package::query()->find($subscription->tenant()->value('package_id'));
 
         return $current && ! $current->isFree() ? $current : null;
+    }
+
+    /**
+     * The currency the plan is billed in after this payment: the one it was
+     * priced in, or what it was before when the payment carries no price.
+     *
+     * @param  array<string, mixed>  $provider
+     */
+    private static function billedIn(array $provider, Subscription $subscription): string
+    {
+        $currency = self::pricing($provider)['display_currency'] ?? null;
+
+        return in_array($currency, ['GHS', 'USD'], true) ? $currency : (string) ($subscription->billing_currency ?: 'GHS');
     }
 
     /**

@@ -6,6 +6,8 @@ use App\Mail\Auth\SetUpRecoveryCodesMail;
 use App\Mail\Billing\AgreedPriceMail;
 use App\Mail\Billing\BillingDailySummaryMail;
 use App\Mail\Billing\CommissionSplitBrokenMail;
+use App\Mail\Billing\GhanaPriceAdjusted;
+use App\Mail\Billing\GhanaTopUpFailedAlert;
 use App\Mail\Billing\PaymentFailedMail;
 use App\Mail\Billing\PaymentReceiptMail;
 use App\Mail\Billing\RenewalReminderMail;
@@ -288,6 +290,8 @@ test('every mailable renders', function (): void {
         'EventTicketTransferred' => fn () => new EventTicketTransferred($registration, 'Ama Serwaa', 'Kofi Mensah', 'kofi@stem.org'),
         'UrgentServiceRequestRaised' => fn () => new UrgentServiceRequestRaised($urgentRequest),
         'NewEnterpriseLead' => fn () => new NewEnterpriseLead($lead),
+        'GhanaPriceAdjusted' => fn () => new GhanaPriceAdjusted($tenant, 'topped_up', 'Starter plan', 'GHS 288.50', 'https://acme.test/billing'),
+        'GhanaTopUpFailedAlert' => fn () => new GhanaTopUpFailedAlert($tenant, 'ref_123', 'top_up_failed', 'Insufficient Funds'),
         'RoomRequestDecided' => fn () => new RoomRequestDecided(VenueBooking::factory()->internal()->create(['purpose' => 'Budget review']), 'declined', 'Closed for maintenance'),
         'EnterpriseEnquiryReceived' => fn () => new EnterpriseEnquiryReceived($lead, ['sales@example.com']),
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),

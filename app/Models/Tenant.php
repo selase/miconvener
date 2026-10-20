@@ -79,6 +79,8 @@ final class Tenant extends Model
         'settlement_mode',
         'agreed_price_pesewas',
         'agreed_price_interval',
+        'pricing_region',
+        'pricing_region_evidence',
         'staff_email_domains',
         'booking_limits',
         'created_at',
@@ -89,6 +91,7 @@ final class Tenant extends Model
         'status' => TenantStatusEnum::class,
         'encryption_at_rest' => 'boolean',
         'meta' => 'array',
+        'pricing_region_evidence' => 'array',
         'staff_email_domains' => 'array',
         'booking_limits' => 'array',
         'onboarding_completed_at' => 'datetime',
@@ -264,6 +267,15 @@ final class Tenant extends Model
         $sendingDomain = $this->sendingDomain;
 
         return $sendingDomain?->isVerified() && $this->canHaveSendingDomain() ? $sendingDomain : null;
+    }
+
+    /**
+     * Whether this organisation pays the Ghana price: it has shown it is in
+     * Ghana, and nobody has since taken that away (see GhanaEligibility).
+     */
+    public function isGhanaEligible(): bool
+    {
+        return $this->pricing_region === 'GH';
     }
 
     public function featureEnabled(string $key): bool

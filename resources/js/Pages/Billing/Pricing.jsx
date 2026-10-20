@@ -5,7 +5,6 @@ import PageHeader from '@/Components/Console/PageHeader';
 import SegmentedControl from '@/Components/Console/SegmentedControl';
 import Button from '@/Components/Console/Button';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
-import CurrencySwitch from '@/Components/Console/CurrencySwitch';
 
 export default function Pricing({ packages, currentPackageSlug, currency = 'GHS' }) {
     const [interval, setInterval] = useState('month');
@@ -41,7 +40,6 @@ export default function Pricing({ packages, currentPackageSlug, currency = 'GHS'
                             { value: 'year', label: 'Yearly' },
                         ]}
                     />
-                    <CurrencySwitch value={currency} />
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

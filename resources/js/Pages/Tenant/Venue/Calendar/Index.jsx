@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { router, useForm } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
@@ -28,6 +28,8 @@ export default function VenueCalendarIndex({
     month,
     selectedSpaceId = null,
 }) {
+    // Staff bookings are managed by people with their own permission; others are not shown a link that would refuse them.
+    const canManageRoomBookings = Boolean(usePage().props.auth?.can?.manage_room_bookings);
     // Current viewed month: Date object initialized from month string (YYYY-MM)
     const [currentYear, currentMonthIndex] = useMemo(() => {
         if (!month || !month.includes('-')) {
@@ -461,9 +463,11 @@ export default function VenueCalendarIndex({
                                 <div className="text-ink">{selectedEvent.planner_name}</div>
                                 {selectedEvent.department && <div className="text-ink-secondary">{selectedEvent.department}</div>}
                                 {selectedEvent.purpose && <div className="text-ink-secondary">{selectedEvent.purpose}</div>}
-                                <a className="text-accent underline" href={route('tenant.venue.internal-bookings.index')}>
-                                    Manage staff bookings
-                                </a>
+                                {canManageRoomBookings && (
+                                    <a className="text-accent underline" href={route('tenant.venue.internal-bookings.index')}>
+                                        Manage staff bookings
+                                    </a>
+                                )}
                             </div>
                         )}
 

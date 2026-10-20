@@ -69,6 +69,37 @@
                 </div>
             </div>
         @endcan
+        @if ($pricingRegion)
+            <div class="card mb-5" data-pricing-region>
+                <div class="card-header"><h2 class="card-title">Pricing region</h2></div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>{{ $pricingRegion['label'] }}</strong></p>
+                    @if ($pricingRegion['source'])
+                        <p class="text-muted mb-4">
+                            {{ str_replace('_', ' ', ucfirst($pricingRegion['source'])) }}@if ($pricingRegion['detail']): {{ $pricingRegion['detail'] }}@endif
+                            @if ($pricingRegion['by']) · by {{ $pricingRegion['by'] }}@endif
+                            @if ($pricingRegion['at']) · {{ $pricingRegion['at'] }}@endif
+                        </p>
+                    @endif
+                    <p class="text-muted">The Ghana price goes to organisations in Ghana: a verified Ghana payout account, or a payment by Ghana mobile money or a Ghana card, earns it automatically. Grant it by hand when that evidence is not enough, or remove it to charge the USD price. Every change needs a reason and is recorded.</p>
+                    <form method="POST" action="{{ route('tenants.pricing-region.update', $tenant->uuid) }}" class="row g-3">
+                        @csrf
+                        <div class="col-md-3">
+                            <label class="form-label" for="pricing-region-action">Change to</label>
+                            <select id="pricing-region-action" name="action" class="form-select form-select-solid">
+                                <option value="grant" @selected(! $pricingRegion['eligible'])>Ghana price</option>
+                                <option value="remove" @selected($pricingRegion['eligible'])>USD price</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="pricing-region-reason">Reason</label>
+                            <input id="pricing-region-reason" name="reason" class="form-control form-control-solid" required maxlength="1000">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div>
+            </div>
+        @endif
         <div class="row">
             <div class="col-md-4">
                 <div class="card">

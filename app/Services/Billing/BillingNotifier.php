@@ -95,6 +95,7 @@ final class BillingNotifier
             overdue: false,
             movesToFreeOn: null,
             payUrl: $this->renewUrl($tenant),
+            priceNote: $subscription->renewalNote($package),
         );
 
         $key = "renewal_due:{$subscription->id}:{$subscription->current_period_end->toDateString()}:{$threshold}";
@@ -115,6 +116,7 @@ final class BillingNotifier
             overdue: true,
             movesToFreeOn: $subscription->grace_ends_at ? self::date($subscription->grace_ends_at) : null,
             payUrl: $this->renewUrl($tenant),
+            priceNote: $subscription->renewalNote($package),
         );
 
         $key = "renewal_overdue:{$subscription->id}:{$subscription->current_period_end->toDateString()}:".now()->toDateString();
@@ -291,6 +293,11 @@ final class BillingNotifier
         return $this->sender->send($tenant, BillingEmail::TYPE_PAYMENT_RECEIPT, "receipt:{$reference}", [$payerEmail, $tenant->email], $mail);
     }
 
+    public function billingUrl(Tenant $tenant): string
+    {
+        return route('billing.index', ['subdomain' => $tenant->slug]);
+    }
+
     /**
      * @param  array<string, mixed>  $meta
      */
@@ -339,10 +346,5 @@ final class BillingNotifier
     private function renewUrl(Tenant $tenant): string
     {
         return route('billing.renew', ['subdomain' => $tenant->slug]);
-    }
-
-    private function billingUrl(Tenant $tenant): string
-    {
-        return route('billing.index', ['subdomain' => $tenant->slug]);
     }
 }
