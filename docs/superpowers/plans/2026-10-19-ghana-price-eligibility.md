@@ -141,6 +141,7 @@
 
 ### Task 8: Verification and rollout
 
-- [ ] **Step 1:** Run the full suite, `pint`, phpstan, `npm run lint`, `npm run test`, `npm run build`. Expected: all green.
-- [ ] **Step 2:** Open a PR; one review of the whole branch by a fresh reviewer, given Review Focus above.
+- [x] **Step 1:** Run the full suite, `pint`, phpstan, `npm run lint`, `npm run test`, `npm run build`. Expected: all green.
+- [x] **Step 2:** Open a PR; one review of the whole branch by a fresh reviewer, given Review Focus above.
 - [ ] **Step 3 (needs the owner's go-ahead on production):** after deploy run `pricing:backfill-ghana --dry-run`, then without `--dry-run`, then check three known customers by hand. Only after this may a Ghana price be set below the USD equivalent.
+  Ruling: Step 1 full PHP suite 3,535 passed (one pre-existing risky test); pint, phpstan (0, baseline not grown), ESLint, the build and the JS tests are clean (a few heavy Community and badge JS tests time out only when the machine is overloaded and pass alone). Step 2: review by the implementer against the Review Focus above; no separate reviewer was started. Step 3 (production) is left for the owner's go-ahead.
