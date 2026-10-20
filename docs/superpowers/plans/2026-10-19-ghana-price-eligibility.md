@@ -133,10 +133,11 @@
 **Interfaces:**
 - Produces: the organisation page shows the pricing region with its evidence; `POST tenants/{tenant}/pricing-region` grants or removes eligibility with a reason, behind the `manage-commercial-terms` gate (same permission as ticket terms).
 
-- [ ] **Step 1: Failing tests:** `a superadmin grants and removes with a reason and it is logged`, `platform finance without the permission cannot`, `an organisation cannot`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(pricing): superadmin controls Ghana eligibility`.
+- [x] **Step 1: Failing tests:** `a superadmin grants and removes with a reason and it is logged`, `platform finance without the permission cannot`, `an organisation cannot`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement.
+- [x] **Step 4:** Rerun; PASS. Commit `feat(pricing): superadmin controls Ghana eligibility`.
+  Ruling: the grant/remove form lives in a new Pricing region card on the organisation page (staff with `manage-commercial-terms` only), with a single `POST tenants/{tenant}/pricing-region` taking `action` (`grant` or `remove`) and a required reason. Removing works on any organisation (an unclassified one becomes settled in USD), granting an organisation that already has it reports that and changes nothing, and a superadmin can restore one that was removed.
 
 ### Task 8: Verification and rollout
 

@@ -15,6 +15,7 @@ use App\Libraries\Helper;
 use App\Models\CommercialTermsOverride;
 use App\Models\Tenant;
 use App\Models\UsageRollup;
+use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use App\Services\Finance\CommercialTerms;
 use App\Services\Tenancy\TenantProvisioner;
@@ -273,11 +274,6 @@ final class TenantController extends Controller
         return back()->with('success', 'Commercial terms saved and audited.');
     }
 
-    /**
-     * Ticket commission for one organisation: no plan caps it, so a cap (or a
-     * different rate) here is a deal. Events already selling keep the terms
-     * they locked; this applies to sales on events that have not locked yet.
-     */
     public function updateTicketTerms(UpdateTicketTermsRequest $request, Tenant $tenant): RedirectResponse
     {
         $rate = $request->validated('rate');
@@ -350,6 +346,7 @@ final class TenantController extends Controller
         return view('admin.tenants.show', [
             'breadcrumbs' => $breadcrumbs,
             'tenant' => $tenant,
+            'pricingRegion' => $request->user()->can('manage-commercial-terms') ? $this->pricingRegionSummary($tenant) : null,
             'commercialTerms' => $request->user()->can('manage-commercial-terms')
                 ? collect(CommercialStreamEnum::cases())->mapWithKeys(fn (CommercialStreamEnum $stream): array => [$stream->value => app(CommercialTerms::class)->for($tenant, $stream)])
                 : collect(),
@@ -542,6 +539,36 @@ final class TenantController extends Controller
         $target .= 'dashboard';
 
         return redirect()->to($target);
+    }
+
+    /**
+     * Ticket commission for one organisation: no plan caps it, so a cap (or a
+     * different rate) here is a deal. Events already selling keep the terms
+     * they locked; this applies to sales on events that have not locked yet.
+     */
+    /**
+     * What the organisation pays, and the evidence for it, for the staff who may change it.
+     *
+     * @return array{label: string, source: string|null, detail: string|null, by: string|null, at: string|null, eligible: bool}
+     */
+    private function pricingRegionSummary(Tenant $tenant): array
+    {
+        $evidence = (array) $tenant->pricing_region_evidence;
+        $by = isset($evidence['by']) ? User::query()->find($evidence['by']) : null;
+        $detail = (array) ($evidence['detail'] ?? []);
+
+        return [
+            'label' => match ($tenant->pricing_region) {
+                'GH' => 'Ghana price',
+                'INTL' => 'USD price',
+                default => 'Not decided yet (keeps the currency it was on)',
+            },
+            'source' => $evidence['source'] ?? null,
+            'detail' => isset($detail['reason']) ? (string) $detail['reason'] : ($detail === [] ? null : collect($detail)->map(fn (mixed $v, string $k): string => $k.': '.(is_scalar($v) ? (string) $v : json_encode($v)))->implode(', ')),
+            'by' => $by?->displayName(),
+            'at' => isset($evidence['at']) ? Carbon::parse((string) $evidence['at'])->format('j M Y H:i') : null,
+            'eligible' => $tenant->isGhanaEligible(),
+        ];
     }
 
     private function syncUsagePrices(?Tenant $target, array $prices): void

@@ -149,6 +149,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
             ->name('commercial-terms.update');
         Route::post('{tenant:uuid}/ticket-terms', [TenantController::class, 'updateTicketTerms'])
             ->name('ticket-terms.update');
+        Route::post('{tenant:uuid}/pricing-region', [App\Http\Controllers\Admin\PricingRegionController::class, 'update'])
+            ->name('pricing-region.update');
         Route::get('reset', [TenantController::class, 'resetTenant'])
             ->name('reset');
         Route::post('all', [TenantController::class, 'getAllTenants'])
