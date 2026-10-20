@@ -117,10 +117,11 @@
 **Interfaces:**
 - Produces: `pricing:backfill-ghana {--dry-run}` marking eligible every tenant with `GhanaEligibility::evaluate` evidence (source `ghana_payment` or `payout_account`), reporting counts per source, idempotent.
 
-- [ ] **Step 1: Failing tests:** `a tenant with a mobile money payment is marked and one with only foreign cards is not`, `dry run changes nothing`, `a second run changes nothing`.
-- [ ] **Step 2:** Run; FAIL.
-- [ ] **Step 3:** Implement the command.
-- [ ] **Step 4:** Rerun; PASS. Commit `feat(pricing): backfill Ghana eligibility for existing customers`.
+- [x] **Step 1: Failing tests:** `a tenant with a mobile money payment is marked and one with only foreign cards is not`, `dry run changes nothing`, `a second run changes nothing`.
+- [x] **Step 2:** Run; FAIL.
+- [x] **Step 3:** Implement the command.
+- [x] **Step 4:** Rerun; PASS. Commit `feat(pricing): backfill Ghana eligibility for existing customers`.
+  Ruling: the command and the runtime check share `GhanaEligibility::grantableEvidence()`, so what the backfill would do and what checkout would do cannot disagree: an organisation settled in USD is upgraded only by a verified Ghana payout account, and one a superadmin removed is never touched. Organisations with no evidence are left unclassified (not set to USD), so their renewals keep the currency they were on until someone decides. The dry run prints counts per evidence source.
 
 ### Task 7: Superadmin
 

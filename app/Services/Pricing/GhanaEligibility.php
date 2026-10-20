@@ -114,15 +114,37 @@ final class GhanaEligibility
             return false;
         }
 
-        $evidence = $this->evaluate($tenant);
+        $evidence = $this->grantableEvidence($tenant);
 
-        if ($evidence === null || ($tenant->pricing_region === self::REGION_INTERNATIONAL && $evidence['source'] !== self::SOURCE_PAYOUT_ACCOUNT)) {
+        if ($evidence === null) {
             Cache::put(self::cacheKey($tenant), true, now()->addMinutes(10));
 
             return false;
         }
 
         return $this->grant($tenant, $evidence['source'], $evidence['detail']);
+    }
+
+    /**
+     * The evidence that would make this organisation Ghana eligible now, or
+     * null. An organisation settled in USD is upgraded only by a verified
+     * Ghana payout account, and one a superadmin removed only by a superadmin.
+     *
+     * @return array{source: string, detail: array<string, mixed>}|null
+     */
+    public function grantableEvidence(Tenant $tenant): ?array
+    {
+        if ($tenant->isGhanaEligible() || ($tenant->pricing_region_evidence['source'] ?? null) === self::SOURCE_REVOKED) {
+            return null;
+        }
+
+        $evidence = $this->evaluate($tenant);
+
+        if ($evidence === null || ($tenant->pricing_region === self::REGION_INTERNATIONAL && $evidence['source'] !== self::SOURCE_PAYOUT_ACCOUNT)) {
+            return null;
+        }
+
+        return $evidence;
     }
 
     /**
