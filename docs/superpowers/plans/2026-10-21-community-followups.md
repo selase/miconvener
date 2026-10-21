@@ -196,9 +196,9 @@ Merged-main CI39683132566 subsequently completed successfully: both PHP and qual
 - [x] Run affected mail/queue tests:12passed/40assertions;Pint passed. No external test mail, failed-job replay or fixture mutation.
 - [x] Fresh scoped review approved; strengthen persisted QR assertion and verify retries wait for their delay.
 - [x] Complete strengthened regression run:3passed/18assertions, including persisted QR stability and delayed retries (no retry at9seconds; no third attempt before60seconds). Earlier affected run12passed/40assertions;Pint passed.
-- [ ] Pass full remote CI on the final commit before merge.
-- [ ] Obtain owner approval before merging/deploying. Wait for completed green CI directly; do not issue auto-merge while checks are running.
-- [ ] After approved deployment, read effective9second setting and bounded retry metadata. Do not retry the existing failed ticket job: the owner already received its explicitly authorised diagnostic copy. A new live queued acceptance send needs its own recipient-scoped authorisation.
+- [x] Full PR CI39690525507 passed before merge:3649PHP/17424assertions(1pre-existing risky),458JS/73files;quality/static/build passed.
+- [x] Owner explicitly approved; direct final CI read confirmed both jobsSUCCESS before PR47 merge8127a4fc5255cadd36941f8d771955507c4d6b6a at23:29:41UTC. Merge tree exactly equals reviewedd55cddbe; no auto-merge used.
+- [x] Approved automatic deployment succeeded and effective9second setting/3attempts/backoff10,60 verified. Existing failed ticket job was not replayed: owner already received its explicitly authorised diagnostic copy. A new live queued acceptance send still needs recipient-scoped authorisation; no further email sent.
 
 ### Self-Review Report — ticket mail
 
@@ -223,3 +223,12 @@ Merged-main CI39683132566 subsequently completed successfully: both PHP and qual
  native SMTP/queue delivery is at-least-once. An ambiguous disconnect after provider acceptance could still duplicate an email; this change does not claim exactly-once delivery. The observed451 happened before message submission. The same registration/QR is reused across retries; no payment or member mutation occurs. No live test send or production setting change was performed for this fix.
 
 Sources: https://symfony.com/doc/current/mailer.html (SES background SMTP ping_threshold below10; example9); https://docs.aws.amazon.com/ses/latest/dg/troubleshoot-smtp.html (451 idle timeout; delayed4xx retries).
+
+
+### Mail reliability release evidence — 2026-10-21
+
+PR47 full CI39690525507: quality succeeded23:02:45UTC,PHP succeeded23:12:12UTC,3649passed/17424assertions with1pre-existing risky;458JS/73files. GitHub watch suffered a network timeout; direct final read confirmed completedSUCCESS before merge. Owner-approved merge8127a4fc5255cadd36941f8d771955507c4d6b6a occurred23:29:41UTC, identical tree to tested/reviewedd55cddbe. No repeated local full test suite or manual deployment.
+
+Cloud automatic release `depl-a309cfef-9891-4922-a8c7-7dfe6f74000c` succeeded23:29:46–23:31:38UTC(1m52s), exactSHA/currentDeploymentId verified independently. Required deploy monitor was started after release completion and stayed idle; stopped only the local monitor after direct success verification, not any server process.
+
+Production runtime read `cexe-a309d13d-3969-4a6a-a126-7ccc8fe7e660` confirmed smtp_ping_threshold_seconds9,queued_ticket_max_attempts3,backoff[10,60],ticket mail records1,existing registrationchecked_in/issued/zeroamounts,eventdraft/public. This resolves actual production metadata without sending a new mail or job. New live automatic delivery after this release was not exercised; local real-worker recovery is proven. HomepageHTTP200. Post snapshot `cexe-a309d13c-786b-46d8-8d65-0b3d3757bb0b` equals pre `cexe-a309c6af-a72f-422e-85d8-a9ad328cbb7e`: hash8959c291f6f8358f8053ed0ad69efaaa17e8e856ebe9ba00562fe4176dd68478,9tenants,active pilot0charges,poll1response. No failed-job retry/purge, additional outbound mail, payment, QR change or modification of Claude/original checkouts. Release handover only changes docs on the owned branch; no unnecessary documentation-only redeployment.
