@@ -147,8 +147,6 @@ export default function MemberBenefitVerification({
                     {verify && (
                         <div className="mt-4">
                             <VerifyPrompt
-                                registrationId={registration?.id ?? null}
-                                sentTo={registration?.email ?? null}
                                 allowPhone={false}
                                 autoFocus={false}
                                 sendUrl={route('public.events.member-verify.send', {
