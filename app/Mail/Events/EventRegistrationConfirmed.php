@@ -23,7 +23,15 @@ final class EventRegistrationConfirmed extends Mailable
     use Queueable;
     use SerializesModels;
 
+    public int $tries = 3;
+
     public function __construct(public EventRegistration $registration) {}
+
+    /** @return list<int> */
+    public function backoff(): array
+    {
+        return [10, 60];
+    }
 
     public function envelope(): Envelope
     {
