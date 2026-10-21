@@ -32,10 +32,10 @@ test('a visitor outside Ghana sees fixed USD prices and is told they are billed 
         ->assertDontSee('GHS 249', false);
 });
 
-test('the currency switch overrides the country on the pricing table', function () {
-    $this->withCookie(VisitorCurrency::COOKIE, 'GHS')
-        ->get('/', ['CF-IPCountry' => 'US'])
-        ->assertSee('GHS 249', false);
+test('a visitor in Ghana can choose to see USD on the pricing table', function () {
+    $this->withCookie(VisitorCurrency::COOKIE, 'USD')
+        ->get('/', ['CF-IPCountry' => 'GH'])
+        ->assertSee('US$ 19', false);
 });
 
 test('while USD is paused for a stale rate, visitors abroad see GHS', function () {

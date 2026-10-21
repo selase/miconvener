@@ -3,7 +3,6 @@ import { Head, Link, router } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
-import CurrencySwitch from '@/Components/Console/CurrencySwitch';
 import StatusPill from '@/Components/Console/StatusPill';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import {
@@ -75,7 +74,6 @@ export default function Addons({
                 title="Modular Add-Ons"
                 actions={
                     <div className="flex flex-wrap items-center gap-2">
-                        <CurrencySwitch value={currency} />
                         <Button href={route('tenant.pricing')} variant="default">
                             View Core Plans
                         </Button>

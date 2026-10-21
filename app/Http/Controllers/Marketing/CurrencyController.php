@@ -8,14 +8,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketing\UpdateCurrencyRequest;
 use App\Services\Pricing\VisitorCurrency;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cookie;
 
 /**
- * The "Prices in GHS · USD" switch: remembers the visitor's choice for a year.
+ * The "show prices in USD / GHS" switch for visitors in Ghana. Choosing USD is
+ * remembered for a year; choosing GHS from Ghana clears it. Asking for GHS from
+ * anywhere else does nothing: the Ghana price is not something a visitor picks.
  */
 final class CurrencyController extends Controller
 {
-    public function update(UpdateCurrencyRequest $request): RedirectResponse
+    public function update(UpdateCurrencyRequest $request, VisitorCurrency $currency): RedirectResponse
     {
-        return redirect()->back()->withCookie(cookie(VisitorCurrency::COOKIE, (string) $request->validated('currency'), 60 * 24 * 365));
+        $response = redirect()->back();
+
+        if ($request->validated('currency') === 'USD') {
+            return $response->withCookie(cookie(VisitorCurrency::COOKIE, 'USD', 60 * 24 * 365));
+        }
+
+        return $currency->inGhana($request) ? $response->withCookie(Cookie::forget(VisitorCurrency::COOKIE)) : $response;
     }
 }

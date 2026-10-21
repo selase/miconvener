@@ -46,6 +46,7 @@ final class VenueListingController extends Controller
         }
 
         $spaces = $shop->listings()
+            ->withStaffOnly()
             ->with(['primaryMedia', 'amenities.amenity'])
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
@@ -109,6 +110,8 @@ final class VenueListingController extends Controller
                 'ceiling_height_meters' => $validated['ceiling_height_meters'] ?? null,
                 'rules_and_policies' => $validated['rules_and_policies'] ?? [],
                 'status' => $validated['status'],
+                'audience' => $validated['audience'] ?? StoreListing::AUDIENCE_PUBLIC,
+                'requires_approval' => $validated['requires_approval'] ?? true,
             ]);
 
             if (! empty($validated['amenities'])) {
@@ -179,6 +182,8 @@ final class VenueListingController extends Controller
                 'ceiling_height_meters' => $validated['ceiling_height_meters'] ?? null,
                 'rules_and_policies' => $validated['rules_and_policies'] ?? [],
                 'status' => $validated['status'],
+                'audience' => $validated['audience'] ?? $listing->audience,
+                'requires_approval' => $validated['requires_approval'] ?? $listing->requires_approval,
             ]);
 
             // Sync amenities grid

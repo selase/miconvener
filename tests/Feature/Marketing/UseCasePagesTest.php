@@ -27,7 +27,6 @@ test('each use case has its own page with its headline, features and timeline', 
 
     $page = $this->get(route('use-cases.show', $slug))->assertOk()
         ->assertSee($case['headline'])
-        ->assertSee('Who it is for')
         ->assertSee('What you get')
         ->assertSee('How it runs')
         ->assertSee($case['value']['title']);
@@ -96,7 +95,7 @@ test('the navigation and footer link to the use cases', function (): void {
     $this->get(route('home'))->assertOk()->assertSee(route('use-cases.index'), false);
 });
 
-test('each use case page opens with a black hero, its own line illustration and no buttons', function (string $slug): void {
+test('each use case page opens with a black hero carrying its product panel and the sign-up buttons', function (string $slug): void {
     $html = $this->get(route('use-cases.show', $slug))->assertOk()->getContent();
 
     $document = new DOMDocument;
@@ -105,9 +104,65 @@ test('each use case page opens with a black hero, its own line illustration and 
     $hero = $xpath->query('//*[@data-use-case-hero]')->item(0);
 
     expect($hero)->not->toBeNull()
-        ->and(view()->exists("product.use-cases.art.{$slug}"))->toBeTrue()
-        ->and($xpath->query('.//svg[@data-use-case-art]', $hero)->length)->toBe(1)
-        ->and($xpath->query('.//svg[@data-use-case-art]', $hero)->item(0)->getAttribute('aria-hidden'))->toBe('true')
-        ->and($xpath->query('.//a[contains(@href, "/register")]', $hero)->length)->toBe(0)
+        ->and(view()->exists("product.use-cases.panels.{$slug}"))->toBeTrue()
+        ->and($xpath->query('.//*[@data-use-case-panel]', $hero)->length)->toBe(1)
+        ->and($xpath->query('.//a[contains(@href, "/register")]', $hero)->length)->toBe(1)
+        ->and(str_contains($hero->textContent, 'Built for'))->toBeFalse()
         ->and(str_contains($hero->textContent, config("use-cases.cases.{$slug}.headline")))->toBeTrue();
 })->with(fn () => array_keys((require __DIR__.'/../../../config/use-cases.php')['cases']));
+
+test('every use case page lists all seven in its sub-menu and marks its own', function (string $slug): void {
+    $html = $this->get(route('use-cases.show', $slug))->getContent();
+    $document = new DOMDocument;
+    @$document->loadHTML($html);
+    $xpath = new DOMXPath($document);
+    $nav = $xpath->query('//*[@data-use-case-nav]')->item(0);
+
+    expect($nav)->not->toBeNull();
+    foreach (array_keys(config('use-cases.cases')) as $other) {
+        expect($xpath->query('.//a[@href="'.route('use-cases.show', $other).'"]', $nav)->length)->toBe(1);
+    }
+    expect($xpath->query('.//a[@aria-current="page"]', $nav)->item(0)?->getAttribute('href'))->toBe(route('use-cases.show', $slug));
+})->with(fn () => array_keys((require __DIR__.'/../../../config/use-cases.php')['cases']));
+
+test('every stage of how it runs has its steps and a panel, and the page ends with a call to action', function (string $slug): void {
+    $case = config("use-cases.cases.{$slug}");
+    $html = $this->get(route('use-cases.show', $slug))->getContent();
+    $document = new DOMDocument;
+    @$document->loadHTML($html);
+    $xpath = new DOMXPath($document);
+
+    expect(array_keys($case['panels']))->toBe(array_keys($case['timeline']))
+        ->and($xpath->query('//*[@data-use-case-stage]')->length)->toBe(count($case['timeline']))
+        ->and($xpath->query('//*[@data-use-case-stage]//table')->length)->toBe(count($case['timeline']))
+        ->and(str_contains($html, $case['value']['highlight']))->toBeTrue()
+        ->and(str_contains($case['value']['text'], $case['value']['highlight']))->toBeTrue()
+        ->and($xpath->query('//*[@data-use-case-cta]//a[contains(@href, "/register")]')->length)->toBe(1)
+        ->and(count($case['tags']))->toBe(3)
+        ->and(array_filter(array_column($case['features'], 'tag')))->toHaveCount(count($case['features']));
+})->with(fn () => array_keys((require __DIR__.'/../../../config/use-cases.php')['cases']));
+
+test('example ticket prices follow the visitor: GHS in Ghana, USD elsewhere', function (): void {
+    $this->get(route('use-cases.show', 'international'), ['CF-IPCountry' => 'GH'])
+        ->assertSee('GHS 1,500', false)->assertDontSee('US$ 150', false);
+
+    $this->get(route('use-cases.show', 'international'), ['CF-IPCountry' => 'US'])
+        ->assertSee('US$ 150', false)->assertDontSee('GHS 1,500', false);
+});
+
+test('the hub opens with a black band and one illustration of the seven gatherings around a common core', function (): void {
+    $html = $this->get(route('use-cases.index'))->assertOk()->getContent();
+    $document = new DOMDocument;
+    @$document->loadHTML($html);
+    $xpath = new DOMXPath($document);
+    $hero = $xpath->query('//*[@data-use-case-hub-hero]')->item(0);
+    $art = $xpath->query('.//svg[@data-use-case-hub-art]', $hero);
+
+    expect($hero)->not->toBeNull()
+        ->and($art->length)->toBe(1)
+        ->and($art->item(0)->getAttribute('aria-hidden'))->toBe('true')
+        ->and($xpath->query('.//svg[@data-use-case-art]', $art->item(0))->length)->toBe(7)
+        ->and($xpath->query('.//a', $hero)->length)->toBe(0)
+        ->and($xpath->query('//*[@data-use-case-group]')->length)->toBe(2)
+        ->and($xpath->query('//*[@data-use-case-cta]//a[contains(@href, "/register")]')->length)->toBe(1);
+});

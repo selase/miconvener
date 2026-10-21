@@ -12,6 +12,7 @@ use App\Models\Subscription;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\CheckoutTerms;
 use App\Services\Pricing\Money;
 use App\Services\Pricing\PriceBook;
 use App\Services\Pricing\VisitorCurrency;
@@ -181,7 +182,8 @@ final class CheckoutController extends Controller
 
         // Upgrade or new subscription: one-time Paystack transaction with plan
         // metadata, priced in the visitor's currency and charged in GHS.
-        $price = app(PriceBook::class)->plan($newPackage, $interval, app(VisitorCurrency::class)->resolve($request));
+        $price = app(PriceBook::class)->plan($newPackage, $interval, app(VisitorCurrency::class)->resolve($request, $tenant));
+        $terms = CheckoutTerms::for($tenant, $price, app(PriceBook::class)->plan($newPackage, $interval, 'USD'));
 
         // A negotiated plan (Enterprise) is charged at the organisation's agreed
         // price and interval; without one there is nothing to charge yet.
@@ -194,6 +196,7 @@ final class CheckoutController extends Controller
             }
 
             $price = new Money($agreed['amount'], 'GHS');
+            $terms = CheckoutTerms::agreed();
             $interval = $agreed['interval'];
         }
 
@@ -211,7 +214,7 @@ final class CheckoutController extends Controller
                 'plan_slug' => $newPackage->slug,
                 'interval' => $interval,
                 'tenant_id' => $tenant->id,
-                'pricing' => $quote->meta(),
+                ...$terms->metadata($quote),
             ]
         );
 

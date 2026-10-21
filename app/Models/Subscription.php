@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\GhanaEligibility;
 use App\Services\Pricing\Money;
 use App\Services\Pricing\PriceBook;
+use App\Services\Pricing\Rate;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -138,9 +141,56 @@ final class Subscription extends Model
         $agreed = $this->tenant?->agreedPriceFor($package);
         $price = $agreed !== null
             ? new Money($agreed['amount'], 'GHS')
-            : app(PriceBook::class)->plan($package, $this->billingInterval(), (string) ($this->billing_currency ?: 'GHS'));
+            : app(PriceBook::class)->plan($package, $this->billingInterval(), $this->renewalCurrency());
 
         return app(ChargeQuote::class)->for($price);
+    }
+
+    /**
+     * The currency the next period is priced in: where the organisation
+     * stands today. Ghana eligible organisations renew at the Ghana price,
+     * those settled in USD at the USD price converted on the renewal day, and
+     * one nobody has classified yet keeps the currency it was on.
+     */
+    public function renewalCurrency(): string
+    {
+        if ($this->tenant !== null) {
+            if (app(GhanaEligibility::class)->ensure($this->tenant)) {
+                return 'GHS';
+            }
+
+            if ($this->tenant->pricing_region === GhanaEligibility::REGION_INTERNATIONAL) {
+                return 'USD';
+            }
+        }
+
+        return (string) ($this->billing_currency ?: 'GHS');
+    }
+
+    /**
+     * For a renewal priced in USD: what it costs, that it is charged in cedis
+     * at the rate on the day, and today's figure. Null when the price is in GHS.
+     */
+    public function renewalNote(Package $package): ?string
+    {
+        $quote = $this->chargeQuoteFor($package);
+        $meta = $quote->meta();
+
+        if ($meta['display_currency'] !== 'USD' || $meta['fx_rate'] === null) {
+            return null;
+        }
+
+        $note = sprintf(
+            'This plan is priced in US dollars (%s). It is charged in Ghana cedis at the Bank of Ghana rate on the day it is paid; today that is %s at %s (%s).',
+            $quote->price()->format(),
+            $quote->charged()->format(),
+            Rate::describe((float) $meta['fx_rate']),
+            CarbonImmutable::parse((string) $meta['fx_as_of'])->format('j M Y'),
+        );
+
+        return ($this->billing_currency ?: 'GHS') === 'GHS'
+            ? $note.' Your plan was priced in Ghana cedis before; from now on it is priced in US dollars.'
+            : $note;
     }
 
     public function onGracePeriod(): bool

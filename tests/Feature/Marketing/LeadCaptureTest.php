@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 
 beforeEach(function () {
     Mail::fake();
+    App\Models\PlatformNotificationRecipient::query()->firstOrCreate(['topic' => App\Models\PlatformNotificationRecipient::ENTERPRISE_LEADS, 'email' => 'sales@example.com']);
     RateLimiter::clear('lead-submission:127.0.0.1');
 });
 
@@ -30,8 +31,8 @@ it('captures a lead and sends a notification', function () {
         'company' => 'Doe Inc.',
     ], 'landlord');
 
-    // Verify Mail
-    Mail::assertSent(NewEnterpriseLead::class, function ($mail) {
+    // Verify Mail: queued, so the visitor is not kept waiting on delivery.
+    Mail::assertQueued(NewEnterpriseLead::class, function ($mail) {
         return $mail->lead->email === 'john@example.com';
     });
 });

@@ -10,7 +10,7 @@ final class UpdateCommercialTermsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('access-superadmin-dashboard');
+        return (bool) $this->user()?->can('manage-commercial-terms');
     }
 
     /** @return array<string, list<string>> */

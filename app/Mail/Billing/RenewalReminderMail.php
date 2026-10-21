@@ -29,6 +29,7 @@ final class RenewalReminderMail extends Mailable implements ShouldQueue
         public readonly bool $overdue,
         public readonly ?string $movesToFreeOn,
         public readonly string $payUrl,
+        public readonly ?string $priceNote = null,
     ) {}
 
     public function envelope(): Envelope

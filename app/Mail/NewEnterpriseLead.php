@@ -11,7 +11,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-final class NewEnterpriseLead extends Mailable
+final class NewEnterpriseLead extends Mailable implements \Illuminate\Contracts\Queue\ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -28,6 +28,8 @@ final class NewEnterpriseLead extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            // Replying to this email answers the enquirer directly.
+            replyTo: [new \Illuminate\Mail\Mailables\Address($this->lead->email, $this->lead->name)],
             subject: 'New Enterprise Lead: '.($this->lead->company ?? $this->lead->name),
         );
     }

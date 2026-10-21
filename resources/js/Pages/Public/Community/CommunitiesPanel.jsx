@@ -3,6 +3,7 @@ import { communityRequest } from '@/lib/community';
 import LibraryPanel from './LibraryPanel';
 import ServicesPanel from './ServicesPanel';
 import QuestionnairesPanel from './QuestionnairesPanel';
+import RoomsPanel from './RoomsPanel';
 import FollowControl from './FollowControl';
 import Join from './Join';
 import MemberClaim from './MemberClaim';
@@ -220,7 +221,7 @@ export default function CommunitiesPanel({
     }
     if (
         appPage &&
-        ['library', 'services', 'polls'].includes(
+        ['library', 'services', 'polls', 'rooms'].includes(
             contentLocation.searchParams.get('community_view')
         ) &&
         contentLocation.searchParams.get('organiser')
@@ -232,6 +233,19 @@ export default function CommunitiesPanel({
                     key={slug}
                     tenantSlug={slug}
                     questionnaireId={contentLocation.searchParams.get('questionnaire')}
+                    onExpired={onExpired}
+                    onClose={() =>
+                        window.location.assign(
+                            `/my?organiser=${encodeURIComponent(slug)}&section=communities`
+                        )
+                    }
+                />
+            );
+        if (contentLocation.searchParams.get('community_view') === 'rooms')
+            return (
+                <RoomsPanel
+                    key={slug}
+                    tenantSlug={slug}
                     onExpired={onExpired}
                     onClose={() =>
                         window.location.assign(
@@ -403,6 +417,14 @@ export default function CommunitiesPanel({
                                                     href={`/my?organiser=${encodeURIComponent(community.slug)}&section=communities&community_view=services`}
                                                 >
                                                     Services
+                                                </a>
+                                            )}
+                                            {community.actions?.rooms && (
+                                                <a
+                                                    className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-medium text-ink hover:text-accent"
+                                                    href={`/my?organiser=${encodeURIComponent(community.slug)}&section=communities&community_view=rooms`}
+                                                >
+                                                    Book a room
                                                 </a>
                                             )}
                                             {community.actions?.library && (
