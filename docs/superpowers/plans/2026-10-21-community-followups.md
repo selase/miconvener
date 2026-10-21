@@ -135,3 +135,23 @@ The remaining plan is proposed for owner review. New documents are versioned on 
 ## Plan self-review
 
 This plan separates existing acceptance from future implementation and preserves the original dues-independent Community design. Storage quota enforcement already exists and is not duplicated. Staff room booking work on main is preserved and receives navigation coverage; it does not imply marketplace readiness. Current CI must gate the release, while the missing ticket email and actual-device checks remain real blockers. No new feature or online-payment/booking switch is approved by merely merging this planning document.
+
+
+## Mailbox resolution and checkout fix review — 2026-10-21
+
+Yahoo system Spam contained all three confirmations. The latest diagnostic message was moved to Inbox using Not Spam and its actual confirmation link successfully verified the registration email. The stale member quote correctly required fresh verification; a separate frontend payload mismatch blocked that flow. The prepared fix removes registration-mode props from MemberBenefitVerification's VerifyPrompt so it sends/accepts the email payload expected by the member-verification endpoints. Server access and personal eligibility remain authoritative. Live ticket/QR acceptance remains incomplete until this fix is deployed and the native code flow finishes; synthetic event remains published/private for that bounded check.
+
+### Self-Review Report
+
+**Touchpoints updated:** checkout verification component, integration-style component regression tests, rebuilt tracked assets and this roadmap/handover. AGENTS/memory, seeders, roles/permissions, navigation, environment and configuration require no changes: no new convention, feature, endpoint, permission or dependency.
+
+**UI Gap Analysis:** existing Verify my membership action remains discoverable; empty email has a labelled required field; email-only verification preserves personal membership gates. Existing busy, challenge, cooldown and failed-code states remain. No layout change beyond using the existing responsive email form. Keyboard labels and accent-ink button styles are reused. Physical-device acceptance remains outstanding.
+
+**Solved:** removed the incorrect registration-mode props; replaced the test's mocked verification button with real send/confirm/recovery interactions. A fresh scoped reviewer found no correctness/security issues.
+
+**Recommended for user decision:** deploy the narrow fix, then complete the designated zero-cost member verification and QR check; durable provider delivery-status recording remains a separate proposed follow-up.
+
+**Not gaps:** an emailed confirmation and an expired member quote are independent gates; email verification alone cannot bypass current personal membership eligibility. Paid recovery is tested locally but no live payment is authorised or attempted.
+
+
+**Checkout-fix validation:** regression RED reproduced the absent email field in both existing-registration recovery modes; GREEN: focused JS5/5, affected PHP64/64 with250assertions, lint, Pint and production build passed. Full JS run:457passed/1failed due to the existing badge-editor controls test exceeding its5second limit under parallel load; the unchanged BadgeDesignEditor file passed all11tests when rerun alone. This is not reported as a clean full-suite pass. Build retains its existing large-chunk warning. Diff whitespace check passed. Fresh scoped code review approved. No production code deployment has been performed for this fix; owner review/merge go-ahead and live native acceptance remain outstanding.
