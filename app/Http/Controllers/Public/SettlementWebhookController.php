@@ -153,12 +153,13 @@ final class SettlementWebhookController extends Controller
         }
 
         try {
-            $result = Telescope::withoutRecording(fn () => Http::connectTimeout(3)
+            $send = fn () => Http::connectTimeout(3)
                 ->timeout(15)
                 ->withoutRedirecting()
                 ->withHeaders(['x-paystack-signature' => $signature, 'X-Payment-Relay-Attempt' => $attempt])
                 ->withBody($body, 'application/json')
-                ->post('https://udworkspace.com/webhooks/paystack'));
+                ->post('https://udworkspace.com/webhooks/paystack');
+            $result = class_exists(Telescope::class) ? Telescope::withoutRecording($send) : $send();
             $context['http_status'] = $result->status();
             $targetAttempt = (string) $result->header('X-Webhook-Attempt');
             if (Str::isUuid($targetAttempt)) {

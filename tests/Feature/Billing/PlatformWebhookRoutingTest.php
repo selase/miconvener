@@ -272,3 +272,30 @@ test('Telescope rejects recording either platform payment webhook URI', function
         expect($approval->invoke(null, \Illuminate\Http\Request::create($uri, 'POST')))->toBeFalse();
     }
 });
+
+test('the relay delivers when production excludes development-only Telescope', function (): void {
+    $code = <<<'PHP'
+    $loader = require 'vendor/autoload.php';
+    $loader->unregister();
+    spl_autoload_register(static function (string $class) use ($loader): void {
+        if (!str_starts_with($class, 'Laravel\\Telescope\\')) {
+            $loader->loadClass($class);
+        }
+    });
+    $app = require 'bootstrap/app.php';
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    config(['services.paystack.secret_key' => 'relay-test-key', 'services.paystack.udworkspace_relay_enabled' => true]);
+    Illuminate\Support\Facades\Http::fake(['https://udworkspace.com/webhooks/paystack' => Illuminate\Support\Facades\Http::response([], 200)]);
+    $body = json_encode(['event' => 'charge.success', 'data' => ['metadata' => ['application' => 'udworkspace']]]);
+    $request = Illuminate\Http\Request::create('/webhooks/settlement/paystack', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $body);
+    $request->headers->set('x-paystack-signature', hash_hmac('sha512', $body, 'relay-test-key'));
+    $response = app(App\Http\Controllers\Public\SettlementWebhookController::class)->handle($request, app(App\Http\Controllers\Billing\WebhookController::class), app(App\Services\Billing\SubscriptionProvisioningService::class));
+    if (class_exists(Laravel\Telescope\Telescope::class) || $response->getStatusCode() !== 200 || $response->getData(true)['status'] !== 'relayed') {
+        throw new RuntimeException('Relay did not deliver without Telescope');
+    }
+    Illuminate\Support\Facades\Http::assertSentCount(1);
+    PHP;
+    $process = new \Symfony\Component\Process\Process([PHP_BINARY, '-r', $code], base_path(), ['APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false']);
+    $process->setTimeout(30)->mustRun();
+    expect($process->getExitCode())->toBe(0);
+});
