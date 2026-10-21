@@ -168,3 +168,6 @@ Cleanup write `cexe-a309b21b-4c64-4ae7-bc96-d1618573d587` restored only the labe
 
 
 Merged-main CI39683132566 subsequently completed successfully: both PHP and quality jobs passed. PR and merged-main CI are green on the identical release tree; no duplicate local full run was started. No new application changes after release; this final handover update is documentation only.
+
+
+**Physical QR follow-up:** owner phone test21October22:37UTC passed first admission and duplicate detection. Server read `cexe-a309bdc5-6063-460b-92cf-65d5628f294c`: admitted22:37:22,already_in22:37:24,statuschecked_in,zeroamounts. Owner independently reported the same messages. Retain records as test history. Offline/audio/vibration/general mobile checks and final ticket-email delivery remain separate outstanding checks.
