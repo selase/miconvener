@@ -113,6 +113,8 @@ return [
     ],
 
     'ignore_paths' => [
+        'webhooks/settlement/paystack',
+        'webhooks/paystack',
         'my',
         'my/*',
         'nova-api*',

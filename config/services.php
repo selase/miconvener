@@ -66,6 +66,7 @@ return [
          * user here would be read as one of ours.
          */
         'metadata_source' => env('PAYSTACK_METADATA_SOURCE', 'miconvener'),
+        'udworkspace_relay_enabled' => env('PAYSTACK_UDWORKSPACE_RELAY_ENABLED', true),
         'public_key' => env('PAYSTACK_PUBLIC_KEY'),
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'merchant_email' => env('PAYSTACK_MERCHANT_EMAIL'),
