@@ -43,9 +43,9 @@ export default function CommunitiesPanel({
     const cards = Array.from(
         new Map(
             [
-                ...(communities?.data || []),
-                ...(communities && organiser?.slug ? [organiser] : []),
                 ...(inboxOverview || []),
+                ...(communities && organiser?.slug ? [organiser] : []),
+                ...(communities?.data || []),
             ]
                 .filter((row) => !appPage || !organiser?.slug || row.slug === organiser.slug)
                 .map((row) => [row.slug, row])

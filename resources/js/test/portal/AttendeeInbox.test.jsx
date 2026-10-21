@@ -396,7 +396,19 @@ it('shows one community card with messages prominent and management collapsed', 
                     }
                   : {
                         communities: {
-                            data: [{ id: 'group', slug: 'group', name: 'Volunteer group' }],
+                            data: [
+                                {
+                                    id: 'group',
+                                    slug: 'group',
+                                    name: 'Volunteer group',
+                                    actions: {
+                                        library: true,
+                                        services: true,
+                                        polls: true,
+                                        rooms: true,
+                                    },
+                                },
+                            ],
                         },
                     }
         )
@@ -415,6 +427,10 @@ it('shows one community card with messages prominent and management collapsed', 
         await screen.findByRole('button', { name: 'View messages for Volunteer group' })
     ).toBeTruthy();
     expect(screen.getAllByText('1 unread')).toHaveLength(1);
+    expect(await screen.findByRole('link', { name: 'Library' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Services' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Book a room' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Polls & surveys' })).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Organisation announcements' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'View messages for Volunteer group' }));
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ slug: 'group' }));
@@ -422,6 +438,45 @@ it('shows one community card with messages prominent and management collapsed', 
     expect(await screen.findByRole('region', { name: 'Organisation announcements' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Close community settings' }));
     expect(screen.queryByRole('region', { name: 'Organisation announcements' })).toBeNull();
+});
+
+it('does not restore unavailable member links from fallback cards', async () => {
+    const { default: CommunitiesPanel } = await import('@/Pages/Public/Community/CommunitiesPanel');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+        response(
+            String(url).endsWith('/identity')
+                ? { email: { masked: 'a••@example.test' } }
+                : {
+                      communities: {
+                          data: [
+                              {
+                                  slug: 'group',
+                                  name: 'Updated group',
+                                  actions: {
+                                      library: false,
+                                      services: false,
+                                      polls: false,
+                                      rooms: false,
+                                  },
+                              },
+                          ],
+                      },
+                  }
+        )
+    );
+    const fallback = {
+        slug: 'group',
+        name: 'Fallback group',
+        actions: { library: true, services: true, polls: true, rooms: true },
+    };
+    render(
+        <CommunitiesPanel initiallyOpen appPage organiser={fallback} inboxOverview={[fallback]} />
+    );
+    expect(await screen.findByRole('heading', { name: 'Updated group' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Library' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Services' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Book a room' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Polls & surveys' })).toBeNull();
 });
 
 it('offers verification when history restores an inbox after cross-tab sign-out', async () => {

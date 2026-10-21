@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task using the owner's established native approach. Steps use checkbox (`- [ ]`) syntax. One fresh whole-branch review at the end; no per-task reviewers or redundant second blanket review.
 
-**Status:** Implemented and reviewed locally on `codex/community-7` (owner-approved native approach). Owner accepted and approved push/merge/deploy2026-10-18; full remote CI is the remaining pre-merge gate. No production change or rollout yet.
+**Status:** Deployed2026-10-18 via PR39; Purpledot enabled. Remaining acceptance limitations are retained below and in the release evidence.
 
 **Goal:** Let associations share standing documents, churches publish notes for individual recurring services, and organisations ask their audience questions through the existing `/my` app, without requiring dues or event registration for organisation-owned content.
 
@@ -182,3 +182,7 @@ New classes stay in existing Models, Services/Community, Http/Controllers/{Publi
 ## Plan self-review
 
 The parent organisation Library/polls vision and individual service-note request are implemented through separate organisation records and shared native policies. Existing event tables, verification and money paths were preserved. Owner-approved recommendations are now implementation contracts in the parent spec. Remaining external gates are owner acceptance, authorised upload/full CI and later integration/deployment approval.
+
+## Approved release completed —2026-10-18
+
+Deployed through PR39 merge `a37b162d` after final CI39147674226 passed3439 PHP/16520assertions and449 JS plus quality/build gates. Cloud target `depl-a3034038-7712-4470-9aed-9b1c8647a1e7` succeeded17:14:44UTC. ExactlyPurpledot enabled; schema, permissions, assets, finance categories and signed-out privacy checks passed. Original/Claude checkouts, other organisations and settlement unchanged. See roadmap release evidence for command IDs and remaining actual-device/200%, aggregate storage and live financial acceptance limits. Earlier pending-approval text is historical and superseded by this release note.
