@@ -40,7 +40,8 @@
 - [x] Published text-document reading and poll submission previously passed. Recheck their navigation and recorded response state after deployment without duplicating the response; reopen a separate bounded fixture only if further submission testing is needed.
 - [x] Finish the existing zero-cost registration's actual confirmation email and ticket/QR display. Yahoo's system Spam contained the expected confirmations. Marked only the diagnostic one Not Spam, followed its real confirmation button, then completed the deployed email/code membership recheck. Ticket workspace showed confirmed and the QR; production readback confirms email_verified=true, ticket_issued=true, amount/charged_amount0. No forged proof or private-link logging; no physical-phone scan claimed.
 - [x] Restore the synthetic recurring event to draft/public after ticket verification. Registration and poll response retained; pilot active with0charges; before/after rollout-settings hashes match across all9organisations.
-- [ ] Verify arrival of the final ticket email separately. Native workspace says it was emailed, but the bounded Inbox/Spam check and event-mail history did not establish its receipt; cloud/default waiting0 and failed jobs0. Do not claim email-receipt acceptance or resend without appropriate authorisation.
+- [x] Verify delivery of one explicitly authorised diagnostic copy of the issued ticket: native mailable sent once22:41:21UTC withonePDF; Yahoo Inbox message opened, expected body/PDF visibly verified. No additional registration, QR or charge.
+- [ ] Investigate the original automatic ticket-email path separately: its handoff was not recorded. Successful synchronous diagnostic delivery does not establish that the original queued mail was delivered; no further resend or application change authorised by this acceptance alone.
 - [x] Record proof, failures, fixture cleanup and residual gates in the roadmap.
 
 ## 2. Payment sandbox acceptance — next recommended workstream
@@ -171,3 +172,6 @@ Merged-main CI39683132566 subsequently completed successfully: both PHP and qual
 
 
 **Physical QR follow-up:** owner phone test21October22:37UTC passed first admission and duplicate detection. Server read `cexe-a309bdc5-6063-460b-92cf-65d5628f294c`: admitted22:37:22,already_in22:37:24,statuschecked_in,zeroamounts. Owner independently reported the same messages. Retain records as test history. Offline/audio/vibration/general mobile checks and final ticket-email delivery remain separate outstanding checks.
+
+
+**Ticket delivery acceptance:** owner authorised one diagnostic email21October; `cexe-a309be99-2f3c-4eb1-b9e8-fd2a16eb477e` sent native EventRegistrationConfirmed once22:41:21UTC,onePDF,oneSentEmail record. Yahoo Inbox received it10:41PM; actual message opened and expected body/PDF verified. Diagnostic recipient delivery PASS. Original automatic queue handoff remains a distinct investigation; do not present a synchronous send as proof of that path. No application deploy, provider-setting change, payment or new registration.
