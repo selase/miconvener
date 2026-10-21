@@ -38,9 +38,11 @@
 - [ ] Finish narrow-width/contrast acceptance. Light/dark layouts were inspected, but the viewport override remained1680px despite requesting390px; no mobile pass is claimed. The existing Messages button has white14px text on rgb(0,216,196), calculated1.81:1 contrast; use the established `text-accent-ink` token in a scoped accessibility follow-up and audit equivalent personal-app primary actions.
 - [x] Temporarily publish only the synthetic service note for the existing 25 October occurrence through `CommunityLibrary::save`; open it as the member and confirm the 1 November occurrence does not inherit it. Restore the note to draft.
 - [x] Published text-document reading and poll submission previously passed. Recheck their navigation and recorded response state after deployment without duplicating the response; reopen a separate bounded fixture only if further submission testing is needed.
-- [ ] Finish the existing zero-cost registration's actual confirmation email and ticket/QR display. One resend only with explicit recipient approval. If delivery fails, inspect relay/provider evidence and report the actual blocker; do not bypass verification. The runtime SES identity credentials lack suppression-read access; the existing relevant AWS CLI profile subsequently proved this address is not suppressed. One owner-approved instrumented send reached Yahoo's server at21:24:43UTC (250 ok dirdel,2254ms), with exact recipient match. Yahoo folder/filter inspection and the real confirmation click remain pending. No IAM expansion was needed; temporary private event resources were cleaned up. Permanent provider-event integration still requires its own scoped plan.
-- [ ] Once ticket verification is complete, restore the synthetic recurring event to draft/public. Preserve the registration and poll response; verify pilot remains active/no dues and other organisations unchanged.
-- [x] Record proof, failures and residual gates in the roadmap, including cleanup still awaiting confirmation.
+- [x] Finish the existing zero-cost registration's actual confirmation email and ticket/QR display. Yahoo's system Spam contained the expected confirmations. Marked only the diagnostic one Not Spam, followed its real confirmation button, then completed the deployed email/code membership recheck. Ticket workspace showed confirmed and the QR; production readback confirms email_verified=true, ticket_issued=true, amount/charged_amount0. No forged proof or private-link logging; no physical-phone scan claimed.
+- [x] Restore the synthetic recurring event to draft/public after ticket verification. Registration and poll response retained; pilot active with0charges; before/after rollout-settings hashes match across all9organisations.
+- [x] Verify delivery of one explicitly authorised diagnostic copy of the issued ticket: native mailable sent once22:41:21UTC withonePDF; Yahoo Inbox message opened, expected body/PDF visibly verified. No additional registration, QR or charge.
+- [x] Investigate the original automatic ticket-email path: subsequent owner-approved investigation found a Cloud managed failed job with SMTP451 at MAIL FROM and only1attempt. The database failed_jobs table had not covered Cloud’s managed failure store. SMTP idle checks and bounded ticket retries are implemented locally on `codex/ticket-mail-reliability`; merge/deploy and a new live queue send remain separately gated.
+- [x] Record proof, failures, fixture cleanup and residual gates in the roadmap.
 
 ## 2. Payment sandbox acceptance — next recommended workstream
 
@@ -143,15 +145,81 @@ Yahoo system Spam contained all three confirmations. The latest diagnostic messa
 
 ### Self-Review Report
 
-**Touchpoints updated:** checkout verification component, integration-style component regression tests, rebuilt tracked assets and this roadmap/handover. AGENTS/memory, seeders, roles/permissions, navigation, environment and configuration require no changes: no new convention, feature, endpoint, permission or dependency.
+#### Touchpoints updated
 
-**UI Gap Analysis:** existing Verify my membership action remains discoverable; empty email has a labelled required field; email-only verification preserves personal membership gates. Existing busy, challenge, cooldown and failed-code states remain. No layout change beyond using the existing responsive email form. Keyboard labels and accent-ink button styles are reused. Physical-device acceptance remains outstanding.
+ checkout verification component, integration-style component regression tests, rebuilt tracked assets and this roadmap/handover. AGENTS/memory, seeders, roles/permissions, navigation, environment and configuration require no changes: no new convention, feature, endpoint, permission or dependency.
 
-**Solved:** removed the incorrect registration-mode props; replaced the test's mocked verification button with real send/confirm/recovery interactions. A fresh scoped reviewer found no correctness/security issues.
+#### UI Gap Analysis
 
-**Recommended for user decision:** deploy the narrow fix, then complete the designated zero-cost member verification and QR check; durable provider delivery-status recording remains a separate proposed follow-up.
+ existing Verify my membership action remains discoverable; empty email has a labelled required field; email-only verification preserves personal membership gates. Existing busy, challenge, cooldown and failed-code states remain. No layout change beyond using the existing responsive email form. Keyboard labels and accent-ink button styles are reused. Physical-device acceptance remains outstanding.
 
-**Not gaps:** an emailed confirmation and an expired member quote are independent gates; email verification alone cannot bypass current personal membership eligibility. Paid recovery is tested locally but no live payment is authorised or attempted.
+#### Solved
+
+ removed the incorrect registration-mode props; replaced the test's mocked verification button with real send/confirm/recovery interactions. A fresh scoped reviewer found no correctness/security issues.
+
+#### Recommended for user decision
+
+ deploy the narrow fix, then complete the designated zero-cost member verification and QR check; durable provider delivery-status recording remains a separate proposed follow-up.
+
+#### Not gaps
+
+ an emailed confirmation and an expired member quote are independent gates; email verification alone cannot bypass current personal membership eligibility. Paid recovery is tested locally but no live payment is authorised or attempted.
 
 
 **Checkout-fix validation:** regression RED reproduced the absent email field in both existing-registration recovery modes; GREEN: focused JS5/5, affected PHP64/64 with250assertions, lint, Pint and production build passed. Full JS run:457passed/1failed due to the existing badge-editor controls test exceeding its5second limit under parallel load; the unchanged BadgeDesignEditor file passed all11tests when rerun alone. This is not reported as a clean full-suite pass. Build retains its existing large-chunk warning. Diff whitespace check passed. Fresh scoped code review approved. No production code deployment has been performed for this fix; owner review/merge go-ahead and live native acceptance remain outstanding.
+
+
+## Approved release and live acceptance — 2026-10-21
+
+Owner approved PR46 merge/deploy. Merged commit `d86142e3f50f242f9226e648009b1c6ae7449bd4` has exactly the tested/reviewed head49abbf74 tree. GitHub merged immediately despite running CI after the auto-merge command; root acknowledged the sequencing error. PR CI39682798276 subsequently succeeded:3646PHP/17406assertions,1pre-existing riskyPHP;458JS across73files; quality/static/build passed. Recommend requiring the existing status checks as branch-protection gates, subject to owner's repository-settings approval. No branch protection was changed.
+
+Automatic Cloud deployment `depl-a309afad-aa80-4ce6-b387-20f9b9c25a4e` succeeded21:59:34–22:02:22UTC,2m48s; monitor exit0, currentDeploymentId and exactSHA verified. No duplicate deploy. Native live recheck displayed the corrected labelled email field; one requested platform code arrived in Yahoo Inbox and was entered privately. It redirected to the real ticket workspace: confirmed, QR displayed, member benefit personal/nontransferable. Read `cexe-a309b1b0-83c3-43ae-aa07-cb6ad6cf1d6d` confirmed issued ticket, verified email and zero amounts. No QR token/code or private URL included in saved public proof; no physical scan/check-in claimed.
+
+Cleanup write `cexe-a309b21b-4c64-4ae7-bc96-d1618573d587` restored only the labelled event to draft/public; subsequent read `cexe-a309b2a0-9929-4ef5-9816-194faf94103f` confirmed event restoration, issued ticket retained and document/service-note drafts. Post snapshot `cexe-a309b267-f1f0-46cb-b4ac-4d4cf8be023b` matches pre snapshot `cexe-a309af50-40d1-42c4-9f7a-64e340a9c94f`: rollout hash8959c291f6f8358f8053ed0ad69efaaa17e8e856ebe9ba00562fe4176dd68478,9tenants,active pilot0charges,poll response1. Queue read22:08:28UTC waiting0/failed7days0. Final ticket-email receipt remains unverified; confirmation and platform OTP delivery are proven. Screenshot artifact `purpledot-ticket-confirmed-live.png` crops out the QR/entry code. Original/Claude checkouts and all other tenant settings untouched.
+
+
+Merged-main CI39683132566 subsequently completed successfully: both PHP and quality jobs passed. PR and merged-main CI are green on the identical release tree; no duplicate local full run was started. No new application changes after release; this final handover update is documentation only.
+
+
+**Physical QR follow-up:** owner phone test21October22:37UTC passed first admission and duplicate detection. Server read `cexe-a309bdc5-6063-460b-92cf-65d5628f294c`: admitted22:37:22,already_in22:37:24,statuschecked_in,zeroamounts. Owner independently reported the same messages. Retain records as test history. Offline/audio/vibration/general mobile checks and final ticket-email delivery remain separate outstanding checks.
+
+
+**Ticket delivery acceptance:** owner authorised one diagnostic email21October; `cexe-a309be99-2f3c-4eb1-b9e8-fd2a16eb477e` sent native EventRegistrationConfirmed once22:41:21UTC,onePDF,oneSentEmail record. Yahoo Inbox received it10:41PM; actual message opened and expected body/PDF verified. Diagnostic recipient delivery PASS. Original automatic queue handoff remains a distinct investigation; do not present a synchronous send as proof of that path. No application deploy, provider-setting change, payment or new registration.
+
+
+## 9. Automatic ticket-mail reliability fix — 2026-10-21
+
+- [x] Inspect actual Cloud managed queue failures and sanitised call-stack positions, not only database failed_jobs or queue depth. Matching ticket job01a1607f-0a7a-72b7-95a4-264b7a281e5a failed22:05:00.922UTC at MAIL FROM with4514.4.2,before DATA. Earlier matching ticket-mail failures18October/15September show this is a pre-existing connection-reuse issue.
+- [x] Read production settings without secrets or SMTP connections: `cexe-a309c26d-8b5c-4666-8971-5b3a4e01564b` confirmsSES SMTP and100second idle ping threshold. Existing queue process default1attempt.
+- [x] Reproduce RED in local automated tests: actual configured Symfony SMTPtransport against an in-memory expired connection throws the same451; real database worker with1attempt drops the mail instead of recovering; exhaustion test observes1attempt instead of3. Test-harness compatibility/output-capture errors were corrected before recording these expected failures.
+- [x] Set smtp ping_threshold9 per official Symfony SES guidance. Add native EventRegistrationConfirmed tries3 and backoff10/60seconds, overriding the worker's1attempt without global worker changes. No new package, env var, SMTP account, route, permission, financial write or UI.
+- [x] Run affected mail/queue tests:12passed/40assertions;Pint passed. No external test mail, failed-job replay or fixture mutation.
+- [x] Fresh scoped review approved; strengthen persisted QR assertion and verify retries wait for their delay.
+- [x] Complete strengthened regression run:3passed/18assertions, including persisted QR stability and delayed retries (no retry at9seconds; no third attempt before60seconds). Earlier affected run12passed/40assertions;Pint passed.
+- [ ] Pass full remote CI on the final commit before merge.
+- [ ] Obtain owner approval before merging/deploying. Wait for completed green CI directly; do not issue auto-merge while checks are running.
+- [ ] After approved deployment, read effective9second setting and bounded retry metadata. Do not retry the existing failed ticket job: the owner already received its explicitly authorised diagnostic copy. A new live queued acceptance send needs its own recipient-scoped authorisation.
+
+### Self-Review Report — ticket mail
+
+#### Touchpoints updated
+
+ SMTP config, existing ticket mailable, new mail/worker regressions and roadmap/follow-up notes. AGENTS/memory, seeders/permissions/roles, navigation,env example and built assets are N/A: no new convention, dependency, credential, endpoint, permission, variable or JS/CSS. Existing ticket links, PDF/inline QR rendering and ownership checks are retained.
+
+#### UI Gap Analysis
+
+ no new UI. Existing ticket workspace/PDF remains discoverable; empty/loading/error/access states are unchanged. Mobile/keyboard/contrast are unaffected by these backend changes; phone admission/duplicate acceptance was previously verified. The existing workspace “emailed” text does not itself prove delivery; native staff mail history records SMTP handoff only, while actual failure diagnosis must consult Cloud's managed failed jobs. Do not mislabel SMTP acceptance as recipient delivery.
+
+#### Solved
+
+ expired SES connection is checked/reconnected before submission; transient rejection gets bounded delayed retries without issuing new ticket/QR or touching balances. Local tests use the real configured transport and queue worker, with memory-only SMTP/mail transport. Earlier zero database failures were insufficient evidence and are explicitly corrected in the handover.
+
+#### Recommended for user decision
+
+ approve the reviewed fix's merge/deployment after CI; schedule future delivery-status visibility as a separate scoped feature if desired. Keep old failed jobs as history and do not bulk retry: some tickets have already been sent diagnostically.
+
+#### Not gaps
+
+ native SMTP/queue delivery is at-least-once. An ambiguous disconnect after provider acceptance could still duplicate an email; this change does not claim exactly-once delivery. The observed451 happened before message submission. The same registration/QR is reused across retries; no payment or member mutation occurs. No live test send or production setting change was performed for this fix.
+
+Sources: https://symfony.com/doc/current/mailer.html (SES background SMTP ping_threshold below10; example9); https://docs.aws.amazon.com/ses/latest/dg/troubleshoot-smtp.html (451 idle timeout; delayed4xx retries).
