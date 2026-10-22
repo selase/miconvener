@@ -81,12 +81,17 @@ final readonly class MerchandiseCatalog
 
     public function publish(Tenant $tenant, User $actor, StoreListing $listing): StoreListing
     {
-        return $this->changeState($tenant, $actor, $listing, false);
+        return $this->changeState($tenant, $actor, $listing, 'publish');
     }
 
     public function archive(Tenant $tenant, User $actor, StoreListing $listing): StoreListing
     {
-        return $this->changeState($tenant, $actor, $listing, true);
+        return $this->changeState($tenant, $actor, $listing, 'archive');
+    }
+
+    public function draft(Tenant $tenant, User $actor, StoreListing $listing): StoreListing
+    {
+        return $this->changeState($tenant, $actor, $listing, 'draft');
     }
 
     /** @return \Illuminate\Database\Eloquent\Builder<StoreListing> */
@@ -97,16 +102,19 @@ final readonly class MerchandiseCatalog
             ->when($id !== null, fn ($query) => $query->whereKey($id));
     }
 
-    private function changeState(Tenant $tenant, User $actor, StoreListing $listing, bool $archive): StoreListing
+    private function changeState(Tenant $tenant, User $actor, StoreListing $listing, string $state): StoreListing
     {
         $this->authorize($tenant, $actor);
 
-        return $tenant->getConnection()->transaction(function () use ($tenant, $actor, $listing, $archive): StoreListing {
+        return $tenant->getConnection()->transaction(function () use ($tenant, $actor, $listing, $state): StoreListing {
             $lockedTenant = Tenant::query()->lockForUpdate()->findOrFail($tenant->id);
             $this->authorize($lockedTenant, $actor);
             $current = $this->owned($lockedTenant, $listing->id)->lockForUpdate()->firstOrFail();
-            if ($archive) {
+            if ($state === 'archive') {
                 $current->merchandise()->firstOrFail()->update(['archived_at' => now()]);
+            } elseif ($state === 'draft') {
+                $current->merchandise()->firstOrFail()->update(['archived_at' => null]);
+                $current->update(['status' => $current->taken_down_at !== null ? StoreListing::STATUS_SUSPENDED : StoreListing::STATUS_DRAFT]);
             } else {
                 abort_if($current->taken_down_at !== null, 403, 'This item has been taken down by the platform.');
                 $this->assertPublishable($current);

@@ -66,6 +66,24 @@ final readonly class MerchandiseMediaStorage
         }
     }
 
+    public function remove(Tenant $tenant, StoreListing $listing, string $mediaId): void
+    {
+        $tenant->getConnection()->transaction(function () use ($tenant, $listing, $mediaId): void {
+            $locked = Tenant::query()->lockForUpdate()->findOrFail($tenant->id);
+            abort_unless(app(CommerceCatalogRollout::class)->enabled($locked), 403);
+            $current = StoreListing::withoutGlobalScope(MerchandiseVisibilityScope::class)->whereKey($listing->id)
+                ->where('listing_kind', StoreListing::KIND_MERCHANDISE)->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $locked->id))->firstOrFail();
+            $media = StoreListingMedia::withoutGlobalScope('merchandise')->where('listing_id', $current->id)->lockForUpdate()->findOrFail($mediaId);
+            abort_unless(in_array($media->disk, ['commerce-media-local', 's3'], true)
+                && ! str_contains($media->file_path, '..')
+                && str_starts_with($media->file_path, 'commerce-media/'.$locked->id.'/'.$current->id.'/'), 404);
+            if (! Storage::disk($media->disk)->delete($media->file_path)) {
+                throw ValidationException::withMessages(['photo' => 'The image could not be removed. Try again.']);
+            }
+            $media->delete();
+        });
+    }
+
     public function stream(StoreListingMedia $media): StreamedResponse
     {
         $listing = StoreListing::withoutGlobalScope(MerchandiseVisibilityScope::class)->with('shop')->findOrFail($media->listing_id);

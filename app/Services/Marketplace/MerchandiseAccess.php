@@ -31,12 +31,18 @@ final class MerchandiseAccess
         if ($current->merchandise->visibility === 'public') {
             return true;
         }
+
+        return $this->canReadMembersFrom($current->shop->tenant, $session);
+    }
+
+    public function canReadMembersFrom(\App\Models\Tenant $tenant, Session $session): bool
+    {
         $email = app(PlatformAttendeeVerification::class)->verifiedEmail($session);
         $email = app(MemberIdentity::class)->normaliseEmail($email);
         if ($email === null) {
             return false;
         }
-        $members = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $current->shop->tenant_id)
+        $members = Member::withoutGlobalScope(TenantScope::class)->where('tenant_id', $tenant->id)
             ->where('status', MemberStatusEnum::Active)->whereRaw('lower(trim(email)) = ?', [$email])->get();
 
         return $members->contains(fn (Member $member): bool => app(MemberAccess::class)->role($session, $member) === 'self');

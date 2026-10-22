@@ -42,7 +42,7 @@ Proposed service contract (resolve request context/authorisation before privileg
 - `CommerceCatalogRollout::baseEnabled(Tenant $tenant): bool` requires active tenant and TenantFeature commerce_catalog=true; `enabled(Tenant $tenant): bool` additionally requires an active Shop for public reads. Administration/onboarding checks baseEnabled plus manage store catalog; a missing Shop can be created in the first authorised POST transaction, while an inactive existing Shop is rejected and never auto-reactivated. GET shows an onboarding/empty state without creating records. No rollout method changes flags or grants entitlements. Default public-scope queries enforce equivalent conditions in SQL.
 - `MerchandiseMediaStorage::put(Tenant $tenant, StoreListing $listing, UploadedFile $file): StoreListingMedia` and `stream(StoreListingMedia $media): StreamedResponse` use the spec's private storage/quota rules. Stream callers authorise current access first; the media service validates tenant-prefixed keys and uses no-store/nosniff headers. Existing venue URL/storage behavior is retained.
 
-Proposed route contract: tenant GET/POST `/store/catalog`, GET/PUT `/store/catalog/{listing}`, POST `/store/catalog/{listing}/publish`, POST `/store/catalog/{listing}/archive`, POST `/store/catalog/{listing}/variants/{variant}/adjustments`, POST `/store/catalog/{listing}/photos`; public GET `/marketplace/items/{slug}` and GET `/marketplace/items/{slug}/photos/{media}`. Names use `tenant.store.catalog.*` and `marketplace.items.*`. Each identifier is re-resolved under the seller/type/access context. No checkout route in S1a.
+Proposed route contract: tenant GET/POST `/store/catalog`, GET `/store/catalog/create`, GET/PUT `/store/catalog/{listing}`, POST `/store/catalog/{listing}/publish`, POST `/store/catalog/{listing}/archive`, POST `/store/catalog/{listing}/draft`, POST `/store/catalog/{listing}/variants/{variant}/adjustments`, POST `/store/catalog/{listing}/photos`, DELETE `/store/catalog/{listing}/photos/{media}`; public GET `/marketplace/items/{slug}` and GET `/marketplace/items/{slug}/photos/{media}`. Names use `tenant.store.catalog.*` and `marketplace.items.*`. Each identifier is re-resolved under the seller/type/access context. No checkout route in S1a.
 
 These new names belong to this proposed plan, not existing APIs. `Session` is `Illuminate\Contracts\Session\Session`, matching existing `MemberAccess::role(Session $session, Member $member)`. Resolve the live verified email with `PlatformAttendeeVerification::verifiedEmail($session)`, normalize using existing member identity rules and restrict active members to the selling tenant; require self access for S1. Offline `AttendeeIdentityContext` cache proofs do not authorise purchases. Representatives and phone-only purchase eligibility are deferred design decisions, not silently inherited from document-reading access.
 
@@ -82,12 +82,12 @@ These new names belong to this proposed plan, not existing APIs. `Session` is `I
 
 **Files:** existing storefront controller/page, new merchandise detail controller/page, seller merchandise index/form/inventory views, native organisation/Community Store entry points; tests `MerchandiseStorefrontTest.php` and `resources/js/test/marketplace/MerchandiseCatalog.test.jsx`.
 
-- [ ] Write failures for correct typed card links, preserved venue links, guarded member details, public price/options payload, sold-out/default-variant states, stock correction validation/error feedback and no S1a checkout action. Private cards must not be named in anonymous payloads.
-- [ ] Run the new PHP and JS tests to confirm meaningful failures.
-- [ ] Implement the screens using existing React/console tokens and square visual surfaces. Filter Store navigation by feature/access; public Store works without dues/Community. Keep venue-specific capacities/date controls off purchase forms.
-- [ ] Item selection may display catalog availability only; show “Purchasing is not enabled yet” in S1a. No fake success/order, provider request or reservation from a preview button.
-- [ ] Run affected tests/lint; rebuild and include `public/build` in the same implementation commit. Test keyboard option selection, form focus/errors, safe media and feature revocation.
-- [ ] Commit task plus ticked plan steps.
+- [x] Write failures for correct typed card links, preserved venue links, guarded member details, public price/options payload, sold-out/default-variant states, stock correction validation/error feedback and no S1a checkout action. Private cards must not be named in anonymous payloads.
+- [x] Run the new PHP and JS tests to confirm meaningful failures.
+- [x] Implement the screens using existing React/console tokens and square visual surfaces. Filter Store navigation by feature/access; public Store works without dues/Community. Keep venue-specific capacities/date controls off purchase forms.
+- [x] Item selection may display catalog availability only; show “Purchasing is not enabled yet” in S1a. No fake success/order, provider request or reservation from a preview button.
+- [x] Run affected tests/lint; rebuild and include `public/build` in the same implementation commit. Test keyboard option selection, form focus/errors, safe media and feature revocation.
+- [x] Commit task plus ticked plan steps.
 
 ## Task 5: preservation gate and review
 

@@ -402,6 +402,7 @@ it('shows one community card with messages prominent and management collapsed', 
                                     slug: 'group',
                                     name: 'Volunteer group',
                                     actions: {
+                                        store_url: '/marketplace/group-store',
                                         library: true,
                                         services: true,
                                         polls: true,
@@ -428,6 +429,9 @@ it('shows one community card with messages prominent and management collapsed', 
     ).toBeTruthy();
     expect(screen.getAllByText('1 unread')).toHaveLength(1);
     expect(await screen.findByRole('link', { name: 'Library' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Browse store' }).getAttribute('href')).toBe(
+        '/marketplace/group-store'
+    );
     expect(screen.getByRole('link', { name: 'Services' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Book a room' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Polls & surveys' })).toBeTruthy();

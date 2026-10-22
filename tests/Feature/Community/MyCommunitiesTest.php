@@ -53,3 +53,13 @@ it('supports the standard resource collection contract as well as explicit servi
     $rows = App\Http\Resources\Community\MyCommunityResource::collection(collect([$this->tenant]))->resolve($request);
     expect($rows[0]['id'])->toBe($this->tenant->id);
 });
+
+it('exposes a store link only while the organisation catalog and shop are active', function (): void {
+    $shop = App\Models\Shop::factory()->create(['tenant_id' => $this->tenant->id]);
+    $url = $this->base.'/communities';
+    $this->withSession($this->session->all())->getJson($url)->assertOk()->assertJsonPath('communities.data.0.actions.store_url', null);
+    $this->tenant->features()->create(['feature_key' => 'commerce_catalog', 'enabled' => true]);
+    $this->getJson($url)->assertOk()->assertJsonPath('communities.data.0.actions.store_url', route('marketplace.storefront.show', ['merchant_slug' => $shop->slug]));
+    $shop->update(['is_active' => false]);
+    $this->getJson($url)->assertOk()->assertJsonPath('communities.data.0.actions.store_url', null);
+});

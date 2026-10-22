@@ -37,6 +37,13 @@ final class MerchandiseCatalogController extends Controller
             'shop' => $tenant->shop === null ? null : ['name' => $tenant->shop->name, 'slug' => $tenant->shop->slug], 'checkoutEnabled' => false]);
     }
 
+    public function create(Request $request): Response
+    {
+        $this->catalog->authorize($this->tenant(), $request->user());
+
+        return Inertia::render('Tenant/Store/Catalog/Form', ['item' => null, 'checkoutEnabled' => false]);
+    }
+
     public function show(Request $request, string $subdomain, string $listing): Response
     {
         $tenant = $this->tenant();
@@ -72,6 +79,15 @@ final class MerchandiseCatalogController extends Controller
         return $this->state($request, $listing, true);
     }
 
+    public function draft(ChangeMerchandiseStateRequest $request, string $subdomain, string $listing): JsonResponse
+    {
+        $tenant = $this->tenant();
+        $this->catalog->authorize($tenant, $request->user());
+        $item = $this->catalog->draft($tenant, $request->user(), $this->catalog->owned($tenant, $listing)->firstOrFail());
+
+        return response()->json(['listing' => $this->payload($item)]);
+    }
+
     public function adjust(AdjustMerchandiseStockRequest $request, string $subdomain, string $listing, string $variant, MerchandiseInventory $inventory): JsonResponse
     {
         $tenant = $this->tenant();
@@ -93,6 +109,16 @@ final class MerchandiseCatalogController extends Controller
         return response()->json(['photo' => ['id' => $photo->id, 'url' => $photo->url], 'listing' => $this->payload($item)], 201);
     }
 
+    public function removePhoto(ChangeMerchandiseStateRequest $request, string $subdomain, string $listing, string $media, MerchandiseMediaStorage $storage): JsonResponse
+    {
+        $tenant = $this->tenant();
+        $this->catalog->authorize($tenant, $request->user());
+        $item = $this->catalog->owned($tenant, $listing)->firstOrFail();
+        $storage->remove($tenant, $item, $media);
+
+        return response()->json(['listing' => $this->payload($item)]);
+    }
+
     private function state(ChangeMerchandiseStateRequest $request, string $listing, bool $archive): JsonResponse
     {
         $tenant = $this->tenant();
@@ -106,7 +132,7 @@ final class MerchandiseCatalogController extends Controller
     /** @return array<string,mixed> */
     private function payload(StoreListing $listing, bool $history = true): array
     {
-        $listing->loadMissing(['merchandise', 'variants']);
+        $listing->loadMissing(['merchandise', 'variants' => fn ($variants) => $variants->orderBy('created_at')->orderBy('id')]);
         $details = $listing->merchandise;
         $photos = $history ? StoreListingMedia::withoutGlobalScope('merchandise')->where('listing_id', $listing->id)->photos()->approved()->orderBy('sort_order')->get()
             ->map(fn (StoreListingMedia $photo): array => ['id' => $photo->id, 'url' => $photo->url])->all() : [];

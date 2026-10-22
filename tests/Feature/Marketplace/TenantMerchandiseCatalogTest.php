@@ -177,3 +177,46 @@ it('limits photos to eight and cleans up an object when metadata persistence fai
     $this->post($this->url.'/'.$id.'/photos', ['photo' => UploadedFile::fake()->image('ninth.jpg')], ['Accept' => 'application/json'])->assertUnprocessable();
     expect(StoreListingMedia::withoutGlobalScope('merchandise')->count())->toBe(8);
 });
+
+it('removes only an owned product photo and makes its copied URL unusable', function (): void {
+    Storage::fake('commerce-media-local');
+    $id = $this->postJson($this->url, $this->data)->assertCreated()->json('listing.id');
+    $photo = $this->post($this->url.'/'.$id.'/photos', ['photo' => UploadedFile::fake()->image('shirt.jpg')], ['Accept' => 'application/json'])->assertCreated()->json('photo');
+    $stored = StoreListingMedia::withoutGlobalScope('merchandise')->findOrFail($photo['id']);
+    $other = StoreMerchandise::factory()->create();
+    $this->deleteJson($this->url.'/'.$other->listing_id.'/photos/'.$stored->id)->assertNotFound();
+    Storage::disk('commerce-media-local')->assertExists($stored->file_path);
+    $this->deleteJson($this->url.'/'.$id.'/photos/'.$stored->id)->assertOk();
+    Storage::disk('commerce-media-local')->assertMissing($stored->file_path);
+    $this->get($photo['url'])->assertNotFound();
+});
+
+it('can safely retry photo removal if deleting its metadata fails after storage deletion', function (): void {
+    Storage::fake('commerce-media-local');
+    $id = $this->postJson($this->url, $this->data)->assertCreated()->json('listing.id');
+    $listing = StoreListing::withoutGlobalScope(MerchandiseVisibilityScope::class)->findOrFail($id);
+    $storage = app(App\Services\Marketplace\MerchandiseMediaStorage::class);
+    $photo = $storage->put($this->tenant, $listing, UploadedFile::fake()->image('shirt.jpg'));
+    $fail = true;
+    StoreListingMedia::deleting(function () use (&$fail): void {
+        if ($fail) {
+            $fail = false;
+            throw new RuntimeException('Test removal metadata failure');
+        }
+    });
+    try {
+        $storage->remove($this->tenant, $listing, $photo->id);
+        $this->fail('The simulated metadata failure must occur.');
+    } catch (RuntimeException $error) {
+        expect($error->getMessage())->toBe('Test removal metadata failure');
+    }
+    expect(StoreListingMedia::withoutGlobalScope('merchandise')->whereKey($photo->id)->exists())->toBeTrue();
+    $storage->remove($this->tenant, $listing, $photo->id);
+    expect(StoreListingMedia::withoutGlobalScope('merchandise')->whereKey($photo->id)->exists())->toBeFalse();
+    Storage::disk('commerce-media-local')->assertMissing($photo->file_path);
+});
+
+it('bounds option names at the same limit as the seller editor', function (): void {
+    $this->data['variants'][0]['options'] = [str_repeat('x', 51) => 'M'];
+    $this->postJson($this->url, $this->data)->assertUnprocessable()->assertJsonValidationErrors('variants.0.options');
+});

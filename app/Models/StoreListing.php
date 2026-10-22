@@ -204,6 +204,19 @@ final class StoreListing extends Model
         return isset($capacities[$style]) ? (int) $capacities[$style] : null;
     }
 
+    /** @param Builder<self> $query
+     * @return Builder<self>
+     */
+    public function scopeCatalogAvailable(Builder $query): Builder
+    {
+        return $query->where('store_listings.status', self::STATUS_PUBLISHED)->whereNull('store_listings.taken_down_at')
+            ->whereHas('merchandise', fn (Builder $details) => $details->whereNull('archived_at')->whereRaw("collection_instructions ~ '[^[:space:]]'"))
+            ->whereHas('variants', fn (Builder $variants) => $variants->where('is_active', true))
+            ->whereHas('shop', fn (Builder $shop) => $shop->where('is_active', true)
+                ->whereHas('tenant', fn (Builder $tenant) => $tenant->where('status', 'active')
+                    ->whereHas('features', fn (Builder $feature) => $feature->where('feature_key', 'commerce_catalog')->where('enabled', true))));
+    }
+
     /**
      * @param  Builder<self>  $query
      * @return Builder<self>

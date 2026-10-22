@@ -4,16 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tenant\Store;
 
+use Closure;
 use Illuminate\Validation\Rule;
 
 final class SaveMerchandiseRequest extends CatalogRequest
 {
-    /** @return array<string,mixed> */
-    public function rules(): array
-    {
-        return self::catalogRules();
-    }
-
     /** @return array<string,mixed> */
     public static function catalogRules(): array
     {
@@ -24,9 +19,26 @@ final class SaveMerchandiseRequest extends CatalogRequest
             'variants' => ['required', 'array', 'min:1', 'max:100'],
             'variants.*' => ['required', 'array:id,sku,options,price_pesewas,is_active,initial_stock,idempotency_key'],
             'variants.*.id' => ['sometimes', 'uuid', 'distinct'], 'variants.*.sku' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z0-9_\- ]+$/D'],
-            'variants.*.options' => ['present', 'array', 'max:8'], 'variants.*.options.*' => ['required', 'string', 'max:100'],
+            'variants.*.options' => ['present', 'array', 'max:8', function (string $attribute, mixed $value, Closure $fail): void {
+                if (! is_array($value)) {
+                    return;
+                }
+                foreach (array_keys($value) as $name) {
+                    if (! is_string($name) || mb_trim($name) === '' || mb_strlen($name) > 50) {
+                        $fail('Use option names of 1 to 50 characters.');
+
+                        return;
+                    }
+                }
+            }], 'variants.*.options.*' => ['required', 'string', 'max:100'],
             'variants.*.price_pesewas' => ['required', 'integer', 'min:0', 'max:9007199254740991'], 'variants.*.is_active' => ['required', 'boolean'],
             'variants.*.initial_stock' => ['sometimes', 'integer', 'min:0', 'max:2147483647'], 'variants.*.idempotency_key' => ['sometimes', 'nullable', 'uuid']];
+    }
+
+    /** @return array<string,mixed> */
+    public function rules(): array
+    {
+        return self::catalogRules();
     }
 
     /** @return array<string,string> */
