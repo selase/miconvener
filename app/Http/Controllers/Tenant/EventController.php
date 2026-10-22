@@ -837,7 +837,7 @@ final class EventController extends Controller
             'currency' => ['required', 'string', 'size:3'],
             'plan_your_visit_content' => ['nullable', 'string'],
             'hero_image' => ['nullable', 'image', 'max:20480'],
-            'store_listing_id' => ['nullable', 'uuid', 'exists:landlord.store_listings,id'],
+            'store_listing_id' => ['nullable', 'uuid', Rule::exists('landlord.store_listings', 'id')->where(fn ($query) => $query->where('listing_kind', '!=', \App\Models\StoreListing::KIND_MERCHANDISE))],
             'venue_booking_id' => ['nullable', 'uuid', 'exists:landlord.venue_bookings,id'],
             'is_recurring' => ['sometimes', 'boolean'],
             'recurrence_pattern' => ['nullable', 'required_if:is_recurring,true', Rule::in(RecurrenceService::PATTERNS)],

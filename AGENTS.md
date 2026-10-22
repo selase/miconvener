@@ -326,3 +326,12 @@ Before starting work on members, dues, giving, following, `/my` or community mes
 # Shared Paystack account relay
 
 The existing platform webhook remains the account entry point. After signature verification, `metadata.application=udworkspace` plus `charge.success` relays the exact original body/signature to the fixed HTTPS UDWorkspace invoice receiver. Never accept a destination from payload metadata or follow redirects. Forwarding is bounded (3s connect/15s total); only destination HTTP 200 acknowledges receipt. Non-200/connection failure returns 502, or 503 when `PAYSTACK_UDWORKSPACE_RELAY_ENABLED=false`, so Paystack retries. UDWorkspace independently verifies provider amount/currency/invoice/tenant and deduplicates payment/receipt creation. No MiConvener fulfillment should run for relayed charges. Logs contain attempt UUID, SHA-256 and result/target UUID only; no payload, signature, contact details or exception message. Exclude these inbound paths and the outgoing relay from Telescope body recording. A controlled replay proves routing and deduplication, not provider-origin delivery.
+
+# Unified commerce catalog
+
+Before catalog/commerce work, read `docs/superpowers/marketplace-roadmap.md` and the unified-commerce design. `Shop` and `StoreListing` remain the canonical seller/listing identity; merchandise details and variants extend them without entering venue calendars, legacy RFQs or venue booking code. `commerce_catalog` requires an explicit enabled tenant flag. It grants browsing/catalog management only, never checkout or Community access.
+
+- Stock changes go through `MerchandiseInventory` with the shared `commerce.inventory:<variant UUID>` advisory lock, reason, actor snapshot and idempotency key. Future reservations must use that same lock. Preserve immutable movement history; deactivate organisations with catalog records rather than hard-delete them.
+- Merchandise media stays private and is streamed through current listing/member authorisation. Never expose storage keys or reuse public venue-media paths.
+- Member-only merchandise requires current native verified-email self membership; phone proof, followers and representative access do not qualify.
+- Before rolling back to source predating merchandise scopes, make merchandise parent listings draft. A disabled catalog flag alone is not honoured by that older source. Retain catalog and audit tables.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Jobs\EmbedStoreListingJob;
+use App\Scopes\MerchandiseVisibilityScope;
 use App\Scopes\StaffOnlyScope;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -130,6 +131,18 @@ final class StoreListing extends Model
         'is_bookable' => 'boolean',
     ];
 
+    /** @return HasOne<StoreMerchandise, $this> */
+    public function merchandise(): HasOne
+    {
+        return $this->hasOne(StoreMerchandise::class, 'listing_id');
+    }
+
+    /** @return HasMany<StoreVariant, $this> */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(StoreVariant::class, 'listing_id');
+    }
+
     public function isBookable(): bool
     {
         return (bool) ($this->is_bookable ?? true);
@@ -189,6 +202,19 @@ final class StoreListing extends Model
         $capacities = $this->capacity_breakdown ?? [];
 
         return isset($capacities[$style]) ? (int) $capacities[$style] : null;
+    }
+
+    /** @param Builder<self> $query
+     * @return Builder<self>
+     */
+    public function scopeCatalogAvailable(Builder $query): Builder
+    {
+        return $query->where('store_listings.status', self::STATUS_PUBLISHED)->whereNull('store_listings.taken_down_at')
+            ->whereHas('merchandise', fn (Builder $details) => $details->whereNull('archived_at')->whereRaw("collection_instructions ~ '[^[:space:]]'"))
+            ->whereHas('variants', fn (Builder $variants) => $variants->where('is_active', true))
+            ->whereHas('shop', fn (Builder $shop) => $shop->where('is_active', true)
+                ->whereHas('tenant', fn (Builder $tenant) => $tenant->where('status', 'active')
+                    ->whereHas('features', fn (Builder $feature) => $feature->where('feature_key', 'commerce_catalog')->where('enabled', true))));
     }
 
     /**
@@ -374,12 +400,13 @@ final class StoreListing extends Model
     protected static function booted(): void
     {
         self::addGlobalScope(new StaffOnlyScope);
+        self::addGlobalScope(new MerchandiseVisibilityScope);
 
         // Search reads the embedding, so a published listing whose searchable
         // content changed is re-embedded. Saving the embedding itself changes
         // none of these fields, so this cannot loop.
         self::created(function (self $listing): void {
-            if ($listing->status === self::STATUS_PUBLISHED) {
+            if ($listing->listing_kind !== self::KIND_MERCHANDISE && $listing->status === self::STATUS_PUBLISHED) {
                 EmbedStoreListingJob::dispatch($listing->id);
             }
         });
@@ -387,7 +414,7 @@ final class StoreListing extends Model
         self::updated(function (self $listing): void {
             $searchable = ['title', 'description', 'category', 'listing_kind', 'capacity_breakdown', 'service_scope', 'floor_area_sqm', 'ceiling_height_meters', 'rules_and_policies', 'status'];
 
-            if ($listing->status === self::STATUS_PUBLISHED && $listing->wasChanged($searchable)) {
+            if ($listing->listing_kind !== self::KIND_MERCHANDISE && $listing->status === self::STATUS_PUBLISHED && $listing->wasChanged($searchable)) {
                 EmbedStoreListingJob::dispatch($listing->id);
             }
         });

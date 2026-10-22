@@ -49,6 +49,7 @@ describe('visibleGroups', () => {
             'top',
             'events',
             'community',
+            'store',
             'venue',
             'finance',
             'organisation',
@@ -147,4 +148,17 @@ it('keeps Library reachable for authorised staff with retained documents', () =>
         can: {},
     });
     expect(hidden.find((group) => group.key === 'community')).toBeUndefined();
+});
+
+describe('Store catalog navigation', () => {
+    it('requires the catalog rollout and its own permission without needing Community', () => {
+        const keys = (context) => visibleGroups(NAV_GROUPS, context).map((group) => group.key);
+        expect(
+            keys({ features: { commerce_catalog: true }, can: { manage_store_catalog: true } })
+        ).toContain('store');
+        expect(keys({ features: {}, can: { manage_store_catalog: true } })).not.toContain('store');
+        expect(
+            keys({ features: { commerce_catalog: true }, can: { manage_venue: true } })
+        ).not.toContain('store');
+    });
 });

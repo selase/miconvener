@@ -24,7 +24,7 @@ final class MarketplaceSearchService
     public function searchVenues(array $filters = [], int $perPage = 12): LengthAwarePaginator
     {
         /** @var Builder<StoreListing> $query */
-        $query = StoreListing::query()
+        $query = StoreListing::query()->where('store_listings.listing_kind', '!=', StoreListing::KIND_MERCHANDISE)
             ->with(['shop', 'primaryMedia', 'amenities.amenity'])
             ->where('store_listings.status', StoreListing::STATUS_PUBLISHED)
             ->whereHas('shop', function (Builder $q): void {

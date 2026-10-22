@@ -127,6 +127,10 @@ final class InternalBookings
 
     private function assertAllowed(Tenant $tenant, StoreListing $room, Member $for, CarbonInterface $from, CarbonInterface $to): void
     {
+        if ($room->listing_kind === StoreListing::KIND_MERCHANDISE) {
+            throw ValidationException::withMessages(['room' => 'Merchandise cannot be reserved as a room.']);
+        }
+
         if (! $tenant->featureEnabled(FeatureService::FEATURE_STAFF_ROOM_BOOKING)) {
             throw ValidationException::withMessages(['room' => 'Staff room booking is not available on this plan.']);
         }

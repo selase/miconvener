@@ -46,7 +46,7 @@ final class VenueListingController extends Controller
         }
 
         $spaces = $shop->listings()
-            ->withStaffOnly()
+            ->withStaffOnly()->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE)
             ->with(['primaryMedia', 'amenities.amenity'])
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
@@ -221,6 +221,8 @@ final class VenueListingController extends Controller
         /** @var Tenant $tenant */
         $tenant = $this->tenantContext->getTenant();
         $shop = $tenant->shop;
+
+        abort_if($listing->listing_kind === StoreListing::KIND_MERCHANDISE, 404);
 
         if (! $shop || $listing->shop_id !== $shop->id) {
             abort(403, 'Unauthorized access to venue listing.');

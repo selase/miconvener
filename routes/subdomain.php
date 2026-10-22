@@ -330,6 +330,20 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('community/polls/{questionnaire}/state', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'state'])->whereUuid('questionnaire')->name('tenant.community.polls.state');
     Route::get('community/polls/{questionnaire}/results', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'results'])->whereUuid('questionnaire')->name('tenant.community.polls.results');
     Route::get('community/polls/{questionnaire}/export', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'export'])->whereUuid('questionnaire')->name('tenant.community.polls.export');
+    Route::prefix('store/catalog')->name('tenant.store.catalog.')->group(function (): void {
+        Route::get('/', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'store'])->name('store');
+        Route::get('/create', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'create'])->name('create');
+        Route::get('/{listing}', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'show'])->whereUuid('listing')->name('show');
+        Route::put('/{listing}', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'update'])->whereUuid('listing')->name('update');
+        Route::post('/{listing}/draft', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'draft'])->whereUuid('listing')->name('draft');
+        Route::post('/{listing}/publish', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'publish'])->whereUuid('listing')->name('publish');
+        Route::post('/{listing}/archive', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'archive'])->whereUuid('listing')->name('archive');
+        Route::post('/{listing}/variants/{variant}/adjustments', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'adjust'])->whereUuid(['listing', 'variant'])->name('adjust');
+        Route::delete('/{listing}/photos/{media}', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'removePhoto'])->whereUuid(['listing', 'media'])->name('photos.destroy');
+        Route::post('/{listing}/photos', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'photo'])->whereUuid('listing')->name('photos');
+    });
+
     Route::get('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'index'])->name('tenant.community.library.index');
     Route::post('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'store'])->name('tenant.community.library.store');
     Route::post('community/library/{item}', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'update'])->whereUuid('item')->name('tenant.community.library.update');

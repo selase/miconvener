@@ -468,21 +468,23 @@ final class TenantController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $tenant = Tenant::findByUuidOrFail($id);
+        return (new Tenant)->getConnection()->transaction(function () use ($id): JsonResponse {
+            $tenant = Tenant::query()->where('uuid', $id)->lockForUpdate()->firstOrFail();
+            if ($tenant->getConnection()->getSchemaBuilder()->hasTable('store_merchandise')
+                && \App\Models\StoreMerchandise::query()->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))->exists()) {
+                return response()->json(['message' => 'Deactivate this organisation instead. Merchandise and stock audit records must be retained.'], 409);
+            }
 
-        if ($tenant->logo) {
-            config('app.env') === 'production'
-                ? $disk = 's3'
-                : $disk = 'public';
+            if ($tenant->logo) {
+                $disk = config('app.env') === 'production' ? 's3' : 'public';
+                Helper::deleteFile($tenant->logo, $disk);
+            }
+            $tenant->delete();
 
-            Helper::deleteFile($tenant->logo, $disk);
-        }
-
-        $tenant->delete();
-
-        return response()->json([
-            'status' => __('locale.messages.deleted', ['name' => 'Tenant']),
-        ]);
+            return response()->json([
+                'status' => __('locale.messages.deleted', ['name' => 'Tenant']),
+            ]);
+        });
     }
 
     public function changeTenant($tenantId)
