@@ -50,3 +50,11 @@ Focused implementation runs: stock/schema 21 tests; privacy/legacy integrated 11
 Final preservation, bounded full JS and full static-analysis results are recorded below when finished. The first simultaneous local complete gates caused resource contention: full PHP was stopped; first full JS had 464 passes and nine timeouts. No timeout limit was weakened. The complete PHP gate belongs to the existing PR CI, rather than another redundant full local run. Fresh review: one read-only reviewer, no second review loop; one material calendar finding addressed with RED→GREEN evidence.
 
 Final affected preservation: **288 tests / 1,297 assertions passed** in 365.73s. Bounded complete JS: **472/473 passed**, one pre-existing certificate editor timeout; isolated file rerun **14/14 passed in 6.30s** with the existing timeout, remote complete gate still required. No source/timeout change to hide it.
+
+## Final owner-approved release
+
+PR #49 is merged/deployed as `b358f658`, Cloud deployment `depl-a30b889b-4c89-46b4-9098-3a77fe5bc3bf` succeeded 2026-10-22 at 20:03:53 UTC. Complete CI passed 3,741 PHP / 17,750 assertions (with one non-failing unidentified risky warning), 473 JS, quality/static/build. These supersede the earlier pending-CI notes.
+
+The previously pending enlarged-text check passed using an actual-app local 200% base-font diagnostic, with no horizontal overflow at 320/390/768/1440 and keyboard/dark/seller-form acceptance. All test-only CSS/build bytes restored. Production private storage check and read-only bucket metadata passed; the temporary non-customer object was removed. Extra write probe was auto-review rejected, not retried and not required. Physical-device/native OS zoom is not claimed; the tested method is explicitly browser/text emulation. No further user-facing source correction was needed.
+
+Production tables/permission/routes/assets and live marketplace/venue browse/paused-booking checks passed. Catalog and checkout flags remain off, pending named pilot/terms; no customer/order/message/payment/gateway data changed. All detailed rulings/trade-offs and reviewed fixes are preserved in [PR #49](https://github.com/selase/miconvener/pull/49).
