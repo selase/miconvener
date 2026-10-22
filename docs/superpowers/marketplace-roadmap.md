@@ -190,3 +190,7 @@ Paths are relative to the repository. They identify implementation/test evidence
 - [x] Owner authorises merchandise implementation and systematic roadmap continuation (2026-10-22).
 - [x] Approve S1a catalog plan and start native implementation; typed stock and privacy/legacy-isolation tasks are built and locally verified.
 - [ ] Prepare detailed S1b/S1c plans and resolve their commercial/provider acceptance gates before payment activation.
+
+## Current continuation package (2026-10-22)
+
+S1a implementation is committed on `codex/commerce-s1a`; final compatibility/CI acceptance is in progress. Review the [S1a self-review and release limitations](specs/2026-10-22-commerce-s1a-self-review.md). The [next-slice decisions and systematic sequence](plans/2026-10-22-commerce-continuation-gates.md) preserve the remaining commercial/provider/rollout gates. Do not treat catalog implementation or local QA as approval to enable checkout or deploy.

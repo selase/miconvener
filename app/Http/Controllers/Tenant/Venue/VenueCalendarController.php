@@ -155,6 +155,7 @@ final class VenueCalendarController extends Controller
         $listing = StoreListing::query()
             ->withStaffOnly()
             ->where('shop_id', $shop->id)
+            ->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE)
             ->where('id', $validated['store_listing_id'])
             ->firstOrFail();
 

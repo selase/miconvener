@@ -91,7 +91,7 @@ These new names belong to this proposed plan, not existing APIs. `Session` is `I
 
 ## Task 5: preservation gate and review
 
-- [ ] Self-review the entire slice against spec §7 and the five Review Focus cases. Fix concrete issues before reporting completion.
+- [x] Self-review the entire slice against spec §7 and the five Review Focus cases. Fix concrete issues before reporting completion.
 - [ ] Run the new merchandise suite, affected marketplace/discovery/venue/staff-room/member access tests and affected JS tests. Run Pint/lint/static analysis; run one complete CI gate on the final source rather than duplicating full suites repeatedly.
 - [ ] On isolated local QA, test tenant creation/edit/publication and a no-dues member; all local testing is authorised. Verify 320/390/768/1440px, dark, long names, sold-out, missing photo, revoked access and 200% text. Confirm existing venue search/detail, calendars, private rooms, booking continuation and linked operations still work. No live payment or outbound message.
 - [ ] One fresh scoped whole-change review, address material findings, record self-review with touchpoints and UI gaps. Commit final asset/plan/roadmap state together.
