@@ -220,3 +220,16 @@ it('bounds option names at the same limit as the seller editor', function (): vo
     $this->data['variants'][0]['options'] = [str_repeat('x', 51) => 'M'];
     $this->postJson($this->url, $this->data)->assertUnprocessable()->assertJsonValidationErrors('variants.0.options');
 });
+
+it('refuses organisation hard deletion before removing its logo when merchandise audit records exist', function (): void {
+    $this->postJson($this->url, $this->data)->assertCreated();
+    Storage::fake('public');
+    Storage::disk('public')->put('tenant/logo/catalog.png', 'logo');
+    $this->tenant->update(['logo' => 'tenant/logo/catalog.png']);
+    $response = app(App\Http\Controllers\Admin\TenantController::class)->destroy((string) $this->tenant->uuid);
+    expect($response->getStatusCode())->toBe(409);
+    expect($response->getData(true)['message'])->toContain('Deactivate');
+    expect($this->tenant->fresh())->not->toBeNull();
+    Storage::disk('public')->assertExists('tenant/logo/catalog.png');
+    expect(App\Models\StoreStockMovement::query()->count())->toBe(1);
+});
