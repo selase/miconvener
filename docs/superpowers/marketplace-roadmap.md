@@ -132,7 +132,7 @@ Build the shared foundation only as far as the purchase use case requires, with 
 
 | Priority | Milestone / original scope | Deliverable and acceptance gate | Proposed state |
 |---|---|---|---|
-| 1 | S1a–c: unified catalog/commerce, merchandise first (original Build 3 expansion) | Establish shared foundations with the purchase adapter; complete the slices above; preserve original venue features and booking controls | Proposed; design and implementation plan next |
+| 1 | S1a–c: unified catalog/commerce, merchandise first (original Build 3 expansion) | Establish shared foundations with the purchase adapter; complete the slices above; preserve original venue features and booking controls | Design/preview and S1a plan prepared; implementation scope awaiting clarification |
 | 2 | S2: venue integration and transaction completion (Build 2) | Incremental adapter to shared orders/payments where approved, retaining authoritative booking/calendar records; approval-first public flow; shared lock/availability rules; expiry/cancellation/late payment; common validated confirmer; reconciled ledger and seller settlement; decide split vs platform collection; bank-transfer/pro-forma/evidence/manual review designed as its own slice. Exit: sandbox lifecycle plus concurrency/privacy acceptance | Proposed; blocked from trading by finance and merchant readiness gates |
 | 3 | S3: rental/service commerce completion (Builds 1/3) | Extend the unified catalog and shared commerce with dated quantity/asset availability and returns for rentals, scheduling/deliverables for services; finish type-aware forms/detail/search/storefront links and consistent kind vocabulary; connect existing RFQ/proposals. Exit: seller creates→publishes→buyer discovers→requests→seller quotes→sandbox payment, without hand-created database listings | Proposed; reuse E8 rather than rebuild |
 | 4 | S4: operations and booker handoff (Build 2) | Complete authenticated venue message delivery/live updates and private attachments; preserve multi-event tasks/inspections/calendar; walk-in external booker intake; explicit consent/identity and idempotent booking→event creation with authorised tenant ownership. Exit: two organisations collaborate; wrong tenant denied; retry cannot create another event | Proposed; design separate from staff-room booking |
@@ -150,7 +150,7 @@ The owner has agreed the unified structure and merchandise-first direction. Appr
 3. **Operational policy:** approve the collection, cancellation/refund/support rules and identify the pilot's real operator/products. Existing standing Purpledot approval for Community does not itself approve merchandise trading, sandbox payments or a broader marketplace rollout.
 4. **Sequence and migration:** recommend S1→S2→S3→S4→S5, completing shared finance/privacy prerequisites inside S1; integrate existing venues incrementally, then rental/service adapters. Mixed-type checkout, legacy conversion mechanics and resource-allocation details require their own approved design. Urgent defects affecting currently active use can be separately prioritised; no new exposure is authorised here.
 
-Next artefacts after roadmap review: a unified catalog/commerce design with the merchandise-first desktop/mobile preview, explicit venue-preservation/migration boundaries and type-specific availability contracts, then a task-by-task native implementation plan for S1 against the approved design. Later phases receive their own plans when reached. This roadmap is intentionally not an instruction to start coding.
+Prepared for review: [unified catalog/commerce design](specs/2026-10-22-unified-commerce-design.md) and [S1a catalog implementation plan](plans/2026-10-22-unified-commerce-s1a-catalog.md), with a standalone synthetic storefront preview saved as a local review artifact. These define the merchandise-first UI, venue-preservation boundaries and typed availability contracts. S1b/S1c plans follow their commercial/operational decisions. The owner’s later delegation to use best judgment is being clarified against the earlier explicit review-before-implementation instruction; no implementation has begun.
 
 ## 8. Evidence index
 
@@ -186,5 +186,6 @@ Paths are relative to the repository. They identify implementation/test evidence
 - [x] Preserve existing venue, Community, dues, Giving and verification boundaries in the proposed approach.
 - [x] Separate source evidence, local testing, sandbox acceptance and production readiness.
 - [ ] Owner reviews roadmap and proposed defaults.
-- [ ] Prepare/approve unified catalog/commerce design and merchandise-first visual preview.
+- [x] Prepare unified catalog/commerce design, merchandise-first visual preview and S1a plan; self-review and scoped builder check completed.
+- [ ] Owner reviews design/preview and confirms implementation scope.
 - [ ] Prepare/approve detailed S1 implementation plan; only then consider implementation.
