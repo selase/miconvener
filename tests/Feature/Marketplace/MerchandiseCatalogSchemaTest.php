@@ -12,7 +12,7 @@ it('keeps merchandise in the existing shop listing catalog', function (): void {
     $details = StoreMerchandise::factory()->create();
     $variant = StoreVariant::factory()->create(['listing_id' => $details->listing_id]);
 
-    expect($details->listing->listing_kind)->toBe(StoreListing::KIND_MERCHANDISE)
+    expect(StoreListing::withoutGlobalScope(App\Scopes\MerchandiseVisibilityScope::class)->findOrFail($details->listing_id)->listing_kind)->toBe(StoreListing::KIND_MERCHANDISE)
         ->and($variant->shop_id)->toBe($details->shop_id)
         ->and($variant->price_pesewas)->toBeInt()
         ->and($variant->on_hand)->toBe(0);

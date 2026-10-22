@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Jobs\EmbedStoreListingJob;
+use App\Scopes\MerchandiseVisibilityScope;
 use App\Scopes\StaffOnlyScope;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -129,6 +130,18 @@ final class StoreListing extends Model
         'sort_order' => 'integer',
         'is_bookable' => 'boolean',
     ];
+
+    /** @return HasOne<StoreMerchandise, $this> */
+    public function merchandise(): HasOne
+    {
+        return $this->hasOne(StoreMerchandise::class, 'listing_id');
+    }
+
+    /** @return HasMany<StoreVariant, $this> */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(StoreVariant::class, 'listing_id');
+    }
 
     public function isBookable(): bool
     {
@@ -374,12 +387,13 @@ final class StoreListing extends Model
     protected static function booted(): void
     {
         self::addGlobalScope(new StaffOnlyScope);
+        self::addGlobalScope(new MerchandiseVisibilityScope);
 
         // Search reads the embedding, so a published listing whose searchable
         // content changed is re-embedded. Saving the embedding itself changes
         // none of these fields, so this cannot loop.
         self::created(function (self $listing): void {
-            if ($listing->status === self::STATUS_PUBLISHED) {
+            if ($listing->listing_kind !== self::KIND_MERCHANDISE && $listing->status === self::STATUS_PUBLISHED) {
                 EmbedStoreListingJob::dispatch($listing->id);
             }
         });
@@ -387,7 +401,7 @@ final class StoreListing extends Model
         self::updated(function (self $listing): void {
             $searchable = ['title', 'description', 'category', 'listing_kind', 'capacity_breakdown', 'service_scope', 'floor_area_sqm', 'ceiling_height_meters', 'rules_and_policies', 'status'];
 
-            if ($listing->status === self::STATUS_PUBLISHED && $listing->wasChanged($searchable)) {
+            if ($listing->listing_kind !== self::KIND_MERCHANDISE && $listing->status === self::STATUS_PUBLISHED && $listing->wasChanged($searchable)) {
                 EmbedStoreListingJob::dispatch($listing->id);
             }
         });

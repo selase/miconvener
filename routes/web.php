@@ -340,6 +340,7 @@ Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCe
 // MiConvener Marketplace (Public)
 Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
     Route::get('/', [App\Http\Controllers\Marketplace\MarketplaceController::class, 'index'])->name('index');
+    Route::get('/items/{slug}/photos/{media}', [App\Http\Controllers\Marketplace\MerchandiseMediaController::class, 'show'])->name('items.photos');
     Route::get('/venues', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'index'])->name('venues.index');
     Route::get('/venues/{slug}', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'show'])->name('venues.show');
     Route::post('/venues/{slug}/check-availability', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkAvailability'])->name('venues.check-availability');

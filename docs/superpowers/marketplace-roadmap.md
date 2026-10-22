@@ -185,7 +185,8 @@ Paths are relative to the repository. They identify implementation/test evidence
 - [x] Preserve existing venue features through explicit incremental integration and regression gates, without activating other transaction types.
 - [x] Preserve existing venue, Community, dues, Giving and verification boundaries in the proposed approach.
 - [x] Separate source evidence, local testing, sandbox acceptance and production readiness.
-- [ ] Owner reviews roadmap and proposed defaults.
+- [x] Owner approves the unified direction and merchandise-first execution (2026-10-22); commercial activation gates remain open.
 - [x] Prepare unified catalog/commerce design, merchandise-first visual preview and S1a plan; self-review and scoped builder check completed.
 - [x] Owner authorises merchandise implementation and systematic roadmap continuation (2026-10-22).
-- [ ] Prepare/approve detailed S1 implementation plan; only then consider implementation.
+- [x] Approve S1a catalog plan and start native implementation; typed stock and privacy/legacy-isolation tasks are built and locally verified.
+- [ ] Prepare detailed S1b/S1c plans and resolve their commercial/provider acceptance gates before payment activation.

@@ -38,6 +38,10 @@ final class VenueBookingService
         ?User $user = null,
         ?Tenant $plannerTenant = null
     ): VenueBooking {
+        if ($listing->listing_kind === StoreListing::KIND_MERCHANDISE) {
+            throw ValidationException::withMessages(['store_listing_id' => 'Merchandise cannot be booked as a venue.']);
+        }
+
         $startsAt = Carbon::parse((string) $payload['starts_at']);
         $endsAt = Carbon::parse((string) $payload['ends_at']);
         $guestCount = (int) ($payload['guest_count'] ?? 1);

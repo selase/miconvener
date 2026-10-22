@@ -32,6 +32,13 @@ return [
 
     'disks' => [
 
+        'commerce-media-local' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/commerce-media'),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         'community-library-local' => [
             'driver' => 'local',
             'root' => storage_path('app/private/community-library'),

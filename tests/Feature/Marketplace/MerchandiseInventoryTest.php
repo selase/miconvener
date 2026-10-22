@@ -90,3 +90,9 @@ it('also prevents bulk writes from changing stock history', function (string $ac
     $query = StoreStockMovement::query()->whereKey($movement->id);
     $action === 'delete' ? $query->delete() : $query->update(['delta' => 99]);
 })->with(['update', 'delete'])->throws(Illuminate\Database\QueryException::class);
+
+it('does not borrow catalog permission from another organisation', function (): void {
+    $other = StoreVariant::factory()->create();
+    $this->actor->tenants()->attach($other->shop->tenant_id);
+    app(MerchandiseInventory::class)->adjust($other, 1, 'Wrong tenant permission', (string) Str::uuid(), $this->actor);
+})->throws(AuthorizationException::class);

@@ -27,7 +27,13 @@ final class MerchandiseInventory
             if ($locked->shop === null || ! $actor->tenants()->whereKey($locked->shop->tenant_id)->exists()) {
                 throw new AuthorizationException;
             }
-            Gate::forUser($actor)->authorize('manage store catalog');
+            $team = getPermissionsTeamId();
+            try {
+                setPermissionsTeamId($locked->shop->tenant_id);
+                Gate::forUser($actor->fresh())->authorize('manage store catalog');
+            } finally {
+                setPermissionsTeamId($team);
+            }
             $prior = $locked->movements()->where('idempotency_key', $idempotencyKey)->first();
             if ($prior !== null) {
                 if ($prior->delta !== $delta || $prior->reason !== $reason || $prior->actor_id !== $actor->id) {
