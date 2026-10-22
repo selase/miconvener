@@ -83,6 +83,19 @@ export const NAV_GROUPS = [
         ],
     },
     {
+        key: 'store',
+        label: 'Store',
+        items: [
+            {
+                label: 'Catalog',
+                href: 'tenant.store.catalog.index',
+                icon: 'LayoutGrid',
+                feature: 'commerce_catalog',
+                permission: 'manage_store_catalog',
+            },
+        ],
+    },
+    {
         key: 'venue',
         label: 'Venue',
         items: [

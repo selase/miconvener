@@ -24,13 +24,14 @@ final class MerchandiseInventory
         return $variant->getConnection()->transaction(function () use ($variant, $delta, $reason, $idempotencyKey, $actor): StoreStockMovement {
             $variant->getConnection()->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['commerce.inventory:'.$variant->id]);
             $locked = StoreVariant::query()->with('shop')->lockForUpdate()->findOrFail($variant->id);
-            if ($locked->shop === null || ! $actor->tenants()->whereKey($locked->shop->tenant_id)->exists()) {
+            if ($locked->shop === null || (! User::query()->whereKey($actor->id)->where('tenant_id', $locked->shop->tenant_id)->exists() && ! $actor->tenants()->whereKey($locked->shop->tenant_id)->exists())) {
                 throw new AuthorizationException;
             }
             $team = getPermissionsTeamId();
             try {
                 setPermissionsTeamId($locked->shop->tenant_id);
-                Gate::forUser($actor->fresh())->authorize('manage store catalog');
+                $recordedActor = $actor->fresh();
+                Gate::forUser($recordedActor)->authorize('manage store catalog');
             } finally {
                 setPermissionsTeamId($team);
             }
@@ -50,7 +51,7 @@ final class MerchandiseInventory
 
             return $locked->movements()->create([
                 'shop_id' => $locked->shop_id, 'delta' => $delta, 'balance_after' => $balance,
-                'reason' => $reason, 'actor_id' => $actor->id, 'idempotency_key' => $idempotencyKey,
+                'reason' => $reason, 'actor_id' => $actor->id, 'actor_name' => $recordedActor->name, 'idempotency_key' => $idempotencyKey,
             ]);
         });
     }

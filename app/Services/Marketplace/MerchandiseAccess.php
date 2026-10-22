@@ -48,7 +48,7 @@ final class MerchandiseAccess
             ->where('listing_kind', StoreListing::KIND_MERCHANDISE)->find($listing->id);
 
         if ($current === null || ! app(CommerceCatalogRollout::class)->enabled($current->shop->tenant)
-            || ! $actor->tenants()->whereKey($current->shop->tenant_id)->exists()) {
+            || (! User::query()->whereKey($actor->id)->where('tenant_id', $current->shop->tenant_id)->exists() && ! $actor->tenants()->whereKey($current->shop->tenant_id)->exists())) {
             return false;
         }
         $team = getPermissionsTeamId();

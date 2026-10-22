@@ -51,7 +51,8 @@ return new class extends Migration
             $table->integer('delta');
             $table->integer('balance_after');
             $table->string('reason', 500);
-            $table->foreignId('actor_id')->constrained('users')->restrictOnDelete();
+            $table->unsignedBigInteger('actor_id');
+            $table->text('actor_name');
             $table->timestamps();
             $table->unique(['variant_id', 'idempotency_key']);
             $table->foreign(['variant_id', 'shop_id'])->references(['id', 'shop_id'])->on('store_variants')->restrictOnDelete();

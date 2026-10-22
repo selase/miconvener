@@ -96,3 +96,23 @@ it('does not borrow catalog permission from another organisation', function (): 
     $this->actor->tenants()->attach($other->shop->tenant_id);
     app(MerchandiseInventory::class)->adjust($other, 1, 'Wrong tenant permission', (string) Str::uuid(), $this->actor);
 })->throws(AuthorizationException::class);
+
+it('retains the immutable actor audit after an account is deleted', function (): void {
+    $movement = app(MerchandiseInventory::class)->adjust($this->variant, 1, 'Receipt', (string) Str::uuid(), $this->actor);
+    $actorId = $this->actor->id;
+    $actorName = $this->actor->name;
+    $this->actor->delete();
+    expect($movement->fresh()->actor_id)->toBe($actorId)
+        ->and($movement->fresh()->actor_name)->toBe($actorName)
+        ->and($movement->fresh()->actor)->toBeNull();
+});
+
+it('supports the existing primary-tenant ownership path without a duplicate team pivot', function (): void {
+    $tenant = $this->variant->shop->tenant;
+    $tenant->features()->create(['feature_key' => 'commerce_catalog', 'enabled' => true]);
+    $this->actor->tenants()->detach($tenant->id);
+    $movement = app(MerchandiseInventory::class)->adjust($this->variant, 1, 'Receipt', (string) Str::uuid(), $this->actor);
+    expect($movement->balance_after)->toBe(1);
+    $listing = App\Models\StoreListing::withoutGlobalScope(App\Scopes\MerchandiseVisibilityScope::class)->findOrFail($this->variant->listing_id);
+    expect(app(App\Services\Marketplace\MerchandiseAccess::class)->canManage($listing, $this->actor))->toBeTrue();
+});

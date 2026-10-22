@@ -69,6 +69,7 @@ final class HandleInertiaRequests extends Middleware
                     'create_user' => fn (): bool => (bool) $request->user()?->can('create user'),
                     'update_user' => fn (): bool => (bool) $request->user()?->can('update user'),
                     'delete_user' => fn (): bool => (bool) $request->user()?->can('delete user'),
+                    'manage_store_catalog' => fn (): bool => (bool) $request->user()?->can('manage store catalog'),
                     'manage_venue' => fn (): bool => (bool) $request->user()?->can('manage venue'),
                     'update_event' => fn (): bool => (bool) $request->user()?->can('update event'),
                 ],
@@ -78,6 +79,7 @@ final class HandleInertiaRequests extends Middleware
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
                 'features' => [
+                    'commerce_catalog' => app(\App\Services\Marketplace\CommerceCatalogRollout::class)->baseEnabled($tenant),
                     'paid_tickets' => $tenant->planAllows('paid_tickets'),
                     'staff_room_booking' => $tenant->featureEnabled(\App\Services\Tenancy\FeatureService::FEATURE_STAFF_ROOM_BOOKING),
                     // Gates the Finance link: ticket money (selling now, or still to

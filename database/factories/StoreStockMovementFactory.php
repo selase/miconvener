@@ -22,6 +22,7 @@ final class StoreStockMovementFactory extends Factory
             'shop_id' => fn (array $attributes) => StoreVariant::query()->whereKey($attributes['variant_id'])->firstOrFail()->shop_id,
             'idempotency_key' => (string) Str::uuid(), 'delta' => 1, 'balance_after' => 1,
             'reason' => 'Test stock receipt', 'actor_id' => User::factory(),
+            'actor_name' => fn (array $attributes) => User::query()->whereKey($attributes['actor_id'])->firstOrFail()->name,
         ];
     }
 }
