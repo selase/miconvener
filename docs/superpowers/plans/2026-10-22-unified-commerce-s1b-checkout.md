@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:executing-plans` natively, task by task, failing tests first. Tick steps in the implementation commit. One fresh whole-branch review after the author's self-review; no per-task review agents.
 
-**Status:** proposed for owner review; no checkout implementation or activation authorised by this plan. Prepared after PR #49's approved merge/deployment (`b358f658`, 2026-10-22). Review the decisions below before building.
+**Status:** owner approved native implementation on 2026-10-22; in progress on `codex/commerce-s1b`. No merge/deploy or production checkout activation authorised. Prepared after PR #49's approved merge/deployment (`b358f658`, 2026-10-22). Review the decisions below before building.
 
 **Goal:** allow a verified buyer to purchase one organisation's merchandise, with bounded stock holds, correct payment/refund accounting and recoverable receipts; work for communities with no dues.
 
@@ -60,10 +60,10 @@ Keep the implementation native, but review it in three bounded increments: **A: 
 **Files:** new StoreOrder/StoreOrderLine and read-only StoreCommercialAgreement schema/models/factories and landlord migrations; `StoreOrderAccess.php`; tests `tests/Feature/Marketplace/StoreOrderSchemaTest.php`, `StoreOrderAccessTest.php`.
 **Interfaces:** `StoreOrderAccess::buyer(StoreOrder $order, Session $session): bool`; `staff(StoreOrder $order, Tenant $tenant, User $actor, string $permission): bool`. Reads current native verified email; no Staff User account is created for a buyer.
 
-- [ ] Write failing schema/access tests: foreign-shop line rejected; immutable price/options/terms; historical FK retention; same verified original buyer reads a receipt even after membership lapses, while changed member contact/phone proof does not transfer that buyer's history; foreign tenant and expired proof denied with non-disclosing response. Role permission alone cannot cross tenant/shop.
-- [ ] Run `php artisan test --compact tests/Feature/Marketplace/StoreOrderSchemaTest.php tests/Feature/Marketplace/StoreOrderAccessTest.php`; expect missing schema/access assertions to fail.
-- [ ] Implement the model map and access methods. Nullable member snapshot is attribution/eligibility evidence, not order ownership. Original buyer retains receipt access; private catalog access still revalidates active membership. Route bindings query under authorised buyer or seller.
-- [ ] Run both files; expect all assertions pass. Commit source/tests and tick these steps.
+- [x] Write failing schema/access tests: foreign-shop line rejected; immutable price/options/terms; historical FK retention; same verified original buyer reads a receipt even after membership lapses, while changed member contact/phone proof does not transfer that buyer's history; foreign tenant and expired proof denied with non-disclosing response. Role permission alone cannot cross tenant/shop.
+- [x] Run `php artisan test --compact tests/Feature/Marketplace/StoreOrderSchemaTest.php tests/Feature/Marketplace/StoreOrderAccessTest.php`; expect missing schema/access assertions to fail.
+- [x] Implement the model map and access methods. Nullable member snapshot is attribution/eligibility evidence, not order ownership. Original buyer retains receipt access; private catalog access still revalidates active membership. Route bindings query under authorised buyer or seller.
+- [x] Run both files; expect all assertions pass. Commit source/tests and tick these steps.
 
 ## Task 2: explicit commercial agreement and shared fee arithmetic
 
