@@ -2,7 +2,9 @@
 
 **Date:** 2026-10-22. **State:** proposed for owner review; no implementation approval.
 
-**Purpose:** finish the [Marketplace Architecture & Strategy Handoff](specs/2026-09-20-event-store-handoff.md), with an organisation merchandise store as the first product priority. Keep the original vision, reuse functioning code, and stop treating a model, mocked payment test or public page as proof of a complete trading workflow.
+**Purpose:** finish the [Marketplace Architecture & Strategy Handoff](specs/2026-09-20-event-store-handoff.md), through a unified catalog and commerce structure, with organisation merchandise as the first completed use case. Keep the original vision, reuse functioning code, and stop treating a model, mocked payment test or public page as proof of a complete trading workflow.
+
+**Direction agreed 2026-10-22:** one catalog/storefront and shared commerce infrastructure, with type-specific availability and fulfilment for purchases, rentals, venue reservations and services. The detailed roadmap and first-release defaults remain for review; this agreement does not authorise implementation.
 
 ## 1. Audit boundary and evidence standard
 
@@ -40,7 +42,7 @@ Evidence identifiers link to the code/test inventory in §8. All rows still requ
 | Lightweight booker portal | Implemented foundation | Booking dossier and payment continuation exist; define access/recovery rules and complete post-booking lifecycle | E5 |
 | Walk-in/offline booking intake plus one-click event workspace launch | Partial / launch missing | Internal staff requests exist as a separate flow; no complete public/offline-client-to-event conversion found | E6, E11 |
 | Equipment and service suppliers | Partial, more than schema only | RFQ/proposal/payment endpoints exist, but creation validation, listing-kind vocabulary, detail routing and storefront links need joining up | E3, E8, F4 |
-| Print / association merchandise | Listing-kind constant only; retail workflow missing | First priority: products/variants/stock, orders, verified purchasing, collection, refunds and reconciliation | E1, §5 |
+| Print / association merchandise | Listing-kind constant only; retail workflow missing | First use case of unified commerce: merchandise variants/stock, shared orders and payments, verified purchasing, collection and reconciliation | E1, §5 |
 | Reciprocal host–buyer reputation | Partial | Buyer-to-shop review after paid/accepted quote and aggregate score exist; no reciprocal host-to-buyer system found | E8 |
 | Composite ranking | Partial | Structured/semantic relevance, verification, paid boost and rating signals exist; no reconciled cross-category ranking contract or reciprocal reputation model | E9, E10 |
 | Paid boosts and featured placement | Implemented foundation | Preserve add-on purchase/time-window behavior; assess sponsored disclosure and fair ranking before wider promotion | E9 |
@@ -56,12 +58,12 @@ Evidence identifiers link to the code/test inventory in §8. All rows still requ
 
 Public creation checks availability and then creates a booking without a shared lock/transaction around the check-and-create operation. Host hold/quote transitions also need simultaneous-request scrutiny. `InternalBookings` already locks the listing; reuse the single availability semantics but prove all public/internal/blackout writers serialize consistently. Existing overlap tests are not a concurrent transaction acceptance test.
 
-### F3 — Do not copy the old payment services into merchandise checkout
+### F3 — Reconcile payment services before building shared commerce
 
 Observed discrepancies and missing guarantees to resolve before taking new payments:
 
 - Handoff describes gateway split settlement; the two marketplace checkout services use a plain platform gateway. PaystackGateway supports split configuration elsewhere, but that does not mean these checkouts use it.
-- `MarketplaceFees` has its own configured percentage and buyer-plan fee schedule. It does not use the current event→tenant→package→platform fee cascade. The event-focused `PlatformFeeResolver` cannot simply receive a merchandise order: agree a sale-context extension preserving superadmin control, explicit zero waivers, caps and stored terms.
+- `MarketplaceFees` has its own configured percentage and buyer-plan fee schedule. It does not use the current event→tenant→package→platform fee cascade. The event-focused `PlatformFeeResolver` cannot simply receive a merchandise order: agree a transaction-context extension for purchases, rentals, venues and services, preserving superadmin control, explicit zero waivers, caps and stored terms.
 - Booking browser callback checks metadata/amount, whereas the shared booking confirmer lacks equivalent full status/currency/expected-amount/account validation. Quote confirmer trusts metadata/amount more broadly; its browser path indexes metadata as an array, unlike the webhook's normalisation. Validation must be common to callback and webhook.
 - Neither marketplace path provides the durable payment-attempt/terms-snapshot and full reconciliation model now used by newer money flows. Querying a reference before updating is insufficient proof against concurrent duplicate or extra captures.
 - `MarketplaceLedger::post()` catches posting errors; payment state can advance while ledger posting fails, and reference-based early returns can skip a later repair. Require atomic posting or durable retry/reconciliation with a visible staff exception state.
@@ -79,41 +81,60 @@ The storefront passes the Shop model directly, including attributes such as veri
 
 ### F6 — Missing fulfilment/lifecycle work matters as much as checkout
 
-The handoff lacks enough detail on stock, sizes, expiry, duplicate captures, order cancellation, collection, returns/refunds, seller settlement and support ownership. Agree those rules as part of the merchandise design. Do not repurpose a venue booking, membership dues charge, voluntary gift or event ticket QR into a product order.
+The handoff lacks enough detail on stock, sizes, expiry, duplicate captures, order cancellation, collection, returns/refunds, seller settlement and support ownership. Agree those rules as part of the unified commerce design, implementing the purchase lifecycle first. Shared order infrastructure must retain type-specific reservation/fulfilment records: a venue reservation must not become a stock-decrement sale. Membership dues, voluntary gifts and event admission QR codes remain separate domains.
 
-## 5. First priority: organisation merchandise store
+## 5. Unified catalog and commerce; merchandise first
 
-These are **recommended defaults for review**, not decisions already approved by the owner.
+The unified direction is agreed. The following boundaries, first-release defaults and delivery slices are proposed for review before a detailed design/implementation plan.
 
-### Proposed first release
+### Shared structure
 
-- Reuse the organisation's existing Shop/branding/tenant identity and marketplace discovery conventions. Add a distinct product/order domain under the existing application, rather than forcing inventory into venue booking records or creating a second independent storefront system.
+1. **One catalog:** retain `Shop → StoreListing` as the customer-facing catalog and organisation storefront. Products, rentals, venues and services are types of offering in that catalog, with shared identity, branding, media, descriptions, category, publication, visibility and seller ownership. Add type-specific details/variants as needed; do not introduce an independent Product catalog competing with StoreListing. Exact child tables and interfaces belong in the design.
+2. **Shared commerce:** common customer verification, order header/line-item concepts, quantity/options, quoted price and terms snapshots, approval where required, payment attempts, receipts, cancellation/refund orchestration, ledger/reconciliation and order-history foundations. Store delivery mode and type-specific fulfilment state separately from payment state. Reuse existing audited services where suitable; shared does not mean copying the current marketplace payment gaps.
+3. **Type-specific availability and fulfilment:** a common availability/reservation boundary delegates to the correct rules. A purchase checks variant stock and consumes it when sold; a rental reserves quantities or assets over a date range and restores availability after return; a venue reserves a calendar interval with capacity/approval rules; a service checks provider/resource availability, scope and deliverables, often through a quotation. Expiry, approval, cancellation, late payments and refunds must coordinate with each type's reservation rules. Do not apply a permanent stock deduction to every listing.
+
+This supports one storefront and a coherent commercial journey without forcing every offering into one giant booking/stock table. Quantity-based chair/microphone rentals must account for all overlapping reservations, while a venue's capacity and exclusive time reservation are different constraints.
+
+### Preserve existing venue features
+
+- Keep existing venue listings/identifiers, URLs, shop branding, media, amenities, capacity layouts, calendar/blackouts, enquiries, quotes, bookings, deposits, event links, tasks, inspections and host/planner operations working throughout the transition.
+- Introduce a venue integration/adapter into shared commerce incrementally after its design and acceptance gate. Existing `VenueBooking` records and relationships remain authoritative for current reservations; do not create a second competing availability calendar or require a destructive bulk conversion.
+- Preserve staff-only room privacy, internal staff booking rules, public browsing and paused-booking/payment controls. No global switch from the purchase release may activate another transaction type or alter tenant settlement settings.
+- Require regression checks for venue discovery/detail URLs, availability, staff-room exclusion, quotes, existing booking/payment continuation and linked event operations before adopting shared infrastructure. Repairing the legacy gaps in §4 remains explicit later work, not an implicit change inside merchandise delivery.
+
+### First use case and scope discipline
+
+Build the shared foundation only as far as the purchase use case requires, with explicit extension boundaries for the other types. Do not build speculative rental/service engines or migrate legacy bookings during S1. A shared model does not promise mixed-type or multi-seller checkout in the first release.
+
+### Proposed first release: physical merchandise
+
+- Extend the existing organisation storefront/catalog with purchasable merchandise and the shared commerce foundations above. Merchandise-specific data covers variants, sale inventory and collection; it is not a second shop, separate sign-in or isolated payment/order system.
 - One selling organisation per order; physical goods only initially. Photos, descriptions, size/colour variants, integer minor-unit prices and stock per variant; draft/published/archive states. Default to collection from the organisation. Delivery integrations, multi-seller baskets, digital licensing and pre-orders/backorders are deferred.
 - GHS for the initial pilot; no assumed foreign-currency conversion. Confirm settlement mode, fee policy, tax/invoice presentation and refund rules before money work. Preserve each tenant's existing gateway settings.
 - Public and members-only products. Members-only access requires the existing verified identity and active membership in the selling organisation. Following is not membership, and staff-room audience rules are not member product rules. No dues requirement and no implication that a donation is a purchase.
 - Public store can work for an approved shop even if Community is off. Within Community, expose Store only when the store feature is enabled; public organisation page and member app links must respect product visibility and tenant scope.
 - Native email-first identity/verification for checkout/order access, using existing proof/recovery patterns. Keep phones optional; shared/reassigned numbers must not reveal order history. No new parallel sign-in system.
-- Server-priced checkout snapshot and bounded stock reservation (propose 10 minutes; final provider timing belongs in the design). Revalidate stock/access when creating a quote; honour an eligible accepted quote only within its agreed window. Separate order, payment-attempt and fulfilment states.
+- Server-priced checkout snapshot and bounded stock reservation (propose 10 minutes; final provider timing belongs in the design). Revalidate stock/access when creating a quote; honour an eligible accepted quote only within its agreed window. Separate shared order, payment-attempt and type-specific fulfilment states.
 - Failed/abandoned checkout releases stock. Duplicate callback/webhook cannot issue another order, reserve twice or send multiple receipts. Late/extra payments must enter reconciliation/refund review rather than oversell or lose money.
 - Member order history, receipt and collection instructions; staff product/stock/order screens, ready-for-collection and collected states with auditable handover proof. Do not reuse entry QR codes for collection.
 - First release includes unpaid cancellation and a staff-controlled full-refund/cancellation path for paid but uncollected orders, with provider outcome and ledger reconciliation. Agree returns/partial refunds/collected-order exceptions before expansion; publish support and collection/refund terms.
-- Separate commerce rollout and permissions for products, orders, finance/refunds and collection; no automatic grant via `manage venue`. Use existing permission propagation conventions. A store launch must not turn on venue bookings, supplier quote payments or other organisations' flags.
+- Separate rollout capabilities by transaction type (purchase, rental, venue, service), and permissions for catalog administration, orders, finance/refunds and collection; no automatic grant via `manage venue`. Use existing permission propagation conventions. A store launch must not turn on venue bookings, supplier quote payments or other organisations' flags.
 
 ### Delivery slices, in priority order
 
-**S1a — Catalog and member entry points.** Design/preview first, then products/variants, permissions, visibility and stock administration. No payment activation. Exit: association with no dues can publish a shirt with sizes; another organisation cannot see its private products; public listings and staff-only rooms are unaffected.
+**S1a — Unified catalog contract and purchase entry points.** Design/preview first: map common listing fields and typed details, shared commerce concepts and incremental legacy adapters. Then extend StoreListing-based publishing with merchandise variants, permissions, visibility and sale-stock administration. No rental/service engine or payment activation. Exit: an association with no dues can publish a shirt with sizes through its existing storefront; another organisation cannot see its private products; venue listings, detail URLs, existing availability and staff-only rooms remain unaffected.
 
-**S1b — Orders, stock reservations and payment integrity.** Approve the commerce finance contract, add durable checkout attempts and lifecycle/reconciliation, implement single-seller purchase/receipts/history and refund support. Exit: sandbox-proven last-item race, double-submit, failure/retry, duplicate/out-of-order callback/webhook, expired quote, late/extra payment and failed ledger-post cases; balances reconcile. Payment provider tests need separately agreed isolated sandbox credentials/scope, never a production credential swap.
+**S1b — Shared commerce foundation with purchase availability.** Approve the cross-type commerce finance contract, add the shared order/payment-attempt/terms-snapshot and reconciliation foundation, implement the purchase-specific stock reservation/fulfilment adapter, single-seller merchandise checkout/receipts/history and refund support. Keep venue booking/payment paths on their existing integration until an approved migration slice; do not silently route them through the new purchase implementation. Exit: sandbox-proven last-item race, double-submit, failure/retry, duplicate/out-of-order callback/webhook, expired quote, late/extra payment and failed ledger-post cases; balances reconcile. Payment provider tests need separately agreed isolated sandbox credentials/scope, never a production credential swap.
 
 **S1c — Collection and bounded pilot acceptance.** Staff workflow, collection proof, messages, order support and finance visibility. Exit: authorised Purpledot pilot can complete one sandbox purchase from a no-dues member, receive/read the receipt and collect once; cancellation/refund and access revocation are tested. Live trading requires a separate go-ahead and actual merchant/support readiness. Do not create new permissions/features/data merely because this roadmap is accepted.
 
-## 6. Reconciled completion sequence after the store
+## 6. Reconciled completion sequence
 
 | Priority | Milestone / original scope | Deliverable and acceptance gate | Proposed state |
 |---|---|---|---|
-| 1 | S1a–c: organisation merchandise (original Build 3 expansion) | Complete the slices above; original venue booking controls remain unchanged | Proposed; design and implementation plan next |
-| 2 | S2: venue transaction completion (Build 2) | Approval-first public flow; shared lock/availability rules; expiry/cancellation/late payment; common validated confirmer; reconciled ledger and seller settlement; decide split vs platform collection; bank-transfer/pro-forma/evidence/manual review designed as its own slice. Exit: sandbox lifecycle plus concurrency/privacy acceptance | Proposed; blocked from trading by finance and merchant readiness gates |
-| 3 | S3: supplier catalog completion (Builds 1/3) | Type-aware listing forms, rental/service details, search/category/storefront links, consistent kind vocabulary; connect existing RFQ/proposals. Exit: seller creates→publishes→buyer discovers→requests→seller quotes→sandbox payment, without hand-created database listings | Proposed; reuse E8 rather than rebuild |
+| 1 | S1a–c: unified catalog/commerce, merchandise first (original Build 3 expansion) | Establish shared foundations with the purchase adapter; complete the slices above; preserve original venue features and booking controls | Proposed; design and implementation plan next |
+| 2 | S2: venue integration and transaction completion (Build 2) | Incremental adapter to shared orders/payments where approved, retaining authoritative booking/calendar records; approval-first public flow; shared lock/availability rules; expiry/cancellation/late payment; common validated confirmer; reconciled ledger and seller settlement; decide split vs platform collection; bank-transfer/pro-forma/evidence/manual review designed as its own slice. Exit: sandbox lifecycle plus concurrency/privacy acceptance | Proposed; blocked from trading by finance and merchant readiness gates |
+| 3 | S3: rental/service commerce completion (Builds 1/3) | Extend the unified catalog and shared commerce with dated quantity/asset availability and returns for rentals, scheduling/deliverables for services; finish type-aware forms/detail/search/storefront links and consistent kind vocabulary; connect existing RFQ/proposals. Exit: seller creates→publishes→buyer discovers→requests→seller quotes→sandbox payment, without hand-created database listings | Proposed; reuse E8 rather than rebuild |
 | 4 | S4: operations and booker handoff (Build 2) | Complete authenticated venue message delivery/live updates and private attachments; preserve multi-event tasks/inspections/calendar; walk-in external booker intake; explicit consent/identity and idempotent booking→event creation with authorised tenant ownership. Exit: two organisations collaborate; wrong tenant denied; retry cannot create another event | Proposed; design separate from staff-room booking |
 | 5 | S5: trust and growth completion (Build 3) | Reciprocal review eligibility/consent/moderation/disputes; declared cross-category ranking; sponsored placement disclosure and add-on lifecycle/visibility verification. Exit: only eligible completed transactions review; no retaliation/unauthorised edits; expired promotion loses ranking | Proposed; existing reviews/promotions retained |
 | Always | Merchant and launch readiness | Verify actual participating merchants, accurate listings, support ownership, operational policies and agreed payment journey before promoting transactions | Pending owner confirmation; browsing stays available |
@@ -122,14 +143,14 @@ Do not release merchandise, services and venue changes as one large PR. Each sli
 
 ## 7. Owner decisions and recommendation
 
-Approve or amend these before preparing the S1 build plan:
+The owner has agreed the unified structure and merchandise-first direction. Approve or amend these remaining details before preparing the S1 build plan:
 
 1. **Pilot scope:** recommend physical merchandise, one organisation per order, collection only, GHS, no dues dependency. Public and active-member-only visibility supported; defer discounts, shipping, pre-orders and digital goods.
 2. **Commercial/settlement contract:** decide store fee/bearer/cap policy and which existing tenant settlement modes are supported for the pilot. Recommend no automatic adoption of the old 10%, no forced gateway change, and no checkout until reconciliation/refund/payout responsibilities are explicit.
 3. **Operational policy:** approve the collection, cancellation/refund/support rules and identify the pilot's real operator/products. Existing standing Purpledot approval for Community does not itself approve merchandise trading, sandbox payments or a broader marketplace rollout.
-4. **Sequence:** recommend S1→S2→S3→S4→S5, completing shared finance/privacy prerequisites inside S1. Urgent defects affecting currently active use can be separately prioritised; no new exposure is authorised here.
+4. **Sequence and migration:** recommend S1→S2→S3→S4→S5, completing shared finance/privacy prerequisites inside S1; integrate existing venues incrementally, then rental/service adapters. Mixed-type checkout, legacy conversion mechanics and resource-allocation details require their own approved design. Urgent defects affecting currently active use can be separately prioritised; no new exposure is authorised here.
 
-Next artefacts after roadmap review: an organisation-store design with desktop/mobile preview, then a task-by-task native implementation plan against the approved design. Later phases receive their own plans when reached. This roadmap is intentionally not an instruction to start coding.
+Next artefacts after roadmap review: a unified catalog/commerce design with the merchandise-first desktop/mobile preview, explicit venue-preservation/migration boundaries and type-specific availability contracts, then a task-by-task native implementation plan for S1 against the approved design. Later phases receive their own plans when reached. This roadmap is intentionally not an instruction to start coding.
 
 ## 8. Evidence index
 
@@ -154,14 +175,16 @@ Paths are relative to the repository. They identify implementation/test evidence
 - Existing bounded test run: `php artisan test --compact tests/Feature/Marketplace tests/Feature/Tenant/VenueInquiryTest.php tests/Feature/Tenant/VenueOperationsTest.php tests/Feature/Tenant/VenueCalendarTest.php` against the local testing database. **132 tests passed, 808 assertions, 171.99 seconds on 2026-10-22.** No new tests or application changes were introduced.
 - Test coverage is evidence of covered behavior only: endpoint-created rental fixtures do not prove complete seller UI; sequential booking rejection does not prove concurrency; mocked Paystack success does not prove settlement/provider acceptance; persisted messages do not prove real-time delivery.
 - Finance contradictions, confidential payload/access boundaries, stock/fulfilment and acceptance ownership are explicit gates, not silently accepted trade-offs. No promise of completion dates before designs and dependencies are agreed.
+- Revision 2026-10-22: self-reviewed the unified-structure amendment against the agreed direction; verified catalog reuse, shared orders/payments, all four availability/fulfilment types, venue preservation, gradual adoption, separate rollout controls and merchandise-first scope. The 132-test result above belongs to the earlier audit; this documentation-only revision did not rerun those unchanged application tests.
 - Original handoff remains historical context. After owner approval, this roadmap becomes the continuation/status index; the original note links here without rewriting old decisions as newly approved rules.
 
 ### Review checklist
 
 - [x] Audit all original handoff promises and retain evidence for partial work.
-- [x] Make merchandise the first product priority without enabling booking/payment capabilities.
+- [x] Reflect the agreed unified catalog/commerce direction, with merchandise first and type-specific availability/fulfilment.
+- [x] Preserve existing venue features through explicit incremental integration and regression gates, without activating other transaction types.
 - [x] Preserve existing venue, Community, dues, Giving and verification boundaries in the proposed approach.
 - [x] Separate source evidence, local testing, sandbox acceptance and production readiness.
 - [ ] Owner reviews roadmap and proposed defaults.
-- [ ] Prepare/approve merchandise design and visual preview.
+- [ ] Prepare/approve unified catalog/commerce design and merchandise-first visual preview.
 - [ ] Prepare/approve detailed S1 implementation plan; only then consider implementation.
