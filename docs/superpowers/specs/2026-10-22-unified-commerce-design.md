@@ -1,12 +1,12 @@
 # Unified catalog and commerce design — merchandise first
 
-**Date:** 2026-10-22. **Status:** design for review; implementation authorisation is awaiting clarification. No production deployment, trading, payment or booking activation is authorised by this document.
+**Date:** 2026-10-22. **Status:** merchandise implementation authorised 2026-10-22; native S1a in progress. No production deployment, trading, payment or booking activation is authorised by this document.
 
 **Binding direction:** [marketplace roadmap §5](../marketplace-roadmap.md). One Shop/StoreListing catalog, shared commerce, type-specific availability/fulfilment; merchandise first; preserve venue features. This is a native Laravel/Inertia/React extension with no new dependencies. Proposed defaults below are design recommendations, not newly agreed commercial terms.
 
 ## 1. Scope and delivery boundary
 
-The target is one branded organisation storefront offering purchases, rentals, venues and services. The first implemented transaction type will be physical merchandise. S1a provides catalog publishing and visibility; S1b adds durable orders/reservations/payment integrity; S1c adds collection and pilot acceptance. Each slice needs review before building. No speculative rental/service engine, mixed-type checkout, multi-seller basket, pre-order, digital licensing, shipping integration or bulk legacy-booking conversion in S1.
+The target is one branded organisation storefront offering purchases, rentals, venues and services. The first implemented transaction type will be physical merchandise. S1a provides catalog publishing and visibility; S1b adds durable orders/reservations/payment integrity; S1c adds collection and pilot acceptance. Each slice follows the approved design and a scoped plan; the owner has authorised native merchandise implementation and systematic roadmap continuation, with release/trading approvals separate. No speculative rental/service engine, mixed-type checkout, multi-seller basket, pre-order, digital licensing, shipping integration or bulk legacy-booking conversion in S1.
 
 An association can use this with no dues and, for public merchandise, without Community being enabled. Member-only products use existing verified email/member access. Following, staff employment, a phone match, a guest registration and membership are different credentials.
 
@@ -76,6 +76,6 @@ Use existing React/Inertia public/console tokens, square surfaces and light/dark
 
 ## 9. Next gate
 
-Review the unified design and the preview alongside the roadmap. S1a's detailed implementation plan is prepared separately. S1b/S1c receive their own full plans only once their commercial/operational gates are resolved. As of drafting, a scope clarification is pending about whether the owner's delegation authorises implementation beyond the previous explicit review-before-build instruction.
+Review the unified design and the preview alongside the roadmap. S1a's detailed implementation plan is prepared separately. S1b/S1c receive their own full plans only once their commercial/operational gates are resolved. Owner clarified 2026-10-22: implement the merchandise-first release and proceed systematically through the roadmap; no merge, deployment or payment activation is inferred.
 
 **Preparation evidence (2026-10-22):** synthetic preview browser checks passed at 320/390/768/1440px; purchase filtering and sold-out options, rental date fields, catalog view and dark mode checked. These are prototype checks, not application, checkout or production acceptance. Builder-check findings were incorporated into the design/plan; no source implementation or new payment tests have run.

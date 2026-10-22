@@ -1,6 +1,6 @@
 # Unified catalog S1a implementation plan
 
-> **For agentic workers:** Use superpowers:executing-plans for native task-by-task execution after owner approval. Track steps with checkboxes; one fresh whole-change review at the end. Do not begin while implementation scope is unconfirmed.
+> **For agentic workers:** Use superpowers:executing-plans for native task-by-task execution after owner approval. Track steps with checkboxes; one fresh whole-change review at the end. Owner confirmed implementation scope on 2026-10-22; native execution is in progress.
 
 **Goal:** extend the existing Shop/StoreListing catalog with merchandise publishing, variants, stock administration and protected storefront entry points, preserving all existing venue features.
 
@@ -50,11 +50,11 @@ These new names belong to this proposed plan, not existing APIs. `Session` is `I
 
 **Files:** new three models, factories, landlord migrations and `MerchandiseInventory`; tests `tests/Feature/Marketplace/MerchandiseCatalogSchemaTest.php` and `MerchandiseInventoryTest.php`.
 
-- [ ] Write failures proving listing ownership, one child per merchandise listing, normalized SKU unique per seller, option combination unique under case/whitespace/key-order normalization, nonnegative integer stock/price, and archival retaining variant IDs/history. A venue listing cannot acquire merchandise details by an arbitrary kind flip.
-- [ ] Run `php artisan test --compact tests/Feature/Marketplace/MerchandiseCatalogSchemaTest.php tests/Feature/Marketplace/MerchandiseInventoryTest.php`; confirm meaningful failures for missing schema/service.
-- [ ] Generate/implement schema and typed models/factories; implement `adjust` with transaction/row lock, required reason/actor and immutable movement, using the spec’s normalized option-key/SKU rules. New stock initializes through an auditable movement. Test identical retry returns the original movement, altered payload with same key fails, movement update/delete is denied, and a general variant edit cannot change on_hand. Test concurrent corrections with separate connections; no lost update/negative balance.
-- [ ] Run affected tests to green; inspect migration reversibility without deleting existing venue records. Do not migrate production.
-- [ ] Commit task plus ticked plan steps.
+- [x] Write failures proving listing ownership, one child per merchandise listing, normalized SKU unique per seller, option combination unique under case/whitespace/key-order normalization, nonnegative integer stock/price, and archival retaining variant IDs/history. A venue listing cannot acquire merchandise details by an arbitrary kind flip.
+- [x] Run `php artisan test --compact tests/Feature/Marketplace/MerchandiseCatalogSchemaTest.php tests/Feature/Marketplace/MerchandiseInventoryTest.php`; confirm meaningful failures for missing schema/service.
+- [x] Generate/implement schema and typed models/factories; implement `adjust` with transaction/row lock, required reason/actor and immutable movement, using the spec’s normalized option-key/SKU rules. New stock initializes through an auditable movement. Test identical retry returns the original movement, altered payload with same key fails, movement update/delete is denied, and a general variant edit cannot change on_hand. Test concurrent corrections with separate connections; no lost update/negative balance.
+- [x] Run affected tests to green; inspect migration reversibility without deleting existing venue records. Do not migrate production.
+- [x] Commit task plus ticked plan steps.
 
 ## Task 2: default privacy and legacy venue compatibility
 
@@ -101,7 +101,7 @@ These new names belong to this proposed plan, not existing APIs. `Session` is `I
 
 Coverage: typed data/stock in Task 1; privacy and venue preservation in Task 2; permissions/onboarding in Task 3; customer/staff UI in Task 4; end-to-end compatibility in Task 5. S1b commercial decisions deliberately do not block catalog design, but do block payment work. New service signatures are proposed; session/member integration is explicitly bound to existing native services, with self-only eligibility for S1.
 
-Implementation permission is currently being clarified because the owner's preceding instruction explicitly required review before implementation. The design/preview/plan package can be prepared while that question is pending. This plan does not waive that gate.
+Owner authorised 2026-10-22: start option1 (design/build/test merchandise and prepare a PR), then proceed systematically through the entire roadmap. Native execution starts here. Merge/deployment and production trading/payment activation remain separate gates.
 
 **Builder-check amendments:** specified protected media/stale URL behavior; all-kind/category search isolation; legacy room/event/RFQ/media type guards; precise active-email membership revocation; inventory idempotency/immutability/normalization; and feature-off/default-scope behavior. These resolve concrete implementation ambiguities without authorising implementation.
 
