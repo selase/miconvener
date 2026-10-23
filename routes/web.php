@@ -345,7 +345,7 @@ Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCe
 Route::post('/marketplace/shops/{shop:slug}/quotes', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'quote'])
     ->middleware('throttle:30,1')->name('store.quotes.create');
 Route::post('/my/store-orders/{order}/checkout', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'start'])
-    ->middleware('throttle:30,1')->name('store.checkout.start');
+    ->middleware('throttle:30,1')->whereUuid('order')->name('store.checkout.start');
 Route::get('/marketplace/checkout/{reference}/callback', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'callback'])
     ->middleware('throttle:30,1')->name('store.checkout.callback');
 

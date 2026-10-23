@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
+ * @property string|null $commerce_operation_key
+ * @property string|null $commerce_account_fingerprint
+ * @property string|null $commerce_recipient_fingerprint
  * @property int|null $requested_transfer_fee_amount
  * @property int|null $requested_net_amount
  * @property string|null $event_id
@@ -56,10 +59,16 @@ final class EventPayout extends Model
         'scheduled_at',
         'paid_at',
         'note',
+        'commerce_operation_key',
+        'commerce_account_fingerprint',
+        'commerce_recipient_fingerprint',
+        'commerce_recipient_display',
         'provider_reference',
         'provider_transfer_code',
         'failure_reason',
     ];
+
+    protected $hidden = ['commerce_account_fingerprint', 'commerce_recipient_fingerprint'];
 
     protected $casts = [
         'category' => LedgerCategoryEnum::class,

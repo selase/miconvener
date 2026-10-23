@@ -100,4 +100,39 @@ final class MerchandiseInventory
             }
         });
     }
+
+    public function restockRefund(\App\Models\StoreRefund $refund): void
+    {
+        $refund->getConnection()->transaction(function () use ($refund): void {
+            $locks = app(CommerceInventoryLocks::class);
+            $order = $locks->order($refund->order);
+            $refund = \App\Models\StoreRefund::query()->where('order_id', $order->id)->lockForUpdate()->findOrFail($refund->id);
+            if (! $refund->restock) {
+                return;
+            }
+            $free = $refund->amount_pesewas === 0 && $order->charged_pesewas === 0 && $refund->provider_status === 'not_required';
+            $paid = $refund->amount_pesewas > 0 && $refund->provider_processed_at !== null && \App\Models\LedgerTransaction::withoutGlobalScopes()
+                ->whereKey($refund->ledger_transaction_id)->where('tenant_id', $order->tenant_id)->where('category', 'commerce')->where('transaction_type', 'commerce_refund')->where('reference', 'store-refund:'.$refund->operation_key)->exists();
+            if ($refund->status !== 'confirmed' || (! $free && ! $paid) || $order->fulfilment_state === 'collected') {
+                throw ValidationException::withMessages(['stock' => 'A confirmed refund of eligible uncollected goods is required.']);
+            }
+            $lines = $order->lines()->orderBy('variant_id')->get();
+            $variants = $locks->variants($lines->pluck('variant_id')->all())->keyBy('id');
+            foreach ($lines as $line) {
+                if (StoreStockMovement::query()->where('variant_id', $line->variant_id)->where('source_kind', 'refund')->where('source_id', $refund->id)->exists()) {
+                    continue;
+                }
+                $consumed = StoreStockMovement::query()->where('variant_id', $line->variant_id)->where('source_kind', 'order')->where('source_id', $order->id)->where('delta', -$line->quantity)->exists();
+                $variant = $variants->get($line->variant_id);
+                if (! $consumed || $variant === null || $variant->on_hand > 2147483647 - $line->quantity) {
+                    throw ValidationException::withMessages(['stock' => 'The original stock movement needs review before restocking.']);
+                }
+                $balance = $variant->on_hand + $line->quantity;
+                StoreVariant::query()->whereKey($variant->id)->update(['on_hand' => $balance]);
+                StoreStockMovement::query()->create(['variant_id' => $variant->id, 'shop_id' => $variant->shop_id,
+                    'idempotency_key' => $refund->id, 'delta' => $line->quantity, 'balance_after' => $balance, 'reason' => 'Uncollected order refund',
+                    'actor_id' => null, 'actor_name' => 'Confirmed refund', 'source_kind' => 'refund', 'source_id' => $refund->id]);
+            }
+        });
+    }
 }

@@ -53,6 +53,27 @@ final class StoreCheckoutScenario
         return [$tenant, $variant, $actor, $session, $order, $attempt];
     }
 
+    /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StorePaymentAttempt, \App\Models\StorePaymentObservation} */
+    public static function paid(): array
+    {
+        [$tenant, $variant, $actor, $session, $order, $attempt] = self::online();
+        $capture = app(\App\Services\Marketplace\StorePaymentEvidence::class)->record($attempt, self::evidence($attempt));
+        app(\App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
+
+        return [$tenant, $variant, $actor, $session, $order->fresh(), $attempt->fresh(), $capture->fresh()];
+    }
+
+    /** @return array{\App\Models\StoreOrder, \App\Models\StorePaymentAttempt, \App\Models\StorePaymentObservation} */
+    public static function anotherPaid(Tenant $tenant, StoreVariant $variant, Store $session): array
+    {
+        $order = app(\App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+        $attempt = app(\App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
+        $capture = app(\App\Services\Marketplace\StorePaymentEvidence::class)->record($attempt, self::evidence($attempt));
+        app(\App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
+
+        return [$order->fresh(), $attempt->fresh(), $capture->fresh()];
+    }
+
     /** @param array<string, mixed> $changes
      * @return array<string, mixed>
      */

@@ -552,6 +552,40 @@ final class LedgerService
         return $transaction;
     }
 
+    public function recordStoreRefund(\App\Models\StoreRefund $refund): LedgerTransaction
+    {
+        $capture = $refund->observation;
+        if ($refund->amount_pesewas < 1 || $refund->provider_status !== 'processed' || $refund->provider_processed_at === null || $capture === null
+            || $capture->order_id !== $refund->order_id || $capture->attempt_id !== $refund->attempt_id || $capture->amount_pesewas !== $refund->amount_pesewas
+            || ! $capture->account_matches || ! $capture->reference_matches || $capture->currency !== 'GHS') {
+            throw new InvalidArgumentException('A store refund requires verified original captured money and provider completion.');
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->seller_debit_pesewas],
+            ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->commission_return_pesewas],
+            ['code' => LedgerAccount::CODE_BUYER_REFUNDS, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->review_liability_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->amount_pesewas],
+        ];
+        if ($refund->review_liability_pesewas === 0 && $refund->fee_bearer === 'platform') {
+            $entries[] = ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->gateway_fee_pesewas];
+        } elseif ($refund->review_liability_pesewas > 0 && $refund->fee_bearer === 'seller') {
+            $entries[] = ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->gateway_fee_pesewas];
+        }
+
+        return $this->postTransaction($refund->order->tenant, null, 'commerce_refund', 'Store refund '.$refund->id, 'store-refund:'.$refund->operation_key,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
+    public function recordStorePayout(EventPayout $payout, string $reference): LedgerTransaction
+    {
+        if ($payout->category !== LedgerCategoryEnum::Commerce || $payout->event_id !== null || $payout->provider_reference !== $reference || $payout->currency !== 'GHS') {
+            throw new InvalidArgumentException('Store payouts must retain their original commerce reference.');
+        }
+
+        return $this->postTransaction($payout->tenant, null, LedgerTransaction::TYPE_PAYOUT, 'Commerce seller payout', $reference,
+            $this->payoutEntries($payout->amount, $payout->transfer_fee_amount, false), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
     public function recordStoreCaptureReview(\App\Models\StorePaymentObservation $capture): ?LedgerTransaction
     {
         if (! $capture->account_matches || ! $capture->reference_matches || $capture->currency !== 'GHS' || $capture->amount_pesewas === null

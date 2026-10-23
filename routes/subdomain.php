@@ -330,6 +330,16 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('community/polls/{questionnaire}/state', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'state'])->whereUuid('questionnaire')->name('tenant.community.polls.state');
     Route::get('community/polls/{questionnaire}/results', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'results'])->whereUuid('questionnaire')->name('tenant.community.polls.results');
     Route::get('community/polls/{questionnaire}/export', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'export'])->whereUuid('questionnaire')->name('tenant.community.polls.export');
+    Route::prefix('store')->name('tenant.store.')->middleware('throttle:30,1')->group(function (): void {
+        Route::post('orders/{order}/refunds', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'refund'])->whereUuid('order')->name('refunds.create');
+        Route::post('orders/{order}/cancel-free', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'cancelFree'])->whereUuid('order')->name('orders.cancel-free');
+        Route::post('refunds/{refund}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcileRefund'])->whereUuid('refund')->name('refunds.reconcile');
+        Route::post('payouts', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reserve'])->name('payouts.create');
+        Route::post('payouts/{payout}/send', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'send'])->whereUuid('payout')->name('payouts.send');
+        Route::post('payouts/{payout}/finalize', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'finalize'])->whereUuid('payout')->name('payouts.finalize');
+        Route::post('payouts/{payout}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcilePayout'])->whereUuid('payout')->name('payouts.reconcile');
+    });
+
     Route::prefix('store/catalog')->name('tenant.store.catalog.')->group(function (): void {
         Route::get('/', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'index'])->name('index');
         Route::post('/', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'store'])->name('store');

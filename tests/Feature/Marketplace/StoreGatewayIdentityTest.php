@@ -36,3 +36,28 @@ it('verifies against the stored original reference and strips gateway authorizat
     $tenant->update(['settlement_mode' => App\Models\Tenant::SETTLEMENT_MODE_OWN_GATEWAY]);
     expect(app(StoreGateways::class)->forAttempt($attempt))->toBeInstanceOf(App\Services\Payment\PaystackGateway::class);
 });
+
+it('does not record provider authorizations or private checkout responses in telemetry during commerce verification', function (): void {
+    [, , , , , $attempt] = StoreCheckoutScenario::online();
+    $environment = app('env');
+    $filters = Laravel\Telescope\Telescope::$filterUsing;
+    try {
+        app()->instance('env', 'local');
+        Laravel\Telescope\Telescope::$filterUsing = [];
+        (new App\Providers\TelescopeServiceProvider(app()))->register();
+        Laravel\Telescope\Telescope::flushEntries();
+        Laravel\Telescope\Telescope::startRecording(false);
+        Http::fake(['*api.paystack.co/transaction/verify/*' => function () use ($attempt) {
+            Laravel\Telescope\Telescope::recordClientRequest(Laravel\Telescope\IncomingEntry::make(['uri' => 'https://api.paystack.co/transaction/verify/example', 'response' => ['authorization_code' => 'sensitive-placeholder']]));
+
+            return Http::response(['data' => ['id' => 987, 'reference' => $attempt->reference, 'status' => 'success', 'amount' => 10000, 'fees' => 195, 'currency' => 'GHS']]);
+        }]);
+        app(StorePayments::class)->verify($attempt);
+        expect(Laravel\Telescope\Telescope::$entriesQueue)->toBe([]);
+    } finally {
+        Laravel\Telescope\Telescope::stopRecording();
+        Laravel\Telescope\Telescope::flushEntries();
+        Laravel\Telescope\Telescope::$filterUsing = $filters;
+        app()->instance('env', $environment);
+    }
+});

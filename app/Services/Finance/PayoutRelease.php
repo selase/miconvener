@@ -7,6 +7,7 @@ namespace App\Services\Finance;
 use App\Contracts\SettlementGateway;
 use App\Exceptions\PaymentFailedException;
 use App\Models\EventPayout;
+use Closure;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -42,6 +43,10 @@ final class PayoutRelease
      */
     public function release(EventPayout $payout, string $otp): array
     {
+        if ($payout->category === \App\Enum\LedgerCategoryEnum::Commerce) {
+            return ['released' => false, 'message' => 'Use the commerce payout flow to preserve its balance and original account checks.', 'http_status' => 422];
+        }
+
         return DB::connection('landlord')->transaction(function () use ($payout, $otp): array {
             // Same lock as sending: two submissions of the same code must not
             // both release the transfer.
@@ -121,9 +126,15 @@ final class PayoutRelease
     /** Claim once, then call the provider outside the lock; an uncertain release stays reserved.
      * @return array{released:bool, message:string, http_status:int}
      */
-    public function releaseWithoutLock(EventPayout $payout, string $otp): array
+    public function releaseWithoutLock(EventPayout $payout, string $otp, ?Closure $beforeClaim = null): array
     {
-        $claim = $payout->getConnection()->transaction(function () use ($payout): array {
+        $claim = $payout->getConnection()->transaction(function () use ($payout, $beforeClaim): array {
+            if ($payout->category === \App\Enum\LedgerCategoryEnum::Commerce && $beforeClaim === null) {
+                return ['error' => ['released' => false, 'message' => 'Commerce release requires its balance guard.', 'http_status' => 422]];
+            }
+            if ($beforeClaim !== null) {
+                $beforeClaim($payout);
+            }
             $locked = EventPayout::withoutGlobalScopes()->lockForUpdate()->findOrFail($payout->id);
             if ($locked->status !== EventPayout::STATUS_AWAITING_OTP || ! $locked->provider_transfer_code) {
                 return ['error' => ['released' => false, 'message' => 'This payout is not waiting for a one-time code.', 'http_status' => 422]];

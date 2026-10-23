@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Telescope\Telescope;
 use Throwable;
 
 final class StorePayments
@@ -74,12 +75,12 @@ final class StorePayments
         }
         try {
             $order = $attempt->order;
-            $url = $this->gateways->forAttempt($attempt)->createStoreCheckoutSession(
+            $url = Telescope::withoutRecording(fn () => $this->gateways->forAttempt($attempt)->createStoreCheckoutSession(
                 $order->buyer_email, $attempt->amount_pesewas, $attempt->currency,
                 route('store.checkout.callback', ['reference' => $attempt->reference]),
                 ['source' => 'miconvener_store', 'store_order_id' => $order->id, 'store_attempt_id' => $attempt->id, 'seller_id' => $order->tenant_id],
                 $attempt->reference,
-            );
+            ));
             $attempt->getConnection()->transaction(function () use ($attempt, $url): void {
                 $this->locks->order($attempt->order);
                 $current = StorePaymentAttempt::query()->lockForUpdate()->findOrFail($attempt->id);
@@ -101,7 +102,7 @@ final class StorePayments
     public function verify(StorePaymentAttempt $attempt): array
     {
         $attempt = StorePaymentAttempt::query()->with('order')->findOrFail($attempt->id);
-        $data = $this->gateways->forAttempt($attempt)->verifyTransaction($attempt->reference, true);
+        $data = Telescope::withoutRecording(fn () => $this->gateways->forAttempt($attempt)->verifyTransaction($attempt->reference, true));
 
         return ['status' => $data['status'] ?? 'pending', 'reference' => $data['reference'] ?? null,
             'reference_reported' => $data['reference_reported'] ?? false, 'provider' => 'paystack',

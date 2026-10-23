@@ -17,9 +17,10 @@ use Throwable;
 final class ReconcileStorePayments extends Command
 {
     protected $signature = 'commerce:reconcile {--limit=100 : Maximum captures and attempts per run}';
+
     protected $description = 'Recover captured commerce payments, verify unresolved attempts and release expired unpaid holds';
 
-    public function handle(StorePaymentConfirmer $confirmer, StorePaymentNotifications $notifications, CommerceInventoryLocks $locks, PurchaseReservations $reservations): int
+    public function handle(StorePaymentConfirmer $confirmer, StorePaymentNotifications $notifications, CommerceInventoryLocks $locks, PurchaseReservations $reservations, \App\Services\Marketplace\StoreRefunds $refunds, \App\Services\Marketplace\StorePayouts $payouts): int
     {
         $limit = filter_var($this->option('limit'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 500]]);
         if ($limit === false) {
@@ -39,7 +40,7 @@ final class ReconcileStorePayments extends Command
         }
         $attempts = StorePaymentAttempt::query()->whereIn('status', ['initializing', 'unknown', 'ready', 'pending'])
             ->where('created_at', '<=', now()->subMinute())->where(fn ($q) => $q->whereNull('last_verified_at')->orWhere('last_verified_at', '<=', now()->subMinutes(5)))
-            ->whereDoesntHave('observations')->orderBy('updated_at')->limit($limit)->get();
+            ->whereDoesntHave('observations')->orderBy('updated_at')->limit(min($limit, 10))->get();
         foreach ($attempts as $attempt) {
             try {
                 $notifications->reconcile($attempt);
@@ -61,6 +62,24 @@ final class ReconcileStorePayments extends Command
                 $order->update(['state' => $unresolved ? 'review' : 'cancelled', 'review_reason' => $unresolved ? 'expired_unresolved_attempt' : null,
                     'fulfilment_state' => $unresolved ? 'awaiting_preparation' : 'cancelled']);
             });
+        }
+        foreach (\App\Models\StoreRefund::query()->where('status', '<>', 'confirmed')->where('updated_at', '<=', now()->subMinute())->orderBy('updated_at')->limit(min($limit, 10))->get() as $refund) {
+            try {
+                $refund->touch();
+                $refunds->reconcile($refund);
+            } catch (Throwable) {
+                $failures++;
+                $this->warn('A refund still needs reconciliation: '.$refund->id);
+            }
+        }
+        foreach (\App\Models\EventPayout::withoutGlobalScopes()->where('category', \App\Enum\LedgerCategoryEnum::Commerce)->whereIn('status', [\App\Models\EventPayout::STATUS_PROCESSING, \App\Models\EventPayout::STATUS_AWAITING_OTP])->where('updated_at', '<=', now()->subMinute())->orderBy('updated_at')->limit(min($limit, 10))->get() as $payout) {
+            try {
+                $payout->touch();
+                $payouts->reconcile($payout);
+            } catch (Throwable) {
+                $failures++;
+                $this->warn('A payout still needs reconciliation: '.$payout->id);
+            }
         }
         $this->info('Commerce reconciliation finished; unresolved operations: '.$failures);
 
