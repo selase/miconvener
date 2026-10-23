@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Marketplace;
 
+use App\Models\StoreOrder;
+use App\Models\StoreStockAllocation;
 use App\Models\StoreStockMovement;
 use App\Models\StoreVariant;
 use App\Models\User;
@@ -22,7 +24,10 @@ final class MerchandiseInventory
         }
 
         return $variant->getConnection()->transaction(function () use ($variant, $delta, $reason, $idempotencyKey, $actor): StoreStockMovement {
-            $variant->getConnection()->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['commerce.inventory:'.$variant->id]);
+            $locks = app(CommerceInventoryLocks::class);
+            $current = StoreVariant::query()->with('shop')->findOrFail($variant->id);
+            $locks->tenant($current->shop->tenant_id);
+            $locks->variants([$variant->id]);
             $locked = StoreVariant::query()->with('shop')->lockForUpdate()->findOrFail($variant->id);
             if ($locked->shop === null || (! User::query()->whereKey($actor->id)->where('tenant_id', $locked->shop->tenant_id)->exists() && ! $actor->tenants()->whereKey($locked->shop->tenant_id)->exists())) {
                 throw new AuthorizationException;
@@ -44,7 +49,8 @@ final class MerchandiseInventory
                 return $prior;
             }
             $balance = $locked->on_hand + $delta;
-            if ($balance < 0 || $balance > 2147483647) {
+            $held = (int) StoreStockAllocation::query()->where('variant_id', $locked->id)->where('state', 'active')->where('expires_at', '>', now())->sum('quantity');
+            if ($balance < $held || $balance > 2147483647) {
                 throw ValidationException::withMessages(['delta' => 'The correction would put stock outside its allowed range.']);
             }
             StoreVariant::query()->whereKey($locked->id)->update(['on_hand' => $balance]);
@@ -53,6 +59,37 @@ final class MerchandiseInventory
                 'shop_id' => $locked->shop_id, 'delta' => $delta, 'balance_after' => $balance,
                 'reason' => $reason, 'actor_id' => $actor->id, 'actor_name' => $recordedActor->name, 'idempotency_key' => $idempotencyKey,
             ]);
+        });
+    }
+
+    public function consumeOrder(StoreOrder $order): void
+    {
+        $order->getConnection()->transaction(function () use ($order): void {
+            $locks = app(CommerceInventoryLocks::class);
+            $order = $locks->order($order);
+            if ($order->charged_pesewas !== 0 || $order->payment_state !== 'not_required' || $order->ledger_state !== 'not_applicable' || $order->accepted_at === null) {
+                throw ValidationException::withMessages(['stock' => 'Stock requires an accepted free order or verified, posted payment.']);
+            }
+            $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->orderBy('variant_id')->get();
+            $variants = $locks->variants($allocations->pluck('variant_id')->all())->keyBy('id');
+            if ($allocations->count() !== $order->lines()->count() || $allocations->isEmpty()) {
+                throw ValidationException::withMessages(['stock' => 'The order allocation is incomplete.']);
+            }
+            foreach ($allocations as $allocation) {
+                if ($allocation->state === 'consumed') {
+                    continue;
+                }
+                $variant = $variants->get($allocation->variant_id);
+                if ($allocation->state !== 'active' || $allocation->expires_at->lessThanOrEqualTo(now()) || $variant === null || $variant->on_hand < $allocation->quantity) {
+                    throw ValidationException::withMessages(['stock' => 'The order reservation expired or needs review.']);
+                }
+                $balance = $variant->on_hand - $allocation->quantity;
+                StoreVariant::query()->whereKey($variant->id)->update(['on_hand' => $balance]);
+                StoreStockMovement::query()->create(['variant_id' => $variant->id, 'shop_id' => $variant->shop_id,
+                    'idempotency_key' => $allocation->line_id, 'delta' => -$allocation->quantity, 'balance_after' => $balance,
+                    'reason' => 'Order purchase', 'actor_id' => null, 'actor_name' => 'Verified order', 'source_kind' => 'order', 'source_id' => $order->id]);
+                $allocation->update(['state' => 'consumed']);
+            }
         });
     }
 }

@@ -20,7 +20,9 @@ use LogicException;
  * @property string $reason
  * @property \Carbon\Carbon|null $created_at
  * @property string $actor_name
- * @property string $actor_id
+ * @property string|null $actor_id
+ * @property string $source_kind
+ * @property string|null $source_id
  */
 final class StoreStockMovement extends Model
 {
@@ -31,7 +33,7 @@ final class StoreStockMovement extends Model
 
     protected $connection = 'landlord';
 
-    protected $fillable = ['variant_id', 'shop_id', 'idempotency_key', 'delta', 'balance_after', 'reason', 'actor_id', 'actor_name'];
+    protected $fillable = ['variant_id', 'shop_id', 'idempotency_key', 'delta', 'balance_after', 'reason', 'actor_id', 'actor_name', 'source_kind', 'source_id'];
 
     /** @return BelongsTo<StoreVariant, $this> */
     public function variant(): BelongsTo
