@@ -20,6 +20,8 @@ use LogicException;
  * @property string|null $commerce_recipient_fingerprint
  * @property int|null $requested_transfer_fee_amount
  * @property int|null $requested_net_amount
+ * @property \Carbon\CarbonImmutable|null $commerce_cancelled_at
+ * @property int|null $commerce_cancelled_by
  * @property string|null $event_id
  * @property LedgerCategoryEnum|null $category
  */
@@ -43,6 +45,8 @@ final class EventPayout extends Model
 
     public const string STATUS_FAILED = 'failed';
 
+    public const string STATUS_CANCELLED = 'cancelled';
+
     protected $connection = 'landlord';
 
     protected $fillable = [
@@ -61,6 +65,8 @@ final class EventPayout extends Model
         'paid_at',
         'note',
         'commerce_operation_key',
+        'commerce_cancelled_at',
+        'commerce_cancelled_by',
         'commerce_account_fingerprint',
         'commerce_recipient_fingerprint',
         'commerce_recipient_display',
@@ -80,6 +86,8 @@ final class EventPayout extends Model
         'net_paid_amount' => 'integer',
         'scheduled_at' => 'datetime',
         'paid_at' => 'datetime',
+        'commerce_cancelled_at' => 'immutable_datetime',
+        'commerce_cancelled_by' => 'integer',
     ];
 
     public function event(): BelongsTo

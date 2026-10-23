@@ -74,6 +74,14 @@ final class StoreFinanceController extends Controller
         return response()->json(['payout_id' => $payout->id, 'status' => $payout->status])->header('Cache-Control', 'private, no-store');
     }
 
+    public function cancelPayout(Request $request, string $subdomain, string $payout, StorePayouts $payouts): JsonResponse
+    {
+        $tenant = $this->authorizeFinance($request->user());
+        $updated = $payouts->cancel($this->payout($tenant, $payout), $request->user());
+
+        return response()->json(['payout_id' => $updated->id, 'status' => $updated->status, 'message' => 'Unsent payout reservation cancelled.'])->header('Cache-Control', 'private, no-store');
+    }
+
     public function send(Request $request, string $subdomain, string $payout, StorePayouts $payouts): JsonResponse
     {
         $tenant = $this->authorizeFinance($request->user());

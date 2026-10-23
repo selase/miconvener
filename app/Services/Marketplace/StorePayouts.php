@@ -60,6 +60,28 @@ final class StorePayouts
         });
     }
 
+    public function cancel(EventPayout $payout, User $actor): EventPayout
+    {
+        $this->assertPayout($payout);
+
+        return $payout->getConnection()->transaction(function () use ($payout, $actor): EventPayout {
+            $seller = $this->locks->tenant($payout->tenant_id);
+            $this->authorize($seller, $actor);
+            $current = EventPayout::withoutGlobalScopes()->where('tenant_id', $seller->id)->lockForUpdate()->findOrFail($payout->id);
+            if ($current->status === EventPayout::STATUS_CANCELLED) {
+                return $current;
+            }
+            if ($current->status !== EventPayout::STATUS_SCHEDULED || $current->provider_reference !== null
+                || filled($current->provider_transfer_code) || $current->requested_net_amount !== null || $current->requested_transfer_fee_amount !== null) {
+                $this->refuse('Only an unsent payout reservation can be cancelled. Reconcile submitted transfers using their original reference.');
+            }
+            $current->update(['status' => EventPayout::STATUS_CANCELLED, 'commerce_cancelled_by' => $actor->id,
+                'commerce_cancelled_at' => now(), 'failure_reason' => 'Unsent reservation cancelled by authorised finance staff. No transfer submitted.']);
+
+            return $current;
+        });
+    }
+
     /** @return array<string, mixed> */
     public function send(EventPayout $payout): array
     {

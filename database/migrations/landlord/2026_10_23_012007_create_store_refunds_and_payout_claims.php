@@ -44,6 +44,8 @@ return new class extends Migration
         });
         $schema->table('event_payouts', function (Blueprint $table): void {
             $table->uuid('commerce_operation_key')->nullable();
+            $table->timestampTz('commerce_cancelled_at')->nullable();
+            $table->unsignedBigInteger('commerce_cancelled_by')->nullable();
             $table->string('commerce_account_fingerprint', 64)->nullable();
             $table->string('commerce_recipient_fingerprint', 64)->nullable();
             $table->string('commerce_recipient_display')->nullable();
@@ -86,7 +88,10 @@ BEGIN
             OR (NULLIF(OLD.provider_transfer_code, '') IS NOT NULL AND NEW.provider_transfer_code IS DISTINCT FROM OLD.provider_transfer_code)
             OR (OLD.requested_transfer_fee_amount IS NOT NULL AND NEW.requested_transfer_fee_amount IS DISTINCT FROM OLD.requested_transfer_fee_amount)
             OR (OLD.requested_net_amount IS NOT NULL AND NEW.requested_net_amount IS DISTINCT FROM OLD.requested_net_amount)
-            OR (OLD.status = 'paid' AND NEW.status <> 'paid') THEN
+            OR (OLD.status IN ('paid', 'cancelled') AND NEW.status <> OLD.status)
+            OR (OLD.commerce_cancelled_at IS NOT NULL AND ROW(NEW.commerce_cancelled_at, NEW.commerce_cancelled_by) IS DISTINCT FROM ROW(OLD.commerce_cancelled_at, OLD.commerce_cancelled_by))
+            OR (NEW.status = 'cancelled' AND (NEW.provider_reference IS NOT NULL OR NULLIF(NEW.provider_transfer_code, '') IS NOT NULL OR NEW.requested_net_amount IS NOT NULL OR NEW.requested_transfer_fee_amount IS NOT NULL OR NEW.commerce_cancelled_at IS NULL OR NEW.commerce_cancelled_by IS NULL OR OLD.status NOT IN ('scheduled','cancelled')))
+            OR (NEW.status <> 'cancelled' AND (NEW.commerce_cancelled_at IS NOT NULL OR NEW.commerce_cancelled_by IS NOT NULL)) THEN
             RAISE EXCEPTION 'Commerce payout ownership, original intent and completed transfer cannot change';
         END IF;
     END IF;
@@ -110,7 +115,7 @@ SQL);
         $schema->table('store_payment_observations', fn (Blueprint $table) => $table->dropUnique('commerce_observation_owner_unique'));
         $schema->table('event_payouts', function (Blueprint $table): void {
             $table->dropUnique('commerce_payout_operation_unique');
-            $table->dropColumn(['commerce_operation_key', 'commerce_account_fingerprint', 'commerce_recipient_fingerprint', 'commerce_recipient_display']);
+            $table->dropColumn(['commerce_cancelled_at', 'commerce_cancelled_by', 'commerce_operation_key', 'commerce_account_fingerprint', 'commerce_recipient_fingerprint', 'commerce_recipient_display']);
         });
     }
 };

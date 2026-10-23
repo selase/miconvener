@@ -142,11 +142,13 @@ Keep the implementation native, but review it in three bounded increments: **A: 
 
 ## Task 8: acceptance, provider sandbox and rollout gate
 
-- [ ] Self-review against all five Review Focus classes and the complete state transitions. Verify no unused dependency, unhandled public method, missing permissions/config/nav or placeholder provider result.
+- [x] Self-review against all five Review Focus classes and the complete state transitions. Verify no unused dependency, unhandled public method, missing permissions/config/nav or placeholder provider result.
 - [ ] Run affected store, finance, email, native identity, venue/calendar/rooms, legacy quote/payment continuation and Community tests. One complete final CI gate; one fresh whole-branch review, material fixes with RED→GREEN, no repetitive whole-suite runs for unchanged source.
-- [ ] Prepare a separately approved isolated provider sandbox runbook: named test organisation/operator and recipient, test account only, last-item contention, MoMo-style delayed capture, init timeout/verification recovery, duplicate/out-of-order/extra capture, receipt delivery, full uncollected refund, payout/OTP and unknown transfer reconciliation. Capture safe provider operation IDs and ledger balances, never tokens/codes/private receipt URLs.
+- [x] Prepare a separately approved isolated provider sandbox runbook: named test organisation/operator and recipient, test account only, last-item contention, MoMo-style delayed capture, init timeout/verification recovery, duplicate/out-of-order/extra capture, receipt delivery, full uncollected refund, payout/OTP and unknown transfer reconciliation. Capture safe provider operation IDs and ledger balances, never tokens/codes/private receipt URLs.
 - [ ] Before any pilot enablement, explicitly approve numerical agreement, settlement/refund/payout/support ownership, tax/receipt/collection terms, private storage and sender setup; prove sandbox balances and queues/reconciliation/scheduler. Complete S1c collection acceptance before live trading. Existing production gateway/other tenant flags remain unchanged.
 - [ ] Update roadmap/plan/review report in implementation commits; open a scoped PR for owner review. No merge/deploy/production checkout switch solely from this plan or green tests.
+
+**Fresh review amendments (2026-10-23):** close expired unpaid review only after all original attempts are definitively failed with no capture; preserve late-capture review. Add audited/idempotent unsent payout cancellation, serialised against send, to release reservations without locally releasing ambiguous/submitted transfers. Gate Store discovery by catalog or retained history and permissions; gate Catalog actions by catalog rollout. Focused regressions and one final CI gate are required. External sandbox execution, actual 200% zoom and owner trading decisions remain open.
 
 ## Plan self-review
 

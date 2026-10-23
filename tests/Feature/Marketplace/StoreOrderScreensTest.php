@@ -63,3 +63,21 @@ it('lets authorised finance staff reconcile an original payment without creating
     expect($variant->fresh()->on_hand)->toBe(2);
     Illuminate\Support\Facades\Http::assertNotSent(fn ($request) => $request->method() === 'POST');
 });
+
+it('shares Store discovery only for enabled catalog or retained history', function (): void {
+    [$tenant, $variant, $actor, $session] = StoreCheckoutScenario::make();
+    $actor->tenants()->attach($tenant->id);
+    $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
+    $request = Illuminate\Http\Request::create('http://'.$host.'/store/orders');
+    $request->setLaravelSession(app('session.store'));
+    $request->setUserResolver(fn () => $actor);
+    app(App\Services\Tenancy\TenantContext::class)->setTenant($tenant);
+    $share = fn () => app(App\Http\Middleware\HandleInertiaRequests::class)->share($request)['tenant']['features'];
+    expect($share()['commerce_history'])->toBeTrue();
+    $tenant->features()->where('feature_key', 'commerce_catalog')->update(['enabled' => false]);
+    expect($share()['commerce_history'])->toBeFalse();
+    $tenant->features()->where('feature_key', 'commerce_catalog')->update(['enabled' => true]);
+    app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $tenant->features()->update(['enabled' => false]);
+    expect($share()['commerce_history'])->toBeTrue()->and($share()['commerce_catalog'])->toBeFalse();
+});

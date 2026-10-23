@@ -81,6 +81,7 @@ final class HandleInertiaRequests extends Middleware
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
                 'features' => [
+                    'commerce_history' => app(\App\Services\Marketplace\CommerceCatalogRollout::class)->hasHistoryOrCatalog($tenant),
                     'commerce_catalog' => app(\App\Services\Marketplace\CommerceCatalogRollout::class)->baseEnabled($tenant),
                     'paid_tickets' => $tenant->planAllows('paid_tickets'),
                     'staff_room_booking' => $tenant->featureEnabled(\App\Services\Tenancy\FeatureService::FEATURE_STAFF_ROOM_BOOKING),

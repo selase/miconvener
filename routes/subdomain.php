@@ -338,6 +338,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::post('orders/{order}/cancel-free', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'cancelFree'])->whereUuid('order')->name('orders.cancel-free');
         Route::post('refunds/{refund}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcileRefund'])->whereUuid('refund')->name('refunds.reconcile');
         Route::post('payouts', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reserve'])->name('payouts.create');
+        Route::post('payouts/{payout}/cancel', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'cancelPayout'])->whereUuid('payout')->name('payouts.cancel');
         Route::post('payouts/{payout}/send', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'send'])->whereUuid('payout')->name('payouts.send');
         Route::post('payouts/{payout}/finalize', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'finalize'])->whereUuid('payout')->name('payouts.finalize');
         Route::post('payouts/{payout}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcilePayout'])->whereUuid('payout')->name('payouts.reconcile');

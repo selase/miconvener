@@ -110,3 +110,61 @@ it('retains a commerce payout destination even when its transfer is parked or te
     expect($account->fresh())->not->toBeNull();
     expect(fn () => $account->delete())->toThrow(Illuminate\Database\QueryException::class);
 })->with(['awaiting_otp', 'failed']);
+
+it('cancels an unsent reservation once to unblock a funded refund without erasing its audit', function (): void {
+    [$tenant, $variant, $actor, $session, $order] = StoreCheckoutScenario::paid();
+    setPermissionsTeamId($tenant->id);
+    App\Models\Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
+    $actor->givePermissionTo('manage store finance');
+    StoreCheckoutScenario::anotherPaid($tenant, $variant, $session);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true]);
+    $payout = app(StorePayouts::class)->reserve($tenant, $actor, ['amount' => 15000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Illuminate\Support\Str::uuid()]);
+    Illuminate\Support\Facades\Http::fake();
+    $refund = app(App\Services\Marketplace\StoreRefunds::class)->request($order, $actor, (string) Illuminate\Support\Str::uuid(), 'Return');
+    expect($refund->status)->toBe('needs_funding');
+    $account->update(['is_verified' => false]);
+    $cancelled = app(StorePayouts::class)->cancel($payout, $actor);
+    $same = app(StorePayouts::class)->cancel($payout, $actor);
+    expect($cancelled->status)->toBe('cancelled')->and($same->commerce_cancelled_at)->toEqual($cancelled->commerce_cancelled_at)
+        ->and($cancelled->commerce_cancelled_by)->toBe((int) $actor->id)->and($cancelled->provider_reference)->toBeNull()
+        ->and(app(StoreBalance::class)->refundBacked($refund))->toBeTrue()
+        ->and(app(StorePayouts::class)->send($payout)['http_status'])->toBe(422);
+    Illuminate\Support\Facades\Http::assertNothingSent();
+    $db = $payout->getConnection();
+    expect(fn () => $db->transaction(fn () => $payout->fresh()->update(['status' => 'scheduled'])))->toThrow(Illuminate\Database\QueryException::class);
+});
+
+it('never locally cancels a payout after send has claimed the original provider reference', function (): void {
+    [$tenant, , $actor] = StoreCheckoutScenario::paid();
+    setPermissionsTeamId($tenant->id);
+    App\Models\Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
+    $actor->givePermissionTo('manage store finance');
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'type' => TenantPayoutAccount::TYPE_MOBILE_MONEY, 'recipient_code' => 'RCP_STORE', 'is_verified' => true]);
+    $payout = app(StorePayouts::class)->reserve($tenant, $actor, ['amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Illuminate\Support\Str::uuid()]);
+    Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transfer' => function () use ($payout, $actor) {
+        expect(fn () => app(StorePayouts::class)->cancel($payout, $actor))->toThrow(Illuminate\Validation\ValidationException::class);
+
+        return Illuminate\Support\Facades\Http::response(['data' => ['status' => 'otp', 'transfer_code' => 'TRF_STORE', 'fee' => 100]]);
+    }]);
+    app(StorePayouts::class)->send($payout);
+    expect($payout->fresh()->status)->toBe('awaiting_otp')->and($payout->fresh()->commerce_cancelled_at)->toBeNull();
+});
+
+it('authorizes the unsent cancellation endpoint and keeps it usable with checkout disabled', function (): void {
+    [$tenant, , $actor] = StoreCheckoutScenario::paid();
+    setPermissionsTeamId($tenant->id);
+    App\Models\Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
+    $actor->givePermissionTo('manage store finance');
+    $actor->tenants()->attach($tenant->id);
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true]);
+    $payout = app(StorePayouts::class)->reserve($tenant, $actor, ['amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Illuminate\Support\Str::uuid()]);
+    $tenant->features()->update(['enabled' => false]);
+    $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
+    $url = 'http://'.$host.'/store/payouts/'.$payout->id.'/cancel';
+    $foreign = App\Models\User::factory()->create();
+    expect(fn () => app(StorePayouts::class)->cancel($payout, $foreign))->toThrow(Illuminate\Auth\Access\AuthorizationException::class);
+    $this->actingAs($actor)->postJson($url, [], ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('status', 'cancelled');
+    $this->postJson($url, [], ['HTTP_HOST' => $host])->assertOk();
+    $actor->revokePermissionTo('manage store finance');
+    $this->postJson($url, [], ['HTTP_HOST' => $host])->assertForbidden();
+});

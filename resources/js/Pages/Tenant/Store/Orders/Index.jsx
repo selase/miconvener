@@ -36,6 +36,7 @@ export default function SellerStore({
     refunds = { data: [] },
 }) {
     const can = usePage().props.auth?.can ?? {};
+    const catalogEnabled = usePage().props.tenant?.features?.commerce_catalog ?? false;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
@@ -96,7 +97,7 @@ export default function SellerStore({
             <PageHeader title={finance ? 'Store finance' : 'Store orders'} />
             <div className="mx-auto w-full max-w-6xl space-y-6 p-5 text-ink sm:p-8">
                 <nav className="flex flex-wrap gap-5 text-sm text-accent underline">
-                    {can.manage_store_catalog && (
+                    {can.manage_store_catalog && catalogEnabled && (
                         <a href={route('tenant.store.catalog.index')}>Catalog</a>
                     )}
                     {finance && <a href={route('tenant.store.orders.index')}>Orders</a>}
@@ -206,6 +207,22 @@ export default function SellerStore({
                                                     }
                                                 >
                                                     Send reserved payout once
+                                                </button>
+                                            )}
+                                            {row.status === 'scheduled' && (
+                                                <button
+                                                    disabled={busy}
+                                                    className="min-h-11 text-accent underline"
+                                                    onClick={() =>
+                                                        post(
+                                                            route('tenant.store.payouts.cancel', {
+                                                                payout: row.id,
+                                                            }),
+                                                            {}
+                                                        )
+                                                    }
+                                                >
+                                                    Cancel unsent reservation
                                                 </button>
                                             )}
                                             {row.status === 'awaiting_otp' && (

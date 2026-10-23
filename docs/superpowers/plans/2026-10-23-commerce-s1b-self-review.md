@@ -1,6 +1,6 @@
 # Self-Review Report — S1b checkout
 
-Scope: native implementation of the approved [checkout plan](2026-10-22-unified-commerce-s1b-checkout.md), based on main `b358f658`, branch `codex/commerce-s1b`. Source review candidate; no merge, deployment or production checkout activation. Final independent review/CI evidence will be attached to the scoped PR.
+Scope: native implementation of the approved [checkout plan](2026-10-22-unified-commerce-s1b-checkout.md), based on main `b358f658`, branch `codex/commerce-s1b`. Source review candidate; no merge, deployment or production checkout activation. One fresh whole-branch review completed against `b358f658 → ad50c181`: no critical issues; two important recovery defects and one navigation issue. All three were verified and addressed in one follow-up pass. Final CI evidence will be attached to the scoped PR.
 
 ## Touchpoints updated
 
@@ -41,6 +41,14 @@ Scope: native implementation of the approved [checkout plan](2026-10-22-unified-
 - `app/Services/Marketplace/StoreBalance.php:23–82` — payable, real cash, refund liabilities and reserve floor.
 - `app/Http/Controllers/Admin/TenantController.php:469–490` and `app/Http/Controllers/Tenant/TenantPayoutAccountController.php:69–90` — retention before destructive side effects.
 - `app/Http/Controllers/Tenant/Store/StoreFinanceController.php:45–65` — original-reference staff recovery, with no new charge.
+
+## Fresh review findings and amendments
+
+- **Expired → verified failed checkout:** reconciliation previously left an expired unpaid order in review forever. The original-account verifier now closes only that specific review state, under the canonical locks, once every attempt is definitively failed and there is no captured evidence. Original attempts/references remain retained; any later success still enters late-capture review without consuming released stock.
+- **Unsent payout hold:** a scheduled reservation could block a refund while that refund blocked sending the payout. Finance staff can now cancel only a never-submitted reservation, idempotently under the same tenant/payout locks as send. Cancellation records the staff ID/time, retains the original intent and cannot be reactivated. Both claim interleavings are covered: cancellation prevents send; a send claim prevents cancellation even during provider I/O. Submitted/ambiguous/OTP transfers cannot be locally released. This also recovers a destination edited before submission, without needing to restore credentials or bank data.
+- **Rollout discovery:** Store Orders/Finance navigation requires enabled catalog or retained Commerce history as well as its own permission. Catalog actions require the actual catalog feature. Historical recovery endpoints remain accessible when rollout is disabled.
+
+Focused regressions include the late-success-after-cancellation case, refund backing after cancellation, foreign/revoked finance access, flag-off recovery and immutable cancellation audit. Provider responses are fakes; cancellation/send ordering tests are not a claim of a real concurrent provider acceptance run. The fresh reviewer declined actual provider/browser payment/refund/OTP/payout/mail, native 200% zoom, S1c collection and production policy readiness; these remain the explicit external gates below. No second reviewer was run.
 
 ## Recommended for user decision
 

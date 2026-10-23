@@ -122,3 +122,18 @@ it('repairs a pending recorded capture through the scheduled reconciliation comm
     expect($order->fresh()->payment_state)->toBe('paid')->and($variant->fresh()->on_hand)->toBe(2);
     Illuminate\Support\Facades\Http::assertNothingSent();
 });
+
+it('releases an expired unpaid review after verified failure but retains late capture recovery', function (): void {
+    [$tenant, $variant, , $session, $order, $attempt] = StoreCheckoutScenario::online();
+    $this->travel(11)->minutes();
+    Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/verify/*' => Illuminate\Support\Facades\Http::sequence()->push(['data' => ['id' => 987, 'reference' => $attempt->reference, 'status' => 'pending']])->push(['data' => ['id' => 987, 'reference' => $attempt->reference, 'status' => 'failed']])]);
+    $this->artisan('commerce:reconcile', ['--limit' => 10])->assertSuccessful();
+    expect($order->fresh()->state)->toBe('review');
+    app(App\Services\Marketplace\StorePaymentNotifications::class)->reconcile($attempt);
+    expect($order->fresh()->state)->toBe('cancelled')->and($order->fresh()->review_reason)->toBeNull();
+    $next = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Illuminate\Support\Str::uuid());
+    expect($next->id)->not->toBe($order->id);
+    $capture = app(StorePaymentEvidence::class)->record($attempt, StoreCheckoutScenario::evidence($attempt));
+    app(StorePaymentConfirmer::class)->confirm($capture);
+    expect($order->fresh()->payment_state)->toBe('captured_review')->and($variant->fresh()->on_hand)->toBe(3);
+});
