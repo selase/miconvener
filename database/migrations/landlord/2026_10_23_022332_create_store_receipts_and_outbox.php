@@ -35,7 +35,8 @@ return new class extends Migration
         });
         $schema->create('store_outbox_messages', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->uuid('receipt_id')->unique()->references('id')->on('store_receipts')->restrictOnDelete();
+            $table->uuid('receipt_id')->unique();
+            $table->foreign('receipt_id')->references('id')->on('store_receipts')->restrictOnDelete();
             $table->text('destination');
             $table->string('state')->default('queued')->index();
             $table->unsignedSmallInteger('attempts')->default(0);

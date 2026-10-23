@@ -87,3 +87,8 @@ it('includes only buyer-borne fees in the rendered payment receipt', function ()
     expect($receipt->snapshot['buyer_fee_pesewas'])->toBe(200)->and($receipt->snapshot)->not->toHaveKey('percentage');
     expect((new App\Mail\StoreOrderReceipt($receipt))->render())->toContain('Checkout fee: GHS 2.00')->toContain('102.00');
 });
+
+it('rejects an outbox message without its retained receipt at the database boundary', function (): void {
+    expect(fn () => StoreOutboxMessage::query()->create(['receipt_id' => (string) Str::uuid(), 'destination' => 'buyer@example.test']))
+        ->toThrow(Illuminate\Database\QueryException::class);
+});

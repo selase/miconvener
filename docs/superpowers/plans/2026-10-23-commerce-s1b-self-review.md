@@ -50,6 +50,8 @@ Scope: native implementation of the approved [checkout plan](2026-10-22-unified-
 
 Focused regressions include the late-success-after-cancellation case, refund backing after cancellation, foreign/revoked finance access, flag-off recovery and immutable cancellation audit. Provider responses are fakes; cancellation/send ordering tests are not a claim of a real concurrent provider acceptance run. The fresh reviewer declined actual provider/browser payment/refund/OTP/payout/mail, native 200% zoom, S1c collection and production policy readiness; these remain the explicit external gates below. No second reviewer was run.
 
+The first CI attempt caught an invalid fluent schema call in the outbox migration that scoped runtime-only static analysis had omitted. An orphan-insert regression reproduced the missing database foreign key. The migration now declares an explicit foreign key; receipt checks pass (7 tests / 27 assertions), and every new Commerce migration passes scoped static analysis. This material CI fix requires a new final CI run; the failed attempt is retained in PR evidence.
+
 ## Recommended for user decision
 
 1. **Isolated provider acceptance — required before activation.** Approve the named non-production operator/account/recipients/actions and test-fund limits, then execute the [sandbox runbook](2026-10-23-commerce-s1b-sandbox-acceptance.md). Browser quote→provider→capture and real email/OTP/refund/payout outcomes remain unverified; the owned local QA site intentionally has no payment key, and none was substituted. Recommend a scheduled acceptance session; provider and mail delays determine its duration.
