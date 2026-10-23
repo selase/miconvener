@@ -124,6 +124,25 @@ final class PaystackGateway implements PaymentGateway
         }
     }
 
+    /** @param array<string, mixed> $metadata */
+    public function createStoreCheckoutSession(string $email, int $amount, string $currency, string $redirectUrl, array $metadata, string $reference): string
+    {
+        try {
+            $response = Http::withToken($this->secret)->timeout(10)->post("{$this->baseUrl}/transaction/initialize", [
+                'email' => $email, 'amount' => $amount, 'currency' => $currency,
+                'callback_url' => $redirectUrl, 'metadata' => $metadata, 'reference' => $reference,
+            ])->throw();
+            $url = $response->json('data.authorization_url');
+            if (! is_string($url) || parse_url($url, PHP_URL_SCHEME) !== 'https' || parse_url($url, PHP_URL_HOST) !== 'checkout.paystack.com') {
+                throw PaymentFailedException::fromProvider('paystack', 'Checkout initialization needs review.');
+            }
+
+            return $url;
+        } catch (Throwable $e) {
+            throw PaymentFailedException::fromProvider('paystack', 'Checkout initialization could not be confirmed.', previous: $e);
+        }
+    }
+
     public function createOneTimeCheckoutSession(string $customerId, int $amount, string $currency, string $redirectUrl, array $metadata = [], ?string $reference = null): string
     {
         try {
@@ -297,7 +316,7 @@ final class PaystackGateway implements PaymentGateway
             'transaction_id' => is_array($data['transaction'] ?? null) ? (string) ($data['transaction']['id'] ?? '') : (string) ($data['transaction'] ?? '')];
     }
 
-    public function verifyTransaction(string $reference): array
+    public function verifyTransaction(string $reference, bool $strictEvidence = false): array
     {
         try {
             $response = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/transaction/verify/{$reference}")->throw();
@@ -313,6 +332,7 @@ final class PaystackGateway implements PaymentGateway
                 'amount' => $data['amount'] ?? 0,
                 'fees' => (int) ($data['fees'] ?? 0),
                 'fees_reported' => isset($data['fees']),
+                ...($strictEvidence ? ['fees_valid' => is_int($data['fees'] ?? null), 'currency_reported' => is_string($data['currency'] ?? null)] : []),
                 'fees_split' => (array) ($data['fees_split'] ?? []),
                 'currency' => mb_strtolower($data['currency'] ?? 'ghs'),
                 'channel' => $data['channel'] ?? null,

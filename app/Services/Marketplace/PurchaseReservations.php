@@ -44,7 +44,7 @@ final class PurchaseReservations implements StoreReservationAdapter
 
     public function release(StoreOrder $order, string $reason): void
     {
-        if (! in_array($reason, ['expired', 'cancelled', 'replaced', 'payment_failed'], true)) {
+        if (! in_array($reason, ['expired', 'cancelled', 'replaced', 'payment_failed', 'payment_review'], true)) {
             $this->refuse();
         }
         $order->getConnection()->transaction(function () use ($order, $reason): void {

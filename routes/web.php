@@ -342,6 +342,13 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'verify'])->name('web.certificates.verify');
 Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('web.certificates.download');
 
+Route::post('/marketplace/shops/{shop:slug}/quotes', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'quote'])
+    ->middleware('throttle:30,1')->name('store.quotes.create');
+Route::post('/my/store-orders/{order}/checkout', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'start'])
+    ->middleware('throttle:30,1')->name('store.checkout.start');
+Route::get('/marketplace/checkout/{reference}/callback', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'callback'])
+    ->middleware('throttle:30,1')->name('store.checkout.callback');
+
 // MiConvener Marketplace (Public)
 Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
     Route::get('/', [App\Http\Controllers\Marketplace\MarketplaceController::class, 'index'])->name('index');

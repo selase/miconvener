@@ -67,7 +67,15 @@ final class MerchandiseInventory
         $order->getConnection()->transaction(function () use ($order): void {
             $locks = app(CommerceInventoryLocks::class);
             $order = $locks->order($order);
-            if ($order->charged_pesewas !== 0 || $order->payment_state !== 'not_required' || $order->ledger_state !== 'not_applicable' || $order->accepted_at === null) {
+            $free = $order->charged_pesewas === 0 && $order->payment_state === 'not_required' && $order->ledger_state === 'not_applicable';
+            $paid = false;
+            if ($order->charged_pesewas > 0 && $order->payment_state === 'paid' && $order->ledger_state === 'posted') {
+                $captures = \App\Models\StorePaymentObservation::query()->where('order_id', $order->id)->whereNotNull('ledger_transaction_id')->where('account_matches', true)->where('reference_matches', true)->get();
+                $paid = $captures->contains(fn (\App\Models\StorePaymentObservation $capture): bool => $capture->integrity_errors === []
+                    && $capture->amount_pesewas === $order->charged_pesewas && $capture->paid_at !== null && $capture->paid_at->lessThan($order->expires_at)
+                    && \App\Models\LedgerTransaction::withoutGlobalScopes()->whereKey($capture->ledger_transaction_id)->where('tenant_id', $order->tenant_id)->where('reference', $capture->reference)->where('transaction_type', 'commerce_sale')->where('category', 'commerce')->whereNull('event_id')->exists());
+            }
+            if ((! $free && ! $paid) || $order->accepted_at === null) {
                 throw ValidationException::withMessages(['stock' => 'Stock requires an accepted free order or verified, posted payment.']);
             }
             $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->orderBy('variant_id')->get();

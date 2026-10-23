@@ -1,0 +1,98 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\StorePaymentAttempt;
+use App\Services\Marketplace\StorePayments;
+use App\Services\Marketplace\StoreQuotes;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Tests\Support\StoreCheckoutScenario;
+
+beforeEach(function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        '*api.paystack.co/customer*' => Http::response(['status' => true, 'data' => ['customer_code' => 'CUS_STORE', 'email' => 'buyer@example.test']]),
+        '*api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']]),
+    ]);
+});
+
+it('starts one server-priced attempt and returns the original attempt on retry', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $key = (string) Str::uuid();
+    $attempt = app(StorePayments::class)->start($order, $session, $key);
+    $retry = app(StorePayments::class)->start($order, $session, $key);
+    expect($attempt->id)->toBe($retry->id)->and($attempt->status)->toBe('ready')
+        ->and(StorePaymentAttempt::query()->count())->toBe(1)->and($order->fresh()->accepted_at)->not->toBeNull();
+    Http::assertSent(fn ($r) => str_ends_with($r->url(), '/transaction/initialize') && $r['amount'] === 10000 && $r['reference'] === $attempt->reference && $r['metadata']['store_order_id'] === $order->id);
+    expect($attempt->toArray())->not->toHaveKey('checkout_url');
+});
+
+it('retains unknown initialization without issuing a second charge after timeout', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    Http::fake(['*api.paystack.co/customer*' => Http::response(['data' => ['customer_code' => 'CUS_STORE', 'email' => 'buyer@example.test']]),
+        '*api.paystack.co/transaction/initialize' => fn () => throw new Illuminate\Http\Client\ConnectionException('Unknown provider response')]);
+    $attempt = app(StorePayments::class)->start($order, $session, (string) Str::uuid());
+    $retry = app(StorePayments::class)->start($order, $session, (string) Str::uuid());
+    expect($attempt->status)->toBe('unknown')->and($retry->id)->toBe($attempt->id)
+        ->and(StorePaymentAttempt::query()->count())->toBe(1)->and($variant->fresh()->on_hand)->toBe(3);
+    $initializations = collect(Http::recorded())->filter(fn ($pair) => str_ends_with($pair[0]->url(), '/transaction/initialize'));
+    expect($initializations->count())->toBeLessThanOrEqual(1);
+});
+
+it('accepts a free order without sending a gateway request and consumes it once', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make(1);
+    $variant->update(['price_pesewas' => 0]);
+    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $key = (string) Str::uuid();
+    expect(app(StorePayments::class)->start($order, $session, $key))->toBeNull()
+        ->and(app(StorePayments::class)->start($order, $session, $key))->toBeNull()
+        ->and($order->fresh()->state)->toBe('confirmed')->and($variant->fresh()->on_hand)->toBe(0)
+        ->and(StorePaymentAttempt::query()->count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+it('refuses an expired quote inactive rollout or another buyer without contacting a provider', function (string $change): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    if ($change === 'expired') {
+        $this->travel(10)->minutes();
+    } elseif ($change === 'disabled') {
+        $tenant->features()->where('feature_key', 'commerce_checkout')->update(['enabled' => false]);
+    } else {
+        $session = StoreCheckoutScenario::session('other@example.test');
+    }
+    expect(fn () => app(StorePayments::class)->start($order, $session, (string) Str::uuid()))->toThrow(ValidationException::class);
+    expect(StorePaymentAttempt::query()->count())->toBe(0);
+    Http::assertNothingSent();
+})->with(['expired', 'disabled', 'other_buyer']);
+
+it('rejects caller-supplied prices identities and references at both HTTP boundaries', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    foreach (['amount' => 1, 'fee' => 0, 'buyer_email' => 'other@example.test', 'tenant_id' => $tenant->id, 'reference' => 'fake'] as $key => $value) {
+        $this->withSession(proofFor('buyer@example.test'))->postJson(route('store.quotes.create', $variant->shop->slug), [
+            'lines' => [['variant_id' => $variant->id, 'quantity' => 1]], 'submission_key' => (string) Str::uuid(), $key => $value,
+        ])->assertUnprocessable()->assertJsonValidationErrors($key);
+        $this->withSession(proofFor('buyer@example.test'))->postJson(route('store.checkout.start', $order), ['submission_key' => (string) Str::uuid(), $key => $value])
+            ->assertUnprocessable()->assertJsonValidationErrors($key);
+    }
+    $this->withSession(proofFor('other@example.test'))->postJson(route('store.checkout.start', $order), ['submission_key' => (string) Str::uuid()])->assertNotFound();
+    Http::assertNothingSent();
+});
+
+it('uses the same authoritative verification for callback and signed webhook even after rollout is disabled', function (): void {
+    [$tenant, $variant, , , $order, $attempt] = StoreCheckoutScenario::online();
+    $data = ['id' => 987, 'reference' => $attempt->reference, 'status' => 'success', 'amount' => 10000, 'fees' => 195,
+        'currency' => 'GHS', 'paid_at' => now()->toIso8601String(), 'metadata' => json_encode(['source' => 'miconvener_store', 'store_order_id' => $order->id, 'store_attempt_id' => $attempt->id, 'seller_id' => $tenant->id])];
+    Http::fake(['*api.paystack.co/transaction/verify/*' => Http::response(['data' => $data])]);
+    $tenant->features()->where('feature_key', 'commerce_checkout')->update(['enabled' => false]);
+    $this->get(route('store.checkout.callback', $attempt->reference))->assertRedirect();
+    $payload = json_encode(['event' => 'charge.success', 'data' => $data], JSON_THROW_ON_ERROR);
+    $signature = hash_hmac('sha512', $payload, 'sk_test_store_only');
+    $this->call('POST', route('webhooks.paystack'), [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_PAYSTACK_SIGNATURE' => $signature], $payload)->assertOk();
+    expect($variant->fresh()->on_hand)->toBe(2)->and($order->fresh()->payment_state)->toBe('paid');
+});

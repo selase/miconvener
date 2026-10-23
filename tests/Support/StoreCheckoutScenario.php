@@ -41,6 +41,29 @@ final class StoreCheckoutScenario
         return [$tenant->fresh(), $variant->fresh(), $actor, self::session()];
     }
 
+    /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StorePaymentAttempt} */
+    public static function online(): array
+    {
+        [$tenant, $variant, $actor, $session] = self::make();
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+        \Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/initialize' => \Illuminate\Support\Facades\Http::response(['data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']])]);
+        $order = app(\App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+        $attempt = app(\App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
+
+        return [$tenant, $variant, $actor, $session, $order, $attempt];
+    }
+
+    /** @param array<string, mixed> $changes
+     * @return array<string, mixed>
+     */
+    public static function evidence(\App\Models\StorePaymentAttempt $attempt, array $changes = []): array
+    {
+        return array_replace(['status' => 'success', 'provider' => 'paystack', 'reference' => $attempt->reference,
+            'reference_reported' => true, 'account_fingerprint' => $attempt->account_fingerprint,
+            'amount' => 10000, 'currency' => 'GHS', 'fees' => 195, 'paid_at' => now()->toIso8601String(),
+            'transaction_id' => 987, 'metadata' => ['source' => 'miconvener_store', 'store_order_id' => $attempt->order_id, 'store_attempt_id' => $attempt->id, 'seller_id' => $attempt->tenant_id]], $changes);
+    }
+
     public static function session(string $email = 'buyer@example.test'): Store
     {
         $session = new Store('store-test', new ArraySessionHandler(120));

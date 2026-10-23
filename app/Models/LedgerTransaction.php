@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/** @property LedgerCategoryEnum $category */
 final class LedgerTransaction extends Model
 {
     use BelongsToTenant;
