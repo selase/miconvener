@@ -470,9 +470,11 @@ final class TenantController extends Controller
     {
         return (new Tenant)->getConnection()->transaction(function () use ($id): JsonResponse {
             $tenant = Tenant::query()->where('uuid', $id)->lockForUpdate()->firstOrFail();
-            if ($tenant->getConnection()->getSchemaBuilder()->hasTable('store_merchandise')
-                && \App\Models\StoreMerchandise::query()->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))->exists()) {
-                return response()->json(['message' => 'Deactivate this organisation instead. Merchandise and stock audit records must be retained.'], 409);
+            if (($tenant->getConnection()->getSchemaBuilder()->hasTable('store_merchandise')
+                && \App\Models\StoreMerchandise::query()->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))->exists())
+                || ($tenant->getConnection()->getSchemaBuilder()->hasTable('store_commercial_agreements')
+                    && \App\Models\StoreCommercialAgreement::query()->where('tenant_id', $tenant->id)->exists())) {
+                return response()->json(['message' => 'Deactivate this organisation instead. Commerce agreements, orders and stock audit records must be retained.'], 409);
             }
 
             if ($tenant->logo) {

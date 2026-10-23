@@ -131,3 +131,20 @@ it('refuses total overflow without reserving stock or creating a quote', functio
     expect(fn () => app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 2]], (string) Str::uuid()))->toThrow(ValidationException::class);
     expect(StoreOrder::query()->count())->toBe(0)->and(StoreStockAllocation::query()->count())->toBe(0);
 });
+
+it('does not extend a live identical quote when the browser supplies a new request key', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $cart = [['variant_id' => $variant->id, 'quantity' => 1]];
+    $first = app(StoreQuotes::class)->create($tenant, $session, $cart, (string) Str::uuid());
+    $this->travel(2)->minutes();
+    $retry = app(StoreQuotes::class)->create($tenant, $session, $cart, (string) Str::uuid());
+    expect($retry->id)->toBe($first->id)->and($retry->expires_at->equalTo($first->expires_at))->toBeTrue();
+});
+
+it('reports no public stock while its final unit is held', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make(1);
+    app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $listing = App\Models\StoreListing::withoutGlobalScope(App\Scopes\MerchandiseVisibilityScope::class)->findOrFail($variant->listing_id);
+    $data = app(App\Services\Marketplace\MerchandisePayload::class)->forViewer($listing);
+    expect($data['variants'][0]['available'])->toBeFalse();
+});

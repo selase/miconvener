@@ -6,6 +6,7 @@ namespace App\Services\Marketplace;
 
 use App\Models\StoreListing;
 use App\Models\StoreOrder;
+use App\Models\StoreQuoteSubmission;
 use App\Models\StoreVariant;
 use App\Models\Tenant;
 use App\Scopes\MerchandiseVisibilityScope;
@@ -45,7 +46,8 @@ final class StoreQuotes
                 $this->refuse();
             }
             $shop = $seller->shop;
-            $prior = StoreOrder::query()->where('shop_id', $shop->id)->where('buyer_email', $email)->where('submission_key', $submissionKey)->lockForUpdate()->first();
+            $alias = StoreQuoteSubmission::query()->where('shop_id', $shop->id)->where('buyer_email', $email)->where('submission_key', $submissionKey)->first();
+            $prior = $alias === null ? StoreOrder::query()->where('shop_id', $shop->id)->where('buyer_email', $email)->where('submission_key', $submissionKey)->lockForUpdate()->first() : StoreOrder::query()->where('buyer_email', $email)->where('shop_id', $shop->id)->lockForUpdate()->findOrFail($alias->order_id);
             if ($prior !== null) {
                 if (! hash_equals($prior->cart_hash, $cartHash) || $prior->expires_at->lessThanOrEqualTo(now()) || $prior->state !== 'quoted') {
                     $this->refuse();
@@ -58,11 +60,15 @@ final class StoreQuotes
             if ($variants->count() !== count($cart)) {
                 $this->refuse();
             }
+            $listings = StoreListing::withoutGlobalScope(MerchandiseVisibilityScope::class)->with('merchandise')->where('shop_id', $shop->id)->where('listing_kind', StoreListing::KIND_MERCHANDISE)
+                ->whereIn('id', $variants->pluck('listing_id'))->where('status', StoreListing::STATUS_PUBLISHED)->whereNull('taken_down_at')->get()->keyBy('id');
+            $members = null;
             $principal = 0;
             $snapshots = [];
             foreach ($variants as $variant) {
-                $listing = StoreListing::withoutGlobalScope(MerchandiseVisibilityScope::class)->find($variant->listing_id);
-                if ($listing === null || ! $this->access->canRead($listing, $session)) {
+                $listing = $listings->get($variant->listing_id);
+                if ($listing === null || $listing->merchandise === null || $listing->merchandise->archived_at !== null || blank($listing->merchandise->collection_instructions)
+                    || ($listing->merchandise->visibility !== 'public' && ! ($members ??= $this->access->canReadMembersFrom($seller, $session)))) {
                     $this->refuse();
                 }
                 $quantity = $cart[$variant->id];
@@ -79,6 +85,11 @@ final class StoreQuotes
             foreach ($open as $old) {
                 if ($old->state !== 'quoted') {
                     throw ValidationException::withMessages(['checkout' => 'Resolve the existing payment attempt before starting another checkout.']);
+                }
+                if ($old->expires_at->isFuture() && hash_equals($old->cart_hash, $cartHash)) {
+                    StoreQuoteSubmission::query()->create(['order_id' => $old->id, 'tenant_id' => $seller->id, 'shop_id' => $shop->id, 'buyer_email' => $email, 'submission_key' => $submissionKey, 'cart_hash' => $cartHash]);
+
+                    return $old;
                 }
                 $this->reservations->release($old, $old->expires_at->lessThanOrEqualTo(now()) ? 'expired' : 'replaced');
                 $old->update(['state' => 'cancelled', 'fulfilment_state' => 'cancelled']);
@@ -97,6 +108,7 @@ final class StoreQuotes
                 'expires_at' => now()->addMinutes(10)]);
             $order->lines()->createMany($snapshots);
             $this->reservations->reserve($order);
+            StoreQuoteSubmission::query()->create(['order_id' => $order->id, 'tenant_id' => $seller->id, 'shop_id' => $shop->id, 'buyer_email' => $email, 'submission_key' => $submissionKey, 'cart_hash' => $cartHash]);
 
             return $order;
         });

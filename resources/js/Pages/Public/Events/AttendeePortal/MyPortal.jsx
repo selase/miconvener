@@ -308,14 +308,14 @@ function LegacyMyPortal({
     };
     if (credential)
         return (
-            <PublicLayout>
+            <PublicLayout headerActions={<a href="/my/store-orders" className="text-sm text-accent underline">Store orders</a>}>
                 <Head title="Save your private recovery key" />
                 <RecoveryCredential credential={credential} onClear={clearCredential} />
             </PublicLayout>
         );
 
     return (
-        <PublicLayout>
+        <PublicLayout headerActions={<a href="/my/store-orders" className="text-sm text-accent underline">Store orders</a>}>
             <Head title="My MiConvener">
                 <link rel="manifest" href="/my/manifest.json" />
                 <meta name="theme-color" content="#4f46e5" />

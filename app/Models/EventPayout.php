@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
+ * @property string|null $commerce_recipient_display
  * @property string|null $commerce_operation_key
  * @property string|null $commerce_account_fingerprint
  * @property string|null $commerce_recipient_fingerprint

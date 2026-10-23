@@ -96,3 +96,32 @@ it('uses the same authoritative verification for callback and signed webhook eve
     $this->call('POST', route('webhooks.paystack'), [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_PAYSTACK_SIGNATURE' => $signature], $payload)->assertOk();
     expect($variant->fresh()->on_hand)->toBe(2)->and($order->fresh()->payment_state)->toBe('paid');
 });
+
+it('refuses a new payment after platform product takedown without revisiting quoted member eligibility', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    App\Models\StoreListing::withoutGlobalScope(App\Scopes\MerchandiseVisibilityScope::class)->whereKey($variant->listing_id)->update(['taken_down_at' => now()]);
+    expect(fn () => app(StorePayments::class)->start($order, $session, (string) Str::uuid()))->toThrow(ValidationException::class);
+    Http::assertNothingSent();
+});
+
+it('completes the native quote checkout and protected receipt HTTP contract without dues', function (int $price): void {
+    Illuminate\Support\Facades\Queue::fake();
+    [$tenant, $variant] = StoreCheckoutScenario::make(1);
+    $variant->update(['price_pesewas' => $price]);
+    $quote = $this->withSession(proofFor('buyer@example.test'))->postJson(route('store.quotes.create', $variant->shop->slug), [
+        'submission_key' => (string) Str::uuid(), 'lines' => [['variant_id' => $variant->id, 'quantity' => 1]],
+    ])->assertCreated()->assertJsonPath('order.total_pesewas', $price)->json('order_id');
+    $this->postJson('/my/store-orders/'.$quote.'/checkout', ['submission_key' => (string) Str::uuid()])->assertOk();
+    if ($price > 0) {
+        $attempt = StorePaymentAttempt::query()->where('order_id', $quote)->sole();
+        $data = ['id' => 987, ...StoreCheckoutScenario::evidence($attempt)];
+        Http::fake(['*api.paystack.co/transaction/verify/*' => Http::response(['data' => $data])]);
+        $this->get(route('store.checkout.callback', $attempt->reference))->assertRedirect();
+    } else {
+        Http::assertNothingSent();
+    }
+    $this->getJson('/my/store-orders/'.$quote)->assertOk()->assertJsonPath('order.state', 'confirmed')->assertJsonPath('order.total_pesewas', $price);
+    $this->getJson('/my/store-orders/'.$quote.'/receipt')->assertOk()->assertJsonPath('receipt.total_pesewas', $price);
+    expect($variant->fresh()->on_hand)->toBe(0)->and(App\Models\StoreReceipt::query()->count())->toBe(1);
+})->with([0, 10000]);

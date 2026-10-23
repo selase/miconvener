@@ -43,7 +43,7 @@ final class MarketplaceStorefrontController extends Controller
             if ($member) {
                 $query->withoutGlobalScope(MerchandiseVisibilityScope::class);
             }
-            $page = $query->with(['shop', 'merchandise', 'variants', 'media' => fn ($media) => $media->withoutGlobalScope('merchandise')->photos()->approved()])
+            $page = $query->with(['shop', 'merchandise', 'variants' => fn ($variants) => $variants->withSum(['allocations as held_quantity' => fn ($allocation) => $allocation->where('state', 'active')->where('expires_at', '>', now())], 'quantity'), 'media' => fn ($media) => $media->withoutGlobalScope('merchandise')->photos()->approved()])
                 ->orderBy('sort_order')->orderBy('title')->orderBy('id')->paginate(24, ['*'], 'items_page')->withQueryString();
             $merchandiseLinks = $page->linkCollection()->all();
             $merchandise = $page->getCollection()->map(fn (StoreListing $listing): array => app(MerchandisePayload::class)->forViewer($listing));

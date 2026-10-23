@@ -36,7 +36,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $payment_state
  * @property string $ledger_state
  * @property string $fulfilment_state
- * @property string $review_reason
+ * @property string|null $review_reason
  * @property \Carbon\CarbonImmutable|null $accepted_at
  * @property \Carbon\CarbonImmutable|null $paid_at
  */
@@ -75,6 +75,18 @@ final class StoreOrder extends Model
     public function lines(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(StoreOrderLine::class, 'order_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasOne<StoreReceipt, $this> */
+    public function receipt(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StoreReceipt::class, 'order_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<StorePaymentAttempt, $this> */
+    public function attempts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(StorePaymentAttempt::class, 'order_id');
     }
 
     /** @return array<string, string> */

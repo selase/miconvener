@@ -42,6 +42,21 @@ final class StoreFinanceController extends Controller
         return $this->refundResponse($refunds->cancelFree($owned, $request->user(), $data['operation_key'], $data['reason']));
     }
 
+    public function reconcilePayment(Request $request, string $subdomain, string $order, \App\Services\Marketplace\StorePaymentNotifications $payments): JsonResponse
+    {
+        $tenant = $this->authorizeFinance($request->user());
+        $owned = StoreOrder::query()->where('tenant_id', $tenant->id)->findOrFail($order);
+        foreach (\App\Models\StorePaymentObservation::query()->where('order_id', $owned->id)->where('processing_state', 'pending')->limit(5)->get() as $capture) {
+            app(\App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
+        }
+        $attempt = $owned->attempts()->whereIn('status', ['initializing', 'unknown', 'ready', 'pending', 'review'])->latest()->first();
+        if ($attempt !== null) {
+            $payments->reconcile($attempt);
+        }
+
+        return response()->json(['order_id' => $owned->id, 'status' => $owned->fresh()->state])->header('Cache-Control', 'private, no-store');
+    }
+
     public function reconcileRefund(Request $request, string $subdomain, string $refund, StoreRefunds $refunds): JsonResponse
     {
         $tenant = $this->authorizeFinance($request->user());
@@ -110,6 +125,6 @@ final class StoreFinanceController extends Controller
 
     private function refundResponse(StoreRefund $refund): JsonResponse
     {
-        return response()->json(['refund_id' => $refund->id, 'status' => $refund->status, 'message' => $refund->review_reason])->header('Cache-Control', 'private, no-store');
+        return response()->json(['refund_id' => $refund->id, 'status' => $refund->status, 'message' => $refund->status === 'confirmed' ? ($refund->amount_pesewas === 0 ? 'Free order cancelled.' : 'Full refund confirmed.') : 'Refund request recorded. Review its funding and reconciliation status in Store finance.'])->header('Cache-Control', 'private, no-store');
     }
 }

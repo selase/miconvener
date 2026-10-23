@@ -16,6 +16,10 @@ final class StoreBalance
 {
     public const array HELD_PAYOUTS = [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_AWAITING_OTP, EventPayout::STATUS_PROCESSING];
 
+    /** Seller earnings and real category cash independently bound withdrawals.
+     * Buyer refund liabilities never finance seller payouts. Refunds may use the
+     * approved reserve floor; payouts must leave that protection in place.
+     */
     public function available(Tenant $seller, ?string $excludePayout = null, ?string $excludeRefund = null, bool $forRefund = false): int
     {
         if (StoreOrder::query()->where('tenant_id', $seller->id)->where('ledger_state', 'review')->where(fn ($query) => $query->whereIn('payment_state', ['paid', 'refund_pending'])->orWhere('review_reason', 'verification_changed'))->exists()) {

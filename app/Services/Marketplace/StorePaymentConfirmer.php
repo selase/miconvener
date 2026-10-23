@@ -62,6 +62,7 @@ final class StorePaymentConfirmer
             app(MerchandiseInventory::class)->consumeOrder($order);
             $capture->update(['processing_state' => 'posted', 'review_reason' => null]);
             $attempt->update(['status' => 'succeeded', 'last_verified_at' => now()]);
+            app(StoreReceipts::class)->capture($order);
 
             return $order;
         });

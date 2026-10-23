@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Package, MapPin, LockKeyhole } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { formatDuesMoney } from '@/lib/dues';
+import StoreCheckout from '@/Components/Marketplace/StoreCheckout';
 import csrfFetch from '@/lib/csrfFetch';
 
 export default function ItemShow({
@@ -205,15 +206,23 @@ export default function ItemShow({
                                 <p role="status" className="text-sm font-medium text-ink-secondary">
                                     {variant?.available ? 'In stock' : 'Currently unavailable'}
                                 </p>
-                                <div className="border border-border bg-canvas p-5">
-                                    <h2 className="font-semibold text-ink">
-                                        Purchasing is not enabled yet
-                                    </h2>
-                                    <p className="mt-2 text-sm leading-relaxed text-ink-secondary">
-                                        Browse the catalog and explore your options. This page does
-                                        not reserve stock or accept payment.
-                                    </p>
-                                </div>
+                                {item.purchasing_enabled && !isPreview ? (
+                                    <StoreCheckout
+                                        key={variant?.id}
+                                        shop={item.seller.slug}
+                                        variant={variant}
+                                    />
+                                ) : (
+                                    <div className="border border-border bg-canvas p-5">
+                                        <h2 className="font-semibold text-ink">
+                                            Purchasing is not enabled yet
+                                        </h2>
+                                        <p className="mt-2 text-sm leading-relaxed text-ink-secondary">
+                                            Browse the catalog and explore your options. This page
+                                            does not reserve stock or accept payment.
+                                        </p>
+                                    </div>
+                                )}
                                 {item.description && (
                                     <div className="whitespace-pre-line break-words text-sm leading-7 text-ink-secondary">
                                         {item.description}

@@ -64,6 +64,8 @@ export default function CatalogStock({ item, onChange }) {
                             <p className="break-all text-sm font-medium text-ink">{variant.sku}</p>
                             <p className="text-xs text-ink-secondary">
                                 {variant.is_active ? 'Active' : 'Hidden'}
+                                {variant.reserved != null &&
+                                    ` · ${variant.reserved} held · ${variant.available} available`}
                             </p>
                         </div>
                         <p className="shrink-0 text-xl font-semibold tabular-nums text-ink">

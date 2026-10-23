@@ -93,3 +93,20 @@ it('serves the tenant payout lifecycle through protected endpoints and preserves
     $foreign = App\Models\EventPayout::factory()->create();
     $this->postJson($base.'/'.$foreign->id.'/reconcile', [], ['HTTP_HOST' => $host])->assertNotFound();
 });
+
+it('retains a commerce payout destination even when its transfer is parked or terminal', function (string $status): void {
+    [$tenant, , $actor] = StoreCheckoutScenario::paid();
+    setPermissionsTeamId($tenant->id);
+    foreach (['manage store finance', 'manage payment settings'] as $permission) {
+        App\Models\Permission::query()->firstOrCreate(['name' => $permission, 'guard_name' => 'web'], ['category' => 'store']);
+        $actor->givePermissionTo($permission);
+    }
+    $account = TenantPayoutAccount::factory()->create(['tenant_id' => $tenant->id, 'is_verified' => true]);
+    $payout = app(StorePayouts::class)->reserve($tenant, $actor, ['amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Illuminate\Support\Str::uuid()]);
+    $payout->update(['status' => $status]);
+    $actor->tenants()->attach($tenant->id);
+    $host = $tenant->slug.'.'.mb_ltrim((string) config('session.domain'), '.');
+    $this->actingAs($actor)->deleteJson('http://'.$host.'/payout-accounts/'.$account->id, [], ['HTTP_HOST' => $host])->assertUnprocessable();
+    expect($account->fresh())->not->toBeNull();
+    expect(fn () => $account->delete())->toThrow(Illuminate\Database\QueryException::class);
+})->with(['awaiting_otp', 'failed']);

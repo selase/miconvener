@@ -61,3 +61,14 @@ it('does not record provider authorizations or private checkout responses in tel
         app()->instance('env', $environment);
     }
 });
+
+it('does not propagate provider response bodies or chained authorizations into exception logs', function (): void {
+    [, , , , , $attempt] = StoreCheckoutScenario::online();
+    Http::fake(['*api.paystack.co/transaction/verify/*' => Http::response(['message' => 'sensitive-placeholder-authorization'], 500)]);
+    try {
+        app(StorePayments::class)->verify($attempt);
+        $this->fail('An unavailable original verification must fail closed.');
+    } catch (RuntimeException $exception) {
+        expect($exception->getMessage())->not->toContain('sensitive-placeholder')->and($exception->getPrevious())->toBeNull();
+    }
+});

@@ -29,7 +29,7 @@ export default function CatalogIndex({ items = { data: [], links: [] }, shop = n
                         </h2>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
                             Publish merchandise, offer sizes and colours, and keep an audited stock
-                            record. Purchasing is not enabled yet.
+                            record. Checkout is available only after platform approval and activation.
                         </p>
                     </div>
                     {shop && (

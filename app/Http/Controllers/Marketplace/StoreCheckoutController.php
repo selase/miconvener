@@ -9,7 +9,6 @@ use App\Http\Requests\Marketplace\StoreCheckoutRequest;
 use App\Http\Requests\Marketplace\StoreQuoteRequest;
 use App\Models\Shop;
 use App\Models\StoreOrder;
-use App\Services\Marketplace\StoreOrderAccess;
 use App\Services\Marketplace\StorePayments;
 use App\Services\Marketplace\StoreQuotes;
 use Illuminate\Http\JsonResponse;
@@ -22,12 +21,15 @@ final class StoreCheckoutController extends Controller
         $lines = array_map(fn (array $line): array => ['variant_id' => $line['variant_id'], 'quantity' => (int) $line['quantity']], $data['lines']);
         $order = $quotes->create($shop->tenant, $request->session(), $lines, $data['submission_key']);
 
-        return response()->json(['order_id' => $order->id], 201)->header('Cache-Control', 'private, no-store');
+        return response()->json(['order_id' => $order->id, 'order' => app(\App\Services\Marketplace\StoreOrderPayload::class)->buyer($order)], 201)->header('Cache-Control', 'private, no-store');
     }
 
-    public function start(StoreCheckoutRequest $request, StoreOrder $order, StorePayments $payments, StoreOrderAccess $access): JsonResponse
+    public function start(StoreCheckoutRequest $request, string $order, StorePayments $payments): JsonResponse
     {
-        abort_unless($access->buyer($order, $request->session()), 404);
+        $email = app(\App\Services\Events\PlatformAttendeeVerification::class)->verifiedEmail($request->session());
+        abort_if($email === null, 404, 'Order unavailable.');
+        $order = StoreOrder::query()->where('buyer_email', \App\Services\Events\PlatformAttendeeVerification::normalise($email))->find($order);
+        abort_if($order === null, 404, 'Order unavailable.');
         $attempt = $payments->start($order, $request->session(), $request->validated('submission_key'));
 
         return response()->json(['order_id' => $order->id, 'status' => $attempt->status ?? 'confirmed', 'checkout_url' => $attempt?->status === 'ready' ? $attempt->checkout_url : null])

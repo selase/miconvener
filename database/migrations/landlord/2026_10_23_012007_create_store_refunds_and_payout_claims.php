@@ -73,6 +73,12 @@ SQL);
         $db->unprepared(<<<'SQL'
 CREATE OR REPLACE FUNCTION commerce_payout_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.category = 'commerce' THEN
+            RAISE EXCEPTION 'Commerce payout records must be retained';
+        END IF;
+        RETURN OLD;
+    END IF;
     IF OLD.category = 'commerce' OR NEW.category = 'commerce' THEN
         IF ROW(OLD.tenant_id, OLD.event_id, OLD.category, OLD.payout_account_id, OLD.amount, OLD.currency, OLD.commerce_operation_key, OLD.commerce_account_fingerprint, OLD.commerce_recipient_fingerprint, OLD.commerce_recipient_display)
             IS DISTINCT FROM ROW(NEW.tenant_id, NEW.event_id, NEW.category, NEW.payout_account_id, NEW.amount, NEW.currency, NEW.commerce_operation_key, NEW.commerce_account_fingerprint, NEW.commerce_recipient_fingerprint, NEW.commerce_recipient_display)
@@ -87,7 +93,7 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-CREATE TRIGGER commerce_payout_guard BEFORE UPDATE ON event_payouts FOR EACH ROW EXECUTE FUNCTION commerce_payout_guard();
+CREATE TRIGGER commerce_payout_guard BEFORE UPDATE OR DELETE ON event_payouts FOR EACH ROW EXECUTE FUNCTION commerce_payout_guard();
 SQL);
     }
 

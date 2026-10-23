@@ -160,7 +160,7 @@ final class PayoutRelease
             }
             $previous = $exception->getPrevious();
             if ($previous instanceof \Illuminate\Http\Client\RequestException && $previous->response->status() >= 400 && $previous->response->status() < 500) {
-                $message = 'The one-time code was not accepted: '.$exception->providerMessage();
+                $message = $locked->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'The one-time code was not accepted. Check the original transfer status before retrying.' : 'The one-time code was not accepted: '.$exception->providerMessage();
                 $this->changeProcessing($locked, ['status' => EventPayout::STATUS_AWAITING_OTP, 'failure_reason' => $message]);
 
                 return ['released' => false, 'message' => $message, 'http_status' => 422];
@@ -175,7 +175,7 @@ final class PayoutRelease
         }
         $status = $transfer['status'];
         if (! in_array($status, ['success', 'pending', 'queued'], true)) {
-            $message = 'The payment provider did not release the transfer (status: '.$status.').';
+            $message = $locked->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'The original transfer still needs reconciliation before release.' : 'The payment provider did not release the transfer (status: '.$status.').';
             $this->changeProcessing($locked, ['status' => in_array($status, self::DEAD_TRANSFER_STATUSES, true) ? EventPayout::STATUS_FAILED : EventPayout::STATUS_AWAITING_OTP, 'failure_reason' => $message]);
 
             return ['released' => false, 'message' => $message, 'http_status' => 502];

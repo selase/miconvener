@@ -61,3 +61,11 @@ it('does not allow bulk deletion of purchase history', function (): void {
     $order = StoreOrder::factory()->create();
     StoreOrder::query()->whereKey($order->id)->delete();
 })->throws(QueryException::class);
+
+it('refuses organisation hard deletion when an agreement exists without merchandise', function (): void {
+    $agreement = App\Models\StoreCommercialAgreement::factory()->create();
+    $tenant = App\Models\Tenant::findOrFail($agreement->tenant_id);
+    $response = app(App\Http\Controllers\Admin\TenantController::class)->destroy($tenant->uuid);
+    expect($response->getStatusCode())->toBe(409);
+    expect($tenant->fresh())->not->toBeNull();
+});

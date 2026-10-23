@@ -13,6 +13,7 @@ use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Telescope\Telescope;
+use RuntimeException;
 use Throwable;
 
 final class StorePayments
@@ -55,10 +56,17 @@ final class StorePayments
             if ($allocations->isEmpty() || $allocations->count() !== $order->lines()->count() || $allocations->contains(fn (StoreStockAllocation $a): bool => $a->state !== 'active' || $a->expires_at->lessThanOrEqualTo(now()))) {
                 $this->refuse();
             }
+            $variantIds = $allocations->pluck('variant_id')->all();
+            $offered = \App\Models\StoreVariant::query()->whereKey($variantIds)->where('is_active', true)
+                ->whereHas('merchandise', fn ($query) => $query->whereNull('archived_at')->whereHas('listing', fn ($listing) => $listing->withoutGlobalScope(\App\Scopes\MerchandiseVisibilityScope::class)->where('status', \App\Models\StoreListing::STATUS_PUBLISHED)->whereNull('taken_down_at')))->count();
+            if ($offered !== count($variantIds)) {
+                $this->refuse();
+            }
             if ($order->charged_pesewas === 0) {
                 $order->update(['accepted_at' => now(), 'payment_state' => 'not_required', 'ledger_state' => 'not_applicable']);
                 app(PurchaseReservations::class)->consume($order);
                 $order->update(['state' => 'confirmed']);
+                app(StoreReceipts::class)->capture($order);
 
                 return null;
             }
@@ -102,7 +110,11 @@ final class StorePayments
     public function verify(StorePaymentAttempt $attempt): array
     {
         $attempt = StorePaymentAttempt::query()->with('order')->findOrFail($attempt->id);
-        $data = Telescope::withoutRecording(fn () => $this->gateways->forAttempt($attempt)->verifyTransaction($attempt->reference, true));
+        try {
+            $data = Telescope::withoutRecording(fn () => $this->gateways->forAttempt($attempt)->verifyTransaction($attempt->reference, true));
+        } catch (Throwable) {
+            throw new RuntimeException('Original store payment verification is unavailable. Reconcile this attempt without paying again.');
+        }
 
         return ['status' => $data['status'] ?? 'pending', 'reference' => $data['reference'] ?? null,
             'reference_reported' => $data['reference_reported'] ?? false, 'provider' => 'paystack',

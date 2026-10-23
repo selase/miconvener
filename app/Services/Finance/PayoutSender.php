@@ -102,7 +102,7 @@ final class PayoutSender
                 EventPayout::withoutGlobalScopes()->whereKey($payoutModel->id)->where('status', EventPayout::STATUS_PROCESSING)->where('provider_reference', $reservedReference)->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => 'Recipient registration failed before any transfer was submitted.']);
             }
 
-            return ['message' => 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
+            return ['message' => $payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'Payout submission needs review. Reconcile the original reference before sending again.' : 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
         }
 
         $current = $payoutModel->fresh();
