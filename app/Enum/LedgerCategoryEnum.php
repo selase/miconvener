@@ -26,6 +26,9 @@ enum LedgerCategoryEnum: string
     /** A business's balance from Event Store bookings and quotes. */
     case Marketplace = 'marketplace';
 
+    /** New shared-commerce money, isolated from legacy booking balances. */
+    case Commerce = 'commerce';
+
     /**
      * @return array<int, string>
      */
@@ -42,6 +45,7 @@ enum LedgerCategoryEnum: string
             self::Giving => 'Giving',
             self::CommissionCredit => 'Commission credit',
             self::Marketplace => 'Marketplace',
+            self::Commerce => 'Commerce',
         };
     }
 
@@ -52,7 +56,7 @@ enum LedgerCategoryEnum: string
     {
         return match ($this) {
             self::Event => 'required',
-            self::Dues, self::Giving, self::CommissionCredit => 'forbidden',
+            self::Dues, self::Giving, self::CommissionCredit, self::Commerce => 'forbidden',
             self::Marketplace => 'optional',
         };
     }

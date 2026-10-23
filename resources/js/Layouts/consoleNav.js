@@ -93,6 +93,20 @@ export const NAV_GROUPS = [
                 feature: 'commerce_catalog',
                 permission: 'manage_store_catalog',
             },
+            {
+                label: 'Store orders',
+                href: 'tenant.store.orders.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_orders',
+                feature: 'commerce_history',
+            },
+            {
+                label: 'Store finance',
+                href: 'tenant.store.finance.index',
+                icon: 'Wallet',
+                permission: 'manage_store_finance',
+                feature: 'commerce_history',
+            },
         ],
     },
     {

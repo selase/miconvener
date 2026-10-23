@@ -92,10 +92,10 @@ These new names belong to this proposed plan, not existing APIs. `Session` is `I
 ## Task 5: preservation gate and review
 
 - [x] Self-review the entire slice against spec §7 and the five Review Focus cases. Fix concrete issues before reporting completion.
-- [ ] Run the new merchandise suite, affected marketplace/discovery/venue/staff-room/member access tests and affected JS tests. Run Pint/lint/static analysis; run one complete CI gate on the final source rather than duplicating full suites repeatedly.
-- [ ] On isolated local QA, test tenant creation/edit/publication and a no-dues member; all local testing is authorised. Verify 320/390/768/1440px, dark, long names, sold-out, missing photo, revoked access and 200% text. Confirm existing venue search/detail, calendars, private rooms, booking continuation and linked operations still work. No live payment or outbound message.
-- [ ] One fresh scoped whole-change review, address material findings, record self-review with touchpoints and UI gaps. Commit final asset/plan/roadmap state together.
-- [ ] Prepare PR for owner review. Do not merge, deploy, enable production catalog/checkout or begin S1b solely because S1a tests pass.
+- [x] Run the new merchandise suite, affected marketplace/discovery/venue/staff-room/member access tests and affected JS tests. Run Pint/lint/static analysis; run one complete CI gate on the final source rather than duplicating full suites repeatedly.
+- [x] On isolated local QA, test tenant creation/edit/publication and a no-dues member; all local testing is authorised. Verify 320/390/768/1440px, dark, long names, sold-out, missing photo, revoked access and 200% text. Confirm existing venue search/detail, calendars, private rooms, booking continuation and linked operations still work. No live payment or outbound message.
+- [x] One fresh scoped whole-change review, address material findings, record self-review with touchpoints and UI gaps. Commit final asset/plan/roadmap state together.
+- [x] Prepare PR for owner review. Do not merge, deploy, enable production catalog/checkout or begin S1b solely because S1a tests pass.
 
 ## Plan self-review and open gates
 
@@ -106,3 +106,15 @@ Owner authorised 2026-10-22: start option1 (design/build/test merchandise and pr
 **Builder-check amendments:** specified protected media/stale URL behavior; all-kind/category search isolation; legacy room/event/RFQ/media type guards; precise active-email membership revocation; inventory idempotency/immutability/normalization; and feature-off/default-scope behavior. These resolve concrete implementation ambiguities without authorising implementation.
 
 **Preparation evidence (2026-10-22):** synthetic preview browser checks passed at 320/390/768/1440px; purchase filtering and sold-out options, rental date fields, catalog view and dark mode checked. These are prototype checks, not application, checkout or production acceptance. Builder-check findings were incorporated into the design/plan; no source implementation or new payment tests have run.
+
+## Release acceptance — 2026-10-22
+
+Owner explicitly approved remaining checks then merge/deploy. PR #49 merged as `b358f65818c87383832a064c63839e73fc2e88b7`, byte-identical tree to CI-tested `8fabe0f4`. [CI 39840830356](https://github.com/selase/miconvener/actions/runs/39840830356) passed 3,741 PHP tests / 17,750 assertions (one non-failing risky-test summary) and 473 JS; code quality 3m9s, PHP job 9m8s. The risky warning was not identified by the summary and remains a test-harness follow-up, not claimed resolved.
+
+Actual app 200% base-font diagnostic passed at 320/390/768/1440 widths, keyboard variant selection/dark mode and enlarged seller form at 390. This is local browser/text emulation, not a claim of native OS zoom or physical handset testing. Temporary CSS and every asset restored byte-for-byte; no diagnostic deployed. Existing venue storefront/detail/calendar smoke checks passed; 288 affected preservation tests covered private rooms, legacy payment continuation and operations links.
+
+Production Cloud bucket metadata is private with no public URL. One non-customer private probe confirmed authenticated read, denied anonymous configured/direct endpoint reads (HTTP 400), and was removed. A further signed/unsigned probe was rejected by automatic approval review as a separate production write and not retried; existing completed evidence and read-only metadata were used.
+
+Automatic Cloud deployment `depl-a30b889b-4c89-46b4-9098-3a77fe5bc3bf` succeeded 20:01:58–20:03:53 UTC (1m55s), exact merge active. Read-only checks confirmed three catalog tables, seeded permission, item route and asset manifest; live marketplace and UGMC detail still browse with payments paused. Catalog/checkout enabled-row counts both 0: no organisation rollout, gateway/fee/product change or trading activation. Physical handset confirmation remains optional manual acceptance; it was not simulated or asserted as passed.
+
+Next: review the [S1b checkout plan](2026-10-22-unified-commerce-s1b-checkout.md) and commercial recommendations. No checkout implementation approved.

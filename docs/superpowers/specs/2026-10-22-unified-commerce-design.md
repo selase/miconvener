@@ -1,6 +1,6 @@
 # Unified catalog and commerce design — merchandise first
 
-**Date:** 2026-10-22. **Status:** merchandise implementation authorised 2026-10-22; native S1a in progress. No production deployment, trading, payment or booking activation is authorised by this document.
+**Date:** 2026-10-22. **Status:** S1a merged/deployed by explicit owner approval via PR #49 (`b358f658`); catalog/checkout flags remain off. The owner subsequently requested the S1b checkout plan/recommendations for review. Owner subsequently approved S1b native implementation with preservation and self-review before merge. Trading, payment/booking activation and further merge/deploy remain separately gated.
 
 **Binding direction:** [marketplace roadmap §5](../marketplace-roadmap.md). One Shop/StoreListing catalog, shared commerce, type-specific availability/fulfilment; merchandise first; preserve venue features. This is a native Laravel/Inertia/React extension with no new dependencies. Proposed defaults below are design recommendations, not newly agreed commercial terms.
 
@@ -84,3 +84,5 @@ Review the unified design and the preview alongside the roadmap. S1a's detailed 
 ### Safe rollback to older application code
 
 A release predating the merchandise visibility scope does not understand the catalog flags or member-only child visibility. Before any authorised rollback to that code, move every merchandise **parent** listing to `draft` and pause catalog entry points. Turning a flag off or archiving only the child is insufficient for older generic listing queries. Retain catalog, variant and immutable stock records; do not drop these tables to roll back source. Verify public storefront/detail/media reads after the rollback. This is an operational deployment gate, not an action performed during local implementation.
+
+**2026-10-22 continuation:** [S1b checkout plan](../plans/2026-10-22-unified-commerce-s1b-checkout.md) is prepared as an owner-requested review proposal, including explicit settlement/fee/refund decisions. Proposed amendments (new Commerce ledger pool, system stock actors, bounded delivery increments) require review; they do not overwrite approved live terms.

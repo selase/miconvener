@@ -22,6 +22,9 @@ final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
         Telescope::filter(function (IncomingEntry $entry): bool {
             $uri = (string) parse_url((string) ($entry->content['uri'] ?? ''), PHP_URL_PATH);
+            if (request()->is('marketplace/shops/*/quotes', 'marketplace/checkout/*/callback', 'store/orders', 'store/orders/*', 'store/finance', 'store/refunds/*', 'store/payouts', 'store/payouts/*', 'webhooks/paystack')) {
+                return false;
+            }
             if (request()->is('my', 'my/*') || ($entry->isRequest() && \Illuminate\Support\Str::is(['my', 'my/*'], mb_ltrim($uri, '/')))) {
                 return false;
             }
@@ -62,7 +65,7 @@ final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
      */
     private function hideSensitiveRequestDetails(): void
     {
-        Telescope::hideRequestParameters(['_token', 'code', 'secret', 'capability', 'community_verified_phone',
+        Telescope::hideRequestParameters(['_token', 'otp', 'data.authorization', 'data.authorization_code', 'code', 'secret', 'capability', 'community_verified_phone',
             'community_member_grants', 'community_claim_capabilities', 'community_join_capabilities', 'attendee_verified_platform',
             'attendee_checkout_grants', 'attendee_registered_in_session']);
         Telescope::hideRequestHeaders(['cookie', 'x-csrf-token', 'x-xsrf-token']);

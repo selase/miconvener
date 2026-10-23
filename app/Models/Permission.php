@@ -37,6 +37,8 @@ final class Permission extends SpatiePermission
         'read finance',
         'manage giving',
         'manage store catalog',
+        'manage store orders',
+        'manage store finance',
         'send community messages',
         'manage room bookings',
         'manage community library',

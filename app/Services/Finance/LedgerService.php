@@ -57,6 +57,10 @@ final class LedgerService
             ],
         ];
 
+        if ($category === LedgerCategoryEnum::Commerce) {
+            $definitions[LedgerAccount::CODE_BUYER_REFUNDS] = ['name' => 'Buyer Refund Liability', 'type' => LedgerAccount::TYPE_LIABILITY];
+        }
+
         $accounts = [];
         $eventId = $event?->id;
 
@@ -520,6 +524,82 @@ final class LedgerService
         ]);
 
         return $transaction;
+    }
+
+    /** @param array<string, mixed> $verifiedAmounts */
+    public function recordStoreSale(\App\Models\StoreOrder $order, \App\Models\StorePaymentAttempt $attempt, array $verifiedAmounts): LedgerTransaction
+    {
+        $capture = \App\Models\StorePaymentObservation::query()->where('attempt_id', $attempt->id)->where('order_id', $order->id)->findOrFail($verifiedAmounts['observation_id'] ?? '');
+        if ($capture->integrity_errors !== [] || ! $capture->account_matches || ! $capture->reference_matches || $attempt->order_id !== $order->id
+            || $attempt->tenant_id !== $order->tenant_id || $capture->amount_pesewas !== $order->charged_pesewas
+            || $capture->gateway_fee_pesewas === null || $capture->gateway_fee_pesewas + $order->platform_fee_pesewas >= $order->charged_pesewas) {
+            throw new InvalidArgumentException('Store sale requires matching original-account captured money.');
+        }
+        $net = $order->charged_pesewas - $capture->gateway_fee_pesewas;
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $net],
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $net - $order->platform_fee_pesewas],
+        ];
+        if ($order->platform_fee_pesewas > 0) {
+            $entries[] = ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $order->platform_fee_pesewas];
+        }
+        $transaction = $this->postTransaction($order->tenant, null, 'commerce_sale', 'Store order '.$order->id, $attempt->reference,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, $order->currency, LedgerCategoryEnum::Commerce);
+        if ($transaction->category !== LedgerCategoryEnum::Commerce || $transaction->event_id !== null) {
+            throw new InvalidArgumentException('Store reference conflicts with another ledger stream.');
+        }
+
+        return $transaction;
+    }
+
+    public function recordStoreRefund(\App\Models\StoreRefund $refund): LedgerTransaction
+    {
+        $capture = $refund->observation;
+        if ($refund->amount_pesewas < 1 || $refund->provider_status !== 'processed' || $refund->provider_processed_at === null || $capture === null
+            || $capture->order_id !== $refund->order_id || $capture->attempt_id !== $refund->attempt_id || $capture->amount_pesewas !== $refund->amount_pesewas
+            || ! $capture->account_matches || ! $capture->reference_matches || $capture->currency !== 'GHS') {
+            throw new InvalidArgumentException('A store refund requires verified original captured money and provider completion.');
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->seller_debit_pesewas],
+            ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->commission_return_pesewas],
+            ['code' => LedgerAccount::CODE_BUYER_REFUNDS, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->review_liability_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->amount_pesewas],
+        ];
+        if ($refund->review_liability_pesewas === 0 && $refund->fee_bearer === 'platform') {
+            $entries[] = ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->gateway_fee_pesewas];
+        } elseif ($refund->review_liability_pesewas > 0 && $refund->fee_bearer === 'seller') {
+            $entries[] = ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->gateway_fee_pesewas];
+        }
+
+        return $this->postTransaction($refund->order->tenant, null, 'commerce_refund', 'Store refund '.$refund->id, 'store-refund:'.$refund->operation_key,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
+    public function recordStorePayout(EventPayout $payout, string $reference): LedgerTransaction
+    {
+        if ($payout->category !== LedgerCategoryEnum::Commerce || $payout->event_id !== null || $payout->provider_reference !== $reference || $payout->currency !== 'GHS') {
+            throw new InvalidArgumentException('Store payouts must retain their original commerce reference.');
+        }
+
+        return $this->postTransaction($payout->tenant, null, LedgerTransaction::TYPE_PAYOUT, 'Commerce seller payout', $reference,
+            $this->payoutEntries($payout->amount, $payout->transfer_fee_amount, false), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
+    public function recordStoreCaptureReview(\App\Models\StorePaymentObservation $capture): ?LedgerTransaction
+    {
+        if (! $capture->account_matches || ! $capture->reference_matches || $capture->currency !== 'GHS' || $capture->amount_pesewas === null
+            || $capture->amount_pesewas < 1 || $capture->gateway_fee_pesewas === null || $capture->gateway_fee_pesewas > $capture->amount_pesewas) {
+            return null;
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->amount_pesewas - $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_BUYER_REFUNDS, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $capture->amount_pesewas],
+        ];
+
+        return $this->postTransaction($capture->order->tenant, null, 'commerce_capture_review', 'Captured payment requiring review: '.$capture->order_id,
+            $capture->reference, array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, 'GHS', LedgerCategoryEnum::Commerce);
     }
 
     /** @param array{gateway_fee:int, commission_received:int, credit_used:int} $verifiedAmounts */

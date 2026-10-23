@@ -47,6 +47,7 @@ use App\Mail\Marketplace\QuoteSentNotification;
 use App\Mail\Moderation\TakedownNoticeMail;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Platform\TenantSignupMail;
+use App\Mail\StoreOrderReceipt;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
 use App\Mail\Venue\RoomRequestDecided;
@@ -257,7 +258,15 @@ test('every mailable renders', function (): void {
         'webhook_failures' => ['processing' => 0, 'signature' => 0],
     ];
 
+    $storeReceipt = App\Models\StoreReceipt::factory()->create(['snapshot' => [
+        'seller' => 'Association Store', 'number' => 'STORE-RENDER', 'currency' => 'GHS', 'total_pesewas' => 3000,
+        'lines' => [['title' => 'Association notebook', 'quantity' => 1, 'amount_pesewas' => 3000]],
+        'collection_terms' => 'Collect at the office.', 'refund_terms' => 'Contact support before collection.',
+        'support_contact' => 'support@example.test', 'receipt_terms' => 'Payment receipt, not a VAT invoice.',
+    ]]);
+
     $mailables = [
+        'StoreOrderReceipt' => fn () => new StoreOrderReceipt($storeReceipt),
         'SetUpRecoveryCodesMail' => fn () => new SetUpRecoveryCodesMail('Ama', 'Acme Events', 'https://acme.test/account'),
         'BillingDailySummaryMail' => fn () => new BillingDailySummaryMail($summary),
         'AgreedPriceMail' => fn () => new AgreedPriceMail($tenant, 'Enterprise', 'GHS 2,500.00 a month', false, 'https://acme.test/billing'),

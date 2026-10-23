@@ -32,6 +32,9 @@ final class PayoutSender
      */
     public function send(EventPayout $payoutModel, string $currency, ?string $reservedReference = null): array
     {
+        if ($payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce && ($reservedReference === null || $payoutModel->provider_reference !== $reservedReference || $payoutModel->status !== EventPayout::STATUS_PROCESSING)) {
+            return ['message' => 'Use the commerce payout flow and its reserved original reference.', 'http_status' => 422];
+        }
         $event = $payoutModel->event_id !== null ? \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $payoutModel->tenant_id)->find($payoutModel->event_id) : null;
         $balance = app(\App\Services\Events\MemberBenefitBalance::class);
         if ($event !== null) {
@@ -63,7 +66,11 @@ final class PayoutSender
                     (string) $account->bank_code,
                     $currency
                 );
-                $account->update(['recipient_code' => $recipientCode]);
+                if ($payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce) {
+                    $account->recipient_code = $recipientCode;
+                } else {
+                    $account->update(['recipient_code' => $recipientCode]);
+                }
             }
 
             /*
@@ -95,7 +102,7 @@ final class PayoutSender
                 EventPayout::withoutGlobalScopes()->whereKey($payoutModel->id)->where('status', EventPayout::STATUS_PROCESSING)->where('provider_reference', $reservedReference)->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => 'Recipient registration failed before any transfer was submitted.']);
             }
 
-            return ['message' => 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
+            return ['message' => $payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'Payout submission needs review. Reconcile the original reference before sending again.' : 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
         }
 
         $current = $payoutModel->fresh();

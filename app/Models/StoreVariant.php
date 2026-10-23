@@ -72,6 +72,12 @@ final class StoreVariant extends Model
         return $this->hasMany(StoreStockMovement::class, 'variant_id');
     }
 
+    /** @return HasMany<StoreStockAllocation, $this> */
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(StoreStockAllocation::class, 'variant_id');
+    }
+
     protected static function booted(): void
     {
         self::saving(function (self $variant): void {

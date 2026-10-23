@@ -120,6 +120,8 @@ final class RolePermissions
     {
         return [
             'manage store catalog',
+            'manage store orders',
+            'manage store finance',
             ...self::platformFinancePermissions(),
             ...self::platformMarketingPermissions(),
             // Commission rates and caps for one organisation. Superadmin by
@@ -214,6 +216,8 @@ final class RolePermissions
     {
         return [
             'manage store catalog',
+            'manage store orders',
+            'manage store finance',
             'create communication',
             'read communication',
             'update communication',
@@ -290,6 +294,7 @@ final class RolePermissions
     {
         return [
             'manage store catalog',
+            'manage store orders',
             'create communication',
             'read communication',
             'update communication',

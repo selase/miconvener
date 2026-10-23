@@ -31,7 +31,7 @@ final class MerchandiseCatalogController extends Controller
     {
         $tenant = $this->tenant();
         $this->catalog->authorize($tenant, $request->user());
-        $items = $this->catalog->owned($tenant)->with(['merchandise', 'variants'])->latest('updated_at')->paginate(20);
+        $items = $this->catalog->owned($tenant)->with(['merchandise', 'variants' => fn ($variants) => $variants->withSum(['allocations as held_quantity' => fn ($allocation) => $allocation->where('state', 'active')->where('expires_at', '>', now())], 'quantity')])->latest('updated_at')->paginate(20);
 
         return Inertia::render('Tenant/Store/Catalog/Index', ['items' => $items->through(fn (StoreListing $listing): array => $this->payload($listing, false)),
             'shop' => $tenant->shop === null ? null : ['name' => $tenant->shop->name, 'slug' => $tenant->shop->slug], 'checkoutEnabled' => false]);
@@ -132,7 +132,7 @@ final class MerchandiseCatalogController extends Controller
     /** @return array<string,mixed> */
     private function payload(StoreListing $listing, bool $history = true): array
     {
-        $listing->loadMissing(['merchandise', 'variants' => fn ($variants) => $variants->orderBy('created_at')->orderBy('id')]);
+        $listing->loadMissing(['merchandise', 'variants' => fn ($variants) => $variants->withSum(['allocations as held_quantity' => fn ($allocation) => $allocation->where('state', 'active')->where('expires_at', '>', now())], 'quantity')->orderBy('created_at')->orderBy('id')]);
         $details = $listing->merchandise;
         $photos = $history ? StoreListingMedia::withoutGlobalScope('merchandise')->where('listing_id', $listing->id)->photos()->approved()->orderBy('sort_order')->get()
             ->map(fn (StoreListingMedia $photo): array => ['id' => $photo->id, 'url' => $photo->url])->all() : [];
@@ -144,7 +144,7 @@ final class MerchandiseCatalogController extends Controller
             'taken_down' => $listing->taken_down_at !== null, 'archived' => $details?->archived_at !== null,
             'visibility' => $details?->visibility, 'currency' => $details?->currency, 'collection_instructions' => $details?->collection_instructions,
             'variants' => $listing->variants->map(fn (StoreVariant $variant): array => ['id' => $variant->id, 'sku' => $variant->sku,
-                'options' => $variant->options, 'price_pesewas' => $variant->price_pesewas, 'on_hand' => $variant->on_hand, 'is_active' => $variant->is_active])->all(),
+                'options' => $variant->options, 'price_pesewas' => $variant->price_pesewas, 'on_hand' => $variant->on_hand, 'reserved' => (int) $variant->getAttribute('held_quantity'), 'available' => max(0, $variant->on_hand - (int) $variant->getAttribute('held_quantity')), 'is_active' => $variant->is_active])->all(),
             'photos' => $photos, 'movements' => $movements];
     }
 

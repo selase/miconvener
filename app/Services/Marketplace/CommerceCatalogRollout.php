@@ -15,6 +15,13 @@ final class CommerceCatalogRollout
             ->whereHas('features', fn ($feature) => $feature->where('feature_key', 'commerce_catalog')->where('enabled', true))->exists();
     }
 
+    public function hasHistoryOrCatalog(Tenant $tenant): bool
+    {
+        return $this->baseEnabled($tenant)
+            || \App\Models\StoreOrder::query()->where('tenant_id', $tenant->id)->exists()
+            || \App\Models\EventPayout::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', \App\Enum\LedgerCategoryEnum::Commerce)->exists();
+    }
+
     public function enabled(Tenant $tenant): bool
     {
         return $this->baseEnabled($tenant) && $tenant->shop()->where('is_active', true)->exists();

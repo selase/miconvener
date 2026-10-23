@@ -148,6 +148,7 @@ export default function AttendeeMoney({
     return (
         <>
             <p className="text-xs uppercase tracking-widest text-accent">Payments & records</p>
+            <a href="/my/store-orders" className="mt-4 inline-block text-sm text-accent underline">Store orders & receipts</a>
             <h1 className="mt-2 text-3xl font-medium">Your contributions and payments</h1>
             <p className="mt-3 text-sm text-ink-secondary">
                 Keep voluntary contributions, dues and receipts together, with a clear record of

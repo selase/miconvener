@@ -251,6 +251,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     Route::post('admin/signups/{tenant:uuid}/follow-up', [App\Http\Controllers\Admin\SignupController::class, 'followUp'])
         ->name('admin.signups.follow-up');
 
+    Route::get('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'index'])
+        ->name('admin.store-agreements.index');
+    Route::post('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'store'])
+        ->name('admin.store-agreements.store');
+
     Route::get('admin/finance', App\Http\Controllers\Admin\FinanceOverviewController::class)
         ->name('admin.finance.overview');
 
@@ -336,6 +341,17 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 
 Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'verify'])->name('web.certificates.verify');
 Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('web.certificates.download');
+
+Route::post('/my/store-orders/{order}/cancel', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'cancel'])->middleware('throttle:30,1')->whereUuid('order')->name('store.orders.cancel');
+Route::get('/my/store-orders', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'index'])->name('store.orders.index');
+Route::get('/my/store-orders/{order}/receipt', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'receipt'])->whereUuid('order')->name('store.orders.receipt');
+Route::get('/my/store-orders/{order}', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'show'])->whereUuid('order')->name('store.orders.show');
+Route::post('/marketplace/shops/{shop:slug}/quotes', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'quote'])
+    ->middleware('throttle:30,1')->name('store.quotes.create');
+Route::post('/my/store-orders/{order}/checkout', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'start'])
+    ->middleware('throttle:30,1')->whereUuid('order')->name('store.checkout.start');
+Route::get('/marketplace/checkout/{reference}/callback', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'callback'])
+    ->middleware('throttle:30,1')->name('store.checkout.callback');
 
 // MiConvener Marketplace (Public)
 Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
