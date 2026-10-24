@@ -29,7 +29,7 @@ it('records an unfunded full refund without calling the provider or inventing ga
 it('sends a funded full refund once and restocks only after verified completion', function (): void {
     [$tenant, $variant, $actor, $session, $order, $attempt] = StoreCheckoutScenario::paid();
     grantStoreFinance($actor, $tenant->id);
-    $second = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $second = \Tests\Support\StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     $secondAttempt = app(App\Services\Marketplace\StorePayments::class)->start($second, $session, (string) Str::uuid());
     $capture = app(App\Services\Marketplace\StorePaymentEvidence::class)->record($secondAttempt, StoreCheckoutScenario::evidence($secondAttempt));
     app(App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
@@ -65,7 +65,7 @@ it('cancels an uncollected free order with one stock reversal and no gateway or 
     [$tenant, $variant, $actor, $session] = StoreCheckoutScenario::make(1);
     grantStoreFinance($actor, $tenant->id);
     $variant->update(['price_pesewas' => 0]);
-    $order = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $order = \Tests\Support\StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     app(App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
     $key = (string) Str::uuid();
     Http::fake();
@@ -158,7 +158,7 @@ it('exposes full refund recovery and free cancellation through protected tenant 
         ->assertOk()->assertJsonPath('status', 'needs_funding');
     $this->postJson($base.'/refunds/'.$result->json('refund_id').'/reconcile', [], ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('status', 'needs_funding');
     $variant->update(['price_pesewas' => 0]);
-    $free = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $free = \Tests\Support\StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     app(App\Services\Marketplace\StorePayments::class)->start($free, $session, (string) Str::uuid());
     $this->postJson($base.'/orders/'.$free->id.'/cancel-free', ['operation_key' => (string) Str::uuid(), 'reason' => 'Not collected'], ['HTTP_HOST' => $host])->assertOk()->assertJsonPath('status', 'confirmed');
     Http::assertNothingSent();

@@ -62,7 +62,7 @@ it('keeps buyer refund liabilities out of withdrawable seller cash even when com
     App\Models\StoreCommercialAgreement::factory()->create(['shop_id' => $variant->shop_id, 'tenant_id' => $tenant->id, 'version' => 2, 'percentage' => '0.00',
         'account_fingerprint' => hash('sha256', app(App\Services\Giving\GivingGateways::class)->platformIdentity())]);
     Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/initialize' => Illuminate\Support\Facades\Http::response(['data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']])]);
-    $order = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Illuminate\Support\Str::uuid());
+    $order = \Tests\Support\StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Illuminate\Support\Str::uuid());
     $attempt = app(App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Illuminate\Support\Str::uuid());
     $capture = app(App\Services\Marketplace\StorePaymentEvidence::class)->record($attempt, StoreCheckoutScenario::evidence($attempt));
     app(App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);

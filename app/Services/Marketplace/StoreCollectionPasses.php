@@ -65,12 +65,7 @@ final class StoreCollectionPasses
     {
         $order = $order->fresh() ?? throw new AuthorizationException;
         app(StoreFulfilment::class)->authorize($order, $actor);
-        $broad = $this->key('staff', [$order->tenant_id, (string) $actor->id]);
-        $failed = $this->key('fail', [$order->tenant_id, $order->id, (string) $actor->id]);
-        if (RateLimiter::tooManyAttempts($broad, 30) || RateLimiter::tooManyAttempts($failed, 5)) {
-            $this->refuse();
-        }
-        RateLimiter::hit($broad, 60);
+        $failed = $this->throttle($order, $actor);
         $this->ready($order);
         if ($this->decode($credential, $this->method($order)) === null) {
             RateLimiter::hit($failed, 600);
@@ -96,6 +91,20 @@ final class StoreCollectionPasses
             && hash_equals($decoded['kind'] === 'manual' ? $pass->manual_hash : $pass->qr_hash, $decoded['hash']);
     }
 
+    /** Retained-hash verification for a recorded completion only; never authorises a new handover.
+     * @param  array<string,mixed>  $credential
+     */
+    public function verifyCompleted(StoreOrder $order, User $actor, StoreCollectionPass $pass, array $credential): void
+    {
+        app(StoreFulfilment::class)->authorize($order, $actor, false);
+        $failed = $this->throttle($order, $actor);
+        if ($pass->order_id !== $order->id || $pass->consumed_at === null
+            || ! \App\Models\StoreCollection::query()->where('order_id', $order->id)->where('pass_id', $pass->id)->exists() || ! $this->matches($pass, $credential)) {
+            RateLimiter::hit($failed, 600);
+            $this->refuse();
+        }
+    }
+
     public function revoke(StoreOrder $order, string $reason): void
     {
         if ($order->getConnection()->transactionLevel() < 1) {
@@ -109,6 +118,18 @@ final class StoreCollectionPasses
     {
         StoreCollectionPass::query()->whereNotNull('secret_material')->where(fn ($query) => $query->where('expires_at', '<=', now())->orWhereNotNull('revoked_at')->orWhereNotNull('consumed_at'))
             ->update(['secret_material' => null]);
+    }
+
+    private function throttle(StoreOrder $order, User $actor): string
+    {
+        $broad = $this->key('staff', [$order->tenant_id, (string) $actor->id]);
+        $failed = $this->key('fail', [$order->tenant_id, $order->id, (string) $actor->id]);
+        if (RateLimiter::tooManyAttempts($broad, 30) || RateLimiter::tooManyAttempts($failed, 5)) {
+            $this->refuse();
+        }
+        RateLimiter::hit($broad, 60);
+
+        return $failed;
     }
 
     /** @param array<string,mixed> $credential

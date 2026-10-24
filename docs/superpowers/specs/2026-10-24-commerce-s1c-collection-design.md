@@ -1,6 +1,6 @@
 # S1c — Collection, delivery and handover design
 
-**Status:** revised 2026-10-24 following the owner’s collection/delivery clarification; planning only, no application implementation or activation. This revision supersedes the earlier collection-only scope. Prepared 2026-10-24 against `main` merge `7a90c66c` (PR #50). The owner has approved native implementation; this document incorporates the requested pre-implementation amendment.
+**Status:** native implementation in progress on `codex/commerce-s1c`, following the owner’s 2026-10-24 approval of collection/delivery and delivery included in displayed price. This design supersedes the earlier collection-only scope. Prepared against `main` merge `7a90c66c` (PR #50). Production activation, merge and deployment require separate approval.
 
 ## 1. Purpose and current state
 
@@ -84,7 +84,7 @@ Affected tests plus one final CI gate and one fresh whole-branch review after na
 
 Prepare separate isolated provider acceptance with approved test operator/account/recipient/actions and budget. Sandbox purchases through collection and delivery: receipt → ready → collection pass → collected, and receipt → ready → dispatched → recipient code → delivered, plus refund before collection and late/extra capture, is required before live trading. Validate phone camera/manual fallback and native 200% text zoom; responsive viewport checks are not a substitute. No production flags, tenant gateway changes or trading approval are inferred from this proposal.
 
-Decisions to review: bearer handover/sharing policy; whole-order-only scope; 15-minute pass and code fallback; no override; proposed collection-role defaults. Numerical fees/reserves, named pilot/operator, support/tax terms and provider test authority remain separate existing owner decisions.
+Implementation decisions approved by the owner: bearer handover/sharing policy; whole-order-only scope; 15-minute verification and manual fallback; no override; collection-role defaults; buyer-selected seller-offered collection/delivery with delivery included in displayed price. Numerical fees/reserves, named pilot/operator, support/tax terms and provider test authority remain separate existing owner decisions.
 
 **Historical builder/self-review (before delivery amendment, 2026-10-24):** one read-only fresh builder check found nothing important unanswered before planning. Owner policy choices remain recommendations above. Plan maps all lifecycle/security/mail/UX requirements to named tests; no application build or production change occurred.
 

@@ -29,6 +29,7 @@ final class StoreRefunds
         }
         $refund = $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason, $observationId): StoreRefund {
             $order = $this->locks->order($order);
+            $this->authorize($order, $actor);
             $prior = StoreRefund::query()->where('tenant_id', $order->tenant_id)->where('operation_key', $operationKey)->first();
             if ($prior !== null) {
                 if ($prior->order_id !== $order->id || $prior->reason !== $reason || ($observationId !== null && $prior->observation_id !== $observationId)) {
@@ -68,6 +69,7 @@ final class StoreRefunds
                 'seller_debit_pesewas' => $sellerDebit, 'commission_return_pesewas' => $commission, 'gateway_fee_pesewas' => $capture->gateway_fee_pesewas,
                 'review_liability_pesewas' => $sale ? 0 : $amount, 'fee_bearer' => $bearer, 'restock' => $sale, 'status' => 'needs_funding']);
             if ($sale) {
+                app(StoreCollectionPasses::class)->revoke($order, 'primary_refund');
                 $order->update(['payment_state' => 'refund_pending']);
             }
 
@@ -87,6 +89,7 @@ final class StoreRefunds
 
         return $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason): StoreRefund {
             $order = $this->locks->order($order);
+            $this->authorize($order, $actor);
             $prior = StoreRefund::query()->where('order_id', $order->id)->whereNull('attempt_id')->first();
             if ($prior !== null) {
                 if ($prior->operation_key !== $operationKey || $prior->reason !== $reason) {
@@ -102,6 +105,7 @@ final class StoreRefunds
                 'operation_key' => $operationKey, 'reason' => $reason, 'requested_by' => $actor->id, 'account_fingerprint' => $order->account_fingerprint,
                 'amount_pesewas' => 0, 'seller_debit_pesewas' => 0, 'commission_return_pesewas' => 0, 'gateway_fee_pesewas' => 0, 'review_liability_pesewas' => 0,
                 'fee_bearer' => 'seller', 'restock' => true, 'status' => 'confirmed', 'provider_status' => 'not_required']);
+            app(StoreCollectionPasses::class)->revoke($order, 'free_cancel');
             app(MerchandiseInventory::class)->restockRefund($refund);
             $order->update(['state' => 'cancelled', 'payment_state' => 'refunded', 'fulfilment_state' => 'cancelled']);
 
