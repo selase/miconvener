@@ -315,6 +315,7 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'notifications',
             ],
+            ['uuid' => Str::uuid(), 'name' => 'manage store collection', 'guard_name' => 'web', 'category' => 'store'],
             ['uuid' => Str::uuid(), 'name' => 'manage store orders', 'guard_name' => 'web', 'category' => 'store'],
             ['uuid' => Str::uuid(), 'name' => 'manage store finance', 'guard_name' => 'web', 'category' => 'store'],
             [
