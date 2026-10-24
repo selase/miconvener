@@ -75,6 +75,6 @@ it('treats delivered orders as completed when applying snapshotted payout reserv
     $before = app(App\Services\Marketplace\StoreBalance::class)->available($tenant);
     app(StoreDeliveries::class)->dispatch($order, $actor, (string) Str::uuid());
     $proof = app(StoreCollectionPasses::class)->issue($order, $session, (string) Str::uuid());
-    app(StoreCollections::class)->confirm($order,$actor,['manual_code' => $proof['manual_code']],(string) Str::uuid());
+    app(StoreCollections::class)->confirm($order, $actor, ['manual_code' => $proof['manual_code']], (string) Str::uuid());
     expect(app(App\Services\Marketplace\StoreBalance::class)->available($tenant))->toBe($before + 5000);
 });
