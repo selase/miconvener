@@ -128,10 +128,17 @@ final readonly class MerchandiseCatalog
     private function assertPublishable(StoreListing $listing): void
     {
         $details = $listing->merchandise()->first();
-        if ($details === null || $details->archived_at !== null || blank($details->collection_instructions)
+        if ($details === null || $details->archived_at !== null || (blank($details->collection_instructions) && ! $this->hasFulfilmentPolicy($listing))
             || ! $listing->variants()->where('is_active', true)->exists()) {
             throw ValidationException::withMessages(['publication' => 'Add collection instructions and at least one active variant before publishing. Archived items cannot be published.']);
         }
+    }
+
+    private function hasFulfilmentPolicy(StoreListing $listing): bool
+    {
+        $policy = \App\Models\StoreFulfilmentPolicy::query()->where('shop_id', $listing->shop_id)->orderByDesc('version')->first();
+
+        return $policy !== null && count($policy->snapshot['methods'] ?? []) > 0;
     }
 
     /** @param list<array<string,mixed>> $variants */

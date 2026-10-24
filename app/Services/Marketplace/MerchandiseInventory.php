@@ -113,7 +113,7 @@ final class MerchandiseInventory
             $free = $refund->amount_pesewas === 0 && $order->charged_pesewas === 0 && $refund->provider_status === 'not_required';
             $paid = $refund->amount_pesewas > 0 && $refund->provider_processed_at !== null && \App\Models\LedgerTransaction::withoutGlobalScopes()
                 ->whereKey($refund->ledger_transaction_id)->where('tenant_id', $order->tenant_id)->where('category', 'commerce')->where('transaction_type', 'commerce_refund')->where('reference', 'store-refund:'.$refund->operation_key)->exists();
-            if ($refund->status !== 'confirmed' || (! $free && ! $paid) || $order->fulfilment_state === 'collected') {
+            if ($refund->status !== 'confirmed' || (! $free && ! $paid) || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true)) {
                 throw ValidationException::withMessages(['stock' => 'A confirmed refund of eligible uncollected goods is required.']);
             }
             $lines = $order->lines()->orderBy('variant_id')->get();

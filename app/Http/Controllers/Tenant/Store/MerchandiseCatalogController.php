@@ -33,7 +33,7 @@ final class MerchandiseCatalogController extends Controller
         $this->catalog->authorize($tenant, $request->user());
         $items = $this->catalog->owned($tenant)->with(['merchandise', 'variants' => fn ($variants) => $variants->withSum(['allocations as held_quantity' => fn ($allocation) => $allocation->where('state', 'active')->where('expires_at', '>', now())], 'quantity')])->latest('updated_at')->paginate(20);
 
-        return Inertia::render('Tenant/Store/Catalog/Index', ['items' => $items->through(fn (StoreListing $listing): array => $this->payload($listing, false)),
+        return Inertia::render('Tenant/Store/Catalog/Index', ['fulfilmentPolicy' => \App\Models\StoreFulfilmentPolicy::query()->where('tenant_id', $tenant->id)->orderByDesc('version')->first()?->snapshot, 'items' => $items->through(fn (StoreListing $listing): array => $this->payload($listing, false)),
             'shop' => $tenant->shop === null ? null : ['name' => $tenant->shop->name, 'slug' => $tenant->shop->slug], 'checkoutEnabled' => false]);
     }
 

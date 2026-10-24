@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import StoreCheckout from '@/Components/Marketplace/StoreCheckout';
-import StoreOrders from '@/Pages/Public/Marketplace/Orders/Index';
+import StoreOrders, { OrderSummary } from '@/Pages/Public/Marketplace/Orders/Index';
 import csrfFetch from '@/lib/csrfFetch';
 vi.mock('@/Layouts/PublicLayout', () => ({ default: ({ children }) => children }));
 vi.mock('@/lib/csrfFetch', () => ({ default: vi.fn() }));
@@ -13,6 +13,7 @@ const order = {
     payment_state: 'awaiting',
     state: 'quoted',
     fulfilment_state: 'awaiting_preparation',
+    fulfilment_method: 'collection',
     expires_at: new Date(Date.now() + 600000).toISOString(),
     collection_terms: 'Collect at the office',
     refund_terms: 'Full uncollected refunds',
@@ -98,4 +99,93 @@ it('aborts pending checkout initialization when the buyer leaves the item', asyn
     const options = csrfFetch.mock.calls.at(-1)[1];
     view.unmount();
     expect(options.signal?.aborted).toBe(true);
+});
+
+it('shows the method-specific handover progress without calling dispatch delivered', () => {
+    render(
+        <OrderSummary
+            order={{
+                ...order,
+                state: 'confirmed',
+                payment_state: 'paid',
+                fulfilment_method: 'delivery',
+                fulfilment_state: 'dispatched',
+            }}
+        />
+    );
+    const progress = screen.getByRole('list', { name: 'Order handover progress' });
+    expect(progress.textContent).toContain('Confirmed');
+    expect(progress.textContent).toContain('Ready');
+    expect(progress.textContent).toContain('Dispatched');
+    expect(progress.textContent).toContain('Delivered');
+    expect(progress.querySelector('[aria-current="step"]').textContent).toBe('Dispatched');
+});
+
+it('blocks payment while changing or saving a replacement fulfilment option in the storefront', async () => {
+    csrfFetch.mockReset();
+    csrfFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+            order: {
+                ...order,
+                fulfilment_options: {
+                    policy_id: 'p1',
+                    methods: ['collection', 'delivery'],
+                    delivery_countries: ['GH'],
+                },
+            },
+        }),
+    });
+    render(<StoreCheckout shop="teachers" variant={{ id: 'medium', available: true }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Review order' }));
+    await screen.findByRole('button', { name: 'Change collection or delivery' });
+    fireEvent.click(screen.getByRole('button', { name: 'Change collection or delivery' }));
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText('Collect from the seller'));
+    let resolve;
+    csrfFetch.mockImplementationOnce(
+        () =>
+            new Promise((done) => {
+                resolve = done;
+            })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Accept fulfilment option' }));
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).disabled).toBe(true);
+    let refresh;
+    csrfFetch.mockImplementationOnce(
+        () =>
+            new Promise((done) => {
+                refresh = done;
+            })
+    );
+    await act(async () => resolve({ ok: true, json: async () => ({ order_id: 'replacement' }) }));
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).disabled).toBe(true);
+    await act(async () =>
+        refresh({ ok: true, json: async () => ({ order: { ...order, id: 'replacement' } }) })
+    );
+    await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Continue to payment' }).disabled).toBe(false)
+    );
+});
+
+it('blocks the My Orders payment action while a fulfilment edit is open', async () => {
+    csrfFetch.mockReset();
+    csrfFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+            order: {
+                ...order,
+                fulfilment_options: {
+                    policy_id: 'p1',
+                    methods: ['collection'],
+                    collection_location: 'Office',
+                },
+            },
+            verified_until: Date.now() / 1000 + 3600,
+        }),
+    });
+    render(<StoreOrders orderId={order.id} />);
+    await screen.findByRole('button', { name: 'Change collection or delivery' });
+    fireEvent.click(screen.getByRole('button', { name: 'Change collection or delivery' }));
+    expect(screen.getByRole('button', { name: 'Continue to payment' }).disabled).toBe(true);
 });

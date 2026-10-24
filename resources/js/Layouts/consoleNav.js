@@ -101,6 +101,13 @@ export const NAV_GROUPS = [
                 feature: 'commerce_history',
             },
             {
+                label: 'Store fulfilment',
+                href: 'tenant.store.collections.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_collection',
+                feature: 'commerce_history',
+            },
+            {
                 label: 'Store finance',
                 href: 'tenant.store.finance.index',
                 icon: 'Wallet',

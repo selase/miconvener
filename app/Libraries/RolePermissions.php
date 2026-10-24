@@ -120,6 +120,7 @@ final class RolePermissions
     {
         return [
             'manage store catalog',
+            'manage store collection',
             'manage store orders',
             'manage store finance',
             ...self::platformFinancePermissions(),
@@ -216,6 +217,7 @@ final class RolePermissions
     {
         return [
             'manage store catalog',
+            'manage store collection',
             'manage store orders',
             'manage store finance',
             'create communication',
@@ -294,6 +296,7 @@ final class RolePermissions
     {
         return [
             'manage store catalog',
+            'manage store collection',
             'manage store orders',
             'create communication',
             'read communication',

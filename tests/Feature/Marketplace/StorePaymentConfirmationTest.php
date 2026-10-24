@@ -131,7 +131,7 @@ it('releases an expired unpaid review after verified failure but retains late ca
     expect($order->fresh()->state)->toBe('review');
     app(App\Services\Marketplace\StorePaymentNotifications::class)->reconcile($attempt);
     expect($order->fresh()->state)->toBe('cancelled')->and($order->fresh()->review_reason)->toBeNull();
-    $next = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Illuminate\Support\Str::uuid());
+    $next = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Illuminate\Support\Str::uuid());
     expect($next->id)->not->toBe($order->id);
     $capture = app(StorePaymentEvidence::class)->record($attempt, StoreCheckoutScenario::evidence($attempt));
     app(StorePaymentConfirmer::class)->confirm($capture);

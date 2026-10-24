@@ -331,6 +331,16 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::get('community/polls/{questionnaire}/results', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'results'])->whereUuid('questionnaire')->name('tenant.community.polls.results');
     Route::get('community/polls/{questionnaire}/export', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'export'])->whereUuid('questionnaire')->name('tenant.community.polls.export');
     Route::prefix('store')->name('tenant.store.')->middleware('throttle:30,1')->group(function (): void {
+        Route::get('collections', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'index'])->name('collections.index');
+        Route::get('collections/{order}', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'show'])->whereUuid('order')->name('collections.show');
+        Route::post('collections/{order}/ready', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'ready'])->whereUuid('order')->name('collections.ready');
+        Route::post('collections/{order}/prepare', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'prepare'])->whereUuid('order')->name('collections.prepare');
+        Route::post('collections/{order}/dispatch', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'dispatchOrder'])->whereUuid('order')->name('collections.dispatch');
+        Route::post('collections/{order}/delivery-failed', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'deliveryFailed'])->whereUuid('order')->name('collections.delivery-failed');
+        Route::post('collections/{order}/returned', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'returned'])->whereUuid('order')->name('collections.returned');
+        Route::post('collections/{order}/validate', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'validatePass'])->whereUuid('order')->name('collections.validate');
+        Route::post('collections/{order}/confirm', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'confirm'])->whereUuid('order')->name('collections.confirm');
+        Route::post('fulfilment-policies', [App\Http\Controllers\Tenant\Store\StoreFulfilmentPolicyController::class, 'store'])->name('fulfilment-policies.store');
         Route::get('orders', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'index'])->name('orders.index');
         Route::get('finance', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'finance'])->name('finance.index');
         Route::post('orders/{order}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcilePayment'])->whereUuid('order')->middleware('throttle:10,1')->name('orders.reconcile');

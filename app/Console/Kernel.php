@@ -46,6 +46,7 @@ final class Kernel extends ConsoleKernel
         $schedule->command('tenants:sync-features')->dailyAt('03:45')->withoutOverlapping();
         $schedule->command('community:inbox-prune')->dailyAt('04:15')->withoutOverlapping()->onOneServer();
         $schedule->command('community:messages-dispatch')->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->call(fn () => app(\App\Services\Marketplace\StoreFulfilmentNotices::class)->retryQueued())->name('commerce-ready-notices')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
         $schedule->call(fn () => app(\App\Services\Marketplace\StoreReceipts::class)->retryQueued())->name('commerce-receipts')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('commerce:reconcile')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('giving:send-reminders')->hourly()->withoutOverlapping()->onOneServer();
@@ -96,6 +97,7 @@ final class Kernel extends ConsoleKernel
         $schedule->command('sms:sync-delivery')->everyFifteenMinutes()->withoutOverlapping();
 
         // Compliance
+        $schedule->call(fn () => app(\App\Services\Marketplace\StoreCollectionPasses::class)->purge())->dailyAt('04:15')->name('store-collection-pass-purge')->withoutOverlapping();
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
     }
 

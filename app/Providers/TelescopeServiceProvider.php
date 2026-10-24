@@ -22,7 +22,7 @@ final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
         Telescope::filter(function (IncomingEntry $entry): bool {
             $uri = (string) parse_url((string) ($entry->content['uri'] ?? ''), PHP_URL_PATH);
-            if (request()->is('marketplace/shops/*/quotes', 'marketplace/checkout/*/callback', 'store/orders', 'store/orders/*', 'store/finance', 'store/refunds/*', 'store/payouts', 'store/payouts/*', 'webhooks/paystack')) {
+            if (request()->is('marketplace/shops/*/quotes', 'marketplace/checkout/*/callback', 'store/fulfilment-policies', 'store/collections', 'store/collections/*', 'store/orders', 'store/orders/*', 'store/finance', 'store/refunds/*', 'store/payouts', 'store/payouts/*', 'webhooks/paystack')) {
                 return false;
             }
             if (request()->is('my', 'my/*') || ($entry->isRequest() && \Illuminate\Support\Str::is(['my', 'my/*'], mb_ltrim($uri, '/')))) {

@@ -3,8 +3,13 @@ import { ArrowUpRight, Package, Plus } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
+import StoreFulfilmentPolicyForm from '@/Components/Marketplace/StoreFulfilmentPolicyForm';
 
-export default function CatalogIndex({ items = { data: [], links: [] }, shop = null }) {
+export default function CatalogIndex({
+    items = { data: [], links: [] },
+    shop = null,
+    fulfilmentPolicy = null,
+}) {
     return (
         <ConsoleLayout>
             <Head title="Store catalog" />
@@ -29,7 +34,8 @@ export default function CatalogIndex({ items = { data: [], links: [] }, shop = n
                         </h2>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
                             Publish merchandise, offer sizes and colours, and keep an audited stock
-                            record. Checkout is available only after platform approval and activation.
+                            record. Checkout is available only after platform approval and
+                            activation.
                         </p>
                     </div>
                     {shop && (
@@ -46,6 +52,7 @@ export default function CatalogIndex({ items = { data: [], links: [] }, shop = n
                         </a>
                     )}
                 </div>
+                {shop && <StoreFulfilmentPolicyForm initial={fulfilmentPolicy} />}
                 {items.data.length ? (
                     <div className="divide-y divide-border border border-border bg-surface">
                         {items.data.map((item) => (

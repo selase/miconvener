@@ -29,6 +29,7 @@ final class StoreRefunds
         }
         $refund = $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason, $observationId): StoreRefund {
             $order = $this->locks->order($order);
+            $this->authorize($order, $actor);
             $prior = StoreRefund::query()->where('tenant_id', $order->tenant_id)->where('operation_key', $operationKey)->first();
             if ($prior !== null) {
                 if ($prior->order_id !== $order->id || $prior->reason !== $reason || ($observationId !== null && $prior->observation_id !== $observationId)) {
@@ -52,7 +53,7 @@ final class StoreRefunds
             }
             $txn = LedgerTransaction::withoutGlobalScopes()->where('tenant_id', $order->tenant_id)->where('reference', $capture->reference)->where('category', 'commerce')->findOrFail($capture->ledger_transaction_id);
             $sale = $txn->transaction_type === 'commerce_sale';
-            if ((! $sale && $txn->transaction_type !== 'commerce_capture_review') || ($sale && ($order->ledger_state === 'review' || $order->fulfilment_state === 'collected' || $order->payment_state !== 'paid'))) {
+            if ((! $sale && $txn->transaction_type !== 'commerce_capture_review') || ($sale && ($order->ledger_state === 'review' || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) || $order->payment_state !== 'paid'))) {
                 $this->refuse('Collected or unreconciled orders require an approved support review.');
             }
             $bearer = $order->terms_snapshot['refund_gateway_fee_bearer'] ?? null;
@@ -68,6 +69,7 @@ final class StoreRefunds
                 'seller_debit_pesewas' => $sellerDebit, 'commission_return_pesewas' => $commission, 'gateway_fee_pesewas' => $capture->gateway_fee_pesewas,
                 'review_liability_pesewas' => $sale ? 0 : $amount, 'fee_bearer' => $bearer, 'restock' => $sale, 'status' => 'needs_funding']);
             if ($sale) {
+                app(StoreCollectionPasses::class)->revoke($order, 'primary_refund');
                 $order->update(['payment_state' => 'refund_pending']);
             }
 
@@ -87,6 +89,7 @@ final class StoreRefunds
 
         return $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason): StoreRefund {
             $order = $this->locks->order($order);
+            $this->authorize($order, $actor);
             $prior = StoreRefund::query()->where('order_id', $order->id)->whereNull('attempt_id')->first();
             if ($prior !== null) {
                 if ($prior->operation_key !== $operationKey || $prior->reason !== $reason) {
@@ -95,13 +98,14 @@ final class StoreRefunds
 
                 return $prior;
             }
-            if ($order->charged_pesewas !== 0 || $order->state !== 'confirmed' || $order->payment_state !== 'not_required' || $order->fulfilment_state === 'collected') {
+            if ($order->charged_pesewas !== 0 || $order->state !== 'confirmed' || $order->payment_state !== 'not_required' || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true)) {
                 $this->refuse('Only a confirmed, uncollected free order can be cancelled without a refund.');
             }
             $refund = StoreRefund::query()->create(['order_id' => $order->id, 'tenant_id' => $order->tenant_id, 'shop_id' => $order->shop_id,
                 'operation_key' => $operationKey, 'reason' => $reason, 'requested_by' => $actor->id, 'account_fingerprint' => $order->account_fingerprint,
                 'amount_pesewas' => 0, 'seller_debit_pesewas' => 0, 'commission_return_pesewas' => 0, 'gateway_fee_pesewas' => 0, 'review_liability_pesewas' => 0,
                 'fee_bearer' => 'seller', 'restock' => true, 'status' => 'confirmed', 'provider_status' => 'not_required']);
+            app(StoreCollectionPasses::class)->revoke($order, 'free_cancel');
             app(MerchandiseInventory::class)->restockRefund($refund);
             $order->update(['state' => 'cancelled', 'payment_state' => 'refunded', 'fulfilment_state' => 'cancelled']);
 
@@ -211,10 +215,12 @@ final class StoreRefunds
                 return $refund;
             }
             $transaction = $this->ledger->recordStoreRefund($refund);
-            $refund->update(['status' => 'confirmed', 'ledger_transaction_id' => $transaction->id, 'review_reason' => $order->fulfilment_state === 'collected' && $refund->restock ? 'goods_already_collected' : null]);
+            $refund->update(['status' => 'confirmed', 'ledger_transaction_id' => $transaction->id, 'review_reason' => in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) && $refund->restock ? match ($order->fulfilment_state) {
+                'dispatched' => 'goods_in_transit', 'delivered' => 'goods_already_delivered', default => 'goods_already_collected'
+            } : null]);
             if ($refund->restock) {
                 $order->update(['payment_state' => 'refunded', 'state' => 'cancelled']);
-                if ($order->fulfilment_state !== 'collected') {
+                if (! in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true)) {
                     app(MerchandiseInventory::class)->restockRefund($refund);
                     $order->update(['fulfilment_state' => 'cancelled']);
                 }

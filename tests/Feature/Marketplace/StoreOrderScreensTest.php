@@ -44,7 +44,7 @@ it('gates seller orders and finance separately and denies another organisation',
 
 it('allows the verified buyer to release only an unpaid quote without an unresolved payment attempt', function (): void {
     [$tenant, $variant, , $session] = StoreCheckoutScenario::make(1);
-    $order = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     $this->withSession(proofFor('buyer@example.test'))->getJson('/my/store-orders')->assertOk()->assertJsonCount(1, 'orders.data')->assertJsonPath('orders.data.0.payment_label', 'Quote ready');
     $this->postJson('/my/store-orders/'.$order->id.'/cancel')->assertOk();
     expect($order->fresh()->state)->toBe('cancelled')->and(App\Models\StoreStockAllocation::query()->where('order_id', $order->id)->sole()->state)->toBe('released');
@@ -77,7 +77,7 @@ it('shares Store discovery only for enabled catalog or retained history', functi
     $tenant->features()->where('feature_key', 'commerce_catalog')->update(['enabled' => false]);
     expect($share()['commerce_history'])->toBeFalse();
     $tenant->features()->where('feature_key', 'commerce_catalog')->update(['enabled' => true]);
-    app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     $tenant->features()->update(['enabled' => false]);
     expect($share()['commerce_history'])->toBeTrue()->and($share()['commerce_catalog'])->toBeFalse();
 });
