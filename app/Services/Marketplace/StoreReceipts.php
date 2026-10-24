@@ -9,8 +9,8 @@ use App\Mail\StoreOrderReceipt;
 use App\Models\StoreOrder;
 use App\Models\StoreOutboxMessage;
 use App\Models\StoreReceipt;
+use App\Support\WithoutTelescope;
 use Illuminate\Support\Facades\Mail;
-use Laravel\Telescope\Telescope;
 use RuntimeException;
 use Throwable;
 
@@ -60,7 +60,7 @@ final class StoreReceipts
             return;
         }
         try {
-            Telescope::withoutRecording(fn () => Mail::to($notice->destination)->send(new StoreOrderReceipt(StoreReceipt::query()->findOrFail($notice->receipt_id))));
+            WithoutTelescope::run(fn () => Mail::to($notice->destination)->send(new StoreOrderReceipt(StoreReceipt::query()->findOrFail($notice->receipt_id))));
             $notice->update(['state' => 'sent', 'sent_at' => now(), 'next_attempt_at' => null]);
         } catch (Throwable) {
             $notice->refresh();

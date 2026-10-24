@@ -9,10 +9,10 @@ use App\Models\StoreOrder;
 use App\Models\StorePaymentAttempt;
 use App\Models\StoreStockAllocation;
 use App\Models\Tenant;
+use App\Support\WithoutTelescope;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Laravel\Telescope\Telescope;
 use RuntimeException;
 use Throwable;
 
@@ -86,7 +86,7 @@ final class StorePayments
         }
         try {
             $order = $attempt->order;
-            $url = Telescope::withoutRecording(fn () => $this->gateways->forAttempt($attempt)->createStoreCheckoutSession(
+            $url = WithoutTelescope::run(fn () => $this->gateways->forAttempt($attempt)->createStoreCheckoutSession(
                 $order->buyer_email, $attempt->amount_pesewas, $attempt->currency,
                 route('store.checkout.callback', ['reference' => $attempt->reference]),
                 ['source' => 'miconvener_store', 'store_order_id' => $order->id, 'store_attempt_id' => $attempt->id, 'seller_id' => $order->tenant_id],
@@ -114,7 +114,7 @@ final class StorePayments
     {
         $attempt = StorePaymentAttempt::query()->with('order')->findOrFail($attempt->id);
         try {
-            $data = Telescope::withoutRecording(fn () => $this->gateways->forAttempt($attempt)->verifyTransaction($attempt->reference, true));
+            $data = WithoutTelescope::run(fn () => $this->gateways->forAttempt($attempt)->verifyTransaction($attempt->reference, true));
         } catch (Throwable) {
             throw new RuntimeException('Original store payment verification is unavailable. Reconcile this attempt without paying again.');
         }

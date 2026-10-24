@@ -189,4 +189,4 @@ it('does not record sign-in SMS plaintext in diagnostic outgoing-request entries
         Laravel\Telescope\Telescope::flushEntries();
         Laravel\Telescope\Telescope::$filterUsing = $filters;
     }
-});
+})->skip(fn (): bool => ! class_exists(Laravel\Telescope\Telescope::class), 'Requires the optional development recorder; phone delivery is tested without it separately.');
