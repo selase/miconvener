@@ -96,6 +96,7 @@ final class Kernel extends ConsoleKernel
         $schedule->command('sms:sync-delivery')->everyFifteenMinutes()->withoutOverlapping();
 
         // Compliance
+        $schedule->call(fn () => app(\App\Services\Marketplace\StoreCollectionPasses::class)->purge())->dailyAt('04:15')->name('store-collection-pass-purge')->withoutOverlapping();
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
     }
 

@@ -59,6 +59,20 @@ final class StoreCheckoutScenario
         return $order;
     }
 
+    /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StorePaymentAttempt, \App\Models\StorePaymentObservation} */
+    public static function collectionReady(): array
+    {
+        $data = self::paid();
+        [$tenant,,$actor,,$order] = $data;
+        $tenant->features()->create(['feature_key' => 'commerce_collection', 'enabled' => true]);
+        setPermissionsTeamId($tenant->id);
+        Permission::query()->firstOrCreate(['name' => 'manage store collection', 'guard_name' => 'web'], ['category' => 'store']);
+        $actor->givePermissionTo('manage store collection');
+        app(\App\Services\Marketplace\StoreFulfilment::class)->ready($order, $actor, (string) Str::uuid());
+
+        return $data;
+    }
+
     /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StorePaymentAttempt} */
     public static function online(): array
     {

@@ -54,6 +54,31 @@ final class StoreFulfilment
         });
     }
 
+    public function prepare(StoreOrder $order, User $actor, string $operationKey, string $reason): StoreFulfilmentEvent
+    {
+        $reason = mb_trim($reason);
+        if ($reason === '' || mb_strlen($reason) > 500) {
+            $this->refuse();
+        }
+
+        return $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason): StoreFulfilmentEvent {
+            $order = app(CommerceInventoryLocks::class)->order($order);
+            $this->authorize($order, $actor);
+            $prior = $this->replay($order, $actor, $operationKey, 'prepare', $reason);
+            if ($prior !== null) {
+                return $prior;
+            }
+            if ($order->fulfilment_state !== 'ready' || ! $this->eligible($order)) {
+                $this->refuse();
+            }
+            app(StoreCollectionPasses::class)->revoke($order, 'preparation');
+            $event = $this->record($order, $actor, $operationKey, 'prepare', $reason);
+            $order->update(['fulfilment_state' => 'awaiting_preparation']);
+
+            return $event;
+        });
+    }
+
     public function authorize(StoreOrder $order, User $actor, bool $requireEnabled = true): void
     {
         if (! app(StoreOrderAccess::class)->staff($order, $order->tenant, $actor, 'manage store collection')) {
