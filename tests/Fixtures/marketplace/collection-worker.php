@@ -29,8 +29,14 @@ echo "READY\n";
 flush();
 try {
     if ($input['action'] === 'collect') {
-        app(StoreCollections::class)->confirm($order, $user, $input['credential'], $input['key']);
-        echo 'COLLECTED';
+        $record = app(StoreCollections::class)->confirm($order, $user, $input['credential'], $input['key']);
+        echo $record->method === 'delivery' ? 'DELIVERED' : 'COLLECTED';
+    } elseif ($input['action'] === 'dispatch') {
+        app(App\Services\Marketplace\StoreDeliveries::class)->dispatch($order, $user, $input['key']);
+        echo 'DISPATCHED';
+    } elseif ($input['action'] === 'return') {
+        app(App\Services\Marketplace\StoreDeliveries::class)->returned($order, $user, $input['key'], 'All goods physically back');
+        echo 'RETURNED';
     } elseif ($input['action'] === 'cancel') {
         app(StoreRefunds::class)->cancelFree($order, $user, $input['key'], 'Local acceptance cancellation');
         echo 'CANCELLED';

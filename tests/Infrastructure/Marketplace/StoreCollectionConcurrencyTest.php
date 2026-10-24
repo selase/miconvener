@@ -19,9 +19,14 @@ afterEach(function (): void {
     $this->truncateDatabaseTables();
 });
 
-it('serialises real workers at the tenant/order boundary for full handover and cancellation', function (array $actions, bool $free, array $expected) {
+it('serialises real workers at the tenant/order boundary for full handover and cancellation', function (array $actions, bool $free, array $expected, bool $delivery = false, bool $dispatched = false) {
     Queue::fake();
-    if ($free) {
+    if ($delivery) {
+        [$tenant,$variant,$actor,$session,$order] = StoreCheckoutScenario::deliveryReady();
+        if ($dispatched) {
+            app(App\Services\Marketplace\StoreDeliveries::class)->dispatch($order, $actor, (string) Str::uuid());
+        }
+    } elseif ($free) {
         [$tenant,$variant,$actor,$session] = StoreCheckoutScenario::make(1);
         $variant->update(['price_pesewas' => 0]);
         $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
@@ -36,14 +41,14 @@ it('serialises real workers at the tenant/order boundary for full handover and c
     }
     Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
     $actor->givePermissionTo('manage store finance');
-    $proof = app(StoreCollectionPasses::class)->issue($order, $session, (string) Str::uuid());
+    $credential = $delivery && ! $dispatched ? [] : ['manual_code' => app(StoreCollectionPasses::class)->issue($order, $session, (string) Str::uuid())['manual_code']];
     $key = (string) Str::uuid();
     $before = $variant->fresh()->on_hand;
     $environment = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
     $workers = [];
     foreach ($actions as $action) {
         $worker = new Process([PHP_BINARY, base_path('tests/Fixtures/marketplace/collection-worker.php')], base_path(), $environment);
-        $worker->setTimeout(90)->setInput(json_encode(['order' => $order->id, 'actor' => (string) $actor->id, 'action' => $action, 'credential' => ['manual_code' => $proof['manual_code']], 'key' => $key], JSON_THROW_ON_ERROR));
+        $worker->setTimeout(90)->setInput(json_encode(['order' => $order->id, 'actor' => (string) $actor->id, 'action' => $action, 'credential' => $credential, 'key' => $key], JSON_THROW_ON_ERROR));
         $workers[] = $worker;
     }
     $db = $order->getConnection();
@@ -66,7 +71,7 @@ it('serialises real workers at the tenant/order boundary for full handover and c
             expect($worker->isSuccessful())->toBeTrue($worker->getErrorOutput());
             expect(mb_trim(str_replace('READY', '', $worker->getOutput())))->toBe($expected[$index]);
         }
-        $collected = in_array('COLLECTED', $expected, true);
+        $collected = in_array('COLLECTED', $expected, true) || in_array('DELIVERED', $expected, true);
         expect(StoreCollection::query()->where('order_id', $order->id)->count())->toBe($collected ? 1 : 0)
             ->and($variant->fresh()->on_hand)->toBe($before + ($free && ! $collected ? 1 : 0));
     } finally {
@@ -80,6 +85,10 @@ it('serialises real workers at the tenant/order boundary for full handover and c
         }
     }
 })->with([
+    'dispatch wins' => [['dispatch', 'refund'], false, ['DISPATCHED', 'BLOCKED'], true, false],
+    'refund prevents dispatch' => [['refund', 'dispatch'], false, ['REFUND', 'BLOCKED'], true, false],
+    'return wins' => [['return', 'collect'], false, ['RETURNED', 'BLOCKED'], true, true],
+    'delivery wins' => [['collect', 'return'], false, ['DELIVERED', 'BLOCKED'], true, true],
     'collection wins' => [['collect', 'refund'], false, ['COLLECTED', 'BLOCKED']],
     'refund wins' => [['refund', 'collect'], false, ['REFUND', 'BLOCKED']],
     'same confirmation retry' => [['collect', 'collect'], false, ['COLLECTED', 'COLLECTED']],

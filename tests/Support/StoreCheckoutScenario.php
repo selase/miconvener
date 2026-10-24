@@ -73,6 +73,30 @@ final class StoreCheckoutScenario
         return $data;
     }
 
+    /** @return array{Tenant,StoreVariant,User,Store,\App\Models\StoreOrder} */
+    public static function deliveryReady(?int $holdback = null): array
+    {
+        [$tenant,$variant,$actor,$session] = self::make();
+        if ($holdback !== null) {
+            $prior = StoreCommercialAgreement::query()->where('shop_id', $variant->shop_id)->firstOrFail();
+            StoreCommercialAgreement::factory()->create(['tenant_id' => $tenant->id, 'shop_id' => $variant->shop_id, 'version' => 2, 'account_fingerprint' => $prior->account_fingerprint, 'payout_policy' => ['holdback_pesewas' => $holdback, 'manual_release' => true]]);
+        }
+        $policy = app(\App\Services\Marketplace\StoreFulfilmentOptions::class)->offer($variant->shop, $actor, ['methods' => ['delivery'], 'delivery_countries' => ['GH'], 'delivery_instructions' => 'Delivery included in the displayed price'], (string) Str::uuid());
+        $order = app(\App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+        app(\App\Services\Marketplace\StoreFulfilmentOptions::class)->choose($order, $session, ['policy_id' => $policy->id, 'method' => 'delivery', 'destination' => ['recipient' => 'Test Buyer', 'address_line_1' => '12 Test Street', 'locality' => 'Accra', 'country' => 'GH']], (string) Str::uuid());
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+        \Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/initialize' => \Illuminate\Support\Facades\Http::response(['data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']])]);
+        $attempt = app(\App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
+        $capture = app(\App\Services\Marketplace\StorePaymentEvidence::class)->record($attempt, self::evidence($attempt));
+        app(\App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
+        $tenant->features()->create(['feature_key' => 'commerce_collection', 'enabled' => true]);
+        Permission::query()->firstOrCreate(['name' => 'manage store collection', 'guard_name' => 'web'], ['category' => 'store']);
+        $actor->givePermissionTo('manage store collection');
+        app(\App\Services\Marketplace\StoreFulfilment::class)->ready($order, $actor, (string) Str::uuid());
+
+        return [$tenant, $variant, $actor, $session, $order->fresh()];
+    }
+
     /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StorePaymentAttempt} */
     public static function online(): array
     {

@@ -115,7 +115,7 @@ final class StoreFulfilment
         }
 
         return StoreFulfilmentEvent::query()->create(['order_id' => $order->id, 'shop_id' => $order->shop_id, 'tenant_id' => $order->tenant_id,
-            'kind' => $kind, 'operation_key' => $operationKey, 'actor_id' => $actor->id, 'actor_name' => $actor->name, 'reason' => $reason,
+            'arrangement_id' => StoreFulfilmentArrangement::query()->where('order_id', $order->id)->value('id'), 'kind' => $kind, 'operation_key' => $operationKey, 'actor_id' => $actor->id, 'actor_name' => $actor->name, 'reason' => $reason,
             'lines_snapshot' => $order->lines()->get()->map(fn ($line): array => ['id' => $line->id, 'variant_id' => $line->variant_id, 'quantity' => $line->quantity, 'title' => $line->title_snapshot, 'options' => $line->options_snapshot])->all(),
             'terms_hash' => $order->terms_hash]);
     }

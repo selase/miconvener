@@ -53,7 +53,7 @@ final class StoreRefunds
             }
             $txn = LedgerTransaction::withoutGlobalScopes()->where('tenant_id', $order->tenant_id)->where('reference', $capture->reference)->where('category', 'commerce')->findOrFail($capture->ledger_transaction_id);
             $sale = $txn->transaction_type === 'commerce_sale';
-            if ((! $sale && $txn->transaction_type !== 'commerce_capture_review') || ($sale && ($order->ledger_state === 'review' || $order->fulfilment_state === 'collected' || $order->payment_state !== 'paid'))) {
+            if ((! $sale && $txn->transaction_type !== 'commerce_capture_review') || ($sale && ($order->ledger_state === 'review' || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) || $order->payment_state !== 'paid'))) {
                 $this->refuse('Collected or unreconciled orders require an approved support review.');
             }
             $bearer = $order->terms_snapshot['refund_gateway_fee_bearer'] ?? null;
@@ -98,7 +98,7 @@ final class StoreRefunds
 
                 return $prior;
             }
-            if ($order->charged_pesewas !== 0 || $order->state !== 'confirmed' || $order->payment_state !== 'not_required' || $order->fulfilment_state === 'collected') {
+            if ($order->charged_pesewas !== 0 || $order->state !== 'confirmed' || $order->payment_state !== 'not_required' || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true)) {
                 $this->refuse('Only a confirmed, uncollected free order can be cancelled without a refund.');
             }
             $refund = StoreRefund::query()->create(['order_id' => $order->id, 'tenant_id' => $order->tenant_id, 'shop_id' => $order->shop_id,
@@ -215,10 +215,12 @@ final class StoreRefunds
                 return $refund;
             }
             $transaction = $this->ledger->recordStoreRefund($refund);
-            $refund->update(['status' => 'confirmed', 'ledger_transaction_id' => $transaction->id, 'review_reason' => $order->fulfilment_state === 'collected' && $refund->restock ? 'goods_already_collected' : null]);
+            $refund->update(['status' => 'confirmed', 'ledger_transaction_id' => $transaction->id, 'review_reason' => in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) && $refund->restock ? match ($order->fulfilment_state) {
+                'dispatched' => 'goods_in_transit', 'delivered' => 'goods_already_delivered', default => 'goods_already_collected'
+            } : null]);
             if ($refund->restock) {
                 $order->update(['payment_state' => 'refunded', 'state' => 'cancelled']);
-                if ($order->fulfilment_state !== 'collected') {
+                if (! in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true)) {
                     app(MerchandiseInventory::class)->restockRefund($refund);
                     $order->update(['fulfilment_state' => 'cancelled']);
                 }

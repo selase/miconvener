@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $tenant_id
  * @property string $shop_id
  * @property string $order_id
+ * @property string|null $arrangement_id
  * @property string $kind
  * @property string $operation_key
  * @property int $actor_id
@@ -32,7 +33,7 @@ final class StoreFulfilmentEvent extends Model
 
     protected $connection = 'landlord';
 
-    protected $fillable = ['tenant_id', 'shop_id', 'order_id', 'kind', 'operation_key', 'actor_id', 'actor_name', 'reason', 'lines_snapshot', 'terms_hash'];
+    protected $fillable = ['tenant_id', 'shop_id', 'order_id', 'arrangement_id', 'kind', 'operation_key', 'actor_id', 'actor_name', 'reason', 'lines_snapshot', 'terms_hash'];
 
     /** @return BelongsTo<StoreOrder,$this> */
     public function order(): BelongsTo
