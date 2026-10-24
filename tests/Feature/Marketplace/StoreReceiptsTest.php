@@ -27,7 +27,7 @@ it('retains one immutable payment receipt and outbox despite repeated confirmati
 it('creates the same zero-value receipt without a provider or monetary ledger', function (): void {
     [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
     $variant->update(['price_pesewas' => 0]);
-    $order = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     Illuminate\Support\Facades\Http::fake();
     app(App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
     expect(StoreReceipt::query()->where('order_id', $order->id)->sole()->snapshot['total_pesewas'])->toBe(0);
@@ -78,7 +78,7 @@ it('includes only buyer-borne fees in the rendered payment receipt', function ()
     [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
     $agreement = App\Models\StoreCommercialAgreement::query()->where('tenant_id', $tenant->id)->firstOrFail();
     $agreement->replicate()->fill(['version' => 2, 'fee_bearer' => 'attendee'])->save();
-    $order = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/initialize' => Illuminate\Support\Facades\Http::response(['data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']])]);
     $attempt = app(App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
     $capture = app(App\Services\Marketplace\StorePaymentEvidence::class)->record($attempt, StoreCheckoutScenario::evidence($attempt, ['amount' => 10200, 'fees' => 199]));

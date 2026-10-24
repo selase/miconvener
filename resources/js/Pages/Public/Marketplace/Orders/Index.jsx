@@ -2,11 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
 import { StoreFulfilmentSelector } from '@/Components/Marketplace/StoreFulfilmentChoice';
+import StoreHandoverPass from '@/Components/Marketplace/StoreHandoverPass';
 import csrfFetch from '@/lib/csrfFetch';
 import { formatDuesMoney } from '@/lib/dues';
 import { QuoteTimer, STORE_BUTTON } from '@/Components/Marketplace/StoreCheckout';
 
 export function OrderSummary({ order }) {
+    const steps =
+        order.fulfilment_method === 'delivery'
+            ? ['Confirmed', 'Ready', 'Dispatched', 'Delivered']
+            : ['Confirmed', 'Ready', 'Collected'];
+    const step = ['collected', 'delivered'].includes(order.fulfilment_state)
+        ? steps.length - 1
+        : order.fulfilment_state === 'dispatched'
+          ? 2
+          : order.fulfilment_state === 'ready'
+            ? 1
+            : 0;
     return (
         <div className="space-y-5 break-words">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -26,12 +38,33 @@ export function OrderSummary({ order }) {
                     </dd>
                 </div>
                 <div>
-                    <dt className="text-xs text-ink-secondary">Collection</dt>
+                    <dt className="text-xs text-ink-secondary">Handover</dt>
                     <dd className="mt-1 font-medium">
                         {order.fulfilment_label ?? order.fulfilment_state}
                     </dd>
                 </div>
             </dl>
+            {order.state === 'confirmed' && order.fulfilment_method && (
+                <ol
+                    aria-label="Order handover progress"
+                    className="flex min-w-0 flex-wrap gap-x-5 gap-y-3 text-xs"
+                >
+                    {steps.map((label, index) => (
+                        <li
+                            key={label}
+                            aria-current={index === step ? 'step' : undefined}
+                            className={`border-t-2 pt-2 ${index <= step ? 'border-accent text-accent' : 'border-border text-ink-secondary'}`}
+                        >
+                            {label}
+                        </li>
+                    ))}
+                </ol>
+            )}
+            {order.handed_over_at && (
+                <p className="text-sm text-ink-secondary">
+                    Handover recorded: {new Date(order.handed_over_at).toLocaleString()}
+                </p>
+            )}
             {order.lines?.map((line) => (
                 <div
                     key={line.id}
@@ -63,11 +96,54 @@ export function OrderSummary({ order }) {
                 </p>
             )}
             <section>
-                <h3 className="font-semibold">Collection</h3>
+                <h3 className="font-semibold">
+                    {order.fulfilment_method === 'delivery'
+                        ? 'Seller-arranged delivery'
+                        : 'Collection'}
+                </h3>
                 <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">
-                    {order.collection_terms}
+                    {order.fulfilment_terms
+                        ? (order.fulfilment_method === 'delivery'
+                              ? [
+                                    order.fulfilment_terms.delivery_timing,
+                                    order.fulfilment_terms.delivery_instructions,
+                                    'Delivery is included in the displayed price.',
+                                ]
+                              : [
+                                    order.fulfilment_terms.collection_location,
+                                    order.fulfilment_terms.collection_hours,
+                                    order.fulfilment_terms.collection_instructions,
+                                ]
+                          )
+                              .filter(Boolean)
+                              .join('\n')
+                        : order.collection_terms}
                 </p>
             </section>
+            {order.fulfilment_method === 'delivery' && order.destination && (
+                <section>
+                    <h3 className="font-semibold">Delivery destination</h3>
+                    <address className="mt-2 space-y-1 text-sm not-italic text-ink-secondary">
+                        {[
+                            'recipient',
+                            'address_line_1',
+                            'address_line_2',
+                            'locality',
+                            'country',
+                            'postal_code',
+                            'landmark',
+                            'phone',
+                            'instructions',
+                        ].map(
+                            (key) =>
+                                order.destination[key] && <p key={key}>{order.destination[key]}</p>
+                        )}
+                    </address>
+                    <p className="mt-3 text-xs text-ink-secondary">
+                        Contact the seller before dispatch if these details need correcting.
+                    </p>
+                </section>
+            )}
             <section>
                 <h3 className="font-semibold">Refunds & support</h3>
                 <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">
@@ -302,6 +378,16 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                         ) : order ? (
                             <section className="border border-border bg-surface p-5 sm:p-8">
                                 <OrderSummary order={order} />
+                                {order.state === 'confirmed' && (
+                                    <div className="mt-6">
+                                        <StoreHandoverPass
+                                            key={order.id}
+                                            order={order}
+                                            verifiedUntil={data.verified_until}
+                                            onRefresh={() => setRevision((value) => value + 1)}
+                                        />
+                                    </div>
+                                )}
                                 {order.checkout_allowed && (
                                     <div className="mt-6 space-y-3">
                                         <QuoteTimer
@@ -344,6 +430,23 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                     >
                                         Release unpaid stock hold
                                     </button>
+                                )}
+                                {order.ready_email_state && (
+                                    <p className="mt-5 text-xs text-ink-secondary">
+                                        Ready notice:{' '}
+                                        {
+                                            {
+                                                sent: 'Sent',
+                                                queued: 'Queued',
+                                                sending: 'Sending',
+                                                retryable: 'Delayed — retry scheduled',
+                                                exhausted: 'Delivery needs support',
+                                                superseded: 'Replaced by a newer order status',
+                                            }[order.ready_email_state]
+                                        }
+                                        . Check this page for the current order status even if email
+                                        is delayed.
+                                    </p>
                                 )}
                                 {order.receipt_url && (
                                     <a

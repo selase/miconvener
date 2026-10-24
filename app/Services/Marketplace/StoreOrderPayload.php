@@ -14,11 +14,11 @@ final class StoreOrderPayload
      */
     public function buyer(StoreOrder $order): array
     {
-        $order->loadMissing(['lines', 'tenant.features', 'receipt.outbox', 'attempts']);
+        $order->loadMissing(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection']);
         $receipt = $order->receipt;
         $outbox = $receipt?->outbox;
         $terms = $order->terms_snapshot;
-        $arrangement = \App\Models\StoreFulfilmentArrangement::query()->where('order_id', $order->id)->first();
+        $arrangement = $order->fulfilmentArrangement;
         $options = ($arrangement === null || $order->state === 'quoted') ? app(StoreFulfilmentOptions::class)->options(\App\Models\StoreVariant::query()->whereKey($order->lines->pluck('variant_id'))->get()->all()) : [];
 
         $unresolved = $order->attempts->contains(fn (\App\Models\StorePaymentAttempt $attempt): bool => in_array($attempt->status, ['initializing', 'unknown', 'pending'], true));
@@ -26,7 +26,12 @@ final class StoreOrderPayload
         $data = ['fulfilment_method' => $arrangement?->method, 'fulfilment_options' => $options, 'fulfilment_terms' => $arrangement?->policy_snapshot, 'id' => $order->id, 'number' => mb_strtoupper(mb_substr(str_replace('-', '', $order->id), -12)), 'seller' => $order->seller_snapshot['name'] ?? 'Store', 'currency' => $order->currency,
             'total_pesewas' => $order->charged_pesewas, 'state' => $order->state, 'payment_state' => $order->payment_state,
             'payment_label' => $order->state === 'review' ? 'Payment under review' : ($labels[$order->payment_state] ?? 'Needs review'), 'fulfilment_state' => $order->fulfilment_state,
-            'fulfilment_label' => $order->fulfilment_state === 'cancelled' ? 'Cancelled' : ($order->fulfilment_state === 'collected' ? 'Collected' : ($order->payment_state === 'paid' || $order->payment_state === 'not_required' ? 'Await seller’s collection instructions' : 'Not ready for collection')),
+            'fulfilment_label' => match ($order->fulfilment_state) {
+                'cancelled' => 'Cancelled', 'collected' => 'Collected', 'delivered' => 'Delivered', 'dispatched' => 'Out for delivery',
+                'ready' => $arrangement?->method === 'delivery' ? 'Ready for dispatch' : 'Ready for collection',
+                default => $order->state === 'confirmed' ? 'In preparation' : 'Not ready for handover',
+            },
+            'handed_over_at' => $order->collection?->handed_over_at->toIso8601String(),
             'expires_at' => $order->expires_at?->toIso8601String(), 'collection_terms' => $terms['collection_terms'] ?? '', 'refund_terms' => $terms['refund_terms'] ?? '', 'support_contact' => $terms['support_contact'] ?? '',
             'receipt_url' => $receipt === null ? null : route('store.orders.receipt', $order->id, false), 'email_state' => $outbox?->state, 'email_label' => match ($outbox?->state) {
                 'sent' => 'Sent', 'queued', 'sending' => 'Delivery pending', 'retryable' => 'Delayed — retry scheduled', 'exhausted' => 'Delivery needs support', default => 'Not queued'

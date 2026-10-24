@@ -266,6 +266,7 @@ test('every mailable renders', function (): void {
     ]]);
 
     $mailables = [
+        'StoreOrderReady' => fn () => new App\Mail\StoreOrderReady(App\Models\StoreFulfilmentNotice::factory()->create()),
         'StoreOrderReceipt' => fn () => new StoreOrderReceipt($storeReceipt),
         'SetUpRecoveryCodesMail' => fn () => new SetUpRecoveryCodesMail('Ama', 'Acme Events', 'https://acme.test/account'),
         'BillingDailySummaryMail' => fn () => new BillingDailySummaryMail($summary),

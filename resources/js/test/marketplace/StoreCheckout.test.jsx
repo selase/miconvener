@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import StoreCheckout from '@/Components/Marketplace/StoreCheckout';
-import StoreOrders from '@/Pages/Public/Marketplace/Orders/Index';
+import StoreOrders, { OrderSummary } from '@/Pages/Public/Marketplace/Orders/Index';
 import csrfFetch from '@/lib/csrfFetch';
 vi.mock('@/Layouts/PublicLayout', () => ({ default: ({ children }) => children }));
 vi.mock('@/lib/csrfFetch', () => ({ default: vi.fn() }));
@@ -99,4 +99,24 @@ it('aborts pending checkout initialization when the buyer leaves the item', asyn
     const options = csrfFetch.mock.calls.at(-1)[1];
     view.unmount();
     expect(options.signal?.aborted).toBe(true);
+});
+
+it('shows the method-specific handover progress without calling dispatch delivered', () => {
+    render(
+        <OrderSummary
+            order={{
+                ...order,
+                state: 'confirmed',
+                payment_state: 'paid',
+                fulfilment_method: 'delivery',
+                fulfilment_state: 'dispatched',
+            }}
+        />
+    );
+    const progress = screen.getByRole('list', { name: 'Order handover progress' });
+    expect(progress.textContent).toContain('Confirmed');
+    expect(progress.textContent).toContain('Ready');
+    expect(progress.textContent).toContain('Dispatched');
+    expect(progress.textContent).toContain('Delivered');
+    expect(progress.querySelector('[aria-current="step"]').textContent).toBe('Dispatched');
 });

@@ -49,6 +49,7 @@ final class StoreFulfilment
             }
             $event = $this->record($order, $actor, $operationKey, 'ready');
             $order->update(['fulfilment_state' => 'ready']);
+            app(StoreFulfilmentNotices::class)->queue($event);
 
             return $event;
         });

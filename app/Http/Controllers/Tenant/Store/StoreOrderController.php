@@ -24,7 +24,7 @@ final class StoreOrderController extends Controller
     public function index(Request $request, StoreOrderPayload $payload): Response
     {
         $tenant = $this->authorizeSeller($request->user(), 'manage store orders');
-        $orders = StoreOrder::query()->where('tenant_id', $tenant->id)->where('state', '<>', 'quoted')->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts'])->latest()->paginate(20);
+        $orders = StoreOrder::query()->where('tenant_id', $tenant->id)->where('state', '<>', 'quoted')->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection'])->latest()->paginate(20);
         $finance = Gate::forUser($request->user()->fresh())->allows('manage store finance');
         $orders->through(function (StoreOrder $order) use ($payload, $finance): array {
             $captures = $finance ? \App\Models\StorePaymentObservation::query()->where('order_id', $order->id)->whereNotNull('ledger_transaction_id')
@@ -32,8 +32,8 @@ final class StoreOrderController extends Controller
 
             return [...$payload->buyer($order), 'buyer_email' => $order->buyer_email, 'review_reason' => $order->review_reason, 'captures' => $captures,
                 'can_reconcile' => $finance,
-                'can_refund' => $finance && (($order->payment_state === 'paid' && $order->fulfilment_state !== 'collected') || collect($captures)->contains('state', 'review')),
-                'can_cancel_free' => $finance && $order->payment_state === 'not_required' && $order->fulfilment_state !== 'collected'];
+                'can_refund' => $finance && (($order->payment_state === 'paid' && ! in_array($order->fulfilment_state, ['collected', 'dispatched', 'delivered'], true)) || collect($captures)->contains('state', 'review')),
+                'can_cancel_free' => $finance && $order->payment_state === 'not_required' && ! in_array($order->fulfilment_state, ['collected', 'dispatched', 'delivered'], true)];
         });
 
         return $this->respond($request, ['orders' => $orders, 'finance' => false]);

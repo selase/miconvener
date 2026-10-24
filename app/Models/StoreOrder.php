@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property-read StoreFulfilmentArrangement|null $fulfilmentArrangement
+ * @property-read StoreCollection|null $collection
  * @property string $id
  * @property string $tenant_id
  * @property string $shop_id
@@ -87,6 +89,24 @@ final class StoreOrder extends Model
     public function attempts(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(StorePaymentAttempt::class, 'order_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasOne<StoreFulfilmentArrangement, $this> */
+    public function fulfilmentArrangement(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StoreFulfilmentArrangement::class, 'order_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<StoreFulfilmentEvent, $this> */
+    public function fulfilmentEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(StoreFulfilmentEvent::class, 'order_id')->orderBy('sequence');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasOne<StoreCollection, $this> */
+    public function collection(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StoreCollection::class, 'order_id');
     }
 
     /** @return array<string, string> */
