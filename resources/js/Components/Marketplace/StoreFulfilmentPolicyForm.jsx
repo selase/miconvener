@@ -2,6 +2,9 @@ import { useState } from 'react';
 import csrfFetch from '@/lib/csrfFetch';
 export default function StoreFulfilmentPolicyForm({ initial = null }) {
     const [policy, setPolicy] = useState(initial ?? { methods: [], delivery_countries: ['GH'] });
+    const [countryCodes, setCountryCodes] = useState(
+        (initial?.delivery_countries ?? ['GH']).join(', ')
+    );
     const [message, setMessage] = useState('');
     const [busy, setBusy] = useState(false);
     const update = (name, value) => setPolicy((old) => ({ ...old, [name]: value }));
@@ -30,7 +33,13 @@ export default function StoreFulfilmentPolicyForm({ initial = null }) {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                    policy,
+                                    policy: {
+                                        ...policy,
+                                        delivery_countries: countryCodes
+                                            .split(',')
+                                            .map((country) => country.trim().toUpperCase())
+                                            .filter(Boolean),
+                                    },
                                     operation_key: crypto.randomUUID(),
                                 }),
                             }
@@ -103,16 +112,9 @@ export default function StoreFulfilmentPolicyForm({ initial = null }) {
                     <label className="block text-sm">
                         Delivery country codes (comma separated)
                         <input
-                            value={policy.delivery_countries?.join(', ') ?? ''}
-                            onChange={(event) =>
-                                update(
-                                    'delivery_countries',
-                                    event.target.value
-                                        .split(',')
-                                        .map((part) => part.trim().toUpperCase())
-                                        .filter(Boolean)
-                                )
-                            }
+                            value={countryCodes}
+                            onChange={(event) => setCountryCodes(event.target.value)}
+                            disabled={busy}
                             className="mt-2 block w-full border border-border bg-surface px-3 py-2 text-ink"
                             required
                         />

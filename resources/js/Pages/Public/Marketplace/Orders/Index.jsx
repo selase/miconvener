@@ -156,6 +156,7 @@ export function OrderSummary({ order }) {
 }
 export default function StoreOrders({ orderId = null, receipt = false }) {
     const [busy, setBusy] = useState(false);
+    const [fulfilmentPending, setFulfilmentPending] = useState(false);
     const actionRequest = useRef(null);
     useEffect(() => () => actionRequest.current?.abort(), []);
     const [quoteExpired, setQuoteExpired] = useState(false);
@@ -255,7 +256,7 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
         }
     };
     const start = async () => {
-        if (busy) return;
+        if (busy || fulfilmentPending) return;
         setBusy(true);
         setError('');
         const controller = new AbortController();
@@ -397,6 +398,7 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                         <button
                                             disabled={
                                                 busy ||
+                                                fulfilmentPending ||
                                                 quoteExpired ||
                                                 Date.parse(order.expires_at) <= Date.now()
                                             }
@@ -412,6 +414,7 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                 {['quoted', 'confirmed'].includes(order.state) && (
                                     <StoreFulfilmentSelector
                                         order={order}
+                                        onPendingChange={setFulfilmentPending}
                                         onAccepted={(accepted) => {
                                             if (accepted.order_id !== order.id)
                                                 window.location.assign(

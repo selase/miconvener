@@ -103,7 +103,7 @@ export default function StoreFulfilmentChoice({ options, value, onChange, disabl
         </fieldset>
     );
 }
-export function StoreFulfilmentSelector({ order, onAccepted }) {
+export function StoreFulfilmentSelector({ order, onAccepted, onPendingChange }) {
     const [choice, setChoice] = useState(null);
     const [editing, setEditing] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -112,6 +112,9 @@ export function StoreFulfilmentSelector({ order, onAccepted }) {
     const pending = useRef(null);
     useEffect(() => () => pending.current?.abort(), []);
     const alert = useRef(null);
+    useEffect(() => {
+        onPendingChange?.(editing || busy || !order.fulfilment_method);
+    }, [editing, busy, order.fulfilment_method, onPendingChange]);
     if (order.fulfilment_method && !editing)
         return (
             <div className="space-y-3">
@@ -154,8 +157,8 @@ export function StoreFulfilmentSelector({ order, onAccepted }) {
                         data.message ??
                         'Could not accept this option.'
                 );
-            setEditing(false);
-            onAccepted?.(data);
+            await onAccepted?.(data);
+            if (!controller.signal.aborted) setEditing(false);
         } catch (failure) {
             if (controller.signal.aborted) return;
             setError(failure.message);

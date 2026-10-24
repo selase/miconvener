@@ -99,3 +99,46 @@ it('cannot extend a stored pass expiry and does not issue after buyer email proo
     $pass = StoreCollectionPass::query()->findOrFail($proof['pass_id']);
     expect(fn () => $pass->update(['expires_at' => now()->addDay()]))->toThrow(Illuminate\Database\QueryException::class);
 });
+
+it('accepts the actual issued collection QR secret and rejects a changed purpose without consuming it', function (): void {
+    [, , $actor, $session, $order] = passScenario();
+    $service = app(StoreCollectionPasses::class);
+    $proof = $service->issue($order, $session, (string) Str::uuid());
+    $pass = StoreCollectionPass::query()->findOrFail($proof['pass_id']);
+    $qr = ['purpose' => 'miconvener.store.collection.v1', 'pass_id' => $pass->id, 'secret' => $pass->secret_material['qr']];
+    expect(fn () => $service->validate($order, $actor, [...$qr, 'purpose' => 'event']))->toThrow(ValidationException::class);
+    expect(fn () => $service->validate($order, $actor, [...$qr, 'purpose' => 'miconvener.store.delivery.v1']))->toThrow(ValidationException::class);
+    expect($pass->fresh()->consumed_at)->toBeNull()->and($order->fresh()->fulfilment_state)->toBe('ready');
+    expect($service->validate($order, $actor, $qr)->id)->toBe($pass->id);
+    app(App\Services\Marketplace\StoreCollections::class)->confirm($order, $actor, $qr, (string) Str::uuid());
+    expect($order->fresh()->fulfilment_state)->toBe('collected')->and($pass->fresh()->consumed_at)->not->toBeNull();
+});
+
+it('expires and rotates delivery QR proof and invalidates its generation after return and redispatch', function (): void {
+    [, $variant, $actor, $session, $order] = StoreCheckoutScenario::deliveryReady();
+    $deliveries = app(App\Services\Marketplace\StoreDeliveries::class);
+    $service = app(StoreCollectionPasses::class);
+    $deliveries->dispatch($order, $actor, (string) Str::uuid());
+    $issued = $service->issue($order, $session, (string) Str::uuid());
+    $first = StoreCollectionPass::query()->findOrFail($issued['pass_id']);
+    $qr = ['purpose' => 'miconvener.store.delivery.v1', 'pass_id' => $first->id, 'secret' => $first->secret_material['qr']];
+    expect(fn () => $service->validate($order, $actor, [...$qr, 'purpose' => 'miconvener.store.collection.v1']))->toThrow(ValidationException::class);
+    expect($service->validate($order, $actor, $qr)->id)->toBe($first->id);
+    $this->travel(16)->minutes();
+    expect(fn () => $service->validate($order, $actor, $qr))->toThrow(ValidationException::class);
+    expect($order->fresh()->fulfilment_state)->toBe('dispatched')->and($first->fresh()->consumed_at)->toBeNull();
+    $issued = $service->issue($order, $session, (string) Str::uuid());
+    $second = StoreCollectionPass::query()->findOrFail($issued['pass_id']);
+    $rotated = ['purpose' => 'miconvener.store.delivery.v1', 'pass_id' => $second->id, 'secret' => $second->secret_material['qr']];
+    expect(fn () => $service->validate($order, $actor, $qr))->toThrow(ValidationException::class);
+    expect($service->validate($order, $actor, $rotated)->id)->toBe($second->id);
+    $deliveries->returned($order, $actor, (string) Str::uuid(), 'All goods physically back');
+    $deliveries->dispatch($order->fresh(), $actor, (string) Str::uuid());
+    expect(fn () => $service->validate($order, $actor, $rotated))->toThrow(ValidationException::class);
+    $issued = $service->issue($order, $session, (string) Str::uuid());
+    $third = StoreCollectionPass::query()->findOrFail($issued['pass_id']);
+    $current = ['purpose' => 'miconvener.store.delivery.v1', 'pass_id' => $third->id, 'secret' => $third->secret_material['qr']];
+    expect($third->event_id)->not->toBe($second->event_id);
+    app(App\Services\Marketplace\StoreCollections::class)->confirm($order, $actor, $current, (string) Str::uuid());
+    expect($order->fresh()->fulfilment_state)->toBe('delivered')->and($variant->fresh()->on_hand)->toBe(2);
+});

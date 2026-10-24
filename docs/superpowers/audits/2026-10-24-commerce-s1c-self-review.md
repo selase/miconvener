@@ -1,6 +1,6 @@
 # S1c author self-review and release evidence
 
-2026-10-24. Native implementation on `codex/commerce-s1c`, based on deployed PR #50 / `7a90c66c`. Pending one fresh whole-branch reviewer and final CI. No merge, deployment, production flag or real send/payment performed. Checkout stays disabled.
+2026-10-24. Native implementation on `codex/commerce-s1c`, based on deployed PR #50 / `7a90c66c`. One fresh whole-branch review completed; findings addressed in one focused fix pass. Final CI pending. No merge, deployment, production flag or real send/payment performed. Checkout stays disabled.
 
 Author pause: **Is there anything I have overlooked? Is the solution optimal? Let me take a step back.**
 
@@ -61,3 +61,11 @@ Before trading: approve a named sandbox operator/account/recipient/action budget
 - Whole-order only. Failed delivery and custody return do not create a merchandise exchange/return or automatically restock.
 - SMTP cannot guarantee exactly-once inbox arrival or recall an already claimed message. Stable identity, bounded retries, supersession of unsent stale notices and the current native order link make that explicit.
 - External provider/camera/zoom acceptance is not replaced by mocks, viewport measurements or this local fixture.
+
+## Independent review and single fix pass
+
+Fresh reviewer inspected `7a90c66c..278e16e9` with no conversation history, read-only. No Critical finance/security defect found. Two Important findings: direct HTML detail URLs lost selection, and purpose isolation/successful QR handover needed stronger backend tests. Two suggestions labelled Minor were regraded by the author as Important for user impact: typed country separators were discarded, and payment could be clicked while replacing an accepted fulfilment choice.
+
+All four addressed in one pass. Native direct links now bootstrap a selected-order ID and masked summary, then fetch protected detail; addresses remain out of initial Inertia props. Checkout is disabled during editing, saving and the replacement-order refetch in storefront and My Orders. Country input retains raw typing until submission normalisation. Genuine issued collection/delivery QR secrets now succeed; changing only purpose is rejected without consumption, and delivery expiry/rotation/physical-return/redispatch generations are covered.
+
+Evidence: native-props/direct-loader/form/payment tests observed failing before fixes. Backend3passed29 assertions and three affected component files18passed after fixes. The test-only QR coverage passed against existing correct guards; no guard was temporarily weakened to manufacture a failure. One reviewer and one fix pass, no repeat whole-branch review. Final CI will run on the resulting source; operator/provider/phone/zoom gates remain unchanged.

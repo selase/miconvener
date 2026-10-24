@@ -109,3 +109,11 @@ it('labels cancelled and reviewed orders honestly rather than calling them in pr
     $order->fulfilment_state = 'cancelled';
     expect(app(App\Services\Marketplace\StoreCollectionPayload::class)->summary($order)['label'])->toBe('Cancelled');
 });
+
+it('opens a direct native order URL with a protected selected-order loader rather than an empty workspace', function (): void {
+    [$tenant, , $actor, , $order] = StoreCheckoutScenario::collectionReady();
+    $actor->tenants()->attach($tenant->id);
+    $host = $tenant->slug.'.miconvener.test';
+    $this->actingAs($actor)->get('http://'.$host.'/store/collections/'.$order->id, ['HTTP_HOST' => $host])
+        ->assertOk()->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->component('Tenant/Store/Collections/Index')->where('orderId', $order->id)->missing('order.destination'));
+});

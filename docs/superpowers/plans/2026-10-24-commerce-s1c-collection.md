@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-24-commerce-s1c-collection-design.md` (read first).
 
-**Status:** native implementation in progress on `codex/commerce-s1c`, approved 2026-10-24 including delivery in the displayed price. Seller offers/buyer arrangements (`7e7de7ee`), readiness/permissions (`bee067ac`), protected credentials (`986d98c1`), atomic handover (`9c2473c0`) and delivery (`d22dbd99`) are committed. Native screens and durable notices are built and checked; final whole-branch review/CI and separate activation acceptance remain below. The earlier pickup-only preview is incomplete for delivery. Based on deployed `7a90c66c` / PR #50. No production configuration, payments, sends, merge or deployment are authorised by implementation approval. Checkout stays disabled. Preserve native execution; do not ask the owner to choose it again.
+**Status:** native implementation in progress on `codex/commerce-s1c`, approved 2026-10-24 including delivery in the displayed price. Seller offers/buyer arrangements (`7e7de7ee`), readiness/permissions (`bee067ac`), protected credentials (`986d98c1`), atomic handover (`9c2473c0`) and delivery (`d22dbd99`) are committed. Native screens and durable notices are built and checked; one fresh whole-branch review completed with a single focused fix pass; final CI and separate activation acceptance remain below. The earlier pickup-only preview is incomplete for delivery. Based on deployed `7a90c66c` / PR #50. No production configuration, payments, sends, merge or deployment are authorised by implementation approval. Checkout stays disabled. Preserve native execution; do not ask the owner to choose it again.
 
 ## Global constraints
 

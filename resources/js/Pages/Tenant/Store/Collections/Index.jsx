@@ -14,6 +14,7 @@ const field =
 export default function StoreCollections({
     orders = { data: [], current_page: 1, last_page: 1 },
     enabled: initialEnabled = false,
+    orderId = null,
 }) {
     const [online, setOnline] = useState(navigator.onLine !== false);
     useEffect(() => {
@@ -154,6 +155,9 @@ export default function StoreCollections({
         operation.current = crypto.randomUUID();
         void load(id);
     };
+    useEffect(() => {
+        if (orderId) choose(orderId);
+    }, [orderId]);
     const match = async (proof) => {
         const id = current.current;
         if (!id || !enabled || !online) return;

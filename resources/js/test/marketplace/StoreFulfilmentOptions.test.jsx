@@ -82,3 +82,21 @@ it('ignores a delayed buyer acceptance response after the screen unmounts', asyn
     );
     expect(accepted).not.toHaveBeenCalled();
 });
+
+it('keeps a typed country separator until submission and normalizes the offered countries then', async () => {
+    const { default: PolicyForm } =
+        await import('@/Components/Marketplace/StoreFulfilmentPolicyForm');
+    csrfFetch.mockReset();
+    csrfFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    render(<PolicyForm initial={{ methods: ['delivery'], delivery_countries: ['GH'] }} />);
+    const input = screen.getByLabelText('Delivery country codes (comma separated)');
+    fireEvent.change(input, { target: { value: 'GH,' } });
+    expect(input.value).toBe('GH,');
+    fireEvent.change(input, { target: { value: 'GH, ng' } });
+    fireEvent.submit(screen.getByText('Save fulfilment options').closest('form'));
+    await waitFor(() => expect(csrfFetch).toHaveBeenCalledOnce());
+    expect(JSON.parse(csrfFetch.mock.calls[0][1].body).policy.delivery_countries).toEqual([
+        'GH',
+        'NG',
+    ]);
+});

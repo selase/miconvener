@@ -28,6 +28,7 @@ export function QuoteTimer({ expires, onExpire }) {
     );
 }
 export default function StoreCheckout({ shop, variant }) {
+    const [fulfilmentPending, setFulfilmentPending] = useState(false);
     const [quantity, setQuantity] = useState(1);
     const [quote, setQuote] = useState(null);
     const [busy, setBusy] = useState(false);
@@ -50,6 +51,7 @@ export default function StoreCheckout({ shop, variant }) {
         return () => clearTimeout(timer);
     }, [quote]);
     const request = async (start) => {
+        if (busy || (start && fulfilmentPending)) return;
         currentRequest.current?.abort();
         const controller = new AbortController();
         currentRequest.current = controller;
@@ -178,6 +180,7 @@ export default function StoreCheckout({ shop, variant }) {
                     {quote && (
                         <StoreFulfilmentSelector
                             order={quote}
+                            onPendingChange={setFulfilmentPending}
                             onAccepted={async (accepted) => {
                                 const response = await csrfFetch(
                                     `/my/store-orders/${accepted.order_id}`,
@@ -202,7 +205,9 @@ export default function StoreCheckout({ shop, variant }) {
                         <button
                             type="button"
                             className={STORE_BUTTON}
-                            disabled={busy || expired || !quote.fulfilment_method}
+                            disabled={
+                                busy || fulfilmentPending || expired || !quote.fulfilment_method
+                            }
                             onClick={() => request(true)}
                         >
                             {busy

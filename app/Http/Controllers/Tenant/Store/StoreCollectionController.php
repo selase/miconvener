@@ -48,7 +48,16 @@ final class StoreCollectionController extends Controller
 
     public function show(Request $request, string $subdomain, string $order, StoreCollectionPayload $payload): Response
     {
-        return $this->result($request, $this->order($request, $order), $payload);
+        $model = $this->order($request, $order);
+        if (! $request->expectsJson()) {
+            $model->loadMissing(['lines', 'fulfilmentArrangement:id,order_id,method']);
+
+            return $this->respond($request, ['orderId' => $model->id,
+                'orders' => ['data' => [$payload->summary($model)], 'current_page' => 1, 'last_page' => 1],
+                'enabled' => app(StoreFulfilment::class)->enabled($model)]);
+        }
+
+        return $this->result($request, $model, $payload);
     }
 
     public function ready(StoreReadyRequest $request, string $subdomain, string $order): Response

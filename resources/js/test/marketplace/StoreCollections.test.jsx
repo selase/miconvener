@@ -147,3 +147,19 @@ it('discards a pass response when email verification expires while it is loading
     );
     expect(screen.queryByText('PRIVATE')).toBeNull();
 });
+
+it('loads the protected selected detail when opened through a direct order URL', async () => {
+    csrfFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ order: detail, enabled: true }),
+    });
+    render(
+        <StoreCollections
+            orderId="order-1"
+            orders={{ data: [summary], last_page: 1, current_page: 1 }}
+            enabled
+        />
+    );
+    await screen.findByText('Association shirt');
+    expect(csrfFetch.mock.calls[0][0]).toBe('/store/collections/order-1');
+});
