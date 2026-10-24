@@ -10,10 +10,10 @@ use App\Models\StorePaymentObservation;
 use App\Models\StoreRefund;
 use App\Models\User;
 use App\Services\Finance\LedgerService;
+use App\Support\WithoutTelescope;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Laravel\Telescope\Telescope;
 use Throwable;
 
 final class StoreRefunds
@@ -143,7 +143,7 @@ final class StoreRefunds
             return $this->complete($refund);
         }
         try {
-            [$id, $data] = Telescope::withoutRecording(function () use ($refund, $candidateId): array {
+            [$id, $data] = WithoutTelescope::run(function () use ($refund, $candidateId): array {
                 $gateway = $this->gateways->forAttempt($refund->attempt);
                 $id = $refund->provider_refund_id ?? $candidateId ?? $gateway->findCommerceRefund($refund->attempt->reference, $refund->operation_key, $refund->amount_pesewas, 'GHS');
 
@@ -197,7 +197,7 @@ final class StoreRefunds
             return $refund->fresh();
         }
         try {
-            $result = Telescope::withoutRecording(fn () => $this->gateways->forAttempt($refund->attempt)->requestCommerceRefund($refund->attempt->reference, $refund->amount_pesewas, $refund->operation_key));
+            $result = WithoutTelescope::run(fn () => $this->gateways->forAttempt($refund->attempt)->requestCommerceRefund($refund->attempt->reference, $refund->amount_pesewas, $refund->operation_key));
             StoreRefund::query()->whereKey($refund->id)->where('status', 'submitting')->update(['status' => filled($result['reference']) ? 'pending' : 'unknown', 'provider_refund_id' => filled($result['reference']) ? $result['reference'] : null, 'provider_status' => $result['status']]);
         } catch (Throwable) {
             StoreRefund::query()->whereKey($refund->id)->where('status', 'submitting')->update(['status' => 'unknown', 'review_reason' => 'refund_submission_unknown']);

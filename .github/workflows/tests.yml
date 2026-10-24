@@ -123,4 +123,13 @@ jobs:
         DB_DATABASE: testing
         DB_USERNAME: postgres
         DB_PASSWORD: password
-      run: php artisan test --parallel --processes=4
+      run: |
+        php artisan test --parallel --processes=4
+        php artisan test --compact --bootstrap=tests/Support/without-telescope-bootstrap.php \
+          tests/Unit/Support/WithoutTelescopeTest.php \
+          tests/Feature/Marketplace/StoreCheckoutTest.php \
+          tests/Feature/Marketplace/StoreReceiptsTest.php \
+          tests/Feature/Marketplace/StoreReadyNoticesTest.php \
+          tests/Feature/Marketplace/StoreRefundsTest.php \
+          tests/Feature/Marketplace/StorePayoutsTest.php \
+          tests/Feature/Community/PhoneVerificationTest.php

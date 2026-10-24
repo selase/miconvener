@@ -15,11 +15,11 @@ use App\Services\Finance\PayoutRelease;
 use App\Services\Finance\PayoutSender;
 use App\Services\Finance\TransferFeeSchedule;
 use App\Services\Giving\GivingGateways;
+use App\Support\WithoutTelescope;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Laravel\Telescope\Telescope;
 use Throwable;
 
 final class StorePayouts
@@ -106,7 +106,7 @@ final class StorePayouts
             return ['message' => 'This payout is already submitted, parked or complete. Reconcile its original reference.', 'http_status' => 422];
         }
 
-        return Telescope::withoutRecording(fn () => $this->sender->send($claimed, 'GHS', $claimed->provider_reference));
+        return WithoutTelescope::run(fn () => $this->sender->send($claimed, 'GHS', $claimed->provider_reference));
     }
 
     /** @return array<string, mixed> */
@@ -117,7 +117,7 @@ final class StorePayouts
             $this->refuse('Enter the one-time payout code.');
         }
 
-        return Telescope::withoutRecording(fn () => $this->release->releaseWithoutLock($payout, $otp, function (EventPayout $claim): void {
+        return WithoutTelescope::run(fn () => $this->release->releaseWithoutLock($payout, $otp, function (EventPayout $claim): void {
             $seller = $this->locks->tenant($claim->tenant_id);
             $current = EventPayout::withoutGlobalScopes()->lockForUpdate()->findOrFail($claim->id);
             $this->originalPlatformAccount($current);
@@ -136,7 +136,7 @@ final class StorePayouts
         }
         $this->originalPlatformAccount($payout);
         try {
-            $data = Telescope::withoutRecording(fn () => $this->gateway->verifyTransfer($payout->provider_reference));
+            $data = WithoutTelescope::run(fn () => $this->gateway->verifyTransfer($payout->provider_reference));
         } catch (Throwable) {
             EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', '<>', EventPayout::STATUS_PAID)->update(['failure_reason' => 'Original transfer verification is unavailable; do not resend.']);
 

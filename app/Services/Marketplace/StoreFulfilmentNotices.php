@@ -9,8 +9,8 @@ use App\Mail\StoreOrderReady;
 use App\Models\StoreFulfilmentEvent;
 use App\Models\StoreFulfilmentNotice;
 use App\Models\StoreOrder;
+use App\Support\WithoutTelescope;
 use Illuminate\Support\Facades\Mail;
-use Laravel\Telescope\Telescope;
 use RuntimeException;
 use Throwable;
 
@@ -79,7 +79,7 @@ final class StoreFulfilmentNotices
             return;
         }
         try {
-            Telescope::withoutRecording(fn () => Mail::to($notice->destination)->send(new StoreOrderReady($notice)));
+            WithoutTelescope::run(fn () => Mail::to($notice->destination)->send(new StoreOrderReady($notice)));
             $notice->update(['state' => 'sent', 'sent_at' => now(), 'next_attempt_at' => null]);
         } catch (Throwable) {
             $notice->refresh();
