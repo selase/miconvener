@@ -210,7 +210,11 @@ final class StoreListing extends Model
     public function scopeCatalogAvailable(Builder $query): Builder
     {
         return $query->where('store_listings.status', self::STATUS_PUBLISHED)->whereNull('store_listings.taken_down_at')
-            ->whereHas('merchandise', fn (Builder $details) => $details->whereNull('archived_at')->whereRaw("collection_instructions ~ '[^[:space:]]'"))
+            ->whereHas('merchandise', fn (Builder $details) => $details->whereNull('archived_at')->where(function (Builder $ready): void {
+                $ready->whereRaw("collection_instructions ~ '[^[:space:]]'")->orWhereExists(function ($policy): void {
+                    $policy->selectRaw('1')->from('store_fulfilment_policies')->whereColumn('store_fulfilment_policies.shop_id', 'store_merchandise.shop_id');
+                });
+            }))
             ->whereHas('variants', fn (Builder $variants) => $variants->where('is_active', true))
             ->whereHas('shop', fn (Builder $shop) => $shop->where('is_active', true)
                 ->whereHas('tenant', fn (Builder $tenant) => $tenant->where('status', 'active')

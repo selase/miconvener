@@ -13,6 +13,7 @@ const order = {
     payment_state: 'awaiting',
     state: 'quoted',
     fulfilment_state: 'awaiting_preparation',
+    fulfilment_method: 'collection',
     expires_at: new Date(Date.now() + 600000).toISOString(),
     collection_terms: 'Collect at the office',
     refund_terms: 'Full uncollected refunds',

@@ -34,6 +34,9 @@ final class StorePayments
             if ($order->state === 'review' || $order->payment_state === 'captured_review') {
                 $this->refuse();
             }
+            if ($order->state === 'quoted' && ! \App\Models\StoreFulfilmentArrangement::query()->where('order_id', $order->id)->exists()) {
+                $this->refuse();
+            }
             $seller = Tenant::query()->findOrFail($order->tenant_id);
             if (! app(CommerceCatalogRollout::class)->enabled($seller)
                 || ! $seller->features()->where('feature_key', 'commerce_checkout')->where('enabled', true)->exists()

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { StoreFulfilmentSelector } from '@/Components/Marketplace/StoreFulfilmentChoice';
 import csrfFetch from '@/lib/csrfFetch';
 import { formatDuesMoney } from '@/lib/dues';
 
@@ -158,7 +159,8 @@ export default function StoreCheckout({ shop, variant }) {
                         {formatDuesMoney(quote.total_pesewas, quote.currency)}
                     </p>
                     <p className="text-sm text-ink-secondary">
-                        {quantity} item{Number(quantity) === 1 ? '' : 's'} · Collection only
+                        {quantity} item{Number(quantity) === 1 ? '' : 's'} · Choose collection or
+                        delivery
                     </p>
                     {quote.buyer_fee_pesewas != null && (
                         <p className="text-sm text-ink-secondary">
@@ -173,6 +175,24 @@ export default function StoreCheckout({ shop, variant }) {
                     <p className="whitespace-pre-line break-words text-sm text-ink-secondary">
                         {quote.refund_terms}
                     </p>
+                    {quote && (
+                        <StoreFulfilmentSelector
+                            order={quote}
+                            onAccepted={async (accepted) => {
+                                const response = await csrfFetch(
+                                    `/my/store-orders/${accepted.order_id}`,
+                                    { headers: { Accept: 'application/json' } }
+                                );
+                                if (!response.ok) {
+                                    setQuote(null);
+                                    setError('Verify your email to continue.');
+                                    return;
+                                }
+                                const data = await response.json();
+                                setQuote(data.order);
+                            }}
+                        />
+                    )}
                     {unknown ? (
                         <p role="status" className="text-sm text-ink">
                             Your payment needs confirmation. Do not pay again. Check your order or
@@ -182,7 +202,7 @@ export default function StoreCheckout({ shop, variant }) {
                         <button
                             type="button"
                             className={STORE_BUTTON}
-                            disabled={busy || expired}
+                            disabled={busy || expired || !quote.fulfilment_method}
                             onClick={() => request(true)}
                         >
                             {busy

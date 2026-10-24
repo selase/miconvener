@@ -331,6 +331,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::get('community/polls/{questionnaire}/results', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'results'])->whereUuid('questionnaire')->name('tenant.community.polls.results');
     Route::get('community/polls/{questionnaire}/export', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'export'])->whereUuid('questionnaire')->name('tenant.community.polls.export');
     Route::prefix('store')->name('tenant.store.')->middleware('throttle:30,1')->group(function (): void {
+        Route::post('fulfilment-policies', [App\Http\Controllers\Tenant\Store\StoreFulfilmentPolicyController::class, 'store'])->name('fulfilment-policies.store');
         Route::get('orders', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'index'])->name('orders.index');
         Route::get('finance', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'finance'])->name('finance.index');
         Route::post('orders/{order}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcilePayment'])->whereUuid('order')->middleware('throttle:10,1')->name('orders.reconcile');

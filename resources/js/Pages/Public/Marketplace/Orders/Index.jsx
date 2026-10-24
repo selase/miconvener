@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Head } from '@inertiajs/react';
 import PublicLayout from '@/Layouts/PublicLayout';
+import { StoreFulfilmentSelector } from '@/Components/Marketplace/StoreFulfilmentChoice';
 import csrfFetch from '@/lib/csrfFetch';
 import { formatDuesMoney } from '@/lib/dues';
 import { QuoteTimer, STORE_BUTTON } from '@/Components/Marketplace/StoreCheckout';
@@ -321,6 +322,18 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                                 : 'Continue to payment'}
                                         </button>
                                     </div>
+                                )}
+                                {['quoted', 'confirmed'].includes(order.state) && (
+                                    <StoreFulfilmentSelector
+                                        order={order}
+                                        onAccepted={(accepted) => {
+                                            if (accepted.order_id !== order.id)
+                                                window.location.assign(
+                                                    `/my/store-orders/${accepted.order_id}`
+                                                );
+                                            else setRevision((value) => value + 1);
+                                        }}
+                                    />
                                 )}
                                 {order.cancel_allowed && (
                                     <button

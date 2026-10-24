@@ -41,13 +41,31 @@ final class StoreCheckoutScenario
         return [$tenant->fresh(), $variant->fresh(), $actor, self::session()];
     }
 
+    /**
+     * Explicit fixture buyer acceptance for legacy checkout regression scenarios.
+     *
+     * @param  array<array-key,mixed>  $lines
+     */
+    public static function quote(Tenant $tenant, \Illuminate\Contracts\Session\Session $session, array $lines, string $key): \App\Models\StoreOrder
+    {
+        $order = app(\App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, $lines, $key);
+        if (! \App\Models\StoreFulfilmentArrangement::query()->where('order_id', $order->id)->exists()) {
+            $policy = \App\Models\StoreFulfilmentPolicy::query()->where('shop_id', $order->shop_id)->orderByDesc('version')->first()
+                ?? \App\Models\StoreFulfilmentPolicy::factory()->create(['shop_id' => $order->shop_id, 'tenant_id' => $order->tenant_id]);
+            app(\App\Services\Marketplace\StoreFulfilmentOptions::class)->choose($order, $session,
+                ['policy_id' => $policy->id, 'method' => 'collection'], (string) Str::uuid());
+        }
+
+        return $order;
+    }
+
     /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StorePaymentAttempt} */
     public static function online(): array
     {
         [$tenant, $variant, $actor, $session] = self::make();
         \Illuminate\Support\Facades\Http::preventStrayRequests();
         \Illuminate\Support\Facades\Http::fake(['*api.paystack.co/transaction/initialize' => \Illuminate\Support\Facades\Http::response(['data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']])]);
-        $order = app(\App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+        $order = self::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
         $attempt = app(\App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
 
         return [$tenant, $variant, $actor, $session, $order, $attempt];
@@ -66,7 +84,7 @@ final class StoreCheckoutScenario
     /** @return array{\App\Models\StoreOrder, \App\Models\StorePaymentAttempt, \App\Models\StorePaymentObservation} */
     public static function anotherPaid(Tenant $tenant, StoreVariant $variant, Store $session): array
     {
-        $order = app(\App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+        $order = self::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
         $attempt = app(\App\Services\Marketplace\StorePayments::class)->start($order, $session, (string) Str::uuid());
         $capture = app(\App\Services\Marketplace\StorePaymentEvidence::class)->record($attempt, self::evidence($attempt));
         app(\App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Services\Marketplace\StoreGateways;
 use App\Services\Marketplace\StorePayments;
-use App\Services\Marketplace\StoreQuotes;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -12,7 +11,7 @@ use Tests\Support\StoreCheckoutScenario;
 
 it('fails closed when the original platform account changes before checkout', function (): void {
     [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
-    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     config(['services.settlement.paystack.secret_key' => 'sk_test_rotated']);
     Http::fake();
     expect(fn () => app(StorePayments::class)->start($order, $session, (string) Str::uuid()))->toThrow(ValidationException::class);
@@ -21,7 +20,7 @@ it('fails closed when the original platform account changes before checkout', fu
 
 it('verifies against the stored original reference and strips gateway authorizations', function (): void {
     [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
-    $order = app(StoreQuotes::class)->create($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
     Http::fake([
         '*api.paystack.co/customer*' => Http::response(['data' => ['customer_code' => 'CUS_STORE', 'email' => 'buyer@example.test']]),
         '*api.paystack.co/transaction/initialize' => Http::response(['data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']]),
