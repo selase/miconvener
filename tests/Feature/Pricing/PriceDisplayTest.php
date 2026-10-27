@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
+    $this->travelTo('2026-10-17 12:00:00');
     refreshTenantDatabases();
     Cache::flush();
     Http::fake(['*' => Http::response('offline', 500)]);

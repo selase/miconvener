@@ -42,9 +42,9 @@ it('starts only on request, rejects event codes and stops after a store credenti
     expect(camera.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Start camera' }));
     await waitFor(() => expect(camera.start).toHaveBeenCalledOnce());
-    act(() => camera.callback('https://example.test/checkin/event-ticket'));
+    await act(async () => camera.callback('https://example.test/checkin/event-ticket'));
     expect(accept).not.toHaveBeenCalled();
-    expect(screen.getByText(/store handover QR/)).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toMatch(/store handover QR/);
     const credential = {
         purpose: 'miconvener.store.collection.v1',
         pass_id: 'pass',
@@ -78,3 +78,73 @@ it('stops a camera whose permission prompt resolves after unmount', async () => 
     expect(accept).not.toHaveBeenCalled();
     expect(camera.stop).toHaveBeenCalled();
 });
+
+it('does not offer restart until the previous camera has finished stopping', async () => {
+    let finishStop;
+    camera.stop.mockImplementationOnce(
+        () =>
+            new Promise((resolve) => {
+                finishStop = resolve;
+            })
+    );
+    render(<StoreCollectionScanner onCredential={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+    await waitFor(() => expect(camera.start).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Stop camera' }));
+    expect(screen.getByRole('button', { name: 'Start camera' }).disabled).toBe(true);
+    await waitFor(() => expect(finishStop).toBeTypeOf('function'));
+    await act(async () => finishStop());
+    await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Start camera' }).disabled).toBe(false)
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+    await waitFor(() => expect(camera.start).toHaveBeenCalledTimes(2));
+});
+
+it('keeps restart disabled while a cancelled camera permission request is unresolved', async () => {
+    let finishStart;
+    camera.start.mockImplementationOnce(
+        () =>
+            new Promise((resolve) => {
+                finishStart = resolve;
+            })
+    );
+    render(<StoreCollectionScanner onCredential={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+    await waitFor(() => expect(camera.start).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Stop camera' }));
+    expect(screen.getByRole('button', { name: 'Start camera' }).disabled).toBe(true);
+    await act(async () => finishStart());
+    await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Start camera' }).disabled).toBe(false)
+    );
+    expect(camera.stop).toHaveBeenCalledOnce();
+});
+
+it.each(['sync', 'async'])(
+    'stops the camera and reports a %s verification failure separately from QR parsing',
+    async (mode) => {
+        const accept =
+            mode === 'sync'
+                ? () => {
+                      throw new Error('Consumer failure');
+                  }
+                : async () => {
+                      throw new Error('Consumer failure');
+                  };
+        render(<StoreCollectionScanner onCredential={accept} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+        await waitFor(() => expect(camera.start).toHaveBeenCalledOnce());
+        await act(async () =>
+            camera.callback(
+                JSON.stringify({
+                    purpose: 'miconvener.store.collection.v1',
+                    pass_id: 'pass',
+                    secret: 'secret',
+                })
+            )
+        );
+        await waitFor(() => expect(camera.stop).toHaveBeenCalled());
+        expect(screen.getByRole('alert').textContent).toMatch(/verification could not start/i);
+    }
+);

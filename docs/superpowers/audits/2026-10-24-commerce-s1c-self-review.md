@@ -1,6 +1,6 @@
 # S1c author self-review and release evidence
 
-2026-10-24. Native implementation on `codex/commerce-s1c`, based on deployed PR #50 / `7a90c66c`. One fresh whole-branch review completed; findings addressed in one focused fix pass. Final CI pending. No merge, deployment, production flag or real send/payment performed. Checkout stays disabled.
+**Initial checkpoint (2026-10-24, before CI/release):** Native implementation on `codex/commerce-s1c`, based on deployed PR #50 / `7a90c66c`. One fresh whole-branch review completed; findings addressed in one focused fix pass. Final CI pending. No merge, deployment, production flag or real send/payment performed. Checkout stays disabled.
 
 Author pause: **Is there anything I have overlooked? Is the solution optimal? Let me take a step back.**
 
@@ -71,3 +71,7 @@ All four addressed in one pass. Native direct links now bootstrap a selected-ord
 Evidence: native-props/direct-loader/form/payment tests observed failing before fixes. Backend3passed29 assertions and three affected component files18passed after fixes. The test-only QR coverage passed against existing correct guards; no guard was temporarily weakened to manufacture a failure. One reviewer and one fix pass, no repeat whole-branch review. Final CI will run on the resulting source; operator/provider/phone/zoom gates remain unchanged.
 
 CI’s first formatting gate found eight formatting/import-alias lines in five earlier-task test files. Formatted every changed PHP file against the branch base, inspected the diff (no runtime behavior changed), and retained all assertions. Final checks rerun on the formatted commit; no dependency or CI configuration workaround.
+
+## Current checkpoint — 2026-10-27
+
+The initial pending-CI/no-release statement above is historical. S1c is deployed via PR #51 (`7afdb2e5`) after green final CI, with the production optional-dependency correction deployed via PR #52 (`d4c16801`). The marketplace roadmap records release IDs and test counts. Two explicitly approved GH1 live purchases completed once each: collection and delivery using manual proof, balanced posting, stock zero and checkout off. Owner confirmed receipt/readiness emails found. No mail-provider settings, resend, refund or payout was needed. Phone QR scanning remains unverified after failure; the PR #53 lifecycle/focus correction has reproduced RED cases and13 passing focused tests but still needs its final release gate and physical retest. This is bounded owner acceptance, not general marketplace readiness approval.

@@ -163,3 +163,36 @@ it('loads the protected selected detail when opened through a direct order URL',
     await screen.findByText('Association shirt');
     expect(csrfFetch.mock.calls[0][0]).toBe('/store/collections/order-1');
 });
+
+it('does not let window focus abort an in-flight code validation', async () => {
+    let validationSignal;
+    let finishValidation;
+    csrfFetch.mockImplementation(async (url, options) => {
+        if (url.endsWith('/validate')) {
+            validationSignal = options.signal;
+            return new Promise((resolve, reject) => {
+                finishValidation = () =>
+                    resolve({ ok: true, json: async () => ({ order: detail }) });
+                options.signal.addEventListener('abort', () =>
+                    reject(new DOMException('Aborted', 'AbortError'))
+                );
+            });
+        }
+        return {
+            ok: true,
+            json: async () => ({ order: detail, orders: { data: [summary] }, enabled: true }),
+        };
+    });
+    render(<StoreCollections orderId="order-1" orders={{ data: [summary] }} enabled />);
+    await screen.findByText('Association shirt');
+    fireEvent.change(screen.getByLabelText('Collection or delivery code'), {
+        target: { value: '7K2M-4Q9R-8H3V' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check code' }));
+    await waitFor(() => expect(finishValidation).toBeTypeOf('function'));
+    act(() => window.dispatchEvent(new Event('focus')));
+    expect(validationSignal.aborted).toBe(false);
+    await act(async () => finishValidation());
+    await screen.findByText(/Code matched/);
+    expect(document.activeElement).toBe(screen.getByText(/Code matched/));
+});
