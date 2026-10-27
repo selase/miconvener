@@ -48,6 +48,13 @@ export default function StoreCollections({
     const alert = useRef(null);
     const heading = useRef(null);
     const focusResult = useRef(false);
+    const validating = useRef(false);
+    const recording = useRef(false);
+    const cameraActive = useRef(false);
+    const matchedResult = useRef(null);
+    useEffect(() => {
+        if (matched) matchedResult.current?.focus();
+    }, [matched]);
     useEffect(() => {
         if (!dialog && focusResult.current) {
             focusResult.current = false;
@@ -135,7 +142,13 @@ export default function StoreCollections({
             } else void refresh();
         };
         const focus = () => {
-            if (document.visibilityState !== 'hidden') void refresh();
+            if (
+                document.visibilityState !== 'hidden' &&
+                !validating.current &&
+                !recording.current &&
+                !cameraActive.current
+            )
+                void refresh();
         };
         document.addEventListener('visibilitychange', visibility);
         window.addEventListener('focus', focus);
@@ -160,7 +173,8 @@ export default function StoreCollections({
     }, [orderId]);
     const match = async (proof) => {
         const id = current.current;
-        if (!id || !enabled || !online) return;
+        if (!id || !enabled || !online || validating.current || recording.current) return false;
+        validating.current = true;
         setBusy(true);
         setError('');
         setMatched(false);
@@ -171,13 +185,15 @@ export default function StoreCollections({
             if (data && current.current === id) {
                 setDetail(data.order);
                 setMatched(true);
-                heading.current?.focus();
+                return true;
             }
         } catch (failure) {
             if (failure.name !== 'AbortError') setError(failure.message);
         } finally {
+            validating.current = false;
             setBusy(false);
         }
+        return false;
     };
     const open = (action) => {
         setDialog(action);
@@ -195,6 +211,7 @@ export default function StoreCollections({
         )
             return;
         const id = current.current;
+        recording.current = true;
         setBusy(true);
         setError('');
         const body = {
@@ -230,6 +247,7 @@ export default function StoreCollections({
                 await load(id);
             }
         } finally {
+            recording.current = false;
             setBusy(false);
         }
     };
@@ -532,6 +550,11 @@ export default function StoreCollections({
                                         <StoreCollectionScanner
                                             disabled={busy}
                                             onCredential={match}
+                                            onActiveChange={(value, owner) => {
+                                                if (value) cameraActive.current = owner;
+                                                else if (cameraActive.current === owner)
+                                                    cameraActive.current = false;
+                                            }}
                                         />
                                         <form
                                             onSubmit={(event) => {
@@ -563,7 +586,12 @@ export default function StoreCollections({
                                         </form>
                                         {matched && (
                                             <div className="space-y-3 border-l-2 border-accent bg-accent/5 p-4">
-                                                <p role="status" className="text-sm">
+                                                <p
+                                                    role="status"
+                                                    tabIndex={-1}
+                                                    ref={matchedResult}
+                                                    className="text-sm"
+                                                >
                                                     Code matched. Check every item before
                                                     confirming.
                                                 </p>
