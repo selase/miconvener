@@ -61,6 +61,50 @@ it('refuses another organisation or an already collected order', function (bool 
     expect(StoreRefund::query()->count())->toBe(0);
 })->with([true, false]);
 
+it('reconciles full refunds after Paystack changes the original payment to a reversal status', function (string $paymentStatus, string $refundStatus): void {
+    [$tenant, $variant, $actor, $session, $order, $attempt] = StoreCheckoutScenario::paid();
+    grantStoreFinance($actor, $tenant->id);
+    StoreCheckoutScenario::anotherPaid($tenant, $variant, $session);
+    $key = (string) Str::uuid();
+    Http::fake(['*api.paystack.co/refund' => Http::response(['data' => ['id' => 126, 'status' => 'pending']])]);
+    $refund = app(StoreRefunds::class)->request($order, $actor, $key, 'Not collected');
+    Http::fake([
+        '*api.paystack.co/transaction/verify/*' => Http::response(['data' => ['id' => 987, 'reference' => $attempt->reference, 'status' => $paymentStatus, 'amount' => 10000, 'fees' => 195, 'currency' => 'GHS']]),
+        '*api.paystack.co/refund/126' => Http::response(['data' => ['id' => 126, 'status' => $refundStatus, 'amount' => 10000, 'currency' => 'GHS', 'merchant_note' => 'store:'.$key, 'transaction' => 987]]),
+    ]);
+    app(StoreRefunds::class)->reconcile($refund);
+    app(StoreRefunds::class)->reconcile($refund);
+    $processed = $refundStatus === 'processed';
+    expect($refund->fresh()->status)->toBe($processed ? 'confirmed' : 'pending')
+        ->and($refund->fresh()->provider_status)->toBe($refundStatus)
+        ->and($variant->fresh()->on_hand)->toBe($processed ? 2 : 1)
+        ->and($order->fresh()->payment_state)->toBe($processed ? 'refunded' : 'refund_pending')
+        ->and(App\Models\LedgerTransaction::withoutGlobalScopes()->where('transaction_type', 'commerce_refund')->count())->toBe($processed ? 1 : 0)
+        ->and(App\Models\StoreStockMovement::query()->where('source_kind', 'refund')->where('source_id', $refund->id)->count())->toBe($processed ? 1 : 0);
+    Http::assertNotSent(fn ($request): bool => $request->method() === 'POST');
+})->with([
+    'refund queued' => ['reversal-pending', 'pending'],
+    'refund processing' => ['reversal-pending', 'processing'],
+    'refund completed' => ['reversed', 'processed'],
+]);
+
+it('still rejects unrelated payment states and refund identities during reversal recovery', function (string $status, string $reference, string $note, int $transaction): void {
+    $key = (string) Str::uuid();
+    Http::fake([
+        '*api.paystack.co/transaction/verify/original-ref' => Http::response(['data' => ['id' => 987, 'reference' => $reference, 'status' => $status, 'amount' => 10000, 'fees' => 195, 'currency' => 'GHS']]),
+        '*api.paystack.co/refund/126' => Http::response(['data' => ['id' => 126, 'status' => 'processed', 'amount' => 10000, 'currency' => 'GHS', 'merchant_note' => $note === 'correct' ? 'store:'.$key : 'store:foreign-operation', 'transaction' => $transaction]]),
+    ]);
+    $gateway = new App\Services\Payment\PaystackGateway(['secret_key' => 'sk_test_store_only']);
+    expect($gateway->verifyCommerceRefund('126', 'original-ref', $key))->toBe(['status' => 'unknown']);
+})->with([
+    'failed payment' => ['failed', 'original-ref', 'correct', 987],
+    'unpaid payment' => ['pending', 'original-ref', 'correct', 987],
+    'abandoned payment' => ['abandoned', 'original-ref', 'correct', 987],
+    'foreign reference' => ['reversed', 'foreign-ref', 'correct', 987],
+    'foreign operation' => ['reversed', 'original-ref', 'wrong', 987],
+    'foreign transaction' => ['reversed', 'original-ref', 'correct', 988],
+]);
+
 it('cancels an uncollected free order with one stock reversal and no gateway or money ledger', function (): void {
     [$tenant, $variant, $actor, $session] = StoreCheckoutScenario::make(1);
     grantStoreFinance($actor, $tenant->id);

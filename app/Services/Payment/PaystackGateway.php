@@ -329,7 +329,8 @@ final class PaystackGateway implements PaymentGateway
             return ['status' => 'unknown'];
         }
         $payment = $this->verifyTransaction($reference, true);
-        if (! ($payment['reference_reported'] ?? false) || ($payment['reference'] ?? null) !== $reference || ($payment['status'] ?? null) !== 'success') {
+        if (! ($payment['reference_reported'] ?? false) || ($payment['reference'] ?? null) !== $reference
+            || ! in_array($payment['status'] ?? null, ['success', 'reversal-pending', 'reversed'], true)) {
             return ['status' => 'unknown'];
         }
         $data = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/refund/".rawurlencode($refundId))->throw()->json('data');

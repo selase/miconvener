@@ -74,4 +74,23 @@ CI’s first formatting gate found eight formatting/import-alias lines in five e
 
 ## Current checkpoint — 2026-10-27
 
-The initial pending-CI/no-release statement above is historical. S1c is deployed via PR #51 (`7afdb2e5`) after green final CI, with the production optional-dependency correction deployed via PR #52 (`d4c16801`). The marketplace roadmap records release IDs and test counts. Two explicitly approved GH1 live purchases completed once each: collection and delivery using manual proof, balanced posting, stock zero and checkout off. Owner confirmed receipt/readiness emails found. No mail-provider settings, resend, refund or payout was needed. Phone QR scanning remains unverified after failure; the PR #53 lifecycle/focus correction has reproduced RED cases and13 passing focused tests but still needs its final release gate and physical retest. This is bounded owner acceptance, not general marketplace readiness approval.
+The initial pending-CI/no-release statement above is historical. S1c is deployed via PR #51 (`7afdb2e5`) after green final CI, with the production optional-dependency correction deployed via PR #52 (`d4c16801`). The marketplace roadmap records release IDs and test counts. Two explicitly approved GH1 live purchases completed once each: collection and delivery using manual proof, balanced posting, stock zero and checkout off. Owner confirmed receipt/readiness emails found. No mail-provider settings, resend, refund or payout was needed. PR #53 (`df385c12`) is deployed and its separately approved free physical retest passed: camera stopped, Code matched appeared, and exactly one QR-based collection was recorded. The owner report was independently verified against production; zero charge, no payment attempt and checkout disabled. This is bounded owner acceptance, not general marketplace readiness approval.
+
+
+## Finance acceptance self-review — 2026-10-27
+
+Author pause: **Is there anything I have overlooked? Is the solution optimal? Let me take a step back.**
+
+### Touchpoints updated
+
+- Gateway correction is confined to commerce refund verification; purchase capture eligibility, Giving/legacy refunds, commissions, ledger writers, stock consumption and payout release are unchanged. The existing refund/reconcile UI and scheduler already call this verifier.
+- Proportional tests cover three reversal lifecycle states, six rejected identities/payment states and two rejected new-capture reversals. Actual provider pending evidence reproduced the defect; RED preceded correction. The roadmap/runbook distinguish mocked, real-worker, actual test-provider and bounded live evidence.
+- AGENTS.md/memory: no new architecture or standing rule. Seeders/roles/permissions/navigation: existing recovery route and permission remain. Environment/config/packages/schema: no additions or changes. Frontend/build: no JS/CSS change, so no asset rebuild required. Original Claude checkout remains read-only.
+
+### UI gap analysis
+
+Existing finance recovery actions expose pending/review/confirmed outcomes and remain permission-gated; no new screen, link, modal, input, responsive layout or keyboard interaction is introduced. No UI-specific change requires a new browser layout run. Pending provider outcomes must not be presented as completed refunds, and the existing completion path remains responsible for exactly-once ledger/restock updates. The earlier real phone camera failure is closed by actual device acceptance, not by a mocked assertion.
+
+### Solved and recommendations
+
+Solved the actual Paystack reversal-status mismatch without weakening refund identity or allowing a reversed payment to fulfil a new sale. One focused independent review found no blockers. Do not claim the financial release complete: actual sandbox refunds remain pending, the test transfer requires owner OTP, the correction is not merged/deployed, and launch terms/readiness are still unapproved. Keep checkout disabled; complete/reconcile the existing operations and obtain release/activation approval before any production trading change.
