@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Mail;
  * organisation nobody has classified yet keeps what it was on.
  */
 beforeEach(function (): void {
+    $this->travelTo('2026-10-17 12:00:00');
     refreshTenantDatabases();
     Cache::flush();
     Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
