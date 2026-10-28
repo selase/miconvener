@@ -37,6 +37,16 @@ it('retains mismatched or incomplete captured evidence without granting an order
     [['metadata' => ['source' => 'another-app']]],
 ]);
 
+it('never treats a reversing payment as a new successful capture', function (string $status): void {
+    [, $variant, , , $order, $attempt] = StoreCheckoutScenario::online();
+    expect(fn () => app(StorePaymentEvidence::class)->record($attempt, StoreCheckoutScenario::evidence($attempt, ['status' => $status])))
+        ->toThrow(Illuminate\Validation\ValidationException::class);
+    expect(StorePaymentObservation::query()->count())->toBe(0)
+        ->and(LedgerTransaction::withoutGlobalScopes()->count())->toBe(0)
+        ->and($variant->fresh()->on_hand)->toBe(3)
+        ->and($order->fresh()->payment_state)->not->toBe('paid');
+})->with(['reversal-pending', 'reversed']);
+
 it('retains late or released captures as review liabilities without consuming replacement stock', function (string $change): void {
     [, $variant, , , $order, $attempt] = StoreCheckoutScenario::online();
     if ($change === 'released') {

@@ -1,6 +1,6 @@
 # S1b sandbox acceptance and launch gate
 
-Status: proposed runbook for owner approval; **not executed**. S1b source is under review on `codex/commerce-s1b`. Production checkout remains disabled. No account, numerical agreement, pilot or provider action is approved by this document.
+Status: **partially executed with owner approval, 2026-10-27**. S1b/S1c and the camera correction are deployed; production checkout remains disabled. The historical approval prerequisites below remain the general launch policy. The owner separately authorised the bounded live purchases, free camera retest and current isolated finance acceptance; none supplies a real trading agreement or general activation approval.
 
 ## Approvals before provider testing
 
@@ -33,3 +33,23 @@ Keep catalog/checkout off outside that named environment. Test private media sto
 ## Exit and owner sign-off
 
 Record pass/fail evidence and remaining exceptions for every sequence above. Before trading, complete **S1c collection/handover acceptance**, including refund-vs-collection locking and operational ownership. Obtain explicit approval for the real pilot, numerical agreement, support/funding/reserve policy, statutory receipt requirements, sender/storage setup and production activation. A green PR, merge or deploy does not supply that trading approval.
+
+
+## Execution record — 2026-10-27
+
+See the marketplace roadmap's **Finance acceptance checkpoint** for counts, safe provider operation IDs and current boundaries. The local database is `miconvener_commerce_s1c_testing`; Paystack calls used the configured local test key, GHS only, the owner's previously approved test email, and the provider-documented synthetic MTN number. Credentials stayed in process memory; original checkout/environment files were not changed. No live money operation was performed.
+
+1. Local native checks: 105 production-style tests /419 assertions and a separate 13 identity/real-worker tests /100 assertions passed. Covered recovery paths and actual-worker handover/refund races are distinguished from provider fault injection.
+2. Real provider checks: initialisation, duplicate-reference rejection, successful MoMo capture and fee/reference verification, full-refund submission/read-back, synthetic transfer-recipient creation and OTP parking/read-back. Refunds `18864251` and `18865434` remain pending, and the original test transfer awaits owner OTP; terminal outcomes are **not passed**.
+3. Real sandbox behavior exposed a refund verifier defect when the original payment becomes `reversal-pending`. The scoped correction and 11 additional regression cases are prepared on the acceptance branch. Three positive cases were RED first; related 56 tests /235 assertions and two new-sale rejection cases /10 assertions passed after correction. Native gateway calls against actual refund `18865434` now recognise pending correctly and reject a wrong operation key. No release of this correction is implied by test execution.
+4. The physical camera gate is closed: owner-confirmed stop/match and collection, independently verified as exactly one QR-source collection at 05:29:05 UTC, zero charge and no provider attempt. The free listing remains a draft. Original two live payments remain GH2 total; checkout is disabled.
+5. Pending owner/provider steps: approve only the named existing test-mode transfer in Paystack, verify its original reference after OTP, and wait for/refine the provider's sandbox refund completion evidence. Do not share OTPs in chat, disable protections, replay an unknown money submission, switch production keys or use a live refund/payout to manufacture acceptance.
+
+The full numbered sequence above is not marked complete: direct provider-contract probes, local mocked integration and the prior bounded live UI journeys provide different evidence. Real pilot commercial/funding/support/receipt terms and explicit activation remain required.
+
+
+## Terminal follow-through — 2026-10-28
+
+Both original sandbox refunds are now provider-confirmed **processed**. The native gateway on the proposed correction recognises refund `18865434` as processed while its original payment is reversed, matching refund/reference/operation/transaction identity and GHS10 (1,000 pesewas). The earlier expired OTP transfer became abandoned; after explicit owner retry approval, one replacement test transfer was approved through the private Terminal prompt and verified successful for GHS10 (1,000 pesewas) with zero provider transfer fee. Read-back and the native settlement gateway agree. No OTP/key was shared in chat, no protection was disabled and no live funds were used. See the roadmap terminal-outcomes section for the replacement reference and source CI evidence.
+
+This closes the previously pending test-provider refund and OTP completion steps. It does not mark the full numbered runbook complete: remaining hosted sandbox/fault scenarios, real operational readiness and launch terms remain explicit. PR #54 still requires review/release approval, and checkout remains off.
