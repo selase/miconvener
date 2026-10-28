@@ -125,3 +125,21 @@ it('links the organisation page to its enabled store without requiring dues', fu
     $tenant->features()->where('feature_key', 'commerce_catalog')->update(['enabled' => false]);
     $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page->where('storeUrl', null));
 });
+
+it('shows made-to-order public enquiries without exposing a purchase action or requiring member verification', function (): void {
+    $listing = storefrontMerchandise();
+    $listing->merchandise->update(['order_mode' => 'made_to_order', 'enquiry_phone' => '+233208333151']);
+    $this->getJson('/marketplace/items/'.$listing->slug)->assertOk()
+        ->assertJsonPath('item.order_mode', 'made_to_order')
+        ->assertJsonPath('item.enquiry_phone', '+233208333151')
+        ->assertJsonPath('item.purchasing_enabled', false)
+        ->assertJsonPath('item.variants.0.price_pesewas', 1450);
+});
+
+it('keeps enquiry contacts private on members-only items and omits them for stocked items', function (): void {
+    $listing = storefrontMerchandise('members');
+    $listing->merchandise->update(['order_mode' => 'made_to_order', 'enquiry_phone' => '+233208333151']);
+    $this->getJson('/marketplace/items/'.$listing->slug)->assertNotFound()->assertDontSee('+233208333151');
+    $listing->merchandise->update(['visibility' => 'public', 'order_mode' => 'stock']);
+    $this->getJson('/marketplace/items/'.$listing->slug)->assertOk()->assertJsonPath('item.order_mode', 'stock')->assertJsonPath('item.enquiry_phone', null);
+});

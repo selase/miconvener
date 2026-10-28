@@ -245,3 +245,18 @@ This section supersedes the pending refund/OTP states recorded on 27 October; hi
 - PR #54 source commit `4331675c` passed CI run `40476431826`: 3,938 PHP tests /18,590 assertions (one existing risky summary), 64 no-Telescope checks /323 assertions (two recorder-only skips), and all JavaScript/quality checks. The refund correction remains a draft, unmerged and undeployed; any subsequent documentation refresh has its own CI state.
 
 The tested provider capture/refund/OTP lifecycle gates are now closed within this bounded test-mode scope. Local mocked faults, real-worker races, direct provider-contract probes and previous live UI journeys remain distinct evidence. This is not a full hosted sandbox checkout/fault-injection certification or trading approval. Keep checkout disabled while reviewing/releasing the correction and agreeing actual merchant, refund-funding, support, receipt and pilot terms.
+
+
+### Made-to-order enquiry option — 28 October 2026
+
+The owner approved public Purpledot listings for Foi Sincere made-to-order tote bags: small white/black GHS200; large black GHS400. Prices exclude printing and delivery. Quantity, custom printing and location determine the final quote and production timeframe. The public enquiry contact is +233208333151. Three production drafts with original photos exist; no stock was invented and these drafts must not be published with the stock-only checkout UI.
+
+- [x] Add an additive landlord migration with `order_mode` (existing items default to `stock`) and validated international `enquiry_phone`.
+- [x] Add native catalogue controls, base-price/made-to-order labels, and user-initiated WhatsApp/call links containing the chosen option. No message is sent automatically.
+- [x] Prevent new checkout/order/reservation creation for enquiry items on the server; preserve existing stocked quotes, payments, order history and all visibility/verification rules.
+- [x] Test catalogue validation, contact privacy, enquiry UI, checkout rejection and existing-quote continuation; review responsive layouts with real product photos.
+- [ ] Merge and deploy the reviewed change, then set the three Purpledot drafts to `made_to_order` and publish through the native catalogue service. Do not enable other sellers or venue bookings.
+
+**Scope:** enquiries leave MiConvener only when a buyer chooses WhatsApp or calls. They do not create a tracked quote, order, production job or payment link. Seller-issued payable custom quotes and production-capacity scheduling remain later work; no payment is requested before quantity, customisation, delivery and lead time are agreed. Existing stocked-product checkout remains available under its existing rollout and agreement gates.
+
+**Self-review and verification:** 101 focused PHP tests (436 assertions), PHPStan on all changed PHP surfaces, and desktop/mobile browser checks with the supplied bag photos. A fresh read-only reviewer found no blockers; the empty instructions section and existing-quote continuation test gap were fixed. Seller mode/contact controls use the existing catalogue permission and navigation; member-only contacts retain verification gates. No new dependency, role, permission, configuration or environment variable is needed. No ledger, settlement, payout, checkout feature switch or production listing state is changed by this feature branch. Existing collection UI tests now wait for their asynchronous focus effect rather than racing it.

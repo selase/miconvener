@@ -142,6 +142,7 @@ final class MerchandiseCatalogController extends Controller
 
         return ['id' => $listing->id, 'title' => $listing->title, 'slug' => $listing->slug, 'description' => $listing->description, 'status' => $listing->status,
             'taken_down' => $listing->taken_down_at !== null, 'archived' => $details?->archived_at !== null,
+            'order_mode' => $details->order_mode, 'enquiry_phone' => $details?->enquiry_phone,
             'visibility' => $details?->visibility, 'currency' => $details?->currency, 'collection_instructions' => $details?->collection_instructions,
             'variants' => $listing->variants->map(fn (StoreVariant $variant): array => ['id' => $variant->id, 'sku' => $variant->sku,
                 'options' => $variant->options, 'price_pesewas' => $variant->price_pesewas, 'on_hand' => $variant->on_hand, 'reserved' => (int) $variant->getAttribute('held_quantity'), 'available' => max(0, $variant->on_hand - (int) $variant->getAttribute('held_quantity')), 'is_active' => $variant->is_active])->all(),

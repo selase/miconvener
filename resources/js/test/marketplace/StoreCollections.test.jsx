@@ -72,7 +72,9 @@ it('keeps code matching separate from explicit whole-order confirmation', async 
     fireEvent.click(screen.getByRole('button', { name: 'Record collection' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.getByRole('button', { name: /Order TEST01.*Collected/ })).toBeTruthy();
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Order TEST01' }));
+    await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Order TEST01' }))
+    );
 });
 it('shows empty and paused states without inventing an order or taking payment', () => {
     render(

@@ -191,8 +191,9 @@ export default function StorefrontShow({
                                     From our store
                                 </h2>
                                 <p className="mt-2 text-sm text-ink-secondary">
-                                    Browse merchandise, options and collection information.
-                                    Purchasing is not enabled yet.
+                                    Browse options and fulfilment details, or request a quote for
+                                    made-to-order items. Each item shows its available ordering
+                                    options.
                                 </p>
                             </div>
                             {memberAccessUrl && (

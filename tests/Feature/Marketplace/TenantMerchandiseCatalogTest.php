@@ -233,3 +233,41 @@ it('refuses organisation hard deletion before removing its logo when merchandise
     Storage::disk('public')->assertExists('tenant/logo/catalog.png');
     expect(App\Models\StoreStockMovement::query()->count())->toBe(1);
 });
+
+it('saves a made-to-order public draft without inventing inventory', function (): void {
+    $this->data['order_mode'] = 'made_to_order';
+    $this->data['enquiry_phone'] = '+233208333151';
+    $this->data['variants'][0]['initial_stock'] = 0;
+    $response = $this->postJson($this->url, $this->data)->assertCreated()
+        ->assertJsonPath('listing.order_mode', 'made_to_order')
+        ->assertJsonPath('listing.enquiry_phone', '+233208333151');
+    $listing = StoreListing::withoutGlobalScope(MerchandiseVisibilityScope::class)->findOrFail($response->json('listing.id'));
+    expect($listing->variants()->firstOrFail()->on_hand)->toBe(0)
+        ->and($listing->variants()->firstOrFail()->movements()->count())->toBe(0);
+    $this->postJson($this->url.'/'.$listing->id.'/publish')->assertOk();
+});
+
+it('rejects invalid order modes and made-to-order contacts', function (array $fields, string $field): void {
+    $this->postJson($this->url, array_replace($this->data, $fields))->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    [['order_mode' => 'anything'], 'order_mode'],
+    [['order_mode' => 'made_to_order'], 'enquiry_phone'],
+    [['order_mode' => 'made_to_order', 'enquiry_phone' => 'javascript:alert(1)'], 'enquiry_phone'],
+    [['order_mode' => 'made_to_order', 'enquiry_phone' => '0208333151'], 'enquiry_phone'],
+]);
+
+it('retains made-to-order details when older clients omit the new fields', function (): void {
+    $created = $this->postJson($this->url, array_replace($this->data, ['order_mode' => 'made_to_order', 'enquiry_phone' => '+233208333151']))->assertCreated();
+    $id = $created->json('listing.id');
+    $data = $this->data;
+    $data['variants'][0]['id'] = $created->json('listing.variants.0.id');
+    unset($data['variants'][0]['initial_stock'], $data['variants'][0]['idempotency_key']);
+    $this->putJson($this->url.'/'.$id, $data)->assertOk()->assertJsonPath('listing.order_mode', 'made_to_order')->assertJsonPath('listing.enquiry_phone', '+233208333151');
+});
+
+it('refuses publishing a made-to-order listing with a missing enquiry contact', function (): void {
+    $created = $this->postJson($this->url, $this->data)->assertCreated();
+    $id = $created->json('listing.id');
+    StoreMerchandise::query()->where('listing_id', $id)->update(['order_mode' => 'made_to_order']);
+    $this->postJson($this->url.'/'.$id.'/publish')->assertUnprocessable()->assertJsonValidationErrors('publication');
+});

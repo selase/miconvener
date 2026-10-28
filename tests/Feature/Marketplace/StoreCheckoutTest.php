@@ -126,3 +126,27 @@ it('completes the native quote checkout and protected receipt HTTP contract with
     $this->getJson('/my/store-orders/'.$quote.'/receipt')->assertOk()->assertJsonPath('receipt.total_pesewas', $price);
     expect($variant->fresh()->on_hand)->toBe(0)->and(App\Models\StoreReceipt::query()->count())->toBe(1);
 })->with([0, 10000]);
+
+it('refuses direct checkout of made-to-order items even if stock is present', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    App\Models\StoreMerchandise::query()->where('listing_id', $variant->listing_id)->firstOrFail()->forceFill(['order_mode' => 'made_to_order', 'enquiry_phone' => '+233208333151'])->save();
+    expect(fn () => StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid()))
+        ->toThrow(ValidationException::class);
+    expect(App\Models\StoreOrder::query()->count())->toBe(0)
+        ->and(StorePaymentAttempt::query()->count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+it('honours an existing stocked quote and buyer history after switching to enquiry ordering', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $key = (string) Str::uuid();
+    $lines = [['variant_id' => $variant->id, 'quantity' => 1]];
+    $order = StoreCheckoutScenario::quote($tenant, $session, $lines, $key);
+    App\Models\StoreMerchandise::query()->where('listing_id', $variant->listing_id)->firstOrFail()->update(['order_mode' => 'made_to_order', 'enquiry_phone' => '+233208333151']);
+    $replay = app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, $lines, $key);
+    expect($replay->id)->toBe($order->id);
+    $attempt = app(StorePayments::class)->start($order, $session, (string) Str::uuid());
+    expect($attempt->status)->toBe('ready')
+        ->and(App\Models\StoreOrder::query()->count())->toBe(1)
+        ->and(app(App\Services\Marketplace\StoreOrderAccess::class)->buyer($order, $session))->toBeTrue();
+});

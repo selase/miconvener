@@ -20,6 +20,8 @@ export function catalogFormValues(item) {
         visibility: item?.visibility ?? 'public',
         currency: 'GHS',
         collection_instructions: item?.collection_instructions ?? '',
+        order_mode: item?.order_mode ?? 'stock',
+        enquiry_phone: item?.enquiry_phone ?? '',
         variants: item
             ? item.variants.map((variant) => ({
                   id: variant.id,
@@ -35,7 +37,7 @@ export function catalogFormValues(item) {
     };
 }
 
-export default function CatalogVariants({ variants, onChange, errors }) {
+export default function CatalogVariants({ variants, onChange, errors, madeToOrder = false }) {
     const update = (index, field, value) =>
         onChange(
             variants.map((variant, position) =>
@@ -71,7 +73,7 @@ export default function CatalogVariants({ variants, onChange, errors }) {
                             className="rounded-none bg-canvas"
                         />
                         <Input
-                            label="Price (GHS)"
+                            label={madeToOrder ? 'Base price (GHS)' : 'Price (GHS)'}
                             name={`variants.${index}.price_pesewas`}
                             type="number"
                             inputMode="decimal"
@@ -161,7 +163,7 @@ export default function CatalogVariants({ variants, onChange, errors }) {
                     >
                         Add option
                     </Button>
-                    {!variant.id && (
+                    {!variant.id && !madeToOrder && (
                         <Input
                             label="Opening stock"
                             name={`variants.${index}.initial_stock`}

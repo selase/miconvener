@@ -5,6 +5,7 @@ import { formatDuesMoney } from '@/lib/dues';
 export default function MerchandiseCard({ item }) {
     const prices = item.variants.map((variant) => variant.price_pesewas);
     const price = prices.length ? Math.min(...prices) : null;
+    const madeToOrder = item.order_mode === 'made_to_order';
     const available = item.variants.some((variant) => variant.available);
     return (
         <Link
@@ -42,10 +43,14 @@ export default function MerchandiseCard({ item }) {
                 <p className="text-sm font-medium text-ink">
                     {price === null
                         ? 'No active options'
-                        : `${prices.some((value) => value !== price) ? 'From ' : ''}${formatDuesMoney(price, item.currency)}`}
+                        : `${madeToOrder || prices.some((value) => value !== price) ? 'From ' : ''}${formatDuesMoney(price, item.currency)}`}
                 </p>
                 <p className={`text-xs ${available ? 'text-ink-secondary' : 'text-ink-tertiary'}`}>
-                    {available ? 'View options & collection details' : 'Currently unavailable'}
+                    {madeToOrder
+                        ? 'Made to order · Request a quote'
+                        : available
+                          ? 'View options & collection details'
+                          : 'Currently unavailable'}
                 </p>
             </div>
         </Link>
