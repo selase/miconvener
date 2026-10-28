@@ -44,7 +44,10 @@ export default function CatalogForm({ item = null }) {
                 ...(variant.id
                     ? { id: variant.id }
                     : {
-                          initial_stock: Number(variant.initial_stock),
+                          initial_stock:
+                              values.order_mode === 'made_to_order'
+                                  ? 0
+                                  : Number(variant.initial_stock),
                           idempotency_key: variant.idempotency_key,
                       }),
                 sku: variant.sku.trim(),
@@ -65,7 +68,7 @@ export default function CatalogForm({ item = null }) {
             saved
                 ? route('tenant.store.catalog.update', { listing: saved.id })
                 : route('tenant.store.catalog.store'),
-            { ...values, variants }
+            { ...values, enquiry_phone: values.enquiry_phone.trim() || null, variants }
         );
         setBusy(false);
         if (!result.ok) {
@@ -256,6 +259,42 @@ export default function CatalogForm({ item = null }) {
                                 />
                             </label>
                             <Select
+                                label="How is this item ordered?"
+                                name="order_mode"
+                                value={values.order_mode}
+                                onChange={(event) => set('order_mode', event.target.value)}
+                                error={errors.order_mode}
+                                className="rounded-none bg-canvas"
+                            >
+                                <option value="stock">Buy from available stock</option>
+                                <option value="made_to_order">Made to order · Enquire first</option>
+                            </Select>
+                            {values.order_mode === 'made_to_order' && (
+                                <div className="space-y-3">
+                                    <Input
+                                        label="Public enquiry phone"
+                                        name="enquiry_phone"
+                                        type="tel"
+                                        value={values.enquiry_phone}
+                                        onChange={(event) =>
+                                            set('enquiry_phone', event.target.value)
+                                        }
+                                        required
+                                        maxLength={16}
+                                        placeholder="+233208333151"
+                                        error={errors.enquiry_phone}
+                                        hint="Use international format. This number will be public for calls and WhatsApp enquiries."
+                                        className="rounded-none bg-canvas"
+                                    />
+                                    <p className="text-sm leading-6 text-ink-secondary">
+                                        Prices are base prices. Buyers contact you to agree
+                                        quantity, customisation, delivery cost and production time
+                                        before paying. These items do not reserve stock or use
+                                        online checkout.
+                                    </p>
+                                </div>
+                            )}
+                            <Select
                                 label="Who can view this item?"
                                 name="visibility"
                                 value={values.visibility}
@@ -267,7 +306,9 @@ export default function CatalogForm({ item = null }) {
                                 <option value="members">Verified active members</option>
                             </Select>
                             <label className="block text-sm font-medium text-ink">
-                                Collection instructions
+                                {values.order_mode === 'made_to_order'
+                                    ? 'Production & delivery information'
+                                    : 'Collection instructions'}
                                 <textarea
                                     name="collection_instructions"
                                     rows={3}
@@ -279,8 +320,9 @@ export default function CatalogForm({ item = null }) {
                                     className="mt-2 block w-full border border-border bg-canvas p-3 text-sm text-ink focus:border-accent focus:outline-none"
                                 />
                                 <span className="mt-2 block text-xs font-normal text-ink-secondary">
-                                    Required before publishing. Include the collection location,
-                                    opening times and who to contact.
+                                    {values.order_mode === 'made_to_order'
+                                        ? 'Optional: explain how production time and delivery arrangements are agreed.'
+                                        : 'Required before publishing. Include the collection location, opening times and who to contact.'}
                                 </span>
                             </label>
                         </section>
@@ -288,6 +330,7 @@ export default function CatalogForm({ item = null }) {
                             variants={values.variants}
                             onChange={(variants) => set('variants', variants)}
                             errors={errors}
+                            madeToOrder={values.order_mode === 'made_to_order'}
                         />
                         <div className="flex flex-wrap items-center gap-4">
                             <Button
@@ -309,7 +352,9 @@ export default function CatalogForm({ item = null }) {
                 {saved && (
                     <>
                         <CatalogPhotos item={saved} onChange={setSaved} />
-                        <CatalogStock item={saved} onChange={setSaved} />
+                        {saved.order_mode !== 'made_to_order' && (
+                            <CatalogStock item={saved} onChange={setSaved} />
+                        )}
                     </>
                 )}
             </div>

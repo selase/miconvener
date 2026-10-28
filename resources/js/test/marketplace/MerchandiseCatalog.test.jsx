@@ -8,6 +8,7 @@ import { sendJson } from '@/lib/dues';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import CatalogPhotos from '@/Components/Marketplace/CatalogPhotos';
 import CatalogForm from '@/Pages/Tenant/Store/Catalog/Form';
+import CatalogIndex from '@/Pages/Tenant/Store/Catalog/Index';
 import Storefront from '@/Pages/Public/Marketplace/Storefront/Show';
 
 vi.mock('@/Layouts/ConsoleLayout', () => ({ default: ({ children }) => children }));
@@ -291,4 +292,127 @@ it('revalidates expired history using renewed proof instead of aborting the fres
     } finally {
         vi.useRealTimers();
     }
+});
+
+it('offers made-to-order enquiries with base pricing without stock or checkout claims', () => {
+    render(
+        <Item
+            item={{
+                ...item,
+                purchasing_enabled: true,
+                order_mode: 'made_to_order',
+                enquiry_phone: '+233208333151',
+            }}
+            storefrontUrl="/marketplace/teachers"
+        />
+    );
+    expect(screen.getByText(/Base price/)).toBeTruthy();
+    expect(
+        screen.getByRole('link', { name: /Request a quote on WhatsApp/ }).getAttribute('href')
+    ).toContain('https://wa.me/233208333151?text=');
+    expect(screen.getByRole('link', { name: /Call to discuss/ }).getAttribute('href')).toBe(
+        'tel:+233208333151'
+    );
+    expect(screen.queryByText('In stock')).toBeNull();
+    expect(screen.queryByText('Currently unavailable')).toBeNull();
+    expect(screen.queryByText('Purchasing is not enabled yet')).toBeNull();
+    expect(screen.queryByRole('button', { name: /checkout|buy|reserve/i })).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /Size: L/ }));
+    expect(
+        decodeURIComponent(
+            screen.getByRole('link', { name: /Request a quote on WhatsApp/ }).getAttribute('href')
+        )
+    ).toContain('Size: L');
+});
+
+it('labels a made-to-order card honestly when it has no inventory', () => {
+    render(
+        <MerchandiseCard
+            item={{
+                ...item,
+                order_mode: 'made_to_order',
+                variants: item.variants.map((v) => ({ ...v, available: false })),
+            }}
+        />
+    );
+    expect(screen.getByText('Made to order · Request a quote')).toBeTruthy();
+    expect(screen.queryByText('Currently unavailable')).toBeNull();
+});
+
+it('lets sellers select enquiry ordering and saves the public contact without creating stock', async () => {
+    sendJson.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        errors: { form: 'Example server response' },
+        message: 'Check the draft.',
+    });
+    render(<CatalogForm />);
+    fireEvent.change(screen.getByLabelText('How is this item ordered?'), {
+        target: { value: 'made_to_order' },
+    });
+    expect(screen.queryByLabelText('Opening stock')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Public enquiry phone'), {
+        target: { value: '+233208333151' },
+    });
+    fireEvent.change(screen.getByLabelText('Item name'), {
+        target: { value: 'Made-to-order tote' },
+    });
+    fireEvent.change(screen.getByLabelText('Item address'), { target: { value: 'custom-tote' } });
+    fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 'TOTE' } });
+    fireEvent.change(screen.getByLabelText('Base price (GHS)'), { target: { value: '200' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Save draft' }).closest('form'));
+    await screen.findByRole('alert');
+    expect(sendJson.mock.calls[0][2]).toMatchObject({
+        order_mode: 'made_to_order',
+        enquiry_phone: '+233208333151',
+    });
+    expect(sendJson.mock.calls[0][2].variants[0]).toMatchObject({
+        price_pesewas: 20000,
+        initial_stock: 0,
+    });
+});
+
+it('does not generate unsafe contact links for malformed phone numbers', () => {
+    render(
+        <Item
+            item={{ ...item, order_mode: 'made_to_order', enquiry_phone: 'javascript:alert(1)' }}
+            storefrontUrl="/marketplace/teachers"
+        />
+    );
+    expect(screen.queryByRole('link', { name: /WhatsApp|Call to discuss/ })).toBeNull();
+});
+
+it('omits an empty collection section on enquiry-only items', () => {
+    render(
+        <Item
+            item={{
+                ...item,
+                order_mode: 'made_to_order',
+                enquiry_phone: '+233208333151',
+                collection_instructions: '',
+            }}
+            storefrontUrl="/marketplace/teachers"
+        />
+    );
+    expect(screen.queryByText('Collection information')).toBeNull();
+});
+
+it('describes enquiries on the storefront without claiming all purchasing is disabled', () => {
+    render(
+        <Storefront
+            shop={{ name: 'Teacher Association', slug: 'teachers' }}
+            catalogEnabled
+            merchandise={[{ ...item, order_mode: 'made_to_order' }]}
+        />
+    );
+    expect(screen.getByText(/request a quote for made-to-order items/i)).toBeTruthy();
+    expect(screen.queryByText(/Purchasing is not enabled yet/)).toBeNull();
+});
+
+it('shows enquiry ordering rather than an on-hand balance in the seller catalogue', () => {
+    render(
+        <CatalogIndex items={{ data: [{ ...item, order_mode: 'made_to_order' }], links: [] }} />
+    );
+    expect(screen.getByText('Made to order · Enquiries')).toBeTruthy();
+    expect(screen.queryByText('on hand')).toBeNull();
 });

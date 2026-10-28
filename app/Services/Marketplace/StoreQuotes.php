@@ -67,7 +67,7 @@ final class StoreQuotes
             $snapshots = [];
             foreach ($variants as $variant) {
                 $listing = $listings->get($variant->listing_id);
-                if ($listing === null || $listing->merchandise === null || $listing->merchandise->archived_at !== null || (blank($listing->merchandise->collection_instructions) && ! \App\Models\StoreFulfilmentPolicy::query()->where('shop_id', $shop->id)->exists())
+                if ($listing === null || $listing->merchandise === null || $listing->merchandise->archived_at !== null || $listing->merchandise->order_mode !== 'stock' || (blank($listing->merchandise->collection_instructions) && ! \App\Models\StoreFulfilmentPolicy::query()->where('shop_id', $shop->id)->exists())
                     || ($listing->merchandise->visibility !== 'public' && ! ($members ??= $this->access->canReadMembersFrom($seller, $session)))) {
                     $this->refuse();
                 }

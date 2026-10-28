@@ -63,7 +63,7 @@ final readonly class MerchandiseCatalog
                 }
                 $current->fill(['title' => $data['title'], 'slug' => $data['slug'], 'description' => $data['description'] ?? null])->save();
                 $details = StoreMerchandise::query()->firstOrNew(['listing_id' => $current->id], ['shop_id' => $shop->id]);
-                $details->fill(['visibility' => $data['visibility'], 'currency' => $data['currency'], 'collection_instructions' => $data['collection_instructions'] ?? null])->save();
+                $details->fill(['order_mode' => $data['order_mode'] ?? $details->order_mode ?? 'stock', 'enquiry_phone' => array_key_exists('enquiry_phone', $data) ? $data['enquiry_phone'] : $details->enquiry_phone, 'visibility' => $data['visibility'], 'currency' => $data['currency'], 'collection_instructions' => $data['collection_instructions'] ?? null])->save();
                 $this->saveVariants($current, $data['variants'], $actor);
                 if ($current->isPublished()) {
                     $this->assertPublishable($current);
@@ -128,9 +128,11 @@ final readonly class MerchandiseCatalog
     private function assertPublishable(StoreListing $listing): void
     {
         $details = $listing->merchandise()->first();
-        if ($details === null || $details->archived_at !== null || (blank($details->collection_instructions) && ! $this->hasFulfilmentPolicy($listing))
+        if ($details === null || $details->archived_at !== null || ! in_array($details->order_mode, ['stock', 'made_to_order'], true)
+            || ($details->order_mode === 'made_to_order' && ! preg_match('/^\+[1-9][0-9]{7,14}$/D', $details->enquiry_phone ?? ''))
+            || ($details->order_mode === 'stock' && blank($details->collection_instructions) && ! $this->hasFulfilmentPolicy($listing))
             || ! $listing->variants()->where('is_active', true)->exists()) {
-            throw ValidationException::withMessages(['publication' => 'Add collection instructions and at least one active variant before publishing. Archived items cannot be published.']);
+            throw ValidationException::withMessages(['publication' => 'Add at least one active variant and collection instructions, or a valid enquiry phone for made-to-order items. Archived items cannot be published.']);
         }
     }
 

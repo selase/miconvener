@@ -78,6 +78,16 @@ export default function ItemShow({
     }, [expires]);
     const variant =
         item?.variants.find((candidate) => candidate.id === selected) ?? item?.variants[0];
+    const madeToOrder = item?.order_mode === 'made_to_order';
+    const enquiryPhone = /^\+[1-9][0-9]{7,14}$/u.test(item?.enquiry_phone ?? '')
+        ? item.enquiry_phone
+        : null;
+    const enquiryText =
+        item && variant
+            ? `I'd like a quote for ${item.title}.\n${Object.entries(variant.options)
+                  .map(([name, value]) => `${name}: ${value}`)
+                  .join(' · ')}\nQuantity: \nCustom printing: \nDelivery location: `
+            : '';
     const showOptions =
         item &&
         (item.variants.length > 1 || Object.keys(item.variants[0]?.options ?? {}).length > 0);
@@ -169,6 +179,11 @@ export default function ItemShow({
                                 </div>
                                 {variant && (
                                     <p className="text-2xl font-semibold text-ink">
+                                        {madeToOrder && (
+                                            <span className="mb-1 block text-xs font-normal text-ink-secondary">
+                                                Base price
+                                            </span>
+                                        )}
                                         {formatDuesMoney(variant.price_pesewas, item.currency)}
                                     </p>
                                 )}
@@ -193,7 +208,7 @@ export default function ItemShow({
                                                     {Object.entries(option.options)
                                                         .map(([name, value]) => `${name}: ${value}`)
                                                         .join(' · ') || 'Standard'}
-                                                    {!option.available && (
+                                                    {!madeToOrder && !option.available && (
                                                         <span className="ml-2 text-xs text-ink-tertiary">
                                                             Unavailable
                                                         </span>
@@ -204,9 +219,53 @@ export default function ItemShow({
                                     </fieldset>
                                 )}
                                 <p role="status" className="text-sm font-medium text-ink-secondary">
-                                    {variant?.available ? 'In stock' : 'Currently unavailable'}
+                                    {madeToOrder
+                                        ? 'Made to order'
+                                        : variant?.available
+                                          ? 'In stock'
+                                          : 'Currently unavailable'}
                                 </p>
-                                {item.purchasing_enabled && !isPreview ? (
+                                {madeToOrder ? (
+                                    <div className="space-y-4 border border-border bg-canvas p-5">
+                                        <h2 className="font-semibold text-ink">
+                                            Let’s make it yours
+                                        </h2>
+                                        <p className="text-sm leading-relaxed text-ink-secondary">
+                                            Tell the seller your quantity, any custom printing and
+                                            your delivery location. The displayed price is a base
+                                            price; printing and delivery cost extra. Agree the final
+                                            quote and production timeframe before paying.
+                                        </p>
+                                        {enquiryPhone && !isPreview ? (
+                                            <div className="flex flex-col gap-3 sm:items-start">
+                                                <a
+                                                    href={`https://wa.me/${enquiryPhone.slice(1)}?text=${encodeURIComponent(enquiryText)}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex min-h-11 items-center justify-center border border-accent bg-accent px-5 py-3 text-center text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+                                                >
+                                                    Request a quote on WhatsApp
+                                                </a>
+                                                <a
+                                                    href={`tel:${enquiryPhone}`}
+                                                    className="break-words text-sm text-accent underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+                                                >
+                                                    Call to discuss · {enquiryPhone}
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-ink-secondary">
+                                                {isPreview
+                                                    ? 'Enquiry links will appear when this item is published.'
+                                                    : 'Contact the seller to discuss your order.'}
+                                            </p>
+                                        )}
+                                        <p className="text-xs leading-relaxed text-ink-secondary">
+                                            An enquiry does not place an order, reserve stock or
+                                            take payment.
+                                        </p>
+                                    </div>
+                                ) : item.purchasing_enabled && !isPreview ? (
                                     <StoreCheckout
                                         key={variant?.id}
                                         shop={item.seller.slug}
@@ -228,15 +287,19 @@ export default function ItemShow({
                                         {item.description}
                                     </div>
                                 )}
-                                <div className="border-t border-border pt-5">
-                                    <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                                        <MapPin className="h-4 w-4" />
-                                        Collection information
-                                    </h2>
-                                    <p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-ink-secondary">
-                                        {item.collection_instructions}
-                                    </p>
-                                </div>
+                                {item.collection_instructions?.trim() && (
+                                    <div className="border-t border-border pt-5">
+                                        <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                                            <MapPin className="h-4 w-4" />
+                                            {madeToOrder
+                                                ? 'Production & delivery'
+                                                : 'Collection information'}
+                                        </h2>
+                                        <p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-ink-secondary">
+                                            {item.collection_instructions}
+                                        </p>
+                                    </div>
+                                )}
                             </section>
                         </div>
                     </>

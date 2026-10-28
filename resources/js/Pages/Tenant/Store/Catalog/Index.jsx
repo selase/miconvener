@@ -33,9 +33,9 @@ export default function CatalogIndex({
                             Make your organisation’s store your own
                         </h2>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
-                            Publish merchandise, offer sizes and colours, and keep an audited stock
-                            record. Checkout is available only after platform approval and
-                            activation.
+                            Publish merchandise with sizes and colours. Track stocked items or
+                            accept made-to-order enquiries. Checkout is available only after
+                            platform approval and activation.
                         </p>
                     </div>
                     {shop && (
@@ -79,15 +79,21 @@ export default function CatalogIndex({
                                     </p>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-5">
-                                    <p className="text-sm text-ink-secondary">
-                                        <strong className="font-semibold tabular-nums text-ink">
-                                            {item.variants.reduce(
-                                                (sum, variant) => sum + variant.on_hand,
-                                                0
-                                            )}
-                                        </strong>{' '}
-                                        on hand
-                                    </p>
+                                    {item.order_mode === 'made_to_order' ? (
+                                        <p className="text-sm text-ink-secondary">
+                                            Made to order · Enquiries
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-ink-secondary">
+                                            <strong className="font-semibold tabular-nums text-ink">
+                                                {item.variants.reduce(
+                                                    (sum, variant) => sum + variant.on_hand,
+                                                    0
+                                                )}
+                                            </strong>{' '}
+                                            on hand
+                                        </p>
+                                    )}
                                     <ArrowUpRight className="h-4 w-4 text-ink-secondary" />
                                 </div>
                             </Link>

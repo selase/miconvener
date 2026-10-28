@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $listing_id
  * @property string $shop_id
  * @property string $visibility
+ * @property string $order_mode
+ * @property string|null $enquiry_phone
  * @property string $currency
  * @property string|null $collection_instructions
  * @property \Carbon\CarbonImmutable|null $archived_at
@@ -30,7 +32,7 @@ final class StoreMerchandise extends Model
 
     protected $table = 'store_merchandise';
 
-    protected $fillable = ['listing_id', 'shop_id', 'visibility', 'currency', 'collection_instructions', 'archived_at'];
+    protected $fillable = ['listing_id', 'shop_id', 'visibility', 'currency', 'collection_instructions', 'order_mode', 'enquiry_phone', 'archived_at'];
 
     /** @return BelongsTo<StoreListing, $this> */
     public function listing(): BelongsTo

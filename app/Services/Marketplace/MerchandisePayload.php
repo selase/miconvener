@@ -20,6 +20,8 @@ final class MerchandisePayload
         abort_unless($listing->merchandise !== null, 404);
 
         return ['id' => $listing->id, 'slug' => $listing->slug, 'title' => $listing->title, 'description' => $listing->description,
+            'order_mode' => $listing->merchandise->order_mode,
+            'enquiry_phone' => $listing->merchandise->order_mode === 'made_to_order' ? $listing->merchandise->enquiry_phone : null,
             'listing_kind' => StoreListing::KIND_MERCHANDISE, 'currency' => $listing->merchandise->currency,
             'visibility' => $listing->merchandise->visibility, 'collection_instructions' => $listing->merchandise->collection_instructions,
             'seller' => ['name' => $listing->shop->name, 'slug' => $listing->shop->slug],
@@ -28,7 +30,7 @@ final class MerchandisePayload
             ])->all(),
             'photos' => $listing->media->filter(fn (StoreListingMedia $photo): bool => $photo->media_type === StoreListingMedia::TYPE_PHOTO && $photo->status === StoreListingMedia::STATUS_APPROVED)->values()
                 ->map(fn (StoreListingMedia $photo): array => ['id' => $photo->id, 'url' => route('marketplace.items.photos', ['slug' => $listing->slug, 'media' => $photo->id]), 'title' => $photo->title])->all(),
-            'purchasing_enabled' => $this->purchasingEnabled($listing->shop->tenant)];
+            'purchasing_enabled' => $listing->merchandise->order_mode === 'stock' && $this->purchasingEnabled($listing->shop->tenant)];
     }
 
     private function purchasingEnabled(\App\Models\Tenant $tenant): bool
