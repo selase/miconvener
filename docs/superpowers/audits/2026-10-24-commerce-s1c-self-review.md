@@ -94,3 +94,8 @@ Existing finance recovery actions expose pending/review/confirmed outcomes and r
 ### Solved and recommendations
 
 Solved the actual Paystack reversal-status mismatch without weakening refund identity or allowing a reversed payment to fulfil a new sale. One focused independent review found no blockers. Do not claim the financial release complete: actual sandbox refunds remain pending, the test transfer requires owner OTP, the correction is not merged/deployed, and launch terms/readiness are still unapproved. Keep checkout disabled; complete/reconcile the existing operations and obtain release/activation approval before any production trading change.
+
+
+### Terminal acceptance follow-through — 2026-10-28
+
+The pending provider outcomes above are historical: both refunds are processed and the owner-approved replacement sandbox transfer succeeded after private OTP entry. The native patched refund verifier returned processed with the original payment reversed, and the settlement gateway independently returned success/GHS10/zero fee. Source CI on `4331675c` passed (3,938 PHP, 64 production-style no-Telescope checks, all JS/quality checks); the correction is still unmerged/undeployed. No additional code change, dependency, repeated source review or new paid live test was introduced for this outcome recording. Remaining hosted sandbox/launch gates and explicit checkout activation are not silently accepted.

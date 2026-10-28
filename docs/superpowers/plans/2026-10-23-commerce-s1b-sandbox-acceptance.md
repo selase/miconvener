@@ -46,3 +46,10 @@ See the marketplace roadmap's **Finance acceptance checkpoint** for counts, safe
 5. Pending owner/provider steps: approve only the named existing test-mode transfer in Paystack, verify its original reference after OTP, and wait for/refine the provider's sandbox refund completion evidence. Do not share OTPs in chat, disable protections, replay an unknown money submission, switch production keys or use a live refund/payout to manufacture acceptance.
 
 The full numbered sequence above is not marked complete: direct provider-contract probes, local mocked integration and the prior bounded live UI journeys provide different evidence. Real pilot commercial/funding/support/receipt terms and explicit activation remain required.
+
+
+## Terminal follow-through — 2026-10-28
+
+Both original sandbox refunds are now provider-confirmed **processed**. The native gateway on the proposed correction recognises refund `18865434` as processed while its original payment is reversed, matching refund/reference/operation/transaction identity and GHS10 (1,000 pesewas). The earlier expired OTP transfer became abandoned; after explicit owner retry approval, one replacement test transfer was approved through the private Terminal prompt and verified successful for GHS10 (1,000 pesewas) with zero provider transfer fee. Read-back and the native settlement gateway agree. No OTP/key was shared in chat, no protection was disabled and no live funds were used. See the roadmap terminal-outcomes section for the replacement reference and source CI evidence.
+
+This closes the previously pending test-provider refund and OTP completion steps. It does not mark the full numbered runbook complete: remaining hosted sandbox/fault scenarios, real operational readiness and launch terms remain explicit. PR #54 still requires review/release approval, and checkout remains off.
