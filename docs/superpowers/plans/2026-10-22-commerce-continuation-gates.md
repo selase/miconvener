@@ -1,6 +1,6 @@
 # Commerce continuation gates — after S1a
 
-**Status:** continuation brief for owner review, not a payment implementation approval. Read with the reconciled marketplace roadmap and unified-commerce design. The owner authorised systematic continuation; option 1 preserves separate review, merge/deployment and trading gates. Finish S1a's CI/review before treating it as ready.
+**Status (29 October 2026):** historical S1 continuation decisions below are retained as design history. S1a–c, refund recovery, made-to-order enquiries and seller quotes are deployed; Purpledot merchandise checkout is live under its approved 3% agreement. Read the current marketplace roadmap for release evidence. Next is the [S2a approval/availability plan](2026-10-29-commerce-s2a-booking-approval-availability.md), for review before implementation. Venue/rental/service activation remains separate.
 
 ## Recommended S1b contract to settle next
 
