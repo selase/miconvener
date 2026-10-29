@@ -85,3 +85,49 @@ it('lets only a global superadmin approve a new immutable policy version through
     $data['refund_gateway_fee_bearer'] = null;
     $this->actingAs($root)->post(route('admin.store-agreements.store', $seller), $data)->assertSessionHasErrors('refund_gateway_fee_bearer');
 });
+
+it('resolves each scope independently and defaults to the purchase agreement', function (): void {
+    $purchase = StoreCommercialAgreement::factory()->create(['account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
+    $reservation = StoreCommercialAgreement::factory()->reservation()->create([
+        'shop_id' => $purchase->shop_id, 'tenant_id' => $purchase->tenant_id, 'version' => 2,
+        'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity()),
+    ]);
+    $purchase->tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT]);
+    $terms = app(StoreCommercialTerms::class);
+
+    expect($terms->resolve($purchase->tenant)->id)->toBe($purchase->id)
+        ->and($terms->resolve($purchase->tenant, 'purchase')->id)->toBe($purchase->id)
+        ->and($terms->resolve($purchase->tenant, 'reservation')->id)->toBe($reservation->id);
+});
+
+it('does not let a venue reservation agreement stand in for missing merchandise terms', function (): void {
+    $reservation = StoreCommercialAgreement::factory()->reservation()->create(['account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
+    $reservation->tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT]);
+
+    expect(fn () => app(StoreCommercialTerms::class)->resolve($reservation->tenant))->toThrow(ValidationException::class)
+        ->and(app(StoreCommercialTerms::class)->resolve($reservation->tenant, 'reservation')->id)->toBe($reservation->id);
+});
+
+it('approves a venue agreement as a new version without touching the active purchase agreement', function (): void {
+    $purchase = StoreCommercialAgreement::factory()->create(['percentage' => '2.00', 'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
+    $tenant = $purchase->tenant;
+    $tenant->update(['settlement_mode' => Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT]);
+    Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'RoleSeeder']);
+    Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'PermissionsSeeder']);
+    $admin = User::factory()->create(['tenant_id' => null]);
+    setPermissionsTeamId(null);
+    $admin->assignRole('Superadmin');
+    $input = ['percentage' => '3.00', 'cap_pesewas' => null, 'fee_bearer' => 'organizer', 'gateway_estimate_rate' => '1.95', 'refund_gateway_fee_bearer' => 'seller',
+        'collection_terms' => 'Access to the booked venue.', 'refund_terms' => 'Per the accepted quote.', 'support_contact' => 'support@example.test', 'receipt_terms' => 'Payment receipt.',
+        'payout_policy' => ['holdback_pesewas' => 0, 'manual_release' => true]];
+
+    $venue = app(StoreCommercialTerms::class)->approve($tenant->fresh(), $admin, $input, 'reservation');
+
+    expect($venue->offering_scope)->toBe('reservation')->and($venue->version)->toBe(2)->and($venue->percentage)->toBe('3.00')
+        ->and(app(StoreCommercialTerms::class)->resolve($tenant->fresh())->id)->toBe($purchase->id)
+        ->and(app(StoreCommercialTerms::class)->resolve($tenant->fresh())->percentage)->toBe('2.00');
+});
+
+it('refuses an unknown agreement scope', function (): void {
+    app(StoreCommercialTerms::class)->resolve(Tenant::factory()->create(), 'subscription');
+})->throws(InvalidArgumentException::class);

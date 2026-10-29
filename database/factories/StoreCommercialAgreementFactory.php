@@ -19,7 +19,7 @@ final class StoreCommercialAgreementFactory extends Factory
         return [
             'shop_id' => Shop::factory(),
             'tenant_id' => fn (array $a) => Shop::findOrFail($a['shop_id'])->tenant_id,
-            'version' => 1, 'percentage' => '2.00', 'cap_pesewas' => null, 'fee_bearer' => 'organizer',
+            'offering_scope' => 'purchase', 'version' => 1, 'percentage' => '2.00', 'cap_pesewas' => null, 'fee_bearer' => 'organizer',
             'gateway_estimate_rate' => '1.95', 'currency' => 'GHS', 'settlement_mode' => 'platform_default',
             'provider' => 'paystack', 'account_fingerprint' => hash('sha256', 'test-account'),
             'refund_gateway_fee_bearer' => 'seller', 'collection_terms' => 'Collect weekdays from the office.',
@@ -27,5 +27,15 @@ final class StoreCommercialAgreementFactory extends Factory
             'receipt_terms' => 'Payment receipt; no VAT asserted.', 'payout_policy' => ['holdback_pesewas' => 0, 'manual_release' => true],
             'approved_by' => User::factory(), 'approved_at' => now(),
         ];
+    }
+
+    /** A venue reservation agreement: its own terms, never the shop's merchandise terms. */
+    public function reservation(): static
+    {
+        return $this->state(fn (): array => [
+            'offering_scope' => 'reservation', 'percentage' => '3.00',
+            'collection_terms' => 'Access to the booked venue during the booked period.',
+            'refund_terms' => 'Refunds follow the host cancellation terms on the accepted quote.',
+        ]);
     }
 }

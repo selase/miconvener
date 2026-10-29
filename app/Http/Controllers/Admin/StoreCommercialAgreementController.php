@@ -19,7 +19,7 @@ final class StoreCommercialAgreementController extends Controller
         $this->authorize('access-superadmin-dashboard');
 
         return view('admin.store-agreements', ['seller' => $tenant,
-            'agreements' => StoreCommercialAgreement::query()->where('tenant_id', $tenant->id)->orderByDesc('version')->get()]);
+            'agreements' => StoreCommercialAgreement::query()->where('tenant_id', $tenant->id)->where('offering_scope', StoreCommercialAgreement::SCOPE_PURCHASE)->orderByDesc('version')->get()]);
     }
 
     public function store(StoreCommercialAgreementRequest $request, Tenant $tenant, StoreCommercialTerms $terms): RedirectResponse

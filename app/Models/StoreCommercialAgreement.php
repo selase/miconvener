@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property string $tenant_id
  * @property string $shop_id
+ * @property string $offering_scope
  * @property int $version
  * @property string $percentage
  * @property int $cap_pesewas
@@ -38,11 +39,15 @@ final class StoreCommercialAgreement extends Model
 
     use HasUuids;
 
+    public const SCOPE_PURCHASE = 'purchase';
+
+    public const SCOPE_RESERVATION = 'reservation';
+
     protected $connection = 'landlord';
 
     protected $table = 'store_commercial_agreements';
 
-    protected $fillable = ['tenant_id', 'shop_id', 'version', 'percentage', 'cap_pesewas', 'fee_bearer', 'gateway_estimate_rate', 'currency', 'settlement_mode', 'provider', 'account_fingerprint', 'refund_gateway_fee_bearer', 'collection_terms', 'refund_terms', 'support_contact', 'receipt_terms', 'payout_policy', 'approved_by', 'approved_at'];
+    protected $fillable = ['tenant_id', 'shop_id', 'offering_scope', 'version', 'percentage', 'cap_pesewas', 'fee_bearer', 'gateway_estimate_rate', 'currency', 'settlement_mode', 'provider', 'account_fingerprint', 'refund_gateway_fee_bearer', 'collection_terms', 'refund_terms', 'support_contact', 'receipt_terms', 'payout_policy', 'approved_by', 'approved_at'];
 
     /** @return BelongsTo<Shop, $this> */
     public function shop(): BelongsTo
