@@ -189,3 +189,43 @@ it('blocks the My Orders payment action while a fulfilment edit is open', async 
     fireEvent.click(screen.getByRole('button', { name: 'Change collection or delivery' }));
     expect(screen.getByRole('button', { name: 'Continue to payment' }).disabled).toBe(true);
 });
+
+it('requires explicit acceptance before paying a seller-issued quote', async () => {
+    const quoted = {
+        ...order,
+        cancel_allowed: true,
+        seller_quote: {
+            acceptance_hash: 'a'.repeat(64),
+            customisation: 'Red printing',
+            production_terms: 'Seven working days',
+        },
+        production_terms: 'Seven working days',
+        customisation: 'Red printing',
+        charges: [
+            { label: 'Custom printing', amount_pesewas: 5000 },
+            { label: 'Delivery', amount_pesewas: 2500 },
+        ],
+    };
+    csrfFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ order: quoted, verified_until: Date.now() / 1000 + 3600 }),
+    });
+    render(<StoreOrders orderId={order.id} />);
+    const pay = await screen.findByRole('button', { name: 'Continue to payment' });
+    expect(pay.disabled).toBe(true);
+    expect(screen.getByText('Seven working days')).toBeTruthy();
+    expect(screen.getByText('Custom printing')).toBeTruthy();
+    expect(screen.queryByText(/Price and stock held/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Decline unpaid quote' })).toBeTruthy();
+    expect(screen.queryByText(/Release unpaid stock hold/)).toBeNull();
+    expect(screen.queryByText(/Receipt email:/)).toBeNull();
+    fireEvent.click(screen.getByLabelText(/I accept the quoted specification/));
+    expect(pay.disabled).toBe(false);
+    csrfFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ message: 'Payment paused' }),
+    });
+    fireEvent.click(pay);
+    await screen.findByRole('alert');
+    expect(JSON.parse(csrfFetch.mock.calls[1][1].body).accepted_quote_hash).toBe('a'.repeat(64));
+});

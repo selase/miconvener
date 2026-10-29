@@ -30,7 +30,7 @@ final class StoreCheckoutController extends Controller
         abort_if($email === null, 404, 'Order unavailable.');
         $order = StoreOrder::query()->where('buyer_email', \App\Services\Events\PlatformAttendeeVerification::normalise($email))->find($order);
         abort_if($order === null, 404, 'Order unavailable.');
-        $attempt = $payments->start($order, $request->session(), $request->validated('submission_key'));
+        $attempt = $payments->start($order, $request->session(), $request->validated('submission_key'), $request->validated('accepted_quote_hash'));
 
         return response()->json(['order_id' => $order->id, 'status' => $attempt->status ?? 'confirmed', 'checkout_url' => $attempt?->status === 'ready' ? $attempt->checkout_url : null])
             ->header('Cache-Control', 'private, no-store');

@@ -109,6 +109,12 @@ final class StoreOrder extends Model
         return $this->hasOne(StoreCollection::class, 'order_id');
     }
 
+    /** @return \Illuminate\Database\Eloquent\Relations\HasOne<StoreSellerQuote, $this> */
+    public function sellerQuote(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StoreSellerQuote::class, 'order_id');
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {

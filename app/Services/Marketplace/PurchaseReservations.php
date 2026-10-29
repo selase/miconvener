@@ -17,7 +17,7 @@ final class PurchaseReservations implements StoreReservationAdapter
     {
         $order->getConnection()->transaction(function () use ($order): void {
             $order = $this->locks->order($order);
-            if ($order->offering_type !== 'purchase' || $order->state !== 'quoted' || $order->expires_at->lessThanOrEqualTo(now())) {
+            if ($order->sellerQuote()->exists() || $order->offering_type !== 'purchase' || $order->state !== 'quoted' || $order->expires_at->lessThanOrEqualTo(now())) {
                 $this->refuse();
             }
             $lines = $order->lines()->orderBy('variant_id')->get();

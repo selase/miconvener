@@ -94,6 +94,13 @@ export const NAV_GROUPS = [
                 permission: 'manage_store_catalog',
             },
             {
+                label: 'Store quotes',
+                href: 'tenant.store.quotes.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_orders',
+                feature: 'commerce_history',
+            },
+            {
                 label: 'Store orders',
                 href: 'tenant.store.orders.index',
                 icon: 'LayoutGrid',

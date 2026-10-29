@@ -97,6 +97,9 @@ export default function SellerStore({
             <PageHeader title={finance ? 'Store finance' : 'Store orders'} />
             <div className="mx-auto w-full max-w-6xl space-y-6 p-5 text-ink sm:p-8">
                 <nav className="flex flex-wrap gap-5 text-sm text-accent underline">
+                    {can.manage_store_orders && (
+                        <a href={route('tenant.store.quotes.index')}>Quotes</a>
+                    )}
                     {can.manage_store_catalog && catalogEnabled && (
                         <a href={route('tenant.store.catalog.index')}>Catalog</a>
                     )}
@@ -105,7 +108,7 @@ export default function SellerStore({
                 <p className="max-w-3xl text-sm leading-6 text-ink-secondary">
                     {finance
                         ? 'New commerce funds only. Refunds, transfer fees and approved reserves reduce the amount available. Legacy venue, dues and Giving balances are separate.'
-                        : 'Payment and collection are separate. Collection handover is not enabled in this release. Use the order’s recorded support and collection terms.'}
+                        : 'Track payment, preparation and handover separately. Seller-issued quotes retain their agreed specifications, charges and fulfilment terms.'}
                 </p>
                 {error && (
                     <p

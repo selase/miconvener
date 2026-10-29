@@ -130,6 +130,27 @@ final class StoreCheckoutScenario
         return [$order->fresh(), $attempt->fresh(), $capture->fresh()];
     }
 
+    /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StoreSellerQuote} */
+    public static function sellerQuote(bool $delivery = true): array
+    {
+        [$tenant, $variant, $actor, $session] = self::make(0);
+        $variant->merchandise->update(['order_mode' => 'made_to_order', 'enquiry_phone' => '+233208333151']);
+        foreach (['manage store orders', 'manage store collection', 'manage store finance'] as $permission) {
+            Permission::query()->firstOrCreate(['name' => $permission, 'guard_name' => 'web'], ['category' => 'store']);
+            $actor->givePermissionTo($permission);
+        }
+        $tenant->features()->create(['feature_key' => 'commerce_collection', 'enabled' => true]);
+        $policy = \App\Models\StoreFulfilmentPolicy::factory()->create(['shop_id' => $variant->shop_id, 'tenant_id' => $tenant->id,
+            'snapshot' => ['methods' => ['collection', 'delivery'], 'collection_location' => 'Collection by appointment', 'delivery_countries' => ['GH'], 'delivery_instructions' => 'Seller-arranged delivery.']]);
+        $quote = app(\App\Services\Marketplace\StoreSellerQuotes::class)->issue($tenant, $actor, ['operation_key' => (string) Str::uuid(),
+            'buyer_email' => 'buyer@example.test', 'valid_for_hours' => 48, 'production_terms' => 'Seven working days after payment.',
+            'customisation' => 'Red association name.', 'printing_pesewas' => 5000, 'delivery_pesewas' => $delivery ? 2500 : 0,
+            'lines' => [['variant_id' => $variant->id, 'quantity' => 2, 'unit_price_pesewas' => 20000]],
+            'choice' => $delivery ? ['policy_id' => $policy->id, 'method' => 'delivery', 'destination' => ['recipient' => 'Test Buyer', 'address_line_1' => '12 Test Street', 'locality' => 'Accra', 'country' => 'GH']] : ['policy_id' => $policy->id, 'method' => 'collection']]);
+
+        return [$tenant, $variant, $actor, $session, $quote->order, $quote];
+    }
+
     /** @param array<string, mixed> $changes
      * @return array<string, mixed>
      */

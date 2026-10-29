@@ -5,7 +5,7 @@ import { formatDuesMoney } from '@/lib/dues';
 
 export const STORE_BUTTON =
     'inline-flex min-h-11 items-center justify-center border border-border bg-accent px-5 py-3 text-sm font-medium text-accent-ink disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
-export function QuoteTimer({ expires, onExpire }) {
+export function QuoteTimer({ expires, onExpire, stockHeld = true }) {
     const [left, setLeft] = useState(() =>
         Math.max(0, Math.ceil((Date.parse(expires) - Date.now()) / 1000))
     );
@@ -22,8 +22,12 @@ export function QuoteTimer({ expires, onExpire }) {
     return (
         <p className="text-sm text-ink-secondary" role="timer" aria-label="Quote time remaining">
             {left
-                ? `Price and stock held for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
-                : 'Quote expired. Return to the item for a fresh quote.'}
+                ? stockHeld
+                    ? `Price and stock held for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
+                    : `Quote valid until ${new Date(expires).toLocaleString()}`
+                : stockHeld
+                  ? 'Quote expired. Return to the item for a fresh quote.'
+                  : 'Quote expired. Ask the seller for a replacement quote.'}
         </p>
     );
 }

@@ -14,12 +14,13 @@ final class StoreOrderPayload
      */
     public function buyer(StoreOrder $order): array
     {
-        $order->loadMissing(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection']);
+        $order->loadMissing(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection', 'sellerQuote']);
         $receipt = $order->receipt;
         $outbox = $receipt?->outbox;
         $terms = $order->terms_snapshot;
         $arrangement = $order->fulfilmentArrangement;
-        $options = ($arrangement === null || $order->state === 'quoted') ? app(StoreFulfilmentOptions::class)->options(\App\Models\StoreVariant::query()->whereKey($order->lines->pluck('variant_id'))->get()->all()) : [];
+        $quote = $order->sellerQuote;
+        $options = $quote === null && ($arrangement === null || $order->state === 'quoted') ? app(StoreFulfilmentOptions::class)->options(\App\Models\StoreVariant::query()->whereKey($order->lines->pluck('variant_id'))->get()->all()) : [];
 
         $unresolved = $order->attempts->contains(fn (\App\Models\StorePaymentAttempt $attempt): bool => in_array($attempt->status, ['initializing', 'unknown', 'pending'], true));
         $labels = ['awaiting' => ($order->state === 'cancelled' ? 'Quote released' : ($order->state === 'quoted' ? 'Quote ready' : 'Awaiting payment')), 'paid' => 'Paid', 'not_required' => 'Free order confirmed', 'captured_review' => 'Payment under review', 'refund_pending' => 'Refund requested', 'refunded' => $order->charged_pesewas === 0 ? 'Cancelled' : 'Refunded'];
@@ -42,6 +43,17 @@ final class StoreOrderPayload
             'message' => $unresolved || $order->state === 'review' || $order->review_reason !== null ? 'Your payment needs review. Do not pay again. Contact the seller using the support details below.' : null,
             'lines' => $order->lines->map(fn (StoreOrderLine $line): array => ['id' => $line->id, 'title' => $line->title_snapshot, 'options' => $line->options_snapshot,
                 'quantity' => $line->quantity, 'amount_pesewas' => $line->line_amount_pesewas])->all()];
+        if ($quote !== null) {
+            if ($quote->withdrawn_at !== null) {
+                $data['message'] = 'The seller withdrew this quote. Ask for a replacement quote before paying.';
+            } elseif ($order->state === 'quoted' && $order->expires_at->isPast()) {
+                $data['message'] = 'This quote expired. Ask the seller for a replacement quote.';
+            }
+            $data['seller_quote'] = [...$quote->snapshot, 'acceptance_hash' => $order->terms_hash, 'withdrawn_at' => $quote->withdrawn_at?->toIso8601String()];
+            $data['charges'] = [['label' => 'Custom printing', 'amount_pesewas' => $quote->snapshot['printing_pesewas']], ['label' => 'Delivery', 'amount_pesewas' => $quote->snapshot['delivery_pesewas']]];
+            $data['production_terms'] = $quote->snapshot['production_terms'];
+            $data['customisation'] = $quote->snapshot['customisation'];
+        }
         if ($order->fee_bearer === 'attendee') {
             $data['buyer_fee_pesewas'] = $order->platform_fee_pesewas;
         }

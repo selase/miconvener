@@ -3,7 +3,13 @@ import csrfFetch from '@/lib/csrfFetch';
 
 const field =
     'mt-2 block w-full min-w-0 border border-border bg-surface px-3 py-2 text-ink focus:outline-accent';
-export default function StoreFulfilmentChoice({ options, value, onChange, disabled = false }) {
+export default function StoreFulfilmentChoice({
+    options,
+    value,
+    onChange,
+    disabled = false,
+    quoted = false,
+}) {
     if (!options?.methods?.length)
         return (
             <p role="status">
@@ -23,7 +29,9 @@ export default function StoreFulfilmentChoice({ options, value, onChange, disabl
     return (
         <fieldset disabled={disabled} className="min-w-0 space-y-4 border border-border p-4">
             <legend className="px-1 font-semibold">
-                How would you like to receive your order?
+                {quoted
+                    ? 'Agreed collection or delivery'
+                    : 'How would you like to receive your order?'}
             </legend>
             {options.methods.includes('collection') && (
                 <div>
@@ -50,7 +58,9 @@ export default function StoreFulfilmentChoice({ options, value, onChange, disabl
                             checked={value?.method === 'delivery'}
                             onChange={() => select('delivery')}
                         />
-                        Delivery — included in the displayed price
+                        {quoted
+                            ? 'Delivery — charge included in the quoted total'
+                            : 'Delivery — included in the displayed price'}
                     </label>
                     <p className="mt-2 text-sm text-ink-secondary">{options.delivery_timing}</p>
                     <p className="whitespace-pre-line text-sm">{options.delivery_instructions}</p>

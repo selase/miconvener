@@ -16,7 +16,7 @@ final class StoreCheckoutRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['submission_key' => ['required', 'uuid'], 'amount' => ['prohibited'], 'price' => ['prohibited'], 'fee' => ['prohibited'],
+        return ['submission_key' => ['required', 'uuid'], 'accepted_quote_hash' => ['sometimes', 'nullable', 'string', 'regex:/^[a-f0-9]{64}$/D'], 'amount' => ['prohibited'], 'price' => ['prohibited'], 'fee' => ['prohibited'],
             'buyer_email' => ['prohibited'], 'tenant_id' => ['prohibited'], 'reference' => ['prohibited']];
     }
 
