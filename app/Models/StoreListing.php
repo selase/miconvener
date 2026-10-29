@@ -103,6 +103,7 @@ final class StoreListing extends Model
         'is_bookable',
         'audience',
         'requires_approval',
+        'public_booking_policy',
     ];
 
     /**
@@ -129,6 +130,7 @@ final class StoreListing extends Model
         'ceiling_height_meters' => 'decimal:2',
         'sort_order' => 'integer',
         'is_bookable' => 'boolean',
+        'public_booking_policy' => 'array',
     ];
 
     /** @return HasOne<StoreMerchandise, $this> */
@@ -141,6 +143,23 @@ final class StoreListing extends Model
     public function variants(): HasMany
     {
         return $this->hasMany(StoreVariant::class, 'listing_id');
+    }
+
+    /**
+     * The approval-first public booking policy, with defaults for unset keys.
+     *
+     * @return array{approval_required: bool, default_hold_hours: int, max_hold_hours: int, timezone: string}
+     */
+    public function publicBookingPolicy(): array
+    {
+        $stored = (array) ($this->public_booking_policy ?? []);
+
+        return [
+            'approval_required' => (bool) ($stored['approval_required'] ?? true),
+            'default_hold_hours' => (int) ($stored['default_hold_hours'] ?? 48),
+            'max_hold_hours' => (int) ($stored['max_hold_hours'] ?? 168),
+            'timezone' => (string) ($stored['timezone'] ?? config('app.timezone')),
+        ];
     }
 
     public function isBookable(): bool

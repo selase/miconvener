@@ -48,6 +48,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $contract_agreed_at
  * @property array<string, mixed>|null $contract_terms_snapshot
  * @property string|null $host_notes
+ * @property int|null $approval_flow_version
+ * @property \Illuminate\Support\Carbon|null $hold_expires_at
+ * @property string|null $submission_key
  * @property \Illuminate\Support\Carbon|null $quote_valid_until
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -77,6 +80,18 @@ final class VenueBooking extends Model
     public const STATUS_PENDING_APPROVAL = 'pending_approval';
 
     public const STATUS_DECLINED = 'declined';
+
+    /** A public request in the approval-first flow. It never holds the calendar. */
+    public const STATUS_PENDING_HOST_APPROVAL = 'pending_host_approval';
+
+    /** A host-approved request holding its time until `hold_expires_at`. */
+    public const STATUS_APPROVED_HOLD = 'approved_hold';
+
+    /** Presentation only: an approved hold past its deadline. Never stored. */
+    public const STATUS_HOLD_EXPIRED = 'hold_expired';
+
+    /** Marks a booking created by the approval-first flow; null is legacy. */
+    public const APPROVAL_FLOW_VERSION = 1;
 
     /** Booked and paid for through the marketplace. */
     public const KIND_MARKETPLACE = 'marketplace';
@@ -160,6 +175,9 @@ final class VenueBooking extends Model
         'department',
         'purpose',
         'decline_reason',
+        'approval_flow_version',
+        'hold_expires_at',
+        'submission_key',
     ];
 
     /**
@@ -240,6 +258,11 @@ final class VenueBooking extends Model
         $query->where(function (Builder $q): void {
             // A staff request waiting for approval holds its time, so it cannot be double-booked.
             $q->whereIn('status', [self::STATUS_CONFIRMED, self::STATUS_BLOCKED, self::STATUS_PENDING_APPROVAL])
+                ->orWhere(function (Builder $hold): void {
+                    // An approved hold ends at its deadline, whether or not a scheduler has run.
+                    $hold->where('status', self::STATUS_APPROVED_HOLD)
+                        ->where('hold_expires_at', '>', now());
+                })
                 ->orWhere(function (Builder $pending): void {
                     $pending->where('status', self::STATUS_PENDING_PAYMENT)
                         ->where(function (Builder $valid): void {
@@ -278,6 +301,30 @@ final class VenueBooking extends Model
         return in_array($this->payment_status, [self::PAYMENT_DEPOSIT_PAID, self::PAYMENT_FULLY_PAID], true);
     }
 
+    public function usesApprovalFlow(): bool
+    {
+        return $this->approval_flow_version !== null;
+    }
+
+    public function isHoldExpired(): bool
+    {
+        return $this->status === self::STATUS_APPROVED_HOLD
+            && ($this->hold_expires_at === null || ! $this->hold_expires_at->isFuture());
+    }
+
+    public function effectiveStatus(): string
+    {
+        return $this->isHoldExpired() ? self::STATUS_HOLD_EXPIRED : $this->status;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<VenueBookingAction, $this>
+     */
+    public function actions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(VenueBookingAction::class, 'booking_id')->orderBy('created_at');
+    }
+
     public function isExpired(): bool
     {
         return $this->quote_valid_until !== null && $this->quote_valid_until->isPast();
@@ -294,6 +341,8 @@ final class VenueBooking extends Model
             'paid_at' => 'datetime',
             'contract_agreed_at' => 'datetime',
             'quote_valid_until' => 'datetime',
+            'hold_expires_at' => 'datetime',
+            'approval_flow_version' => 'integer',
             'contract_terms_snapshot' => 'array',
             'guest_count' => 'integer',
             'duration_units' => 'float',
