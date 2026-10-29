@@ -8,14 +8,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Shop;
 use App\Models\StoreListing;
 use App\Models\VenueBooking;
-use App\Services\Marketplace\VenueAvailabilityService;
 use App\Services\Tenancy\TenantContext;
+use App\Services\Venue\VenueBlackouts;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -152,54 +151,11 @@ final class VenueCalendarController extends Controller
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
-        $listing = StoreListing::query()
-            ->withStaffOnly()
-            ->where('shop_id', $shop->id)
-            ->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE)
-            ->where('id', $validated['store_listing_id'])
-            ->firstOrFail();
-
         $startsAt = Carbon::parse((string) $validated['starts_at']);
         $endsAt = Carbon::parse((string) $validated['ends_at']);
 
-        // A confirmed booking, a hold, a staff request or a blackout already occupying this time blocks it.
-        if (! app(VenueAvailabilityService::class)->isSlotAvailable($listing, $startsAt, $endsAt)) {
-            throw ValidationException::withMessages([
-                'starts_at' => ['Cannot block dates: An active reservation, hold, or blackout already occupies this space during this time.'],
-            ]);
-        }
-
-        do {
-            $uniqueRef = 'BLK-'.mb_strtoupper(Str::random(8));
-        } while (VenueBooking::query()->where('booking_reference', $uniqueRef)->exists());
-
-        VenueBooking::create([
-            'booking_reference' => $uniqueRef,
-            'tenant_id' => $tenant->id,
-            'shop_id' => $shop->id,
-            'store_listing_id' => $listing->id,
-            'planner_name' => 'Venue Maintenance / Blackout',
-            'planner_email' => $shop->email ?? 'venue@miconvener.test',
-            'planner_phone' => $shop->phone ?? null,
-            'event_type' => 'Maintenance / Blackout',
-            'guest_count' => 0,
-            'layout_style' => 'banquet',
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
-            'time_slot_type' => 'full_day',
-            'pricing_model' => 'per_day',
-            'rate_pesewas' => 0,
-            'duration_units' => 1.0,
-            'rental_amount_pesewas' => 0,
-            'security_deposit_pesewas' => 0,
-            'total_amount_pesewas' => 0,
-            'deposit_required_pesewas' => 0,
-            'amount_paid_pesewas' => 0,
-            'gateway_fee_pesewas' => 0,
-            'status' => VenueBooking::STATUS_BLOCKED,
-            'payment_status' => VenueBooking::PAYMENT_UNPAID,
-            'host_notes' => (string) $validated['reason'],
-        ]);
+        $block = app(VenueBlackouts::class)->create($shop, (string) $validated['store_listing_id'], $startsAt, $endsAt, (string) $validated['reason']);
+        $listing = $block->listing;
 
         return redirect()->back()->with('success', "Dates blocked successfully for {$listing->title}.");
     }
@@ -219,14 +175,9 @@ final class VenueCalendarController extends Controller
             abort(404, 'Block not found');
         }
 
-        $booking = VenueBooking::query()
-            ->where('shop_id', $shop->id)
-            ->where('id', $block)
-            ->where('status', VenueBooking::STATUS_BLOCKED)
-            ->firstOrFail();
+        $booking = app(VenueBlackouts::class)->remove($shop, $block);
 
         $listingTitle = $booking->listing->title ?? 'Space';
-        $booking->delete();
 
         return redirect()->back()->with('success', "Blackout block removed for {$listingTitle}. Dates are now available on the calendar.");
     }

@@ -8,11 +8,13 @@ use App\Http\Controllers\Controller;
 use App\Mail\Marketplace\QuoteSentNotification;
 use App\Models\Shop;
 use App\Models\VenueBooking;
+use App\Services\Marketplace\VenueBookingService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -198,21 +200,11 @@ final class VenueInquiryController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
 
-        /** @var VenueBooking $inquiry */
-        $inquiry = VenueBooking::query()
-            ->where('shop_id', $shop->id)
-            ->where('id', $inquiryId)
-            ->firstOrFail();
-
-        if ($inquiry->isConfirmed() || $inquiry->isDepositPaid()) {
-            return redirect()->back()->with('error', 'Cannot modify an already confirmed or paid reservation.');
+        try {
+            $inquiry = app(VenueBookingService::class)->placeHostHold($shop, $inquiryId);
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', (string) collect($e->errors())->flatten()->first());
         }
-
-        $inquiry->update([
-            'status' => VenueBooking::STATUS_PENDING_PAYMENT,
-            'host_notes' => 'Host has placed a 48-hour tentative reservation hold on this space.',
-            'quote_valid_until' => now()->addHours(48),
-        ]);
 
         return redirect()->back()->with('success', "Booking {$inquiry->booking_reference} placed on tentative hold.");
     }
@@ -231,31 +223,15 @@ final class VenueInquiryController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
 
-        /** @var VenueBooking $inquiry */
-        $inquiry = VenueBooking::query()
-            ->with('listing')
-            ->where('shop_id', $shop->id)
-            ->where('id', $inquiryId)
-            ->firstOrFail();
-
-        if ($inquiry->isConfirmed() || $inquiry->isDepositPaid()) {
-            return redirect()->back()->with('error', 'Cannot modify an already confirmed or paid reservation.');
-        }
-
         $rentalPesewas = (int) round(((float) $validated['rental_amount_ghs']) * 100);
         $depositPesewas = isset($validated['security_deposit_ghs']) ? (int) round(((float) $validated['security_deposit_ghs']) * 100) : 0;
-        $totalPesewas = $rentalPesewas + $depositPesewas;
         $requiredPesewas = (int) round(((float) $validated['deposit_required_ghs']) * 100);
 
-        $inquiry->update([
-            'rental_amount_pesewas' => $rentalPesewas,
-            'security_deposit_pesewas' => $depositPesewas,
-            'total_amount_pesewas' => $totalPesewas,
-            'deposit_required_pesewas' => min($requiredPesewas, $totalPesewas),
-            'host_notes' => $validated['host_notes'] ?? null,
-            'status' => VenueBooking::STATUS_PENDING_PAYMENT,
-            'quote_valid_until' => now()->addDays(7),
-        ]);
+        try {
+            $inquiry = app(VenueBookingService::class)->quoteAsHost($shop, $inquiryId, $rentalPesewas, $depositPesewas, $requiredPesewas, $validated['host_notes'] ?? null);
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', (string) collect($e->errors())->flatten()->first());
+        }
 
         // Send quote notification to planner
         try {
@@ -279,20 +255,11 @@ final class VenueInquiryController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
 
-        /** @var VenueBooking $inquiry */
-        $inquiry = VenueBooking::query()
-            ->where('shop_id', $shop->id)
-            ->where('id', $inquiryId)
-            ->firstOrFail();
-
-        if ($inquiry->isConfirmed() || $inquiry->isDepositPaid()) {
-            return redirect()->back()->with('error', 'Cannot decline an already confirmed or paid reservation.');
+        try {
+            $inquiry = app(VenueBookingService::class)->rejectAsHost($shop, $inquiryId, $validated['reason'] ?? null);
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', (string) collect($e->errors())->flatten()->first());
         }
-
-        $inquiry->update([
-            'status' => VenueBooking::STATUS_REJECTED,
-            'host_notes' => $validated['reason'] ?? 'Declined by venue host.',
-        ]);
 
         return redirect()->back()->with('info', "Inquiry {$inquiry->booking_reference} marked as declined.");
     }

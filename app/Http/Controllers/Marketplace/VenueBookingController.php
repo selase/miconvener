@@ -338,11 +338,16 @@ final class VenueBookingController extends Controller
                         ->with('error', 'Payment verification failed: transaction details did not match this reservation.');
                 }
 
-                $this->bookingService->confirmBookingPayment($paystackRef, [
+                $settled = $this->bookingService->confirmBookingPayment($paystackRef, [
                     'metadata' => $verificationMetadata,
                     'amount' => $verifiedAmount,
                     'fees' => (int) ($verification['fees'] ?? 0),
                 ]);
+
+                if (! $settled->isConfirmed() || $settled->paystack_reference !== $paystackRef) {
+                    return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
+                        ->with('warning', 'We received your payment, but these dates are no longer available, so the reservation is not confirmed. The venue team will contact you about the payment.');
+                }
 
                 return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
                     ->with('success', 'Your reservation deposit has been confirmed! The venue calendar is now locked for your event.');

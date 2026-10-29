@@ -13,7 +13,6 @@ use App\Models\VenueBooking;
 use App\Services\Marketplace\VenueAvailabilityService;
 use App\Services\Tenancy\FeatureService;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +25,10 @@ use Illuminate\Validation\ValidationException;
  */
 final class InternalBookings
 {
-    public function __construct(private readonly VenueAvailabilityService $availability) {}
+    public function __construct(
+        private readonly VenueAvailabilityService $availability,
+        private readonly VenueCalendarLocks $locks,
+    ) {}
 
     /**
      * A request is pending until a facility manager decides, unless the room
@@ -46,9 +48,7 @@ final class InternalBookings
     ): VenueBooking {
         $this->assertAllowed($tenant, $room, $for, $from, $to);
 
-        return DB::connection('landlord')->transaction(function () use ($tenant, $room, $for, $from, $to, $purpose, $department, $guests, $enteredBy, $confirmNow): VenueBooking {
-            $locked = StoreListing::query()->withStaffOnly()->lockForUpdate()->findOrFail($room->id);
-
+        return $this->locks->forListing($room->id, function (StoreListing $locked) use ($tenant, $for, $from, $to, $purpose, $department, $guests, $enteredBy, $confirmNow): VenueBooking {
             $this->assertFree($locked, $from, $to);
             $this->assertOpenRequestsBelowLimit($tenant, $for);
 
@@ -81,9 +81,9 @@ final class InternalBookings
 
     public function approve(VenueBooking $booking, User $by): VenueBooking
     {
-        return DB::connection('landlord')->transaction(function () use ($booking, $by): VenueBooking {
-            $locked = $this->pending($booking);
-            $this->assertFree($locked->listing, $locked->starts_at, $locked->ends_at, $locked->id);
+        return $this->locks->forBooking($booking->id, function (StoreListing $listing, VenueBooking $locked) use ($by): VenueBooking {
+            $this->assertPending($locked);
+            $this->assertFree($listing, $locked->starts_at, $locked->ends_at, $locked->id);
             $locked->update(['status' => VenueBooking::STATUS_CONFIRMED, 'entered_by_user_id' => $locked->entered_by_user_id ?? $by->id]);
             $this->tell($locked, RoomRequestDecided::APPROVED);
 
@@ -93,8 +93,8 @@ final class InternalBookings
 
     public function decline(VenueBooking $booking, User $by, string $reason): VenueBooking
     {
-        return DB::connection('landlord')->transaction(function () use ($booking, $reason): VenueBooking {
-            $locked = $this->pending($booking);
+        return $this->locks->forBooking($booking->id, function (StoreListing $listing, VenueBooking $locked) use ($reason): VenueBooking {
+            $this->assertPending($locked);
             $locked->update(['status' => VenueBooking::STATUS_DECLINED, 'decline_reason' => $reason]);
             $this->tell($locked, RoomRequestDecided::DECLINED, $reason);
 
@@ -108,21 +108,23 @@ final class InternalBookings
      */
     public function cancel(VenueBooking $booking, Member|User $by): VenueBooking
     {
-        if ($booking->kind !== VenueBooking::KIND_INTERNAL || ! in_array($booking->status, [VenueBooking::STATUS_PENDING_APPROVAL, VenueBooking::STATUS_CONFIRMED], true)) {
-            throw ValidationException::withMessages(['booking' => 'This booking cannot be cancelled.']);
-        }
+        return $this->locks->forBooking($booking->id, function (StoreListing $listing, VenueBooking $locked) use ($by): VenueBooking {
+            if ($locked->kind !== VenueBooking::KIND_INTERNAL || ! in_array($locked->status, [VenueBooking::STATUS_PENDING_APPROVAL, VenueBooking::STATUS_CONFIRMED], true)) {
+                throw ValidationException::withMessages(['booking' => 'This booking cannot be cancelled.']);
+            }
 
-        if ($by instanceof Member && $booking->requested_for_member_id !== $by->id) {
-            throw ValidationException::withMessages(['booking' => 'You can only cancel your own bookings.']);
-        }
+            if ($by instanceof Member && $locked->requested_for_member_id !== $by->id) {
+                throw ValidationException::withMessages(['booking' => 'You can only cancel your own bookings.']);
+            }
 
-        $booking->update(['status' => VenueBooking::STATUS_CANCELLED]);
+            $locked->update(['status' => VenueBooking::STATUS_CANCELLED]);
 
-        if ($by instanceof User) {
-            $this->tell($booking, RoomRequestDecided::CANCELLED);
-        }
+            if ($by instanceof User) {
+                $this->tell($locked, RoomRequestDecided::CANCELLED);
+            }
 
-        return $booking;
+            return $locked;
+        });
     }
 
     private function assertAllowed(Tenant $tenant, StoreListing $room, Member $for, CarbonInterface $from, CarbonInterface $to): void
@@ -180,15 +182,11 @@ final class InternalBookings
         }
     }
 
-    private function pending(VenueBooking $booking): VenueBooking
+    private function assertPending(VenueBooking $locked): void
     {
-        $locked = VenueBooking::query()->whereKey($booking->id)->lockForUpdate()->firstOrFail();
-
         if ($locked->kind !== VenueBooking::KIND_INTERNAL || $locked->status !== VenueBooking::STATUS_PENDING_APPROVAL) {
             throw ValidationException::withMessages(['booking' => 'This request has already been decided.']);
         }
-
-        return $locked;
     }
 
     private function tell(VenueBooking $booking, string $outcome, ?string $reason = null): void
