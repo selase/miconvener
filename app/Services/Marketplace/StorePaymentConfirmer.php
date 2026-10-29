@@ -40,8 +40,14 @@ final class StorePaymentConfirmer
             }
             $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->orderBy('variant_id')->get();
             $variants = $this->locks->variants($allocations->pluck('variant_id')->all())->keyBy('id');
-            if ($allocations->isEmpty() || $allocations->count() !== $order->lines()->count() || $allocations->contains(fn (StoreStockAllocation $a): bool => $a->state !== 'active' || $a->expires_at->lessThanOrEqualTo(now()) || $variants->get($a->variant_id)?->on_hand < $a->quantity)) {
-                $issues[] = 'allocation_unavailable';
+            if ($order->sellerQuote()->exists()) {
+                if (! app(StoreSellerQuotes::class)->validCommitment($order) || $order->expires_at->lessThanOrEqualTo(now()) || $allocations->isNotEmpty()) {
+                    $issues[] = 'production_quote_unavailable';
+                }
+            } else {
+                if ($allocations->isEmpty() || $allocations->count() !== $order->lines()->count() || $allocations->contains(fn (StoreStockAllocation $a): bool => $a->state !== 'active' || $a->expires_at->lessThanOrEqualTo(now()) || $variants->get($a->variant_id)?->on_hand < $a->quantity)) {
+                    $issues[] = 'allocation_unavailable';
+                }
             }
             if ($issues !== []) {
                 $txn = $capture->ledger_transaction_id === null ? $this->ledger->recordStoreCaptureReview($capture) : null;

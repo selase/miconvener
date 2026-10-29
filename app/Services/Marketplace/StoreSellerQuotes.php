@@ -139,7 +139,7 @@ final class StoreSellerQuotes
                 'policy_snapshot' => $policy->snapshot, 'destination' => $choice['destination'] ?? null]);
 
             return StoreSellerQuote::query()->create(['id' => $id, 'order_id' => $order->id, 'tenant_id' => $tenant->id, 'shop_id' => $shop->id,
-                'issued_by' => $actor->id, 'issuer_name' => $actor->name, 'operation_key' => $data['operation_key'], 'request_hash' => $requestHash, 'snapshot' => $snapshot])->fresh(['order']);
+                'issued_by' => $actor->id, 'issuer_name' => $actor->name, 'operation_key' => $data['operation_key'], 'request_hash' => $requestHash, 'snapshot' => $snapshot])->refresh()->load('order');
         });
     }
 
@@ -153,6 +153,20 @@ final class StoreSellerQuotes
             && ($snapshot['goods_pesewas'] ?? -1) === (int) $order->lines()->sum('line_amount_pesewas')
             && $order->principal_pesewas === ($snapshot['goods_pesewas'] ?? -1) + ($snapshot['printing_pesewas'] ?? -1) + ($snapshot['delivery_pesewas'] ?? -1)
             && ! $order->lines()->doesntExist();
+    }
+
+    public function paidCommitment(StoreOrder $order): bool
+    {
+        if (! $this->validCommitment($order) || $order->accepted_at === null || $order->payment_state !== 'paid' || $order->ledger_state !== 'posted'
+            || \App\Models\StoreStockAllocation::query()->where('order_id', $order->id)->exists()) {
+            return false;
+        }
+
+        return \App\Models\StorePaymentObservation::query()->where('order_id', $order->id)->where('processing_state', 'posted')->whereNotNull('ledger_transaction_id')
+            ->where('account_matches', true)->where('reference_matches', true)->where('amount_pesewas', $order->charged_pesewas)->where('paid_at', '<', $order->expires_at)
+            ->get()->contains(fn (\App\Models\StorePaymentObservation $capture): bool => $capture->integrity_errors === []
+                && \App\Models\LedgerTransaction::withoutGlobalScopes()->whereKey($capture->ledger_transaction_id)->where('tenant_id', $order->tenant_id)
+                    ->where('reference', $capture->reference)->where('transaction_type', 'commerce_sale')->where('category', 'commerce')->whereNull('event_id')->exists());
     }
 
     public function withdraw(StoreSellerQuote $quote, User $actor, string $reason): StoreSellerQuote
@@ -176,7 +190,7 @@ final class StoreSellerQuotes
             $order->update(['state' => 'cancelled', 'fulfilment_state' => 'cancelled', 'review_reason' => 'seller_quote_withdrawn']);
             $current->update(['withdrawn_by' => $actor->id, 'withdrawn_at' => now(), 'withdrawal_reason' => $reason]);
 
-            return $current->fresh();
+            return $current->refresh();
         });
     }
 

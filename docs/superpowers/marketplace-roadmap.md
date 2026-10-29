@@ -273,7 +273,7 @@ The owner approved public Purpledot listings for Foi Sincere made-to-order tote 
 **Review focus:** unknown/failed/late and duplicate captures; withdrawn/expired/repriced quote acceptance; forged quote identity or another seller/buyer; exact minor-unit totals on receipts/refunds; private-item access and expired verification; production proof versus warehouse stock; dispatch/return/refund races; existing stocked order compatibility.
 
 - [x] Task 1 — failing tests, additive quote schema/immutable evidence, seller-authorised issuance/withdrawal, exact total calculation via native fee services and protected private payment link.
-- [ ] Task 2 — explicit buyer acceptance and made-to-order payment/capture/fulfilment/refund adaptation without weakening stock guards or creating stock.
+- [x] Task 2 — explicit buyer acceptance and made-to-order payment/capture/fulfilment/refund adaptation without weakening stock guards or creating stock.
 - [ ] Task 3 — staff quote form/list/copy-link/withdraw controls through existing store navigation and permissions; buyer review/receipt/email charge and production-term rendering.
 - [ ] Task 4 — focused regressions, adversarial/concurrent payment and access checks, rebuilt assets, responsive browser acceptance using local fixtures.
 - [ ] Task 5 — one fresh whole-change review, fix findings, record self-review and prepare a PR for owner review. No merge, deploy, production quote, payment or message during this implementation task.

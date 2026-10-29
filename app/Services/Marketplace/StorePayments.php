@@ -20,10 +20,10 @@ final class StorePayments
 {
     public function __construct(private readonly CommerceInventoryLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreGateways $gateways) {}
 
-    public function start(StoreOrder $order, Session $session, string $submissionKey): ?StorePaymentAttempt
+    public function start(StoreOrder $order, Session $session, string $submissionKey, ?string $acceptedQuoteHash = null): ?StorePaymentAttempt
     {
         $created = false;
-        $attempt = $order->getConnection()->transaction(function () use ($order, $session, $submissionKey, &$created): ?StorePaymentAttempt {
+        $attempt = $order->getConnection()->transaction(function () use ($order, $session, $submissionKey, $acceptedQuoteHash, &$created): ?StorePaymentAttempt {
             $order = $this->locks->order($order);
             if (! Str::isUuid($submissionKey) || ! $this->access->buyer($order, $session)) {
                 $this->refuse();
@@ -43,6 +43,19 @@ final class StorePayments
                 || ! $seller->isPlatformDefaultSettlement() || $order->expires_at->lessThanOrEqualTo(now())) {
                 $this->refuse();
             }
+            $sellerQuote = $order->sellerQuote()->first();
+            if ($sellerQuote !== null) {
+                if ($acceptedQuoteHash === null || ! hash_equals($order->terms_hash, $acceptedQuoteHash) || ! app(StoreSellerQuotes::class)->validCommitment($order)) {
+                    $this->refuse();
+                }
+                if ($order->accepted_at === null) {
+                    foreach ($order->lines()->with('variant.merchandise')->get() as $line) {
+                        if ($line->variant->merchandise->visibility === 'members' && ! app(MerchandiseAccess::class)->canReadMembersFrom($seller, $session)) {
+                            $this->refuse();
+                        }
+                    }
+                }
+            }
             $this->gateways->forOrder($order);
             $prior = StorePaymentAttempt::query()->where('order_id', $order->id)->where('submission_key', $submissionKey)->first();
             if ($prior !== null) {
@@ -55,11 +68,18 @@ final class StorePayments
             if (! in_array($order->state, ['quoted', 'awaiting_payment'], true)) {
                 $this->refuse();
             }
-            $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->get();
-            if ($allocations->isEmpty() || $allocations->count() !== $order->lines()->count() || $allocations->contains(fn (StoreStockAllocation $a): bool => $a->state !== 'active' || $a->expires_at->lessThanOrEqualTo(now()))) {
-                $this->refuse();
+            if ($sellerQuote !== null) {
+                if (StoreStockAllocation::query()->where('order_id', $order->id)->exists()) {
+                    $this->refuse();
+                }
+                $variantIds = $order->lines()->pluck('variant_id')->all();
+            } else {
+                $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->get();
+                if ($allocations->isEmpty() || $allocations->count() !== $order->lines()->count() || $allocations->contains(fn (StoreStockAllocation $a): bool => $a->state !== 'active' || $a->expires_at->lessThanOrEqualTo(now()))) {
+                    $this->refuse();
+                }
+                $variantIds = $allocations->pluck('variant_id')->all();
             }
-            $variantIds = $allocations->pluck('variant_id')->all();
             $offered = \App\Models\StoreVariant::query()->whereKey($variantIds)->where('is_active', true)
                 ->whereHas('merchandise', fn ($query) => $query->whereNull('archived_at')->whereHas('listing', fn ($listing) => $listing->withoutGlobalScope(\App\Scopes\MerchandiseVisibilityScope::class)->where('status', \App\Models\StoreListing::STATUS_PUBLISHED)->whereNull('taken_down_at')))->count();
             if ($offered !== count($variantIds)) {

@@ -98,6 +98,9 @@ final class StoreFulfilmentOptions
                 throw new AuthorizationException;
             }
             Validator::make(['choice' => $choice, 'operation_key' => $operationKey], self::choiceRules())->validate();
+            if ($order->sellerQuote()->exists()) {
+                throw ValidationException::withMessages(['fulfilment' => 'This quote fixes the agreed fulfilment and delivery charge. Ask the seller for a replacement quote to change them.']);
+            }
             $fingerprint = self::fingerprint($choice);
             $replay = StoreFulfilmentArrangement::query()->where('replaces_order_id', $order->id)->where('operation_key', $operationKey)->first();
             if ($replay !== null) {

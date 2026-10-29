@@ -28,6 +28,9 @@ final class StoreFulfilment
             || StoreRefund::query()->where('order_id', $order->id)->where('restock', true)->where('status', '<>', 'confirmed')->exists()) {
             return false;
         }
+        if ($order->sellerQuote()->exists()) {
+            return app(StoreSellerQuotes::class)->paidCommitment($order);
+        }
         $lines = $order->lines()->get()->keyBy('id');
         $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->get();
 
