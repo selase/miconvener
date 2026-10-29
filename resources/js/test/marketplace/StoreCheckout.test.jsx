@@ -229,3 +229,35 @@ it('requires explicit acceptance before paying a seller-issued quote', async () 
     await screen.findByRole('alert');
     expect(JSON.parse(csrfFetch.mock.calls[1][1].body).accepted_quote_hash).toBe('a'.repeat(64));
 });
+it('shows immutable quote extras and production terms on the web receipt', async () => {
+    csrfFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+            receipt: {
+                number: 'QUOTED-R1',
+                seller: 'Teachers',
+                currency: 'GHS',
+                total_pesewas: 47500,
+                lines: [{ id: 'line-1', title: 'Tote', quantity: 2, amount_pesewas: 40000 }],
+                charges: [
+                    { label: 'Custom printing', amount_pesewas: 5000 },
+                    { label: 'Delivery', amount_pesewas: 2500 },
+                ],
+                customisation: 'Red association name on each tote.',
+                production_terms: 'Seven working days after artwork approval.',
+                issued_at: '2026-10-29T03:00:00Z',
+                receipt_terms: 'Agreed quote paid in full.',
+            },
+            verified_until: Date.now() / 1000 + 3600,
+        }),
+    });
+    render(<StoreOrders orderId="quoted-order" receipt />);
+    await screen.findByText('Receipt QUOTED-R1');
+    expect(screen.getByText('Custom printing')).toBeTruthy();
+    expect(screen.getByText('GHS 50.00')).toBeTruthy();
+    expect(screen.getByText('Delivery')).toBeTruthy();
+    expect(screen.getByText('GHS 25.00')).toBeTruthy();
+    expect(screen.getByText('Red association name on each tote.')).toBeTruthy();
+    expect(screen.getByText('Seven working days after artwork approval.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Print / save receipt' })).toBeTruthy();
+});
