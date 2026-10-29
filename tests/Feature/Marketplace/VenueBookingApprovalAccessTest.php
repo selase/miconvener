@@ -51,7 +51,7 @@ beforeEach(function (): void {
     $this->pending = function (): VenueBooking {
         ($this->submit)();
 
-        return VenueBooking::query()->where('approval_flow_version', 1)->latest('created_at')->firstOrFail();
+        return VenueBooking::query()->where('approval_flow_version', 1)->orderByDesc('id')->firstOrFail();
     };
     $this->hostPost = fn (string $action, VenueBooking $booking, array $data = [], ?User $as = null) => $this->actingAs($as ?? $this->admin)
         ->post("http://{$this->host}/venue/inquiries/{$booking->id}/{$action}", $data + ['operation_key' => (string) Str::uuid()], ['HTTP_HOST' => $this->host]);
@@ -117,6 +117,19 @@ describe('requesting over HTTP', function (): void {
         ]);
 
         expect(VenueBooking::query()->sole()->approval_flow_version)->toBeNull();
+    });
+});
+
+describe('the public venue page', function (): void {
+    test('tells the booking drawer whether this venue takes approval-first requests and in which time zone', function (): void {
+        $this->listing->update(['public_booking_policy' => ['timezone' => 'Africa/Accra']]);
+
+        $this->get(route('marketplace.venues.show', $this->listing->slug))->assertInertia(fn (Assert $page) => $page
+            ->where('venue.approval_requests', true)
+            ->where('venue.booking_timezone', 'Africa/Accra'));
+
+        Artisan::call('venue:enable-requests', ['tenant' => $this->tenant->slug, '--off' => true]);
+        $this->get(route('marketplace.venues.show', $this->listing->slug))->assertInertia(fn (Assert $page) => $page->where('venue.approval_requests', false));
     });
 });
 
@@ -289,6 +302,49 @@ describe('host decisions over HTTP', function (): void {
                 ->where('inquiry.approval.actions.1.action', VenueBookingAction::ACTION_APPROVED)
                 ->has('inquiry.approval.actions.1.delivery_state')
                 ->where('inquiry.approval.conflicts', []));
+    });
+
+    test('flags a pending request whose dates were taken after it was made', function (): void {
+        $booking = ($this->pending)();
+        $this->actingAs($this->admin)->get("http://{$this->host}/venue/inquiries/{$booking->id}", ['HTTP_HOST' => $this->host])
+            ->assertInertia(fn (Assert $page) => $page->where('inquiry.approval.dates_available', true));
+
+        VenueBooking::factory()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'store_listing_id' => $this->listing->id, 'starts_at' => $booking->starts_at, 'ends_at' => $booking->ends_at]);
+
+        $this->actingAs($this->admin)->get("http://{$this->host}/venue/inquiries/{$booking->id}", ['HTTP_HOST' => $this->host])
+            ->assertInertia(fn (Assert $page) => $page->where('inquiry.approval.dates_available', false));
+    });
+
+    test('shows a legacy booking\'s unreconciled late payment on its page', function (): void {
+        $legacy = VenueBooking::factory()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'store_listing_id' => $this->listing->id, 'status' => VenueBooking::STATUS_PENDING_PAYMENT, 'quote_valid_until' => now()->subHour()]);
+        VenueBookingAction::factory()->create(['booking_id' => $legacy->id, 'action' => VenueBookingAction::ACTION_PAYMENT_CALENDAR_CONFLICT, 'actor_type' => 'system', 'result_status' => $legacy->status, 'evidence' => ['provider_reference' => 'pstk_late', 'amount_pesewas' => 20000, 'currency' => 'GHS']]);
+
+        $this->actingAs($this->admin)->get("http://{$this->host}/venue/inquiries/{$legacy->id}", ['HTTP_HOST' => $this->host])
+            ->assertInertia(fn (Assert $page) => $page->where('inquiry.approval.flow', false)->where('inquiry.approval.conflicts.0.provider_reference', 'pstk_late'));
+    });
+});
+
+describe('the host calendar', function (): void {
+    test('shows a pending request as not holding the dates and an active hold as tentative, and drops an expired hold', function (): void {
+        $this->freezeTime();
+        $pending = ($this->pending)();
+        $held = ($this->pending)();
+        $held->update(['starts_at' => $this->from->addDays(2), 'ends_at' => $this->from->addDays(2)->addHours(3)]);
+        ($this->hostPost)('approve', $held, ['hold_hours' => 24]);
+        $expired = ($this->pending)();
+        $expired->update(['starts_at' => $this->from->addDays(4), 'ends_at' => $this->from->addDays(4)->addHours(3)]);
+        ($this->hostPost)('approve', $expired, ['hold_hours' => 1]);
+        $this->travel(2)->hours();
+
+        $month = $this->from->addDays(2)->format('Y-m');
+        $events = collect($this->actingAs($this->admin)->get("http://{$this->host}/venue/calendar?month={$month}", ['HTTP_HOST' => $this->host])
+            ->assertOk()->viewData('page')['props']['events'])->keyBy('id');
+
+        expect($events->has($expired->id))->toBeFalse('expired hold still listed');
+        expect($events[$pending->id]['holds_calendar'])->toBeFalse('pending request claims to hold')
+            ->and($events[$pending->id]['approval_flow'])->toBeTrue()
+            ->and($events[$held->id]['holds_calendar'])->toBeTrue()
+            ->and($events[$held->id]['hold_expires_at'])->not->toBeNull();
     });
 });
 

@@ -79,8 +79,15 @@ final class VenueCalendarController extends Controller
                 VenueBooking::STATUS_PENDING_PAYMENT,
                 VenueBooking::STATUS_PENDING_QUOTE,
                 VenueBooking::STATUS_PENDING_APPROVAL,
+                VenueBooking::STATUS_PENDING_HOST_APPROVAL,
+                VenueBooking::STATUS_APPROVED_HOLD,
                 VenueBooking::STATUS_BLOCKED,
             ])
+            ->where(function ($visible): void {
+                // An expired hold no longer occupies anything, so it leaves the calendar.
+                $visible->where('status', '!=', VenueBooking::STATUS_APPROVED_HOLD)
+                    ->orWhere('hold_expires_at', '>', now());
+            })
             ->overlapping($windowStart, $windowEnd);
 
         if ($spaceId && is_string($spaceId) && Str::isUuid($spaceId)) {
@@ -117,6 +124,10 @@ final class VenueCalendarController extends Controller
                 'purpose' => $b->purpose,
                 'host_notes' => $b->host_notes,
                 'quote_valid_until' => $b->quote_valid_until?->toIso8601String(),
+                'approval_flow' => $b->usesApprovalFlow(),
+                'holds_calendar' => VenueBooking::query()->whereKey($b->id)->blockingCalendar()->exists(),
+                'hold_expires_at' => $b->hold_expires_at?->toIso8601String(),
+                'timezone' => $b->usesApprovalFlow() ? $b->approvalPolicy()['timezone'] : null,
             ];
         });
 

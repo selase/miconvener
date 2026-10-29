@@ -9,6 +9,7 @@ use App\Http\Requests\Marketplace\MarketplaceVenueSearchRequest;
 use App\Models\StoreAmenity;
 use App\Models\StoreListing;
 use App\Services\Marketplace\MarketplaceSearchService;
+use App\Services\Marketplace\VenueBookingApprovals;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -56,6 +57,9 @@ final class MarketplaceListingController extends Controller
             ->where('status', StoreListing::STATUS_PUBLISHED)
             ->take(3)
             ->get();
+
+        $listing->setAttribute('approval_requests', app(VenueBookingApprovals::class)->acceptsRequests($listing));
+        $listing->setAttribute('booking_timezone', $listing->publicBookingPolicy()['timezone']);
 
         return Inertia::render('Public/Marketplace/Venues/Show', [
             'venue' => $listing,

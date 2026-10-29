@@ -10,6 +10,7 @@ use App\Mail\Marketplace\QuoteSentNotification;
 use App\Models\Shop;
 use App\Models\VenueBooking;
 use App\Models\VenueBookingAction;
+use App\Services\Marketplace\VenueAvailabilityService;
 use App\Services\Marketplace\VenueBookingApprovals;
 use App\Services\Marketplace\VenueBookingService;
 use App\Services\Tenancy\TenantContext;
@@ -98,6 +99,7 @@ final class VenueInquiryController extends Controller
             'deposit_required_pesewas' => $lead->deposit_required_pesewas,
             'amount_paid_pesewas' => $lead->amount_paid_pesewas,
             'status' => $lead->status,
+            'effective_status' => $lead->effectiveStatus(),
             'payment_status' => $lead->payment_status,
             'listing' => $lead->listing ? [
                 'id' => $lead->listing->id,
@@ -358,6 +360,7 @@ final class VenueInquiryController extends Controller
             'default_hold_hours' => $policy['default_hold_hours'],
             'max_hold_hours' => min(168, $policy['max_hold_hours']),
             'decision_reason' => $booking->decline_reason,
+            'dates_available' => $booking->listing === null || app(VenueAvailabilityService::class)->isSlotAvailable($booking->listing, $booking->starts_at, $booking->ends_at, $booking->id),
             'actions' => $booking->actions()->get()->map(fn (VenueBookingAction $action): array => [
                 'id' => $action->id,
                 'action' => $action->action,
