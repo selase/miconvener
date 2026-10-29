@@ -311,7 +311,8 @@ final class VenueBookingApprovals
 
     /**
      * Whether this operation key was already used on the booking. A key reused
-     * for a different decision is an error, never a second action.
+     * for a different decision is an error, never a second action, and a replay
+     * is only a success while the booking still reflects what that action did.
      */
     private function replay(VenueBooking $booking, string $operationKey, string $hash): bool
     {
@@ -322,6 +323,11 @@ final class VenueBookingApprovals
 
         if (! hash_equals($prior->request_hash, $hash)) {
             throw ValidationException::withMessages(['operation_key' => 'This request key was already used for a different decision.']);
+        }
+
+        $sameDeadline = $prior->hold_expires_at === null || $prior->hold_expires_at->getTimestamp() === $booking->hold_expires_at?->getTimestamp();
+        if ($prior->result_status !== $booking->status || ! $sameDeadline) {
+            throw ValidationException::withMessages(['booking' => 'This request has changed since that decision was made. Refresh to see where it stands now.']);
         }
 
         return true;

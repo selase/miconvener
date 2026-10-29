@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { formatInZone } from '@/lib/venueTime';
@@ -25,6 +25,51 @@ const TONES = {
     rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
     slate: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
 };
+
+const LIVE_STATES = ['pending_host_approval', 'approved_hold'];
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+/**
+ * Keeps an open page honest: once a hold's deadline passes it reads as expired
+ * without a manual refresh, and the page asks the server for the real state
+ * then and whenever the tab becomes visible again.
+ */
+export function useLiveApproval(approval) {
+    const [now, setNow] = useState(() => Date.now());
+    const status = approval?.effective_status;
+    const deadline = approval?.hold_expires_at ? new Date(approval.hold_expires_at).getTime() : null;
+
+    useEffect(() => {
+        if (!LIVE_STATES.includes(status)) return undefined;
+
+        const refresh = () => {
+            setNow(Date.now());
+            router.reload({ only: ['booking'] });
+        };
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') refresh();
+        };
+        const timer =
+            status === 'approved_hold' && deadline !== null
+                ? setTimeout(refresh, Math.min(Math.max(deadline - Date.now(), 0) + 1000, MAX_TIMER_MS))
+                : null;
+
+        window.addEventListener('focus', refresh);
+        document.addEventListener('visibilitychange', onVisible);
+
+        return () => {
+            if (timer !== null) clearTimeout(timer);
+            window.removeEventListener('focus', refresh);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [status, deadline]);
+
+    if (status === 'approved_hold' && deadline !== null && now >= deadline) {
+        return { ...approval, effective_status: 'hold_expired', can_cancel: false };
+    }
+
+    return approval;
+}
 
 /** The status pill for an approval-first venue request. */
 export function VenueRequestBadge({ approval }) {

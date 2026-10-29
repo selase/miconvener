@@ -212,6 +212,28 @@ describe('host decisions', function (): void {
             ->and(VenueBookingAction::query()->where('booking_id', $booking->id)->where('action', VenueBookingAction::ACTION_APPROVED)->count())->toBe(1);
     });
 
+    test('replaying an approval key after the request moved on is an explicit conflict, not a success', function (): void {
+        $booking = ($this->request)();
+        $key = (string) Str::uuid();
+        $this->approvals->approve($booking, $this->host, 24, $key);
+        $this->approvals->release($booking->fresh(), $this->host, 'Double booked', (string) Str::uuid());
+
+        expect(fn () => $this->approvals->approve($booking->fresh(), $this->host, 24, $key))->toThrow(ValidationException::class)
+            ->and($booking->fresh()->status)->toBe(VenueBooking::STATUS_CANCELLED)
+            ->and(VenueBookingAction::query()->where('booking_id', $booking->id)->where('action', VenueBookingAction::ACTION_APPROVED)->count())->toBe(1);
+    });
+
+    test('replaying an approval key after a renewal is a conflict too', function (): void {
+        $this->freezeTime();
+        $booking = ($this->request)();
+        $key = (string) Str::uuid();
+        $this->approvals->approve($booking, $this->host, 2, $key);
+        $this->travel(3)->hours();
+        $this->approvals->renew($booking->fresh(), $this->host, 2, (string) Str::uuid());
+
+        expect(fn () => $this->approvals->approve($booking->fresh(), $this->host, 2, $key))->toThrow(ValidationException::class);
+    });
+
     test('an approval key reused for a different decision is refused', function (): void {
         $booking = ($this->request)();
         $key = (string) Str::uuid();

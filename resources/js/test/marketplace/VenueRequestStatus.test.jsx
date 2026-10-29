@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { router } from '@inertiajs/react';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import BookingShow from '@/Pages/Public/Marketplace/Bookings/Show';
 
 vi.mock('@/Layouts/MarketplaceLayout', () => ({ default: ({ children }) => children }));
@@ -138,4 +138,63 @@ it('leaves a legacy paid booking exactly as it was', () => {
     expect(screen.getByText(/Confirmed & Calendar Locked/)).toBeTruthy();
     expect(screen.getByText(/Add to Calendar/)).toBeTruthy();
     expect(screen.getByText(/Paystack Secure/)).toBeTruthy();
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+});
+
+it('an open page stops saying the dates are held once the hold runs out, and asks the server', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2030-04-20T15:29:00+00:00'));
+    router.reload.mockClear();
+    render(
+        <BookingShow
+            booking={withApproval(
+                {
+                    effective_status: 'approved_hold',
+                    hold_expires_at: '2030-04-20T15:30:00+00:00',
+                    can_cancel: true,
+                },
+                'approved_hold'
+            )}
+        />
+    );
+    expect(screen.getByText('Dates held')).toBeTruthy();
+
+    act(() => {
+        vi.advanceTimersByTime(61_000);
+    });
+
+    expect(screen.getByText('Hold expired')).toBeTruthy();
+    expect(screen.queryByText('Dates held')).toBeNull();
+    expect(screen.getByText(/no longer reserved/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Cancel/ })).toBeNull();
+    expect(router.reload).toHaveBeenCalledWith({ only: ['booking'] });
+});
+
+it('refreshes when a waiting tab comes back into focus', () => {
+    router.reload.mockClear();
+    render(<BookingShow booking={base} />);
+
+    act(() => {
+        window.dispatchEvent(new Event('focus'));
+    });
+
+    expect(router.reload).toHaveBeenCalledWith({ only: ['booking'] });
+});
+
+it('does not poll or refresh a request that has already ended', () => {
+    router.reload.mockClear();
+    render(
+        <BookingShow
+            booking={withApproval({ effective_status: 'declined', can_cancel: false }, 'declined')}
+        />
+    );
+
+    act(() => {
+        window.dispatchEvent(new Event('focus'));
+    });
+
+    expect(router.reload).not.toHaveBeenCalled();
 });

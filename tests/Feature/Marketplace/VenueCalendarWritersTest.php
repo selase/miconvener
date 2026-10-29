@@ -171,10 +171,38 @@ describe('a late legacy payment', function (): void {
             ->and(VenueBookingAction::query()->where('booking_id', $this->late->id)->sole()->decision_reason)->toBe('booking_closed');
     });
 
+    test('stays a staff exception when the competing booking is later cancelled and the callback replays', function (): void {
+        $winner = ($this->booking)(['status' => VenueBooking::STATUS_CONFIRMED]);
+        ($this->pay)();
+
+        $winner->update(['status' => VenueBooking::STATUS_CANCELLED]);
+        $booking = ($this->pay)();
+
+        expect($booking->fresh()->status)->toBe(VenueBooking::STATUS_PENDING_PAYMENT)
+            ->and($booking->fresh()->paystack_reference)->toBeNull()
+            ->and(VenueBookingAction::query()->where('booking_id', $this->late->id)->count())->toBe(1)
+            ->and(LedgerTransaction::query()->where('reference', 'like', 'MKT-%')->count())->toBe(0);
+        Mail::assertNothingQueued();
+    });
+
     test('is idempotent once confirmed', function (): void {
         ($this->pay)();
         ($this->pay)();
 
         expect(LedgerTransaction::query()->where('reference', 'like', 'MKT-%')->count())->toBe(1);
     });
+});
+
+test('the booking service itself refuses a pay-now enquiry on a venue that takes approval-first requests', function (): void {
+    Illuminate\Support\Facades\Artisan::call('venue:enable-requests', ['tenant' => $this->tenant->slug]);
+    $this->listing->update(['is_bookable' => true]);
+
+    foreach ([false, true] as $quoteOnly) {
+        expect(fn () => $this->service->createBooking($this->listing->fresh(), [
+            'planner_name' => 'Ama', 'planner_email' => 'ama@example.test', 'guest_count' => 10,
+            'starts_at' => $this->from->toDateTimeString(), 'ends_at' => $this->to->toDateTimeString(), 'request_quote_only' => $quoteOnly,
+        ]))->toThrow(ValidationException::class);
+    }
+
+    expect(VenueBooking::query()->where('store_listing_id', $this->listing->id)->count())->toBe(0);
 });

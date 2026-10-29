@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
-import VenueRequestStatus, { VenueRequestBadge } from '@/Components/Marketplace/VenueRequestStatus';
+import VenueRequestStatus, { VenueRequestBadge, useLiveApproval } from '@/Components/Marketplace/VenueRequestStatus';
 import {
     Calendar,
     Clock,
@@ -81,7 +81,7 @@ export default function BookingShow({ booking }) {
 
     const isConfirmed = booking.status === 'confirmed' || booking.payment_status === 'deposit_paid';
     const isPendingQuote = booking.status === 'pending_quote';
-    const approval = booking.approval?.flow ? booking.approval : null;
+    const approval = useLiveApproval(booking.approval?.flow ? booking.approval : null);
 
     return (
         <MarketplaceLayout>
@@ -151,7 +151,7 @@ export default function BookingShow({ booking }) {
                         </div>
                     </div>
 
-                    {approval && <VenueRequestStatus booking={booking} />}
+                    {approval && <VenueRequestStatus booking={{ ...booking, approval }} />}
 
                     {/* Pending Deposit Action Banner */}
                     {!isConfirmed &&

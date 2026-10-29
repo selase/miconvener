@@ -31,6 +31,7 @@ import AbstractsSection from './components/AbstractsSection';
 import AttendanceSection from './components/AttendanceSection';
 import ContributionsSection from './components/ContributionsSection';
 import HistorySkeleton from './components/HistorySkeleton';
+import { safePortalReturn } from '@/lib/portalReturn';
 
 const RECORDS = {
     certificates: CertificatesSection,
@@ -477,10 +478,9 @@ export default function AttendeeApp({
         window.history.pushState({}, '', url);
     };
     const verified = () => {
-        const requested = new URLSearchParams(window.location.search).get('return_to');
+        const requested = safePortalReturn(new URLSearchParams(window.location.search).get('return_to'));
         if (communityReturnUrl) window.location.assign(communityReturnUrl);
-        else if (requested && /^\/my(\/|$)/.test(requested) && !requested.startsWith('//'))
-            window.location.assign(requested);
+        else if (requested) window.location.assign(requested);
         else router.reload();
     };
     useEffect(() => {

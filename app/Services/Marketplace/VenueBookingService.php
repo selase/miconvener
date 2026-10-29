@@ -28,6 +28,7 @@ final class VenueBookingService
     public function __construct(
         private readonly VenueAvailabilityService $availabilityService,
         private readonly VenueCalendarLocks $locks,
+        private readonly VenueBookingApprovals $approvals,
     ) {}
 
     /**
@@ -59,6 +60,12 @@ final class VenueBookingService
         }
 
         $booking = $this->locks->forListing($listing->id, function () use ($listing, $payload, $user, $plannerTenant, $startsAt, $endsAt, $guestCount, $layoutStyle): VenueBooking {
+            if ($this->approvals->acceptsRequests($listing)) {
+                throw ValidationException::withMessages([
+                    'starts_at' => ['This venue takes requests that the host approves first. Please send a request instead.'],
+                ]);
+            }
+
             // Verify calendar availability
             if (! $this->availabilityService->isSlotAvailable($listing, $startsAt, $endsAt)) {
                 throw ValidationException::withMessages([
@@ -285,6 +292,10 @@ final class VenueBookingService
                 return [$booking, false];
             }
 
+            if ($this->paymentConflictRecorded($booking, $reference)) {
+                return [$booking, false];
+            }
+
             $conflict = $booking->usesApprovalFlow() ? 'approval_flow_no_payment' : $this->paymentCalendarConflict($listing, $booking);
             if ($conflict !== null) {
                 $this->recordPaymentCalendarConflict($booking, $reference, $gatewayData, $conflict);
@@ -343,15 +354,30 @@ final class VenueBookingService
         return null;
     }
 
+    private function paymentConflictKey(string $reference): string
+    {
+        return Uuid::uuid5(Uuid::NAMESPACE_URL, 'venue-payment-calendar-conflict:'.$reference)->toString();
+    }
+
+    /**
+     * A payment already kept as conflict evidence stays with staff: a replayed
+     * callback never confirms it, even if the dates have since become free.
+     */
+    private function paymentConflictRecorded(VenueBooking $booking, string $reference): bool
+    {
+        return VenueBookingAction::query()->where('booking_id', $booking->id)->where('operation_key', $this->paymentConflictKey($reference))->exists();
+    }
+
     /**
      * @param  array<string, mixed>  $gatewayData
      */
     private function recordPaymentCalendarConflict(VenueBooking $booking, string $reference, array $gatewayData, string $reason): void
     {
-        $operationKey = Uuid::uuid5(Uuid::NAMESPACE_URL, 'venue-payment-calendar-conflict:'.$reference)->toString();
-        if (VenueBookingAction::query()->where('booking_id', $booking->id)->where('operation_key', $operationKey)->exists()) {
+        if ($this->paymentConflictRecorded($booking, $reference)) {
             return;
         }
+
+        $operationKey = $this->paymentConflictKey($reference);
 
         $evidence = [
             'provider_reference' => $reference,

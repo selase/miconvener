@@ -28,10 +28,12 @@ afterEach(function (): void {
 
 /**
  * One enterprise organisation with a bookable venue, a staff member and a team user.
+ * Approval-first requests are on unless $requests is false, which gives the legacy
+ * pay-now venue that the public booking path still serves.
  *
  * @return array{tenant: Tenant, shop: Shop, listing: StoreListing, member: Member, user: User, from: CarbonImmutable, to: CarbonImmutable}
  */
-function venueRaceScenario(): array
+function venueRaceScenario(bool $requests = true): array
 {
     $tenant = Tenant::factory()->create(['package_id' => Package::query()->where('slug', 'enterprise')->value('id')]);
     $tenant->syncFeaturesFromPackage();
@@ -44,7 +46,9 @@ function venueRaceScenario(): array
     $member = Member::factory()->create(['tenant_id' => $tenant->id, 'email' => 'ama@race.example', 'is_staff' => true]);
     $from = CarbonImmutable::now()->addDays(3)->setTime(9, 0);
 
-    Artisan::call('venue:enable-requests', ['tenant' => $tenant->slug]);
+    if ($requests) {
+        Artisan::call('venue:enable-requests', ['tenant' => $tenant->slug]);
+    }
     App\Models\Permission::query()->firstOrCreate(['name' => 'manage venue', 'guard_name' => 'web'], ['category' => 'venue']);
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
     setPermissionsTeamId($tenant->id);
@@ -116,7 +120,7 @@ function occupying(array $scenario): int
 }
 
 it('lets exactly one of a public request and a blackout take the slot', function (array $order, array $expected): void {
-    $s = venueRaceScenario();
+    $s = venueRaceScenario(false);
     $jobs = array_map(fn (string $action) => venueJob($s, $action), $order);
 
     expect(raceVenueWorkers($s['listing'], $jobs))->toBe($expected)
@@ -127,7 +131,7 @@ it('lets exactly one of a public request and a blackout take the slot', function
 ]);
 
 it('lets exactly one of a public request and a staff request take the slot', function (array $order, array $expected): void {
-    $s = venueRaceScenario();
+    $s = venueRaceScenario(false);
     $jobs = array_map(fn (string $action) => venueJob($s, $action), $order);
 
     expect(raceVenueWorkers($s['listing'], $jobs))->toBe($expected)
@@ -170,7 +174,7 @@ it('serialises internal approval and cancellation against a blackout', function 
 ]);
 
 it('serialises blackout removal against new occupancy', function (array $order, array $expected, int $occupying): void {
-    $s = venueRaceScenario();
+    $s = venueRaceScenario(false);
     $block = VenueBooking::factory()->create([
         'tenant_id' => $s['tenant']->id, 'shop_id' => $s['shop']->id, 'store_listing_id' => $s['listing']->id,
         'status' => VenueBooking::STATUS_BLOCKED, 'starts_at' => $s['from'], 'ends_at' => $s['to'],
@@ -216,7 +220,7 @@ it('keeps a retried conflicting payment as one evidence row', function (): void 
 });
 
 it('does not delay a request for a different time on the same venue', function (): void {
-    $s = venueRaceScenario();
+    $s = venueRaceScenario(false);
     $later = ['from' => $s['from']->addDays(1)->toIso8601String(), 'to' => $s['from']->addDays(1)->addHours(2)->toIso8601String()];
 
     expect(raceVenueWorkers($s['listing'], [venueJob($s, 'public_create'), venueJob($s, 'blackout', $later)]))->toBe(['CREATED', 'BLACKOUT'])
@@ -246,10 +250,19 @@ it('lets only one of two host approvals hold the same dates', function (): void 
         ->and(occupying($s))->toBe(1);
 });
 
+function legacyEnquiry(array $s): VenueBooking
+{
+    return VenueBooking::factory()->create([
+        'tenant_id' => $s['tenant']->id, 'shop_id' => $s['shop']->id, 'store_listing_id' => $s['listing']->id,
+        'status' => VenueBooking::STATUS_PENDING_QUOTE, 'starts_at' => $s['from'], 'ends_at' => $s['to'],
+    ]);
+}
+
 it('lets exactly one of an approval and another writer take the slot', function (array $order, array $expected): void {
     $s = venueRaceScenario();
     $request = approvalRequest($s);
-    $jobs = array_map(fn (string $action) => venueJob($s, $action, ['booking' => $request->id]), $order);
+    $legacy = legacyEnquiry($s);
+    $jobs = array_map(fn (string $action) => venueJob($s, $action, ['booking' => $action === 'host_hold' ? $legacy->id : $request->id]), $order);
 
     expect(raceVenueWorkers($s['listing'], $jobs))->toBe($expected)
         ->and(occupying($s))->toBe(1);
@@ -258,19 +271,20 @@ it('lets exactly one of an approval and another writer take the slot', function 
     'blackout then approval' => [['blackout', 'approve'], ['BLACKOUT', 'UNAVAILABLE']],
     'approval then staff request' => [['approve', 'internal_request'], ['APPROVED', 'UNAVAILABLE']],
     'staff request then approval' => [['internal_request', 'approve'], ['REQUESTED', 'UNAVAILABLE']],
-    'approval then legacy public request' => [['approve', 'public_create'], ['APPROVED', 'UNAVAILABLE']],
-    'legacy public request then approval' => [['public_create', 'approve'], ['CREATED', 'UNAVAILABLE']],
+    'approval then host hold on an older legacy enquiry' => [['approve', 'host_hold'], ['APPROVED', 'UNAVAILABLE']],
+    'host hold on an older legacy enquiry then approval' => [['host_hold', 'approve'], ['HELD', 'UNAVAILABLE']],
 ]);
 
 it('lets an expired hold be renewed only if nobody took the dates first', function (array $order, array $expected, string $holdStatus): void {
     $s = venueRaceScenario();
     $hold = approvalRequest($s, ['status' => VenueBooking::STATUS_APPROVED_HOLD, 'hold_expires_at' => now()->subMinute()]);
-    $jobs = array_map(fn (string $action) => venueJob($s, $action, ['booking' => $hold->id]), $order);
+    $legacy = legacyEnquiry($s);
+    $jobs = array_map(fn (string $action) => venueJob($s, $action, ['booking' => $action === 'host_hold' ? $legacy->id : $hold->id]), $order);
 
     expect(raceVenueWorkers($s['listing'], $jobs))->toBe($expected)
         ->and($hold->fresh()->effectiveStatus())->toBe($holdStatus)
         ->and(occupying($s))->toBe(1);
 })->with([
-    'renewal first' => [['renew', 'public_create'], ['RENEWED', 'UNAVAILABLE'], VenueBooking::STATUS_APPROVED_HOLD],
-    'someone else first' => [['public_create', 'renew'], ['CREATED', 'UNAVAILABLE'], VenueBooking::STATUS_HOLD_EXPIRED],
+    'renewal first' => [['renew', 'host_hold'], ['RENEWED', 'UNAVAILABLE'], VenueBooking::STATUS_APPROVED_HOLD],
+    'someone else first' => [['host_hold', 'renew'], ['HELD', 'UNAVAILABLE'], VenueBooking::STATUS_HOLD_EXPIRED],
 ]);
