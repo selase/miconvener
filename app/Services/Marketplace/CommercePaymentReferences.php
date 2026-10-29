@@ -22,6 +22,7 @@ final class CommercePaymentReferences
 {
     public function claimForOrder(StoreOrder $order, string $reference, string $origin = 'checkout'): CommercePaymentReference
     {
+        $reference = mb_trim($reference);
         if ($this->postedByLegacyVenuePath($reference)) {
             throw new RuntimeException('This provider reference was already taken by a legacy venue booking payment and needs staff reconciliation.');
         }
@@ -45,13 +46,16 @@ final class CommercePaymentReferences
      */
     public function linkLedger(CommercePaymentReference $claim, string $ledgerReference): CommercePaymentReference
     {
-        if ($claim->ledger_reference === $ledgerReference) {
-            return $claim;
-        }
+        return DB::connection('landlord')->transaction(function () use ($claim, $ledgerReference): CommercePaymentReference {
+            $current = CommercePaymentReference::query()->lockForUpdate()->findOrFail($claim->id);
+            if ($current->ledger_reference === $ledgerReference) {
+                return $current;
+            }
 
-        $claim->update(['ledger_reference' => $ledgerReference]);
+            $current->update(['ledger_reference' => $ledgerReference]);
 
-        return $claim;
+            return $current;
+        });
     }
 
     /**
@@ -59,6 +63,7 @@ final class CommercePaymentReferences
      */
     public function postedByLegacyVenuePath(string $reference): bool
     {
+        $reference = mb_trim($reference);
         $escaped = addcslashes($reference, '\\%_');
 
         return VenueBooking::query()->where('paystack_reference', $reference)->exists()

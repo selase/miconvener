@@ -123,10 +123,10 @@ return new class extends Migration
             $table->unique(['provider', 'account_fingerprint', 'reference'], 'commerce_reference_owner_unique');
             $table->index(['tenant_id', 'created_at']);
             $table->foreign('tenant_id')->references('id')->on('tenants')->restrictOnDelete();
-            $table->foreign('order_id')->references('id')->on('store_orders')->restrictOnDelete();
-            $table->foreign('booking_id')->references('id')->on('venue_bookings')->restrictOnDelete();
+            $table->foreign(['order_id', 'shop_id', 'tenant_id'], 'commerce_reference_order_owner_fk')->references(['id', 'shop_id', 'tenant_id'])->on('store_orders')->restrictOnDelete();
+            $table->foreign(['booking_id', 'shop_id', 'tenant_id'], 'commerce_reference_booking_owner_fk')->references(['id', 'shop_id', 'tenant_id'])->on('venue_bookings')->restrictOnDelete();
         });
-        $db->statement("ALTER TABLE commerce_payment_references ADD CONSTRAINT commerce_reference_values CHECK (length(reference) > 0 AND origin IN ('checkout','legacy_reconciliation') AND ((source_type = 'store_order' AND order_id IS NOT NULL) OR (source_type = 'legacy_venue_booking' AND booking_id IS NOT NULL AND order_id IS NULL) OR (source_type = 'legacy_ledger_posting' AND order_id IS NULL AND ledger_reference IS NOT NULL)))");
+        $db->statement("ALTER TABLE commerce_payment_references ADD CONSTRAINT commerce_reference_values CHECK (length(reference) > 0 AND origin IN ('checkout','legacy_reconciliation') AND ((source_type = 'store_order' AND order_id IS NOT NULL AND shop_id IS NOT NULL AND booking_id IS NULL) OR (source_type = 'legacy_venue_booking' AND booking_id IS NOT NULL AND shop_id IS NOT NULL AND order_id IS NULL) OR (source_type = 'legacy_ledger_posting' AND order_id IS NULL AND ledger_reference IS NOT NULL)))");
 
         $schema->create('venue_payment_resolutions', function (Blueprint $table): void {
             $table->uuid('id')->primary();

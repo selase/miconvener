@@ -24,7 +24,8 @@ final class CommercePaymentReferenceFactory extends Factory
             'source_type' => CommercePaymentReference::SOURCE_ORDER,
             'order_id' => StoreOrder::factory(),
             'tenant_id' => fn (array $a) => $a['order_id'] === null ? VenueBooking::factory()->create()->tenant_id : StoreOrder::query()->findOrFail($a['order_id'])->tenant_id,
-            'shop_id' => null, 'booking_id' => null, 'ledger_reference' => null, 'origin' => 'checkout',
+            'shop_id' => fn (array $a) => $a['order_id'] === null ? null : StoreOrder::query()->findOrFail($a['order_id'])->shop_id,
+            'booking_id' => null, 'ledger_reference' => null, 'origin' => 'checkout',
         ];
     }
 

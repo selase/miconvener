@@ -10,6 +10,11 @@ use App\Services\Marketplace\CommercePaymentReferences;
 use App\Services\Marketplace\VenueBookingService;
 use Illuminate\Support\Facades\Mail;
 
+function claimRejectedByDatabase(Closure $statement): void
+{
+    expect(fn () => Illuminate\Support\Facades\DB::connection('landlord')->transaction($statement))->toThrow(Illuminate\Database\QueryException::class);
+}
+
 beforeEach(function (): void {
     refreshTenantDatabases();
     $this->references = app(CommercePaymentReferences::class);
@@ -79,4 +84,36 @@ test('the first ledger link is recorded and repeated safely', function (): void 
 
 test('a blank reference is refused', function (): void {
     expect(fn () => $this->references->claimForOrder(StoreOrder::factory()->create(), '  '))->toThrow(RuntimeException::class);
+});
+
+test('linking the same ledger entry from an older loaded copy returns the existing claim', function (): void {
+    $claim = $this->references->claimForOrder(StoreOrder::factory()->create(), 'pstk_stale');
+    $stale = CommercePaymentReference::query()->findOrFail($claim->id);
+
+    $this->references->linkLedger($claim, 'COMMERCE-1');
+
+    expect($this->references->linkLedger($stale, 'COMMERCE-1')->ledger_reference)->toBe('COMMERCE-1')
+        ->and(fn () => $this->references->linkLedger($stale, 'COMMERCE-2'))->toThrow(Illuminate\Database\QueryException::class);
+});
+
+test('surrounding whitespace cannot hide a reference the older venue path already took', function (): void {
+    VenueBooking::factory()->create(['paystack_reference' => 'pstk_padded']);
+
+    expect($this->references->postedByLegacyVenuePath(' pstk_padded '))->toBeTrue()
+        ->and(fn () => $this->references->claimForOrder(StoreOrder::factory()->create(), "  pstk_padded\n"))->toThrow(RuntimeException::class);
+});
+
+test('a reference claim must carry the same tenant and shop as its order or booking', function (): void {
+    $order = StoreOrder::factory()->create();
+    $foreign = StoreOrder::factory()->create();
+    $claim = fn (array $overrides) => fn () => CommercePaymentReference::factory()->create($overrides + ['order_id' => $order->id]);
+
+    claimRejectedByDatabase($claim(['tenant_id' => $foreign->tenant_id]));
+    claimRejectedByDatabase($claim(['shop_id' => $foreign->shop_id]));
+    claimRejectedByDatabase($claim(['shop_id' => null]));
+    expect($claim(['tenant_id' => $order->tenant_id, 'shop_id' => $order->shop_id])()->exists)->toBeTrue();
+
+    $booking = VenueBooking::factory()->create();
+    claimRejectedByDatabase(fn () => CommercePaymentReference::factory()->legacyBooking()->create(['booking_id' => $booking->id, 'tenant_id' => $foreign->tenant_id, 'shop_id' => $booking->shop_id]));
+    claimRejectedByDatabase(fn () => CommercePaymentReference::factory()->legacyBooking()->create(['booking_id' => $booking->id, 'tenant_id' => $booking->tenant_id, 'shop_id' => null]));
 });
