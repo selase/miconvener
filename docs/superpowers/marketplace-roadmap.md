@@ -274,6 +274,21 @@ The owner approved public Purpledot listings for Foi Sincere made-to-order tote 
 
 - [x] Task 1 — failing tests, additive quote schema/immutable evidence, seller-authorised issuance/withdrawal, exact total calculation via native fee services and protected private payment link.
 - [x] Task 2 — explicit buyer acceptance and made-to-order payment/capture/fulfilment/refund adaptation without weakening stock guards or creating stock.
-- [ ] Task 3 — staff quote form/list/copy-link/withdraw controls through existing store navigation and permissions; buyer review/receipt/email charge and production-term rendering.
-- [ ] Task 4 — focused regressions, adversarial/concurrent payment and access checks, rebuilt assets, responsive browser acceptance using local fixtures.
-- [ ] Task 5 — one fresh whole-change review, fix findings, record self-review and prepare a PR for owner review. No merge, deploy, production quote, payment or message during this implementation task.
+- [x] Task 3 — staff quote form/list/copy-link/withdraw controls through existing store navigation and permissions; buyer review/receipt/email charge and production-term rendering.
+- [x] Task 4 — focused regressions, adversarial/concurrent payment and access checks, rebuilt assets, responsive browser acceptance using local fixtures.
+- [x] Task 5 — one fresh whole-change review, fix findings, record self-review and prepare a PR for owner review. No merge, deploy, production quote, payment or message during this implementation task.
+
+**Permission ruling:** existing order managers can read quote history. Issuing or withdrawing quotes additionally requires catalogue management (the existing pricing permission), so read-only order operators do not gain a new pricing power. No role or permission is silently added.
+
+
+#### Seller quotes self-review — 29 October 2026
+
+**Touchpoints updated:** native Store quotes navigation and catalogue/order permission checks, private buyer review and email-verification context, payment acceptance, immutable order/receipt/email breakdowns, refunds and handover are covered. The roadmap records the new pricing-authority rule. No new dependency, role, permission, service configuration or environment variable is introduced, so AGENTS.md, memory, permission seeders and `.env.example` need no changes. The additive landlord migration retains immutable financial history and refuses a destructive rollback once quotes exist.
+
+**UI gap analysis:** discoverable from Store navigation and order history; empty history and paused issuance have explanatory states; pricing actions require catalogue plus order management; normal loading, validation, copy-link fallback and withdrawal errors are visible. Local desktop (1680px) and phone (390px) buyer/staff screens fit without horizontal overflow. Inputs, acceptance checkbox and actions have text labels, with explicit acceptance before payment. A real local email-code sign-in preserved the private order return path. Local HTTP issuance is correctly paused because this QA environment has no payment credentials; positive issuance and payment paths were tested with fake provider responses, not a live charge.
+
+**Solved during review:** prevented ordinary stock-cart replacement or reservation from cancelling/allocating seller offers; required actual posted capture evidence rather than paid flags for production handover; exposed withdrawal errors inside the modal; included the agreed destination in staff history; removed misleading unpaid stock-hold and premature receipt labels for custom quotes; clarified store-order sign-in copy. One fresh whole-change review found no blocking money, identity or stock-isolation defects; its two UI findings were fixed and regression-tested.
+
+**Verification:** 174 focused PHP tests /698 assertions passed, including legacy checkout/refund/receipt/collection and console component checks. The full JS run passed 512 tests before final copy/error regressions; the subsequent affected 24 tests passed, including the new regressions. Eleven real-worker handover/refund race cases passed; after correcting a test-helper setup error, both additional payment/withdrawal race cases passed separately (18 assertions). PHPStan, changed-file ESLint, `pint --dirty`, whitespace checks and the production asset build passed. Rebuilt assets accompany the UI.
+
+**Recommended for owner decision:** review this PR before merge. Automatic quote emails and deposits/partial payment remain outside this slice: staff copy/share the private link, and the buyer pays the full accepted amount. A separately approved production acceptance run is needed after deployment; existing commercial/checkout gates stay in force. No production quote, charge, message, rollout or deployment was performed for this task.

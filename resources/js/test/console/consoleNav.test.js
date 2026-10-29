@@ -175,7 +175,11 @@ it('hides inactive empty Store navigation but retains authorised order and finan
     const retained = visibleGroups(NAV_GROUPS, { features: { commerce_history: true }, can }).find(
         (g) => g.key === 'store'
     );
-    expect(retained.items.map((i) => i.label)).toEqual(['Store orders', 'Store finance']);
+    expect(retained.items.map((i) => i.label)).toEqual([
+        'Store quotes',
+        'Store orders',
+        'Store finance',
+    ]);
     expect(
         visibleGroups(NAV_GROUPS, { features: { commerce_history: true }, can: {} }).find(
             (g) => g.key === 'store'

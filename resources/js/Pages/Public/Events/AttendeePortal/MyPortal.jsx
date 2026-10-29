@@ -60,6 +60,12 @@ function LegacyMyPortal({
         typeof window !== 'undefined' &&
         /^\/my\/join\//.test(new URLSearchParams(window.location.search).get('return_to') || '');
 
+    const returningToStore =
+        typeof window !== 'undefined' &&
+        /^\/my\/store-orders(?:\/|$)/.test(
+            new URLSearchParams(window.location.search).get('return_to') || ''
+        );
+
     useEffect(() => {
         registerAttendeeServiceWorker();
         purgeExpiredOfflineTickets();
@@ -308,14 +314,26 @@ function LegacyMyPortal({
     };
     if (credential)
         return (
-            <PublicLayout headerActions={<a href="/my/store-orders" className="text-sm text-accent underline">Store orders</a>}>
+            <PublicLayout
+                headerActions={
+                    <a href="/my/store-orders" className="text-sm text-accent underline">
+                        Store orders
+                    </a>
+                }
+            >
                 <Head title="Save your private recovery key" />
                 <RecoveryCredential credential={credential} onClear={clearCredential} />
             </PublicLayout>
         );
 
     return (
-        <PublicLayout headerActions={<a href="/my/store-orders" className="text-sm text-accent underline">Store orders</a>}>
+        <PublicLayout
+            headerActions={
+                <a href="/my/store-orders" className="text-sm text-accent underline">
+                    Store orders
+                </a>
+            }
+        >
             <Head title="My MiConvener">
                 <link rel="manifest" href="/my/manifest.json" />
                 <meta name="theme-color" content="#4f46e5" />
@@ -334,20 +352,24 @@ function LegacyMyPortal({
                 )}
                 <div className="space-y-1 mb-8">
                     <h1 className="text-2xl font-normal tracking-tight text-ink">
-                        {joiningEvent && !verifiedEmail
-                            ? 'Verify your registration email'
-                            : selectedOrganiser?.name
-                              ? `Your events with ${selectedOrganiser.name}`
-                              : phoneVerified && !verifiedEmail
-                                ? 'Your MiConvener Communities'
-                                : 'Your MiConvener events'}
+                        {returningToStore && !verifiedEmail
+                            ? 'Your MiConvener store orders'
+                            : joiningEvent && !verifiedEmail
+                              ? 'Verify your registration email'
+                              : selectedOrganiser?.name
+                                ? `Your events with ${selectedOrganiser.name}`
+                                : phoneVerified && !verifiedEmail
+                                  ? 'Your MiConvener Communities'
+                                  : 'Your MiConvener events'}
                     </h1>
                     <p className="text-[13.5px] text-ink-secondary">
-                        {joiningEvent && !verifiedEmail
-                            ? 'Use the email you registered with to open the programme, polls, Q&A and surveys. Phone verification does not unlock event tickets.'
-                            : phoneVerified && !verifiedEmail
-                              ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
-                              : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
+                        {returningToStore && !verifiedEmail
+                            ? 'Verify the email used for your quote or order to review the details, pay and track collection or delivery.'
+                            : joiningEvent && !verifiedEmail
+                              ? 'Use the email you registered with to open the programme, polls, Q&A and surveys. Phone verification does not unlock event tickets.'
+                              : phoneVerified && !verifiedEmail
+                                ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
+                                : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
                     </p>
                 </div>
 

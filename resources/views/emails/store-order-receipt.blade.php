@@ -7,6 +7,17 @@
 {{ $line['title'] }} · Quantity {{ $line['quantity'] }} · {{ $receipt['currency'] }} {{ number_format($line['amount_pesewas'] / 100, 2) }}
 
 @endforeach
+@foreach ($receipt['charges'] ?? [] as $charge)
+{{ $charge['label'] }}: {{ $receipt['currency'] }} {{ number_format($charge['amount_pesewas'] / 100, 2) }}
+
+@endforeach
+@if (isset($receipt['production_terms']))
+## Your agreed specification
+{{ $receipt['customisation'] }}
+
+{{ $receipt['production_terms'] }}
+
+@endif
 @if (isset($receipt['buyer_fee_pesewas']))
 Checkout fee: {{ $receipt['currency'] }} {{ number_format($receipt['buyer_fee_pesewas'] / 100, 2) }}
 

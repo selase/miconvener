@@ -82,6 +82,22 @@ export function OrderSummary({ order }) {
                     <p>{formatDuesMoney(line.amount_pesewas, order.currency)}</p>
                 </div>
             ))}
+            {order.charges?.map((charge) => (
+                <p key={charge.label} className="flex flex-wrap justify-between gap-3 text-sm">
+                    <span>{charge.label}</span>
+                    <span>{formatDuesMoney(charge.amount_pesewas, order.currency)}</span>
+                </p>
+            ))}
+            {order.production_terms && (
+                <section className="space-y-3 border-l-2 border-accent bg-accent/5 p-4">
+                    <h3 className="font-semibold">Your agreed specification</h3>
+                    <p className="whitespace-pre-line text-sm leading-6">{order.customisation}</p>
+                    <h4 className="text-sm font-semibold">Production timeframe</h4>
+                    <p className="whitespace-pre-line text-sm leading-6">
+                        {order.production_terms}
+                    </p>
+                </section>
+            )}
             {order.buyer_fee_pesewas != null && (
                 <p className="text-sm">
                     Checkout fee: {formatDuesMoney(order.buyer_fee_pesewas, order.currency)}
@@ -160,6 +176,7 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
     const actionRequest = useRef(null);
     useEffect(() => () => actionRequest.current?.abort(), []);
     const [quoteExpired, setQuoteExpired] = useState(false);
+    const [acceptedQuote, setAcceptedQuote] = useState(false);
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const [revision, setRevision] = useState(0);
@@ -233,6 +250,7 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
     }, [orderId, receipt, page, revision]);
     const order = data?.order;
     useEffect(() => setQuoteExpired(false), [order?.id, order?.expires_at]);
+    useEffect(() => setAcceptedQuote(false), [order?.id, order?.seller_quote?.acceptance_hash]);
     const cancel = async () => {
         if (busy) return;
         setBusy(true);
@@ -256,7 +274,7 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
         }
     };
     const start = async () => {
-        if (busy || fulfilmentPending) return;
+        if (busy || fulfilmentPending || (order.seller_quote && !acceptedQuote)) return;
         setBusy(true);
         setError('');
         const controller = new AbortController();
@@ -266,7 +284,12 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                 method: 'POST',
                 signal: controller.signal,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ submission_key: crypto.randomUUID() }),
+                body: JSON.stringify({
+                    submission_key: crypto.randomUUID(),
+                    ...(order.seller_quote
+                        ? { accepted_quote_hash: order.seller_quote.acceptance_hash }
+                        : {}),
+                }),
             });
             const result = await response.json().catch(() => ({}));
             if (controller.signal.aborted) return;
@@ -393,12 +416,29 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                     <div className="mt-6 space-y-3">
                                         <QuoteTimer
                                             expires={order.expires_at}
+                                            stockHeld={!order.seller_quote}
                                             onExpire={setQuoteExpired}
                                         />
+                                        {order.seller_quote && (
+                                            <label className="flex items-start gap-3 border border-border p-4 text-sm leading-6">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={acceptedQuote}
+                                                    onChange={(event) =>
+                                                        setAcceptedQuote(event.target.checked)
+                                                    }
+                                                    className="mt-1 accent-accent"
+                                                />
+                                                I accept the quoted specification, production
+                                                timeframe, fulfilment arrangements and final payable
+                                                total.
+                                            </label>
+                                        )}
                                         <button
                                             disabled={
                                                 busy ||
                                                 fulfilmentPending ||
+                                                (order.seller_quote && !acceptedQuote) ||
                                                 quoteExpired ||
                                                 Date.parse(order.expires_at) <= Date.now()
                                             }
@@ -411,19 +451,20 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                         </button>
                                     </div>
                                 )}
-                                {['quoted', 'confirmed'].includes(order.state) && (
-                                    <StoreFulfilmentSelector
-                                        order={order}
-                                        onPendingChange={setFulfilmentPending}
-                                        onAccepted={(accepted) => {
-                                            if (accepted.order_id !== order.id)
-                                                window.location.assign(
-                                                    `/my/store-orders/${accepted.order_id}`
-                                                );
-                                            else setRevision((value) => value + 1);
-                                        }}
-                                    />
-                                )}
+                                {!order.seller_quote &&
+                                    ['quoted', 'confirmed'].includes(order.state) && (
+                                        <StoreFulfilmentSelector
+                                            order={order}
+                                            onPendingChange={setFulfilmentPending}
+                                            onAccepted={(accepted) => {
+                                                if (accepted.order_id !== order.id)
+                                                    window.location.assign(
+                                                        `/my/store-orders/${accepted.order_id}`
+                                                    );
+                                                else setRevision((value) => value + 1);
+                                            }}
+                                        />
+                                    )}
                                 {order.cancel_allowed && (
                                     <button
                                         type="button"
@@ -431,7 +472,9 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                         onClick={cancel}
                                         className="mt-5 block text-sm text-accent underline"
                                     >
-                                        Release unpaid stock hold
+                                        {order.seller_quote
+                                            ? 'Decline unpaid quote'
+                                            : 'Release unpaid stock hold'}
                                     </button>
                                 )}
                                 {order.ready_email_state && (
@@ -459,11 +502,13 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                         Read payment receipt
                                     </a>
                                 )}
-                                <p className="mt-5 text-xs text-ink-secondary">
-                                    Receipt email:{' '}
-                                    {order.email_label ?? order.email_state ?? 'Not queued'}. You
-                                    can read the receipt here even if delivery is delayed.
-                                </p>
+                                {(!order.seller_quote || order.receipt_url) && (
+                                    <p className="mt-5 text-xs text-ink-secondary">
+                                        Receipt email:{' '}
+                                        {order.email_label ?? order.email_state ?? 'Not queued'}.
+                                        You can read the receipt here even if delivery is delayed.
+                                    </p>
+                                )}
                                 <button
                                     onClick={() => setRevision((v) => v + 1)}
                                     className="mt-5 block text-sm text-accent underline"

@@ -56,6 +56,9 @@ SQL);
     public function down(): void
     {
         $schema = Schema::connection('landlord');
+        if ($schema->hasTable('store_seller_quotes') && $schema->getConnection()->table('store_seller_quotes')->exists()) {
+            throw new RuntimeException('Issued quote evidence must be retained; review this rollback manually.');
+        }
         if ($schema->getConnection()->table('store_order_lines')->where('quantity', '>', 99)->exists()) {
             throw new RuntimeException('Retain historical large-quantity orders; review this migration rollback manually.');
         }

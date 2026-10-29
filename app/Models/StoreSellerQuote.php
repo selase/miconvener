@@ -21,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Carbon\CarbonImmutable|null $withdrawn_at
  * @property string|null $withdrawn_by
  * @property string|null $withdrawal_reason
+ * @property \Carbon\CarbonImmutable|null $created_at
+ * @property \Carbon\CarbonImmutable|null $updated_at
  */
 final class StoreSellerQuote extends Model
 {
@@ -48,6 +50,6 @@ final class StoreSellerQuote extends Model
     /** @return array<string,string> */
     protected function casts(): array
     {
-        return ['snapshot' => 'array', 'issued_by' => 'string', 'withdrawn_by' => 'string', 'withdrawn_at' => 'immutable_datetime'];
+        return ['snapshot' => 'array', 'issued_by' => 'string', 'withdrawn_by' => 'string', 'withdrawn_at' => 'immutable_datetime', 'created_at' => 'immutable_datetime', 'updated_at' => 'immutable_datetime'];
     }
 }

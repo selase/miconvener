@@ -81,7 +81,7 @@ final class StoreQuotes
                     'title_snapshot' => $listing->title, 'sku_snapshot' => $variant->sku, 'options_snapshot' => $variant->options,
                     'quantity' => $quantity, 'unit_price_pesewas' => $variant->price_pesewas, 'line_amount_pesewas' => $amount];
             }
-            $open = StoreOrder::query()->where('shop_id', $shop->id)->where('buyer_email', $email)->whereIn('state', ['quoted', 'awaiting_payment', 'review'])->orderBy('id')->lockForUpdate()->get();
+            $open = StoreOrder::query()->where('shop_id', $shop->id)->where('buyer_email', $email)->whereIn('state', ['quoted', 'awaiting_payment', 'review'])->whereDoesntHave('sellerQuote')->orderBy('id')->lockForUpdate()->get();
             foreach ($open as $old) {
                 if ($old->state !== 'quoted') {
                     throw ValidationException::withMessages(['checkout' => 'Resolve the existing payment attempt before starting another checkout.']);

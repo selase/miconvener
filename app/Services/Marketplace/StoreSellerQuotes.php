@@ -27,7 +27,7 @@ use Illuminate\Validation\ValidationException;
 
 final class StoreSellerQuotes
 {
-    public function canManage(Tenant $tenant, User $actor): bool
+    public function canManage(Tenant $tenant, User $actor, bool $pricing = false): bool
     {
         if (! User::query()->whereKey($actor->id)->where('tenant_id', $tenant->id)->exists() && ! $actor->tenants()->whereKey($tenant->id)->exists()) {
             return false;
@@ -36,15 +36,16 @@ final class StoreSellerQuotes
         try {
             setPermissionsTeamId($tenant->id);
 
-            return Gate::forUser($actor->fresh())->allows('manage store orders');
+            return Gate::forUser($actor->fresh())->allows('manage store orders')
+                && (! $pricing || Gate::forUser($actor->fresh())->allows('manage store catalog'));
         } finally {
             setPermissionsTeamId($team);
         }
     }
 
-    public function authorize(Tenant $tenant, User $actor): void
+    public function authorize(Tenant $tenant, User $actor, bool $pricing = false): void
     {
-        if (! $this->canManage($tenant, $actor)) {
+        if (! $this->canManage($tenant, $actor, $pricing)) {
             throw new AuthorizationException;
         }
     }
@@ -52,7 +53,7 @@ final class StoreSellerQuotes
     /** @param array<string,mixed> $input */
     public function issue(Tenant $tenant, User $actor, array $input): StoreSellerQuote
     {
-        $this->authorize($tenant, $actor);
+        $this->authorize($tenant, $actor, true);
         if (is_string($input['buyer_email'] ?? null)) {
             $input['buyer_email'] = PlatformAttendeeVerification::normalise($input['buyer_email']);
         }
@@ -71,7 +72,7 @@ final class StoreSellerQuotes
 
         return $tenant->getConnection()->transaction(function () use ($tenant, $actor, $data, $requestHash): StoreSellerQuote {
             $tenant = app(CommerceInventoryLocks::class)->tenant($tenant->id);
-            $this->authorize($tenant, $actor);
+            $this->authorize($tenant, $actor, true);
             if (! app(CommerceCatalogRollout::class)->enabled($tenant)
                 || ! $tenant->features()->where('feature_key', 'commerce_checkout')->where('enabled', true)->exists()) {
                 $this->refuse('Store checkout must be approved and enabled before issuing a payable quote.');
@@ -152,7 +153,7 @@ final class StoreSellerQuotes
             && ($snapshot['quote_id'] ?? null) === $quote->id
             && ($snapshot['goods_pesewas'] ?? -1) === (int) $order->lines()->sum('line_amount_pesewas')
             && $order->principal_pesewas === ($snapshot['goods_pesewas'] ?? -1) + ($snapshot['printing_pesewas'] ?? -1) + ($snapshot['delivery_pesewas'] ?? -1)
-            && ! $order->lines()->doesntExist();
+            && $order->lines()->exists();
     }
 
     public function paidCommitment(StoreOrder $order): bool
@@ -171,7 +172,7 @@ final class StoreSellerQuotes
 
     public function withdraw(StoreSellerQuote $quote, User $actor, string $reason): StoreSellerQuote
     {
-        $this->authorize($quote->tenant, $actor);
+        $this->authorize($quote->tenant, $actor, true);
         $reason = mb_trim($reason);
         if ($reason === '' || mb_strlen($reason) > 500) {
             $this->refuse('Provide a reason for withdrawing this quote.');
@@ -180,11 +181,11 @@ final class StoreSellerQuotes
         return $quote->getConnection()->transaction(function () use ($quote, $actor, $reason): StoreSellerQuote {
             $order = app(CommerceInventoryLocks::class)->order($quote->order);
             $current = StoreSellerQuote::query()->where('order_id', $order->id)->lockForUpdate()->findOrFail($quote->id);
-            $this->authorize($current->tenant, $actor);
+            $this->authorize($current->tenant, $actor, true);
             if ($current->withdrawn_at !== null) {
                 return $current;
             }
-            if ($order->state !== 'quoted' || $order->payment_state !== 'awaiting' || $order->attempts()->whereNotIn('status', ['failed', 'expired'])->exists()) {
+            if (! in_array($order->state, ['quoted', 'awaiting_payment'], true) || $order->payment_state !== 'awaiting' || $order->attempts()->whereNotIn('status', ['failed', 'expired'])->exists()) {
                 $this->refuse('Reconcile any existing payment before withdrawing a quote. Paid orders use the existing refund process.');
             }
             $order->update(['state' => 'cancelled', 'fulfilment_state' => 'cancelled', 'review_reason' => 'seller_quote_withdrawn']);

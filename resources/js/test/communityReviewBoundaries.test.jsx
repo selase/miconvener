@@ -283,3 +283,14 @@ it('does not link retained private history to a disabled public organisation pag
     await screen.findByRole('heading', { name: 'Paused organisation' });
     expect(screen.queryByRole('link', { name: 'Public organisation page' })).toBeNull();
 });
+it('explains store quote email verification when returning to a private order', () => {
+    const previous = window.location.href;
+    window.history.replaceState({}, '', '/my?return_to=%2Fmy%2Fstore-orders%2Fquote-id');
+    try {
+        render(<MyPortal />);
+        expect(screen.getByText('Your MiConvener store orders')).toBeTruthy();
+        expect(screen.getByText(/Verify the email used for your quote or order/)).toBeTruthy();
+    } finally {
+        window.history.replaceState({}, '', previous);
+    }
+});

@@ -37,7 +37,7 @@ final class IssueStoreSellerQuoteRequest extends FormRequest
     {
         $tenant = app(TenantContext::class)->getTenant();
 
-        return $tenant !== null && $this->user() !== null && app(StoreSellerQuotes::class)->canManage($tenant, $this->user());
+        return $tenant !== null && $this->user() !== null && app(StoreSellerQuotes::class)->canManage($tenant, $this->user(), true);
     }
 
     /** @return array<string,mixed> */

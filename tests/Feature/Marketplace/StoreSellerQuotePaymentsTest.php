@@ -53,6 +53,13 @@ it('posts one sale and receipt and enables production without manufacturing inve
         ->and($order->receipt()->count())->toBe(1)->and(LedgerTransaction::withoutGlobalScopes()->where('transaction_type', 'commerce_sale')->count())->toBe(1)
         ->and(StoreStockMovement::query()->count())->toBe(0)->and($variant->fresh()->on_hand)->toBe(0)
         ->and(app(StoreFulfilment::class)->eligible($order))->toBeTrue();
+    $receipt = $order->receipt;
+    expect($receipt->snapshot['charges'][0]['amount_pesewas'])->toBe(5000)
+        ->and($receipt->snapshot['charges'][1]['amount_pesewas'])->toBe(2500)
+        ->and($receipt->snapshot['total_pesewas'])->toBe(47500);
+    $email = (new App\Mail\StoreOrderReceipt($receipt))->render();
+    expect($email)->toContain('Custom printing', 'GHS 50.00', 'GHS 25.00', 'Seven working days after payment.');
+
     app(StoreFulfilment::class)->ready($order, $actor, (string) Str::uuid());
     expect($order->fresh()->fulfilment_state)->toBe('ready');
 });
@@ -136,3 +143,42 @@ it('fully refunds a paid production order without adding fictitious warehouse st
         ->and($order->fresh()->fulfilment_state)->toBe('cancelled')->and($variant->fresh()->on_hand)->toBe(0)
         ->and(StoreStockMovement::query()->count())->toBe(0);
 });
+
+it('does not cancel a seller offer when the buyer starts ordinary stocked checkout', function (): void {
+    [$tenant, , $actor, $session, $offered] = StoreCheckoutScenario::sellerQuote();
+    $listing = App\Models\StoreListing::factory()->published()->create(['shop_id' => $tenant->shop->id, 'listing_kind' => 'merchandise']);
+    App\Models\StoreMerchandise::factory()->create(['listing_id' => $listing->id, 'shop_id' => $tenant->shop->id, 'order_mode' => 'stock']);
+    $stocked = App\Models\StoreVariant::factory()->create(['listing_id' => $listing->id, 'shop_id' => $tenant->shop->id]);
+    app(App\Services\Marketplace\MerchandiseInventory::class)->adjust($stocked, 3, 'Opening stock', (string) Str::uuid(), $actor);
+    app(App\Services\Marketplace\StoreQuotes::class)->create($tenant, $session, [['variant_id' => $stocked->id, 'quantity' => 1]], (string) Str::uuid());
+    expect($offered->fresh()->state)->toBe('quoted')
+        ->and(StoreStockAllocation::query()->where('order_id', $offered->id)->count())->toBe(0);
+});
+
+it('never substitutes a warehouse reservation for a production commitment', function (): void {
+    [, $variant, $actor, , $order] = StoreCheckoutScenario::sellerQuote();
+    app(App\Services\Marketplace\MerchandiseInventory::class)->adjust($variant, 3, 'Unrelated existing stock', (string) Str::uuid(), $actor);
+    expect(fn () => app(App\Services\Marketplace\PurchaseReservations::class)->reserve($order))->toThrow(ValidationException::class);
+    expect(StoreStockAllocation::query()->count())->toBe(0);
+});
+
+it('preserves paid production orders through quote expiry and the existing whole-order handover', function (bool $delivery): void {
+    [, $variant, $actor, $session, $order] = StoreCheckoutScenario::sellerQuote($delivery);
+    $amount = $delivery ? 47500 : 45000;
+    $attempt = app(StorePayments::class)->start($order, $session, (string) Str::uuid(), $order->terms_hash);
+    $capture = app(StorePaymentEvidence::class)->record($attempt, StoreCheckoutScenario::evidence($attempt, ['amount' => $amount, 'fees' => 900]));
+    app(StorePaymentConfirmer::class)->confirm($capture);
+    $this->travel(10)->days();
+    $session = StoreCheckoutScenario::session();
+    app(StoreFulfilment::class)->ready($order->fresh(), $actor, (string) Str::uuid());
+    if ($delivery) {
+        app(App\Services\Marketplace\StoreDeliveries::class)->dispatch($order->fresh(), $actor, (string) Str::uuid());
+    }
+    $pass = app(App\Services\Marketplace\StoreCollectionPasses::class)->issue($order->fresh(), $session, (string) Str::uuid());
+    $key = (string) Str::uuid();
+    $handover = app(App\Services\Marketplace\StoreCollections::class)->confirm($order->fresh(), $actor, ['manual_code' => $pass['manual_code']], $key);
+    expect($order->fresh()->fulfilment_state)->toBe($delivery ? 'delivered' : 'collected')
+        ->and(app(App\Services\Marketplace\StoreCollections::class)->confirm($order->fresh(), $actor, ['manual_code' => $pass['manual_code']], $key)->id)->toBe($handover->id)
+        ->and($variant->fresh()->on_hand)->toBe(0)->and(StoreStockMovement::query()->count())->toBe(0)
+        ->and(LedgerTransaction::withoutGlobalScopes()->where('transaction_type', 'commerce_sale')->count())->toBe(1);
+})->with([true, false]);

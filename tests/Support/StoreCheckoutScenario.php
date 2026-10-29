@@ -131,7 +131,7 @@ final class StoreCheckoutScenario
     }
 
     /** @return array{Tenant, StoreVariant, User, Store, \App\Models\StoreOrder, \App\Models\StoreSellerQuote} */
-    public static function sellerQuote(): array
+    public static function sellerQuote(bool $delivery = true): array
     {
         [$tenant, $variant, $actor, $session] = self::make(0);
         $variant->merchandise->update(['order_mode' => 'made_to_order', 'enquiry_phone' => '+233208333151']);
@@ -144,9 +144,9 @@ final class StoreCheckoutScenario
             'snapshot' => ['methods' => ['collection', 'delivery'], 'collection_location' => 'Collection by appointment', 'delivery_countries' => ['GH'], 'delivery_instructions' => 'Seller-arranged delivery.']]);
         $quote = app(\App\Services\Marketplace\StoreSellerQuotes::class)->issue($tenant, $actor, ['operation_key' => (string) Str::uuid(),
             'buyer_email' => 'buyer@example.test', 'valid_for_hours' => 48, 'production_terms' => 'Seven working days after payment.',
-            'customisation' => 'Red association name.', 'printing_pesewas' => 5000, 'delivery_pesewas' => 2500,
+            'customisation' => 'Red association name.', 'printing_pesewas' => 5000, 'delivery_pesewas' => $delivery ? 2500 : 0,
             'lines' => [['variant_id' => $variant->id, 'quantity' => 2, 'unit_price_pesewas' => 20000]],
-            'choice' => ['policy_id' => $policy->id, 'method' => 'delivery', 'destination' => ['recipient' => 'Test Buyer', 'address_line_1' => '12 Test Street', 'locality' => 'Accra', 'country' => 'GH']]]);
+            'choice' => $delivery ? ['policy_id' => $policy->id, 'method' => 'delivery', 'destination' => ['recipient' => 'Test Buyer', 'address_line_1' => '12 Test Street', 'locality' => 'Accra', 'country' => 'GH']] : ['policy_id' => $policy->id, 'method' => 'collection']]);
 
         return [$tenant, $variant, $actor, $session, $quote->order, $quote];
     }

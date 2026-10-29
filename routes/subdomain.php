@@ -341,6 +341,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::post('collections/{order}/validate', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'validatePass'])->whereUuid('order')->name('collections.validate');
         Route::post('collections/{order}/confirm', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'confirm'])->whereUuid('order')->name('collections.confirm');
         Route::post('fulfilment-policies', [App\Http\Controllers\Tenant\Store\StoreFulfilmentPolicyController::class, 'store'])->name('fulfilment-policies.store');
+        Route::get('quotes', [App\Http\Controllers\Tenant\Store\StoreSellerQuoteController::class, 'index'])->name('quotes.index');
+        Route::post('quotes', [App\Http\Controllers\Tenant\Store\StoreSellerQuoteController::class, 'store'])->middleware('throttle:30,1')->name('quotes.store');
+        Route::post('quotes/{quote}/withdraw', [App\Http\Controllers\Tenant\Store\StoreSellerQuoteController::class, 'withdraw'])->whereUuid('quote')->middleware('throttle:30,1')->name('quotes.withdraw');
         Route::get('orders', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'index'])->name('orders.index');
         Route::get('finance', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'finance'])->name('finance.index');
         Route::post('orders/{order}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcilePayment'])->whereUuid('order')->middleware('throttle:10,1')->name('orders.reconcile');
