@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-22-unified-commerce-design.md` §§2/4/7/8; `docs/superpowers/specs/2026-09-20-event-store-handoff.md` approval/calendar requirements; current `docs/superpowers/marketplace-roadmap.md`. The design rulings below are recommendations for owner review, not approved product decisions.
 
-**Status:** proposed on 29 October 2026. Documentation only. No implementation, production rollout, venue payment or merchant activation authorised.
+**Status:** implemented 29 October 2026 on a draft PR (unmerged, undeployed). Tasks 1–5 done except the Task 4 browser walkthrough and the independent Codex review. No production rollout, venue payment or merchant activation authorised.
 
 ## Global constraints
 
@@ -116,11 +116,11 @@ No method may treat possession of a model instance or a globally valid permissio
 
 **Files:** targeted tests from Tasks 1–4; `docs/superpowers/marketplace-roadmap.md` and this plan.
 
-- [ ] Run affected suites once after final changes, including availability/approval, internal booking identity/limits, merchant boundaries, operations/event linkage, legacy payment conflict/replay and merchandise checkout isolation. Rerun only failures or changed surfaces; don't loop the whole suite per task.
-- [ ] Repeat the real-worker races independently from transactional feature tests (no simultaneous DB truncation). Prove winner/loser and notification/evidence outcomes, not just one HTTP error. Verify current public availability and staff calendar agree at the exact expiry boundary.
-- [ ] Perform self-review (“Is there anything I have overlooked? Is the solution optimal? Let me take a step back.”), then one fresh whole-change review. Include money/legacy boundaries and every writer/reader, not only new endpoints; fix findings with targeted regressions.
-- [ ] Update permissions/feature discovery only if needed: reuse `manage venue`, no new pricing/payment authority. Register the new off-by-default feature with the named rollout command; verify it appears in the existing `Admin/FeatureController` CRUD after registration and can be explicitly disabled. No new feature seeder, package entitlement or env flag. No dependency/config change without scope approval.
-- [ ] Record outcomes and unresolved limits; open a reviewable PR and run one final CI gate. No merge/deploy/production opt-in until separately authorised. Plan S2b with full verifier/attempt/ledger recovery, approval-to-checkout handoff, deposit/balance policy and settlement before venue payment activation. S2c remains pro-forma/bank-transfer evidence/manual verification.
+- [x] Run affected suites once after final changes, including availability/approval, internal booking identity/limits, merchant boundaries, operations/event linkage, legacy payment conflict/replay and merchandise checkout isolation. Rerun only failures or changed surfaces; don't loop the whole suite per task.
+- [x] Repeat the real-worker races independently from transactional feature tests (no simultaneous DB truncation). Prove winner/loser and notification/evidence outcomes, not just one HTTP error. Verify current public availability and staff calendar agree at the exact expiry boundary.
+- [ ] Perform self-review (“Is there anything I have overlooked? Is the solution optimal? Let me take a step back.”), then one fresh whole-change review. Include money/legacy boundaries and every writer/reader, not only new endpoints; fix findings with targeted regressions. **Partly done (29 Oct 2026):** the author self-review is complete (see the PR); no fresh-context reviewer was dispatched, and the independent whole-change review is the Codex review requested by the owner. Left open until that review lands.
+- [x] Update permissions/feature discovery only if needed: reuse `manage venue`, no new pricing/payment authority. Register the new off-by-default feature with the named rollout command; verify it appears in the existing `Admin/FeatureController` CRUD after registration and can be explicitly disabled. No new feature seeder, package entitlement or env flag. No dependency/config change without scope approval.
+- [ ] Record outcomes and unresolved limits; open a reviewable PR and run one final CI gate. No merge/deploy/production opt-in until separately authorised. Plan S2b with full verifier/attempt/ledger recovery, approval-to-checkout handoff, deposit/balance policy and settlement before venue payment activation. S2c remains pro-forma/bank-transfer evidence/manual verification. **Partly done:** outcomes and limits are recorded in the roadmap and the draft PR is open; the final CI gate is pending.
 
 ## Plan self-review and owner review points
 

@@ -16,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property array<string, mixed>|null $public_booking_policy
+ */
 final class StoreListing extends Model
 {
     use HasFactory;

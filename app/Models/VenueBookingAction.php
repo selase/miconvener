@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $delivery_claimed_at
  * @property \Illuminate\Support\Carbon|null $delivery_completed_at
  * @property string|null $delivery_error
+ * @property \Illuminate\Support\Carbon|null $created_at
  */
 final class VenueBookingAction extends Model
 {

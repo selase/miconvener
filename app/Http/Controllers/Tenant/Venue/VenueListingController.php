@@ -253,7 +253,7 @@ final class VenueListingController extends Controller
      */
     private function bookingPolicy(?array $submitted, ?StoreListing $existing): ?array
     {
-        $current = (array) ($existing?->public_booking_policy ?? []);
+        $current = (array) ($existing->public_booking_policy ?? []);
         if ($submitted === null) {
             return $current === [] ? null : $current;
         }

@@ -190,6 +190,14 @@ describe('host decisions', function (): void {
             ->and(VenueBookingAction::query()->where('booking_id', $second->id)->where('action', VenueBookingAction::ACTION_APPROVED)->exists())->toBeFalse();
     });
 
+    test('an approval cannot take dates an existing legacy hold or paid booking occupies', function (string $status): void {
+        $request = ($this->request)();
+        VenueBooking::factory()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'store_listing_id' => $this->listing->id, 'status' => $status, 'quote_valid_until' => now()->addHour(), 'starts_at' => $this->from, 'ends_at' => $this->from->addHours(3)]);
+
+        expect(fn () => $this->approvals->approve($request, $this->host, 24, (string) Str::uuid()))->toThrow(ValidationException::class)
+            ->and($request->fresh()->status)->toBe(VenueBooking::STATUS_PENDING_HOST_APPROVAL);
+    })->with([VenueBooking::STATUS_PENDING_PAYMENT, VenueBooking::STATUS_CONFIRMED, VenueBooking::STATUS_BLOCKED, VenueBooking::STATUS_PENDING_APPROVAL]);
+
     test('replaying an approval after more time has passed returns the same hold and does not extend it', function (): void {
         $this->freezeTime();
         $booking = ($this->request)();

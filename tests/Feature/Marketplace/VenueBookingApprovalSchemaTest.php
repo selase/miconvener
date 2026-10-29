@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Enum\TenantStatusEnum;
+use App\Models\Role;
 use App\Models\Shop;
 use App\Models\StoreListing;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Models\VenueBooking;
 use App\Models\VenueBookingAction;
 use App\Services\Marketplace\VenueRequestRollout;
@@ -193,4 +195,27 @@ test('legacy and staff holds keep their existing calendar semantics', function (
     expect($on('01'))->toBeTrue()
         ->and($on('02'))->toBeFalse()
         ->and($on('03'))->toBeTrue();
+});
+
+test('the registered feature appears in the admin feature list and survives a plan sync', function (): void {
+    $superadmin = User::factory()->create();
+    $superadmin->assignRole(Role::create(['name' => 'Superadmin', 'guard_name' => 'web']));
+    $tenant = Tenant::factory()->create();
+    Shop::factory()->create(['tenant_id' => $tenant->id]);
+
+    $this->artisan('venue:enable-requests', ['tenant' => $tenant->slug])->assertSuccessful();
+    $tenant->syncFeaturesFromPackage();
+
+    expect(app(VenueRequestRollout::class)->enabled($tenant->fresh()))->toBeTrue();
+    $this->actingAs($superadmin)->getJson(route('features.index'), ['X-Requested-With' => 'XMLHttpRequest'])
+        ->assertOk()->assertJsonFragment(['slug' => VenueRequestRollout::FEATURE]);
+});
+
+test('a plan sync never turns requests on by itself', function (): void {
+    $tenant = Tenant::factory()->create();
+    Shop::factory()->create(['tenant_id' => $tenant->id]);
+
+    $tenant->syncFeaturesFromPackage();
+
+    expect(app(VenueRequestRollout::class)->enabled($tenant->fresh()))->toBeFalse();
 });
