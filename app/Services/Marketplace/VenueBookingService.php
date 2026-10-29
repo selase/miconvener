@@ -198,6 +198,8 @@ final class VenueBookingService
     public function rejectAsHost(Shop $shop, string $bookingId, ?string $reason): VenueBooking
     {
         return $this->locks->forBooking($bookingId, function (StoreListing $listing, VenueBooking $booking) use ($reason): VenueBooking {
+            $this->assertLegacyBooking($booking);
+
             if ($booking->isConfirmed() || $booking->isDepositPaid()) {
                 throw ValidationException::withMessages(['booking' => 'Cannot decline an already confirmed or paid reservation.']);
             }
@@ -216,6 +218,10 @@ final class VenueBookingService
      */
     public function initializeDepositCheckout(VenueBooking $booking, string $callbackUrl): string
     {
+        if ($booking->usesApprovalFlow()) {
+            throw new RuntimeException('Payment is not available for venue requests that await host approval.');
+        }
+
         $gateway = $this->getPlatformGateway();
         $customerId = $gateway->createCustomer($booking->planner_email, $booking->planner_name);
 
@@ -279,7 +285,7 @@ final class VenueBookingService
                 return [$booking, false];
             }
 
-            $conflict = $this->paymentCalendarConflict($listing, $booking);
+            $conflict = $booking->usesApprovalFlow() ? 'approval_flow_no_payment' : $this->paymentCalendarConflict($listing, $booking);
             if ($conflict !== null) {
                 $this->recordPaymentCalendarConflict($booking, $reference, $gatewayData, $conflict);
 
@@ -300,8 +306,17 @@ final class VenueBookingService
 
     private function assertHostMayChange(VenueBooking $booking): void
     {
+        $this->assertLegacyBooking($booking);
+
         if ($booking->isConfirmed() || $booking->isDepositPaid()) {
             throw ValidationException::withMessages(['booking' => 'Cannot modify an already confirmed or paid reservation.']);
+        }
+    }
+
+    private function assertLegacyBooking(VenueBooking $booking): void
+    {
+        if ($booking->usesApprovalFlow()) {
+            throw ValidationException::withMessages(['booking' => 'Use the approval controls for this request.']);
         }
     }
 

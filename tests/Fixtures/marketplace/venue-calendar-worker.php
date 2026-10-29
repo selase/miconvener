@@ -7,6 +7,7 @@ use App\Models\Shop;
 use App\Models\StoreListing;
 use App\Models\User;
 use App\Models\VenueBooking;
+use App\Services\Marketplace\VenueBookingApprovals;
 use App\Services\Marketplace\VenueBookingService;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Venue\InternalBookings;
@@ -70,6 +71,14 @@ try {
         case 'confirm_payment':
             $booking = app(VenueBookingService::class)->confirmBookingPayment($input['reference'], ['amount' => (int) $input['amount'], 'fees' => 0, 'metadata' => ['booking_reference' => $input['booking_reference']]]);
             echo $booking->isConfirmed() && $booking->paystack_reference === $input['reference'] ? 'CONFIRMED' : 'CONFLICT';
+            break;
+        case 'approve':
+            app(VenueBookingApprovals::class)->approve(VenueBooking::query()->findOrFail($input['booking']), User::query()->findOrFail($input['actor']), 24, (string) Illuminate\Support\Str::uuid());
+            echo 'APPROVED';
+            break;
+        case 'renew':
+            app(VenueBookingApprovals::class)->renew(VenueBooking::query()->findOrFail($input['booking']), User::query()->findOrFail($input['actor']), 24, (string) Illuminate\Support\Str::uuid());
+            echo 'RENEWED';
             break;
         default:
             echo 'UNKNOWN';

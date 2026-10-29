@@ -312,6 +312,23 @@ final class VenueBooking extends Model
             && ($this->hold_expires_at === null || ! $this->hold_expires_at->isFuture());
     }
 
+    /**
+     * The venue policy as it stood when this request was made.
+     *
+     * @return array{approval_required: bool, default_hold_hours: int, max_hold_hours: int, timezone: string}
+     */
+    public function approvalPolicy(): array
+    {
+        $snapshot = (array) ($this->contract_terms_snapshot['policy'] ?? []);
+
+        return [
+            'approval_required' => (bool) ($snapshot['approval_required'] ?? true),
+            'default_hold_hours' => (int) ($snapshot['default_hold_hours'] ?? 48),
+            'max_hold_hours' => (int) ($snapshot['max_hold_hours'] ?? 168),
+            'timezone' => (string) ($snapshot['timezone'] ?? config('app.timezone')),
+        ];
+    }
+
     public function effectiveStatus(): string
     {
         return $this->isHoldExpired() ? self::STATUS_HOLD_EXPIRED : $this->status;
@@ -322,7 +339,7 @@ final class VenueBooking extends Model
      */
     public function actions(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(VenueBookingAction::class, 'booking_id')->orderBy('created_at');
+        return $this->hasMany(VenueBookingAction::class, 'booking_id')->orderBy('created_at')->orderBy('id');
     }
 
     public function isExpired(): bool

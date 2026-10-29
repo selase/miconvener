@@ -491,6 +491,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::post('inquiries/{inquiry}/hold', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'acceptAndHold'])->name('inquiries.hold');
         Route::post('inquiries/{inquiry}/quote', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'sendQuote'])->name('inquiries.quote');
         Route::post('inquiries/{inquiry}/reject', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'reject'])->name('inquiries.reject');
+        Route::middleware('throttle:venue-decisions')->group(function (): void {
+            Route::post('inquiries/{inquiry}/approve', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'approve'])->name('inquiries.approve');
+            Route::post('inquiries/{inquiry}/decline', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'decline'])->name('inquiries.decline');
+            Route::post('inquiries/{inquiry}/release', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'release'])->name('inquiries.release');
+            Route::post('inquiries/{inquiry}/renew', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'renew'])->name('inquiries.renew');
+        });
 
         Route::get('calendar', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'index'])->name('calendar.index');
         Route::post('calendar/blocks', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'storeBlock'])->name('calendar.blocks.store');
