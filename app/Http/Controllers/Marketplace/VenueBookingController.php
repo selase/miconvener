@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Marketplace\StoreVenueBookingRequest;
 use App\Models\StoreListing;
 use App\Models\VenueBooking;
+use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Marketplace\VenueAvailabilityService;
+use App\Services\Marketplace\VenueBookingApprovals;
 use App\Services\Marketplace\VenueBookingService;
 use App\Services\Payment\PaystackGateway;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +29,8 @@ final class VenueBookingController extends Controller
 {
     public function __construct(
         private readonly VenueAvailabilityService $availabilityService,
-        private readonly VenueBookingService $bookingService
+        private readonly VenueBookingService $bookingService,
+        private readonly VenueBookingApprovals $approvals,
     ) {}
 
     /**
@@ -155,6 +160,12 @@ final class VenueBookingController extends Controller
             ]);
         }
 
+        if ($this->approvals->acceptsRequests($listing)) {
+            throw ValidationException::withMessages([
+                'starts_at' => 'This venue now takes requests that the host approves first. Please send a request instead.',
+            ]);
+        }
+
         $user = $request->user();
         /** @var \App\Models\Tenant|null $plannerTenant */
         $plannerTenant = $request->attributes->get('tenant');
@@ -188,9 +199,56 @@ final class VenueBookingController extends Controller
     }
 
     /**
+     * Send an approval-first request. It reserves nothing: the host decides.
+     */
+    public function requestVenue(StoreVenueBookingRequest $request, string $slug): RedirectResponse
+    {
+        /** @var StoreListing $listing */
+        $listing = StoreListing::query()
+            ->with('shop.tenant')
+            ->where('slug', $slug)
+            ->where('listing_kind', StoreListing::KIND_VENUE)
+            ->where('status', StoreListing::STATUS_PUBLISHED)
+            ->whereHas('shop', fn ($q) => $q->where('is_active', true))
+            ->firstOrFail();
+
+        $validated = $request->validated();
+        $booking = $this->approvals->request($listing, $validated, $request->session(), (string) $validated['operation_key']);
+
+        return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
+            ->with('success', 'Your request has been sent. Your dates are not reserved until the host approves.');
+    }
+
+    /**
+     * The requester withdraws an open request or hold.
+     */
+    public function cancel(Request $request, string $reference): RedirectResponse
+    {
+        $validated = $request->validate(['operation_key' => ['required', 'uuid']]);
+
+        $booking = VenueBooking::query()
+            ->where('booking_reference', $reference)
+            ->where('kind', VenueBooking::KIND_MARKETPLACE)
+            ->whereNotNull('approval_flow_version')
+            ->firstOrFail();
+
+        try {
+            $this->approvals->cancelByBuyer($booking, $request->session(), $validated['operation_key']);
+        } catch (AuthorizationException) {
+            abort(404);
+        } catch (ValidationException $e) {
+            return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
+                ->with('error', (string) collect($e->errors())->flatten()->first());
+        }
+
+        return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
+            ->with('success', 'Your request has been cancelled.');
+    }
+
+    /**
      * Show booking dossier, payment receipt, and contract terms snapshot.
      */
-    public function show(string $reference): Response
+    public function show(Request $request, string $reference): Response|SymfonyResponse
     {
         /** @var VenueBooking $booking */
         $booking = VenueBooking::query()
@@ -198,6 +256,10 @@ final class VenueBookingController extends Controller
             ->where('booking_reference', $reference)
             ->where('kind', VenueBooking::KIND_MARKETPLACE)
             ->firstOrFail();
+
+        if ($booking->usesApprovalFlow()) {
+            return $this->showApprovalRequest($request, $booking);
+        }
 
         return Inertia::render('Public/Marketplace/Bookings/Show', [
             'booking' => [
@@ -338,11 +400,16 @@ final class VenueBookingController extends Controller
                         ->with('error', 'Payment verification failed: transaction details did not match this reservation.');
                 }
 
-                $this->bookingService->confirmBookingPayment($paystackRef, [
+                $settled = $this->bookingService->confirmBookingPayment($paystackRef, [
                     'metadata' => $verificationMetadata,
                     'amount' => $verifiedAmount,
                     'fees' => (int) ($verification['fees'] ?? 0),
                 ]);
+
+                if (! $settled->isConfirmed() || $settled->paystack_reference !== $paystackRef) {
+                    return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
+                        ->with('warning', 'We received your payment, but these dates are no longer available, so the reservation is not confirmed. The venue team will contact you about the payment.');
+                }
 
                 return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
                     ->with('success', 'Your reservation deposit has been confirmed! The venue calendar is now locked for your event.');
@@ -360,5 +427,82 @@ final class VenueBookingController extends Controller
             return redirect()->route('marketplace.bookings.show', $booking->booking_reference)
                 ->with('info', 'We are finalizing your payment with Paystack. Your booking status will update momentarily.');
         }
+    }
+
+    /**
+     * The private page for an approval-first request: only its verified requester sees it.
+     */
+    private function showApprovalRequest(Request $request, VenueBooking $booking): SymfonyResponse
+    {
+        $email = app(PlatformAttendeeVerification::class)->verifiedEmail($request->session());
+        if ($email === null) {
+            $path = route('marketplace.bookings.show', $booking->booking_reference, false);
+
+            return redirect('/my?return_to='.rawurlencode($path))->header('Cache-Control', 'private, no-store');
+        }
+
+        abort_unless(hash_equals(PlatformAttendeeVerification::normalise($booking->planner_email), PlatformAttendeeVerification::normalise($email)), 404);
+
+        $booking->loadMissing(['listing.primaryMedia', 'shop']);
+        $policy = $booking->approvalPolicy();
+        $effective = $booking->effectiveStatus();
+
+        $response = Inertia::render('Public/Marketplace/Bookings/Show', [
+            'booking' => [
+                'id' => $booking->id,
+                'booking_reference' => $booking->booking_reference,
+                'status' => $booking->status,
+                'payment_status' => $booking->payment_status,
+                'planner_name' => $booking->planner_name,
+                'planner_email' => $booking->planner_email,
+                'planner_phone' => $booking->planner_phone,
+                'planner_company' => $booking->planner_company,
+                'event_type' => $booking->event_type,
+                'guest_count' => $booking->guest_count,
+                'layout_style' => $booking->layout_style,
+                'special_requests' => $booking->special_requests,
+                'starts_at' => $booking->starts_at->toIso8601String(),
+                'ends_at' => $booking->ends_at->toIso8601String(),
+                'time_slot_type' => $booking->time_slot_type,
+                'duration_units' => (float) $booking->duration_units,
+                'rental_amount_pesewas' => $booking->rental_amount_pesewas,
+                'security_deposit_pesewas' => $booking->security_deposit_pesewas,
+                'total_amount_pesewas' => $booking->total_amount_pesewas,
+                'deposit_required_pesewas' => 0,
+                'amount_paid_pesewas' => 0,
+                'paystack_reference' => null,
+                'paid_at' => null,
+                'contract_agreed_at' => $booking->contract_agreed_at?->toIso8601String(),
+                'contract_terms_snapshot' => $booking->contract_terms_snapshot,
+                'approval' => [
+                    'flow' => true,
+                    'effective_status' => $effective,
+                    'hold_expires_at' => $booking->hold_expires_at?->toIso8601String(),
+                    'timezone' => $policy['timezone'],
+                    'decision_reason' => in_array($booking->status, [VenueBooking::STATUS_DECLINED, VenueBooking::STATUS_CANCELLED], true) ? $booking->decline_reason : null,
+                    'price_is_indicative' => true,
+                    'can_cancel' => in_array($effective, [VenueBooking::STATUS_PENDING_HOST_APPROVAL, VenueBooking::STATUS_APPROVED_HOLD], true),
+                ],
+                'venue' => [
+                    'id' => $booking->listing?->id,
+                    'title' => $booking->listing?->title,
+                    'slug' => $booking->listing?->slug,
+                    'pricing_model' => $booking->listing?->pricing_model,
+                    'primary_media' => $booking->listing?->primaryMedia,
+                ],
+                'shop' => [
+                    'name' => $booking->shop?->name,
+                    'slug' => $booking->shop?->slug,
+                    'address' => $booking->shop?->address,
+                    'city' => $booking->shop?->city,
+                    'region' => $booking->shop?->region,
+                    'phone' => $booking->shop?->phone,
+                    'email' => $booking->shop?->email,
+                ],
+            ],
+        ])->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 }

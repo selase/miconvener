@@ -10,9 +10,21 @@ import {
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react';
+import { localToOffsetIso } from '@/lib/venueTime';
+
+const newOperationKey = () =>
+    globalThis.crypto?.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = (Math.random() * 16) | 0;
+              return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+          });
 
 export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
     const isPriceOnRequest = venue.price_visibility === 'on_request' || !venue.rental_price_pesewas;
+    const approvalFlow = Boolean(venue.approval_requests);
+    const zone = venue.booking_timezone || 'UTC';
+    const [operationKey] = useState(newOperationKey);
 
     // Tomorrow's date formatted as YYYY-MM-DD
     const tomorrowStr = () => {
@@ -145,15 +157,44 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
     // Calculate startsAt and endsAt strings in ISO / standard format
     const getTimestamps = useCallback(() => {
         const start = `${startDate}T${startTime}:00`;
-        const end = dateMode === 'multi' ? `${endDate}T${endTime}:00` : `${startDate}T${endTime}:00`;
+        const end =
+            dateMode === 'multi' ? `${endDate}T${endTime}:00` : `${startDate}T${endTime}:00`;
         return { start, end };
     }, [startDate, endDate, startTime, endTime, dateMode]);
+
+    // In the approval flow every time is sent as the venue's wall clock plus its UTC offset.
+    const getRequestTimes = useCallback(() => {
+        const { start, end } = getTimestamps();
+        const from = localToOffsetIso(start.slice(0, 16), zone);
+        const to = localToOffsetIso(end.slice(0, 16), zone);
+        const bad = [from, to].find((result) => !result.ok);
+        if (bad) {
+            return {
+                ok: false,
+                message:
+                    bad.reason === 'ambiguous'
+                        ? `That time happens twice in ${zone} because clocks change. Choose another time.`
+                        : `That time does not exist in ${zone} because clocks change. Choose another time.`,
+            };
+        }
+
+        return { ok: true, start: from.iso, end: to.iso };
+    }, [getTimestamps, zone]);
 
     // Live Slot & Pricing Check
     useEffect(() => {
         if (!isOpen) return;
 
-        const { start, end } = getTimestamps();
+        let { start, end } = getTimestamps();
+        if (approvalFlow) {
+            const times = getRequestTimes();
+            if (!times.ok) {
+                setAvailability({ available: false, pricing: null, errorMessage: times.message });
+                return;
+            }
+            start = times.start;
+            end = times.end;
+        }
         if (new Date(end) <= new Date(start)) {
             setAvailability({
                 available: false,
@@ -196,7 +237,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [isOpen, getTimestamps, guestCount, layoutStyle, venue.slug]);
+    }, [isOpen, getTimestamps, getRequestTimes, approvalFlow, guestCount, layoutStyle, venue.slug]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -204,6 +245,41 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
 
         if (!agreedToTerms) {
             setErrors({ agreed_to_terms: 'You must agree to the venue terms and policies.' });
+            return;
+        }
+
+        if (approvalFlow) {
+            const times = getRequestTimes();
+            if (!times.ok) {
+                setErrors({ starts_at: times.message });
+                return;
+            }
+            setSubmitting(true);
+            router.post(
+                route('marketplace.venues.request', venue.slug),
+                {
+                    operation_key: operationKey,
+                    starts_at: times.start,
+                    ends_at: times.end,
+                    guest_count: parseInt(guestCount, 10) || 1,
+                    layout_style: layoutStyle,
+                    event_type: eventType,
+                    planner_name: plannerName,
+                    planner_email: plannerEmail,
+                    planner_phone: plannerPhone,
+                    planner_company: plannerCompany,
+                    special_requests: specialRequests,
+                    agreed_to_terms: agreedToTerms,
+                },
+                {
+                    onError: (errs) => {
+                        setErrors(errs);
+                        setSubmitting(false);
+                    },
+                    onFinish: () => setSubmitting(false),
+                }
+            );
+
             return;
         }
 
@@ -248,7 +324,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                 <div className="flex items-center justify-between border-b border-border p-5 sticky top-0 bg-surface/95 backdrop-blur-xs z-10">
                     <div>
                         <div className="text-[11px] font-semibold text-accent uppercase tracking-wider">
-                            Venue Booking & Reservation
+                            {approvalFlow ? 'Request this venue' : 'Venue Booking & Reservation'}
                         </div>
                         <h2 className="text-base font-bold text-ink">{venue.title}</h2>
                     </div>
@@ -262,6 +338,20 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 text-xs">
+                    {approvalFlow && (
+                        <div
+                            role="note"
+                            className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-ink-secondary leading-relaxed"
+                        >
+                            <p className="font-semibold text-ink">
+                                Your dates are not reserved until the host approves.
+                            </p>
+                            <p>
+                                Send a request and the host decides. Nothing is charged now. Times
+                                are in {zone}.
+                            </p>
+                        </div>
+                    )}
                     {/* Mode Toggle: Single Day vs Multi-Day */}
                     <div className="flex rounded-lg border border-border bg-canvas p-1">
                         <button
@@ -304,12 +394,24 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                         <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
                             <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
                                 <span className="font-semibold text-ink text-xs">
-                                    {calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                                    {calendarDate.toLocaleString('default', {
+                                        month: 'long',
+                                        year: 'numeric',
+                                    })}
                                 </span>
                                 <div className="flex items-center gap-1">
                                     <button
                                         type="button"
-                                        onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                                        onClick={() =>
+                                            setCalendarDate(
+                                                (prev) =>
+                                                    new Date(
+                                                        prev.getFullYear(),
+                                                        prev.getMonth() - 1,
+                                                        1
+                                                    )
+                                            )
+                                        }
                                         className="p-1 rounded hover:bg-surface-hover text-ink-secondary hover:text-ink transition-colors"
                                         title="Previous Month"
                                     >
@@ -324,7 +426,16 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                                        onClick={() =>
+                                            setCalendarDate(
+                                                (prev) =>
+                                                    new Date(
+                                                        prev.getFullYear(),
+                                                        prev.getMonth() + 1,
+                                                        1
+                                                    )
+                                            )
+                                        }
                                         className="p-1 rounded hover:bg-surface-hover text-ink-secondary hover:text-ink transition-colors"
                                         title="Next Month"
                                     >
@@ -357,18 +468,22 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                     const isSelected =
                                         dateMode === 'single'
                                             ? dayObj.dateStr === startDate
-                                            : dayObj.dateStr >= startDate && dayObj.dateStr <= endDate;
+                                            : dayObj.dateStr >= startDate &&
+                                              dayObj.dateStr <= endDate;
 
-                                    let cellClasses = 'h-7 w-full flex items-center justify-center rounded-md text-[11px] transition-colors ';
+                                    let cellClasses =
+                                        'h-7 w-full flex items-center justify-center rounded-md text-[11px] transition-colors ';
 
                                     if (isSelected) {
                                         cellClasses += 'bg-accent text-white font-bold shadow-2xs';
                                     } else if (isBlocked) {
-                                        cellClasses += 'bg-rose-500/10 text-rose-500 line-through cursor-not-allowed opacity-70';
+                                        cellClasses +=
+                                            'bg-rose-500/10 text-rose-500 line-through cursor-not-allowed opacity-70';
                                     } else if (isPast) {
                                         cellClasses += 'text-ink-muted/40 cursor-not-allowed';
                                     } else {
-                                        cellClasses += 'text-ink hover:bg-accent/15 cursor-pointer font-medium';
+                                        cellClasses +=
+                                            'text-ink hover:bg-accent/15 cursor-pointer font-medium';
                                     }
 
                                     return (
@@ -377,7 +492,13 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                             key={dayObj.dateStr}
                                             disabled={isPast || isBlocked}
                                             onClick={() => handleCalendarDayClick(dayObj)}
-                                            title={isBlocked ? 'Unavailable / Reserved' : isPast ? 'Past Date' : `Select ${dayObj.dateStr}`}
+                                            title={
+                                                isBlocked
+                                                    ? 'Unavailable / Reserved'
+                                                    : isPast
+                                                      ? 'Past Date'
+                                                      : `Select ${dayObj.dateStr}`
+                                            }
                                             className={cellClasses}
                                         >
                                             {dayObj.day}
@@ -408,10 +529,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
 
                         {dateMode === 'single' ? (
                             <div>
-                                <label className="block text-ink-secondary font-medium mb-1">
+                                <label
+                                    htmlFor="vbd-start-date"
+                                    className="block text-ink-secondary font-medium mb-1"
+                                >
                                     Event Date
                                 </label>
                                 <input
+                                    id="vbd-start-date"
                                     type="date"
                                     min={tomorrowStr()}
                                     value={startDate}
@@ -426,10 +551,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                         ) : (
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-ink-secondary font-medium mb-1">
+                                    <label
+                                        htmlFor="vbd-start-date-multi"
+                                        className="block text-ink-secondary font-medium mb-1"
+                                    >
                                         Start Date
                                     </label>
                                     <input
+                                        id="vbd-start-date-multi"
                                         type="date"
                                         min={tomorrowStr()}
                                         value={startDate}
@@ -439,10 +568,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-ink-secondary font-medium mb-1">
+                                    <label
+                                        htmlFor="vbd-end-date"
+                                        className="block text-ink-secondary font-medium mb-1"
+                                    >
                                         End Date
                                     </label>
                                     <input
+                                        id="vbd-end-date"
                                         type="date"
                                         min={startDate}
                                         value={endDate}
@@ -457,10 +590,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                         {/* Preferred Time Slots */}
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-ink-secondary font-medium mb-1">
+                                <label
+                                    htmlFor="vbd-start-time"
+                                    className="block text-ink-secondary font-medium mb-1"
+                                >
                                     Start Time
                                 </label>
                                 <input
+                                    id="vbd-start-time"
                                     type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
@@ -469,10 +606,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-ink-secondary font-medium mb-1">
+                                <label
+                                    htmlFor="vbd-end-time"
+                                    className="block text-ink-secondary font-medium mb-1"
+                                >
                                     End Time
                                 </label>
                                 <input
+                                    id="vbd-end-time"
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
@@ -507,10 +648,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                     {/* Seating Layout & Expected Guests */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-ink-secondary font-medium mb-1">
+                            <label
+                                htmlFor="vbd-layout"
+                                className="block text-ink-secondary font-medium mb-1"
+                            >
                                 Seating Arrangement
                             </label>
                             <select
+                                id="vbd-layout"
                                 value={layoutStyle}
                                 onChange={(e) => setLayoutStyle(e.target.value)}
                                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-ink text-xs focus:border-accent focus:outline-none"
@@ -523,7 +668,10 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-ink-secondary font-medium mb-1">
+                            <label
+                                htmlFor="vbd-guests"
+                                className="block text-ink-secondary font-medium mb-1"
+                            >
                                 Attendee Count{' '}
                                 {capacityLimit && (
                                     <span className="text-[10px] text-ink-tertiary">
@@ -532,6 +680,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 )}
                             </label>
                             <input
+                                id="vbd-guests"
                                 type="number"
                                 min="1"
                                 max={capacityLimit ? capacityLimit * 1.2 : 5000}
@@ -550,10 +699,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                         </div>
 
                         <div>
-                            <label className="block text-ink-secondary font-medium mb-1">
+                            <label
+                                htmlFor="vbd-event-type"
+                                className="block text-ink-secondary font-medium mb-1"
+                            >
                                 Event Category / Type
                             </label>
                             <input
+                                id="vbd-event-type"
                                 type="text"
                                 placeholder="e.g. Annual General Meeting, Tech Summit, Wedding"
                                 value={eventType}
@@ -565,10 +718,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-ink-secondary font-medium mb-1">
+                                <label
+                                    htmlFor="vbd-name"
+                                    className="block text-ink-secondary font-medium mb-1"
+                                >
                                     Full Name
                                 </label>
                                 <input
+                                    id="vbd-name"
                                     type="text"
                                     placeholder="Your full name"
                                     value={plannerName}
@@ -578,10 +735,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-ink-secondary font-medium mb-1">
+                                <label
+                                    htmlFor="vbd-email"
+                                    className="block text-ink-secondary font-medium mb-1"
+                                >
                                     Email Address
                                 </label>
                                 <input
+                                    id="vbd-email"
                                     type="email"
                                     placeholder="name@company.com"
                                     value={plannerEmail}
@@ -594,10 +755,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-ink-secondary font-medium mb-1">
+                                <label
+                                    htmlFor="vbd-phone"
+                                    className="block text-ink-secondary font-medium mb-1"
+                                >
                                     Phone Number
                                 </label>
                                 <input
+                                    id="vbd-phone"
                                     type="tel"
                                     placeholder="+233 24 000 0000"
                                     value={plannerPhone}
@@ -606,10 +771,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-ink-secondary font-medium mb-1">
+                                <label
+                                    htmlFor="vbd-company"
+                                    className="block text-ink-secondary font-medium mb-1"
+                                >
                                     Organization / Agency (Optional)
                                 </label>
                                 <input
+                                    id="vbd-company"
                                     type="text"
                                     placeholder="Company name"
                                     value={plannerCompany}
@@ -620,10 +789,14 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                         </div>
 
                         <div>
-                            <label className="block text-ink-secondary font-medium mb-1">
+                            <label
+                                htmlFor="vbd-requests"
+                                className="block text-ink-secondary font-medium mb-1"
+                            >
                                 Special Logistics or Equipment Requests (Optional)
                             </label>
                             <textarea
+                                id="vbd-requests"
                                 rows="2"
                                 placeholder="Stage setup, lighting, sound engineer, 3-phase power, outside catering..."
                                 value={specialRequests}
@@ -634,7 +807,31 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                     </div>
 
                     {/* Cost & Deposit Breakdown */}
-                    {!isPriceOnRequest && pricing && (
+                    {approvalFlow && !isPriceOnRequest && pricing && (
+                        <div className="rounded-xl border border-border bg-surface p-4 space-y-1.5">
+                            <div className="font-semibold text-ink">Indicative price</div>
+                            <div className="flex justify-between text-ink-secondary">
+                                <span>Rental:</span>
+                                <span className="font-medium text-ink">
+                                    {formatCurrency(pricing.rental_amount_pesewas)}
+                                </span>
+                            </div>
+                            {pricing.security_deposit_pesewas > 0 && (
+                                <div className="flex justify-between text-ink-secondary">
+                                    <span>Security deposit:</span>
+                                    <span className="font-medium text-ink">
+                                        {formatCurrency(pricing.security_deposit_pesewas)}
+                                    </span>
+                                </div>
+                            )}
+                            <p className="text-[11px] text-ink-tertiary">
+                                This price is indicative. The host confirms the final terms and
+                                payment is not available yet.
+                            </p>
+                        </div>
+                    )}
+
+                    {!approvalFlow && !isPriceOnRequest && pricing && (
                         <div className="rounded-xl border border-border bg-surface p-4 space-y-2">
                             <div className="font-semibold text-ink flex items-center justify-between">
                                 <span>Estimated Pricing Breakdown</span>
@@ -682,7 +879,8 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                     <span>Due Now:</span>
                                     <span>
                                         {formatCurrency(
-                                            pricing.due_now_pesewas ?? pricing.deposit_required_pesewas
+                                            pricing.due_now_pesewas ??
+                                                pricing.deposit_required_pesewas
                                         )}
                                     </span>
                                 </div>
@@ -709,6 +907,24 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 {errors.agreed_to_terms}
                             </p>
                         )}
+                        {errors.planner_email && (
+                            <p className="text-rose-600 dark:text-rose-400 text-[11px]">
+                                {errors.planner_email}{' '}
+                                {approvalFlow && (
+                                    <a
+                                        href={`/my?return_to=${encodeURIComponent(window.location.pathname)}`}
+                                        className="underline font-semibold"
+                                    >
+                                        Verify your email
+                                    </a>
+                                )}
+                            </p>
+                        )}
+                        {errors.operation_key && (
+                            <p className="text-rose-600 dark:text-rose-400 text-[11px]">
+                                {errors.operation_key}
+                            </p>
+                        )}
                         {errors.starts_at && (
                             <p className="text-rose-600 dark:text-rose-400 text-[11px]">
                                 {errors.starts_at}
@@ -730,6 +946,15 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                 className="w-full rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-3 text-xs font-semibold text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none flex items-center justify-center gap-2"
                             >
                                 <span>Online Booking Unavailable</span>
+                            </button>
+                        ) : approvalFlow ? (
+                            <button
+                                type="submit"
+                                disabled={submitting || !availability.available}
+                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                <span>{submitting ? 'Sending...' : 'Send request'}</span>
                             </button>
                         ) : isPriceOnRequest ? (
                             <button

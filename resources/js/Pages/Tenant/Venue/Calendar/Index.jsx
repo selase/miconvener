@@ -5,6 +5,7 @@ import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
 import Modal from '@/Components/Console/Modal';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
+import { calendarEventNote, calendarEventTone } from '@/lib/venueCalendar';
 import StatusPill from '@/Components/Console/StatusPill';
 import {
     ChevronLeft,
@@ -384,7 +385,13 @@ export default function VenueCalendarIndex({
                                             const isBlocked = ev.is_blocked;
 
                                             let badgeStyle = 'bg-amber-500/10 text-amber-700 border-amber-300 dark:border-amber-800 dark:text-amber-400';
-                                            if (ev.kind === 'internal') {
+                                            const tone = calendarEventTone(ev);
+                                            const note = calendarEventNote(ev);
+                                            if (tone === 'request') {
+                                                badgeStyle = 'bg-blue-500/5 text-blue-700 border-blue-300 dark:border-blue-800 dark:text-blue-300 border-dashed';
+                                            } else if (tone === 'hold') {
+                                                badgeStyle = 'bg-amber-500/10 text-amber-700 border-amber-400 dark:border-amber-700 dark:text-amber-300 border-dashed';
+                                            } else if (ev.kind === 'internal') {
                                                 badgeStyle = `bg-sky-500/10 text-sky-700 border-sky-300 dark:border-sky-800 dark:text-sky-400${isConfirmed ? '' : ' border-dashed'}`;
                                             } else if (isConfirmed) {
                                                 badgeStyle = 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:border-emerald-800 dark:text-emerald-400';
@@ -406,6 +413,9 @@ export default function VenueCalendarIndex({
                                                     <div className="truncate text-[10px] opacity-80">
                                                         {ev.kind === 'internal' ? [ev.department, ev.purpose].filter(Boolean).join(' · ') || ev.title : ev.title}
                                                     </div>
+                                                    {note && (
+                                                        <div className="truncate text-[10px] font-medium">{note}</div>
+                                                    )}
                                                 </button>
                                             );
                                         })}
@@ -454,9 +464,20 @@ export default function VenueCalendarIndex({
                                         : 'pending'
                                 }
                             >
-                                {selectedEvent.status.replace('_', ' ')}
+                                {selectedEvent.status.replace(/_/g, ' ')}
                             </StatusPill>
                         </div>
+                        {calendarEventNote(selectedEvent) && (
+                            <div
+                                role="note"
+                                className="rounded-lg border border-border bg-surface-sunken/30 p-3 text-xs text-ink-secondary"
+                            >
+                                {calendarEventNote(selectedEvent)}.{' '}
+                                {selectedEvent.status === 'pending_host_approval'
+                                    ? 'Other requests and bookings can still take these dates until you approve.'
+                                    : 'No one else can book these dates until the hold ends.'}
+                            </div>
+                        )}
                         {selectedEvent.kind === 'internal' && (
                             <div className="rounded-lg border border-border bg-surface-sunken/30 p-3 text-xs space-y-1">
                                 <div className="font-semibold text-ink">Staff booking, free of charge</div>

@@ -344,3 +344,54 @@ test('global uniqueness: two tenants cannot create a venue space with colliding 
 
     $response->assertSessionHasErrors(['slug']);
 });
+
+test('a host can set the hold length and time zone for approval-first requests, and unset keys keep their defaults', function (): void {
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $user->assignRole('Org Superadmin');
+    $shop = Shop::create(['tenant_id' => $tenant->id, 'name' => 'Policy Hotel', 'slug' => 'policy-hotel', 'email' => 'p@hotel.test', 'phone' => '+233244222333', 'address' => '1 Road', 'city' => 'Accra', 'region' => 'Greater Accra']);
+    $listing = StoreListing::create(['shop_id' => $shop->id, 'listing_kind' => StoreListing::KIND_VENUE, 'title' => 'Hall', 'slug' => 'policy-hall', 'rental_price_pesewas' => 800000, 'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY, 'price_visibility' => StoreListing::PRICE_VISIBILITY_PUBLIC, 'status' => StoreListing::STATUS_DRAFT]);
+    $update = fn (array $extra) => $this->actingAs($user)->put(route('tenant.venue.spaces.update', ['subdomain' => $tenant->slug, 'listing' => $listing->id]), [
+        'title' => 'Hall', 'slug' => 'policy-hall', 'rental_price' => 8000, 'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+        'price_visibility' => StoreListing::PRICE_VISIBILITY_PUBLIC, 'status' => StoreListing::STATUS_PUBLISHED,
+    ] + $extra);
+
+    expect($listing->fresh()->publicBookingPolicy())->toMatchArray(['default_hold_hours' => 48, 'timezone' => config('app.timezone')]);
+
+    $update(['public_booking_policy' => ['default_hold_hours' => 72, 'timezone' => 'Africa/Accra']])->assertSessionHasNoErrors();
+    expect($listing->fresh()->publicBookingPolicy())->toBe(['approval_required' => true, 'default_hold_hours' => 72, 'max_hold_hours' => 168, 'timezone' => 'Africa/Accra']);
+
+    $update([])->assertSessionHasNoErrors();
+    expect($listing->fresh()->publicBookingPolicy()['default_hold_hours'])->toBe(72);
+});
+
+test('a hold length outside one to 168 hours or an unknown time zone is refused', function (array $policy, string $field): void {
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $user->assignRole('Org Superadmin');
+    Shop::create(['tenant_id' => $tenant->id, 'name' => 'Policy Hotel', 'slug' => 'policy-hotel-2', 'email' => 'p@hotel.test', 'phone' => '+233244222333', 'address' => '1 Road', 'city' => 'Accra', 'region' => 'Greater Accra']);
+
+    $this->actingAs($user)->post(route('tenant.venue.spaces.store', ['subdomain' => $tenant->slug]), [
+        'title' => 'Hall', 'slug' => 'policy-hall-2', 'rental_price' => 8000, 'pricing_model' => StoreListing::PRICING_MODEL_PER_DAY,
+        'price_visibility' => StoreListing::PRICE_VISIBILITY_PUBLIC, 'status' => StoreListing::STATUS_PUBLISHED, 'public_booking_policy' => $policy,
+    ])->assertSessionHasErrors($field);
+
+    expect(StoreListing::query()->where('slug', 'policy-hall-2')->exists())->toBeFalse();
+})->with([
+    'zero hours' => [['default_hold_hours' => 0], 'public_booking_policy.default_hold_hours'],
+    'too many hours' => [['default_hold_hours' => 169], 'public_booking_policy.default_hold_hours'],
+    'unknown zone' => [['timezone' => 'Mars/Olympus'], 'public_booking_policy.timezone'],
+]);
+
+test('the space form is told whether this organisation takes approval-first requests', function (): void {
+    $user = User::factory()->create();
+    $tenant = setActiveTenantForTest($user);
+    $user->assignRole('Org Superadmin');
+    $page = fn () => $this->actingAs($user)->get(route('tenant.venue.spaces.create', ['subdomain' => $tenant->slug]));
+
+    Shop::factory()->create(['tenant_id' => $tenant->id, 'is_active' => true]);
+    $page()->assertInertia(fn ($p) => $p->where('venueRequests', false));
+
+    Artisan::call('venue:enable-requests', ['tenant' => $tenant->slug]);
+    $page()->assertInertia(fn ($p) => $p->where('venueRequests', true));
+});

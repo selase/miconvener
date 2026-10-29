@@ -44,6 +44,7 @@ use App\Mail\Marketplace\NewQuoteRequestNotification;
 use App\Mail\Marketplace\NewVenueBookingNotification;
 use App\Mail\Marketplace\QuoteProposalReady;
 use App\Mail\Marketplace\QuoteSentNotification;
+use App\Mail\Marketplace\VenueApprovalNotice;
 use App\Mail\Moderation\TakedownNoticeMail;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Platform\TenantSignupMail;
@@ -317,6 +318,8 @@ test('every mailable renders', function (): void {
         'NewVenueBookingNotification' => fn () => new NewVenueBookingNotification($booking, 'https://acme.test/console/venue/inquiries/BK-RENDER-001'),
         'QuoteSentNotification' => fn () => new QuoteSentNotification($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001/checkout'),
         'NewQuoteRequestNotification' => fn () => new NewQuoteRequestNotification($quote, 'https://acme.test/venue/quotes/RFQ-RENDER001'),
+        'VenueApprovalNotice' => fn () => new VenueApprovalNotice(App\Models\VenueBookingAction::factory()->create(['booking_id' => $booking->id, 'action' => 'approved', 'hold_expires_at' => now()->addDay()]), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'VenueApprovalNotice (declined)' => fn () => new VenueApprovalNotice(App\Models\VenueBookingAction::factory()->create(['booking_id' => $booking->id, 'action' => 'declined', 'decision_reason' => 'Closed for repairs']), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
         'QuoteProposalReady' => fn () => new QuoteProposalReady($quote, 'https://miconvener.test/marketplace/quotes/RFQ-RENDER001'),
     ];
 

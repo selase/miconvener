@@ -365,6 +365,8 @@ Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
     Route::post('/venues/{slug}/check-availability', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkAvailability'])->name('venues.check-availability');
     Route::get('/venues/{slug}/booked-slots', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'bookedSlots'])->name('venues.booked-slots');
     Route::post('/venues/{slug}/book', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'book'])->name('venues.book');
+    Route::post('/venues/{slug}/request', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'requestVenue'])->middleware('throttle:20,1')->name('venues.request');
+    Route::post('/bookings/{reference}/cancel', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'cancel'])->middleware('throttle:30,1')->name('bookings.cancel');
     Route::get('/bookings/{reference}', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'show'])->name('bookings.show');
     Route::post('/bookings/{reference}/checkout', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkout'])->name('bookings.checkout');
     Route::get('/bookings/{reference}/callback', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'callback'])->name('bookings.callback');

@@ -19,6 +19,7 @@ import HistorySkeleton from './components/HistorySkeleton';
 import { AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
 import { clearAllOfflineTickets, purgeExpiredOfflineTickets } from '@/lib/offlineTicketStore';
 import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
+import { safePortalReturn } from '@/lib/portalReturn';
 
 /**
  * Platform attendee portal shell: proves identity across all organisers
@@ -199,8 +200,8 @@ function LegacyMyPortal({
         // back where they were going. The target is only ever followed when it
         // is a path on this portal, so a crafted ?return_to cannot bounce a
         // just-verified visitor off to somewhere else.
-        const requested = new URLSearchParams(window.location.search).get('return_to');
-        if (requested && /^\/my(\/|$)/.test(requested) && !requested.startsWith('//')) {
+        const requested = safePortalReturn(new URLSearchParams(window.location.search).get('return_to'));
+        if (requested) {
             window.location.assign(requested);
             return;
         }

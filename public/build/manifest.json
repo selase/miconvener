@@ -4,7 +4,7 @@
     "name": "pusher"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DSTT4xv3.css",
+    "file": "assets/app-D4AUhq0g.css",
     "name": "app",
     "names": [
       "app.css"
@@ -22,7 +22,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-qGe17BZ2.js",
+    "file": "assets/app-4xmmd_c1.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,

@@ -73,6 +73,9 @@ final class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('api-key-management', fn (Request $request) => Limit::perMinute(10)
             ->by($request->user()?->id ?: $request->ip()));
 
+        RateLimiter::for('venue-decisions', fn (Request $request) => Limit::perMinute(30)
+            ->by($request->user()?->id ?: $request->ip()));
+
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(30)
             ->by($request->ip()));
 
