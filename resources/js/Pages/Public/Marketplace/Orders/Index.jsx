@@ -373,6 +373,36 @@ export default function StoreOrders({ orderId = null, receipt = false }) {
                                         {formatDuesMoney(l.amount_pesewas, data.receipt.currency)}
                                     </p>
                                 ))}
+                                {data.receipt.charges?.map((charge) => (
+                                    <p
+                                        key={charge.label}
+                                        className="flex flex-wrap justify-between gap-3 text-sm"
+                                    >
+                                        <span>{charge.label}</span>
+                                        <span>
+                                            {formatDuesMoney(
+                                                charge.amount_pesewas,
+                                                data.receipt.currency
+                                            )}
+                                        </span>
+                                    </p>
+                                ))}
+                                {data.receipt.customisation && (
+                                    <section className="wrap-anywhere space-y-2 border-t border-border pt-4">
+                                        <h3 className="font-medium">Your agreed specification</h3>
+                                        <p className="whitespace-pre-wrap text-sm">
+                                            {data.receipt.customisation}
+                                        </p>
+                                    </section>
+                                )}
+                                {data.receipt.production_terms && (
+                                    <section className="wrap-anywhere space-y-2">
+                                        <h3 className="font-medium">Production timeframe</h3>
+                                        <p className="whitespace-pre-wrap text-sm">
+                                            {data.receipt.production_terms}
+                                        </p>
+                                    </section>
+                                )}
                                 {data.receipt.buyer_fee_pesewas != null && (
                                     <p className="text-sm">
                                         Checkout fee included:{' '}
