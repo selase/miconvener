@@ -59,14 +59,14 @@
 <body class="bg-white text-slate-900">
     {{-- NAV --}}
     <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur">
-        <div class="mx-auto max-w-7xl px-6">
-            <div class="flex h-16 items-center justify-between">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6">
+            <div class="flex h-16 items-center justify-between gap-2">
                 <div class="flex items-center gap-3">
                     <a href="{{ route('home') }}" class="flex items-center">
                         <img src="{{ config('product-page.brand.wordmark') }}"
                              srcset="{{ config('product-page.brand.wordmark') }} 1x, {{ config('product-page.brand.wordmark_2x') }} 2x"
                              alt="{{ config('product-page.brand.name') }}"
-                             class="h-7 w-auto" width="1228" height="229" />
+                             class="h-5 w-auto sm:h-7" width="1228" height="229" />
                     </a>
                 </div>
 
@@ -88,13 +88,13 @@
                     @endforeach
                 </nav>
 
-                <div class="flex items-center gap-3">
+                <div class="flex shrink-0 items-center gap-2 sm:gap-3">
                     <a href="{{ config('product-page.nav.cta_secondary.href') }}"
-                        class="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:border-slate-300 md:inline-flex transition">
+                        class="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:border-slate-300 sm:px-3 transition">
                         {{ config('product-page.nav.cta_secondary.label') }}
                     </a>
                     <a href="{{ config('product-page.nav.cta_primary.href') }}"
-                        class="inline-flex rounded-lg px-3.5 py-2 text-sm font-semibold text-white transition" style="background: var(--field)">
+                        class="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-semibold text-white sm:px-3.5 transition" style="background: var(--field)">
                         {{ config('product-page.nav.cta_primary.label') }}
                     </a>
                 </div>
