@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * One immutable priced version of the host's offer for an approved booking:
@@ -62,6 +63,12 @@ final class VenueFinancialQuote extends Model
 
     /** @var list<string> */
     protected $fillable = ['tenant_id', 'shop_id', 'booking_id', 'version', 'agreement_id', 'agreement_scope', 'hold_action_id', 'hold_expires_at', 'currency', 'provider', 'account_fingerprint', 'rental_pesewas', 'extras_pesewas', 'security_pesewas', 'initial_pesewas', 'balance_pesewas', 'contract_fee_pesewas', 'initial_fee_pesewas', 'balance_fee_pesewas', 'event_starts_at', 'event_ends_at', 'expires_at', 'balance_due_at', 'security_due_at', 'cancellation_terms', 'support_contact', 'issued_by', 'issuer_name', 'operation_key', 'request_hash', 'terms_hash', 'snapshot'];
+
+    /** @return HasMany<VenueFinancialDecision, $this> */
+    public function decisions(): HasMany
+    {
+        return $this->hasMany(VenueFinancialDecision::class, 'quote_id');
+    }
 
     /** @return BelongsTo<VenueBooking, $this> */
     public function booking(): BelongsTo

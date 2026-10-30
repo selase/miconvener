@@ -17,7 +17,7 @@ final class StoreCollectionPassController extends Controller
     {
         $email = app(PlatformAttendeeVerification::class)->verifiedEmail($request->session());
         abort_if($email === null, 404);
-        $owned = StoreOrder::query()->where('buyer_email', PlatformAttendeeVerification::normalise($email))->findOrFail($order);
+        $owned = StoreOrder::query()->where('offering_type', 'purchase')->where('buyer_email', PlatformAttendeeVerification::normalise($email))->findOrFail($order);
 
         return response()->json($passes->issue($owned, $request->session(), $request->validated('operation_key')))->header('Cache-Control', 'private, no-store');
     }

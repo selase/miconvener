@@ -273,6 +273,16 @@ final class VenueBookingApprovals
     }
 
     /**
+     * Whether this user may act for the owning organisation on this booking.
+     *
+     * @throws AuthorizationException
+     */
+    public function assertHost(VenueBooking $booking, User $actor): void
+    {
+        $this->authoriseHost($booking, $actor);
+    }
+
+    /**
      * @param  Closure(StoreListing, VenueBooking): VenueBooking  $transition
      */
     private function hostTransition(VenueBooking $booking, User $actor, string $operationKey, string $hash, Closure $transition): VenueBooking

@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Marketplace;
 
+use App\Models\StoreListing;
 use App\Models\StoreOrder;
 use App\Models\VenueBooking;
 use App\Models\VenueBookingCharge;
 use App\Services\Venue\VenueCalendarLocks;
+use Closure;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
@@ -33,6 +37,30 @@ final class CommerceOrderLocks
             'reservation' => $this->reservation($order),
             default => throw new LogicException('The order type could not be resolved.'),
         };
+    }
+
+    /**
+     * Run a money operation on a booking under the reservation lock order up to
+     * the booking: tenant, then listing, then booking.
+     *
+     * @template T
+     *
+     * @param  Closure(StoreListing, VenueBooking): T  $callback
+     * @return T
+     */
+    public function forBooking(string $bookingId, Closure $callback): mixed
+    {
+        $booking = VenueBooking::query()->whereKey($bookingId)->first(['id', 'tenant_id', 'store_listing_id']);
+        if ($booking === null) {
+            throw (new ModelNotFoundException)->setModel(VenueBooking::class, [$bookingId]);
+        }
+
+        return DB::connection('landlord')->transaction(function () use ($booking, $callback): mixed {
+            $this->inventory->tenant($booking->tenant_id);
+            $listing = $this->calendar->listing($booking->store_listing_id);
+
+            return $callback($listing, $this->calendar->booking($listing, $booking->id));
+        });
     }
 
     private function reservation(StoreOrder $order): StoreOrder

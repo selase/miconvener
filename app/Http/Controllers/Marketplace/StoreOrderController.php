@@ -21,7 +21,7 @@ final class StoreOrderController extends Controller
         if ($email instanceof Response) {
             return $email;
         }
-        $orders = StoreOrder::query()->where('buyer_email', $email)->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection'])->latest()->paginate(20);
+        $orders = StoreOrder::query()->where('offering_type', 'purchase')->where('buyer_email', $email)->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection'])->latest()->paginate(20);
         $orders->through(fn (StoreOrder $order): array => $payload->buyer($order));
 
         return $this->respond($request, ['orders' => $orders, 'verified_until' => $request->session()->get(PlatformAttendeeVerification::SESSION_KEY.'.expires_at')]);
@@ -33,7 +33,7 @@ final class StoreOrderController extends Controller
         if ($email instanceof Response) {
             return $email;
         }
-        $owned = StoreOrder::query()->where('buyer_email', $email)->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection'])->find($order);
+        $owned = StoreOrder::query()->where('offering_type', 'purchase')->where('buyer_email', $email)->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection'])->find($order);
         abort_if($owned === null, 404, 'Order unavailable.');
 
         return $this->respond($request, ['order' => [...$payload->buyer($owned), 'ready_email_state' => app(\App\Services\Marketplace\StoreFulfilmentNotices::class)->status($owned), 'can_issue_pass' => app(\App\Services\Marketplace\StoreFulfilment::class)->enabled($owned) && app(\App\Services\Marketplace\StoreFulfilment::class)->eligible($owned) && (($owned->fulfilmentArrangement?->method === 'collection' && $owned->fulfilment_state === 'ready') || ($owned->fulfilmentArrangement?->method === 'delivery' && $owned->fulfilment_state === 'dispatched')), 'fulfilment_paused' => ! app(\App\Services\Marketplace\StoreFulfilment::class)->enabled($owned), 'fulfilment_revision' => $owned->fulfilmentEvents()->max('sequence'), 'destination' => $owned->fulfilmentArrangement?->destination], 'verified_until' => $request->session()->get(PlatformAttendeeVerification::SESSION_KEY.'.expires_at')], ['orderId' => $order]);
@@ -45,7 +45,7 @@ final class StoreOrderController extends Controller
         if ($email instanceof Response) {
             return $email;
         }
-        $owned = StoreOrder::query()->where('buyer_email', $email)->find($order);
+        $owned = StoreOrder::query()->where('offering_type', 'purchase')->where('buyer_email', $email)->find($order);
         abort_if($owned === null, 404, 'Order unavailable.');
         $receipt = StoreReceipt::query()->where('order_id', $owned->id)->first();
         abort_if($receipt === null, 404, 'Receipt unavailable.');
