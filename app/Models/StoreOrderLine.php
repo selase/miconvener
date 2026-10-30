@@ -34,7 +34,7 @@ final class StoreOrderLine extends Model
 
     protected $table = 'store_order_lines';
 
-    protected $fillable = ['order_id', 'shop_id', 'variant_id', 'listing_id', 'offering_type', 'title_snapshot', 'sku_snapshot', 'options_snapshot', 'quantity', 'unit_price_pesewas', 'line_amount_pesewas'];
+    protected $fillable = ['order_id', 'shop_id', 'variant_id', 'booking_id', 'listing_id', 'offering_type', 'title_snapshot', 'sku_snapshot', 'options_snapshot', 'quantity', 'unit_price_pesewas', 'line_amount_pesewas'];
 
     /** @return BelongsTo<StoreOrder, $this> */
     public function order(): BelongsTo

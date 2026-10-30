@@ -76,7 +76,7 @@ final class StoreBalance
 
     private function holdback(Tenant $seller): int
     {
-        $current = StoreCommercialAgreement::query()->where('tenant_id', $seller->id)->orderByDesc('version')->first();
+        $current = StoreCommercialAgreement::query()->where('tenant_id', $seller->id)->where('offering_scope', StoreCommercialAgreement::SCOPE_PURCHASE)->orderByDesc('version')->first();
         $minimum = (int) ($current?->payout_policy['holdback_pesewas'] ?? 0);
         $open = StoreOrder::query()->where('tenant_id', $seller->id)->whereIn('payment_state', ['paid', 'refund_pending'])->whereNotIn('fulfilment_state', ['collected', 'delivered'])
             ->selectRaw("max((terms_snapshot->'payout_policy'->>'holdback_pesewas')::bigint) as reserve_floor")->first();

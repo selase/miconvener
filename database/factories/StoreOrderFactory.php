@@ -28,4 +28,13 @@ final class StoreOrderFactory extends Factory
             'terms_hash' => hash('sha256', 'test-terms'), 'expires_at' => now()->addMinutes(10),
         ];
     }
+
+    /** A venue reservation payment order resting on the shop's reservation agreement. */
+    public function reservation(): static
+    {
+        return $this->state(fn (): array => [
+            'offering_type' => 'reservation',
+            'agreement_id' => StoreCommercialAgreement::factory()->reservation(),
+        ]);
+    }
 }
