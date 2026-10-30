@@ -17,7 +17,7 @@ use Throwable;
 
 final class StorePayments
 {
-    public function __construct(private readonly CommerceOrderLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreGateways $gateways, private readonly CommerceOfferingRegistry $offerings) {}
+    public function __construct(private readonly CommerceOrderLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreGateways $gateways, private readonly CommerceOfferingRegistry $offerings, private readonly CommercePaymentReferences $references) {}
 
     public function start(StoreOrder $order, Session $session, string $submissionKey, ?string $acceptedQuoteHash = null): ?StorePaymentAttempt
     {
@@ -60,10 +60,13 @@ final class StorePayments
             $order->update(['state' => 'awaiting_payment', 'accepted_at' => $order->accepted_at ?? now()]);
             $created = true;
 
-            return StorePaymentAttempt::query()->create(['order_id' => $order->id, 'tenant_id' => $order->tenant_id, 'shop_id' => $order->shop_id,
+            $attempt = StorePaymentAttempt::query()->create(['order_id' => $order->id, 'tenant_id' => $order->tenant_id, 'shop_id' => $order->shop_id,
                 'submission_key' => $submissionKey, 'reference' => 'store-'.Str::uuid(), 'provider' => $order->provider,
                 'settlement_mode' => $order->settlement_mode, 'account_fingerprint' => $order->account_fingerprint,
                 'amount_pesewas' => $order->charged_pesewas, 'currency' => $order->currency]);
+            $this->references->claimForOrder($order, $attempt->reference);
+
+            return $attempt;
         });
         if ($attempt === null || ! $created) {
             return $attempt;
@@ -73,7 +76,7 @@ final class StorePayments
             $url = WithoutTelescope::run(fn () => $this->gateways->forAttempt($attempt)->createStoreCheckoutSession(
                 $order->buyer_email, $attempt->amount_pesewas, $attempt->currency,
                 route('store.checkout.callback', ['reference' => $attempt->reference]),
-                ['source' => 'miconvener_store', 'store_order_id' => $order->id, 'store_attempt_id' => $attempt->id, 'seller_id' => $order->tenant_id],
+                $this->offerings->for($order)->expectedMetadata($attempt),
                 $attempt->reference,
             ));
             $attempt->getConnection()->transaction(function () use ($attempt, $url): void {

@@ -16,6 +16,7 @@ use App\Models\VenueBookingCharge;
 use App\Models\VenueFinancialDecision;
 use App\Models\VenueFinancialQuote;
 use App\Services\Events\PlatformAttendeeVerification;
+use App\Services\Finance\LedgerService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Validation\ValidationException;
@@ -24,15 +25,15 @@ use LogicException;
 /**
  * The rules for paying toward a venue booking. Money is only ever taken for the
  * contract the verified buyer accepted, and only while the host's dates are
- * still theirs to give. This slice validates and describes; confirming a
- * booking from a capture, refunds and payouts arrive with the payment slices
- * and stay closed until then.
+ * still theirs to give. A clean rental capture is posted and confirms the
+ * booking in one transaction; security money, refunds and payouts arrive with
+ * the later payment slices and stay closed until then.
  */
 final class VenueOffering implements CommerceOffering
 {
     private const CLOSED = [VenueBooking::STATUS_CANCELLED, VenueBooking::STATUS_DECLINED, VenueBooking::STATUS_REJECTED];
 
-    public function __construct(private readonly VenuePaymentRollout $rollout, private readonly VenueAvailabilityService $availability, private readonly PlatformAttendeeVerification $verification) {}
+    public function __construct(private readonly VenuePaymentRollout $rollout, private readonly VenueAvailabilityService $availability, private readonly PlatformAttendeeVerification $verification, private readonly LedgerService $ledger) {}
 
     public function hasCharge(StoreOrder $order): bool
     {
@@ -104,6 +105,9 @@ final class VenueOffering implements CommerceOffering
         } elseif ($booking->status !== VenueBooking::STATUS_CONFIRMED) {
             $issues[] = 'booking_not_confirmed';
         }
+        if ($charge->purpose === VenueBookingCharge::SECURITY) {
+            $issues[] = 'security_posting_unavailable';
+        }
 
         return array_values(array_unique($issues));
     }
@@ -112,7 +116,26 @@ final class VenueOffering implements CommerceOffering
 
     public function applyCapture(StoreOrder $order, StorePaymentAttempt $attempt, StorePaymentObservation $capture): void
     {
-        throw new LogicException('Confirming a venue booking from a capture is not available yet.');
+        $charge = $this->charge($order);
+        $booking = $charge->booking;
+        $quote = $this->quote($charge);
+        if ($quote === null || ! in_array($charge->purpose, [VenueBookingCharge::RENTAL_INITIAL, VenueBookingCharge::RENTAL_BALANCE], true)) {
+            throw new LogicException('Only a rental payment of an accepted contract can be applied.');
+        }
+
+        $transaction = $this->ledger->recordStoreSale($order, $attempt, ['observation_id' => $capture->id]);
+        $capture->update(['ledger_transaction_id' => $transaction->id, 'processing_state' => 'posted', 'review_reason' => null]);
+        $order->update(['state' => 'confirmed', 'payment_state' => 'paid', 'ledger_state' => 'posted', 'paid_at' => $capture->paid_at, 'review_reason' => null]);
+        $attempt->update(['status' => 'succeeded', 'last_verified_at' => now()]);
+
+        $settled = $charge->purpose === VenueBookingCharge::RENTAL_BALANCE || $quote->balance_pesewas === 0;
+        $booking->update([
+            'status' => VenueBooking::STATUS_CONFIRMED,
+            'payment_status' => $settled ? VenueBooking::PAYMENT_FULLY_PAID : VenueBooking::PAYMENT_DEPOSIT_PAID,
+            'paid_at' => $booking->paid_at ?? $capture->paid_at,
+            'amount_paid_pesewas' => $booking->amount_paid_pesewas + $charge->amount_pesewas,
+        ]);
+        app(StoreReceipts::class)->capture($order);
     }
 
     public function expectedMetadata(StorePaymentAttempt $attempt): array
