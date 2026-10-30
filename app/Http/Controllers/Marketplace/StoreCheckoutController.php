@@ -28,7 +28,7 @@ final class StoreCheckoutController extends Controller
     {
         $email = app(\App\Services\Events\PlatformAttendeeVerification::class)->verifiedEmail($request->session());
         abort_if($email === null, 404, 'Order unavailable.');
-        $order = StoreOrder::query()->where('buyer_email', \App\Services\Events\PlatformAttendeeVerification::normalise($email))->find($order);
+        $order = StoreOrder::query()->where('offering_type', 'purchase')->where('buyer_email', \App\Services\Events\PlatformAttendeeVerification::normalise($email))->find($order);
         abort_if($order === null, 404, 'Order unavailable.');
         $attempt = $payments->start($order, $request->session(), $request->validated('submission_key'), $request->validated('accepted_quote_hash'));
 

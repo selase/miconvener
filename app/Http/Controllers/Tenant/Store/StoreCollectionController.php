@@ -31,7 +31,7 @@ final class StoreCollectionController extends Controller
     public function index(StoreCollectionIndexRequest $request, StoreCollectionPayload $payload): Response
     {
         $tenant = $this->tenant($request);
-        $query = StoreOrder::query()->where('tenant_id', $tenant->id)->whereNotIn('state', ['quoted', 'expired'])->with(['lines', 'fulfilmentArrangement:id,order_id,method']);
+        $query = StoreOrder::query()->where('offering_type', 'purchase')->where('tenant_id', $tenant->id)->whereNotIn('state', ['quoted', 'expired'])->with(['lines', 'fulfilmentArrangement:id,order_id,method']);
         $states = ['preparing' => ['awaiting_preparation'], 'ready' => ['ready'], 'dispatched' => ['dispatched'], 'completed' => ['collected', 'delivered']];
         $state = $request->validated('state', 'all');
         if (isset($states[$state])) {
@@ -135,7 +135,7 @@ final class StoreCollectionController extends Controller
     private function order(Request $request, string $id): StoreOrder
     {
         $tenant = $this->tenant($request);
-        $order = StoreOrder::query()->where('tenant_id', $tenant->id)->findOrFail($id);
+        $order = StoreOrder::query()->where('offering_type', 'purchase')->where('tenant_id', $tenant->id)->findOrFail($id);
         app(StoreFulfilment::class)->authorize($order, $request->user(), false);
 
         return $order;

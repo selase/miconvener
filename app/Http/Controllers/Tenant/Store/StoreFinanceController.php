@@ -27,7 +27,7 @@ final class StoreFinanceController extends Controller
     public function refund(StoreRefundRequest $request, string $subdomain, string $order, StoreRefunds $refunds): JsonResponse
     {
         $tenant = $this->tenant();
-        $owned = StoreOrder::query()->where('tenant_id', $tenant->id)->findOrFail($order);
+        $owned = StoreOrder::query()->where('offering_type', 'purchase')->where('tenant_id', $tenant->id)->findOrFail($order);
         $data = $request->validated();
         $refund = $refunds->request($owned, $request->user(), $data['operation_key'], $data['reason'], $data['observation_id'] ?? null);
 
@@ -36,7 +36,7 @@ final class StoreFinanceController extends Controller
 
     public function cancelFree(StoreRefundRequest $request, string $subdomain, string $order, StoreRefunds $refunds): JsonResponse
     {
-        $owned = StoreOrder::query()->where('tenant_id', $this->tenant()->id)->findOrFail($order);
+        $owned = StoreOrder::query()->where('offering_type', 'purchase')->where('tenant_id', $this->tenant()->id)->findOrFail($order);
         $data = $request->validated();
 
         return $this->refundResponse($refunds->cancelFree($owned, $request->user(), $data['operation_key'], $data['reason']));
@@ -45,7 +45,7 @@ final class StoreFinanceController extends Controller
     public function reconcilePayment(Request $request, string $subdomain, string $order, \App\Services\Marketplace\StorePaymentNotifications $payments): JsonResponse
     {
         $tenant = $this->authorizeFinance($request->user());
-        $owned = StoreOrder::query()->where('tenant_id', $tenant->id)->findOrFail($order);
+        $owned = StoreOrder::query()->where('offering_type', 'purchase')->where('tenant_id', $tenant->id)->findOrFail($order);
         foreach (\App\Models\StorePaymentObservation::query()->where('order_id', $owned->id)->where('processing_state', 'pending')->limit(5)->get() as $capture) {
             app(\App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
         }

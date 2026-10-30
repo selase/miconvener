@@ -17,7 +17,7 @@ final class StoreFulfilmentChoiceController extends Controller
     {
         $email = app(PlatformAttendeeVerification::class)->verifiedEmail($request->session());
         abort_if($email === null, 404);
-        $owned = StoreOrder::query()->where('buyer_email', PlatformAttendeeVerification::normalise($email))->findOrFail($order);
+        $owned = StoreOrder::query()->where('offering_type', 'purchase')->where('buyer_email', PlatformAttendeeVerification::normalise($email))->findOrFail($order);
         $arrangement = $options->choose($owned, $request->session(), $request->validated('choice'), $request->validated('operation_key'));
 
         return response()->json(['order_id' => $arrangement->order_id, 'method' => $arrangement->method])->header('Cache-Control', 'private, no-store');

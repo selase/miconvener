@@ -24,7 +24,7 @@ final class StoreOrderController extends Controller
     public function index(Request $request, StoreOrderPayload $payload): Response
     {
         $tenant = $this->authorizeSeller($request->user(), 'manage store orders');
-        $orders = StoreOrder::query()->where('tenant_id', $tenant->id)->where('state', '<>', 'quoted')->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection'])->latest()->paginate(20);
+        $orders = StoreOrder::query()->where('offering_type', 'purchase')->where('tenant_id', $tenant->id)->where('state', '<>', 'quoted')->with(['lines', 'tenant.features', 'receipt.outbox', 'attempts', 'fulfilmentArrangement', 'collection'])->latest()->paginate(20);
         $finance = Gate::forUser($request->user()->fresh())->allows('manage store finance');
         $orders->through(function (StoreOrder $order) use ($payload, $finance): array {
             $captures = $finance ? \App\Models\StorePaymentObservation::query()->where('order_id', $order->id)->whereNotNull('ledger_transaction_id')
