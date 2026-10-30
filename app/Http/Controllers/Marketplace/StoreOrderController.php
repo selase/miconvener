@@ -59,7 +59,7 @@ final class StoreOrderController extends Controller
         if ($email instanceof Response) {
             return $email;
         }
-        $owned = StoreOrder::query()->where('buyer_email', $email)->find($order);
+        $owned = StoreOrder::query()->where('buyer_email', $email)->where('offering_type', 'purchase')->find($order);
         abort_if($owned === null, 404, 'Order unavailable.');
         $owned->getConnection()->transaction(function () use ($owned): void {
             $current = app(\App\Services\Marketplace\CommerceInventoryLocks::class)->order($owned);

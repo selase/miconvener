@@ -11,7 +11,7 @@ use App\Models\StorePaymentObservation;
 
 final class StorePaymentNotifications
 {
-    public function __construct(private readonly StorePayments $payments, private readonly StorePaymentEvidence $evidence, private readonly StorePaymentConfirmer $confirmer, private readonly CommerceInventoryLocks $locks) {}
+    public function __construct(private readonly StorePayments $payments, private readonly StorePaymentEvidence $evidence, private readonly StorePaymentConfirmer $confirmer, private readonly CommerceOrderLocks $locks) {}
 
     public function reconcile(StorePaymentAttempt $attempt): StoreOrder
     {

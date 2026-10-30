@@ -20,13 +20,13 @@ final class StoreReceipts
     public function capture(StoreOrder $order): StoreReceipt
     {
         return $order->getConnection()->transaction(function () use ($order): StoreReceipt {
-            $order = app(CommerceInventoryLocks::class)->order($order);
+            $order = app(CommerceOrderLocks::class)->order($order);
             abort_unless($order->state === 'confirmed' && in_array($order->payment_state, ['paid', 'not_required'], true), 409);
             $existing = StoreReceipt::query()->where('order_id', $order->id)->first();
             if ($existing !== null) {
                 return $existing;
             }
-            $data = app(StoreOrderPayload::class)->buyer($order);
+            $data = app(CommerceOfferingRegistry::class)->for($order)->receiptContext($order);
             $snapshot = array_intersect_key($data, array_flip(['number', 'seller', 'currency', 'total_pesewas', 'lines', 'buyer_fee_pesewas', 'collection_terms', 'refund_terms', 'support_contact', 'charges', 'production_terms', 'customisation']));
             $snapshot['issued_at'] = now()->toIso8601String();
             $snapshot['receipt_terms'] = $order->terms_snapshot['receipt_terms'] ?? '';
