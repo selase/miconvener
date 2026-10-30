@@ -18,7 +18,7 @@ use Throwable;
 
 final class StoreRefunds
 {
-    public function __construct(private readonly CommerceInventoryLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreBalance $balance, private readonly StoreGateways $gateways, private readonly LedgerService $ledger) {}
+    public function __construct(private readonly CommerceOrderLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreBalance $balance, private readonly StoreGateways $gateways, private readonly LedgerService $ledger, private readonly CommerceOfferingRegistry $offerings) {}
 
     public function request(StoreOrder $order, User $actor, string $operationKey, string $reason, ?string $observationId = null): StoreRefund
     {
@@ -30,6 +30,7 @@ final class StoreRefunds
         $refund = $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason, $observationId): StoreRefund {
             $order = $this->locks->order($order);
             $this->authorize($order, $actor);
+            $this->offerings->for($order)->assertRefund($order);
             $prior = StoreRefund::query()->where('tenant_id', $order->tenant_id)->where('operation_key', $operationKey)->first();
             if ($prior !== null) {
                 if ($prior->order_id !== $order->id || $prior->reason !== $reason || ($observationId !== null && $prior->observation_id !== $observationId)) {
@@ -90,6 +91,7 @@ final class StoreRefunds
         return $order->getConnection()->transaction(function () use ($order, $actor, $operationKey, $reason): StoreRefund {
             $order = $this->locks->order($order);
             $this->authorize($order, $actor);
+            $this->offerings->for($order)->assertRefund($order);
             $prior = StoreRefund::query()->where('order_id', $order->id)->whereNull('attempt_id')->first();
             if ($prior !== null) {
                 if ($prior->operation_key !== $operationKey || $prior->reason !== $reason) {
@@ -218,17 +220,7 @@ final class StoreRefunds
             $refund->update(['status' => 'confirmed', 'ledger_transaction_id' => $transaction->id, 'review_reason' => in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) && $refund->restock ? match ($order->fulfilment_state) {
                 'dispatched' => 'goods_in_transit', 'delivered' => 'goods_already_delivered', default => 'goods_already_collected'
             } : null]);
-            if ($refund->restock) {
-                $order->update(['payment_state' => 'refunded', 'state' => 'cancelled']);
-                if (! in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true)) {
-                    app(MerchandiseInventory::class)->restockRefund($refund);
-                    $order->update(['fulfilment_state' => 'cancelled']);
-                }
-            }
-
-            if (! $refund->restock && $order->payment_state === 'captured_review') {
-                $order->update(['state' => 'cancelled', 'payment_state' => 'refunded', 'fulfilment_state' => 'cancelled', 'ledger_state' => 'posted', 'review_reason' => null]);
-            }
+            $this->offerings->for($order)->applyRefund($refund, $order);
 
             return $refund;
         });

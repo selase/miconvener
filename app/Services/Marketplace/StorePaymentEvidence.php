@@ -14,7 +14,7 @@ use Throwable;
 /** Receives only server-side original-account transaction verification. */
 final class StorePaymentEvidence
 {
-    public function __construct(private readonly CommerceInventoryLocks $locks) {}
+    public function __construct(private readonly CommerceOrderLocks $locks, private readonly CommerceOfferingRegistry $offerings) {}
 
     /** @param array<string, mixed> $verified */
     public function record(StorePaymentAttempt $attempt, array $verified): StorePaymentObservation
@@ -45,7 +45,7 @@ final class StorePaymentEvidence
             $errors[] = 'gateway_fee_unpostable';
         }
         $metadata = WebhookController::metadata($verified['metadata'] ?? null);
-        $expected = ['source' => 'miconvener_store', 'store_order_id' => $attempt->order_id, 'store_attempt_id' => $attempt->id, 'seller_id' => $attempt->tenant_id];
+        $expected = $this->offerings->for($attempt->order)->expectedMetadata($attempt);
         foreach ($expected as $key => $value) {
             if (($metadata[$key] ?? null) !== $value) {
                 $errors[] = 'metadata_mismatch';

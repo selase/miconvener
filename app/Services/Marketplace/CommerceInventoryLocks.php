@@ -22,6 +22,9 @@ final class CommerceInventoryLocks
     public function order(StoreOrder $order): StoreOrder
     {
         $this->tenant($order->tenant_id);
+        if (StoreOrder::query()->whereKey($order->id)->value('offering_type') === 'reservation') {
+            throw new LogicException('Reservation orders are locked through CommerceOrderLocks.');
+        }
 
         return StoreOrder::query()->where('tenant_id', $order->tenant_id)->lockForUpdate()->findOrFail($order->id);
     }

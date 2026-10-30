@@ -7,12 +7,11 @@ namespace App\Services\Marketplace;
 use App\Models\StoreOrder;
 use App\Models\StorePaymentAttempt;
 use App\Models\StorePaymentObservation;
-use App\Models\StoreStockAllocation;
 use App\Services\Finance\LedgerService;
 
 final class StorePaymentConfirmer
 {
-    public function __construct(private readonly CommerceInventoryLocks $locks, private readonly LedgerService $ledger) {}
+    public function __construct(private readonly CommerceOrderLocks $locks, private readonly LedgerService $ledger, private readonly CommerceOfferingRegistry $offerings) {}
 
     public function confirm(StorePaymentObservation $capture): StoreOrder
     {
@@ -38,37 +37,22 @@ final class StorePaymentConfirmer
             if ($order->accepted_at === null) {
                 $issues[] = 'quote_not_accepted';
             }
-            $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->orderBy('variant_id')->get();
-            $variants = $this->locks->variants($allocations->pluck('variant_id')->all())->keyBy('id');
-            if ($order->sellerQuote()->exists()) {
-                if (! app(StoreSellerQuotes::class)->validCommitment($order) || $order->expires_at->lessThanOrEqualTo(now()) || $allocations->isNotEmpty()) {
-                    $issues[] = 'production_quote_unavailable';
-                }
-            } else {
-                if ($allocations->isEmpty() || $allocations->count() !== $order->lines()->count() || $allocations->contains(fn (StoreStockAllocation $a): bool => $a->state !== 'active' || $a->expires_at->lessThanOrEqualTo(now()) || $variants->get($a->variant_id)?->on_hand < $a->quantity)) {
-                    $issues[] = 'allocation_unavailable';
-                }
-            }
+            $offering = $this->offerings->for($order);
+            $issues = [...$issues, ...$offering->captureIssues($order, $capture)];
             if ($issues !== []) {
                 $txn = $capture->ledger_transaction_id === null ? $this->ledger->recordStoreCaptureReview($capture) : null;
                 $capture->update(['processing_state' => 'review', 'review_reason' => $issues[0], 'ledger_transaction_id' => $capture->ledger_transaction_id ?? $txn?->id]);
                 $attempt->update(['status' => 'review', 'review_reason' => $issues[0]]);
                 if ($order->payment_state !== 'paid') {
                     $order->update(['state' => 'review', 'payment_state' => 'captured_review', 'ledger_state' => 'review', 'review_reason' => $issues[0]]);
-                    app(PurchaseReservations::class)->release($order, 'payment_review');
+                    $offering->onCaptureReview($order);
                 } else {
                     $order->update(['review_reason' => $issues[0]]);
                 }
 
                 return $order;
             }
-            $transaction = $this->ledger->recordStoreSale($order, $attempt, ['observation_id' => $capture->id]);
-            $capture->update(['ledger_transaction_id' => $transaction->id]);
-            $order->update(['state' => 'confirmed', 'payment_state' => 'paid', 'ledger_state' => 'posted', 'paid_at' => $capture->paid_at, 'review_reason' => null]);
-            app(MerchandiseInventory::class)->consumeOrder($order);
-            $capture->update(['processing_state' => 'posted', 'review_reason' => null]);
-            $attempt->update(['status' => 'succeeded', 'last_verified_at' => now()]);
-            app(StoreReceipts::class)->capture($order);
+            $offering->applyCapture($order, $attempt, $capture);
 
             return $order;
         });

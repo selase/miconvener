@@ -7,7 +7,7 @@ namespace App\Console\Commands\Commerce;
 use App\Models\StoreOrder;
 use App\Models\StorePaymentAttempt;
 use App\Models\StorePaymentObservation;
-use App\Services\Marketplace\CommerceInventoryLocks;
+use App\Services\Marketplace\CommerceOrderLocks;
 use App\Services\Marketplace\PurchaseReservations;
 use App\Services\Marketplace\StorePaymentConfirmer;
 use App\Services\Marketplace\StorePaymentNotifications;
@@ -20,7 +20,7 @@ final class ReconcileStorePayments extends Command
 
     protected $description = 'Recover captured commerce payments, verify unresolved attempts and release expired unpaid holds';
 
-    public function handle(StorePaymentConfirmer $confirmer, StorePaymentNotifications $notifications, CommerceInventoryLocks $locks, PurchaseReservations $reservations, \App\Services\Marketplace\StoreRefunds $refunds, \App\Services\Marketplace\StorePayouts $payouts): int
+    public function handle(StorePaymentConfirmer $confirmer, StorePaymentNotifications $notifications, CommerceOrderLocks $locks, PurchaseReservations $reservations, \App\Services\Marketplace\StoreRefunds $refunds, \App\Services\Marketplace\StorePayouts $payouts): int
     {
         $limit = filter_var($this->option('limit'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 500]]);
         if ($limit === false) {
@@ -50,7 +50,7 @@ final class ReconcileStorePayments extends Command
                 $this->warn('An unresolved attempt still needs verification: '.$attempt->id);
             }
         }
-        $expired = StoreOrder::query()->whereIn('state', ['quoted', 'awaiting_payment'])->where('payment_state', 'awaiting')->where('expires_at', '<=', now())->orderBy('expires_at')->limit($limit)->get();
+        $expired = StoreOrder::query()->where('offering_type', 'purchase')->whereIn('state', ['quoted', 'awaiting_payment'])->where('payment_state', 'awaiting')->where('expires_at', '<=', now())->orderBy('expires_at')->limit($limit)->get();
         foreach ($expired as $order) {
             $order->getConnection()->transaction(function () use ($order, $locks, $reservations): void {
                 $order = $locks->order($order);

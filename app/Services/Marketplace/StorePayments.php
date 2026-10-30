@@ -7,7 +7,6 @@ namespace App\Services\Marketplace;
 use App\Http\Controllers\Billing\WebhookController;
 use App\Models\StoreOrder;
 use App\Models\StorePaymentAttempt;
-use App\Models\StoreStockAllocation;
 use App\Models\Tenant;
 use App\Support\WithoutTelescope;
 use Illuminate\Contracts\Session\Session;
@@ -18,7 +17,7 @@ use Throwable;
 
 final class StorePayments
 {
-    public function __construct(private readonly CommerceInventoryLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreGateways $gateways) {}
+    public function __construct(private readonly CommerceOrderLocks $locks, private readonly StoreOrderAccess $access, private readonly StoreGateways $gateways, private readonly CommerceOfferingRegistry $offerings) {}
 
     public function start(StoreOrder $order, Session $session, string $submissionKey, ?string $acceptedQuoteHash = null): ?StorePaymentAttempt
     {
@@ -34,28 +33,12 @@ final class StorePayments
             if ($order->state === 'review' || $order->payment_state === 'captured_review') {
                 $this->refuse();
             }
-            if ($order->state === 'quoted' && ! \App\Models\StoreFulfilmentArrangement::query()->where('order_id', $order->id)->exists()) {
-                $this->refuse();
-            }
             $seller = Tenant::query()->findOrFail($order->tenant_id);
-            if (! app(CommerceCatalogRollout::class)->enabled($seller)
-                || ! $seller->features()->where('feature_key', 'commerce_checkout')->where('enabled', true)->exists()
-                || ! $seller->isPlatformDefaultSettlement() || $order->expires_at->lessThanOrEqualTo(now())) {
+            if (! $seller->isPlatformDefaultSettlement() || $order->expires_at->lessThanOrEqualTo(now())) {
                 $this->refuse();
             }
-            $sellerQuote = $order->sellerQuote()->first();
-            if ($sellerQuote !== null) {
-                if ($acceptedQuoteHash === null || ! hash_equals($order->terms_hash, $acceptedQuoteHash) || ! app(StoreSellerQuotes::class)->validCommitment($order)) {
-                    $this->refuse();
-                }
-                if ($order->accepted_at === null) {
-                    foreach ($order->lines()->with('variant.merchandise')->get() as $line) {
-                        if ($line->variant->merchandise->visibility === 'members' && ! app(MerchandiseAccess::class)->canReadMembersFrom($seller, $session)) {
-                            $this->refuse();
-                        }
-                    }
-                }
-            }
+            $offering = $this->offerings->for($order);
+            $offering->assertCheckout($order, $session, $acceptedQuoteHash);
             $this->gateways->forOrder($order);
             $prior = StorePaymentAttempt::query()->where('order_id', $order->id)->where('submission_key', $submissionKey)->first();
             if ($prior !== null) {
@@ -68,28 +51,9 @@ final class StorePayments
             if (! in_array($order->state, ['quoted', 'awaiting_payment'], true)) {
                 $this->refuse();
             }
-            if ($sellerQuote !== null) {
-                if (StoreStockAllocation::query()->where('order_id', $order->id)->exists()) {
-                    $this->refuse();
-                }
-                $variantIds = $order->lines()->pluck('variant_id')->all();
-            } else {
-                $allocations = StoreStockAllocation::query()->where('order_id', $order->id)->get();
-                if ($allocations->isEmpty() || $allocations->count() !== $order->lines()->count() || $allocations->contains(fn (StoreStockAllocation $a): bool => $a->state !== 'active' || $a->expires_at->lessThanOrEqualTo(now()))) {
-                    $this->refuse();
-                }
-                $variantIds = $allocations->pluck('variant_id')->all();
-            }
-            $offered = \App\Models\StoreVariant::query()->whereKey($variantIds)->where('is_active', true)
-                ->whereHas('merchandise', fn ($query) => $query->whereNull('archived_at')->whereHas('listing', fn ($listing) => $listing->withoutGlobalScope(\App\Scopes\MerchandiseVisibilityScope::class)->where('status', \App\Models\StoreListing::STATUS_PUBLISHED)->whereNull('taken_down_at')))->count();
-            if ($offered !== count($variantIds)) {
-                $this->refuse();
-            }
+            $offering->assertNewAttempt($order);
             if ($order->charged_pesewas === 0) {
-                $order->update(['accepted_at' => now(), 'payment_state' => 'not_required', 'ledger_state' => 'not_applicable']);
-                app(PurchaseReservations::class)->consume($order);
-                $order->update(['state' => 'confirmed']);
-                app(StoreReceipts::class)->capture($order);
+                $offering->settleWithoutPayment($order);
 
                 return null;
             }
