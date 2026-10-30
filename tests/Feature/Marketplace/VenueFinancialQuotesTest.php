@@ -419,3 +419,33 @@ describe('charges', function (): void {
             ->and(VenueBookingCharge::query()->where('quote_id', $quote->id)->count())->toBe(2);
     });
 });
+
+it('refuses acceptance at the exact quote expiry instant', function (): void {
+    $quote = ($this->issue)();
+
+    $this->travelTo($quote->expires_at);
+
+    expect(fn () => ($this->accept)($quote))->toThrow(ValidationException::class);
+    expect(VenueFinancialDecision::query()->where('quote_id', $quote->id)->count())->toBe(0);
+});
+
+it('refuses acceptance at the exact hold deadline', function (): void {
+    $quote = ($this->issue)();
+    $quote->forceFill(['expires_at' => $quote->hold_expires_at]);
+
+    $this->travelTo($this->booking->fresh()->hold_expires_at);
+
+    expect(fn () => ($this->accept)($quote))->toThrow(ValidationException::class);
+});
+
+it('validates acceptance against the persisted quote, not the supplied model', function (): void {
+    $quote = ($this->issue)();
+    $forged = hash('sha256', 'forged');
+    $tampered = $quote->replicate();
+    $tampered->id = $quote->id;
+    $tampered->terms_hash = $forged;
+
+    expect(fn () => ($this->accept)($tampered, $forged))->toThrow(ValidationException::class);
+    expect(VenueFinancialDecision::query()->where('quote_id', $quote->id)->count())->toBe(0);
+    expect(($this->accept)($quote)->decision)->toBe(VenueFinancialDecision::ACCEPTED);
+});

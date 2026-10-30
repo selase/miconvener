@@ -164,6 +164,7 @@ final class VenueCommercialQuotes
             if (! hash_equals(PlatformAttendeeVerification::normalise($booking->planner_email), PlatformAttendeeVerification::normalise($email))) {
                 $this->refuse('Verify the email address used for this request first.');
             }
+            $quote = VenueFinancialQuote::query()->where('booking_id', $booking->id)->findOrFail($quote->id);
             $replay = $this->replay($quote, $operationKey, $requestHash);
             if ($replay !== null) {
                 return $replay;
@@ -174,7 +175,7 @@ final class VenueCommercialQuotes
             if ($this->outcome($quote) !== null || ! hash_equals($quote->terms_hash, $acceptedHash)) {
                 $this->refuse('This quote is no longer available. Ask the host for the current one.');
             }
-            if ($quote->expires_at->isPast() || ! $quote->hold_expires_at->equalTo($booking->hold_expires_at)) {
+            if (! now()->lt($quote->expires_at) || ! $quote->hold_expires_at->equalTo($booking->hold_expires_at)) {
                 $this->refuse('This quote has expired. Ask the host to quote again.');
             }
             if (! $this->availability->isSlotAvailable($listing, $booking->starts_at, $booking->ends_at, $booking->id)) {
@@ -218,7 +219,7 @@ final class VenueCommercialQuotes
             $this->refuse('Venue payments are not available for this organisation.');
         }
         if (! $booking->usesApprovalFlow() || $booking->kind !== VenueBooking::KIND_MARKETPLACE || $booking->status !== VenueBooking::STATUS_APPROVED_HOLD
-            || $booking->hold_expires_at === null || $booking->hold_expires_at->isPast() || $booking->starts_at->isPast()) {
+            || $booking->hold_expires_at === null || ! now()->lt($booking->hold_expires_at) || $booking->starts_at->isPast()) {
             $this->refuse('Only a booking with a live approved hold can be quoted or accepted.');
         }
     }
