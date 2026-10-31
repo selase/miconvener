@@ -126,7 +126,7 @@ test('the member list is paginated and shows effective amount and open totals', 
     [$tenant, $user, $class] = duesMembersTenant();
     $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'amount_override' => 3000]);
     DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'due_on' => now()->subDays(3)->toDateString()]);
-    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonth()->startOfMonth()->toDateString()]);
+    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonthNoOverflow()->startOfMonth()->toDateString()]);
     $beta = Tenant::factory()->create(['slug' => 'beta']);
     Member::factory()->create(['tenant_id' => $beta->id]);
 

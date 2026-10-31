@@ -19,7 +19,7 @@ test('billing dashboard displays last 6 months revenue analytics', function () {
     Transaction::factory()->create(['tenant_id' => $tenant->id, 'amount' => 2000, 'status' => 'success', 'created_at' => now()]);
 
     // Month 2 (Last Month): 10000
-    Transaction::factory()->create(['tenant_id' => $tenant->id, 'amount' => 10000, 'status' => 'success', 'created_at' => now()->subMonth()]);
+    Transaction::factory()->create(['tenant_id' => $tenant->id, 'amount' => 10000, 'status' => 'success', 'created_at' => now()->subMonthNoOverflow()]);
 
     // Failed Transaction (Should be ignored)
     Transaction::factory()->create(['tenant_id' => $tenant->id, 'amount' => 99999, 'status' => 'failed', 'created_at' => now()]);
@@ -35,7 +35,7 @@ test('billing dashboard displays last 6 months revenue analytics', function () {
     expect($currentMonthStat['amount'])->toBe(7000); // 5000 + 2000
 
     // Find Last Month
-    $lastMonthStat = collect($stats)->first(fn ($s) => $s['label'] === now()->subMonth()->format('M'));
+    $lastMonthStat = collect($stats)->first(fn ($s) => $s['label'] === now()->subMonthNoOverflow()->format('M'));
     expect($lastMonthStat['amount'])->toBe(10000);
 
     $response->assertInertia(fn ($page) => $page->component('Billing/Index'));

@@ -89,8 +89,8 @@ test('usage from an earlier period is not counted', function () {
         'tenant_id' => $this->tenant->id,
         'feature_slug' => 'ai_tokens_quota',
         'used_count' => 95,
-        'period_start' => now()->subMonth()->startOfMonth(),
-        'period_end' => now()->subMonth()->endOfMonth(),
+        'period_start' => now()->subMonthNoOverflow()->startOfMonth(),
+        'period_end' => now()->subMonthNoOverflow()->endOfMonth(),
     ]);
 
     usagePage($this->user)
