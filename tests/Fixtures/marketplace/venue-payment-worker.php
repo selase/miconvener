@@ -25,7 +25,7 @@ use Illuminate\Validation\ValidationException;
 require dirname(__DIR__, 3).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 3).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
-config(['cache.default' => 'array', 'session.driver' => 'array']);
+config(['cache.default' => 'array', 'session.driver' => 'array', 'services.settlement.paystack.secret_key' => 'sk_test_venue_race']);
 DB::connection('landlord')->statement("SET application_name = 'venue-payment-worker'");
 $input = json_decode(stream_get_contents(STDIN), true, 16, JSON_THROW_ON_ERROR);
 echo "READY\n";
@@ -44,7 +44,32 @@ try {
             app(App\Services\Marketplace\VenueBookingService::class)->confirmBookingPayment('review-legacy-conflict', ['amount' => 30000, 'fees' => 150, 'metadata' => ['venue_booking_id' => $input['booking']]]);
             echo 'LEGACY_RECORDED';
             break;
+        case 'legacy_resolve':
+            Illuminate\Support\Facades\Http::fake([
+                '*api.paystack.co/transaction/verify/*' => Illuminate\Support\Facades\Http::response(['status' => true, 'data' => ['id' => 9001, 'reference' => $input['reference'], 'status' => 'success', 'amount' => $input['amount'], 'fees' => 150, 'currency' => 'GHS', 'paid_at' => now()->subHour()->toIso8601String(), 'metadata' => ['venue_booking_id' => $input['booking']]]]),
+                '*api.paystack.co/refund' => Illuminate\Support\Facades\Http::response(['data' => ['id' => 55001, 'status' => 'pending']]),
+            ]);
+            $resolution = App\Models\VenuePaymentResolution::query()->findOrFail($input['resolution']);
+            app(TenantContext::class)->setTenant(Tenant::query()->findOrFail($resolution->tenant_id));
+            try {
+                app(App\Services\Marketplace\VenuePaymentReconciliation::class)->resolve($resolution, User::query()->findOrFail($input['actor']), 'refund', 'Return the late payment.', $input['key']);
+                echo 'RESOLVED';
+            } catch (ValidationException) {
+                echo 'REFUSED';
+            }
+            break;
+        case 'payout_reserve':
+            $tenant = Tenant::query()->findOrFail($input['tenant']);
+            app(TenantContext::class)->setTenant($tenant);
+            try {
+                app(App\Services\Marketplace\StorePayouts::class)->reserve($tenant, User::query()->findOrFail($input['actor']), ['amount' => $input['amount'], 'currency' => 'GHS', 'payout_account_id' => $input['account'], 'operation_key' => $input['key']]);
+                echo 'RESERVED';
+            } catch (ValidationException) {
+                echo 'REFUSED';
+            }
+            break;
         case 'refund_request':
+            Illuminate\Support\Facades\Http::fake(['*api.paystack.co/refund' => Illuminate\Support\Facades\Http::response(['data' => ['id' => 55001, 'status' => 'pending']])]);
             $order = App\Models\StoreOrder::query()->findOrFail($input['order']);
             app(TenantContext::class)->setTenant(Tenant::query()->findOrFail($order->tenant_id));
             $refund = app(App\Services\Marketplace\StoreRefunds::class)->request($order, User::query()->findOrFail($input['host']), $input['key'], 'Cancelled by the planner.');

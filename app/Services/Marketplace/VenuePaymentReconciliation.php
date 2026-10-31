@@ -135,6 +135,7 @@ final class VenuePaymentReconciliation
             if ($prior !== null) {
                 return $prior;
             }
+            $this->assertOpen($action);
 
             return $this->append($action, $actor, VenuePaymentResolution::REFUNDED, $operationKey, $requestHash, $reason, $verified->verified_amount_pesewas, ['order_id' => $order->id, 'refund_id' => $refund->id, 'refund_status' => $refund->status]);
         });
