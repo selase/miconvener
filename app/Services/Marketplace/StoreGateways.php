@@ -23,6 +23,23 @@ final class StoreGateways
         return new PaystackGateway(['secret_key' => config('services.settlement.paystack.secret_key')]);
     }
 
+    /**
+     * The supported platform account, for verifying a payment that has no order.
+     */
+    public function platform(): PaystackGateway
+    {
+        if (! filled(config('services.settlement.paystack.secret_key'))) {
+            throw ValidationException::withMessages(['payment' => 'The original payment account needs operator review.']);
+        }
+
+        return new PaystackGateway(['secret_key' => config('services.settlement.paystack.secret_key')]);
+    }
+
+    public function platformFingerprint(): string
+    {
+        return hash('sha256', app(GivingGateways::class)->platformIdentity());
+    }
+
     public function forAttempt(StorePaymentAttempt $attempt): PaystackGateway
     {
         $attempt = StorePaymentAttempt::query()->with('order')->findOrFail($attempt->id);

@@ -41,6 +41,12 @@ interface CommerceOffering
     public function captureIssues(StoreOrder $order, StorePaymentObservation $capture): array;
 
     /**
+     * Whether this order carries money captured before it existed, so its capture
+     * is judged against the original chronology rather than this order's own.
+     */
+    public function importsHistoricalCapture(StoreOrder $order): bool;
+
+    /**
      * Release whatever the order held when its capture goes to review.
      */
     public function onCaptureReview(StoreOrder $order): void;

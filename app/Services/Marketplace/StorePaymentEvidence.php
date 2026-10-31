@@ -45,7 +45,9 @@ final class StorePaymentEvidence
             $errors[] = 'gateway_fee_unpostable';
         }
         $metadata = WebhookController::metadata($verified['metadata'] ?? null);
-        $expected = $this->offerings->for($attempt->order)->expectedMetadata($attempt);
+        $offering = $this->offerings->for($attempt->order);
+        $imported = $offering->importsHistoricalCapture($attempt->order);
+        $expected = $offering->expectedMetadata($attempt);
         foreach ($expected as $key => $value) {
             if (($metadata[$key] ?? null) !== $value) {
                 $errors[] = 'metadata_mismatch';
@@ -60,10 +62,10 @@ final class StorePaymentEvidence
         } catch (Throwable) {
             $paidAt = null;
         }
-        if ($paidAt === null || $paidAt->greaterThan(now()->addSeconds(30)) || $paidAt->lessThan($attempt->created_at->copy()->subSeconds(1))) {
+        if ($paidAt === null || $paidAt->greaterThan(now()->addSeconds(30)) || (! $imported && $paidAt->lessThan($attempt->created_at->copy()->subSeconds(1)))) {
             $errors[] = 'capture_time_unknown';
         }
-        if ($paidAt !== null && $paidAt->greaterThanOrEqualTo($attempt->order->expires_at)) {
+        if (! $imported && $paidAt !== null && $paidAt->greaterThanOrEqualTo($attempt->order->expires_at)) {
             $errors[] = 'capture_after_expiry';
         }
         $transactionId = $verified['transaction_id'] ?? null;
