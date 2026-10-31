@@ -498,6 +498,18 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
             Route::post('inquiries/{inquiry}/renew', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'renew'])->name('inquiries.renew');
         });
 
+        Route::post('inquiries/{inquiry}/financial-quote', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'issue'])->whereUuid('inquiry')->middleware('throttle:venue-decisions')->name('inquiries.financial-quote');
+        Route::post('inquiries/{inquiry}/complete', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'complete'])->whereUuid('inquiry')->middleware('throttle:venue-decisions')->name('inquiries.complete');
+        Route::post('financial-quotes/{quote}/withdraw', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'withdraw'])->whereUuid('quote')->middleware('throttle:venue-decisions')->name('financial-quotes.withdraw');
+
+        Route::prefix('finance')->name('finance.')->middleware('throttle:venue-decisions')->group(function (): void {
+            Route::get('/', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'index'])->withoutMiddleware('throttle:venue-decisions')->name('index');
+            Route::post('conflicts/{action}/verify', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'verify'])->whereUuid('action')->name('conflicts.verify');
+            Route::post('resolutions/{resolution}/resolve', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'resolve'])->whereUuid('resolution')->name('resolutions.resolve');
+            Route::post('charges/{charge}/refund', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'refund'])->whereUuid('charge')->name('charges.refund');
+            Route::post('refunds/{refund}/reconcile', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'reconcileRefund'])->whereUuid('refund')->name('refunds.reconcile');
+        });
+
         Route::get('calendar', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'index'])->name('calendar.index');
         Route::post('calendar/blocks', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'storeBlock'])->name('calendar.blocks.store');
         Route::delete('calendar/blocks/{block}', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'destroyBlock'])

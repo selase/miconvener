@@ -474,6 +474,7 @@ final class VenueBookingController extends Controller
                 'paid_at' => null,
                 'contract_agreed_at' => $booking->contract_agreed_at?->toIso8601String(),
                 'contract_terms_snapshot' => $booking->contract_terms_snapshot,
+                'financial' => app(\App\Services\Marketplace\VenueFinancialJourney::class)->forBuyer($booking),
                 'approval' => [
                     'flow' => true,
                     'effective_status' => $effective,

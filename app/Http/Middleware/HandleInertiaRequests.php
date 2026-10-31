@@ -71,6 +71,7 @@ final class HandleInertiaRequests extends Middleware
                     'delete_user' => fn (): bool => (bool) $request->user()?->can('delete user'),
                     'manage_store_collection' => fn (): bool => (bool) $request->user()?->can('manage store collection'),
                     'manage_store_orders' => fn (): bool => (bool) $request->user()?->can('manage store orders'),
+                    'venue_money' => fn (): bool => (bool) ($request->user()?->can('manage venue refunds') || $request->user()?->can('reconcile venue payments') || $request->user()?->can('release venue settlements')),
                     'manage_store_finance' => fn (): bool => (bool) $request->user()?->can('manage store finance'),
                     'manage_store_catalog' => fn (): bool => (bool) $request->user()?->can('manage store catalog'),
                     'manage_venue' => fn (): bool => (bool) $request->user()?->can('manage venue'),

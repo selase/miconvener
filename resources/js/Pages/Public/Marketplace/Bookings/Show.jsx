@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
+import VenueQuotePanel from '@/Components/Marketplace/VenueQuotePanel';
 import VenueRequestStatus, { VenueRequestBadge, useLiveApproval } from '@/Components/Marketplace/VenueRequestStatus';
 import {
     Calendar,
@@ -152,6 +153,7 @@ export default function BookingShow({ booking }) {
                     </div>
 
                     {approval && <VenueRequestStatus booking={{ ...booking, approval }} />}
+                    {approval && booking.financial && <VenueQuotePanel booking={booking} />}
 
                     {/* Pending Deposit Action Banner */}
                     {!isConfirmed &&

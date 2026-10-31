@@ -352,6 +352,7 @@ Route::post('/marketplace/shops/{shop:slug}/quotes', [App\Http\Controllers\Marke
     ->middleware('throttle:30,1')->name('store.quotes.create');
 Route::post('/my/store-orders/{order}/checkout', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'start'])
     ->middleware('throttle:30,1')->whereUuid('order')->name('store.checkout.start');
+Route::get('/my/venue-charges/{charge}/receipt', [App\Http\Controllers\Marketplace\VenueQuoteAcceptanceController::class, 'receipt'])->whereUuid('charge')->name('venue.charges.receipt');
 Route::post('/my/venue-charges/{charge}/checkout', [App\Http\Controllers\Marketplace\VenueChargeController::class, 'start'])
     ->middleware('throttle:30,1')->whereUuid('charge')->name('venue.charges.checkout');
 Route::get('/marketplace/checkout/{reference}/callback', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'callback'])
@@ -368,6 +369,7 @@ Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
     Route::get('/venues/{slug}/booked-slots', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'bookedSlots'])->name('venues.booked-slots');
     Route::post('/venues/{slug}/book', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'book'])->name('venues.book');
     Route::post('/venues/{slug}/request', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'requestVenue'])->middleware('throttle:20,1')->name('venues.request');
+    Route::post('/bookings/{reference}/quote/accept', [App\Http\Controllers\Marketplace\VenueQuoteAcceptanceController::class, 'accept'])->middleware('throttle:30,1')->name('bookings.quote.accept');
     Route::post('/bookings/{reference}/cancel', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'cancel'])->middleware('throttle:30,1')->name('bookings.cancel');
     Route::get('/bookings/{reference}', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'show'])->name('bookings.show');
     Route::post('/bookings/{reference}/checkout', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkout'])->name('bookings.checkout');
