@@ -30,7 +30,7 @@ final class VenueQuoteNotices
             ['tenant_id' => $quote->tenant_id, 'shop_id' => $quote->shop_id, 'booking_id' => $quote->booking_id, 'state' => VenueQuoteNotice::QUEUED],
         );
         if ($notice->wasRecentlyCreated) {
-            DB::connection('landlord')->afterCommit(fn () => DeliverVenueQuoteNotice::dispatch($notice->id));
+            DB::connection('landlord')->afterCommit(fn () => $this->submit($notice->id));
         }
     }
 
@@ -58,16 +58,31 @@ final class VenueQuoteNotices
     }
 
     /**
-     * Queue every notice whose retry is due, and recover sends that never reported back.
+     * Submit every notice still waiting for its first send or whose retry is due, and
+     * recover sends that never reported back. Submitting twice is safe: the job claims
+     * the row before it sends.
      */
     public function retryDue(): int
     {
         VenueQuoteNotice::query()->where('state', VenueQuoteNotice::SENDING)->where('claimed_at', '<=', now()->subMinutes(15))
             ->update(['state' => VenueQuoteNotice::RETRY, 'next_attempt_at' => now(), 'error' => 'The send did not report back.']);
-        $due = VenueQuoteNotice::query()->where('state', VenueQuoteNotice::RETRY)->where('next_attempt_at', '<=', now())->pluck('id');
-        $due->each(fn (string $id) => DeliverVenueQuoteNotice::dispatch($id));
+        $due = VenueQuoteNotice::query()->where(fn ($query) => $query->where('state', VenueQuoteNotice::QUEUED)->orWhere(fn ($retry) => $retry->where('state', VenueQuoteNotice::RETRY)->where('next_attempt_at', '<=', now())))->pluck('id');
+        $due->each(fn (string $id) => $this->submit($id));
 
         return $due->count();
+    }
+
+    /**
+     * The quote is already committed, so a queue that cannot take the job must not
+     * fail it: the notice stays queued and the scheduled sweep submits it again.
+     */
+    private function submit(string $noticeId): void
+    {
+        try {
+            DeliverVenueQuoteNotice::dispatch($noticeId);
+        } catch (Throwable $e) {
+            Log::warning('Venue quote notice could not be queued; the sweep will retry', ['notice_id' => $noticeId, 'error' => $e->getMessage()]);
+        }
     }
 
     private function failed(VenueQuoteNotice $notice, Throwable $e): void

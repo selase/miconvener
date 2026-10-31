@@ -86,3 +86,14 @@ describe('the host financial panel', () => {
         expect(screen.getByRole('button', { name: 'Mark event complete' }).disabled).toBe(true);
     });
 });
+
+vi.mock('@/Layouts/ConsoleLayout', () => ({ default: ({ children }) => <div>{children}</div> }));
+
+it('finance still offers the valid rental refund after an extra capture was returned', async () => {
+    const { default: Finance } = await import('@/Pages/Tenant/Venue/Finance/Index');
+    render(<Finance can={{ refunds: true, reconcile: false, settlements: false }} conflicts={[]} payments={[{
+        id: 'charge-1', booking_reference: 'VEN-1', purpose: 'rental_initial', amount_pesewas: 30000,
+        payment_state: 'paid', held_captures: [], refund: { id: 'extra-refund', status: 'confirmed' },
+    }]} />);
+    expect(screen.queryByRole('button', { name: 'Refund in full' })).not.toBeNull();
+});

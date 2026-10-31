@@ -209,3 +209,23 @@ describe('buyer quote emails', function (): void {
         Mail::assertSentCount(1);
     });
 });
+
+it('a queue submission failure does not fail an already committed quote', function (): void {
+    Illuminate\Support\Facades\Bus::shouldReceive('dispatch')->andThrow(new RuntimeException('queue unavailable'));
+    $error = null;
+    try {
+        ($this->issueQuote)();
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+    }
+    expect(VenueFinancialQuote::query()->count())->toBe(1)
+        ->and(VenueQuoteNotice::query()->sole()->state)->toBe('queued')
+        ->and($error)->toBeNull();
+});
+
+it('the scheduled sweep recovers a queued notice whose job was never submitted', function (): void {
+    Illuminate\Support\Facades\Bus::fake();
+    ($this->issueQuote)();
+    expect(VenueQuoteNotice::query()->sole()->state)->toBe('queued');
+    expect(app(VenueQuoteNotices::class)->retryDue())->toBe(1);
+});

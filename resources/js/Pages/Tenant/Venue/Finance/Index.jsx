@@ -142,7 +142,7 @@ function Payments({ payments }) {
                             {payment.held_captures.length === 0 && payment.refund && payment.refund.status !== 'confirmed' && (
                                 <button type="button" disabled={busy === payment.refund.id} className={button} onClick={() => run(payment.refund.id, route('tenant.venue.finance.refunds.reconcile', { refund: payment.refund.id }))}>Refresh refund</button>
                             )}
-                            {payment.held_captures.length === 0 && !payment.refund && payment.payment_state === 'paid' && (
+                            {payment.held_captures.length === 0 && payment.payment_state === 'paid' && (
                                 <ReasonAction id={payment.id}>
                                     {(reason) => (
                                         <button type="button" disabled={!reason || busy === payment.id} className={primary} onClick={() => run(payment.id, route('tenant.venue.finance.charges.refund', { charge: payment.id }), { reason })}>Refund in full</button>
