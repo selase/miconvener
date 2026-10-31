@@ -41,30 +41,32 @@ final class SorkorAt70Seeder extends Seeder
         $heroPath = 'events/hero/'.self::EVENT_SLUG.'.jpg';
         Storage::disk(Event::uploadDisk())->put($heroPath, (string) file_get_contents(database_path('seeders/assets/sorkor/hero.jpg')));
 
-        /** @var Event $event */
-        $event = Event::query()->updateOrCreate(
-            ['tenant_id' => $tenant->id, 'slug' => self::EVENT_SLUG],
-            [
-                'name' => 'Sorkor at 70: A Celebration of Christiana Korkor Tawiah',
-                'description' => $this->description(),
-                'event_category' => Event::CATEGORY_CELEBRATION,
-                'status' => app()->isProduction() ? Event::STATUS_DRAFT : Event::STATUS_PUBLISHED,
-                'visibility' => Event::VISIBILITY_PUBLIC,
-                'starts_at' => Carbon::parse('2026-11-14 15:00', self::TIMEZONE)->utc(),
-                'ends_at' => Carbon::parse('2026-11-14 19:00', self::TIMEZONE)->utc(),
-                'timezone' => self::TIMEZONE,
-                'location_type' => Event::LOCATION_IN_PERSON,
-                'address' => 'Gaithersburg, Maryland, USA (exact venue to be confirmed)',
-                'currency' => 'USD',
-                'ticket_price' => 0,
-                'capacity' => 30,
-                'allow_contributions' => false,
-                'allow_goodwill_messages' => true,
-                'show_tribute_wall' => true,
-                'hero_image_path' => $heroPath,
-                'cover_image_path' => $heroPath,
-            ]
-        );
+        $event = Event::query()->firstOrNew(['tenant_id' => $tenant->id, 'slug' => self::EVENT_SLUG]);
+
+        // Only a new event gets a status: re-seeding must not unpublish one the organiser has published.
+        if (! $event->exists) {
+            $event->status = app()->isProduction() ? Event::STATUS_DRAFT : Event::STATUS_PUBLISHED;
+        }
+
+        $event->fill([
+            'name' => 'Sorkor at 70: A Celebration of Christiana Korkor Tawiah',
+            'description' => $this->description(),
+            'event_category' => Event::CATEGORY_CELEBRATION,
+            'visibility' => Event::VISIBILITY_PUBLIC,
+            'starts_at' => Carbon::parse('2026-11-21 15:00', self::TIMEZONE)->utc(),
+            'ends_at' => Carbon::parse('2026-11-21 19:00', self::TIMEZONE)->utc(),
+            'timezone' => self::TIMEZONE,
+            'location_type' => Event::LOCATION_IN_PERSON,
+            'address' => 'Gaithersburg, Maryland, USA (exact venue to be confirmed)',
+            'currency' => 'USD',
+            'ticket_price' => 0,
+            'capacity' => 30,
+            'allow_contributions' => false,
+            'allow_goodwill_messages' => true,
+            'show_tribute_wall' => true,
+            'hero_image_path' => $heroPath,
+            'cover_image_path' => $heroPath,
+        ])->save();
 
         EventTicketType::query()->updateOrCreate(
             ['event_id' => $event->id, 'name' => 'Guest place'],
@@ -88,7 +90,7 @@ final class SorkorAt70Seeder extends Seeder
 
             Born on 24 October 1956 and raised in James Town, Accra, Sorkor has lived a life of faith, enterprise, courage and service: a seamstress and entrepreneur, a deacon, a voice for her community, a wife, a mother and a grandmother. Seven decades on, her family and friends are gathering to say thank you.
 
-            Saturday 14 November 2026, from 3:00 p.m., in Gaithersburg, Maryland. Entry is free, but places are limited to 30, so please book yours.
+            Saturday 21 November 2026, from 3:00 p.m., in Gaithersburg, Maryland. Entry is free, but places are limited to 30, so please book yours.
 
             Cannot be with us, or have something you want her to hear? Leave a goodwill message on the wall. Every message is read by the family and shared once approved.
 
