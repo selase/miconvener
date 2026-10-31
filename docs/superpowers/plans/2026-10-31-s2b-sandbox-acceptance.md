@@ -22,7 +22,7 @@
 | P4 | Paystack **test** secret/public keys in `PAYSTACK_SECRET_KEY` (settlement shares it) | Test-mode dashboard open to inspect transactions, refunds and transfers. |
 | P5 | Webhook delivery path | A public tunnel to `/webhooks/paystack` (Herd Share or similar) set as the test account's webhook URL. If no tunnel is available, webhooks are **simulated** by posting a payload signed with the test secret (HMAC-SHA512 of the raw body in `x-paystack-signature`); the callback and `php artisan commerce:reconcile` still use the real provider. Record which path was used. |
 | P6 | Queue and scheduler | `QUEUE_CONNECTION=database` with a worker running, and `php artisan schedule:work`, so quote emails, retries and reconciliation run as in production. |
-| P7 | **Reservation agreement approval path (open gap, see section 9)** | `venue:enable-payments` requires an approved reservation-scope agreement, but the superadmin agreements screen only manages purchase-scope agreements. Until a path exists, acceptance seeds the agreement through a local-only script (labelled **simulated setup**). |
+| P7 | **Reservation agreement approval** | Approve Acceptance Hall's venue (reservation) terms on the superadmin agreements screen (`admin.store-agreements`, scope "Venue bookings"), as the application superadmin. This path is built in PR #68; until it is merged, acceptance seeds the agreement through a local-only script labelled **simulated setup**. `venue:enable-payments` needs it. |
 | P8 | Evidence folder | One folder per run: `commit.txt`, `mail/`, `ledger/` (SQL dumps), `screens/`, `provider/` (dashboard screenshots with keys cropped), `log.md`. |
 
 ### Test organisations (all local)
@@ -153,9 +153,9 @@ Drive the real application with headless Chrome (the Playwright tool was not ava
 5. **Named acceptance recipients:** the test emails, the Paystack test account owner and where the test keys are kept.
 6. **Go-live sign-off:** who flips `venue:enable-payments` for the first venue, with which first scope (deposit-only, or deposit, balance and security), and the date.
 
-### Open engineering gap found while preparing this plan
+### Engineering gap found while preparing this plan (fixed in PR #68)
 
-- **No application path approves a reservation-scope commercial agreement.** `StoreCommercialAgreementController` and its request only create purchase-scope agreements, and nothing else calls the scope-aware `approve`. Without one, `venue:enable-payments` can never succeed for a real organisation. Recommended: let the superadmin agreements screen choose the scope (purchase or reservation), restricted to the application superadmin, with a test that a reservation agreement never changes the merchandise agreement. Estimated half a day. This must be built and merged before acceptance step P7 can be run without a simulated setup.
+- Nothing in the application could approve a reservation-scope commercial agreement: the superadmin agreements screen only created purchase-scope agreements, so `venue:enable-payments` could never succeed for a real organisation. PR #68 lets the application superadmin choose the scope on that screen (venue terms must take the commission from the venue's side; approving one scope never touches the other) and tests that `venue:enable-payments` succeeds once the venue terms are approved there. Merge #68 before acceptance step P7 is run without a simulated setup.
 
 ## 10. Deployment verification already done (read-only)
 
