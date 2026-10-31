@@ -229,3 +229,20 @@ it('review legacy conflict recording obeys the money tenant then listing lock or
     expect($error)->toBeNull()
         ->and($worker->getOutput())->not->toContain('ERROR');
 });
+
+it('records one full refund when two staff request a refund of the same paid rental together', function (): void {
+    $s = venuePaymentScenario();
+    Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
+    $s['host']->givePermissionTo('manage store finance');
+    $capture = app(App\Services\Marketplace\StorePaymentEvidence::class)->record($s['attempt'], $s['evidence']);
+    app(App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
+    $orderId = $s['attempt']->order_id;
+
+    $outputs = venuePaymentRace($s['booking']->store_listing_id, [
+        ['action' => 'refund_request', 'order' => $orderId, 'host' => $s['host']->id, 'key' => (string) Str::uuid()],
+        ['action' => 'refund_request', 'order' => $orderId, 'host' => $s['host']->id, 'key' => (string) Str::uuid()],
+    ]);
+
+    expect($outputs)->toBe(['REFUND_needs_funding', 'REFUND_needs_funding'])->and(DB::connection('landlord')->table('store_refunds')->where('order_id', $orderId)->count())->toBe(1)
+        ->and(LedgerTransaction::withoutGlobalScopes()->where('transaction_type', 'commerce_refund')->count())->toBe(0);
+});

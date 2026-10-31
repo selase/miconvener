@@ -11,6 +11,7 @@ use App\Models\StoreCommercialAgreement;
 use App\Models\StoreOrder;
 use App\Models\StoreRefund;
 use App\Models\Tenant;
+use App\Models\VenueSettlementReserve;
 
 final class StoreBalance
 {
@@ -35,12 +36,12 @@ final class StoreBalance
         }
         $inFlight = (int) $payouts->sum('amount');
         $refundRows = $refunds->get();
-        $reserved = $inFlight + (int) $refundRows->sum('seller_debit_pesewas');
+        $reserved = $inFlight + (int) $refundRows->sum('seller_debit_pesewas') + ($forRefund ? 0 : $this->venueReserve($seller));
         $refundCash = (int) $refundRows->sum(fn (StoreRefund $refund): int => max(0, $refund->amount_pesewas - $refund->review_liability_pesewas));
         $floor = $forRefund ? 0 : $this->holdback($seller);
         $payable = $this->account($seller, LedgerAccount::CODE_ORGANIZER_PAYABLE) - $reserved - $floor;
         $cash = $this->account($seller, LedgerAccount::CODE_GATEWAY_CLEARING) + $this->account($seller, LedgerAccount::CODE_BANK)
-            - $this->account($seller, LedgerAccount::CODE_BUYER_REFUNDS) - $this->account($seller, LedgerAccount::CODE_HOLDBACK_RESERVE)
+            - $this->account($seller, LedgerAccount::CODE_BUYER_REFUNDS) - $this->account($seller, LedgerAccount::CODE_SECURITY_DEPOSITS) - $this->account($seller, LedgerAccount::CODE_HOLDBACK_RESERVE)
             - $inFlight - $refundCash - $floor;
 
         return max(0, min($payable, $cash));
@@ -56,7 +57,7 @@ final class StoreBalance
 
         return $this->account($seller, LedgerAccount::CODE_GATEWAY_CLEARING) + $this->account($seller, LedgerAccount::CODE_BANK)
             - $this->account($seller, LedgerAccount::CODE_ORGANIZER_PAYABLE) - $this->account($seller, LedgerAccount::CODE_BUYER_REFUNDS)
-            - $this->account($seller, LedgerAccount::CODE_HOLDBACK_RESERVE) - $cost;
+            - $this->account($seller, LedgerAccount::CODE_SECURITY_DEPOSITS) - $this->account($seller, LedgerAccount::CODE_HOLDBACK_RESERVE) - $cost;
     }
 
     public function refundBacked(StoreRefund $refund): bool
@@ -66,6 +67,16 @@ final class StoreBalance
 
         return $refund->seller_debit_pesewas <= $this->available($seller, excludeRefund: $refund->id, forRefund: true)
             && $this->cashBuffer($seller, $refund->id) >= $bufferRequired;
+    }
+
+    /**
+     * Rental earnings held until the event is complete. The reserve is an overlay on
+     * the payable, never a second journal, and ends with its charge's refund.
+     */
+    private function venueReserve(Tenant $seller): int
+    {
+        return (int) VenueSettlementReserve::query()->where('tenant_id', $seller->id)->where('state', 'held')
+            ->whereHas('charge.order', fn ($order) => $order->whereIn('payment_state', ['paid', 'refund_pending']))->sum('reserved_pesewas');
     }
 
     private function account(Tenant $seller, string $code): int

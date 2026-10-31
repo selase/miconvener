@@ -222,11 +222,11 @@ describe('the venue offering', function (): void {
             ->and($this->registry->for($closed->order)->captureIssues($closed->order, $capture))->toContain('booking_closed');
     });
 
-    test('keeps refunds closed and refuses to apply a capture that was never verified', function (): void {
+    test('allows a rental refund before settlement and refuses to apply a capture that was never verified', function (): void {
         $charge = ($this->payable)();
         $offering = $this->registry->for($charge->order);
 
-        expect(fn () => $offering->assertRefund($charge->order))->toThrow(ValidationException::class)
+        expect(fn () => $offering->assertRefund($charge->order))->not->toThrow(ValidationException::class)
             ->and(fn () => $offering->applyCapture($charge->order, new App\Models\StorePaymentAttempt, new StorePaymentObservation))->toThrow(Exception::class);
     });
 

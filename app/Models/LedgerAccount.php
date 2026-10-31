@@ -40,6 +40,8 @@ final class LedgerAccount extends Model
 
     public const CODE_HOLDBACK_RESERVE = '2010'; // Liability
 
+    public const CODE_SECURITY_DEPOSITS = '2030'; // Liability: refundable venue security held for buyers
+
     public const CODE_PLATFORM_REVENUE = '4000'; // Revenue
 
     public const CODE_GATEWAY_FEES = '5000';     // Expense

@@ -54,7 +54,7 @@ final class StoreRefunds
             }
             $txn = LedgerTransaction::withoutGlobalScopes()->where('tenant_id', $order->tenant_id)->where('reference', $capture->reference)->where('category', 'commerce')->findOrFail($capture->ledger_transaction_id);
             $sale = $txn->transaction_type === 'commerce_sale';
-            if ((! $sale && $txn->transaction_type !== 'commerce_capture_review') || ($sale && ($order->ledger_state === 'review' || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) || $order->payment_state !== 'paid'))) {
+            if ((! $sale && ! in_array($txn->transaction_type, ['commerce_capture_review', 'venue_security_capture'], true)) || ($sale && ($order->ledger_state === 'review' || in_array($order->fulfilment_state, ['collected', 'delivered', 'dispatched'], true) || $order->payment_state !== 'paid'))) {
                 $this->refuse('Collected or unreconciled orders require an approved support review.');
             }
             $bearer = $order->terms_snapshot['refund_gateway_fee_bearer'] ?? null;

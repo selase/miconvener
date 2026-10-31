@@ -348,12 +348,12 @@ describe('timing and the calendar', function (): void {
         expect(fn () => ($this->attemptFor)($quote, VenueBookingCharge::RENTAL_BALANCE))->toThrow(ValidationException::class);
     });
 
-    test('a security payment never confirms the booking and is held for review until it can be posted safely', function (): void {
+    test('a security payment is posted as a refundable liability and never confirms or completes the booking', function (): void {
         $quote = ($this->accepted)();
         ($this->capture)(($this->attemptFor)($quote));
         $security = ($this->capture)(($this->attemptFor)($quote, VenueBookingCharge::SECURITY));
 
-        expect($security->processing_state)->toBe('review')->and($security->review_reason)->toBe('security_posting_unavailable')
+        expect($security->processing_state)->toBe('posted')->and($security->review_reason)->toBeNull()
             ->and($this->booking->fresh()->payment_status)->toBe(VenueBooking::PAYMENT_DEPOSIT_PAID)
             ->and(($this->sales)())->toBe(1);
     });

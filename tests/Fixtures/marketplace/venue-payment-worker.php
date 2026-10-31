@@ -44,6 +44,12 @@ try {
             app(App\Services\Marketplace\VenueBookingService::class)->confirmBookingPayment('review-legacy-conflict', ['amount' => 30000, 'fees' => 150, 'metadata' => ['venue_booking_id' => $input['booking']]]);
             echo 'LEGACY_RECORDED';
             break;
+        case 'refund_request':
+            $order = App\Models\StoreOrder::query()->findOrFail($input['order']);
+            app(TenantContext::class)->setTenant(Tenant::query()->findOrFail($order->tenant_id));
+            $refund = app(App\Services\Marketplace\StoreRefunds::class)->request($order, User::query()->findOrFail($input['host']), $input['key'], 'Cancelled by the planner.');
+            echo 'REFUND_'.$refund->status;
+            break;
         case 'occupy':
             $rival = VenueBooking::query()->findOrFail($input['booking']);
             $won = app(VenueCalendarLocks::class)->forBooking($rival->id, function ($listing, VenueBooking $locked): bool {
