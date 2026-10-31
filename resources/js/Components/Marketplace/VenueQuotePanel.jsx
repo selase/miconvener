@@ -48,9 +48,9 @@ function useMoneyRefresh(financial) {
 
 function Line({ label, value }) {
     return (
-        <div className="flex items-baseline justify-between gap-4 text-sm">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 text-sm">
             <dt className="text-ink-secondary">{label}</dt>
-            <dd className="font-medium text-ink">{value}</dd>
+            <dd className="shrink-0 whitespace-nowrap font-medium text-ink">{value}</dd>
         </div>
     );
 }

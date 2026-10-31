@@ -33,7 +33,7 @@ function ReasonAction({ id, can, children }) {
     return (
         <div className="flex flex-wrap items-center gap-2">
             <label htmlFor={`reason-${id}`} className="sr-only">Reason</label>
-            <input id={`reason-${id}`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="Reason (required)" className="w-56 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-ink" />
+            <input id={`reason-${id}`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="Reason (required)" className="w-full min-w-40 rounded-md sm:w-56 border border-border bg-surface px-3 py-1.5 text-sm text-ink" />
             {children(reason.trim(), can)}
         </div>
     );
@@ -49,7 +49,7 @@ function Conflicts({ conflicts }) {
     return (
         <Table>
             <Thead>
-                <Tr><Th>Booking</Th><Th>Payment</Th><Th>Status</Th><Th>Action</Th></Tr>
+                <Th>Booking</Th><Th>Payment</Th><Th>Status</Th><Th>Action</Th>
             </Thead>
             <tbody>
                 {conflicts.map((conflict) => (
@@ -108,7 +108,7 @@ function Payments({ payments }) {
     return (
         <Table>
             <Thead>
-                <Tr><Th>Booking</Th><Th>Payment</Th><Th>State</Th><Th>Action</Th></Tr>
+                <Th>Booking</Th><Th>Payment</Th><Th>State</Th><Th>Action</Th>
             </Thead>
             <tbody>
                 {payments.map((payment) => (
