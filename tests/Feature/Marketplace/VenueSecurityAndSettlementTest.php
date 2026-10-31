@@ -110,8 +110,10 @@ beforeEach(function (): void {
 
         return $capture->fresh();
     };
-    Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
-    $this->host->givePermissionTo('manage store finance');
+    foreach (['manage venue refunds', 'release venue settlements'] as $name) {
+        Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web'], ['category' => 'venue']);
+        $this->host->givePermissionTo($name);
+    }
     $this->fund = fn (int $pesewas = 200000) => app(App\Services\Finance\LedgerService::class)->postTransaction($this->tenant, null, 'test_funding', 'Earlier venue earnings', 'test-funding-'.Str::uuid(), [
         ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => 'debit', 'amount' => $pesewas],
         ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => 'credit', 'amount' => $pesewas],

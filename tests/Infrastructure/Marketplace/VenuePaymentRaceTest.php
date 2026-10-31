@@ -52,7 +52,7 @@ afterEach(function (): void {
  *
  * @return array{attempt: StorePaymentAttempt, booking: VenueBooking, rival: VenueBooking, host: User, evidence: array<string, mixed>}
  */
-function venuePaymentScenario(): array
+function venuePaymentScenario(array $quoteTerms = []): array
 {
     $tenant = Tenant::factory()->create(['settlement_mode' => Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT]);
     $shop = Shop::factory()->create(['tenant_id' => $tenant->id, 'is_active' => true]);
@@ -87,7 +87,7 @@ function venuePaymentScenario(): array
 
     $session = tap(new Store('venue-race', new ArraySessionHandler(120)), fn (Store $s) => $s->put(proofFor('buyer@planner.test')));
     $quotes = app(VenueCommercialQuotes::class);
-    $quote = $quotes->issue($booking, $host, [
+    $quote = $quotes->issue($booking, $host, $quoteTerms + [
         'rental_pesewas' => 100000, 'extras_pesewas' => 0, 'security_pesewas' => 0, 'payment_plan' => 'deposit', 'deposit_pesewas' => 30000,
         'balance_due_at' => $start->subDays(7)->toIso8601String(), 'security_due_at' => null,
         'cancellation_terms' => 'Full refund up to 14 days before.', 'support_contact' => 'bookings@host.example',
@@ -100,7 +100,7 @@ function venuePaymentScenario(): array
         'paid_at' => now()->toIso8601String(), 'transaction_id' => 4242,
         'metadata' => ['source' => 'miconvener_venue', 'venue_charge_id' => $charge->id, 'store_order_id' => $attempt->order_id, 'store_attempt_id' => $attempt->id, 'seller_id' => $attempt->tenant_id]];
 
-    return ['attempt' => $attempt, 'booking' => $booking, 'rival' => $rival, 'host' => $host, 'evidence' => $evidence];
+    return ['attempt' => $attempt, 'booking' => $booking, 'rival' => $rival, 'host' => $host, 'evidence' => $evidence, 'quote' => $quote, 'session' => $session, 'tenant' => $tenant];
 }
 
 /**
@@ -148,6 +148,25 @@ function venuePaymentRace(string $listingId, array $jobs): array
             }
         }
     }
+}
+
+/**
+ * Pay one charge of an accepted contract in the test process and return its order.
+ *
+ * @param  array<string, mixed>  $s
+ */
+function venuePayCharge(array $s, string $purpose): App\Models\StoreOrder
+{
+    $charge = VenueBookingCharge::query()->where('quote_id', $s['quote']->id)->where('purpose', $purpose)->firstOrFail();
+    $attempt = $purpose === VenueBookingCharge::RENTAL_INITIAL ? $s['attempt'] : app(StorePayments::class)->start($charge->order, $s['session'], (string) Str::uuid(), $s['quote']->terms_hash);
+    $capture = app(App\Services\Marketplace\StorePaymentEvidence::class)->record($attempt, [
+        'status' => 'success', 'provider' => 'paystack', 'reference' => $attempt->reference, 'reference_reported' => true, 'account_fingerprint' => $attempt->account_fingerprint,
+        'amount' => $attempt->amount_pesewas, 'currency' => 'GHS', 'fees' => 150, 'paid_at' => now()->toIso8601String(), 'transaction_id' => random_int(1000, 9999),
+        'metadata' => ['source' => 'miconvener_venue', 'venue_charge_id' => $charge->id, 'store_order_id' => $attempt->order_id, 'store_attempt_id' => $attempt->id, 'seller_id' => $attempt->tenant_id],
+    ]);
+    app(App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
+
+    return $charge->order->fresh();
 }
 
 function venueSales(): int
@@ -232,8 +251,8 @@ it('review legacy conflict recording obeys the money tenant then listing lock or
 
 it('records one full refund when two staff request a refund of the same paid rental together', function (): void {
     $s = venuePaymentScenario();
-    Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
-    $s['host']->givePermissionTo('manage store finance');
+    Permission::query()->firstOrCreate(['name' => 'manage venue refunds', 'guard_name' => 'web'], ['category' => 'venue']);
+    $s['host']->givePermissionTo('manage venue refunds');
     $capture = app(App\Services\Marketplace\StorePaymentEvidence::class)->record($s['attempt'], $s['evidence']);
     app(App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
     $orderId = $s['attempt']->order_id;
@@ -245,4 +264,79 @@ it('records one full refund when two staff request a refund of the same paid ren
 
     expect($outputs)->toBe(['REFUND_needs_funding', 'REFUND_needs_funding'])->and(DB::connection('landlord')->table('store_refunds')->where('order_id', $orderId)->count())->toBe(1)
         ->and(LedgerTransaction::withoutGlobalScopes()->where('transaction_type', 'commerce_refund')->count())->toBe(0);
+});
+
+it('imports and refunds a legacy conflict payment once when two finance users resolve it together', function (): void {
+    $s = venuePaymentScenario();
+    foreach (['reconcile venue payments', 'manage venue refunds'] as $name) {
+        Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web'], ['category' => 'venue']);
+    }
+    $finance = User::factory()->create(['tenant_id' => $s['tenant']->id]);
+    setPermissionsTeamId($s['tenant']->id);
+    $finance->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
+    $legacy = VenueBooking::factory()->create(['tenant_id' => $s['tenant']->id, 'shop_id' => $s['booking']->shop_id, 'store_listing_id' => $s['booking']->store_listing_id, 'status' => VenueBooking::STATUS_PENDING_PAYMENT,
+        'starts_at' => CarbonImmutable::now()->addDays(60), 'ends_at' => CarbonImmutable::now()->addDays(60)->addHours(8), 'planner_email' => 'late@planner.test']);
+    $action = VenueBookingAction::factory()->create(['booking_id' => $legacy->id, 'action' => VenueBookingAction::ACTION_PAYMENT_CALENDAR_CONFLICT, 'actor_type' => VenueBookingAction::ACTOR_SYSTEM,
+        'evidence' => ['provider_reference' => 'race-legacy-1', 'amount_pesewas' => 30000, 'currency' => 'GHS', 'fees_pesewas' => 150]]);
+    $resolution = App\Models\VenuePaymentResolution::factory()->forAction($action)->create(['step' => 'verified', 'reference' => 'race-legacy-1', 'verified_amount_pesewas' => 30000, 'evidence' => ['classification' => 'unposted']]);
+    $job = fn () => ['action' => 'legacy_resolve', 'resolution' => $resolution->id, 'actor' => $finance->id, 'key' => (string) Str::uuid(), 'reference' => 'race-legacy-1', 'amount' => 30000, 'booking' => $legacy->id];
+
+    $outputs = venuePaymentRace($s['booking']->store_listing_id, [$job(), $job()]);
+
+    expect(collect($outputs)->sort()->values()->all())->toBe(['REFUSED', 'RESOLVED'])
+        ->and(DB::connection('landlord')->table('venue_payment_resolutions')->where('step', 'refunded')->count())->toBe(1)
+        ->and(DB::connection('landlord')->table('venue_booking_charges')->where('purpose', 'legacy_review')->count())->toBe(1)
+        ->and(DB::connection('landlord')->table('store_payment_observations')->where('reference', 'race-legacy-1')->count())->toBe(1)
+        ->and(DB::connection('landlord')->table('store_refunds')->count())->toBe(1)
+        ->and(LedgerTransaction::withoutGlobalScopes()->where('transaction_type', 'commerce_capture_review')->count())->toBe(1)
+        ->and(venueSales())->toBe(0);
+});
+
+it('posts a balance capture once and records one refund when the balance arrives as the first payment is refunded', function (): void {
+    $s = venuePaymentScenario();
+    Permission::query()->firstOrCreate(['name' => 'manage venue refunds', 'guard_name' => 'web'], ['category' => 'venue']);
+    $s['host']->givePermissionTo('manage venue refunds');
+    $initial = venuePayCharge($s, VenueBookingCharge::RENTAL_INITIAL);
+    $balanceCharge = VenueBookingCharge::query()->where('quote_id', $s['quote']->id)->where('purpose', VenueBookingCharge::RENTAL_BALANCE)->firstOrFail();
+    $balanceAttempt = app(StorePayments::class)->start($balanceCharge->order, $s['session'], (string) Str::uuid(), $s['quote']->terms_hash);
+    $evidence = ['status' => 'success', 'provider' => 'paystack', 'reference' => $balanceAttempt->reference, 'reference_reported' => true, 'account_fingerprint' => $balanceAttempt->account_fingerprint,
+        'amount' => $balanceAttempt->amount_pesewas, 'currency' => 'GHS', 'fees' => 150, 'paid_at' => now()->toIso8601String(), 'transaction_id' => 5151,
+        'metadata' => ['source' => 'miconvener_venue', 'venue_charge_id' => $balanceCharge->id, 'store_order_id' => $balanceAttempt->order_id, 'store_attempt_id' => $balanceAttempt->id, 'seller_id' => $balanceAttempt->tenant_id]];
+
+    $outputs = venuePaymentRace($s['booking']->store_listing_id, [
+        ['action' => 'record_confirm', 'attempt' => $balanceAttempt->id, 'evidence' => $evidence],
+        ['action' => 'refund_request', 'order' => $initial->id, 'host' => $s['host']->id, 'key' => (string) Str::uuid()],
+    ]);
+
+    expect($outputs)->toContain('CONFIRMED')->and(collect($outputs)->contains(fn (string $output): bool => str_starts_with($output, 'REFUND_')))->toBeTrue()
+        ->and(venueSales())->toBe(2)->and(DB::connection('landlord')->table('store_refunds')->count())->toBe(1)
+        ->and($balanceCharge->order->fresh()->payment_state)->toBe('paid')->and($s['booking']->fresh()->amount_paid_pesewas)->toBe(100000);
+});
+
+it('never lets a security return and a seller payout both spend the same earnings', function (): void {
+    $s = venuePaymentScenario(['security_pesewas' => 20000, 'security_due_at' => CarbonImmutable::now()->addDays(25)->toIso8601String()]);
+    foreach (['manage venue refunds', 'manage store finance'] as $name) {
+        Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web'], ['category' => 'venue']);
+        $s['host']->givePermissionTo($name);
+    }
+    venuePayCharge($s, VenueBookingCharge::RENTAL_INITIAL);
+    $security = venuePayCharge($s, VenueBookingCharge::SECURITY);
+    app(App\Services\Finance\LedgerService::class)->postTransaction($s['tenant'], null, 'test_funding', 'Earlier venue earnings', 'race-funding', [
+        ['code' => App\Models\LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => 'debit', 'amount' => 2000],
+        ['code' => App\Models\LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => 'credit', 'amount' => 2000],
+    ], null, 'GHS', App\Enum\LedgerCategoryEnum::Commerce);
+    $account = App\Models\TenantPayoutAccount::factory()->create(['tenant_id' => $s['tenant']->id, 'is_verified' => true]);
+    $available = app(App\Services\Marketplace\StoreBalance::class)->available($s['tenant']);
+    expect($available)->toBe(2000);
+
+    $outputs = venuePaymentRace($s['booking']->store_listing_id, [
+        ['action' => 'refund_request', 'order' => $security->id, 'host' => $s['host']->id, 'key' => (string) Str::uuid()],
+        ['action' => 'payout_reserve', 'tenant' => $s['tenant']->id, 'actor' => $s['host']->id, 'amount' => $available, 'account' => $account->id, 'key' => (string) Str::uuid()],
+    ]);
+
+    $refund = DB::connection('landlord')->table('store_refunds')->where('order_id', $security->id)->first();
+    $reserved = (int) DB::connection('landlord')->table('event_payouts')->where('tenant_id', $s['tenant']->id)->whereIn('status', ['scheduled', 'awaiting_otp', 'processing'])->sum('amount');
+    expect($refund)->not->toBeNull()->and($outputs)->toContain($reserved > 0 ? 'RESERVED' : 'REFUSED')
+        ->and($reserved + (int) $refund->seller_debit_pesewas)->toBeLessThanOrEqual($available + 0 + 0 + 0 + 0)
+        ->and(app(App\Services\Marketplace\StoreBalance::class)->available($s['tenant']))->toBeGreaterThanOrEqual(0);
 });

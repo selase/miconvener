@@ -330,6 +330,9 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'venue',
             ],
+            ['uuid' => Str::uuid(), 'name' => 'manage venue refunds', 'guard_name' => 'web', 'category' => 'venue'],
+            ['uuid' => Str::uuid(), 'name' => 'reconcile venue payments', 'guard_name' => 'web', 'category' => 'venue'],
+            ['uuid' => Str::uuid(), 'name' => 'release venue settlements', 'guard_name' => 'web', 'category' => 'venue'],
         ];
     }
 

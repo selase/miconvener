@@ -164,6 +164,12 @@ export const NAV_GROUPS = [
                 icon: 'FileText',
                 permission: 'manage_venue',
             },
+            {
+                label: 'Venue money',
+                href: 'tenant.venue.finance.index',
+                icon: 'Wallet',
+                permission: 'venue_money',
+            },
         ],
     },
     {
