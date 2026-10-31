@@ -43,7 +43,7 @@ final class VenueFinanceController extends Controller
             'reconcile' => Gate::forUser($user)->allows(VenueMoneyPermissions::RECONCILE),
             'settlements' => Gate::forUser($user)->allows(VenueMoneyPermissions::SETTLEMENTS),
         ];
-        abort_unless(in_array(true, $can, true), 403);
+        abort_unless($can['refunds'] || $can['reconcile'] || $can['settlements'], 403);
 
         return Inertia::render('Tenant/Venue/Finance/Index', [
             'can' => $can,
