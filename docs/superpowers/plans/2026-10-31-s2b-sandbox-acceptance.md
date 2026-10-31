@@ -160,3 +160,35 @@ Drive the real application with headless Chrome (the Playwright tool was not ava
 ## 10. Deployment verification already done (read-only)
 
 The documented deploy command (`php artisan migrate --force && php artisan db:seed --class=PermissionsSeeder --force`, recorded in `AGENTS.md` and confirmed as the production environment's configured deploy command) ran as part of Cloud deployment `depl-a31d2c2f-e5f8-42e8-9134-58b38b78daf2` for `d9f1a994`, which finished with status `deployment.succeeded`. The Cloud CLI does not expose command output, so success of the deploy command is inferred from the successful deployment. Because the seeder grants a new permission to the built-in roles only on the run that creates it, the three venue-money permissions reached Superadmin and Org Superadmin on that deployment; **the seeder does not need to be run again.** A read-only production query of the permission rows is available if the owner wants direct confirmation.
+
+## 11. Run log: first local run (31 October 2026)
+
+**Commit under test:** `ef9a42bc` (main after #68). **Environment:** a separate checkout and database `miconvener_acceptance`; the app served locally with a port-mapped browser (`*.acceptance.localhost`); Paystack **test** keys; email to the log; queue worker running; headless Chrome driving the real pages. Test buyers use `@example.org` addresses because Paystack rejects `.test` emails. The production flags were not touched.
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| P7 venue terms on the real superadmin screen | **Pass**: surcharge refused with its message; approval shows under "venue bookings" only; 390px no overflow; select labelled | provider-free, database + screenshots |
+| B15 organisation prerequisites | **Pass**: own-gateway (platform account + agreement) and no-agreement (agreement) refused; the venue under test enabled, disabled and re-enabled | database |
+| A1 request with emailed verification code | **Pass** | mail log |
+| A2 approve dates, A3 final quote | **Pass**: hold email; quote email carries amounts, deadlines and cancellation terms and **no commission**; host sees its own commission (GHS 31.50 on GHS 1,050.00) and "the buyer was sent the quote email" | mail log, screenshots |
+| A4 buyer accepts the exact terms | **Pass**: three payments listed; nothing charged | database, screenshots |
+| A5 hosted payment | **Initialisation passed with the provider** (a real test checkout URL was issued). **The hosted page sits behind a Cloudflare bot check, so the card payment cannot be automated**; A5-A11 (deposit, balance, security, refund, payout, OTP) need a person at the hosted page or stay simulated by the automated tests | provider (initialisation only) |
+| B3 unknown initialisation | **Observed with the real provider**: Paystack rejected an invalid email (400); the attempt is held as unknown, the buyer is told to wait and not pay twice, and `commerce:reconcile` reports it unresolved. **Finding F1** below | provider, database |
+| B4 wrong email, signed out | **Pass** (404; redirected to verify) | HTTP |
+| B5 forged terms hash | **Pass**: no acceptance recorded (0 accepted decisions) | database |
+| B6 withdraw with reason | **Pass**: buyer sees the reason and no payment is offered; withdrawal email sent; the host can issue a replacement | mail log, screenshots |
+| B14 permission split | **Pass**: host-only user gets 403 on the venue money desk; the owner sees it with its empty states | HTTP, screenshots |
+| Browser matrix (real data) | **Pass**: buyer (accepted, withdrawn), host inquiry and finance desk at desktop and 390px, light and dark: no horizontal overflow, every focus stop named and visible. Known: white on the accent colour is 4.31:1 (shared token) | screenshots |
+| B1, B2, B7-B13, B16-B18, C, D | **Not run in the browser**; covered by the automated feature and real-worker tests named in the plan; B17/B18 (mail and queue outage) are covered by `VenueQuoteNoticesTest` | automated, simulated |
+
+### Findings from this run
+
+- **F1 (decide):** a definitive provider rejection at checkout initialisation (an HTTP 400 such as "Invalid Email Address Passed") is stored as an *unknown* attempt, so the buyer cannot try again until staff resolve it, although a 4xx means nothing was created. Safe fix: treat a 4xx initialisation response as failed and allow a new attempt; keep timeouts and connection errors unknown. It changes the shared payment path that live merchandise checkout uses, so it needs your decision.
+- **F2 (fixed in #70):** the buyer's hold panel said payment was unavailable and the price indicative while a "Pay now" button was shown.
+- **F3 (known):** accent-colour button text contrast is 4.31:1.
+
+### Still needed before any activation
+
+1. A person completes the Paystack **test-card** payments (deposit, balance, security) at the hosted page, so A5-A11 can be recorded with provider evidence, and the test-mode refund and transfer/OTP steps (D) are tried; or the owner accepts the automated and simulated coverage for those steps.
+2. Decision on F1.
+3. The merchant-specific approvals in section 9.
