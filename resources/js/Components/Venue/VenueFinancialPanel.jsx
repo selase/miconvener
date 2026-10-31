@@ -161,6 +161,18 @@ export default function VenueFinancialPanel({ inquiry, can }) {
                 </div>
             )}
 
+            {financial?.notices?.length > 0 && (
+                <p role="status" className="text-xs text-ink-secondary">
+                    {(() => {
+                        const notice = financial.notices[financial.notices.length - 1];
+                        const what = notice.kind === 'withdrawn' ? 'withdrawal notice' : 'quote email';
+                        if (notice.state === 'sent') return `The buyer was sent the ${what}.`;
+                        if (notice.state === 'failed') return `The ${what} could not be delivered after ${notice.attempts} attempts. Contact the buyer directly.`;
+                        return `Sending the ${what} to the buyer… (attempt ${notice.attempts}; it is retried automatically).`;
+                    })()}
+                </p>
+            )}
+
             {financial?.charges.length > 0 && (
                 <ul className="space-y-2" aria-label="Payments">
                     {financial.charges.map((charge) => (

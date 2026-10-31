@@ -11,6 +11,7 @@ use App\Models\VenueBooking;
 use App\Models\VenueBookingCharge;
 use App\Models\VenueFinancialDecision;
 use App\Models\VenueFinancialQuote;
+use App\Models\VenueQuoteNotice;
 use App\Models\VenueSettlementReserve;
 
 /**
@@ -58,7 +59,7 @@ final class VenueFinancialJourney
 
         $charges = VenueBookingCharge::query()->with(['order'])->where('quote_id', $quote->id)->orderByRaw("array_position(array['rental_initial','rental_balance','security'], purpose::text)")->get();
         $rows = $charges->map(fn (VenueBookingCharge $charge): array => $this->charge($charge, $booking, $tenant, $host))->values()->all();
-        $paid = fn (string $purpose): int => (int) $charges->filter(fn (VenueBookingCharge $c): bool => $c->purpose === $purpose && $c->order->payment_state === 'paid')->sum('amount_pesewas');
+        $paid = fn (string $purpose): int => (int) $charges->filter(fn (VenueBookingCharge $c): bool => $c->purpose === $purpose && in_array($c->order->payment_state, ['paid', 'refund_pending'], true))->sum('amount_pesewas');
         $refunded = (int) $charges->filter(fn (VenueBookingCharge $c): bool => $c->order->payment_state === 'refunded')->sum('amount_pesewas');
 
         $payload = [
@@ -85,6 +86,8 @@ final class VenueFinancialJourney
         if ($host) {
             $payload['quote']['commission_pesewas'] = $quote->contract_fee_pesewas;
             $payload['settlement'] = $this->settlement($booking);
+            $payload['notices'] = VenueQuoteNotice::query()->where('quote_id', $quote->id)->orderBy('created_at')->get()
+                ->map(fn (VenueQuoteNotice $notice): array => ['kind' => $notice->kind, 'state' => $notice->state, 'attempts' => $notice->attempts, 'next_attempt_at' => $notice->next_attempt_at?->toIso8601String()])->values()->all();
         }
 
         return $payload;

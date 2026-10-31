@@ -113,24 +113,42 @@ function Payments({ payments }) {
             <tbody>
                 {payments.map((payment) => (
                     <Tr key={payment.id}>
-                        <Td className="font-mono text-xs">{payment.booking_reference}</Td>
+                        <Td><span className="font-mono text-xs">{payment.booking_reference}</span></Td>
                         <Td>{PURPOSE_LABELS[payment.purpose]} · {formatMoney(payment.amount_pesewas)}</Td>
                         <Td>
                             <StatusPill status={payment.payment_state === 'paid' ? 'success' : 'pending'}>{payment.payment_state.replaceAll('_', ' ')}</StatusPill>
                             {payment.refund && <div className="mt-1 text-xs text-ink-secondary">Refund: {payment.refund.status.replaceAll('_', ' ')}</div>}
                         </Td>
                         <Td>
-                            {payment.refund ? (
-                                payment.refund.status !== 'confirmed' && (
-                                    <button type="button" disabled={busy === payment.refund.id} className={button} onClick={() => run(payment.refund.id, route('tenant.venue.finance.refunds.reconcile', { refund: payment.refund.id }))}>Refresh refund</button>
-                                )
-                            ) : payment.payment_state === 'paid' || payment.payment_state === 'captured_review' ? (
+                            {payment.held_captures.length > 0 && (
+                                <ul className="space-y-2">
+                                    {payment.held_captures.map((capture) => (
+                                        <li key={capture.id} className="space-y-1">
+                                            <div className="text-xs text-ink-secondary">
+                                                Held for review: {formatMoney(capture.amount_pesewas)}
+                                                {capture.reason ? ` (${capture.reason.replaceAll('_', ' ')})` : ''}
+                                            </div>
+                                            <ReasonAction id={capture.id}>
+                                                {(reason) => (
+                                                    <button type="button" disabled={!reason || busy === capture.id} className={primary} onClick={() => run(capture.id, route('tenant.venue.finance.charges.refund', { charge: payment.id }), { reason, observation_id: capture.id })}>
+                                                        Refund this payment
+                                                    </button>
+                                                )}
+                                            </ReasonAction>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            {payment.held_captures.length === 0 && payment.refund && payment.refund.status !== 'confirmed' && (
+                                <button type="button" disabled={busy === payment.refund.id} className={button} onClick={() => run(payment.refund.id, route('tenant.venue.finance.refunds.reconcile', { refund: payment.refund.id }))}>Refresh refund</button>
+                            )}
+                            {payment.held_captures.length === 0 && !payment.refund && payment.payment_state === 'paid' && (
                                 <ReasonAction id={payment.id}>
                                     {(reason) => (
                                         <button type="button" disabled={!reason || busy === payment.id} className={primary} onClick={() => run(payment.id, route('tenant.venue.finance.charges.refund', { charge: payment.id }), { reason })}>Refund in full</button>
                                     )}
                                 </ReasonAction>
-                            ) : null}
+                            )}
                         </Td>
                     </Tr>
                 ))}

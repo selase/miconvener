@@ -13,6 +13,7 @@ use App\Models\VenueBooking;
 use App\Models\VenueBookingAction;
 use App\Models\VenueFinancialDecision;
 use App\Models\VenueFinancialQuote;
+use App\Models\VenueQuoteNotice;
 use App\Services\Events\PlatformAttendeeVerification;
 use App\Services\Finance\FeeCalculator;
 use App\Services\Finance\FeeTerms;
@@ -42,6 +43,7 @@ final class VenueCommercialQuotes
         private readonly VenueBookingApprovals $approvals,
         private readonly VenueCharges $charges,
         private readonly PlatformAttendeeVerification $verification,
+        private readonly VenueQuoteNotices $notices,
     ) {}
 
     /**
@@ -104,7 +106,7 @@ final class VenueCommercialQuotes
 
             $snapshot = $this->snapshot($locked, $agreement, $plan, $data);
 
-            return VenueFinancialQuote::query()->create([
+            $created = VenueFinancialQuote::query()->create([
                 'tenant_id' => $locked->tenant_id, 'shop_id' => $locked->shop_id, 'booking_id' => $locked->id, 'version' => $version,
                 'agreement_id' => $agreement->id, 'agreement_scope' => StoreCommercialAgreement::SCOPE_RESERVATION,
                 'hold_action_id' => $hold->id, 'hold_expires_at' => $locked->hold_expires_at,
@@ -118,6 +120,9 @@ final class VenueCommercialQuotes
                 'issued_by' => $actor->id, 'issuer_name' => $actor->name, 'operation_key' => $operationKey, 'request_hash' => $requestHash,
                 'terms_hash' => hash('sha256', json_encode($snapshot['terms'], JSON_THROW_ON_ERROR)), 'snapshot' => $snapshot,
             ]);
+            $this->notices->queue($created, VenueQuoteNotice::ISSUED);
+
+            return $created;
         });
     }
 
@@ -143,7 +148,10 @@ final class VenueCommercialQuotes
                 $this->refuse('This quote has already been accepted or withdrawn.');
             }
 
-            return $this->decide($quote, VenueFinancialDecision::WITHDRAWN, 'host', $actor, null, $reason, null, $operationKey, $requestHash);
+            $decision = $this->decide($quote, VenueFinancialDecision::WITHDRAWN, 'host', $actor, null, $reason, null, $operationKey, $requestHash);
+            $this->notices->queue($quote, VenueQuoteNotice::WITHDRAWN);
+
+            return $decision;
         });
     }
 

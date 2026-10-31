@@ -289,3 +289,44 @@ describe('the venue finance desk', function (): void {
             ->assertInertia(fn (Assert $page) => $page->where('payments.0.refund.status', 'needs_funding'));
     });
 });
+
+it('the venue refund refresh refuses a merchandise refund', function (): void {
+    $actor = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->tenant->users()->attach($actor->id);
+    $actor->givePermissionTo('manage venue refunds');
+    $agreement = StoreCommercialAgreement::factory()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'version' => 2]);
+    $order = App\Models\StoreOrder::factory()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'agreement_id' => $agreement->id,
+        'principal_pesewas' => 0, 'charged_pesewas' => 0, 'platform_fee_pesewas' => 0, 'gateway_estimate_pesewas' => 0]);
+    $refund = App\Models\StoreRefund::factory()->create(['order_id' => $order->id]);
+    ($this->hostPost)("finance/refunds/{$refund->id}/reconcile", [], $actor)->assertNotFound();
+});
+
+it('the finance refund endpoint returns a review-only venue capture', function (): void {
+    ($this->issue)();
+    $quote = ($this->latest)();
+    ($this->accept)($quote);
+    $charge = VenueBookingCharge::query()->where('quote_id', $quote->id)->where('purpose', VenueBookingCharge::RENTAL_INITIAL)->firstOrFail();
+    $attempt = app(StorePayments::class)->start($charge->order, ($this->session)(), (string) Str::uuid(), $quote->terms_hash);
+    $this->travelTo($quote->expires_at->addSecond());
+    $capture = app(StorePaymentEvidence::class)->record($attempt, [
+        'status' => 'success', 'provider' => 'paystack', 'reference' => $attempt->reference, 'reference_reported' => true, 'account_fingerprint' => $attempt->account_fingerprint,
+        'amount' => $attempt->amount_pesewas, 'currency' => 'GHS', 'fees' => 150, 'paid_at' => now()->toIso8601String(), 'transaction_id' => 4242,
+        'metadata' => ['source' => 'miconvener_venue', 'venue_charge_id' => $charge->id, 'store_order_id' => $attempt->order_id, 'store_attempt_id' => $attempt->id, 'seller_id' => $attempt->tenant_id],
+    ]);
+    app(StorePaymentConfirmer::class)->confirm($capture);
+    expect($charge->order->fresh()->payment_state)->toBe('captured_review');
+    ($this->hostPost)("finance/charges/{$charge->id}/refund", ['operation_key' => (string) Str::uuid(), 'reason' => 'Return late capture.', 'observation_id' => $capture->id])
+        ->assertRedirect()->assertSessionMissing('error');
+    expect(App\Models\StoreRefund::query()->where('observation_id', $capture->id)->exists())->toBeTrue();
+});
+
+it('pending refunds remain received until the provider confirms their return', function (): void {
+    ($this->issue)();
+    ($this->accept)(($this->latest)());
+    $capture = ($this->payCharge)();
+    $charge = VenueBookingCharge::query()->where('order_id', $capture->order_id)->firstOrFail();
+    ($this->hostPost)("finance/charges/{$charge->id}/refund", ['operation_key' => (string) Str::uuid(), 'reason' => 'Cancellation.'])->assertRedirect();
+    expect($capture->order->fresh()->payment_state)->toBe('refund_pending');
+    $payload = app(App\Services\Marketplace\VenueFinancialJourney::class)->forBuyer($this->booking->fresh());
+    expect($payload['totals']['rental_received_pesewas'])->toBe(30000)->and($payload['totals']['refunded_pesewas'])->toBe(0);
+});

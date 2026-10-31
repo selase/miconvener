@@ -24,6 +24,7 @@ final class RefundVenueChargeRequest extends FormRequest
         return [
             'operation_key' => ['required', 'uuid'],
             'reason' => ['required', 'string', 'min:1', 'max:500'],
+            'observation_id' => ['nullable', 'uuid'],
         ];
     }
 

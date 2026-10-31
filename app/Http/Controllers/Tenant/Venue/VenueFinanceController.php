@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Venue\RefundVenueChargeRequest;
 use App\Http\Requests\Tenant\Venue\ResolveVenueConflictRequest;
 use App\Http\Requests\Tenant\Venue\VerifyVenueConflictRequest;
+use App\Models\StorePaymentObservation;
 use App\Models\StoreRefund;
 use App\Models\Tenant;
 use App\Models\VenueBooking;
@@ -76,7 +77,7 @@ final class VenueFinanceController extends Controller
     {
         return $this->act(function () use ($request, $charge, $refunds): string {
             $owned = VenueBookingCharge::query()->with('order')->where('tenant_id', $this->tenant()->id)->findOrFail($charge);
-            $refund = $refunds->request($owned->order, $request->user(), (string) $request->validated('operation_key'), (string) $request->validated('reason'));
+            $refund = $refunds->request($owned->order, $request->user(), (string) $request->validated('operation_key'), (string) $request->validated('reason'), $this->captureToReturn($owned, $request->validated('observation_id')));
 
             return $refund->status === 'needs_funding'
                 ? 'Refund recorded. It is sent once the organisation balance covers the processing fee.'
@@ -87,7 +88,7 @@ final class VenueFinanceController extends Controller
     public function reconcileRefund(Request $request, string $subdomain, string $refund, StoreRefunds $refunds): RedirectResponse
     {
         return $this->act(function () use ($request, $refund, $refunds): string {
-            $owned = StoreRefund::query()->where('tenant_id', $this->tenant()->id)->findOrFail($refund);
+            $owned = StoreRefund::query()->where('tenant_id', $this->tenant()->id)->whereHas('order', fn ($order) => $order->where('offering_type', 'reservation'))->findOrFail($refund);
             app(VenueMoneyPermissions::class)->authorize($request->user(), $owned->tenant_id, VenueMoneyPermissions::REFUNDS);
             $refunds->reconcile($owned);
 
@@ -109,6 +110,24 @@ final class VenueFinanceController extends Controller
         }
 
         return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * The capture a refund returns: the one the finance user picked, or the only
+     * capture held for review when the payment was never applied.
+     */
+    private function captureToReturn(VenueBookingCharge $charge, ?string $picked): ?string
+    {
+        if ($picked !== null) {
+            return $picked;
+        }
+        if ($charge->order->payment_state !== 'captured_review') {
+            return null;
+        }
+        $held = StorePaymentObservation::query()->where('order_id', $charge->order_id)->where('processing_state', 'review')->whereNotNull('ledger_transaction_id')
+            ->whereNotIn('id', StoreRefund::query()->whereNotNull('observation_id')->select('observation_id'))->pluck('id');
+
+        return $held->count() === 1 ? (string) $held->first() : null;
     }
 
     private function tenant(): Tenant
@@ -149,8 +168,11 @@ final class VenueFinanceController extends Controller
         return VenueBookingCharge::query()->with(['order', 'booking'])->where('tenant_id', $tenant->id)->whereHas('order', fn ($order) => $order->whereIn('payment_state', ['paid', 'refund_pending', 'captured_review']))
             ->latest()->limit(50)->get()->map(function (VenueBookingCharge $charge): array {
                 $refund = StoreRefund::query()->where('order_id', $charge->order_id)->latest()->first();
+                $held = StorePaymentObservation::query()->where('order_id', $charge->order_id)->where('processing_state', 'review')->whereNotNull('ledger_transaction_id')
+                    ->whereNotIn('id', StoreRefund::query()->whereNotNull('observation_id')->select('observation_id'))->orderBy('created_at')->get();
 
                 return [
+                    'held_captures' => $held->map(fn (StorePaymentObservation $capture): array => ['id' => $capture->id, 'amount_pesewas' => $capture->amount_pesewas, 'reason' => $capture->review_reason])->values()->all(),
                     'id' => $charge->id, 'booking_reference' => $charge->booking?->booking_reference, 'purpose' => $charge->purpose,
                     'amount_pesewas' => $charge->amount_pesewas, 'payment_state' => $charge->order->payment_state,
                     'refund' => $refund === null ? null : ['id' => $refund->id, 'status' => $refund->status, 'review_reason' => $refund->review_reason],
