@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Marketplace;
 
 use App\Http\Controllers\Billing\WebhookController;
+use App\Models\StoreCommercialAgreement;
 use App\Models\StoreOrder;
 use App\Models\StoreOrderLine;
 use App\Models\StorePaymentAttempt;
@@ -272,12 +273,12 @@ final class VenuePaymentReconciliation
         ];
     }
 
-    private function agreementFor(Tenant $tenant): \App\Models\StoreCommercialAgreement
+    private function agreementFor(Tenant $tenant): StoreCommercialAgreement
     {
         try {
-            return $this->terms->resolve($tenant, \App\Models\StoreCommercialAgreement::SCOPE_RESERVATION);
+            return $this->terms->resolve($tenant, StoreCommercialAgreement::SCOPE_RESERVATION);
         } catch (ValidationException) {
-            return $this->terms->resolve($tenant);
+            $this->refuse('Approve this organisation\'s venue payment terms before refunding an older payment, or refund it directly from the payment provider and tell the platform team.');
         }
     }
 

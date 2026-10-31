@@ -341,3 +341,20 @@ describe('resolving verified money', function (): void {
         expect($refund->status)->toBe('unknown')->and($refund->attempt->reference)->toBe('legacy-late-1');
     });
 });
+
+it('a venue reconciliation does not borrow purchase-only refund terms', function (): void {
+    $this->tenant = Tenant::factory()->create(['settlement_mode' => Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT]);
+    $this->shop = Shop::factory()->create(['tenant_id' => $this->tenant->id, 'is_active' => true]);
+    $this->listing = StoreListing::factory()->create(['shop_id' => $this->shop->id, 'listing_kind' => StoreListing::KIND_VENUE]);
+    StoreCommercialAgreement::factory()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id,
+        'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
+    $this->finance = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    setPermissionsTeamId($this->tenant->id);
+    $this->finance->givePermissionTo('manage store finance');
+    app(TenantContext::class)->setTenant($this->tenant);
+    $booking = ($this->booking)();
+    $action = ($this->conflict)($booking);
+    ($this->providerSays)($booking);
+    $verified = ($this->verify)($action);
+    expect(fn () => ($this->reconciliation)()->resolve($verified, $this->finance, 'refund', 'Return old money.', (string) Str::uuid()))->toThrow(ValidationException::class);
+});
