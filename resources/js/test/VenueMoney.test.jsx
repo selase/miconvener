@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import VenueQuotePanel from '@/Components/Marketplace/VenueQuotePanel';
+import VenueRequestStatus from '@/Components/Marketplace/VenueRequestStatus';
 import VenueFinancialPanel from '@/Components/Venue/VenueFinancialPanel';
 import { formatMoney, pesewasFromInput } from '@/lib/venueMoney';
 
@@ -96,4 +97,32 @@ it('finance still offers the valid rental refund after an extra capture was retu
         payment_state: 'paid', held_captures: [], refund: { id: 'extra-refund', status: 'confirmed' },
     }]} />);
     expect(screen.queryByRole('button', { name: 'Refund in full' })).not.toBeNull();
+});
+
+describe('the request status beside a final quote', () => {
+    const status = (f) => ({ booking_reference: 'VEN-1', financial: f, approval: { effective_status: 'approved_hold', hold_expires_at: '2099-01-01T10:00:00Z', timezone: 'Africa/Accra', price_is_indicative: true, can_cancel: true } });
+
+    it('keeps the hold wording and the indicative-price note while no quote exists', () => {
+        render(<VenueRequestStatus booking={status(null)} />);
+        expect(screen.getByText(/Payment is not available yet/)).toBeTruthy();
+        expect(screen.getByText(/The price shown is indicative/)).toBeTruthy();
+    });
+
+    it('tells the buyer to review an open quote and drops the indicative-price note', () => {
+        render(<VenueRequestStatus booking={status(financial())} />);
+        expect(screen.getByText(/Review and accept the final quote below/)).toBeTruthy();
+        expect(screen.queryByText(/Payment is not available yet/)).toBeNull();
+        expect(screen.queryByText(/The price shown is indicative/)).toBeNull();
+    });
+
+    it('says the hold becomes a booking on the first payment once the quote is accepted', () => {
+        render(<VenueRequestStatus booking={status(financial({}, { status: 'accepted', terms_hash: null }))} />);
+        expect(screen.getByText(/become a confirmed booking when your first payment is received/)).toBeTruthy();
+        expect(screen.queryByText(/payment is not available yet/i)).toBeNull();
+    });
+
+    it('does not promise online payment when it is not open for the venue', () => {
+        render(<VenueRequestStatus booking={status(financial({ payments_open: false }, { status: 'accepted', terms_hash: null }))} />);
+        expect(screen.getByText(/The venue will contact you about payment/)).toBeTruthy();
+    });
 });
