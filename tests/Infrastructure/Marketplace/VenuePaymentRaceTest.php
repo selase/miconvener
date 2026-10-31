@@ -198,3 +198,34 @@ it('either confirms the paid booking or keeps the money for review when the host
         expect(venueSales())->toBe(0)->and($s['attempt']->order->fresh()->payment_state)->toBe('captured_review')->and($outputs)->toContain('RELEASED');
     }
 });
+
+it('review legacy conflict recording obeys the money tenant then listing lock order', function (): void {
+    $s = venuePaymentScenario();
+    $db = DB::connection('landlord');
+    $env = ['DATABASE_URL' => '', 'DB_DATABASE' => (string) config('database.connections.landlord.database'), 'DB_HOST' => (string) config('database.connections.landlord.host'), 'APP_ENV' => 'testing', 'TELESCOPE_ENABLED' => 'false', 'PAO_DISABLE' => '1'];
+    $worker = (new Process([PHP_BINARY, base_path('tests/Fixtures/marketplace/venue-payment-worker.php')], base_path(), $env))->setTimeout(30)->setInput(json_encode(['action' => 'legacy_conflict', 'booking' => $s['rival']->id], JSON_THROW_ON_ERROR));
+    $error = null;
+    $db->beginTransaction();
+    try {
+        Tenant::query()->lockForUpdate()->findOrFail($s['booking']->tenant_id);
+        $worker->start();
+        $deadline = microtime(true) + 10;
+        do {
+            $db->select('select pg_stat_clear_snapshot()');
+            $waiting = (int) $db->selectOne("select count(*) as n from pg_stat_activity where datname=current_database() and application_name='venue-payment-worker' and wait_event_type='Lock'")->n;
+            usleep(20000);
+        } while ($waiting < 1 && microtime(true) < $deadline);
+        expect($waiting)->toBe(1);
+        app(App\Services\Venue\VenueCalendarLocks::class)->listing($s['booking']->store_listing_id);
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+    } finally {
+        if ($db->transactionLevel() > 0) {
+            $db->rollBack();
+        }
+    }
+    $worker->wait();
+    fwrite(STDERR, json_encode(['review_parent_error' => $error, 'review_worker_output' => $worker->getOutput()], JSON_THROW_ON_ERROR).PHP_EOL);
+    expect($error)->toBeNull()
+        ->and($worker->getOutput())->not->toContain('ERROR');
+});

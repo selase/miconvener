@@ -403,3 +403,18 @@ describe('legacy payment boundary', function (): void {
         expect($claim->source_type)->toBe(CommercePaymentReference::SOURCE_LEGACY_BOOKING)->and($claim->booking_id)->toBe($booking->id);
     });
 });
+
+test('review a calendar-conflicted capture stays held after the competing booking is cancelled', function (): void {
+    $quote = ($this->accepted)();
+    $attempt = ($this->attemptFor)($quote);
+    $paidAt = now()->addHour()->toIso8601String();
+    $this->travelTo($this->booking->hold_expires_at->addMinutes(5));
+    $winner = ($this->heldBooking)(['status' => VenueBooking::STATUS_CONFIRMED, 'hold_expires_at' => null, 'planner_email' => 'winner@planner.test']);
+    $capture = ($this->capture)($attempt, ['paid_at' => $paidAt]);
+    expect($capture->review_reason)->toBe('calendar_conflict');
+    $winner->update(['status' => VenueBooking::STATUS_CANCELLED]);
+    app(StorePaymentConfirmer::class)->confirm($capture);
+    expect($attempt->order->fresh()->payment_state)->toBe('captured_review')
+        ->and(($this->sales)())->toBe(0)
+        ->and($this->booking->fresh()->status)->toBe(VenueBooking::STATUS_APPROVED_HOLD);
+});

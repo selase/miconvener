@@ -30,6 +30,7 @@ final class VenueBookingService
         private readonly VenueAvailabilityService $availabilityService,
         private readonly VenueCalendarLocks $locks,
         private readonly VenueBookingApprovals $approvals,
+        private readonly CommerceOrderLocks $moneyLocks,
     ) {}
 
     /**
@@ -286,9 +287,9 @@ final class VenueBookingService
             throw new RuntimeException("Venue booking not found for Paystack reference: {$reference}");
         }
 
-        // 3. Confirm under the same calendar lock as every other writer. A payment
+        // 3. Confirm under the money lock order (tenant, listing, booking), which is also the calendar writers' order. A payment
         // that can no longer be honoured is kept as evidence, never as a reservation.
-        [$booking, $confirmed] = $this->locks->forBooking($found->id, function (StoreListing $listing, VenueBooking $booking) use ($reference, $gatewayData): array {
+        [$booking, $confirmed] = $this->moneyLocks->forBooking($found->id, function (StoreListing $listing, VenueBooking $booking) use ($reference, $gatewayData): array {
             if ($booking->paystack_reference === $reference) {
                 return [$booking, false];
             }

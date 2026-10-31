@@ -26,7 +26,7 @@ final class VenueChargeController extends Controller
         abort_if($charge === null, 404, 'Payment unavailable.');
         $attempt = $payments->start($charge->order, $request->session(), $request->validated('submission_key'), $request->validated('accepted_quote_hash'));
 
-        return response()->json(['charge_id' => $charge->id, 'status' => $attempt?->status ?? 'confirmed', 'checkout_url' => $attempt?->status === 'ready' ? $attempt->checkout_url : null])
+        return response()->json(['charge_id' => $charge->id, 'status' => $attempt->status ?? 'confirmed', 'checkout_url' => $attempt?->status === 'ready' ? $attempt->checkout_url : null])
             ->header('Cache-Control', 'private, no-store');
     }
 }

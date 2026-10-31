@@ -39,6 +39,11 @@ try {
             app(StorePaymentConfirmer::class)->confirm($capture);
             echo 'CONFIRMED';
             break;
+        case 'legacy_conflict':
+            Illuminate\Support\Facades\Mail::fake();
+            app(App\Services\Marketplace\VenueBookingService::class)->confirmBookingPayment('review-legacy-conflict', ['amount' => 30000, 'fees' => 150, 'metadata' => ['venue_booking_id' => $input['booking']]]);
+            echo 'LEGACY_RECORDED';
+            break;
         case 'occupy':
             $rival = VenueBooking::query()->findOrFail($input['booking']);
             $won = app(VenueCalendarLocks::class)->forBooking($rival->id, function ($listing, VenueBooking $locked): bool {
