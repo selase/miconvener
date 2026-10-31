@@ -81,6 +81,9 @@ final class VenueOffering implements CommerceOffering
         $charge = $this->charge($order);
         $quote = $this->quote($charge);
         $booking = $charge->booking;
+        if ($charge->purpose === VenueBookingCharge::LEGACY_REVIEW) {
+            return ['legacy_review_import'];
+        }
         if ($quote === null) {
             return ['unknown_charge'];
         }
@@ -112,6 +115,11 @@ final class VenueOffering implements CommerceOffering
         return array_values(array_unique($issues));
     }
 
+    public function importsHistoricalCapture(StoreOrder $order): bool
+    {
+        return $this->charge($order)->purpose === VenueBookingCharge::LEGACY_REVIEW;
+    }
+
     public function onCaptureReview(StoreOrder $order): void {}
 
     public function applyCapture(StoreOrder $order, StorePaymentAttempt $attempt, StorePaymentObservation $capture): void
@@ -141,17 +149,30 @@ final class VenueOffering implements CommerceOffering
     public function expectedMetadata(StorePaymentAttempt $attempt): array
     {
         $charge = $this->charge($attempt->order);
+        if ($charge->purpose === VenueBookingCharge::LEGACY_REVIEW) {
+            return ['venue_booking_id' => $charge->booking_id];
+        }
 
         return ['source' => 'miconvener_venue', 'venue_charge_id' => $charge->id, 'store_order_id' => $attempt->order_id, 'store_attempt_id' => $attempt->id, 'seller_id' => $attempt->tenant_id];
     }
 
     public function assertRefund(StoreOrder $order): void
     {
+        if ($this->charge($order)->purpose === VenueBookingCharge::LEGACY_REVIEW) {
+            return;
+        }
+
         throw ValidationException::withMessages(['refund' => 'Venue refunds are not available yet. Ask a platform administrator.']);
     }
 
     public function applyRefund(StoreRefund $refund, StoreOrder $order): void
     {
+        if ($this->charge($order)->purpose === VenueBookingCharge::LEGACY_REVIEW) {
+            $order->update(['state' => 'cancelled', 'payment_state' => 'refunded', 'ledger_state' => 'posted', 'review_reason' => null]);
+
+            return;
+        }
+
         throw new LogicException('Venue refunds are not available yet.');
     }
 

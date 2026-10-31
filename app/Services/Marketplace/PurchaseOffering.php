@@ -100,6 +100,11 @@ final class PurchaseOffering implements CommerceOffering
         return $issues;
     }
 
+    public function importsHistoricalCapture(StoreOrder $order): bool
+    {
+        return false;
+    }
+
     public function onCaptureReview(StoreOrder $order): void
     {
         app(PurchaseReservations::class)->release($order, 'payment_review');
