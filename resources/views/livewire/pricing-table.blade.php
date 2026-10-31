@@ -1,10 +1,62 @@
 <?php
 
+use App\Models\Package;
+use App\Services\Pricing\Money;
+use App\Services\Pricing\PriceBook;
+use App\Services\Pricing\VisitorCurrency;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 new class extends Component
 {
     public string $interval = 'month';
+
+    #[Locked]
+    public string $currency = 'GHS';
+
+    #[Locked]
+    public bool $canChoose = false;
+
+    public function mount(VisitorCurrency $visitorCurrency): void
+    {
+        $this->currency = $visitorCurrency->resolve(request());
+        $this->canChoose = $visitorCurrency->canChoose(request());
+    }
+
+    /**
+     * Seeded plans by slug: their prices are the ones checkout charges.
+     *
+     * @return \Illuminate\Support\Collection<string, Package>
+     */
+    #[Computed]
+    public function packages(): \Illuminate\Support\Collection
+    {
+        return Package::query()->whereIn('slug', collect(config('product-page.plans', []))->pluck('slug'))->get()->keyBy('slug');
+    }
+
+    /**
+     * A plan's price in the visitor's currency, from the price book when the
+     * plan is seeded and from the page copy otherwise.
+     *
+     * @param  array<string, mixed>  $plan
+     */
+    public function price(array $plan, string $interval): Money
+    {
+        $package = $this->packages->get($plan['slug']);
+
+        if ($package !== null) {
+            return app(PriceBook::class)->plan($package, $interval, $this->currency);
+        }
+
+        return new Money((int) round((float) $plan[$interval === 'year' ? 'yearly_price' : 'monthly_price'] * 100), 'GHS');
+    }
+
+    /** A yearly price spread over twelve months, to the whole unit. */
+    public function perMonth(Money $yearly): Money
+    {
+        return new Money((int) round($yearly->minor / 1200) * 100, $yearly->currency);
+    }
 
     public function setInterval(string $interval): void
     {
@@ -47,10 +99,8 @@ new class extends Component
                     $isPopular  = $plan['most_popular'] ?? false;
                     $isFree     = $plan['monthly_price'] === 0;
                     $priceLabel = $plan['price_label'] ?? null;
-                    // The symbol must come from what is actually charged. It was hardcoded
-                    // to $ while checkout billed the configured currency, so the page
-                    // advertised one amount and the customer was charged another.
-                    $currency   = config('services.paystack.currency', 'GHS');
+                    $monthly    = $isFree || $priceLabel ? null : $this->price($plan, 'month');
+                    $yearly     = $isFree || $priceLabel ? null : $this->price($plan, 'year');
                 @endphp
 
                 <div class="relative flex flex-col rounded-2xl border p-6 transition-all
@@ -83,17 +133,22 @@ new class extends Component
                         @else
                             <div class="flex items-end gap-1">
                                 <div class="pricing-heading text-4xl font-bold {{ $isPopular ? 'text-white' : 'text-slate-900' }}">
-                                    {{ $currency }} {{ $interval === 'year' ? (int) round($plan['yearly_price'] / 12) : $plan['monthly_price'] }}
+                                    {{ ($interval === 'year' ? $this->perMonth($yearly) : $monthly)->format() }}
                                 </div>
                                 <div class="mb-1.5 text-sm {{ $isPopular ? 'text-blue-200' : 'text-slate-400' }}">/mo</div>
                             </div>
                             @if ($interval === 'year')
                                 <div class="mt-1 text-xs font-medium {{ $isPopular ? 'text-blue-100' : 'text-emerald-600' }}">
-                                    {{ $currency }} {{ $plan['yearly_price'] }} billed annually
+                                    {{ $yearly->format() }} billed annually
                                 </div>
                             @else
                                 <div class="mt-1 text-xs {{ $isPopular ? 'text-blue-200/70' : 'text-slate-400' }}">
-                                    {{ $currency }} {{ (int) round($plan['yearly_price'] / 12) }}/mo with annual billing
+                                    {{ $this->perMonth($yearly)->format() }}/mo with annual billing
+                                </div>
+                            @endif
+                            @if ($monthly->currency === 'USD')
+                                <div class="mt-1 text-[11px] {{ $isPopular ? 'text-blue-200/70' : 'text-slate-400' }}">
+                                    Billed in GHS at checkout
                                 </div>
                             @endif
                         @endif
@@ -126,8 +181,27 @@ new class extends Component
             @endforeach
         </div>
 
+        {{-- Only a visitor in Ghana has anything to choose: GHS is never offered to anyone else --}}
+        @if ($canChoose)
+            <form method="POST" action="{{ route('currency.update') }}" class="mt-10 flex items-center justify-center text-sm" data-currency-switch>
+                @csrf
+                <button type="submit" name="currency" value="{{ $currency === 'GHS' ? 'USD' : 'GHS' }}" class="rounded-full px-3 py-1 font-medium text-slate-600 underline underline-offset-4 hover:bg-slate-100">
+                    Show prices in {{ $currency === 'GHS' ? 'USD' : 'GHS' }}
+                </button>
+            </form>
+        @endif
+        @if ($currency === 'USD')
+            <p class="mt-2 text-center text-xs text-slate-400">
+                Payments are taken in Ghana cedis (GHS) at the Bank of Ghana rate on the day you pay; your bank converts it to your card's currency.
+            </p>
+        @endif
+
+        <p class="mt-4 text-center text-xs text-slate-400" data-commission-note>
+            Commission is charged on ticket sales only. It does not include card and mobile money processing fees, which the payment provider charges and are passed on at cost.
+        </p>
+
         {{-- Enterprise footer note --}}
-        <div class="mt-10 text-center">
+        <div class="mt-6 text-center">
             <p class="text-sm text-slate-400">
                 Need a custom contract or volume pricing?
                 <a href="{{ route('product.enterprise') }}"

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant\Commerce;
 
 use App\Http\Controllers\Controller;
-use App\Mail\Events\EventRegistrationConfirmed;
 use App\Models\EventRegistration;
 use App\Models\MerchantTransaction;
 use App\Models\Tenant;
@@ -13,7 +12,6 @@ use App\Models\TenantPaymentGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 final class WebhookController extends Controller
@@ -94,12 +92,23 @@ final class WebhookController extends Controller
 
         try {
             switch ($event->type) {
+                case 'refund.created':
+                case 'refund.updated':
+                case 'charge.refunded':
+                    app(\App\Services\Giving\GivingRefunds::class)->handleStripeNotification($event->data->object, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway));
+                    break;
+                case 'checkout.session.async_payment_failed':
+                case 'checkout.session.expired':
+                    if ($tenant !== null) {
+                        app(\App\Services\Events\MemberBenefitNotifications::class)->stripe($tenant, $gateway, $event->data->object, null, true);
+                    }
+                    break;
                 case 'checkout.session.completed':
                 case 'checkout.session.async_payment_succeeded':
                     $session = $event->data->object;
 
                     if (($session->payment_status ?? null) === 'paid' && $tenant) {
-                        $this->confirmStripeSession($tenant, $gateway, $session);
+                        $this->confirmStripeSession($tenant, $gateway, $session, isset($event->created) ? (int) $event->created : null);
                     }
                     break;
 
@@ -147,7 +156,30 @@ final class WebhookController extends Controller
         $data = $request->input('data');
 
         try {
+            if (is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Giving\GivingRefunds::class)->handlePaystackNotification((array) $data, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway))) {
+                return response()->json(['status' => 'success']);
+            }
+            if ($event === 'charge.failed' && app(\App\Services\Events\MemberBenefitNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway), $tenant, true)) {
+                return response()->json(['status' => 'success']);
+            }
             if ($event === 'charge.success') {
+                if (app(\App\Services\Events\MemberBenefitNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway), $tenant)) {
+                    return response()->json(['status' => 'success']);
+                }
+                $metadata = \App\Http\Controllers\Billing\WebhookController::metadata($data['metadata'] ?? null);
+                if (($metadata['type'] ?? null) === 'community_gift') {
+                    $reference = (string) ($data['reference'] ?? '');
+                    app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($reference, [
+                        'status' => 'success', 'provider' => 'paystack', 'reference' => $reference, 'provider_reference' => $reference,
+                        'account_identity' => app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway),
+                        'metadata' => $metadata, 'amount' => (int) ($data['amount'] ?? 0),
+                        'fees' => isset($data['fees']) ? (int) $data['fees'] : null, 'currency' => mb_strtoupper((string) ($data['currency'] ?? '')),
+                        'commission_received' => is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : 0,
+                        'paid_at' => $data['paid_at'] ?? null,
+                    ]);
+
+                    return response()->json(['status' => 'success']);
+                }
                 $this->recordTransaction($tenant, 'paystack', (object) $data);
                 $this->flagMissingCommissionSplit($tenant, (array) $data);
                 $this->confirmEventRegistrationIfApplicable($tenant, (array) ($data['metadata'] ?? []), $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS')), 'paystack', is_numeric($data['fees_split']['subaccount'] ?? null) ? (int) $data['fees_split']['subaccount'] : null);
@@ -191,8 +223,20 @@ final class WebhookController extends Controller
      * The charge reference is the PaymentIntent, because that is what a refund
      * is issued against.
      */
-    private function confirmStripeSession(Tenant $tenant, TenantPaymentGateway $gateway, object $session): void
+    private function confirmStripeSession(Tenant $tenant, TenantPaymentGateway $gateway, object $session, ?int $completionTimestamp = null): void
     {
+        if (app(\App\Services\Events\MemberBenefitNotifications::class)->stripe($tenant, $gateway, $session, $completionTimestamp)) {
+            return;
+        }
+        $givingMetadata = $session->metadata ? $session->metadata->toArray() : [];
+        if (($givingMetadata['type'] ?? null) === 'community_gift') {
+            $attempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('provider', 'stripe')->where('provider_session_id', $session->id)->find($givingMetadata['giving_attempt_id'] ?? null);
+            if ($attempt !== null && hash_equals($attempt->account_identity, app(\App\Services\Giving\GivingGateways::class)->identityForRow($gateway))) {
+                app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($attempt->reference, app(\App\Services\Giving\GivingGateways::class)->verify($attempt));
+            }
+
+            return;
+        }
         $currency = mb_strtoupper((string) $session->currency);
         $paymentIntent = (string) ($session->payment_intent ?? $session->id);
         $fee = app(\App\Services\Payment\StripeConnect::class)
@@ -284,57 +328,7 @@ final class WebhookController extends Controller
             return;
         }
 
-        $eventModel = $registration->event;
-        /*
-         * $amount is what the gateway actually collected. When the organizer
-         * bears the commission that is exactly the ticket price, but when the
-         * attendee bears it the receipt is larger by the commission — so the
-         * ticket price comes from the registration rather than the receipt,
-         * and must not be overwritten with it.
-         */
-        $ticketAmount = $eventModel->effectiveFeeBearer() === \App\Services\Finance\PlatformFeeResolver::BEARER_ATTENDEE
-            ? (int) $registration->amount
-            : $amount;
-
-        $commissionAmount = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $ticketAmount)->platformFee;
-
-        // Payment stands in for email verification: the checkout link was sent
-        // to this address and the gateway receipts it there too.
-        $registration->email_verified_at ??= now();
-        $registration->issueTicket();
-        $registration->fill([
-            'status' => EventRegistration::STATUS_CONFIRMED,
-            'payment_reference' => $reference,
-            'amount' => $ticketAmount,
-            'charged_amount' => $amount,
-            'gateway_fee_amount' => $gatewayFeeAmount,
-            'currency' => $currency,
-        ]);
-        $registration->save();
-        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
-
-        // The organizer holds the money, so the books carry only the commission:
-        // what reached us with the payment, what was netted against credit we
-        // owed them, and any remainder they owe. Checkout recorded the first
-        // two in the metadata it sent to the gateway.
-        $settlement = self::commissionSettlement($tenant, $currency, $provider, $metadata, $commissionAmount, $splitReceived);
-
-        app(\App\Services\Finance\LedgerService::class)->recordOwnGatewayTicketSale(
-            $eventModel,
-            $registration,
-            $amount,
-            $commissionAmount,
-            $reference,
-            $gatewayFeeAmount,
-            $provider,
-            $settlement['received'],
-            $settlement['credit'],
-        );
-
-        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
-        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-
-        Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
+        app(\App\Services\Events\StandardEventPaymentConfirmer::class)->confirm($registration, $reference, $amount, $gatewayFeeAmount, $currency, $provider, false, $metadata, $splitReceived);
     }
 
     /**

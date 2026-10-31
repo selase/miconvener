@@ -44,6 +44,7 @@ return [
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
+            'ping_threshold' => 9,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],
 

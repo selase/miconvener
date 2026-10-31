@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import csrfFetch from '@/lib/csrfFetch';
+import PhoneVerify from '@/Pages/Public/Community/PhoneVerify';
 
 const RESEND_AFTER_SECONDS = 60;
 
 const INPUT_CLASS =
     'w-full border border-border bg-surface px-3 py-2 text-[13px] text-ink focus:border-accent focus:outline-none';
 const PRIMARY_CLASS =
-    'inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed';
+    'inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-accent-ink hover:opacity-90 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed';
 
 const OFFLINE_MESSAGE = "Couldn't reach the server. Check your connection and try again.";
 
@@ -15,7 +16,17 @@ const OFFLINE_MESSAGE = "Couldn't reach the server. Check your connection and tr
  * to that registration's own address and nothing is typed; otherwise it goes
  * to the address entered here.
  */
-export default function VerifyPrompt({ registrationId = null, sentTo = null, onVerified }) {
+export default function VerifyPrompt({
+    registrationId = null,
+    sentTo = null,
+    onVerified,
+    organiserSlug = null,
+    allowPhone = true,
+    autoFocus = true,
+    sendUrl = null,
+    confirmUrl = null,
+}) {
+    const [phoneMode, setPhoneMode] = useState(false);
     const [stage, setStage] = useState(registrationId ? 'ready' : 'address');
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
@@ -84,8 +95,10 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
         }
     }, [challengeRequired, siteKey, challengeAction]);
 
-    const sendRoute = window.route ? route('attendee.my.verify.send') : '/my/verify/send';
-    const confirmRoute = window.route ? route('attendee.my.verify.confirm') : '/my/verify/confirm';
+    const sendRoute =
+        sendUrl ?? (window.route ? route('attendee.my.verify.send') : '/my/verify/send');
+    const confirmRoute =
+        confirmUrl ?? (window.route ? route('attendee.my.verify.confirm') : '/my/verify/confirm');
 
     const send = async (e) => {
         e?.preventDefault();
@@ -117,7 +130,10 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             }
 
             if (!response.ok) {
-                const errorMsg = json.errors?.email?.[0] ?? json.message ?? "Couldn't send the code. Please try again.";
+                const errorMsg =
+                    json.errors?.email?.[0] ??
+                    json.message ??
+                    "Couldn't send the code. Please try again.";
                 setMessage(errorMsg);
                 return;
             }
@@ -139,9 +155,7 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
         setBusy(true);
         setMessage(null);
 
-        const payload = registrationId
-            ? { registration: registrationId, code }
-            : { email, code };
+        const payload = registrationId ? { registration: registrationId, code } : { email, code };
 
         try {
             const response = await csrfFetch(confirmRoute, {
@@ -169,6 +183,20 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
         }
     };
 
+    const choosePhone = () => {
+        if (turnstileWidgetId.current !== null && window.turnstile?.remove) {
+            window.turnstile.remove(turnstileWidgetId.current);
+            turnstileWidgetId.current = null;
+        }
+        setChallengeRequired(false);
+        setSiteKey(null);
+        setChallengeAction(null);
+        setTurnstileToken(null);
+        setCode('');
+        setMessage(null);
+        setPhoneMode(true);
+    };
+
     const switchAddress = () => {
         setStage('address');
         setCode('');
@@ -178,14 +206,28 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
         setTurnstileToken(null);
     };
 
+    if (phoneMode && !registrationId) {
+        return (
+            <PhoneVerify
+                organiserSlug={organiserSlug}
+                onVerified={onVerified}
+                onUseEmail={() => setPhoneMode(false)}
+            />
+        );
+    }
+
     if (stage === 'address') {
         return (
             <form onSubmit={send} className="space-y-4">
                 <div>
-                    <label htmlFor="verify-email" className="block text-[13px] font-medium text-ink-secondary">
+                    <label
+                        htmlFor="verify-email"
+                        className="block text-[13px] font-medium text-ink-secondary"
+                    >
                         Your email address
                     </label>
                     <input
+                        autoFocus={autoFocus}
                         id="verify-email"
                         type="email"
                         required
@@ -195,6 +237,16 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
                         className={`mt-1.5 ${INPUT_CLASS}`}
                     />
                 </div>
+
+                {allowPhone && !registrationId && (
+                    <button
+                        type="button"
+                        onClick={choosePhone}
+                        className="block text-sm font-medium text-accent underline"
+                    >
+                        Use a phone number instead
+                    </button>
+                )}
 
                 {challengeRequired && (
                     <div className="py-2">
@@ -241,7 +293,10 @@ export default function VerifyPrompt({ registrationId = null, sentTo = null, onV
             </div>
 
             <div>
-                <label htmlFor="verify-code" className="block text-[13px] font-medium text-ink-secondary">
+                <label
+                    htmlFor="verify-code"
+                    className="block text-[13px] font-medium text-ink-secondary"
+                >
                     Verification code
                 </label>
                 <input

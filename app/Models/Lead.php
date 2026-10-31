@@ -7,9 +7,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * An Enterprise enquiry and how its follow-up is going.
+ */
 final class Lead extends Model
 {
     use HasFactory;
+
+    /** @var list<string> */
+    public const array STATUSES = ['new', 'contacted', 'won', 'lost'];
 
     protected $connection = 'landlord';
 
@@ -21,9 +27,12 @@ final class Lead extends Model
         'status',
         'ip_address',
         'meta',
+        'notes',
+        'status_changed_at',
     ];
 
     protected $casts = [
         'meta' => 'array',
+        'status_changed_at' => 'datetime',
     ];
 }

@@ -131,6 +131,11 @@ final class ReconcilePayoutSchedulesCommand extends Command
             $netPayable = max(0, $collected - $refunded - $fees - $paidOut - $holdbackBalance);
         }
 
+        $memberBalance = app(\App\Services\Events\MemberBenefitBalance::class);
+        if ($memberBalance->applies($event)) {
+            $netPayable = $memberBalance->available($event);
+        }
+
         $shouldDisburse = match (true) {
             ! $schedule->auto_payout_enabled => false,
             $schedule->isImmediate() => $netPayable >= $schedule->minimum_payout_amount,

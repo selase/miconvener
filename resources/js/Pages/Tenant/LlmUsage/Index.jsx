@@ -44,6 +44,11 @@ function TokenPacks({ packs }) {
                         <div className="num mt-1 text-sm text-ink-secondary">
                             {pack.tokens.toLocaleString()} tokens
                         </div>
+                        {pack.charge_note && (
+                            <div className="mt-1 text-xs text-ink-secondary">
+                                {pack.charge_note}
+                            </div>
+                        )}
                         <Button
                             className="mt-4 self-start"
                             variant="primary"

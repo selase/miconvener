@@ -35,6 +35,15 @@ return [
 
     'stores' => [
 
+        // Lock-only store; shared by all web instances, independent of value caching.
+        'portal_sessions' => [
+            'driver' => 'database',
+            'table' => 'cache',
+            'connection' => 'landlord',
+            'lock_connection' => 'landlord',
+            'lock_table' => 'portal_session_locks',
+        ],
+
         'apc' => [
             'driver' => 'apc',
         ],

@@ -49,11 +49,16 @@ final class VenueAvailabilityService
             ->blockingCalendar()
             ->overlapping($from, $to)
             ->orderBy('starts_at')
-            ->get(['starts_at', 'ends_at', 'status'])
+            ->get(['starts_at', 'ends_at', 'status', 'kind'])
             ->map(fn (VenueBooking $booking): array => [
                 'starts_at' => $booking->starts_at->toIso8601String(),
                 'ends_at' => $booking->ends_at->toIso8601String(),
-                'status' => $booking->status,
+                // The public only needs to know the time is taken, not that a staff request is still pending.
+                'status' => match (true) {
+                    $booking->kind === VenueBooking::KIND_INTERNAL => VenueBooking::STATUS_CONFIRMED,
+                    $booking->status === VenueBooking::STATUS_APPROVED_HOLD => VenueBooking::STATUS_PENDING_PAYMENT,
+                    default => $booking->status,
+                },
             ]);
     }
 

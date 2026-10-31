@@ -16,6 +16,7 @@ return [
     'nav' => [
         'links' => [
             ['label' => 'Features', 'href' => '/#features'],
+            ['label' => 'Use cases', 'href' => '/use-cases', 'route' => 'use-cases.index'],
             ['label' => 'Pricing', 'href' => '/#pricing'],
             ['label' => 'Enterprise', 'href' => '/product-enterprise'],
             ['label' => 'Marketplace', 'href' => '/marketplace', 'route' => 'marketplace.index', 'target' => '_blank'],
@@ -115,13 +116,13 @@ return [
                 'Sell paid tickets',
                 '3 live events at a time',
                 '500 registrations per month',
-                '3 team seats',
+                '2 team seats',
                 '2 staff links for door and floor crew',
                 '3,000 email credits per month',
                 '150 SMS credits per month',
                 'Speaker material downloads',
                 'CSV settlement export',
-                '3.5% commission on ticket sales (GHS 25 cap)',
+                '3.5% commission on ticket sales',
                 'Modular add-ons available (Live Polling, extra seats)',
             ],
             'cta' => [
@@ -139,15 +140,14 @@ return [
             'features' => [
                 'Everything in Starter',
                 '15 live events at a time',
-                '3,000 registrations per month',
-                '6 team seats',
+                '1,500 registrations per month',
+                '4 team seats',
                 '5 staff links for door and floor crew',
                 '15,000 email credits per month',
                 '500 SMS credits per month',
                 'Live Polling & Audience Q&A included',
-                'Your own domain',
                 'No platform branding & white label',
-                '2.0% commission on ticket sales (GHS 20 cap)',
+                '2.0% commission on ticket sales',
             ],
             'cta' => [
                 'label' => 'Choose Growth',
@@ -168,6 +168,7 @@ return [
                 'Unlimited events, registrations, seats and staff links',
                 'Unlimited email and SMS credits',
                 'White label portals',
+                'Your own domain',
                 'Negotiated commission',
             ],
             'cta' => [
@@ -218,6 +219,22 @@ return [
             ['group' => 'Venue operations', 'title' => 'Spaces & amenities', 'body' => 'Describe your spaces, capacities and facilities so the event team knows what is available.'],
             ['group' => 'Venue operations', 'title' => 'Venue calendar & facilities', 'body' => 'Coordinate bookings, blocked dates, facility tasks and inspection handovers.'],
             ['group' => 'Venue operations', 'title' => 'Inquiries & organiser collaboration', 'body' => 'Follow inquiries and quotations, exchange messages and prepare the space with the organiser.'],
+        ],
+    ],
+
+    /*
+     * The homepage feature map: each area is one capability group above (a test
+     * pins them together), with three key features. The full list with
+     * descriptions lives on the Full features page.
+     */
+    'feature_map' => [
+        'areas' => [
+            ['group' => 'Programme & coordination', 'icon' => 'programme', 'side' => 'left', 'features' => ['Programme & rooms', 'Speaker portal', 'Team tasks']],
+            ['group' => 'Registration & participation', 'icon' => 'registration', 'side' => 'left', 'features' => ['Event pages', 'Tickets & payments', 'Attendee portal']],
+            ['group' => 'Engagement & communication', 'icon' => 'engagement', 'side' => 'left', 'features' => ['Offline door scanning', 'SMS & email', 'Live polling & Q&A']],
+            ['group' => 'Recognition & academic events', 'icon' => 'recognition', 'side' => 'right', 'features' => ['Badges & certificates', 'Certificate verification', 'Abstracts & peer review']],
+            ['group' => 'Giving & finance', 'icon' => 'finance', 'side' => 'right', 'features' => ['Giving & tributes', 'Settlement', 'Payouts']],
+            ['group' => 'Venue operations', 'icon' => 'venue', 'side' => 'right', 'features' => ['Spaces', 'Venue calendar', 'Inquiries & quotes']],
         ],
     ],
 
@@ -286,9 +303,11 @@ return [
         'columns' => [
             'Product' => [
                 ['label' => 'Features', 'href' => '/#features'],
+                ['label' => 'Use cases', 'href' => '/use-cases', 'route' => 'use-cases.index'],
                 ['label' => 'Pricing', 'href' => '/#pricing'],
                 ['label' => 'Enterprise', 'href' => '/product-enterprise'],
                 ['label' => 'Marketplace', 'href' => '/marketplace', 'route' => 'marketplace.index', 'target' => '_blank'],
+                ['label' => 'Full features', 'href' => '/features', 'route' => 'features'],
             ],
             'Company' => [
                 ['label' => 'Terms', 'href' => '/terms'],

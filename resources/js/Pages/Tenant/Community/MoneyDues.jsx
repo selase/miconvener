@@ -13,7 +13,13 @@ import { useToast } from '@/Components/Console/Toast';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { formatDuesMoney, sendJson, toMajorUnits, toMinorUnits } from '@/lib/dues';
 
-const PERIODS = { monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' };
+const PERIODS = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    quarterly: 'Quarterly',
+    yearly: 'Yearly',
+};
 
 function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
     const editing = membershipType !== null;
@@ -24,7 +30,9 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
         amount: toMajorUnits(membershipType?.amount),
         currency: membershipType?.currency ?? 'GHS',
         period: membershipType?.period ?? 'monthly',
+        dues_start_on: membershipType?.dues_start_on ?? '',
     });
+    const introducingDues = editing && membershipType.amount === null && form.hasDues;
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
     const showToast = useToast();
@@ -44,6 +52,7 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
             currency: form.currency,
             amount,
             period: form.hasDues ? form.period : null,
+            ...(introducingDues ? { dues_start_on: form.dues_start_on } : {}),
         };
         const result = editing
             ? await sendJson(
@@ -127,6 +136,18 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
                         ))}
                     </Select>
                 )}
+                {(introducingDues || membershipType?.dues_start_on) && (
+                    <Input
+                        label="Dues start date"
+                        type="date"
+                        value={form.dues_start_on}
+                        onChange={(e) => setForm({ ...form, dues_start_on: e.target.value })}
+                        error={errors.dues_start_on}
+                        required={introducingDues}
+                        disabled={!introducingDues}
+                        hint="Dues begin with the first full billing period on or after this date. Earlier membership periods remain free of dues. Existing charges are unchanged."
+                    />
+                )}
                 {locked && (
                     <p className="text-sm text-ink-secondary">
                         This type already has charges, so its dues, currency and billing period are
@@ -141,11 +162,43 @@ function MembershipTypeFormModal({ membershipType, onClose, onSaved }) {
     );
 }
 
-export default function MoneyDues({ membershipTypes }) {
+export default function MoneyDues({ membershipTypes, canRemindArrears, canUseGiving = false }) {
+    const inactiveMembers = membershipTypes.reduce(
+        (sum, type) => sum + (!type.is_active ? type.member_count : 0),
+        0
+    );
     const showToast = useToast();
     const [modal, setModal] = useState(null);
     const [toggling, setToggling] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [reminderPreview, setReminderPreview] = useState(null);
+    const [reminding, setReminding] = useState(false);
+    const previewReminders = async () => {
+        setReminding(true);
+        const result = await sendJson(
+            'GET',
+            route('tenant.community.money.dues.remind-arrears.preview')
+        );
+        setReminding(false);
+        if (!result.ok) {
+            showToast?.(result.message);
+            return;
+        }
+        setReminderPreview(result.body);
+    };
+    const sendReminders = async () => {
+        setReminding(true);
+        const result = await sendJson(
+            'POST',
+            route('tenant.community.money.dues.remind-arrears'),
+            {}
+        );
+        setReminding(false);
+        showToast?.(result.message ?? result.body?.message);
+        if (result.ok) {
+            setReminderPreview(null);
+        }
+    };
 
     const refresh = () => router.reload({ only: ['membershipTypes'], preserveScroll: true });
 
@@ -178,6 +231,15 @@ export default function MoneyDues({ membershipTypes }) {
             <PageHeader
                 title="Money"
                 tabs={[
+                    ...(canUseGiving
+                        ? [
+                              {
+                                  key: 'giving',
+                                  label: 'Giving',
+                                  href: route('tenant.community.money.giving.index'),
+                              },
+                          ]
+                        : []),
                     {
                         key: 'dues',
                         label: 'Dues',
@@ -192,7 +254,44 @@ export default function MoneyDues({ membershipTypes }) {
                 }
             />
 
-            <div className="px-8 py-6">
+            <div className="px-4 py-6 sm:px-8">
+                {canRemindArrears && (
+                    <div className="mb-5 flex flex-wrap items-center gap-4">
+                        <a
+                            className="text-sm font-medium text-accent underline"
+                            href={route('tenant.finance.index')}
+                        >
+                            Dues reports
+                        </a>
+                        <a
+                            className="text-sm font-medium text-accent underline"
+                            href={route('tenant.finance.payouts.index')}
+                        >
+                            Payouts
+                        </a>
+                        <Button onClick={previewReminders} disabled={reminding}>
+                            {reminding ? 'Checking…' : 'Remind everyone in arrears'}
+                        </Button>
+                    </div>
+                )}
+                {inactiveMembers > 0 && (
+                    <div
+                        role="status"
+                        className="mb-5 border border-border bg-surface-sunken p-4 text-sm text-ink-secondary"
+                    >
+                        <p>
+                            {inactiveMembers}{' '}
+                            {inactiveMembers === 1 ? 'member belongs' : 'members belong'} to
+                            inactive membership types. No new dues will be generated for them.
+                        </p>
+                        <a
+                            className="mt-2 inline-block font-medium text-accent underline"
+                            href={route('tenant.community.people.index')}
+                        >
+                            Review members
+                        </a>
+                    </div>
+                )}
                 <Table>
                     <Thead>
                         <Th>Name</Th>
@@ -279,6 +378,51 @@ export default function MoneyDues({ membershipTypes }) {
                 />
             )}
 
+            <Modal
+                open={reminderPreview !== null}
+                onClose={() => !reminding && setReminderPreview(null)}
+                title="Remind everyone in arrears"
+            >
+                {reminderPreview && (
+                    <div className="space-y-4 text-sm">
+                        <p>
+                            {reminderPreview.members}{' '}
+                            {reminderPreview.members === 1
+                                ? 'member currently has'
+                                : 'members currently have'}{' '}
+                            overdue charges. Up to {reminderPreview.sms_credits_needed} SMS credits
+                            are needed before daily limits and message-length checks.
+                        </p>
+                        <p className="text-ink-secondary">
+                            SMS credits available:{' '}
+                            {reminderPreview.sms_credits_remaining ?? 'unlimited'}. Remaining
+                            monthly spending limit:{' '}
+                            {reminderPreview.sms_monthly_remaining ?? 'unlimited'}. Email reminders
+                            still send when SMS credits run out.
+                        </p>
+                        <p className="text-ink-secondary">
+                            This queues delivery. Recipients are checked again when sending. Members
+                            already reminded today will be skipped.
+                        </p>
+                        {!reminderPreview.reminders_enabled && (
+                            <p role="alert">
+                                Reminders are disabled. Enable them in Community → Settings first.
+                            </p>
+                        )}
+                        <Button
+                            variant="primary"
+                            onClick={sendReminders}
+                            disabled={
+                                reminding ||
+                                !reminderPreview.reminders_enabled ||
+                                reminderPreview.members === 0
+                            }
+                        >
+                            {reminding ? 'Queuing…' : 'Queue reminders'}
+                        </Button>
+                    </div>
+                )}
+            </Modal>
             <ConfirmModal
                 open={toggling !== null}
                 onClose={() => setToggling(null)}

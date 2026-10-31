@@ -3,9 +3,11 @@ import { Link } from '@inertiajs/react';
 export default function PageHeader({ title, tabs, activeTab, actions }) {
     return (
         <div className="sticky top-0 z-5 bg-surface px-8 pt-7">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-[30px] font-bold leading-9 tracking-tight text-ink">{title}</h1>
-                {actions && <div className="flex items-center gap-3">{actions}</div>}
+                {actions && (
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">{actions}</div>
+                )}
             </div>
 
             {tabs && tabs.length > 0 && (

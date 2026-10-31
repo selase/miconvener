@@ -29,7 +29,7 @@ const PAYOUT_PILL = {
     failed: 'failed',
 };
 
-function RequestPayoutModal({ balances, accounts, onClose, onDone, onAddAccount }) {
+function RequestPayoutModal({ balances, accounts, category, onClose, onDone, onAddAccount }) {
     const showToast = useToast();
     const [form, setForm] = useState({
         payout_account_id: accounts[0]?.id ?? '',
@@ -53,6 +53,7 @@ function RequestPayoutModal({ balances, accounts, onClose, onDone, onAddAccount 
         setProcessing(true);
         const result = await sendJson('POST', route('tenant.finance.payouts.store'), {
             ...form,
+            category,
             amount,
         });
         setProcessing(false);
@@ -269,6 +270,8 @@ function OtpModal({ payout, onClose, onDone }) {
 }
 
 export default function Payouts({
+    category = 'dues',
+    categories = ['dues'],
     balances,
     accounts,
     payouts,
@@ -303,7 +306,9 @@ export default function Payouts({
         refresh();
     };
 
-    const canRequest = balances.length > 0 && accounts.length > 0;
+    const verifiedAccounts = accounts.filter((account) => account.is_verified);
+    const canRequest =
+        balances.some((balance) => balance.available > 0) && verifiedAccounts.length > 0;
 
     return (
         <ConsoleLayout>
@@ -323,14 +328,40 @@ export default function Payouts({
                 }
             />
 
-            <div className="space-y-8 px-8 py-6">
+            <div className="space-y-8 px-4 py-6 sm:px-8">
+                {categories.length > 1 && (
+                    <div className="max-w-xs">
+                        <Select
+                            label="Money category"
+                            value={category}
+                            disabled={sending !== null || modal !== null}
+                            onChange={(event) =>
+                                router.get(
+                                    route('tenant.finance.payouts.index'),
+                                    { category: event.target.value },
+                                    { preserveState: false, preserveScroll: true }
+                                )
+                            }
+                        >
+                            {categories.map((value) => (
+                                <option key={value} value={value}>
+                                    {value === 'giving' ? 'Giving' : 'Dues'}
+                                </option>
+                            ))}
+                        </Select>
+                    </div>
+                )}
                 <p className="text-sm text-ink-secondary">
-                    Payouts of membership dues. Event payouts stay in each event&apos;s Finance tab.
+                    {category === 'giving'
+                        ? 'Giving payouts use online money held across your funds. Recorded cash is already with your organisation.'
+                        : 'Payouts of membership dues.'}{' '}
+                    Event payouts stay in each event&apos;s Finance tab.
                 </p>
                 {balances.length === 0 ? (
                     <p className="text-sm text-ink-secondary">
-                        No dues have been collected yet. Collected dues appear here, ready to pay
-                        out.
+                        {category === 'giving'
+                            ? 'No online Giving money is held here yet. Recorded cash does not create a payout balance.'
+                            : 'No dues have been collected yet. Collected dues appear here, ready to pay out.'}
                     </p>
                 ) : (
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -343,9 +374,19 @@ export default function Payouts({
                                     {formatDuesMoney(balance.available, balance.currency)}
                                 </div>
                                 <div className="mt-3 text-xs text-ink-secondary">
-                                    Collected {formatDuesMoney(balance.payable, balance.currency)} ·
+                                    {balance.payable < 0 ? 'Amount owed' : 'Current payable'}{' '}
+                                    {formatDuesMoney(Math.abs(balance.payable), balance.currency)} ·
                                     In payouts{' '}
                                     {formatDuesMoney(balance.in_flight, balance.currency)}
+                                    {balance.pending_refunds > 0 && (
+                                        <span className="mt-1 block">
+                                            Held for refunds{' '}
+                                            {formatDuesMoney(
+                                                balance.pending_refunds,
+                                                balance.currency
+                                            )}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -356,7 +397,8 @@ export default function Payouts({
                     <div className="border border-border p-5">
                         <div className="text-sm font-medium text-ink">No payout account yet</div>
                         <p className="mt-1 text-sm text-ink-secondary">
-                            Add the bank or mobile money account collected dues are paid into.
+                            Add the verified bank or mobile money account your payouts are paid
+                            into.
                             {!canManagePaymentSettings &&
                                 ' Ask someone who manages payment settings to add one.'}
                         </p>
@@ -445,7 +487,8 @@ export default function Payouts({
             {modal?.kind === 'request' && (
                 <RequestPayoutModal
                     balances={balances}
-                    accounts={accounts}
+                    accounts={verifiedAccounts}
+                    category={category}
                     onClose={() => setModal(null)}
                     onAddAccount={
                         canManagePaymentSettings ? () => setModal({ kind: 'account' }) : undefined

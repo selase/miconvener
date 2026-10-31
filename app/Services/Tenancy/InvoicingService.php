@@ -45,7 +45,8 @@ final readonly class InvoicingService implements \App\Contracts\InvoicingService
                 'period_end' => $end,
                 'due_at' => now()->addDays(14), // Default 14 days due
                 'status' => 'draft',
-                'currency' => 'USD', // Default
+                // What Paystack charges the platform in; plan prices are GHS.
+                'currency' => (string) config('services.paystack.currency', 'GHS'),
             ]);
 
             $subtotal = 0.0;

@@ -9,9 +9,10 @@ use App\Models\LedgerAccount;
 use App\Models\LedgerEntry;
 use App\Models\LedgerTransaction;
 use App\Models\Member;
-use App\Services\Dues\DuesFee;
+use App\Services\Finance\CommercialTerms;
 use App\Services\Finance\LedgerService;
 use App\Services\Finance\PlatformEarnings;
+use App\Services\Finance\ResolvedTerms;
 
 beforeEach(fn () => refreshTenantDatabases());
 
@@ -49,9 +50,10 @@ if (! function_exists('duesTestTotals')) {
 }
 
 test('the dues commission is one percent, rounded, and zero for zero', function () {
-    $fee = app(DuesFee::class);
+    $fee = app(CommercialTerms::class);
+    $terms = new ResolvedTerms(1.0, null, 'organizer', 'platform');
 
-    expect($fee->for(10000))->toBe(100)->and($fee->for(150))->toBe(2)->and($fee->for(0))->toBe(0);
+    expect($fee->commission($terms, 10000))->toBe(100)->and($fee->commission($terms, 150))->toBe(2)->and($fee->commission($terms, 0))->toBe(0);
 });
 
 test('a platform-default dues payment posts a balanced dues-category transaction', function () {

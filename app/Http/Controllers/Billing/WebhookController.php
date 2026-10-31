@@ -13,6 +13,7 @@ use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\SubscriptionRenewalService;
+use App\Services\Pricing\GhanaPaymentProof;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -196,10 +197,14 @@ final class WebhookController extends Controller
          * it is keyed on the reference, so a repeat is a no-op, and a receipt
          * the browser callback failed to queue is still sent from here.
          */
-        $sendReceipt = fn () => app(BillingNotifier::class)->paymentReceived($tenant, $reference, $customerEmail, $data);
+        $sendReceipt = function () use ($tenant, $reference, $customerEmail, $data, $metadata): void {
+            // Where the payment came from decides whether the Ghana price was earned.
+            rescue(fn () => app(GhanaPaymentProof::class)->settle($tenant, [...$data, 'customer_email' => $customerEmail, 'metadata' => $metadata]));
+            app(BillingNotifier::class)->paymentReceived($tenant, $reference, $customerEmail, $data);
+        };
 
         if ($metaType === 'llm_token_purchase') {
-            if (app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase($tenant, $reference, $metadata)) {
+            if (app(PaymentFulfillmentService::class)->fulfillLlmTokenPurchase($tenant, $reference, $metadata, isset($data['amount']) ? (int) $data['amount'] : null)) {
                 Log::info("Paystack: fulfilled token purchase for tenant {$tenant->id} via webhook");
             }
 
@@ -263,6 +268,7 @@ final class WebhookController extends Controller
                         'interval' => $interval,
                         'authorization' => (array) ($data['authorization'] ?? []),
                         'customer_email' => $customerEmail,
+                        'pricing' => $metadata['pricing'] ?? null,
                     ];
 
                     if ($provisioningService->provision($tenant, $dto)) {

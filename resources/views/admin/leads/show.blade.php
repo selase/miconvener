@@ -60,6 +60,40 @@
                     </div>
                 </div>
             </div>
+            @can('follow up signups')
+                <form action="{{ route('admin.leads.update', $lead) }}" method="POST" class="card-body border-top p-9" data-lead-follow-up>
+                    @csrf
+                    @method('PATCH')
+                    @if (session('success'))
+                        <div class="alert alert-success">{{ session('success') }}</div>
+                    @endif
+                    <h3 class="fw-bolder fs-5 mb-5">Follow-up</h3>
+                    <div class="row mb-5">
+                        <label class="col-lg-4 fw-bold text-muted" for="lead-status">Status</label>
+                        <div class="col-lg-8">
+                            <select id="lead-status" name="status" class="form-select form-select-solid mw-250px">
+                                @foreach ($statuses as $status)
+                                    <option value="{{ $status }}" @selected(old('status', $lead->status) === $status)>{{ ucfirst($status) }}</option>
+                                @endforeach
+                            </select>
+                            @if ($lead->status_changed_at)
+                                <div class="text-muted fs-7 mt-2">Changed {{ $lead->status_changed_at->diffForHumans() }}</div>
+                            @endif
+                            @error('status')<div class="text-danger fs-7 mt-2">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div class="row mb-5">
+                        <label class="col-lg-4 fw-bold text-muted" for="lead-notes">Notes</label>
+                        <div class="col-lg-8">
+                            <textarea id="lead-notes" name="notes" rows="5" class="form-control form-control-solid" placeholder="Calls, proposals sent, what they need">{{ old('notes', $lead->notes) }}</textarea>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-3">
+                        <a href="mailto:{{ $lead->email }}" class="btn btn-light btn-sm">Email {{ $lead->name }}</a>
+                        <button type="submit" class="btn btn-primary btn-sm">Save follow-up</button>
+                    </div>
+                </form>
+            @endcan
             <div class="card-footer d-flex justify-content-end py-6 px-9">
                 <form action="{{ route('admin.leads.destroy', $lead->id) }}" method="POST">
                     @csrf

@@ -79,6 +79,10 @@ final class Tenant extends Model
         'settlement_mode',
         'agreed_price_pesewas',
         'agreed_price_interval',
+        'pricing_region',
+        'pricing_region_evidence',
+        'staff_email_domains',
+        'booking_limits',
         'created_at',
         'updated_at',
     ];
@@ -87,6 +91,9 @@ final class Tenant extends Model
         'status' => TenantStatusEnum::class,
         'encryption_at_rest' => 'boolean',
         'meta' => 'array',
+        'pricing_region_evidence' => 'array',
+        'staff_email_domains' => 'array',
+        'booking_limits' => 'array',
         'onboarding_completed_at' => 'datetime',
         'llm_models_whitelist' => 'array',
         'allowed_ips' => 'array',
@@ -262,6 +269,15 @@ final class Tenant extends Model
         return $sendingDomain?->isVerified() && $this->canHaveSendingDomain() ? $sendingDomain : null;
     }
 
+    /**
+     * Whether this organisation pays the Ghana price: it has shown it is in
+     * Ghana, and nobody has since taken that away (see GhanaEligibility).
+     */
+    public function isGhanaEligible(): bool
+    {
+        return $this->pricing_region === 'GH';
+    }
+
     public function featureEnabled(string $key): bool
     {
         return $this->features()->where('feature_key', $key)->where('enabled', true)->exists();
@@ -270,29 +286,70 @@ final class Tenant extends Model
     /**
      * The Community rollout switch (`php artisan community:enable`).
      */
+    public function followingEnabled(): bool
+    {
+        return $this->featureEnabled('community_following');
+    }
+
+    /** @return array{name: string, logo_url: ?string, description: ?string, contact_email: ?string, links: array<string, string>} */
+    public function publicEventProfile(): array
+    {
+        $profile = $this->meta['public_profile'] ?? [];
+        $profile = is_array($profile) ? $profile : [];
+        $links = [];
+
+        foreach (['website', 'instagram', 'x', 'facebook', 'linkedin', 'youtube'] as $key) {
+            $url = $profile[$key] ?? null;
+            if (is_string($url) && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && in_array(mb_strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+                $links[$key] = $url;
+            }
+        }
+
+        $contact = $profile['contact_email'] ?? null;
+
+        return [
+            'name' => $this->name,
+            'logo_url' => $this->canUseOwnLogo() ? $this->logo_url : null,
+            'description' => is_string($profile['description'] ?? null) ? $profile['description'] : null,
+            'contact_email' => is_string($contact) && filter_var($contact, FILTER_VALIDATE_EMAIL) !== false ? $contact : null,
+            'links' => $links,
+        ];
+    }
+
     public function communityEnabled(): bool
     {
         return $this->featureEnabled('community');
     }
 
     /**
-     * Whether the tenant holds or has paid out dues money: a dues ledger
-     * account or a dues payout exists. Payouts and reports stay reachable on
+     * Whether the tenant has dues history: a paid charge (including cash),
+     * dues ledger account or dues payout exists. Payouts and reports stay reachable on
      * this alone, so turning Community off never strands collected money.
      */
     public function hasDuesMoney(): bool
     {
         return LedgerAccount::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists()
-            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists();
+            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Dues)->exists()
+            || DuesCharge::query()->where('tenant_id', $this->id)->where('status', \App\Enum\DuesChargeStatusEnum::Paid)->exists();
     }
 
     /**
      * Whether the Finance section shows: ticket money, Community, or dues
      * money still held. The menu and the page both use this.
      */
+    public function hasGivingMoney(): bool
+    {
+        return GivingGift::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
+            || GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
+            || GivingAdjustment::withoutGlobalScopes()->where('tenant_id', $this->id)->exists()
+            || LedgerAccount::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Giving)->exists()
+            || EventPayout::query()->where('tenant_id', $this->id)->where('category', LedgerCategoryEnum::Giving)->exists();
+    }
+
     public function showsFinance(): bool
     {
-        return $this->handlesTicketMoney() || $this->communityEnabled() || $this->hasDuesMoney();
+        return $this->handlesTicketMoney() || $this->communityEnabled() || $this->hasDuesMoney() || $this->hasGivingMoney();
     }
 
     public function paymentGateways(): HasMany

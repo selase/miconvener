@@ -15,12 +15,10 @@ use Illuminate\Support\Str;
  * needed, deduct the transfer fee, start the transfer and record the outcome
  * on the payout.
  *
- * Shared by event payouts and dues payouts. The caller owns the surrounding
- * DB::transaction, the row lock on the payout and the check that the payout is
- * in a sendable state: locking the row for the whole check-send-write sequence
- * is what stops two concurrent sends from both firing a live transfer, since
- * each send deliberately uses a fresh reference that the provider's own
- * duplicate protection cannot catch.
+ * Event callers keep their existing transaction and row lock. Community
+ * callers commit a processing claim and original reference before the provider
+ * call; response updates must still match that claim, without holding database
+ * locks across the network or replacing a newer transfer.
  */
 final class PayoutSender
 {
@@ -32,10 +30,33 @@ final class PayoutSender
     /**
      * @return array{message: string, http_status: int, status?: string, transfer_code?: mixed}
      */
-    public function send(EventPayout $payoutModel, string $currency): array
+    public function send(EventPayout $payoutModel, string $currency, ?string $reservedReference = null): array
+    {
+        if ($payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce && ($reservedReference === null || $payoutModel->provider_reference !== $reservedReference || $payoutModel->status !== EventPayout::STATUS_PROCESSING)) {
+            return ['message' => 'Use the commerce payout flow and its reserved original reference.', 'http_status' => 422];
+        }
+        $event = $payoutModel->event_id !== null ? \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $payoutModel->tenant_id)->find($payoutModel->event_id) : null;
+        $balance = app(\App\Services\Events\MemberBenefitBalance::class);
+        if ($event !== null) {
+            return $payoutModel->getConnection()->transaction(function () use ($payoutModel, $currency, $reservedReference, $event, $balance): array {
+                $locked = \App\Models\Event::withoutGlobalScopes()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+                if ($balance->applies($locked) && ($currency !== $payoutModel->currency || $currency !== $locked->currency || $payoutModel->amount > $balance->available($locked, $payoutModel->id))) {
+                    return ['message' => 'This payout exceeds the funds available after member-payment and refund holds.', 'http_status' => 422];
+                }
+
+                return $this->sendTransfer($payoutModel, $currency, $reservedReference);
+            });
+        }
+
+        return $this->sendTransfer($payoutModel, $currency, $reservedReference);
+    }
+
+    /** @return array{message:string,http_status:int,status?:string,transfer_code?:mixed} */
+    private function sendTransfer(EventPayout $payoutModel, string $currency, ?string $reservedReference = null): array
     {
         $account = $payoutModel->payoutAccount;
 
+        $transferSubmitted = false;
         try {
             if (! $account->recipient_code) {
                 $recipientCode = $this->settlementGateway->createRecipient(
@@ -45,7 +66,11 @@ final class PayoutSender
                     (string) $account->bank_code,
                     $currency
                 );
-                $account->update(['recipient_code' => $recipientCode]);
+                if ($payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce) {
+                    $account->recipient_code = $recipientCode;
+                } else {
+                    $account->update(['recipient_code' => $recipientCode]);
+                }
             }
 
             /*
@@ -64,12 +89,29 @@ final class PayoutSender
                 ];
             }
 
-            $reference = 'payout_'.$payoutModel->id.'_'.Str::random(8);
+            $payoutModel->update(['requested_transfer_fee_amount' => $transferFee, 'requested_net_amount' => $netToSend]);
+            $reference = $reservedReference ?? 'payout_'.$payoutModel->id.'_'.Str::random(8);
+            $transferSubmitted = true;
             $transfer = $this->settlementGateway->initiateTransfer($account->recipient_code, $netToSend, $currency, $reference);
         } catch (PaymentFailedException $e) {
-            return ['message' => 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
+            if ($payoutModel->fresh()->status === EventPayout::STATUS_PAID) {
+                return ['message' => 'Payout confirmed.', 'http_status' => 200];
+            }
+
+            if (! $transferSubmitted && $reservedReference !== null) {
+                EventPayout::withoutGlobalScopes()->whereKey($payoutModel->id)->where('status', EventPayout::STATUS_PROCESSING)->where('provider_reference', $reservedReference)->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => 'Recipient registration failed before any transfer was submitted.']);
+            }
+
+            return ['message' => $payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce ? 'Payout submission needs review. Reconcile the original reference before sending again.' : 'Could not send payout: '.$e->providerMessage(), 'http_status' => 502];
         }
 
+        $current = $payoutModel->fresh();
+        if ($current->status === EventPayout::STATUS_PAID) {
+            return ['message' => 'Payout confirmed.', 'http_status' => 200];
+        }
+        if ($reservedReference !== null && ($current->provider_reference !== $reservedReference || $current->status !== EventPayout::STATUS_PROCESSING)) {
+            return ['message' => 'The payout state changed while waiting for the provider. Refresh to see its current transfer.', 'http_status' => 409];
+        }
         $transferStatus = (string) ($transfer['status'] ?? '');
 
         /*
@@ -83,25 +125,27 @@ final class PayoutSender
             $transferCode = (string) ($transfer['transfer_code'] ?? '');
 
             /*
-             * Without a transfer code there is nothing to release, and a
-             * parked payout cannot be re-sent — it would strand here. Fail
-             * it instead, which keeps it re-sendable.
+             * Community claims retain the original reference for verification;
+             * an incomplete response is not proof that no transfer exists.
+             * Keep the legacy event sender's existing retry policy.
              */
             if ($transferCode === '') {
-                $payoutModel->update([
-                    'status' => EventPayout::STATUS_FAILED,
-                    'failure_reason' => 'The payment provider asked for a one-time code but returned no transfer to release. Send this payout again.',
-                ]);
+                $this->updateIfUnpaid($payoutModel, [
+                    'status' => $reservedReference === null ? EventPayout::STATUS_FAILED : EventPayout::STATUS_PROCESSING,
+                    'failure_reason' => $reservedReference === null
+                        ? 'The payment provider asked for a one-time code but returned no transfer to release. Send this payout again.'
+                        : 'The provider response is incomplete. Reconcile the original transfer; do not send another payout.',
+                ], $reservedReference);
 
                 return ['message' => $payoutModel->failure_reason, 'http_status' => 502];
             }
 
-            $payoutModel->update([
+            $this->updateIfUnpaid($payoutModel, [
                 'status' => EventPayout::STATUS_AWAITING_OTP,
                 'provider_reference' => $reference,
                 'provider_transfer_code' => $transferCode,
                 'failure_reason' => null,
-            ]);
+            ], $reservedReference);
 
             return [
                 'message' => 'Paystack sent a one-time code to the account owner. Enter it to release this payout.',
@@ -111,10 +155,11 @@ final class PayoutSender
         }
 
         if (! in_array($transferStatus, ['success', 'pending', 'queued'], true)) {
-            $payoutModel->update([
-                'status' => EventPayout::STATUS_FAILED,
-                'failure_reason' => "The payment provider did not release the transfer (status: {$transferStatus}).",
-            ]);
+            $uncertain = $reservedReference !== null && ! in_array($transferStatus, PayoutRelease::DEAD_TRANSFER_STATUSES, true);
+            $this->updateIfUnpaid($payoutModel, [
+                'status' => $uncertain ? EventPayout::STATUS_PROCESSING : EventPayout::STATUS_FAILED,
+                'failure_reason' => $uncertain ? 'The transfer outcome is unknown. Reconcile the original reference; do not send another payout.' : "The payment provider did not release the transfer (status: {$transferStatus}).",
+            ], $reservedReference);
 
             return [
                 'message' => $payoutModel->failure_reason,
@@ -122,15 +167,26 @@ final class PayoutSender
             ];
         }
 
-        $payoutModel->update([
+        $this->updateIfUnpaid($payoutModel, [
             'status' => EventPayout::STATUS_PROCESSING,
             'provider_reference' => $reference,
             'provider_transfer_code' => (string) ($transfer['transfer_code'] ?? ''),
             'failure_reason' => null,
             'transfer_fee_amount' => $this->transferFeeSchedule->feeFromProviderResponse($transfer) ?? $transferFee,
             'net_paid_amount' => $netToSend,
-        ]);
+        ], $reservedReference);
 
         return ['message' => 'Payout sent.', 'transfer_code' => $transfer['transfer_code'], 'http_status' => 200];
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function updateIfUnpaid(EventPayout $payout, array $attributes, ?string $expectedReference = null): void
+    {
+        $query = EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', '!=', EventPayout::STATUS_PAID);
+        if ($expectedReference !== null) {
+            $query->where('provider_reference', $expectedReference)->where('status', EventPayout::STATUS_PROCESSING);
+        }
+        $query->update($attributes);
+        $payout->refresh();
     }
 }

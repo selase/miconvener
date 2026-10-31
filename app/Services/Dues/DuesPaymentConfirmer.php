@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace App\Services\Dues;
 
 use App\Enum\DuesChargeStatusEnum;
+use App\Http\Controllers\Billing\WebhookController as BillingWebhookController;
 use App\Http\Controllers\Tenant\Commerce\WebhookController;
 use App\Mail\DuesReceipt;
 use App\Models\DuesCharge;
+use App\Models\DuesPaymentAttempt;
 use App\Models\Member;
 use App\Models\Tenant;
+use App\Services\Finance\CommercialTerms;
 use App\Services\Finance\LedgerService;
+use App\Services\Finance\ResolvedTerms;
 use App\Services\Operations\OperationalSignals;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -46,7 +51,7 @@ final class DuesPaymentConfirmer
 
     public function __construct(
         private readonly LedgerService $ledgerService,
-        private readonly DuesFee $duesFee,
+        private readonly CommercialTerms $commercialTerms,
         private readonly OperationalSignals $signals,
     ) {}
 
@@ -55,7 +60,7 @@ final class DuesPaymentConfirmer
      * on a redelivery of a payment already confirmed.
      *
      * @param  array{
-     *     metadata?: array<string, mixed>,
+     *     metadata?: array<string, mixed>|string,
      *     amount?: int|numeric-string,
      *     fees?: int|numeric-string,
      *     currency?: string,
@@ -67,10 +72,34 @@ final class DuesPaymentConfirmer
      */
     public function confirm(string $reference, array $gatewayData): array
     {
-        $metadata = (array) ($gatewayData['metadata'] ?? []);
+        $metadata = BillingWebhookController::metadata($gatewayData['metadata'] ?? null);
         $chargeIds = array_values(array_unique(array_map('strval', (array) ($metadata['charge_ids'] ?? []))));
         $tenantId = (string) ($metadata['tenant_id'] ?? '');
         $memberId = (string) ($metadata['member_id'] ?? '');
+
+        $referenceAttempt = DuesPaymentAttempt::query()->withoutGlobalScopes()->where('reference', $reference)->first();
+        if (array_key_exists('dues_attempt_id', $metadata) || $referenceAttempt !== null) {
+            $attemptId = $metadata['dues_attempt_id'] ?? null;
+            $attempt = $referenceAttempt ?? (is_string($attemptId) && Str::isUuid($attemptId)
+                ? DuesPaymentAttempt::query()->withoutGlobalScopes()->find($attemptId)
+                : null);
+            $sortedIds = $chargeIds;
+            sort($sortedIds);
+            if ($attempt === null || $attempt->id !== $attemptId || $attempt->reference !== $reference || $attempt->tenant_id !== $tenantId
+                || $attempt->member_id !== $memberId || $attempt->charge_ids !== $sortedIds
+                || mb_strtoupper((string) ($gatewayData['currency'] ?? '')) !== $attempt->currency
+                || (int) ($gatewayData['amount'] ?? 0) < $attempt->expected_amount) {
+                Log::warning('dues.payment.attempt_mismatch', ['reference' => $reference, 'attempt_id' => $attemptId]);
+                $notedTenant = Tenant::find($attempt->tenant_id ?? $tenantId);
+                if ($notedTenant !== null) {
+                    $this->refuse($notedTenant, $attempt->member_id ?? $memberId, $attempt->charge_ids ?? $chargeIds, $reference, 'the payment does not match its checkout attempt');
+                } else {
+                    $this->signals->recordWebhookFailure('processing', "dues payment {$reference} not booked: invalid checkout attempt");
+                }
+
+                return [];
+            }
+        }
 
         if ($reference === '' || $chargeIds === [] || $tenantId === '' || $memberId === '') {
             return [];
@@ -128,7 +157,7 @@ final class DuesPaymentConfirmer
         $member = $paid[0]->member ?? null;
 
         if ($member !== null && filled($member->email)) {
-            Mail::to($member->email)->queue(new DuesReceipt($member, new Collection($paid), $reference));
+            Mail::to($member->email)->queue((new DuesReceipt($member, new Collection($paid), $reference))->afterCommit());
         }
 
         return $paid;
@@ -142,6 +171,14 @@ final class DuesPaymentConfirmer
      */
     private function settle(Tenant $tenant, string $memberId, array $chargeIds, string $reference, array $gatewayData, array $metadata): array
     {
+        Member::query()->where('tenant_id', $tenant->id)->whereKey($memberId)->lockForUpdate()->first();
+        $attempt = isset($metadata['dues_attempt_id'])
+            ? DuesPaymentAttempt::query()->whereKey($metadata['dues_attempt_id'])->lockForUpdate()->firstOrFail()
+            : null;
+        if ($attempt?->status === 'confirmed') {
+            return [];
+        }
+
         /*
          * Scoped to the member the checkout was started for, so a charge list
          * naming someone else's charge cannot pay it.
@@ -172,6 +209,8 @@ final class DuesPaymentConfirmer
         }
 
         if ($charges->every(fn (DuesCharge $charge): bool => $this->wasPaidBy($charge, $reference))) {
+            $attempt?->update(['status' => 'confirmed', 'confirmed_at' => now()]);
+
             return [];
         }
 
@@ -208,7 +247,10 @@ final class DuesPaymentConfirmer
         }
 
         $feeShares = $this->apportionFees($open, max(0, (int) ($gatewayData['fees'] ?? 0)));
-        $commissions = $open->mapWithKeys(fn (DuesCharge $charge): array => [$charge->id => $this->duesFee->for((int) $charge->amount)])->all();
+        $legacyTerms = new ResolvedTerms((float) config('services.dues.legacy_fee_percentage', 1), null, 'organizer', 'platform');
+        $commissions = $open->mapWithKeys(fn (DuesCharge $charge): array => [$charge->id => $attempt !== null
+            ? (int) $attempt->commissions[$charge->id]
+            : $this->commercialTerms->commission($legacyTerms, (int) $charge->amount)])->all();
         $settlements = $tenant->isPlatformDefaultSettlement()
             ? []
             : $this->allocateOwnGatewayCommission($tenant, $open, $commissions, $currency, $gatewayData, $metadata);
@@ -246,6 +288,13 @@ final class DuesPaymentConfirmer
                 $settlements[$charge->id]['received'],
                 $settlements[$charge->id]['credit'],
             );
+        }
+
+        $attempt?->update(['status' => 'confirmed', 'confirmed_at' => now()]);
+
+        $member = $open->first()->member;
+        if ($member !== null) {
+            app(\App\Services\Community\InboxNotices::class)->receipt($tenant, $member, $reference, $open, \Carbon\CarbonImmutable::now());
         }
 
         return $open->all();

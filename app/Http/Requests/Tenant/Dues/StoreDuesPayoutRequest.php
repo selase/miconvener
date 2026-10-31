@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tenant\Dues;
 
-use App\Enum\LedgerCategoryEnum;
 use App\Models\LedgerAccount;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
@@ -31,7 +30,10 @@ final class StoreDuesPayoutRequest extends FormRequest
     {
         $tenantId = app(TenantContext::class)->getTenant()?->id;
 
+        $category = $this->input('category', 'dues');
+
         return [
+            'category' => ['sometimes', Rule::in(['dues', 'giving'])],
             'payout_account_id' => ['required', Rule::exists('tenant_payout_accounts', 'id')->where('tenant_id', $tenantId)],
             'amount' => ['required', 'integer', 'min:1'],
             'currency' => [
@@ -41,7 +43,7 @@ final class StoreDuesPayoutRequest extends FormRequest
                 Rule::exists('ledger_accounts', 'currency')
                     ->where('tenant_id', $tenantId)
                     ->whereNull('event_id')
-                    ->where('category', LedgerCategoryEnum::Dues->value)
+                    ->where('category', $category)
                     ->where('code', LedgerAccount::CODE_ORGANIZER_PAYABLE),
             ],
             'scheduled_at' => ['nullable', 'date'],
@@ -62,7 +64,7 @@ final class StoreDuesPayoutRequest extends FormRequest
             'amount.min' => 'The amount must be greater than zero.',
             'currency.required' => 'Choose the currency to pay out.',
             'currency.size' => 'The currency must be a three-letter code, such as GHS.',
-            'currency.exists' => 'No dues have been collected in that currency.',
+            'currency.exists' => $this->input('category', 'dues') === 'giving' ? 'No giving has been collected in that currency.' : 'No dues have been collected in that currency.',
         ];
     }
 

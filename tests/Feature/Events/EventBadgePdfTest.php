@@ -178,7 +178,7 @@ test('badge export retries preserve history while intentional reprints create ne
 
 test('actual badge pdf page counts match one partial full and multiple sheets', function (string $paper, int $count, int $pages, int $width = 100, int $height = 70): void {
     [$tenant] = eventHost('acme');
-    $event = Event::factory()->create(['tenant_id' => $tenant->id]);
+    $event = Event::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Medical Congress']);
     $template = app(BadgeTemplateService::class)->forEvent($event);
     $template->update(['width_mm' => $width, 'height_mm' => $height, 'sheet_settings' => ['paper' => $paper, 'margin_mm' => 8, 'gap_mm' => 3, 'crop_marks' => true]]);
     $registrations = collect(range(1, $count))->map(fn (int $index) => badgePdfRegistration($event, ['full_name' => "Attendee {$index}"]));

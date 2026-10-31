@@ -96,10 +96,17 @@ test('the blast texts each attendee with a phone once, in one request, and repor
     (new SendEventBlastJob($blast))->handle();
 
     expect(EventNotificationLog::query()->where('channel', 'sms')->where('status', 'sent')->count())->toBe(2);
-    // One request for the whole audience: everyone gets the same text.
+    // One provider request contains a personalised channel opt-out link for each address.
     Http::assertSentCount(1);
-    Http::assertSent(fn ($request): bool => $request->data()[0]['message'] === 'Room change: Hall B.'
-        && count($request->data()[0]['users']) === 2);
+    Http::assertSent(function ($request): bool {
+        $campaign = $request->data()[0];
+        $texts = array_map(fn ($user) => $user['placeholder'][0]['{{1}}'], $campaign['users']);
+
+        return $campaign['message'] === \App\Services\Sms\OmnichannelSmsGateway::TEXT_PLACEHOLDER
+            && count($campaign['users']) === 2 && count(array_unique($texts)) === 2
+            && collect($texts)->every(fn ($text): bool => str_starts_with($text, 'Room change: Hall B. Stop: ')
+                && str_contains($text, '/community/preferences/'));
+    });
 
     $index = $this->actingAs($user)->getJson("http://{$host}/events/{$event->id}/blasts", ['HTTP_HOST' => $host]);
     $index->assertJsonPath('blasts.0.sms_sent_count', 2)

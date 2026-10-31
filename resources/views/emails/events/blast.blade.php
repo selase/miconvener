@@ -7,6 +7,10 @@ Hi {{ $recipientName }},
 
 Sent to registrants of **{{ $event->name }}**.
 
+@if($unsubscribeUrl)
+[Stop announcements]({{ $unsubscribeUrl }})
+@endif
+
 Thanks,<br>
 {{ config('app.name') }}
 

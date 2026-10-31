@@ -14,8 +14,13 @@ final class EventPackageSeeder extends Seeder
      * @var array<string, array{name: string, type: string, description: string}>
      */
     private array $features = [
+        'community_library_access' => ['name' => 'Community Library', 'type' => 'boolean', 'description' => 'Publish organisation documents and service notes.'],
+        'community_polls_access' => ['name' => 'Community Polls and Surveys', 'type' => 'boolean', 'description' => 'Publish organisation questionnaires.'],
+        'community_message_scheduling' => ['name' => 'Scheduled Community Messages', 'type' => 'boolean', 'description' => 'Schedule Community announcements.'],
+        'community_group_messaging' => ['name' => 'Group Community Messages', 'type' => 'boolean', 'description' => 'Send Community announcements to member groups.'],
         'events_in_flight' => ['name' => 'Concurrent Live Events', 'type' => 'limit', 'description' => 'Maximum non-archived events at a time.'],
         'event_registrations' => ['name' => 'Registrations Per Month', 'type' => 'limit', 'description' => 'Maximum confirmed registrations across all events per month.'],
+        'community_members' => ['name' => 'Community Members', 'type' => 'limit', 'description' => 'Maximum pending, active and lapsed community members. Exited members do not count.'],
         'team_seats' => ['name' => 'Team Seats', 'type' => 'limit', 'description' => 'Maximum team members for this organization.'],
         'staff_links' => ['name' => 'Staff Links', 'type' => 'limit', 'description' => 'Active staff links (ushers and floor crew without an account) at a time. Each usher pack adds five.'],
         'email_credits' => ['name' => 'Email Credits Per Month', 'type' => 'limit', 'description' => 'Maximum event-related emails sent per month.'],
@@ -26,13 +31,14 @@ final class EventPackageSeeder extends Seeder
         'remove_platform_branding' => ['name' => 'Remove Platform Branding', 'type' => 'boolean', 'description' => 'Hide platform branding on public event pages and emails.'],
         'custom-domains' => ['name' => 'Custom Domains', 'type' => 'boolean', 'description' => 'Use your own domain for your workspace.'],
         'csv_settlement_export' => ['name' => 'CSV Settlement Export', 'type' => 'boolean', 'description' => 'Export the settlement statement as CSV.'],
+        'staff_room_booking' => ['name' => 'Staff Room Booking', 'type' => 'boolean', 'description' => 'Staff-only rooms and free internal room bookings for the organisation\'s own staff.'],
         'white_label' => ['name' => 'White Label', 'type' => 'boolean', 'description' => 'Replace MiConvener branding with your own logo across the console, emails and tickets.'],
         'sso' => ['name' => 'SSO Integration', 'type' => 'boolean', 'description' => 'Reserved: Single Sign-On. Not enforced yet — no SAML/OIDC integration exists.'],
         'api_access' => ['name' => 'API Access', 'type' => 'boolean', 'description' => 'Reserved: self-service webhook/API management. Not enforced yet — no tenant-facing management UI exists.'],
     ];
 
     /**
-     * @var array<string, array{name: string, description: string, monthly: float, yearly: float, sort: int, is_free: bool, default_fee: float|null, default_cap: int|null, default_bearer: string, features: array<string, int|bool>}>
+     * @var array<string, array{name: string, description: string, monthly: float, yearly: float, monthly_usd?: int, yearly_usd?: int, sort: int, is_free: bool, default_fee: float|null, default_cap: int|null, default_bearer: string, features: array<string, int|bool>}>
      */
     private array $packages = [
         'free' => [
@@ -43,11 +49,16 @@ final class EventPackageSeeder extends Seeder
             'sort' => 0,
             'is_free' => true,
             'default_fee' => 5.0,
-            'default_cap' => 2000,
+            'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => false,
+                'community_polls_access' => false,
+                'community_message_scheduling' => false,
+                'community_group_messaging' => false,
                 'events_in_flight' => 1,
                 'event_registrations' => 50,
+                'community_members' => 50,
                 'team_seats' => 1,
                 'staff_links' => 1,
                 'email_credits' => 200,
@@ -59,6 +70,7 @@ final class EventPackageSeeder extends Seeder
                 'custom-domains' => false,
                 'csv_settlement_export' => false,
                 'white_label' => false,
+                'staff_room_booking' => false,
                 'sso' => false,
                 'api_access' => false,
             ],
@@ -68,15 +80,22 @@ final class EventPackageSeeder extends Seeder
             'description' => 'For teams running regular professional events and workshops.',
             'monthly' => 249,
             'yearly' => 2490,
+            'monthly_usd' => 19,
+            'yearly_usd' => 190,
             'sort' => 1,
             'is_free' => false,
             'default_fee' => 3.5,
-            'default_cap' => 2500,
+            'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => true,
+                'community_polls_access' => false,
+                'community_message_scheduling' => true,
+                'community_group_messaging' => false,
                 'events_in_flight' => 3,
                 'event_registrations' => 500,
-                'team_seats' => 3,
+                'community_members' => 500,
+                'team_seats' => 2,
                 'staff_links' => 2,
                 'email_credits' => 3000,
                 'sms_credits' => 150,
@@ -87,6 +106,7 @@ final class EventPackageSeeder extends Seeder
                 'custom-domains' => false,
                 'csv_settlement_export' => true,
                 'white_label' => false,
+                'staff_room_booking' => false,
                 'sso' => false,
                 'api_access' => false,
             ],
@@ -96,15 +116,22 @@ final class EventPackageSeeder extends Seeder
             'description' => 'For organizations and agencies running conferences and summits at scale.',
             'monthly' => 499,
             'yearly' => 4990,
+            'monthly_usd' => 39,
+            'yearly_usd' => 390,
             'sort' => 2,
             'is_free' => false,
             'default_fee' => 2.0,
-            'default_cap' => 2000,
+            'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => true,
+                'community_polls_access' => true,
+                'community_message_scheduling' => true,
+                'community_group_messaging' => true,
                 'events_in_flight' => 15,
-                'event_registrations' => 3000,
-                'team_seats' => 6,
+                'event_registrations' => 1500,
+                'community_members' => 5000,
+                'team_seats' => 4,
                 'staff_links' => 5,
                 'email_credits' => 15000,
                 'sms_credits' => 500,
@@ -112,9 +139,10 @@ final class EventPackageSeeder extends Seeder
                 'live_polling' => true,
                 'event_materials' => true,
                 'remove_platform_branding' => true,
-                'custom-domains' => true,
+                'custom-domains' => false,
                 'csv_settlement_export' => true,
                 'white_label' => true,
+                'staff_room_booking' => false,
                 'sso' => false,
                 'api_access' => false,
             ],
@@ -130,8 +158,13 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'community_library_access' => true,
+                'community_polls_access' => true,
+                'community_message_scheduling' => true,
+                'community_group_messaging' => true,
                 'events_in_flight' => -1,
                 'event_registrations' => -1,
+                'community_members' => -1,
                 'team_seats' => -1,
                 'staff_links' => -1,
                 'email_credits' => -1,
@@ -143,6 +176,7 @@ final class EventPackageSeeder extends Seeder
                 'custom-domains' => true,
                 'csv_settlement_export' => true,
                 'white_label' => true,
+                'staff_room_booking' => true,
                 'sso' => true,
                 'api_access' => true,
             ],
@@ -191,6 +225,16 @@ final class EventPackageSeeder extends Seeder
                     'default_fee_bearer' => $config['default_bearer'],
                 ]
             );
+
+            // USD prices are set once; a superadmin's later edit is kept.
+            $usd = array_filter([
+                'price_usd' => $package->price_usd === null ? ($config['monthly_usd'] ?? null) : null,
+                'yearly_price_usd' => $package->yearly_price_usd === null ? ($config['yearly_usd'] ?? null) : null,
+            ], fn (mixed $value): bool => $value !== null);
+
+            if ($usd !== []) {
+                $package->update($usd);
+            }
 
             $syncData = [];
             foreach ($config['features'] as $featureSlug => $value) {

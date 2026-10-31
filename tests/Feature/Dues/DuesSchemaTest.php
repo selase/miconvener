@@ -73,13 +73,14 @@ test('an event payout can carry a currency and belongs to its tenant', function 
 
 test('dues periods compute the next start and the period end', function () {
     $jan = CarbonImmutable::parse('2026-01-01');
+    $settings = new App\Models\CommunitySettings;
 
-    expect(DuesPeriodEnum::Monthly->nextStart($jan)->toDateString())->toBe('2026-02-01')
-        ->and(DuesPeriodEnum::Quarterly->nextStart($jan)->toDateString())->toBe('2026-04-01')
-        ->and(DuesPeriodEnum::Yearly->nextStart($jan)->toDateString())->toBe('2027-01-01')
-        ->and(DuesPeriodEnum::Monthly->periodEnd($jan)->toDateString())->toBe('2026-01-31')
-        ->and(DuesPeriodEnum::Quarterly->periodEnd($jan)->toDateString())->toBe('2026-03-31')
-        ->and(DuesPeriodEnum::Yearly->periodEnd($jan)->toDateString())->toBe('2026-12-31');
+    expect(DuesPeriodEnum::Monthly->nextStart($jan, $settings)->toDateString())->toBe('2026-02-01')
+        ->and(DuesPeriodEnum::Quarterly->nextStart($jan, $settings)->toDateString())->toBe('2026-04-01')
+        ->and(DuesPeriodEnum::Yearly->nextStart($jan, $settings)->toDateString())->toBe('2027-01-01')
+        ->and(DuesPeriodEnum::Monthly->periodEnd($jan, $settings)->toDateString())->toBe('2026-01-31')
+        ->and(DuesPeriodEnum::Quarterly->periodEnd($jan, $settings)->toDateString())->toBe('2026-03-31')
+        ->and(DuesPeriodEnum::Yearly->periodEnd($jan, $settings)->toDateString())->toBe('2026-12-31');
 });
 
 test('a dues class lists its members and a member lists its charges', function () {

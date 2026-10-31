@@ -33,6 +33,8 @@ final class MembershipTypeController extends Controller
             ->get();
 
         return Inertia::render('Tenant/Community/MoneyDues', [
+            'canUseGiving' => auth()->user()->can('manage giving') && app(\App\Services\Giving\GivingRollout::class)->enabled($tenant),
+            'canRemindArrears' => auth()->user()->can('read finance'),
             'membershipTypes' => $classes->map(fn (MembershipType $class): array => $this->payload($class))->values(),
         ]);
     }
@@ -52,8 +54,29 @@ final class MembershipTypeController extends Controller
 
     public function update(UpdateMembershipTypeRequest $request, string $subdomain, string $type): JsonResponse
     {
-        $model = MembershipType::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($type);
-        $model->update($request->validated());
+        $model = \Illuminate\Support\Facades\DB::connection('landlord')->transaction(function () use ($request, $type): MembershipType {
+            $model = MembershipType::query()->where('tenant_id', $this->getTenant()->id)->lockForUpdate()->findOrFail($type);
+            $data = $request->validated();
+            if (! $model->hasDues() && isset($data['amount'])) {
+                $today = \Carbon\CarbonImmutable::now(\App\Models\CommunitySettings::for($this->getTenant())->timezone)->toDateString();
+                if (empty($data['dues_start_on']) || $data['dues_start_on'] < $today) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['dues_start_on' => 'Choose the date from which members should start paying dues.']);
+                }
+            } elseif (array_key_exists('dues_start_on', $data) && $data['dues_start_on'] !== $model->dues_start_on?->toDateString()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['dues_start_on' => 'The dues start date is fixed.']);
+            }
+            if ($model->charges()->exists()) {
+                if ($data['currency'] !== $model->currency) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['currency' => 'This class already has charges, so its currency cannot change.']);
+                }
+                if (($data['period'] ?? null) !== $model->period?->value) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['period' => 'This class already has charges, so its billing period cannot change.']);
+                }
+            }
+            $model->update($data);
+
+            return $model;
+        });
 
         return response()->json($this->payload($model->loadCount('members')->loadExists('charges')));
     }
@@ -69,6 +92,7 @@ final class MembershipTypeController extends Controller
             'amount' => $class->amount,
             'currency' => $class->currency,
             'period' => $class->period?->value,
+            'dues_start_on' => $class->dues_start_on?->toDateString(),
             'is_active' => $class->is_active,
             'member_count' => (int) $class->members_count,
             'has_charges' => (bool) $class->charges_exists,

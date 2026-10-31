@@ -168,7 +168,7 @@ final class EventController extends Controller
         return redirect()->route('tenant.events.index', ['subdomain' => $tenant->slug])->with('success', 'Event created successfully.');
     }
 
-    public function update(Request $request, string $subdomain, string $event): RedirectResponse|JsonResponse
+    public function update(\App\Http\Requests\Tenant\UpdateEventCommercialTermsRequest $request, string $subdomain, string $event): RedirectResponse|JsonResponse
     {
         $this->authorize('update event');
         $tenant = $this->getTenant();
@@ -506,19 +506,22 @@ final class EventController extends Controller
 
         $filename = "{$eventModel->slug}-contributions.csv";
 
-        return response()->streamDownload(function () use ($eventModel): void {
+        $givingIds = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
+        $canFinance = auth()->user()->can('read finance');
+
+        return response()->streamDownload(function () use ($eventModel, $givingIds, $canFinance): void {
             $handle = fopen('php://output', 'wb');
             fputcsv($handle, ['Reference', 'Contributor Name', 'Email', 'Phone', 'Amount (Pesewas)', 'Amount (GHS)', 'Net (GHS)', 'Currency', 'Status', 'Is Anonymous', 'Tribute Message', 'Paid At', 'Created At']);
 
             $sanitizeCsv = fn (?string $v): ?string => ($v !== null && in_array($v[0] ?? '', ['=', '+', '-', '@'], true)) ? "'".$v : $v;
 
-            $eventModel->contributions()->orderByDesc('created_at')->chunk(200, function ($contributions) use ($handle, $sanitizeCsv): void {
+            $eventModel->contributions()->orderByDesc('created_at')->chunk(200, function ($contributions) use ($handle, $sanitizeCsv, $givingIds, $canFinance): void {
                 foreach ($contributions as $c) {
                     fputcsv($handle, [
                         $c->payment_reference,
-                        $sanitizeCsv($c->contributor_name),
-                        $c->contributor_email,
-                        $c->contributor_phone,
+                        $sanitizeCsv(in_array($c->id, $givingIds, true) && ($c->is_anonymous || ! $canFinance) ? $c->displayName() : $c->contributor_name),
+                        in_array($c->id, $givingIds, true) && ($c->is_anonymous || ! $canFinance) ? null : $sanitizeCsv($c->contributor_email),
+                        in_array($c->id, $givingIds, true) && ($c->is_anonymous || ! $canFinance) ? null : $sanitizeCsv($c->contributor_phone),
                         $c->amount,
                         number_format($c->amount / 100, 2),
                         number_format($c->net_amount / 100, 2),
@@ -596,6 +599,14 @@ final class EventController extends Controller
         ]);
     }
 
+    public function updateMemberBenefits(\App\Http\Requests\Tenant\UpdateEventMemberBenefitsRequest $request, string $subdomain, string $event): JsonResponse
+    {
+        $model = Event::query()->where('tenant_id', $this->getTenant()->id)->findOrFail($event);
+        $model->update($request->validated());
+
+        return response()->json(['members_only' => $model->members_only, 'member_ticket_price' => $model->member_ticket_price]);
+    }
+
     protected function getTenant(): Tenant
     {
         $tenant = app(TenantContext::class)->getTenant();
@@ -660,6 +671,8 @@ final class EventController extends Controller
         $snapshot = app(EventWorkspaceSnapshot::class);
         $phase = $snapshot->phase($eventModel);
         $hasActiveGateway = $tenant->canAcceptPayments();
+        $givingLinks = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
+        $canReadGivingFinance = auth()->user()->can('read finance');
 
         return Inertia::render('Tenant/Events/Show', [
             'event' => [
@@ -685,9 +698,10 @@ final class EventController extends Controller
                 ->get()
                 ->map(fn (\App\Models\EventContribution $c): array => [
                     'id' => $c->id,
-                    'contributor_name' => $c->contributor_name,
-                    'contributor_email' => $c->contributor_email,
-                    'contributor_phone' => $c->contributor_phone,
+                    'contributor_name' => in_array($c->id, $givingLinks, true) && ($c->is_anonymous || ! $canReadGivingFinance) ? $c->displayName() : $c->contributor_name,
+                    'payout_category' => in_array($c->id, $givingLinks, true) ? 'giving' : 'event',
+                    'contributor_email' => in_array($c->id, $givingLinks, true) && ($c->is_anonymous || ! $canReadGivingFinance) ? null : $c->contributor_email,
+                    'contributor_phone' => in_array($c->id, $givingLinks, true) && ($c->is_anonymous || ! $canReadGivingFinance) ? null : $c->contributor_phone,
                     'amount' => $c->amount,
                     'gateway_fee_amount' => $c->gateway_fee_amount,
                     'platform_fee_amount' => $c->platform_fee_amount,
@@ -703,6 +717,7 @@ final class EventController extends Controller
                     'created_at' => $c->created_at->toIso8601String(),
                 ])->values() : [],
             'contributionsStats' => $section === 'contributions' ? [
+                ...app(\App\Services\Giving\GivingContributionBridge::class)->eventSummary($eventModel),
                 'total_raised' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('amount'),
                 'net_payout' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('net_amount'),
                 'contributors_count' => (int) $eventModel->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->count(),
@@ -728,10 +743,13 @@ final class EventController extends Controller
     private function registrationRows(Event $event): array
     {
         return $event->registrations()
-            ->with(['ticketType:id,name', 'seatAssignment.room:id,name'])
+            ->with(['ticketType:id,name', 'seatAssignment.room:id,name', 'memberBenefitAttempts' => fn ($query) => $query->latest()->orderByDesc('id')->limit(1)])
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (EventRegistration $registration): array => [
+                'member_benefit_required' => $registration->member_benefit_required,
+                'member_verification_url' => $registration->member_benefit_required ? route('public.events.checkout', ['subdomain' => $event->tenant->slug, 'event' => $event->slug, 'registration' => $registration->id, 'review' => 1]) : null,
+                'member_payment_unresolved' => $registration->memberBenefitAttempts->contains(fn ($source): bool => ! in_array($source->state, ['failed', 'refunded'], true)),
                 'id' => $registration->id,
                 'full_name' => $registration->full_name,
                 'email' => $registration->email,
@@ -785,6 +803,7 @@ final class EventController extends Controller
      */
     private function validateEvent(Request $request): array
     {
+        $memberBenefitsEnabled = app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($this->getTenant());
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -813,11 +832,13 @@ final class EventController extends Controller
             'contact_email' => ['nullable', 'email', 'max:255'],
             'capacity' => ['nullable', 'integer', 'min:1'],
             'requires_approval' => ['sometimes', 'boolean'],
+            'members_only' => $memberBenefitsEnabled ? ['sometimes', 'boolean'] : ['prohibited'],
+            'member_ticket_price' => [$memberBenefitsEnabled ? 'nullable' : 'prohibited', 'integer', 'min:0', 'lte:ticket_price'],
             'ticket_price' => ['required', 'integer', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
             'plan_your_visit_content' => ['nullable', 'string'],
             'hero_image' => ['nullable', 'image', 'max:20480'],
-            'store_listing_id' => ['nullable', 'uuid', 'exists:landlord.store_listings,id'],
+            'store_listing_id' => ['nullable', 'uuid', Rule::exists('landlord.store_listings', 'id')->where(fn ($query) => $query->where('listing_kind', '!=', \App\Models\StoreListing::KIND_MERCHANDISE))],
             'venue_booking_id' => ['nullable', 'uuid', 'exists:landlord.venue_bookings,id'],
             'is_recurring' => ['sometimes', 'boolean'],
             'recurrence_pattern' => ['nullable', 'required_if:is_recurring,true', Rule::in(RecurrenceService::PATTERNS)],
@@ -876,6 +897,9 @@ final class EventController extends Controller
     private function toPayload(Event $event): array
     {
         return [
+            'members_only' => $event->members_only, 'member_ticket_price' => $event->member_ticket_price,
+            'member_benefits_enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant),
+            'has_member_benefit_history' => $event->registrations()->where('member_benefit_required', true)->exists(),
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,
@@ -904,7 +928,7 @@ final class EventController extends Controller
                 'name' => $t->name,
                 'description' => $t->description,
                 'badge_tier' => $t->badge_tier,
-                'price' => $t->price,
+                'price' => $t->price, 'member_price' => $t->member_price,
                 'capacity' => $t->capacity,
                 'is_active' => $t->is_active,
                 'confirmed_count' => $t->confirmedCount(),

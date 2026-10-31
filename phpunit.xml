@@ -19,6 +19,7 @@
     <env name="DB_CONNECTION" value="pgsql"/>
     <env name="DB_DATABASE" value="miconvener_testing"/>
     <env name="CACHE_DRIVER" value="array"/>
+    <env name="FX_BOG_URL" value=""/>
     <env name="MAIL_MAILER" value="array"/>
     <env name="QUEUE_CONNECTION" value="sync"/>
     <env name="SESSION_DRIVER" value="array"/>

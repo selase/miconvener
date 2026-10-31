@@ -11,6 +11,7 @@ use App\Models\StoreAmenity;
 use App\Models\StoreListing;
 use App\Models\StoreListingAmenity;
 use App\Models\Tenant;
+use App\Services\Marketplace\VenueRequestRollout;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ final class VenueListingController extends Controller
         }
 
         $spaces = $shop->listings()
+            ->withStaffOnly()->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE)
             ->with(['primaryMedia', 'amenities.amenity'])
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
@@ -69,6 +71,8 @@ final class VenueListingController extends Controller
         return Inertia::render('Tenant/Venue/Spaces/Form', [
             'space' => null,
             'amenities' => $amenities,
+            'venueRequests' => $this->takesVenueRequests(),
+            'defaultTimezone' => config('app.timezone'),
         ]);
     }
 
@@ -109,6 +113,9 @@ final class VenueListingController extends Controller
                 'ceiling_height_meters' => $validated['ceiling_height_meters'] ?? null,
                 'rules_and_policies' => $validated['rules_and_policies'] ?? [],
                 'status' => $validated['status'],
+                'audience' => $validated['audience'] ?? StoreListing::AUDIENCE_PUBLIC,
+                'requires_approval' => $validated['requires_approval'] ?? true,
+                'public_booking_policy' => $this->bookingPolicy($validated['public_booking_policy'] ?? null, null),
             ]);
 
             if (! empty($validated['amenities'])) {
@@ -139,9 +146,12 @@ final class VenueListingController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $listing->setAttribute('booking_policy', $listing->publicBookingPolicy());
+
         return Inertia::render('Tenant/Venue/Spaces/Form', [
             'space' => $listing,
             'amenities' => $amenities,
+            'venueRequests' => $this->takesVenueRequests(),
         ]);
     }
 
@@ -179,6 +189,9 @@ final class VenueListingController extends Controller
                 'ceiling_height_meters' => $validated['ceiling_height_meters'] ?? null,
                 'rules_and_policies' => $validated['rules_and_policies'] ?? [],
                 'status' => $validated['status'],
+                'audience' => $validated['audience'] ?? $listing->audience,
+                'requires_approval' => $validated['requires_approval'] ?? $listing->requires_approval,
+                'public_booking_policy' => $this->bookingPolicy($validated['public_booking_policy'] ?? null, $listing),
             ]);
 
             // Sync amenities grid
@@ -217,8 +230,34 @@ final class VenueListingController extends Controller
         $tenant = $this->tenantContext->getTenant();
         $shop = $tenant->shop;
 
+        abort_if($listing->listing_kind === StoreListing::KIND_MERCHANDISE, 404);
+
         if (! $shop || $listing->shop_id !== $shop->id) {
             abort(403, 'Unauthorized access to venue listing.');
         }
+    }
+
+    private function takesVenueRequests(): bool
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+
+        return $tenant !== null && app(VenueRequestRollout::class)->enabled($tenant);
+    }
+
+    /**
+     * The stored approval-first policy: only the keys a host sets are kept, so
+     * everything else keeps following the platform defaults.
+     *
+     * @param  array<string, mixed>|null  $submitted
+     * @return array<string, mixed>|null
+     */
+    private function bookingPolicy(?array $submitted, ?StoreListing $existing): ?array
+    {
+        $current = (array) ($existing->public_booking_policy ?? []);
+        if ($submitted === null) {
+            return $current === [] ? null : $current;
+        }
+
+        return [...$current, ...array_intersect_key($submitted, array_flip(['default_hold_hours', 'timezone']))];
     }
 }

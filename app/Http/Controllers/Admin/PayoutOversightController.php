@@ -64,7 +64,9 @@ final class PayoutOversightController extends Controller
         $validated = $request->validate(['otp' => ['required', 'string', 'max:32']], ['otp.required' => 'Enter the one-time code Paystack sent.']);
         $payoutModel = EventPayout::query()->withoutGlobalScopes()->findOrFail($payout);
 
-        $result = $payoutRelease->release($payoutModel, $validated['otp']);
+        $result = $payoutModel->category === \App\Enum\LedgerCategoryEnum::Commerce
+            ? app(\App\Services\Marketplace\StorePayouts::class)->finalize($payoutModel, $validated['otp'])
+            : $payoutRelease->release($payoutModel, $validated['otp']);
 
         activity()
             ->causedBy($request->user())

@@ -36,7 +36,10 @@ final readonly class GuardAttendeePortalHost
             $request->server->set('SERVER_NAME', $host);
             $request->attributes->set('is_platform_attendee_portal', true);
 
-            return $next($request);
+            $response = $next($request);
+            $response->headers->set('Cache-Control', 'private, no-store');
+
+            return $response;
         }
 
         $baseDomain = $this->hostMatcher->baseDomain();

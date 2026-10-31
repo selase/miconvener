@@ -35,17 +35,18 @@ final class PaymentSettingsController extends Controller
         $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
-        // The same check that lets a tenant sell paid tickets: whoever can take
-        // payment can configure how they are paid, and no one else.
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        // Finance eligibility includes dues-only organisations and retained history.
+        if (! $tenant->showsFinance()) {
+            abort(403, 'Payment settings are not available for this organisation.');
         }
 
         $gateways = TenantPaymentGateway::where('tenant_id', $tenant->id)->get()->keyBy('provider');
         $stripe = $gateways->get('stripe');
-        $canSetPlatformFee = Gate::allows('access-superadmin-dashboard');
+        $canSetPlatformFee = Gate::allows('manage-commercial-terms');
 
         return Inertia::render('Tenant/Settings/Payments', [
+            'ticketPaymentsAvailable' => $tenant->handlesTicketMoney(),
+            'givingPaymentsAvailable' => app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) || $tenant->hasGivingMoney(),
             'settlementMode' => $tenant->settlement_mode,
             'platformSettlementAvailable' => (bool) config('services.settlement.paystack.secret_key'),
             'gateways' => [
@@ -83,8 +84,8 @@ final class PaymentSettingsController extends Controller
     {
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        if (! $tenant->showsFinance()) {
+            abort(403, 'Payment settings are not available for this organisation.');
         }
 
         $validated = $request->validated();
@@ -155,8 +156,8 @@ final class PaymentSettingsController extends Controller
         $this->authorize('manage payment settings');
         $tenant = $this->tenantContext->getTenant();
 
-        if (! $tenant->handlesTicketMoney()) {
-            abort(403, 'Your plan does not include paid tickets.');
+        if (! $tenant->handlesTicketMoney() && ! app(\App\Services\Giving\GivingRollout::class)->enabled($tenant) && ! $tenant->hasGivingMoney()) {
+            abort(403, 'Payment connection is not available for this organisation.');
         }
 
         if (! $this->stripeConnect->isConfigured()) {
@@ -202,19 +203,19 @@ final class PaymentSettingsController extends Controller
     }
 
     /**
-     * Application-superadmin only: set a tenant's commission terms from the
-     * UI, writing the same columns php artisan events:set-platform-fee writes.
+     * Platform staff only: set a tenant's commission terms from the UI,
+     * writing the same columns php artisan events:set-platform-fee writes.
      * The CLI command remains for scripted and bulk use.
      *
-     * Authorization is the access-superadmin-dashboard gate, which requires
-     * the global Superadmin role with a null tenant_id. It deliberately does
-     * NOT key off the email column: tenant admins can set team members'
+     * Authorization is the manage-commercial-terms gate: the permission held
+     * through a platform role (null tenant_id), the Superadmin's by default.
+     * It deliberately does NOT key off the email column: tenant admins can set team members'
      * email addresses, and users.email is unique globally rather than per
      * tenant, so an address allowlist is a value the tenant controls.
      */
     public function updatePlatformFee(Request $request): RedirectResponse
     {
-        Gate::authorize('access-superadmin-dashboard');
+        Gate::authorize('manage-commercial-terms');
 
         $tenant = $this->tenantContext->getTenant();
 

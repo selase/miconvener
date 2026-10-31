@@ -1,5 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
+import VenueQuotePanel from '@/Components/Marketplace/VenueQuotePanel';
+import VenueRequestStatus, { VenueRequestBadge, useLiveApproval } from '@/Components/Marketplace/VenueRequestStatus';
 import {
     Calendar,
     Clock,
@@ -49,12 +51,8 @@ export default function BookingShow({ booking }) {
     };
 
     const generateIcsFile = () => {
-        const startDate = new Date(booking.starts_at)
-            .toISOString()
-            .replace(/-|:|\.\d+/g, '');
-        const endDate = new Date(booking.ends_at)
-            .toISOString()
-            .replace(/-|:|\.\d+/g, '');
+        const startDate = new Date(booking.starts_at).toISOString().replace(/-|:|\.\d+/g, '');
+        const endDate = new Date(booking.ends_at).toISOString().replace(/-|:|\.\d+/g, '');
 
         const icsContent = [
             'BEGIN:VCALENDAR',
@@ -84,6 +82,7 @@ export default function BookingShow({ booking }) {
 
     const isConfirmed = booking.status === 'confirmed' || booking.payment_status === 'deposit_paid';
     const isPendingQuote = booking.status === 'pending_quote';
+    const approval = useLiveApproval(booking.approval?.flow ? booking.approval : null);
 
     return (
         <MarketplaceLayout>
@@ -106,7 +105,9 @@ export default function BookingShow({ booking }) {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                {isConfirmed ? (
+                                {approval ? (
+                                    <VenueRequestBadge approval={approval} />
+                                ) : isConfirmed ? (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                         <CheckCircle2 className="h-3.5 w-3.5" />
                                         <span>Confirmed & Calendar Locked</span>
@@ -138,51 +139,59 @@ export default function BookingShow({ booking }) {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={generateIcsFile}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-ink hover:bg-surface-hover transition-colors shadow-2xs"
-                            >
-                                <Download className="h-3.5 w-3.5 text-accent" />
-                                <span>Add to Calendar (.ics)</span>
-                            </button>
+                            {!approval && (
+                                <button
+                                    type="button"
+                                    onClick={generateIcsFile}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-ink hover:bg-surface-hover transition-colors shadow-2xs"
+                                >
+                                    <Download className="h-3.5 w-3.5 text-accent" />
+                                    <span>Add to Calendar (.ics)</span>
+                                </button>
+                            )}
                         </div>
                     </div>
 
+                    {approval && <VenueRequestStatus booking={{ ...booking, approval }} />}
+                    {approval && booking.financial && <VenueQuotePanel booking={booking} />}
+
                     {/* Pending Deposit Action Banner */}
-                    {!isConfirmed && booking.status === 'pending_payment' && booking.deposit_required_pesewas > 0 && (
-                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="space-y-1">
-                                <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                                    Reservation Awaiting Deposit Payment
+                    {!isConfirmed &&
+                        booking.status === 'pending_payment' &&
+                        booking.deposit_required_pesewas > 0 && (
+                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                        Reservation Awaiting Deposit Payment
+                                    </div>
+                                    <p className="text-xs text-ink-secondary">
+                                        Pay the required reservation deposit of{' '}
+                                        <span className="font-semibold text-ink">
+                                            {formatCurrency(booking.deposit_required_pesewas)}
+                                        </span>{' '}
+                                        to lock the venue calendar and guarantee your booking.
+                                    </p>
                                 </div>
-                                <p className="text-xs text-ink-secondary">
-                                    Pay the required reservation deposit of{' '}
-                                    <span className="font-semibold text-ink">
-                                        {formatCurrency(booking.deposit_required_pesewas)}
-                                    </span>{' '}
-                                    to lock the venue calendar and guarantee your booking.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    router.post(
-                                        route(
-                                            'marketplace.bookings.checkout',
-                                            booking.booking_reference
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        router.post(
+                                            route(
+                                                'marketplace.bookings.checkout',
+                                                booking.booking_reference
+                                            )
                                         )
-                                    )
-                                }
-                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-95 transition-all shrink-0 cursor-pointer"
-                            >
-                                <CreditCard className="h-4 w-4" />
-                                <span>
-                                    Pay Deposit ({formatCurrency(booking.deposit_required_pesewas)})
-                                </span>
-                            </button>
-                        </div>
-                    )}
+                                    }
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-95 transition-all shrink-0 cursor-pointer"
+                                >
+                                    <CreditCard className="h-4 w-4" />
+                                    <span>
+                                        Pay Deposit (
+                                        {formatCurrency(booking.deposit_required_pesewas)})
+                                    </span>
+                                </button>
+                            </div>
+                        )}
 
                     {/* Schedule & Space Grid */}
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -249,48 +258,52 @@ export default function BookingShow({ booking }) {
                     </div>
 
                     {/* Financial Receipt & Payment Summary */}
-                    <div className="rounded-xl border border-border bg-surface p-5 space-y-4 text-xs">
-                        <div className="flex items-center justify-between border-b border-border pb-3">
-                            <div className="flex items-center gap-2 font-semibold text-ink">
-                                <CreditCard className="h-4 w-4 text-accent" />
-                                <span>Financial Summary & Receipt</span>
-                            </div>
-                            <span className="rounded bg-accent/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-accent">
-                                Paystack Secure
-                            </span>
-                        </div>
-
-                        <div className="space-y-2 text-ink-secondary">
-                            <div className="flex justify-between">
-                                <span>Base Rental Fee:</span>
-                                <span className="font-medium text-ink">
-                                    {formatCurrency(booking.rental_amount_pesewas)}
+                    {!approval && (
+                        <div className="rounded-xl border border-border bg-surface p-5 space-y-4 text-xs">
+                            <div className="flex items-center justify-between border-b border-border pb-3">
+                                <div className="flex items-center gap-2 font-semibold text-ink">
+                                    <CreditCard className="h-4 w-4 text-accent" />
+                                    <span>Financial Summary & Receipt</span>
+                                </div>
+                                <span className="rounded bg-accent/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-accent">
+                                    Paystack Secure
                                 </span>
                             </div>
-                            {booking.security_deposit_pesewas > 0 && (
+
+                            <div className="space-y-2 text-ink-secondary">
                                 <div className="flex justify-between">
-                                    <span>Refundable Security Deposit:</span>
+                                    <span>Base Rental Fee:</span>
                                     <span className="font-medium text-ink">
-                                        {formatCurrency(booking.security_deposit_pesewas)}
+                                        {formatCurrency(booking.rental_amount_pesewas)}
                                     </span>
                                 </div>
-                            )}
-                            <div className="flex justify-between border-t border-border pt-2 text-sm font-bold text-ink">
-                                <span>Total Estimated Amount:</span>
-                                <span>{formatCurrency(booking.total_amount_pesewas)}</span>
-                            </div>
-                            <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold pt-1">
-                                <span>Amount Paid / Captured:</span>
-                                <span>{formatCurrency(booking.amount_paid_pesewas)}</span>
-                            </div>
-                            {booking.paystack_reference && (
-                                <div className="flex justify-between text-[11px] text-ink-tertiary pt-1">
-                                    <span>Payment Reference:</span>
-                                    <span className="font-mono">{booking.paystack_reference}</span>
+                                {booking.security_deposit_pesewas > 0 && (
+                                    <div className="flex justify-between">
+                                        <span>Refundable Security Deposit:</span>
+                                        <span className="font-medium text-ink">
+                                            {formatCurrency(booking.security_deposit_pesewas)}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between border-t border-border pt-2 text-sm font-bold text-ink">
+                                    <span>Total Estimated Amount:</span>
+                                    <span>{formatCurrency(booking.total_amount_pesewas)}</span>
                                 </div>
-                            )}
+                                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold pt-1">
+                                    <span>Amount Paid / Captured:</span>
+                                    <span>{formatCurrency(booking.amount_paid_pesewas)}</span>
+                                </div>
+                                {booking.paystack_reference && (
+                                    <div className="flex justify-between text-[11px] text-ink-tertiary pt-1">
+                                        <span>Payment Reference:</span>
+                                        <span className="font-mono">
+                                            {booking.paystack_reference}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Special Requests & Contract Terms */}
                     {booking.special_requests && (
@@ -311,7 +324,9 @@ export default function BookingShow({ booking }) {
                                 <span>Agreed Rental Contract & House Rules</span>
                             </div>
                             <p className="text-[11px] text-ink-secondary">
-                                Confirmed with digital agreement snapshot on{' '}
+                                {approval
+                                    ? 'Terms accepted with your request on'
+                                    : 'Confirmed with digital agreement snapshot on'}{' '}
                                 {formatDate(booking.contract_agreed_at)}. Governed by MiConvener
                                 Marketplace Rental Terms v2026.1.
                             </p>

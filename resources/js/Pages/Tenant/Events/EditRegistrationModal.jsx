@@ -43,7 +43,10 @@ export default function EditRegistrationModal({ event, registration, onClose, on
             const json = await response.json().catch(() => ({}));
             setErrors(
                 Object.fromEntries(
-                    Object.entries(json.errors ?? {}).map(([field, messages]) => [field, messages[0]])
+                    Object.entries(json.errors ?? {}).map(([field, messages]) => [
+                        field,
+                        messages[0],
+                    ])
                 )
             );
         } catch {
@@ -72,10 +75,23 @@ export default function EditRegistrationModal({ event, registration, onClose, on
                     value={form.email}
                     onChange={set('email')}
                     error={errors.email}
-                    hint="Their tickets, certificates and history follow this address."
+                    disabled={Boolean(
+                        registration.member_benefit_required &&
+                        (registration.ticket_code || registration.member_payment_unresolved)
+                    )}
+                    hint={
+                        registration.member_benefit_required
+                            ? 'A personal member ticket or unresolved payment cannot be reassigned. Other address corrections require new verification and invalidate earlier links.'
+                            : 'Their tickets, certificates and history follow this address.'
+                    }
                     required
                 />
-                <Input label="Phone" value={form.phone} onChange={set('phone')} error={errors.phone} />
+                <Input
+                    label="Phone"
+                    value={form.phone}
+                    onChange={set('phone')}
+                    error={errors.phone}
+                />
                 {formError && <p className="text-sm text-danger-fg">{formError}</p>}
                 <div className="flex justify-end gap-2">
                     <Button type="button" onClick={onClose}>

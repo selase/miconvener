@@ -99,9 +99,23 @@ jobs:
     - name: Directory Permissions
       run: chmod -R 777 storage bootstrap/cache
 
-    # Each process gets its own database (testing_test_1 ...). Four is the most
-    # the stock Postgres lock table allows while the schema is rebuilt: six
-    # processes ran it out of shared memory.
+    # Rebuilding four schemas with many FK/index relations can exhaust the
+    # stock lock table. This changes only the disposable CI service container.
+    - name: Allow parallel schema rebuilds
+      env:
+        POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      run: |
+        docker exec "$POSTGRES_CONTAINER" psql -U postgres -d testing -c "ALTER SYSTEM SET max_locks_per_transaction = 256;"
+        docker restart "$POSTGRES_CONTAINER"
+        for attempt in {1..30}; do
+          if docker exec "$POSTGRES_CONTAINER" pg_isready -U postgres -d testing; then
+            exit 0
+          fi
+          sleep 1
+        done
+        exit 1
+
+    # Each worker gets its own database (testing_test_1 ...).
     - name: Execute tests
       env:
         DB_HOST: 127.0.0.1
@@ -109,4 +123,13 @@ jobs:
         DB_DATABASE: testing
         DB_USERNAME: postgres
         DB_PASSWORD: password
-      run: php artisan test --parallel --processes=4
+      run: |
+        php artisan test --parallel --processes=4
+        php artisan test --compact --bootstrap=tests/Support/without-telescope-bootstrap.php \
+          tests/Unit/Support/WithoutTelescopeTest.php \
+          tests/Feature/Marketplace/StoreCheckoutTest.php \
+          tests/Feature/Marketplace/StoreReceiptsTest.php \
+          tests/Feature/Marketplace/StoreReadyNoticesTest.php \
+          tests/Feature/Marketplace/StoreRefundsTest.php \
+          tests/Feature/Marketplace/StorePayoutsTest.php \
+          tests/Feature/Community/PhoneVerificationTest.php

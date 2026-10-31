@@ -60,6 +60,8 @@ final class SubscriptionRenewalService
                     'grace_ends_at' => null,
                     'renewal_attempts' => 0,
                     'pending_package_id' => null,
+                    // What the plan is now billed in: a renewal paid at the USD price keeps renewing in USD.
+                    'billing_currency' => self::billedIn($provider, $subscription),
                     ...$this->refreshedAuthorization($subscription, $provider),
                 ]);
 
@@ -77,6 +79,7 @@ final class SubscriptionRenewalService
                         'package_id' => $package->id,
                         'provider_plan_id' => $package->slug.'_'.$interval,
                         'current_period_end' => $periodEnd->toIso8601String(),
+                        'pricing' => self::pricing($provider),
                     ],
                 ]);
 
@@ -104,6 +107,38 @@ final class SubscriptionRenewalService
         $current = Package::query()->find($subscription->tenant()->value('package_id'));
 
         return $current && ! $current->isFree() ? $current : null;
+    }
+
+    /**
+     * The currency the plan is billed in after this payment: the one it was
+     * priced in, or what it was before when the payment carries no price.
+     *
+     * @param  array<string, mixed>  $provider
+     */
+    private static function billedIn(array $provider, Subscription $subscription): string
+    {
+        $currency = self::pricing($provider)['display_currency'] ?? null;
+
+        return in_array($currency, ['GHS', 'USD'], true) ? $currency : (string) ($subscription->billing_currency ?: 'GHS');
+    }
+
+    /**
+     * The price and exchange rate the renewal was charged at: passed directly
+     * by the scheduler, or carried in Paystack's metadata (an array, or JSON).
+     *
+     * @param  array<string, mixed>  $provider
+     * @return array<string, mixed>|null
+     */
+    private static function pricing(array $provider): ?array
+    {
+        if (is_array($provider['pricing'] ?? null)) {
+            return $provider['pricing'];
+        }
+
+        $metadata = $provider['metadata'] ?? null;
+        $metadata = is_string($metadata) ? json_decode($metadata, true) : $metadata;
+
+        return is_array($metadata) && is_array($metadata['pricing'] ?? null) ? $metadata['pricing'] : null;
     }
 
     /**

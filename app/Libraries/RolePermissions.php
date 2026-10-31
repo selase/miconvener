@@ -119,8 +119,15 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
+            'manage store catalog',
+            'manage store collection',
+            'manage store orders',
+            'manage store finance',
             ...self::platformFinancePermissions(),
             ...self::platformMarketingPermissions(),
+            // Commission rates and caps for one organisation. Superadmin by
+            // default; a superadmin may grant it to another platform role.
+            'manage commercial terms',
             'create setting',
             'read setting',
             'update setting',
@@ -198,6 +205,9 @@ final class RolePermissions
             'delete notification-rule',
             'manage notification-settings',
             'manage venue',
+            'manage venue refunds',
+            'reconcile venue payments',
+            'release venue settlements',
         ];
     }
 
@@ -209,6 +219,10 @@ final class RolePermissions
     private static function organizationSuperadminPermissions(): array
     {
         return [
+            'manage store catalog',
+            'manage store collection',
+            'manage store orders',
+            'manage store finance',
             'create communication',
             'read communication',
             'update communication',
@@ -224,6 +238,12 @@ final class RolePermissions
             'process refunds',
             'manage payouts',
             'manage members',
+            'manage giving',
+            'send community messages',
+            'manage room bookings',
+            'manage community library',
+            'manage community polls',
+            'read community poll results',
             'manage payment settings',
             'manage api keys',
             'create role',
@@ -267,6 +287,9 @@ final class RolePermissions
             'delete notification-rule',
             'manage notification-settings',
             'manage venue',
+            'manage venue refunds',
+            'reconcile venue payments',
+            'release venue settlements',
         ];
     }
 
@@ -278,6 +301,9 @@ final class RolePermissions
     private static function organizationAdminPermissions(): array
     {
         return [
+            'manage store catalog',
+            'manage store collection',
+            'manage store orders',
             'create communication',
             'read communication',
             'update communication',
@@ -286,6 +312,11 @@ final class RolePermissions
             'manage organization settings',
             'read finance',
             'manage members',
+            'manage giving',
+            'send community messages',
+            'manage community library',
+            'manage community polls',
+            'read community poll results',
             'manage api keys',
             'create role',
             'read role',

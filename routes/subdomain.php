@@ -36,6 +36,7 @@ use App\Http\Controllers\Tenant\EventSponsorController;
 use App\Http\Controllers\Tenant\EventTicketTypeController;
 use App\Http\Controllers\Tenant\EventVenueController;
 use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\MemberImportController;
 use App\Http\Controllers\Tenant\MembershipTypeController;
 use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\OrgSettingsController;
@@ -145,6 +146,8 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     // Merchant Finance & Sales
     Route::get('/finance', [App\Http\Controllers\Tenant\FinanceController::class, 'index'])->name('tenant.finance.index');
+    Route::get('/finance/dues/collections/export', [App\Http\Controllers\Tenant\FinanceController::class, 'exportDuesCollections'])->name('tenant.finance.dues.collections.export');
+    Route::get('/finance/dues/arrears/export', [App\Http\Controllers\Tenant\FinanceController::class, 'exportDuesArrears'])->name('tenant.finance.dues.arrears.export');
     Route::post('/finance/refund/{transaction}', [App\Http\Controllers\Tenant\FinanceController::class, 'refund'])->name('tenant.finance.refund');
 
     Route::prefix('llm-config')->name('tenant.llm-config.')->group(function () {
@@ -166,6 +169,7 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
 
     // Events (host console)
     Route::resource('events', EventController::class)->names('tenant.events')->except(['create', 'edit']);
+    Route::patch('events/{event}/member-benefits', [EventController::class, 'updateMemberBenefits'])->name('tenant.events.member-benefits');
     Route::post('events/{event}/restore', [EventController::class, 'restore'])->name('tenant.events.restore');
     Route::delete('events/{event}/force-purge', [EventController::class, 'forcePurge'])->name('tenant.events.force-purge');
     // Each section of an event's workspace has its own address, so refresh, the back
@@ -186,6 +190,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/registrations/{registration}/approve-offline', [EventRegistrationController::class, 'approveOfflinePayment'])->name('tenant.events.registrations.approve-offline');
     Route::post('events/{event}/registrations/{registration}/reject-offline', [EventRegistrationController::class, 'rejectOfflinePayment'])->name('tenant.events.registrations.reject-offline');
     Route::get('events/{event}/registrations/{registration}/offline-proof', [EventRegistrationController::class, 'downloadProof'])->name('tenant.events.registrations.offline-proof');
+    Route::get('events/{event}/member-payments', [EventRegistrationController::class, 'memberPayments'])->name('tenant.events.member-payments.index');
+    Route::post('events/{event}/member-payments/{attempt}/refund', [EventRegistrationController::class, 'refundMemberPayment'])->name('tenant.events.member-payments.refund');
+    Route::post('events/{event}/member-payments/{attempt}/reconcile', [EventRegistrationController::class, 'reconcileMemberPayment'])->name('tenant.events.member-payments.reconcile');
     Route::post('events/{event}/registrations/{registration}/cancel', [EventRegistrationController::class, 'cancel'])->name('tenant.events.registrations.cancel');
     Route::patch('events/{event}/registrations/{registration}', [EventRegistrationController::class, 'update'])->name('tenant.events.registrations.update');
     Route::get('events/{event}/checkin/search', [EventCheckInController::class, 'search'])->name('tenant.events.checkin.search');
@@ -304,13 +311,141 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('payout-accounts', [TenantPayoutAccountController::class, 'store'])->name('tenant.payout-accounts.store');
     Route::delete('payout-accounts/{account}', [TenantPayoutAccountController::class, 'destroy'])->name('tenant.payout-accounts.destroy');
 
+    Route::prefix('community/followers/announcements')->middleware('community.following')->name('tenant.following.announcements.')->group(function (): void {
+        Route::get('/', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'index'])->name('index');
+        Route::post('/preview', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'preview'])->name('preview');
+        Route::post('/', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'store'])->name('store');
+        Route::get('/events', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'events'])->name('events');
+        Route::get('/{message}', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'show'])->name('show');
+        Route::post('/{message}/cancel', [App\Http\Controllers\Tenant\FollowingEventAnnouncementController::class, 'cancel'])->name('cancel');
+    });
+
+    Route::get('community/followers', [App\Http\Controllers\Tenant\CommunityFollowerController::class, 'index'])->middleware('community.following')->name('tenant.community.followers.index');
+
+    Route::post('community/library/service-notes', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'store'])->name('tenant.community.service-notes.store');
+    Route::get('community/library/service-options', [App\Http\Controllers\Tenant\CommunityServiceNoteController::class, 'options'])->name('tenant.community.service-notes.options');
+    Route::get('community/polls', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'index'])->name('tenant.community.polls.index');
+    Route::post('community/polls', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'store'])->name('tenant.community.polls.store');
+    Route::post('community/polls/{questionnaire}', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'update'])->whereUuid('questionnaire')->name('tenant.community.polls.update');
+    Route::post('community/polls/{questionnaire}/state', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'state'])->whereUuid('questionnaire')->name('tenant.community.polls.state');
+    Route::get('community/polls/{questionnaire}/results', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'results'])->whereUuid('questionnaire')->name('tenant.community.polls.results');
+    Route::get('community/polls/{questionnaire}/export', [App\Http\Controllers\Tenant\CommunityQuestionnaireController::class, 'export'])->whereUuid('questionnaire')->name('tenant.community.polls.export');
+    Route::prefix('store')->name('tenant.store.')->middleware('throttle:30,1')->group(function (): void {
+        Route::get('collections', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'index'])->name('collections.index');
+        Route::get('collections/{order}', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'show'])->whereUuid('order')->name('collections.show');
+        Route::post('collections/{order}/ready', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'ready'])->whereUuid('order')->name('collections.ready');
+        Route::post('collections/{order}/prepare', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'prepare'])->whereUuid('order')->name('collections.prepare');
+        Route::post('collections/{order}/dispatch', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'dispatchOrder'])->whereUuid('order')->name('collections.dispatch');
+        Route::post('collections/{order}/delivery-failed', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'deliveryFailed'])->whereUuid('order')->name('collections.delivery-failed');
+        Route::post('collections/{order}/returned', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'returned'])->whereUuid('order')->name('collections.returned');
+        Route::post('collections/{order}/validate', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'validatePass'])->whereUuid('order')->name('collections.validate');
+        Route::post('collections/{order}/confirm', [App\Http\Controllers\Tenant\Store\StoreCollectionController::class, 'confirm'])->whereUuid('order')->name('collections.confirm');
+        Route::post('fulfilment-policies', [App\Http\Controllers\Tenant\Store\StoreFulfilmentPolicyController::class, 'store'])->name('fulfilment-policies.store');
+        Route::get('quotes', [App\Http\Controllers\Tenant\Store\StoreSellerQuoteController::class, 'index'])->name('quotes.index');
+        Route::post('quotes', [App\Http\Controllers\Tenant\Store\StoreSellerQuoteController::class, 'store'])->middleware('throttle:30,1')->name('quotes.store');
+        Route::post('quotes/{quote}/withdraw', [App\Http\Controllers\Tenant\Store\StoreSellerQuoteController::class, 'withdraw'])->whereUuid('quote')->middleware('throttle:30,1')->name('quotes.withdraw');
+        Route::get('orders', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'index'])->name('orders.index');
+        Route::get('finance', [App\Http\Controllers\Tenant\Store\StoreOrderController::class, 'finance'])->name('finance.index');
+        Route::post('orders/{order}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcilePayment'])->whereUuid('order')->middleware('throttle:10,1')->name('orders.reconcile');
+        Route::post('orders/{order}/refunds', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'refund'])->whereUuid('order')->name('refunds.create');
+        Route::post('orders/{order}/cancel-free', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'cancelFree'])->whereUuid('order')->name('orders.cancel-free');
+        Route::post('refunds/{refund}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcileRefund'])->whereUuid('refund')->name('refunds.reconcile');
+        Route::post('payouts', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reserve'])->name('payouts.create');
+        Route::post('payouts/{payout}/cancel', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'cancelPayout'])->whereUuid('payout')->name('payouts.cancel');
+        Route::post('payouts/{payout}/send', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'send'])->whereUuid('payout')->name('payouts.send');
+        Route::post('payouts/{payout}/finalize', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'finalize'])->whereUuid('payout')->name('payouts.finalize');
+        Route::post('payouts/{payout}/reconcile', [App\Http\Controllers\Tenant\Store\StoreFinanceController::class, 'reconcilePayout'])->whereUuid('payout')->name('payouts.reconcile');
+    });
+
+    Route::prefix('store/catalog')->name('tenant.store.catalog.')->group(function (): void {
+        Route::get('/', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'store'])->name('store');
+        Route::get('/create', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'create'])->name('create');
+        Route::get('/{listing}', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'show'])->whereUuid('listing')->name('show');
+        Route::put('/{listing}', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'update'])->whereUuid('listing')->name('update');
+        Route::post('/{listing}/draft', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'draft'])->whereUuid('listing')->name('draft');
+        Route::post('/{listing}/publish', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'publish'])->whereUuid('listing')->name('publish');
+        Route::post('/{listing}/archive', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'archive'])->whereUuid('listing')->name('archive');
+        Route::post('/{listing}/variants/{variant}/adjustments', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'adjust'])->whereUuid(['listing', 'variant'])->name('adjust');
+        Route::delete('/{listing}/photos/{media}', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'removePhoto'])->whereUuid(['listing', 'media'])->name('photos.destroy');
+        Route::post('/{listing}/photos', [App\Http\Controllers\Tenant\Store\MerchandiseCatalogController::class, 'photo'])->whereUuid('listing')->name('photos');
+    });
+
+    Route::get('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'index'])->name('tenant.community.library.index');
+    Route::post('community/library', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'store'])->name('tenant.community.library.store');
+    Route::post('community/library/{item}', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'update'])->whereUuid('item')->name('tenant.community.library.update');
+    Route::post('community/library/{item}/withdraw', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'withdraw'])->whereUuid('item')->name('tenant.community.library.withdraw');
+    Route::get('community/library/{item}/versions', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'history'])->whereUuid('item')->name('tenant.community.library.history');
+    Route::get('community/library/{item}/versions/{version}/file', [App\Http\Controllers\Tenant\CommunityLibraryController::class, 'version'])->whereUuid(['item', 'version'])->name('tenant.community.library.version');
+
+    Route::get('community/money/giving', [App\Http\Controllers\Tenant\GivingFundController::class, 'index'])->name('tenant.community.money.giving.index');
+    Route::get('community/money/giving/report', [App\Http\Controllers\Tenant\GivingReportController::class, 'index'])->name('tenant.community.money.giving.report');
+
+    Route::post('finance/giving/refunds/{adjustment}/reconcile', [App\Http\Controllers\Tenant\GivingRefundController::class, 'reconcile'])->name('tenant.community.giving.refunds.reconcile');
+    Route::get('finance/giving/{type}/{source}/refunds/preview', [App\Http\Controllers\Tenant\GivingRefundController::class, 'preview'])->name('tenant.community.giving.refunds.preview');
+    Route::post('finance/giving/{type}/{source}/refunds', [App\Http\Controllers\Tenant\GivingRefundController::class, 'store'])->name('tenant.community.giving.refunds.store');
+
+    Route::get('community/money/giving/member-options', [App\Http\Controllers\Tenant\GivingGiftController::class, 'memberOptions'])->name('tenant.community.giving.member-options');
+    Route::post('community/money/giving/funds/{fund}/gifts', [App\Http\Controllers\Tenant\GivingGiftController::class, 'store'])->name('tenant.community.giving.gifts.store');
+    Route::post('community/money/giving/gifts/{gift}/corrections', [App\Http\Controllers\Tenant\GivingGiftController::class, 'correct'])->name('tenant.community.giving.gifts.correct');
+
+    Route::prefix('community/money/giving/funds')->name('tenant.community.giving.funds.')->group(function (): void {
+        Route::post('/', [App\Http\Controllers\Tenant\GivingFundController::class, 'store'])->name('store');
+        Route::put('/{fund}', [App\Http\Controllers\Tenant\GivingFundController::class, 'update'])->name('update');
+        Route::post('/{fund}/close', [App\Http\Controllers\Tenant\GivingFundController::class, 'close'])->name('close');
+        Route::post('/{fund}/reopen', [App\Http\Controllers\Tenant\GivingFundController::class, 'reopen'])->name('reopen');
+        Route::post('/{fund}/archive', [App\Http\Controllers\Tenant\GivingFundController::class, 'archive'])->name('archive');
+    });
+
     Route::middleware('community.enabled')->group(function (): void {
         Route::prefix('community')->name('tenant.community.')->group(function (): void {
+            Route::get('people/joins', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'index'])->name('joins.index');
+            Route::post('people/joins/{join}/approve', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'approve'])->name('joins.approve');
+            Route::post('people/joins/{join}/reject', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'reject'])->name('joins.reject');
+            Route::patch('settings/joining', [App\Http\Controllers\Tenant\CommunityJoinReviewController::class, 'settings'])->name('joining.settings');
+            Route::post('access/reports/{report}/resolve', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'resolve'])->name('reports.resolve');
+            Route::post('access/credentials/{credential}/revoke', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'revokeCredential'])->name('credentials.revoke');
+            Route::get('access/reports', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'index'])->name('reports.index');
+            Route::post('access/reports/{report}/review', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'review'])->name('reports.review');
+            Route::get('people/members/{member}/credentials', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'credentials'])->name('credentials.index');
+            Route::post('people/members/{member}/revoke-access', [App\Http\Controllers\Tenant\CommunityContactReviewController::class, 'revoke'])->name('credentials.revoke-all');
+            Route::get('access/member-options', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'memberOptions'])->name('claims.member-options');
+            Route::get('access/claims', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'index'])->name('claims.index');
+            Route::post('access/claims/{claim}/approve', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'approve'])->name('claims.approve');
+            Route::post('access/claims/{claim}/reject', [App\Http\Controllers\Tenant\CommunityClaimReviewController::class, 'reject'])->name('claims.reject');
+            Route::get('messages', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'index'])->name('messages.index');
+            Route::get('messages/{message}', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'show'])->whereUuid('message')->name('messages.show');
+            Route::post('messages/{message}/withdraw', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'withdraw'])->whereUuid('message')->name('messages.withdraw');
+            Route::middleware('community.messages')->group(function (): void {
+                Route::get('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'index'])->name('groups.index');
+                Route::post('groups', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'store'])->name('groups.store');
+                Route::patch('groups/{group}', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'update'])->name('groups.update');
+                Route::get('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'memberOptions'])->name('groups.member-options');
+                Route::patch('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'members'])->name('groups.members.patch');
+                Route::put('groups/{group}/members', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'members'])->name('groups.members');
+                Route::post('groups/{group}/archive', [App\Http\Controllers\Tenant\CommunityGroupController::class, 'archive'])->name('groups.archive');
+
+                Route::post('messages/preview', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'preview'])->name('messages.preview');
+                Route::post('messages', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'store'])->name('messages.store');
+                Route::get('messages/groups', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'groups'])->name('messages.groups');
+                Route::patch('messages/{message}', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'update'])->name('messages.update');
+
+                Route::post('messages/{message}/cancel', [App\Http\Controllers\Tenant\CommunityMessageController::class, 'cancel'])->name('messages.cancel');
+            });
+            Route::patch('settings/reminders', [App\Http\Controllers\Tenant\DuesReminderController::class, 'updateSettings'])->name('settings.update');
+            Route::get('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'preview'])->name('money.dues.remind-arrears.preview');
+            Route::post('money/dues/remind-arrears', [App\Http\Controllers\Tenant\DuesReminderController::class, 'send'])->name('money.dues.remind-arrears');
             Route::get('/', [App\Http\Controllers\Tenant\CommunityOverviewController::class, 'index'])->name('overview');
             Route::get('people', [MemberController::class, 'index'])->name('people.index');
+            Route::get('people/import', [MemberImportController::class, 'show'])->name('people.import.show');
+            Route::get('people/import/template', [MemberImportController::class, 'template'])->name('people.import.template');
+            Route::post('people/import/preview', [MemberImportController::class, 'preview'])->name('people.import.preview');
+            Route::post('people/import/confirm', [MemberImportController::class, 'confirm'])->name('people.import.confirm');
+            Route::post('people/member-candidates', [MemberController::class, 'candidates'])->name('members.candidates');
             Route::post('people/members', [MemberController::class, 'store'])->name('members.store');
             Route::patch('people/members/{member}', [MemberController::class, 'update'])->name('members.update');
             Route::post('people/members/{member}/exit', [MemberController::class, 'exit'])->name('members.exit');
+            Route::post('people/members/{member}/rejoin', [MemberController::class, 'rejoin'])->name('members.rejoin');
             Route::post('people/members/{member}/rotate-link', [MemberController::class, 'rotateLink'])->name('members.rotate-link');
 
             Route::get('money/dues', [MembershipTypeController::class, 'index'])->name('money.dues.index');
@@ -356,12 +491,44 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
         Route::post('inquiries/{inquiry}/hold', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'acceptAndHold'])->name('inquiries.hold');
         Route::post('inquiries/{inquiry}/quote', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'sendQuote'])->name('inquiries.quote');
         Route::post('inquiries/{inquiry}/reject', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'reject'])->name('inquiries.reject');
+        Route::middleware('throttle:venue-decisions')->group(function (): void {
+            Route::post('inquiries/{inquiry}/approve', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'approve'])->name('inquiries.approve');
+            Route::post('inquiries/{inquiry}/decline', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'decline'])->name('inquiries.decline');
+            Route::post('inquiries/{inquiry}/release', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'release'])->name('inquiries.release');
+            Route::post('inquiries/{inquiry}/renew', [App\Http\Controllers\Tenant\Venue\VenueInquiryController::class, 'renew'])->name('inquiries.renew');
+        });
+
+        Route::post('inquiries/{inquiry}/financial-quote', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'issue'])->whereUuid('inquiry')->middleware('throttle:venue-decisions')->name('inquiries.financial-quote');
+        Route::post('inquiries/{inquiry}/complete', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'complete'])->whereUuid('inquiry')->middleware('throttle:venue-decisions')->name('inquiries.complete');
+        Route::post('financial-quotes/{quote}/withdraw', [App\Http\Controllers\Tenant\Venue\VenueFinancialQuoteController::class, 'withdraw'])->whereUuid('quote')->middleware('throttle:venue-decisions')->name('financial-quotes.withdraw');
+
+        Route::prefix('finance')->name('finance.')->middleware('throttle:venue-decisions')->group(function (): void {
+            Route::get('/', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'index'])->withoutMiddleware('throttle:venue-decisions')->name('index');
+            Route::post('conflicts/{action}/verify', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'verify'])->whereUuid('action')->name('conflicts.verify');
+            Route::post('resolutions/{resolution}/resolve', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'resolve'])->whereUuid('resolution')->name('resolutions.resolve');
+            Route::post('charges/{charge}/refund', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'refund'])->whereUuid('charge')->name('charges.refund');
+            Route::post('refunds/{refund}/reconcile', [App\Http\Controllers\Tenant\Venue\VenueFinanceController::class, 'reconcileRefund'])->whereUuid('refund')->name('refunds.reconcile');
+        });
 
         Route::get('calendar', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'index'])->name('calendar.index');
         Route::post('calendar/blocks', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'storeBlock'])->name('calendar.blocks.store');
         Route::delete('calendar/blocks/{block}', [App\Http\Controllers\Tenant\Venue\VenueCalendarController::class, 'destroyBlock'])
             ->whereUuid('block')
             ->name('calendar.blocks.destroy');
+
+        Route::prefix('internal-bookings')->name('internal-bookings.')->group(function (): void {
+            Route::get('/', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'index'])->name('index');
+            Route::post('/', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'store'])->name('store');
+            Route::post('{booking}/approve', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'approve'])->whereUuid('booking')->name('approve');
+            Route::post('{booking}/decline', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'decline'])->whereUuid('booking')->name('decline');
+            Route::put('limits', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'updateLimits'])->name('limits.update');
+            Route::post('domains', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'storeDomain'])->name('domains.store');
+            Route::post('domains/verify', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'verifyDomain'])->name('domains.verify');
+            Route::delete('domains', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'destroyDomain'])->name('domains.destroy');
+            Route::post('staff', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'storeStaff'])->name('staff.store');
+            Route::delete('staff/{member}', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'destroyStaff'])->whereUuid('member')->name('staff.destroy');
+            Route::post('{booking}/cancel', [App\Http\Controllers\Tenant\Venue\InternalBookingController::class, 'cancel'])->whereUuid('booking')->name('cancel');
+        });
 
         Route::get('operations', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'index'])->name('operations.index');
         Route::get('operations/{booking}', [App\Http\Controllers\Tenant\Venue\VenueOperationsController::class, 'show'])->name('operations.show');
@@ -472,12 +639,27 @@ Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificate
 Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('public.certificates.download');
 
 // Public event pages (no auth — attendees register here)
+Route::get('/community/about', [App\Http\Controllers\Public\CommunityOrganisationController::class, 'show'])->name('public.community.about');
+Route::middleware(['community.identity', 'throttle:community-access'])->group(function (): void {
+    Route::post('/community/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'store'])->name('public.community.follow.store');
+    Route::delete('/community/follow', [App\Http\Controllers\Public\CommunityFollowController::class, 'destroy'])->name('public.community.follow.destroy');
+    Route::post('/community/join', [App\Http\Controllers\Public\CommunityJoinController::class, 'store'])->name('public.community.join.store');
+    Route::get('/community/joins/{join}', [App\Http\Controllers\Public\CommunityJoinController::class, 'show'])->name('public.community.joins.show');
+});
+
 Route::get('/e/{event}', [PublicEventController::class, 'show'])->name('public.events.show');
 Route::get('/e/{event}/calendar.ics', [PublicEventController::class, 'calendarFeed'])->name('public.events.calendar.ics');
 Route::post('/e/{event}/validate-promo', [PublicEventController::class, 'validatePromo'])->name('public.events.validate-promo');
 Route::post('/e/{event}/unlock-tickets', [PublicEventController::class, 'unlockTicketTypes'])->name('public.events.unlock-tickets');
+Route::post('/e/{event}/member-benefits', [PublicEventController::class, 'memberBenefits'])->middleware('throttle:public-registration')->name('public.events.member-benefits');
+Route::post('/e/{event}/member-verify/email/send', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'send'])->name('public.events.member-verify.send');
+Route::post('/e/{event}/member-verify/email/confirm', [App\Http\Controllers\Public\PlatformAttendeeAccessController::class, 'confirm'])->name('public.events.member-verify.confirm');
+Route::post('/e/{event}/checkout/{registration}/member', [EventCheckoutController::class, 'startMemberPayment'])->middleware('throttle:public-registration')->name('public.events.member-checkout');
+Route::post('/e/{event}/checkout/{registration}/member-benefits/reverify', [EventCheckoutController::class, 'reverifyMemberRegistration'])->middleware('throttle:public-registration')->block()->name('public.events.member-benefits.reverify');
+Route::post('/e/{event}/checkout/{registration}/member-benefits/reassess', [EventCheckoutController::class, 'reassessMemberPayment'])->middleware('throttle:public-registration')->block()->name('public.events.member-benefits.reassess');
+Route::get('/e/{event}/checkout/{registration}/member-callback', [EventCheckoutController::class, 'memberCallback'])->name('public.events.member-callback');
 Route::post('/e/{event}/register', [PublicEventController::class, 'register'])->middleware('throttle:public-registration')->name('public.events.register');
-Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.contribute');
+Route::post('/e/{event}/contribute', [App\Http\Controllers\Public\EventContributionController::class, 'store'])->middleware('throttle:public-registration')->block(15, 15)->name('public.events.contribute');
 Route::post('/e/{event}/messages', [App\Http\Controllers\Public\EventGoodwillMessageController::class, 'store'])->middleware('throttle:public-registration')->name('public.events.messages.store');
 Route::get('/e/{event}/contributions/{contribution}/callback', [App\Http\Controllers\Public\EventContributionController::class, 'callback'])->name('public.events.contributions.callback');
 Route::get('/e/{event}/checkout/{registration}', [EventCheckoutController::class, 'checkout'])->name('public.events.checkout');
@@ -584,3 +766,19 @@ Route::get('/slides', App\Http\Controllers\Marketing\PitchDeckController::class)
 
 Route::get('/media/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*')->name('tenant.media.show');
 Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'show'])->where('path', '.*');
+
+// Opt-out links remain available even when Community is switched off.
+Route::get('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'show'])->middleware('throttle:30,1')->name('public.community.preferences.show');
+Route::post('community/preferences/{token}', [App\Http\Controllers\Public\CommunityPreferenceController::class, 'update'])->middleware('throttle:30,1')->name('public.community.preferences.update');
+
+Route::get('/give', [App\Http\Controllers\Public\GivingFundController::class, 'index'])->name('public.giving.index');
+Route::get('/give/{slug}', [App\Http\Controllers\Public\GivingFundController::class, 'show'])->name('public.giving.show');
+Route::post('/giving/verify/email/send', [App\Http\Controllers\Public\GivingReminderController::class, 'sendVerification'])->name('public.giving.verify.send');
+Route::post('/giving/verify/email/confirm', [App\Http\Controllers\Public\GivingReminderController::class, 'confirmVerification'])->name('public.giving.verify.confirm');
+Route::post('/give/{slug}/reminder', [App\Http\Controllers\Public\GivingReminderController::class, 'subscribe'])->middleware('throttle:10,1')->name('public.giving.reminders.subscribe');
+Route::get('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'unsubscribe'])->middleware('throttle:60,1')->name('public.giving.reminders.unsubscribe');
+Route::post('/giving/reminders/{reminder}/unsubscribe', [App\Http\Controllers\Public\GivingReminderController::class, 'stop'])->middleware('throttle:10,1')->name('public.giving.reminders.stop');
+Route::post('/give/{slug}/checkout', [App\Http\Controllers\Public\GivingCheckoutController::class, 'store'])->middleware('throttle:10,1')->block(15, 15)->name('public.giving.checkout');
+Route::get('/giving/payments/{reference}/callback', [App\Http\Controllers\Public\GivingCheckoutController::class, 'callback'])->name('public.giving.callback');
+Route::get('/giving/payments/{reference}/receipt', [App\Http\Controllers\Public\MyGivingController::class, 'guestReceipt'])->middleware('throttle:60,1')->name('public.giving.receipt');
+Route::get('/giving/payments/{reference}', [App\Http\Controllers\Public\GivingCheckoutController::class, 'result'])->name('public.giving.result');

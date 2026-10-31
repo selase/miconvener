@@ -60,6 +60,30 @@ final class PlatformAttendeeWorkspaceController extends Controller
         private readonly FeatureMeteringService $meteringService,
     ) {}
 
+    public function join(Request $request, string $event): RedirectResponse
+    {
+        $tab = $this->workspaceTab($request, 'agenda');
+        $email = app(\App\Services\Events\PlatformAttendeeVerification::class)->verifiedEmail($request->session());
+        if ($email === null) {
+            return redirect('/my?return_to='.urlencode(route('attendee.my.join', ['event' => $event, 'tab' => $tab], false)));
+        }
+
+        $eventModel = Event::withoutGlobalScopes()->whereNull('deleted_at')->published()->with('tenant')->findOrFail($event);
+        abort_if($eventModel->tenant === null || $eventModel->tenant->status === TenantStatusEnum::BANNED, 404);
+
+        $registrations = EventRegistration::withoutGlobalScopes()
+            ->where('tenant_id', $eventModel->tenant_id)
+            ->where('event_id', $eventModel->id)
+            ->forEmail($email)
+            ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED]);
+        $registration = (clone $registrations)->confirmed()->latest()->first() ?? $registrations->latest()->first();
+        if ($registration === null) {
+            return redirect('/my?event_access=not_found');
+        }
+
+        return redirect($this->authorizer->workspaceUrl($registration).'?'.http_build_query(['tab' => $tab]));
+    }
+
     public function show(Request $request, string $registration): InertiaResponse|RedirectResponse
     {
         $registrationModel = EventRegistration::withoutGlobalScopes()
@@ -152,15 +176,22 @@ final class PlatformAttendeeWorkspaceController extends Controller
             ->all();
 
         return Inertia::render('Public/Events/AttendeePortal/Portal', [
+            'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
+            'initial_tab' => $this->workspaceTab($request, 'ticket'),
             'event' => $this->buildEventPayload($event, revealDetails: $registrationModel->isConfirmed(), registration: $registrationModel),
             'registration' => [
+                'member_benefit_required' => $registrationModel->member_benefit_required,
+                'member_payment_review_url' => $registrationModel->member_benefit_required && $registrationModel->tenant !== null
+                    ? route('public.events.checkout', ['subdomain' => $registrationModel->tenant->slug, 'event' => $event->slug, 'registration' => $registrationModel->id, 'review' => 1]) : null,
+                'can_transfer' => ! $registrationModel->member_benefit_required && $registrationModel->status !== EventRegistration::STATUS_CHECKED_IN,
+                'member_extra_payments' => $registrationModel->member_benefit_required ? $registrationModel->memberBenefitAttempts()->where('is_extra_capture', true)->where('state', '!=', 'refunded')->count() : 0,
                 'id' => $registrationModel->id,
                 'full_name' => $registrationModel->full_name,
                 'email' => ContactMask::email($registrationModel->email),
                 'status' => $registrationModel->status,
                 'ticket_code' => $registrationModel->ticket_code,
                 'ticket_type_name' => $registrationModel->ticketType?->name,
-                'qr_image' => $registrationModel->qr_token
+                'qr_image' => $registrationModel->qr_token && (! $registrationModel->member_benefit_required || $registrationModel->isConfirmed())
                     ? QrCodeGenerator::svgDataUri($registrationModel->qr_token)
                     : null,
                 'agenda_session_ids' => $registrationModel->sessions->pluck('id')->values(),
@@ -171,9 +202,9 @@ final class PlatformAttendeeWorkspaceController extends Controller
                 'checked_in' => $registrationModel->isPresent(),
                 'self_check_in_available' => app(SelfCheckIn::class)->isAvailableFor($registrationModel),
                 'email_verified' => $registrationModel->hasVerifiedEmail(),
-                'awaiting_checkout' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT
-                    && blank($registrationModel->payment_reference),
-                'checkout_url' => $registrationModel->status === EventRegistration::STATUS_PENDING_PAYMENT && $registrationModel->tenant !== null
+                'awaiting_checkout' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true)
+                    && ($registrationModel->member_benefit_required || blank($registrationModel->payment_reference)),
+                'checkout_url' => in_array($registrationModel->status, $registrationModel->member_benefit_required ? [EventRegistration::STATUS_PENDING_PAYMENT, EventRegistration::STATUS_PENDING_MEMBER_VERIFICATION, EventRegistration::STATUS_PENDING_BENEFIT_REVIEW] : [EventRegistration::STATUS_PENDING_PAYMENT], true) && $registrationModel->tenant !== null
                     ? route('public.events.checkout', [
                         'subdomain' => $registrationModel->tenant->slug,
                         'event' => $event->slug,
@@ -191,7 +222,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'canRequestHelp' => $canRequestHelp,
             'poll_payment' => $pollPayment,
             'is_checkout_grant' => $this->authorizer->hasCheckoutGrant($request->session(), $registrationModel->id),
-            'has_live_poll' => $event->polls()->live()->exists(),
+            'has_live_poll' => $event->polls()->live()->get()->contains(fn (EventPoll $poll): bool => ! $poll->timeUp()),
             'has_forum' => $registrationModel->isConfirmed(),
             'has_forms' => $event->dynamicForms()->where('is_active', true)->exists(),
             'active_service_requests_count' => $event->serviceRequests()
@@ -220,7 +251,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'status' => $registrationModel->status,
             'is_confirmed' => $registrationModel->isConfirmed(),
             'ticket_code' => $registrationModel->ticket_code,
-            'qr_image' => $registrationModel->qr_token
+            'qr_image' => $registrationModel->qr_token && (! $registrationModel->member_benefit_required || $registrationModel->isConfirmed())
                 ? QrCodeGenerator::svgDataUri($registrationModel->qr_token)
                 : null,
             'checked_in' => $registrationModel->checked_in_at !== null,
@@ -251,6 +282,21 @@ final class PlatformAttendeeWorkspaceController extends Controller
             'checked_in' => true,
             'message' => "You're checked in. Enjoy the event.",
         ]);
+    }
+
+    public function ticketPass(Request $request, string $registration): JsonResponse
+    {
+        $reg = EventRegistration::withoutGlobalScopes()->with(['event' => fn ($q) => $q->withoutGlobalScopes(), 'tenant' => fn ($q) => $q->withoutGlobalScopes(), 'ticketType' => fn ($q) => $q->withoutGlobalScopes(), 'seatAssignment' => fn ($q) => $q->withoutGlobalScopes()->with('room')])->find($registration);
+        $email = app(\App\Services\Events\PlatformAttendeeVerification::class)->verifiedEmail($request->session());
+        abort_unless($reg !== null && $email !== null && \App\Services\Events\PlatformAttendeeVerification::normalise($reg->email) === $email, 401);
+        abort_if($reg->tenant === null || $reg->tenant->status === TenantStatusEnum::BANNED || $reg->event === null || $reg->event->deleted_at !== null, 404);
+        abort_unless($reg->isConfirmed() && $reg->email_verified_at !== null && filled($reg->qr_token) && filled($reg->ticket_code), 403);
+
+        return response()->json([
+            'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
+            'event' => $this->buildEventPayload($reg->event, revealDetails: true, registration: $reg),
+            'registration' => ['id' => $reg->id, 'full_name' => $reg->full_name, 'status' => $reg->status, 'ticket_code' => $reg->ticket_code, 'ticket_type_name' => $reg->ticketType?->name, 'qr_image' => QrCodeGenerator::svgDataUri($reg->qr_token), 'checked_in' => $reg->isPresent(), 'seat_label' => $reg->seatAssignment?->seat_label, 'room_name' => $reg->seatAssignment?->room?->name],
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function ticket(Request $request, string $registration): Response
@@ -1230,7 +1276,19 @@ final class PlatformAttendeeWorkspaceController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        return redirect('/my?return_to='.urlencode("/my/events/{$registrationId}"));
+        $target = "/my/events/{$registrationId}";
+        if ($request->filled('tab')) {
+            $target .= '?'.http_build_query(['tab' => $this->workspaceTab($request, 'ticket')]);
+        }
+
+        return redirect('/my?return_to='.urlencode($target));
+    }
+
+    private function workspaceTab(Request $request, string $default): string
+    {
+        $tab = $request->query('tab');
+
+        return is_string($tab) && in_array($tab, ['ticket', 'agenda', 'poll', 'forum', 'forms', 'help', 'downloads'], true) ? $tab : $default;
     }
 
     /**

@@ -5,6 +5,104 @@
 @section('content')
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
+        @can('access-superadmin-dashboard')
+            <p><a class="btn btn-light-primary mb-5" href="{{ route('admin.store-agreements.index', $tenant) }}">Commerce agreement</a></p>
+        @endcan
+        @can('manage-commercial-terms')
+            <div class="card card-flush mb-6">
+                <div class="card-header"><h2 class="card-title">Commercial terms</h2></div>
+                <div class="card-body">
+                    @if (session('success'))
+                        <div class="alert alert-success d-flex align-items-center">{{ session('success') }}</div>
+                    @endif
+                    @if ($errors->any())
+                        <div class="alert alert-danger d-flex align-items-center" role="alert">{{ $errors->first() }}</div>
+                    @endif
+                    <p class="text-muted">Rates are percentages. Caps are in minor units. Zero is a waiver; leave the rate blank to remove an override. Existing checkouts keep their frozen terms.</p>
+                    @foreach ($commercialTerms as $stream => $terms)
+                        @if ($stream === 'tickets')
+                            {{-- No plan caps ticket commission; a rate or cap here is this organisation's deal. --}}
+                            <form method="POST" action="{{ route('tenants.ticket-terms.update', $tenant->uuid) }}" class="border-bottom pb-5 mb-5">
+                                @csrf
+                                <h3 class="fs-5">Tickets <span class="badge badge-light">{{ $terms->rate }}% · {{ $terms->source }}</span></h3>
+                                <p class="text-muted">Ticket commission is uncapped on every plan. Set a rate or a cap only as a deal for this organisation; leave a field blank to use the plan. Events already selling keep their locked terms.</p>
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="ticket-rate">Rate (%)</label>
+                                        <input id="ticket-rate" class="form-control form-control-solid" name="rate" type="number" min="0" max="100" step="0.01" value="{{ old('rate', $tenant->platform_fee_percentage) }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="ticket-cap">Cap per ticket (GHS)</label>
+                                        <input id="ticket-cap" class="form-control form-control-solid" name="cap" type="number" min="0.01" step="0.01" value="{{ old('cap', $tenant->platform_fee_cap_amount === null ? null : number_format($tenant->platform_fee_cap_amount / 100, 2, '.', '')) }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="ticket-reason">Reason</label>
+                                        <input id="ticket-reason" class="form-control form-control-solid" name="reason" required maxlength="2000">
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-3 mt-4"><button class="btn btn-primary" type="submit">Save ticket terms</button></div>
+                            </form>
+                        @else
+                            @php($override = $commercialOverrides->get($stream))
+                            <form method="POST" action="{{ route('tenants.commercial-terms.update', $tenant->uuid) }}" class="border-bottom pb-5 mb-5">
+                                @csrf
+                                <input type="hidden" name="stream" value="{{ $stream }}">
+                                <h3 class="fs-5">{{ ucfirst($stream) }} <span class="badge badge-light">{{ $terms->rate }}% · {{ $terms->source }}{{ $terms->isWaiver ? ' · waiver' : '' }}</span></h3>
+                                @if ($stream !== 'dues')
+                                    <p class="text-muted">Future configuration only: these terms do not change existing contribution payments or enable giving.</p>
+                                @endif
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="terms-rate-{{ $stream }}">Override rate (%)</label>
+                                        <input id="terms-rate-{{ $stream }}" class="form-control form-control-solid" name="rate" type="number" min="0" max="100" step="0.01" value="{{ old('stream') === $stream ? old('rate') : $override?->rate }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="terms-cap-{{ $stream }}">Cap (minor units)</label>
+                                        <input id="terms-cap-{{ $stream }}" class="form-control form-control-solid" name="cap_amount" type="number" min="0" step="1" value="{{ old('stream') === $stream ? old('cap_amount') : $override?->cap_amount }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="terms-reason-{{ $stream }}">Reason</label>
+                                        <input id="terms-reason-{{ $stream }}" class="form-control form-control-solid" name="reason" required maxlength="2000" value="{{ old('stream') === $stream ? old('reason') : '' }}">
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-3 mt-4"><button class="btn btn-primary" type="submit">Save {{ $stream }} terms</button></div>
+                            </form>
+                        @endif
+                    @endforeach
+                </div>
+            </div>
+        @endcan
+        @if ($pricingRegion)
+            <div class="card mb-5" data-pricing-region>
+                <div class="card-header"><h2 class="card-title">Pricing region</h2></div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>{{ $pricingRegion['label'] }}</strong></p>
+                    @if ($pricingRegion['source'])
+                        <p class="text-muted mb-4">
+                            {{ str_replace('_', ' ', ucfirst($pricingRegion['source'])) }}@if ($pricingRegion['detail']): {{ $pricingRegion['detail'] }}@endif
+                            @if ($pricingRegion['by']) · by {{ $pricingRegion['by'] }}@endif
+                            @if ($pricingRegion['at']) · {{ $pricingRegion['at'] }}@endif
+                        </p>
+                    @endif
+                    <p class="text-muted">The Ghana price goes to organisations in Ghana: a verified Ghana payout account, or a payment by Ghana mobile money or a Ghana card, earns it automatically. Grant it by hand when that evidence is not enough, or remove it to charge the USD price. Every change needs a reason and is recorded.</p>
+                    <form method="POST" action="{{ route('tenants.pricing-region.update', $tenant->uuid) }}" class="row g-3">
+                        @csrf
+                        <div class="col-md-3">
+                            <label class="form-label" for="pricing-region-action">Change to</label>
+                            <select id="pricing-region-action" name="action" class="form-select form-select-solid">
+                                <option value="grant" @selected(! $pricingRegion['eligible'])>Ghana price</option>
+                                <option value="remove" @selected($pricingRegion['eligible'])>USD price</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="pricing-region-reason">Reason</label>
+                            <input id="pricing-region-reason" name="reason" class="form-control form-control-solid" required maxlength="1000">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end"><button type="submit" class="btn btn-primary">Save</button></div>
+                    </form>
+                </div>
+            </div>
+        @endif
         <div class="row">
             <div class="col-md-4">
                 <div class="card">

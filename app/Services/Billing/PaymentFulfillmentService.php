@@ -28,10 +28,12 @@ final class PaymentFulfillmentService
 {
     /**
      * Credit a token pack once, keyed on the provider's transaction reference.
+     * The amount recorded is what the provider says was paid, which for a USD
+     * price is its GHS equivalent on the day; the pack's list price otherwise.
      *
      * @param  array<string, mixed>  $metadata
      */
-    public function fulfillLlmTokenPurchase(Tenant $tenant, string $reference, array $metadata): bool
+    public function fulfillLlmTokenPurchase(Tenant $tenant, string $reference, array $metadata, ?int $amountPaidMinor = null): bool
     {
         $packKey = (string) ($metadata['pack_key'] ?? '');
         $packs = Config::get('llm.token_packs', []);
@@ -46,7 +48,7 @@ final class PaymentFulfillmentService
         $tokens = (int) $pack['tokens'];
 
         try {
-            return $this->creditTokenPack($tenant, $reference, $packKey, $pack, $tokens);
+            return $this->creditTokenPack($tenant, $reference, $packKey, $pack, $tokens, $amountPaidMinor, is_array($metadata['pricing'] ?? null) ? $metadata['pricing'] : null);
         } catch (UniqueConstraintViolationException) {
             // The other path recorded this payment between our check and our insert.
             return false;
@@ -101,10 +103,11 @@ final class PaymentFulfillmentService
 
     /**
      * @param  array<string, mixed>  $pack
+     * @param  array<string, mixed>|null  $pricing
      */
-    private function creditTokenPack(Tenant $tenant, string $reference, string $packKey, array $pack, int $tokens): bool
+    private function creditTokenPack(Tenant $tenant, string $reference, string $packKey, array $pack, int $tokens, ?int $amountPaidMinor, ?array $pricing): bool
     {
-        return DB::connection('landlord')->transaction(function () use ($tenant, $reference, $packKey, $pack, $tokens): bool {
+        return DB::connection('landlord')->transaction(function () use ($tenant, $reference, $packKey, $pack, $tokens, $amountPaidMinor, $pricing): bool {
             if ($this->alreadyRecorded($reference)) {
                 return false;
             }
@@ -115,7 +118,7 @@ final class PaymentFulfillmentService
 
             Transaction::create([
                 'tenant_id' => $tenant->id,
-                'amount' => (int) round((float) $pack['price'] * 100),
+                'amount' => $amountPaidMinor ?? (int) round((float) $pack['price'] * 100),
                 'currency' => $pack['currency'],
                 'status' => 'success',
                 'type' => 'credit',
@@ -125,6 +128,7 @@ final class PaymentFulfillmentService
                     'type' => 'llm_token_purchase',
                     'pack_key' => $packKey,
                     'tokens' => $tokens,
+                    'pricing' => $pricing,
                 ],
             ]);
 

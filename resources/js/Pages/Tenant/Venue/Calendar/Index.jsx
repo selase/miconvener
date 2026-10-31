@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { router, useForm } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
 import Modal from '@/Components/Console/Modal';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
+import { calendarEventNote, calendarEventTone } from '@/lib/venueCalendar';
 import StatusPill from '@/Components/Console/StatusPill';
 import {
     ChevronLeft,
@@ -28,6 +29,8 @@ export default function VenueCalendarIndex({
     month,
     selectedSpaceId = null,
 }) {
+    // Staff bookings are managed by people with their own permission; others are not shown a link that would refuse them.
+    const canManageRoomBookings = Boolean(usePage().props.auth?.can?.manage_room_bookings);
     // Current viewed month: Date object initialized from month string (YYYY-MM)
     const [currentYear, currentMonthIndex] = useMemo(() => {
         if (!month || !month.includes('-')) {
@@ -324,6 +327,10 @@ export default function VenueCalendarIndex({
                                 <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
                                 <span>Blackout Block</span>
                             </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+                                <span>Staff booking</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -378,7 +385,15 @@ export default function VenueCalendarIndex({
                                             const isBlocked = ev.is_blocked;
 
                                             let badgeStyle = 'bg-amber-500/10 text-amber-700 border-amber-300 dark:border-amber-800 dark:text-amber-400';
-                                            if (isConfirmed) {
+                                            const tone = calendarEventTone(ev);
+                                            const note = calendarEventNote(ev);
+                                            if (tone === 'request') {
+                                                badgeStyle = 'bg-blue-500/5 text-blue-700 border-blue-300 dark:border-blue-800 dark:text-blue-300 border-dashed';
+                                            } else if (tone === 'hold') {
+                                                badgeStyle = 'bg-amber-500/10 text-amber-700 border-amber-400 dark:border-amber-700 dark:text-amber-300 border-dashed';
+                                            } else if (ev.kind === 'internal') {
+                                                badgeStyle = `bg-sky-500/10 text-sky-700 border-sky-300 dark:border-sky-800 dark:text-sky-400${isConfirmed ? '' : ' border-dashed'}`;
+                                            } else if (isConfirmed) {
                                                 badgeStyle = 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:border-emerald-800 dark:text-emerald-400';
                                             } else if (isBlocked) {
                                                 badgeStyle = 'bg-slate-500/10 text-slate-700 border-slate-300 dark:border-slate-700 dark:text-slate-300 border-dashed';
@@ -396,8 +411,11 @@ export default function VenueCalendarIndex({
                                                         <span className="truncate">{ev.space_title}</span>
                                                     </div>
                                                     <div className="truncate text-[10px] opacity-80">
-                                                        {ev.title}
+                                                        {ev.kind === 'internal' ? [ev.department, ev.purpose].filter(Boolean).join(' · ') || ev.title : ev.title}
                                                     </div>
+                                                    {note && (
+                                                        <div className="truncate text-[10px] font-medium">{note}</div>
+                                                    )}
                                                 </button>
                                             );
                                         })}
@@ -446,9 +464,33 @@ export default function VenueCalendarIndex({
                                         : 'pending'
                                 }
                             >
-                                {selectedEvent.status.replace('_', ' ')}
+                                {selectedEvent.status.replace(/_/g, ' ')}
                             </StatusPill>
                         </div>
+                        {calendarEventNote(selectedEvent) && (
+                            <div
+                                role="note"
+                                className="rounded-lg border border-border bg-surface-sunken/30 p-3 text-xs text-ink-secondary"
+                            >
+                                {calendarEventNote(selectedEvent)}.{' '}
+                                {selectedEvent.status === 'pending_host_approval'
+                                    ? 'Other requests and bookings can still take these dates until you approve.'
+                                    : 'No one else can book these dates until the hold ends.'}
+                            </div>
+                        )}
+                        {selectedEvent.kind === 'internal' && (
+                            <div className="rounded-lg border border-border bg-surface-sunken/30 p-3 text-xs space-y-1">
+                                <div className="font-semibold text-ink">Staff booking, free of charge</div>
+                                <div className="text-ink">{selectedEvent.planner_name}</div>
+                                {selectedEvent.department && <div className="text-ink-secondary">{selectedEvent.department}</div>}
+                                {selectedEvent.purpose && <div className="text-ink-secondary">{selectedEvent.purpose}</div>}
+                                {canManageRoomBookings && (
+                                    <a className="text-accent underline" href={route('tenant.venue.internal-bookings.index')}>
+                                        Manage staff bookings
+                                    </a>
+                                )}
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-3 text-xs">
                             <div className="rounded-lg border border-border bg-surface-sunken/40 p-2.5">

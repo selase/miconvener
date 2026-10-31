@@ -52,6 +52,7 @@ final class AppServiceProvider extends ServiceProvider
 
         // Domain service interfaces
         $this->app->bind(\App\Contracts\InvoicingServiceContract::class, \App\Services\Tenancy\InvoicingService::class);
+        $this->app->bind(\App\Contracts\DnsTxtResolver::class, \App\Services\Venue\NativeDnsTxtResolver::class);
         $this->app->bind(\App\Contracts\UsageServiceContract::class, \App\Services\Tenancy\UsageService::class);
         $this->app->bind(\App\Contracts\LlmUsageServiceContract::class, \App\Services\Llm\LlmUsageService::class);
         $this->app->bind(\App\Contracts\TenantMigratorContract::class, \App\Services\Tenancy\TenantMigrator::class);

@@ -11,6 +11,11 @@ use App\Models\Package;
 use App\Models\Subscription;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\SubscriptionRenewalService;
+use App\Services\Pricing\ChargeQuote;
+use App\Services\Pricing\CheckoutTerms;
+use App\Services\Pricing\Money;
+use App\Services\Pricing\PriceBook;
+use App\Services\Pricing\VisitorCurrency;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -67,9 +72,11 @@ final class CheckoutController extends Controller
                 ->with('info', 'There is nothing to renew on this plan.');
         }
 
+        $quote = $subscription->chargeQuoteFor($package);
+
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(
             $this->getOrCreateCustomerId($request, $gateway, $tenant),
-            $subscription->priceMinorFor($package),
+            $quote->ghsMinor(),
             (string) config('services.paystack.currency', 'GHS'),
             route('billing.callback'),
             [
@@ -78,6 +85,7 @@ final class CheckoutController extends Controller
                 'tenant_id' => $tenant->id,
                 'subscription_id' => $subscription->id,
                 'package_id' => $package->id,
+                'pricing' => $quote->meta(),
             ]
         );
 
@@ -97,7 +105,9 @@ final class CheckoutController extends Controller
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(
             $customerId,
             $amount,
-            $invoice->currency ?: 'USD',
+            // Invoices were once labelled USD although their amounts are GHS;
+            // Paystack takes GHS only, so they are paid in GHS.
+            (string) config('services.paystack.currency', 'GHS'),
             $redirectUrl,
             [
                 'invoice_id' => $invoice->id,
@@ -170,10 +180,10 @@ final class CheckoutController extends Controller
                 ->with('success', "Welcome to {$newPackage->name}! Your subscription is now active.");
         }
 
-        // Upgrade or new subscription: one-time Paystack transaction with plan metadata
-        $amount = $interval === 'year'
-            ? (int) round((float) $newPackage->yearly_price * 100)
-            : (int) round((float) $newPackage->price * 100);
+        // Upgrade or new subscription: one-time Paystack transaction with plan
+        // metadata, priced in the visitor's currency and charged in GHS.
+        $price = app(PriceBook::class)->plan($newPackage, $interval, app(VisitorCurrency::class)->resolve($request, $tenant));
+        $terms = CheckoutTerms::for($tenant, $price, app(PriceBook::class)->plan($newPackage, $interval, 'USD'));
 
         // A negotiated plan (Enterprise) is charged at the organisation's agreed
         // price and interval; without one there is nothing to charge yet.
@@ -185,15 +195,17 @@ final class CheckoutController extends Controller
                     ->with('info', 'Enterprise is priced for each organisation. Talk to us and we will set your price.');
             }
 
-            $amount = $agreed['amount'];
+            $price = new Money($agreed['amount'], 'GHS');
+            $terms = CheckoutTerms::agreed();
             $interval = $agreed['interval'];
         }
 
+        $quote = app(ChargeQuote::class)->for($price);
         $customerId = $this->getOrCreateCustomerId($request, $gateway, $tenant);
 
         $checkoutUrl = $gateway->createOneTimeCheckoutSession(
             $customerId,
-            $amount,
+            $quote->ghsMinor(),
             config('services.paystack.currency', 'GHS'),
             route('billing.callback'),
             [
@@ -202,6 +214,7 @@ final class CheckoutController extends Controller
                 'plan_slug' => $newPackage->slug,
                 'interval' => $interval,
                 'tenant_id' => $tenant->id,
+                ...$terms->metadata($quote),
             ]
         );
 

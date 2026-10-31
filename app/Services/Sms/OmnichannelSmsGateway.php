@@ -156,11 +156,15 @@ final class OmnichannelSmsGateway implements SmsGateway
                     'is_scheduled' => false,
                 ]]);
         } catch (ConnectionException $e) {
-            return SmsResult::refused('Could not reach the SMS provider: '.$e->getMessage());
+            return SmsResult::unknown('Could not reach the SMS provider: '.$e->getMessage());
         }
 
         if ($response->status() === 429) {
             return SmsResult::throttled(max(1, (int) ($response->header('Retry-After') ?: 60)));
+        }
+
+        if ($response->serverError()) {
+            return SmsResult::unknown('SMS provider outcome unknown ('.$response->status().').');
         }
 
         if (! $response->successful()) {

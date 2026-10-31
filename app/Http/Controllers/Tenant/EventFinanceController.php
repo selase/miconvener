@@ -33,6 +33,7 @@ final class EventFinanceController extends Controller
         $paidOut = (int) $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount');
 
         $stats = [
+            ...app(\App\Services\Giving\GivingContributionBridge::class)->eventSummary($eventModel),
             'collected' => $collected,
             'refunded' => (int) $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_REFUND)->sum('gross_amount'),
             'fees' => $fees,
@@ -308,7 +309,7 @@ final class EventFinanceController extends Controller
             fputcsv($handle, ['Reconciliation']);
             fputcsv($handle, ['Collected (gross)', $eventModel->ledgerEntries()->where('type', EventLedgerEntry::TYPE_CHARGE)->sum('gross_amount')]);
             fputcsv($handle, ['Paid out', $eventModel->payouts()->where('status', EventPayout::STATUS_PAID)->sum('amount')]);
-            fputcsv($handle, ['Available balance', $eventModel->ledgerEntries()->whereIn('type', [EventLedgerEntry::TYPE_CHARGE, EventLedgerEntry::TYPE_REFUND])->sum('net_amount') - $eventModel->payouts()->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])->sum('amount')]);
+            fputcsv($handle, ['Available balance', $this->availableBalance($eventModel)]);
 
             fputcsv($handle, []);
             fputcsv($handle, ['Double-Entry General Ledger (Trial Balance)']);
@@ -348,6 +349,11 @@ final class EventFinanceController extends Controller
 
     private function availableBalance(Event $eventModel): int
     {
+        $benefits = app(\App\Services\Events\MemberBenefitBalance::class);
+        if ($benefits->applies($eventModel)) {
+            return $benefits->available($eventModel);
+        }
+
         $committedToPayouts = (int) $eventModel->payouts()
             ->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])
             ->sum('amount');

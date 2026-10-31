@@ -5,6 +5,8 @@ import Button from '@/Components/Console/Button';
 import PageHeader from '@/Components/Console/PageHeader';
 import StatusPill from '@/Components/Console/StatusPill';
 import ConfirmModal from '@/Components/Console/ConfirmModal';
+import VenueFinancialPanel from '@/Components/Venue/VenueFinancialPanel';
+import VenueApprovalPanel, { VenuePaymentConflictBanner } from '@/Components/Venue/VenueApprovalPanel';
 import {
     Inbox,
     Calendar,
@@ -23,7 +25,18 @@ import {
     X,
 } from 'lucide-react';
 
+const STATUS_LABEL = {
+    pending_host_approval: 'awaiting approval',
+    approved_hold: 'dates held',
+    hold_expired: 'hold expired',
+    declined: 'declined',
+};
+
 const STATUS_MAP = {
+    pending_host_approval: 'pending',
+    approved_hold: 'pending',
+    hold_expired: 'neutral',
+    declined: 'failed',
     pending_quote: 'pending',
     pending_payment: 'pending',
     confirmed: 'success',
@@ -32,7 +45,9 @@ const STATUS_MAP = {
     cancelled: 'neutral',
 };
 
-export default function InquiryShow({ shop, inquiry }) {
+export default function InquiryShow({ shop, inquiry, can }) {
+    const approvalFlow = Boolean(inquiry.approval?.flow);
+    const shownStatus = approvalFlow ? inquiry.approval.effective_status : inquiry.status;
     const [quoteModalOpen, setQuoteModalOpen] = useState(false);
     const [declineModalOpen, setDeclineModalOpen] = useState(false);
     const [holdModalOpen, setHoldModalOpen] = useState(false);
@@ -144,8 +159,8 @@ export default function InquiryShow({ shop, inquiry }) {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <StatusPill status={STATUS_MAP[inquiry.status] || 'neutral'}>
-                                    {inquiry.status.replace('_', ' ')}
+                                <StatusPill status={STATUS_MAP[shownStatus] || 'neutral'}>
+                                    {STATUS_LABEL[shownStatus] ?? shownStatus.replace('_', ' ')}
                                 </StatusPill>
                                 <span className="font-mono text-xs font-bold text-ink">
                                     {inquiry.booking_reference}
@@ -162,7 +177,7 @@ export default function InquiryShow({ shop, inquiry }) {
 
                         {/* Host Action Buttons */}
                         <div className="flex flex-wrap items-center gap-2">
-                            {inquiry.status === 'pending_quote' && (
+                            {!approvalFlow && inquiry.status === 'pending_quote' && (
                                 <Button
                                     type="button"
                                     onClick={() => setQuoteModalOpen(true)}
@@ -173,7 +188,7 @@ export default function InquiryShow({ shop, inquiry }) {
                                 </Button>
                             )}
 
-                            {inquiry.status !== 'confirmed' && inquiry.status !== 'rejected' && (
+                            {!approvalFlow && inquiry.status !== 'confirmed' && inquiry.status !== 'rejected' && (
                                 <Button
                                     type="button"
                                     onClick={() => setHoldModalOpen(true)}
@@ -184,7 +199,7 @@ export default function InquiryShow({ shop, inquiry }) {
                                 </Button>
                             )}
 
-                            {inquiry.status !== 'rejected' && (
+                            {!approvalFlow && inquiry.status !== 'rejected' && (
                                 <Button
                                     type="button"
                                     onClick={() => setDeclineModalOpen(true)}
@@ -197,6 +212,11 @@ export default function InquiryShow({ shop, inquiry }) {
                             )}
                         </div>
                     </div>
+
+                    <VenuePaymentConflictBanner conflicts={inquiry.approval?.conflicts} />
+
+                    {approvalFlow && <VenueApprovalPanel inquiry={inquiry} />}
+                    {approvalFlow && <VenueFinancialPanel inquiry={inquiry} can={can} />}
 
                     {/* Specifications Grid */}
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

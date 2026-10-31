@@ -141,6 +141,42 @@ final class PermissionsSeeder extends Seeder
             ],
             [
                 'uuid' => Str::uuid(),
+                'name' => 'manage room bookings',
+                'guard_name' => 'web',
+                'category' => 'tenant',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage community library',
+                'guard_name' => 'web',
+                'category' => 'community',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage community polls',
+                'guard_name' => 'web',
+                'category' => 'community',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'read community poll results',
+                'guard_name' => 'web',
+                'category' => 'community',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'send community messages',
+                'guard_name' => 'web',
+                'category' => 'community',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage giving',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
                 'name' => 'manage members',
                 'guard_name' => 'web',
                 'category' => 'finance',
@@ -184,6 +220,12 @@ final class PermissionsSeeder extends Seeder
             [
                 'uuid' => Str::uuid(),
                 'name' => 'manage commission destinations',
+                'guard_name' => 'web',
+                'category' => 'finance',
+            ],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage commercial terms',
                 'guard_name' => 'web',
                 'category' => 'finance',
             ],
@@ -273,12 +315,24 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'notifications',
             ],
+            ['uuid' => Str::uuid(), 'name' => 'manage store collection', 'guard_name' => 'web', 'category' => 'store'],
+            ['uuid' => Str::uuid(), 'name' => 'manage store orders', 'guard_name' => 'web', 'category' => 'store'],
+            ['uuid' => Str::uuid(), 'name' => 'manage store finance', 'guard_name' => 'web', 'category' => 'store'],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage store catalog',
+                'guard_name' => 'web',
+                'category' => 'store',
+            ],
             [
                 'uuid' => Str::uuid(),
                 'name' => 'manage venue',
                 'guard_name' => 'web',
                 'category' => 'venue',
             ],
+            ['uuid' => Str::uuid(), 'name' => 'manage venue refunds', 'guard_name' => 'web', 'category' => 'venue'],
+            ['uuid' => Str::uuid(), 'name' => 'reconcile venue payments', 'guard_name' => 'web', 'category' => 'venue'],
+            ['uuid' => Str::uuid(), 'name' => 'release venue settlements', 'guard_name' => 'web', 'category' => 'venue'],
         ];
     }
 

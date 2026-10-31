@@ -26,6 +26,8 @@ final class Package extends Model
         'slug',
         'price',
         'yearly_price',
+        'price_usd',
+        'yearly_price_usd',
         'interval',
         'billing_model',
         'description',

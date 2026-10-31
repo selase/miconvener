@@ -140,7 +140,8 @@ final class PlatformAttendeeVerification
             return false;
         }
 
-        $session->regenerate();
+        $session->forget('giving_checkout_access');
+        $session->regenerate(true);
         $session->put(self::SESSION_KEY, [
             'email' => $normalized,
             'verified_at' => now()->getTimestamp(),
@@ -170,7 +171,7 @@ final class PlatformAttendeeVerification
         $held = $presentingDeck !== null && $presentingDeck->status === PollDeck::STATUS_LIVE;
 
         if (! $held && $marker['expires_at'] <= now()->getTimestamp()) {
-            $session->forget(self::SESSION_KEY);
+            $session->forget([self::SESSION_KEY, 'giving_checkout_access']);
 
             return null;
         }
@@ -180,7 +181,7 @@ final class PlatformAttendeeVerification
 
     public function forget(Session $session): void
     {
-        $session->forget(self::SESSION_KEY);
+        $session->forget([self::SESSION_KEY, 'giving_checkout_access']);
     }
 
     private static function dummyHash(): string

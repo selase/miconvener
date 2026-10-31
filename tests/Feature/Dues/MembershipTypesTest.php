@@ -77,7 +77,7 @@ test('invalid class input is rejected', function () {
     [, $user] = membershipTypesTenant();
 
     $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
-        ->postJson(route('tenant.community.money.dues.store', ['subdomain' => 'acme']), ['name' => '', 'amount' => 0, 'currency' => 'GH', 'period' => 'weekly'])
+        ->postJson(route('tenant.community.money.dues.store', ['subdomain' => 'acme']), ['name' => '', 'amount' => 0, 'currency' => 'GH', 'period' => 'fortnightly'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['name', 'amount', 'currency', 'period']);
 });
@@ -280,4 +280,41 @@ test('a member of a type without dues cannot be charged', function () {
         ->postJson(route('tenant.community.charges.store', ['subdomain' => 'acme']), ['member_id' => $member->id, 'period_start' => '2026-10-01'])
         ->assertUnprocessable()
         ->assertJsonPath('message', 'This membership type has no dues.');
+});
+
+test('an admin can choose daily and weekly dues', function (string $period) {
+    [$tenant, $user] = membershipTypesTenant();
+
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')])
+        ->postJson(route('tenant.community.money.dues.store', ['subdomain' => 'acme']), ['name' => 'Full member', 'amount' => 5000, 'currency' => 'GHS', 'period' => $period])
+        ->assertCreated();
+
+    expect(MembershipType::query()->where('tenant_id', $tenant->id)->firstOrFail()->period->value)->toBe($period);
+})->with(['daily', 'weekly']);
+
+test('introducing dues requires an explicit nonhistorical start date', function () {
+    [$tenant, $user] = membershipTypesTenant();
+    $this->travelTo(Carbon\CarbonImmutable::parse('2026-10-18 12:00', 'Africa/Accra'));
+    $type = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => null, 'period' => null]);
+    $url = route('tenant.community.money.dues.update', ['subdomain' => 'acme', 'type' => $type->id]);
+    $data = ['name' => $type->name, 'amount' => 2000, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true];
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')]);
+    foreach ([null, '2026-10-17', '2026-02-30'] as $date) {
+        $this->patchJson($url, [...$data, 'dues_start_on' => $date])->assertUnprocessable()->assertJsonValidationErrors('dues_start_on');
+    }
+    $this->patchJson($url, [...$data, 'dues_start_on' => '2026-11-01'])->assertOk()->assertJsonPath('dues_start_on', '2026-11-01');
+    $this->patchJson($url, [...$data, 'dues_start_on' => '2026-10-18'])->assertUnprocessable()->assertJsonValidationErrors('dues_start_on');
+    expect($type->fresh()->dues_start_on->toDateString())->toBe('2026-11-01');
+});
+
+test('reintroducing dues preserves an explicitly selected unchanged future date', function () {
+    [$tenant, $user] = membershipTypesTenant();
+    $this->travelTo(Carbon\CarbonImmutable::parse('2026-10-18 12:00', 'Africa/Accra'));
+    $type = MembershipType::factory()->create(['tenant_id' => $tenant->id, 'amount' => null, 'period' => null]);
+    $url = route('tenant.community.money.dues.update', ['subdomain' => 'acme', 'type' => $type->id]);
+    $data = ['name' => $type->name, 'amount' => 2000, 'currency' => 'GHS', 'period' => 'monthly', 'is_active' => true, 'dues_start_on' => '2026-12-01'];
+    $this->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost('acme')]);
+    $this->patchJson($url, $data)->assertOk();
+    $this->patchJson($url, [...$data, 'amount' => null, 'period' => null])->assertOk();
+    $this->patchJson($url, $data)->assertOk()->assertJsonPath('dues_start_on', '2026-12-01');
 });

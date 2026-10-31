@@ -1,9 +1,25 @@
 import { useState } from 'react';
-import { AlertCircle, Award, Check, Download, ExternalLink, Smartphone, Sparkles, Trash2, WifiOff } from 'lucide-react';
+import {
+    AlertCircle,
+    Award,
+    Check,
+    Download,
+    ExternalLink,
+    Smartphone,
+    Sparkles,
+    Trash2,
+    WifiOff,
+} from 'lucide-react';
 import csrfFetch from '@/lib/csrfFetch';
 import { getOfflineTicket, removeOfflineTicket, saveOfflineTicket } from '@/lib/offlineTicketStore';
 
-export default function MyTicketPanel({ event, registration, isOnline = true, certificate = null }) {
+export default function MyTicketPanel({
+    event,
+    registration,
+    isOnline = true,
+    certificate = null,
+    offlineIdentity = null,
+}) {
     const [transferring, setTransferring] = useState(false);
     // 'details' collects who it goes to; 'code' confirms it from the current
     // holder's inbox. The ticket does not move until the second step.
@@ -13,10 +29,16 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
     const [error, setError] = useState(null);
-    const [savedOffline, setSavedOffline] = useState(Boolean(getOfflineTicket(registration.id)));
+    const [savedOffline, setSavedOffline] = useState(
+        Boolean(getOfflineTicket(registration.id, offlineIdentity))
+    );
     const [showOfflineModal, setShowOfflineModal] = useState(false);
 
-    const canTransfer = registration.status !== 'checked_in' && isOnline;
+    const canTransfer =
+        !registration.member_benefit_required &&
+        registration.can_transfer !== false &&
+        registration.status !== 'checked_in' &&
+        isOnline;
     const [checkingIn, setCheckingIn] = useState(false);
     const [checkedIn, setCheckedIn] = useState(Boolean(registration.checked_in));
 
@@ -47,7 +69,7 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
     };
 
     const handleSaveOffline = () => {
-        const snapshot = saveOfflineTicket(registration, event);
+        const snapshot = saveOfflineTicket(registration, event, offlineIdentity);
         if (snapshot) {
             setSavedOffline(true);
             setShowOfflineModal(false);
@@ -62,7 +84,8 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
     };
 
     const post = async (actionPath, legacyRouteName, body) => {
-        const isPlatform = typeof window !== 'undefined' && window.location.pathname.startsWith('/my/events');
+        const isPlatform =
+            typeof window !== 'undefined' && /^\/my(?:\/|$)/.test(window.location.pathname);
         const url = isPlatform
             ? `/my/events/${registration.id}/${actionPath}`
             : route(legacyRouteName, { event: event.slug, registration: registration.id });
@@ -79,7 +102,11 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
         setSaving(true);
         setError(null);
         setMessage(null);
-        const [response, json] = await post('transfer', 'public.events.registrations.transfer', form);
+        const [response, json] = await post(
+            'transfer',
+            'public.events.registrations.transfer',
+            form
+        );
         setSaving(false);
         if (!response.ok) {
             setError(json.message ?? 'Could not start this transfer.');
@@ -93,9 +120,13 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
         e.preventDefault();
         setSaving(true);
         setError(null);
-        const [response, json] = await post('transfer/confirm', 'public.events.registrations.transfer.confirm', {
-            code,
-        });
+        const [response, json] = await post(
+            'transfer/confirm',
+            'public.events.registrations.transfer.confirm',
+            {
+                code,
+            }
+        );
         setSaving(false);
         if (!response.ok) {
             setError(json.message ?? 'Could not complete this transfer.');
@@ -118,6 +149,33 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
 
     return (
         <div className="flex flex-col gap-6 sm:flex-row">
+            {registration.member_benefit_required && (
+                <div className="border border-border bg-surface-alt p-4 text-sm text-ink-secondary">
+                    <p>Member-benefit registrations are personal. Tickets cannot be transferred.</p>
+                    {registration.checkout_url && (
+                        <a
+                            href={registration.checkout_url}
+                            className="mt-2 inline-block text-accent underline"
+                        >
+                            Verify membership or review payment
+                        </a>
+                    )}
+                    {registration.member_payment_review_url && (
+                        <a
+                            href={registration.member_payment_review_url}
+                            className="mt-2 block text-accent underline"
+                        >
+                            View payment receipt or status
+                        </a>
+                    )}
+                    {registration.member_extra_payments > 0 && (
+                        <p role="status" className="mt-2">
+                            An additional payment needs review. Contact the organiser about the
+                            excess payment. Do not pay again.
+                        </p>
+                    )}
+                </div>
+            )}
             {registration.qr_image && (
                 <img
                     src={registration.qr_image}
@@ -172,6 +230,7 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
                         <button
                             type="button"
                             onClick={() => setShowOfflineModal(true)}
+                            disabled={!isOnline || offlineIdentity?.state !== 'verified'}
                             className="inline-flex h-control items-center gap-1.5 border border-border px-4 text-sm text-ink hover:border-accent cursor-pointer"
                         >
                             <Smartphone className="h-4 w-4" />
@@ -204,7 +263,9 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
                         >
                             Transfer
                         </button>
-                    ) : !isOnline && registration.status !== 'checked_in' ? (
+                    ) : !registration.member_benefit_required &&
+                      !isOnline &&
+                      registration.status !== 'checked_in' ? (
                         <span
                             className="inline-flex h-control items-center gap-1 border border-border/60 bg-surface-subtle px-3 text-xs text-ink-secondary cursor-not-allowed"
                             title="Internet connection required to transfer this ticket"
@@ -225,10 +286,13 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
                                         Save ticket to this device?
                                     </h3>
                                     <p className="mt-1.5 text-xs text-ink-secondary leading-relaxed">
-                                        This stores your ticket and QR code directly in this browser so you can view it even without an internet connection at the venue.
+                                        This stores your ticket and QR code directly in this browser
+                                        so you can view it even without an internet connection at
+                                        the venue.
                                     </p>
                                     <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-300">
-                                        Do not save on shared or public computers. Anyone who opens this browser can see your ticket.
+                                        Do not save on shared or public computers. Anyone who opens
+                                        this browser can see your ticket.
                                     </p>
                                 </div>
                             </div>
@@ -276,7 +340,8 @@ export default function MyTicketPanel({ event, registration, isOnline = true, ce
                         </div>
 
                         <p className="text-xs text-ink-secondary">
-                            Your certificate of participation has been issued and verified for this registration.
+                            Your certificate of participation has been issued and verified for this
+                            registration.
                         </p>
 
                         <div className="flex flex-wrap items-center gap-2 pt-1">

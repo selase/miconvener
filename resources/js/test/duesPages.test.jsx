@@ -105,3 +105,9 @@ describe('creating a charge from the member drawer', () => {
         expect(canCreateCharge({ status: 'exited', effective_amount: 5000 })).toBe(false);
     });
 });
+
+describe('member charge eligibility', () => {
+    it.each(['pending', 'lapsed'])('does not offer a charge for a %s member', (status) => {
+        expect(canCreateCharge({ status, effective_amount: 5000 })).toBe(false);
+    });
+});

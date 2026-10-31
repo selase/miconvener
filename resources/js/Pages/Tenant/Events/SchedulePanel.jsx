@@ -78,7 +78,13 @@ function groupByDay(sessions) {
     return Array.from(groups.values());
 }
 
-export default function SchedulePanel({ event, sessions, speakers, onChange }) {
+export default function SchedulePanel({
+    event,
+    sessions,
+    speakers,
+    onChange,
+    canPublishCommunityNotes = false,
+}) {
     const [form, setForm] = useState(EMPTY);
     const [saving, setSaving] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -145,7 +151,11 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
     };
 
     const [batchCancelOpen, setBatchCancelOpen] = useState(false);
-    const [cancelForm, setCancelForm] = useState({ start_date: '', end_date: '', reason: 'Public Holiday' });
+    const [cancelForm, setCancelForm] = useState({
+        start_date: '',
+        end_date: '',
+        reason: 'Public Holiday',
+    });
     const [submittingCancel, setSubmittingCancel] = useState(false);
 
     const [batchRescheduleOpen, setBatchRescheduleOpen] = useState(false);
@@ -306,7 +316,9 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                             disabled={generating}
                             className="shrink-0"
                         >
-                            <RefreshCw className={`h-4 w-4 mr-1.5 ${generating ? 'animate-spin' : ''}`} />
+                            <RefreshCw
+                                className={`h-4 w-4 mr-1.5 ${generating ? 'animate-spin' : ''}`}
+                            />
                             {generating ? 'Synchronizing...' : 'Generate Next 4 Weeks'}
                         </Button>
                     </div>
@@ -336,11 +348,7 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                             <Calendar className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
                             Calendar Feed (.ics)
                         </Button>
-                        <Button
-                            type="button"
-                            variant="default"
-                            onClick={loadAnalytics}
-                        >
+                        <Button type="button" variant="default" onClick={loadAnalytics}>
                             <BarChart2 className="h-3.5 w-3.5 mr-1.5 text-indigo-600" />
                             Series Retention
                         </Button>
@@ -405,30 +413,44 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                                     {session.title}
                                                 </span>
                                                 {session.is_occurrence && (
-                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider ${
-                                                        session.occurrence_status === 'completed'
-                                                            ? 'bg-success-bg text-success-fg'
-                                                            : session.occurrence_status === 'cancelled'
-                                                            ? 'bg-danger-bg text-danger-fg'
-                                                            : 'bg-surface-sunken text-ink-secondary border border-border'
-                                                    }`}>
+                                                    <span
+                                                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider ${
+                                                            session.occurrence_status ===
+                                                            'completed'
+                                                                ? 'bg-success-bg text-success-fg'
+                                                                : session.occurrence_status ===
+                                                                    'cancelled'
+                                                                  ? 'bg-danger-bg text-danger-fg'
+                                                                  : 'bg-surface-sunken text-ink-secondary border border-border'
+                                                        }`}
+                                                    >
                                                         {session.occurrence_status || 'scheduled'}
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="text-xs text-ink-secondary flex items-center flex-wrap gap-1.5 mt-0.5">
                                                 <span>
-                                                    {formatTime(session.starts_at)}–{formatTime(session.ends_at)} · {session.type}
+                                                    {formatTime(session.starts_at)}–
+                                                    {formatTime(session.ends_at)} · {session.type}
                                                 </span>
-                                                {session.location ? <span>· {session.location}</span> : null}
+                                                {session.location ? (
+                                                    <span>· {session.location}</span>
+                                                ) : null}
                                                 {session.speaker_names?.length ? (
-                                                    <span>· {session.speaker_names.join(', ')}</span>
+                                                    <span>
+                                                        · {session.speaker_names.join(', ')}
+                                                    </span>
                                                 ) : null}
                                                 {session.capacity ? (
-                                                    <span>· {session.signup_count ?? 0}/{session.capacity} signed up</span>
+                                                    <span>
+                                                        · {session.signup_count ?? 0}/
+                                                        {session.capacity} signed up
+                                                    </span>
                                                 ) : null}
                                                 {session.attendances_count > 0 ? (
-                                                    <span className="text-accent font-medium">· {session.attendances_count} attended</span>
+                                                    <span className="text-accent font-medium">
+                                                        · {session.attendances_count} attended
+                                                    </span>
                                                 ) : null}
                                                 {session.notes && (
                                                     <span className="inline-flex items-center gap-0.5 text-accent font-medium">
@@ -448,15 +470,31 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
+                                            {session.is_occurrence && canPublishCommunityNotes && (
+                                                <a
+                                                    className="inline-flex min-h-11 items-center px-2 text-xs font-medium text-accent underline"
+                                                    href={`${route('tenant.community.library.index')}?event=${encodeURIComponent(event.id)}&service=${encodeURIComponent(session.id)}`}
+                                                >
+                                                    Member notes
+                                                </a>
+                                            )}
                                             {session.is_occurrence && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setEditingOccurrence({
-                                                        ...session,
-                                                        notes: session.notes || '',
-                                                        presentation_url: session.presentation_url || '',
-                                                        speaker_ids: session.speaker_ids || session.speakers?.map((s) => s.id) || [],
-                                                    })}
+                                                    onClick={() =>
+                                                        setEditingOccurrence({
+                                                            ...session,
+                                                            notes: session.notes || '',
+                                                            presentation_url:
+                                                                session.presentation_url || '',
+                                                            speaker_ids:
+                                                                session.speaker_ids ||
+                                                                session.speakers?.map(
+                                                                    (s) => s.id
+                                                                ) ||
+                                                                [],
+                                                        })
+                                                    }
                                                     className="p-1 text-ink-secondary hover:text-accent rounded"
                                                     title="Edit sermon notes, presentation, & occurrence details"
                                                 >
@@ -524,19 +562,19 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                             value={form.type}
                             onChange={(e) => setForm({ ...form, type: e.target.value })}
                         >
-                            {event.lexicon?.session_types ? (
-                                Object.entries(event.lexicon.session_types).map(([key, label]) => (
-                                    <option key={key} value={key}>
-                                        {label}
-                                    </option>
-                                ))
-                            ) : (
-                                TYPES.map((t) => (
-                                    <option key={t} value={t}>
-                                        {t.replace('_', ' ')}
-                                    </option>
-                                ))
-                            )}
+                            {event.lexicon?.session_types
+                                ? Object.entries(event.lexicon.session_types).map(
+                                      ([key, label]) => (
+                                          <option key={key} value={key}>
+                                              {label}
+                                          </option>
+                                      )
+                                  )
+                                : TYPES.map((t) => (
+                                      <option key={t} value={t}>
+                                          {t.replace('_', ' ')}
+                                      </option>
+                                  ))}
                         </Select>
                         <Input
                             label="Capacity"
@@ -608,7 +646,10 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                             label="Title / Topic"
                             value={editingOccurrence.title}
                             onChange={(e) =>
-                                setEditingOccurrence({ ...editingOccurrence, title: e.target.value })
+                                setEditingOccurrence({
+                                    ...editingOccurrence,
+                                    title: e.target.value,
+                                })
                             }
                             required
                         />
@@ -618,22 +659,25 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                 label="Session Type"
                                 value={editingOccurrence.type}
                                 onChange={(e) =>
-                                    setEditingOccurrence({ ...editingOccurrence, type: e.target.value })
+                                    setEditingOccurrence({
+                                        ...editingOccurrence,
+                                        type: e.target.value,
+                                    })
                                 }
                             >
-                                {event.lexicon?.session_types ? (
-                                    Object.entries(event.lexicon.session_types).map(([key, label]) => (
-                                        <option key={key} value={key}>
-                                            {label}
-                                        </option>
-                                    ))
-                                ) : (
-                                    TYPES.map((t) => (
-                                        <option key={t} value={t}>
-                                            {t.replace('_', ' ')}
-                                        </option>
-                                    ))
-                                )}
+                                {event.lexicon?.session_types
+                                    ? Object.entries(event.lexicon.session_types).map(
+                                          ([key, label]) => (
+                                              <option key={key} value={key}>
+                                                  {label}
+                                              </option>
+                                          )
+                                      )
+                                    : TYPES.map((t) => (
+                                          <option key={t} value={t}>
+                                              {t.replace('_', ' ')}
+                                          </option>
+                                      ))}
                             </Select>
 
                             <Select
@@ -656,7 +700,10 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                             label="Location / Room"
                             value={editingOccurrence.location || ''}
                             onChange={(e) =>
-                                setEditingOccurrence({ ...editingOccurrence, location: e.target.value })
+                                setEditingOccurrence({
+                                    ...editingOccurrence,
+                                    location: e.target.value,
+                                })
                             }
                             placeholder="e.g. Main Sanctuary, Lecture Hall 1"
                         />
@@ -674,7 +721,9 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                 </label>
                                 <div className="flex flex-wrap gap-2">
                                     {speakers.map((s) => {
-                                        const isSelected = editingOccurrence.speaker_ids?.includes(s.id);
+                                        const isSelected = editingOccurrence.speaker_ids?.includes(
+                                            s.id
+                                        );
                                         return (
                                             <button
                                                 key={s.id}
@@ -709,10 +758,16 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                             <textarea
                                 value={editingOccurrence.notes || ''}
                                 onChange={(e) =>
-                                    setEditingOccurrence({ ...editingOccurrence, notes: e.target.value })
+                                    setEditingOccurrence({
+                                        ...editingOccurrence,
+                                        notes: e.target.value,
+                                    })
                                 }
                                 rows={4}
-                                placeholder={event.lexicon?.notes_placeholder || 'Add key notes, outlines, or references...'}
+                                placeholder={
+                                    event.lexicon?.notes_placeholder ||
+                                    'Add key notes, outlines, or references...'
+                                }
                                 className="w-full rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                             />
                         </div>
@@ -755,7 +810,8 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                 >
                     <form onSubmit={handleBatchCancel} className="space-y-4">
                         <p className="text-xs text-ink-secondary">
-                            Mark occurrences within a date window as cancelled (e.g. national holidays, exam breaks, or facility maintenance).
+                            Mark occurrences within a date window as cancelled (e.g. national
+                            holidays, exam breaks, or facility maintenance).
                         </p>
 
                         <div className="grid grid-cols-2 gap-3">
@@ -813,7 +869,8 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                 >
                     <form onSubmit={handleBatchReschedule} className="space-y-4">
                         <p className="text-xs text-ink-secondary">
-                            Bulk update the start and end times across all upcoming scheduled occurrences in this series.
+                            Bulk update the start and end times across all upcoming scheduled
+                            occurrences in this series.
                         </p>
 
                         <div className="grid grid-cols-2 gap-3">
@@ -822,7 +879,10 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                 type="time"
                                 value={rescheduleForm.time_start}
                                 onChange={(e) =>
-                                    setRescheduleForm({ ...rescheduleForm, time_start: e.target.value })
+                                    setRescheduleForm({
+                                        ...rescheduleForm,
+                                        time_start: e.target.value,
+                                    })
                                 }
                                 required
                             />
@@ -831,7 +891,10 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                 type="time"
                                 value={rescheduleForm.time_end}
                                 onChange={(e) =>
-                                    setRescheduleForm({ ...rescheduleForm, time_end: e.target.value })
+                                    setRescheduleForm({
+                                        ...rescheduleForm,
+                                        time_end: e.target.value,
+                                    })
                                 }
                                 required
                             />
@@ -843,11 +906,17 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                     type="checkbox"
                                     checked={rescheduleForm.future_only}
                                     onChange={(e) =>
-                                        setRescheduleForm({ ...rescheduleForm, future_only: e.target.checked })
+                                        setRescheduleForm({
+                                            ...rescheduleForm,
+                                            future_only: e.target.checked,
+                                        })
                                     }
                                     className="rounded border-border text-accent focus:ring-accent"
                                 />
-                                <span>Apply to future occurrences only (leave past gatherings untouched)</span>
+                                <span>
+                                    Apply to future occurrences only (leave past gatherings
+                                    untouched)
+                                </span>
                             </label>
 
                             <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
@@ -862,7 +931,9 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                     }
                                     className="rounded border-border text-accent focus:ring-accent"
                                 />
-                                <span>Update series default times for future auto-generated weeks</span>
+                                <span>
+                                    Update series default times for future auto-generated weeks
+                                </span>
                             </label>
                         </div>
 
@@ -890,14 +961,20 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                 >
                     <div className="space-y-4">
                         <p className="text-xs text-ink-secondary">
-                            Share this real-time calendar subscription feed. When you schedule, update, or cancel occurrences, members&apos; Apple Calendar, Google Calendar, and Outlook apps sync automatically.
+                            Share this real-time calendar subscription feed. When you schedule,
+                            update, or cancel occurrences, members&apos; Apple Calendar, Google
+                            Calendar, and Outlook apps sync automatically.
                         </p>
 
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
                                 readOnly
-                                value={typeof window !== 'undefined' ? `${window.location.origin}/e/${event.slug}/calendar.ics` : `/e/${event.slug}/calendar.ics`}
+                                value={
+                                    typeof window !== 'undefined'
+                                        ? `${window.location.origin}/e/${event.slug}/calendar.ics`
+                                        : `/e/${event.slug}/calendar.ics`
+                                }
                                 className="flex-1 rounded-md border border-border bg-surface-sunken/40 px-3 py-2 text-xs text-ink font-mono select-all"
                             />
                             <Button
@@ -906,7 +983,11 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                                 onClick={copyFeedUrl}
                                 className="shrink-0"
                             >
-                                {copiedFeed ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                                {copiedFeed ? (
+                                    <Check className="h-4 w-4 text-emerald-600" />
+                                ) : (
+                                    <Copy className="h-4 w-4" />
+                                )}
                                 {copiedFeed ? 'Copied' : 'Copy'}
                             </Button>
                         </div>
@@ -914,9 +995,18 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                         <div className="rounded-md border border-border/80 bg-surface p-3 space-y-2 text-xs text-ink-secondary">
                             <p className="font-semibold text-ink">How to subscribe:</p>
                             <ul className="list-disc pl-4 space-y-1">
-                                <li><strong>Apple Calendar (iOS/macOS):</strong> File &rarr; New Calendar Subscription &rarr; Paste URL.</li>
-                                <li><strong>Google Calendar:</strong> Other calendars (+) &rarr; From URL &rarr; Paste URL.</li>
-                                <li><strong>Microsoft Outlook:</strong> Add Calendar &rarr; Subscribe from web &rarr; Paste URL.</li>
+                                <li>
+                                    <strong>Apple Calendar (iOS/macOS):</strong> File &rarr; New
+                                    Calendar Subscription &rarr; Paste URL.
+                                </li>
+                                <li>
+                                    <strong>Google Calendar:</strong> Other calendars (+) &rarr;
+                                    From URL &rarr; Paste URL.
+                                </li>
+                                <li>
+                                    <strong>Microsoft Outlook:</strong> Add Calendar &rarr;
+                                    Subscribe from web &rarr; Paste URL.
+                                </li>
                             </ul>
                         </div>
 
@@ -947,42 +1037,78 @@ export default function SchedulePanel({ event, sessions, speakers, onChange }) {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                 <div className="rounded-lg border border-border bg-surface-sunken/40 p-3">
-                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">Total Occurrences</div>
-                                    <div className="text-xl font-bold text-ink mt-0.5">{analyticsData.total_occurrences}</div>
+                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">
+                                        Total Occurrences
+                                    </div>
+                                    <div className="text-xl font-bold text-ink mt-0.5">
+                                        {analyticsData.total_occurrences}
+                                    </div>
                                     <div className="text-[10px] text-ink-muted mt-0.5">
-                                        {analyticsData.scheduled_count} active &bull; {analyticsData.cancelled_count} off
+                                        {analyticsData.scheduled_count} active &bull;{' '}
+                                        {analyticsData.cancelled_count} off
                                     </div>
                                 </div>
                                 <div className="rounded-lg border border-border bg-surface-sunken/40 p-3">
-                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">Unique Attendees</div>
-                                    <div className="text-xl font-bold text-ink mt-0.5">{analyticsData.unique_attendees}</div>
-                                    <div className="text-[10px] text-ink-muted mt-0.5">All-time check-ins</div>
+                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">
+                                        Unique Attendees
+                                    </div>
+                                    <div className="text-xl font-bold text-ink mt-0.5">
+                                        {analyticsData.unique_attendees}
+                                    </div>
+                                    <div className="text-[10px] text-ink-muted mt-0.5">
+                                        All-time check-ins
+                                    </div>
                                 </div>
                                 <div className="rounded-lg border border-border bg-surface-sunken/40 p-3">
-                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">Avg Attendance</div>
-                                    <div className="text-xl font-bold text-ink mt-0.5">{analyticsData.average_attendance}</div>
-                                    <div className="text-[10px] text-ink-muted mt-0.5">Per gathering</div>
+                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">
+                                        Avg Attendance
+                                    </div>
+                                    <div className="text-xl font-bold text-ink mt-0.5">
+                                        {analyticsData.average_attendance}
+                                    </div>
+                                    <div className="text-[10px] text-ink-muted mt-0.5">
+                                        Per gathering
+                                    </div>
                                 </div>
                                 <div className="rounded-lg border border-border bg-surface-sunken/40 p-3">
-                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">Retention Rate</div>
-                                    <div className="text-xl font-bold text-ink mt-0.5">{analyticsData.retention_rate}%</div>
-                                    <div className="text-[10px] text-ink-muted mt-0.5">{analyticsData.retained_attendees} returned 2+ times</div>
+                                    <div className="text-[10px] uppercase font-semibold text-ink-secondary">
+                                        Retention Rate
+                                    </div>
+                                    <div className="text-xl font-bold text-ink mt-0.5">
+                                        {analyticsData.retention_rate}%
+                                    </div>
+                                    <div className="text-[10px] text-ink-muted mt-0.5">
+                                        {analyticsData.retained_attendees} returned 2+ times
+                                    </div>
                                 </div>
                             </div>
 
                             {analyticsData.recent_trend?.length > 0 && (
                                 <div>
-                                    <h4 className="text-xs font-semibold text-ink mb-2">Recent Gatherings Check-in Rollup</h4>
+                                    <h4 className="text-xs font-semibold text-ink mb-2">
+                                        Recent Gatherings Check-in Rollup
+                                    </h4>
                                     <div className="divide-y divide-border border border-border rounded-md overflow-hidden text-xs">
                                         {analyticsData.recent_trend.map((occ) => (
-                                            <div key={occ.id} className="flex items-center justify-between p-2.5 bg-surface hover:bg-surface-sunken/30">
+                                            <div
+                                                key={occ.id}
+                                                className="flex items-center justify-between p-2.5 bg-surface hover:bg-surface-sunken/30"
+                                            >
                                                 <div>
-                                                    <div className="font-medium text-ink">{occ.title}</div>
-                                                    <div className="text-[11px] text-ink-secondary">{occ.date}</div>
+                                                    <div className="font-medium text-ink">
+                                                        {occ.title}
+                                                    </div>
+                                                    <div className="text-[11px] text-ink-secondary">
+                                                        {occ.date}
+                                                    </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className="font-semibold text-ink">{occ.attendees_count}</span>
-                                                    <span className="text-[11px] text-ink-secondary ml-1">checked in</span>
+                                                    <span className="font-semibold text-ink">
+                                                        {occ.attendees_count}
+                                                    </span>
+                                                    <span className="text-[11px] text-ink-secondary ml-1">
+                                                        checked in
+                                                    </span>
                                                 </div>
                                             </div>
                                         ))}

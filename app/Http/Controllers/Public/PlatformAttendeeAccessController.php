@@ -47,12 +47,13 @@ final class PlatformAttendeeAccessController extends Controller
             }
         }
 
+        $appEnabled = app(\App\Services\Community\CommunityHistory::class)->usesAppShell($request->session(), $organiserSlug);
         $history = null;
         $certificates = null;
         $abstracts = null;
         $attendance = null;
         $contributions = null;
-        if ($verifiedEmail !== null) {
+        if ($verifiedEmail !== null && ! $appEnabled) {
             $history = $this->history->getHistory($verifiedEmail, $organiserSlug);
             $certificates = $this->history->getCertificates($verifiedEmail, $organiserSlug);
             $abstracts = $this->history->getAbstracts($verifiedEmail, $organiserSlug);
@@ -61,6 +62,11 @@ final class PlatformAttendeeAccessController extends Controller
         }
 
         return Inertia::render('Public/Events/AttendeePortal/MyPortal', [
+            'app_shell_enabled' => $appEnabled,
+            'community_inbox_enabled' => $appEnabled && app(\App\Services\Community\InboxQuery::class)->available($request->session()),
+            'offline_identity' => app(\App\Services\Events\AttendeeIdentityContext::class)->for($request->session()),
+            'communityPhoneVerified' => app(\App\Services\Community\PhoneVerification::class)->verifiedPhone($request->session()) !== null,
+            'communityReturnUrl' => $this->communityReturnUrl($request, $organiserSlug),
             'organiser' => $organiser,
             'verifiedEmail' => $verifiedEmail !== null ? ContactMask::email($verifiedEmail) : null,
             'initialHistory' => $history,
@@ -69,6 +75,27 @@ final class PlatformAttendeeAccessController extends Controller
             'initialAttendance' => $attendance,
             'initialContributions' => $contributions,
         ]);
+    }
+
+    public function offlineShell(): Response
+    {
+        return Inertia::render('Public/Events/AttendeePortal/MyPortal', ['app_shell_enabled' => true, 'offline_identity' => ['state' => 'unknown_offline']]);
+    }
+
+    public function offlineAssets(): JsonResponse
+    {
+        $path = public_path('build/manifest.json');
+        $manifest = is_file($path) ? json_decode((string) file_get_contents($path), true) : [];
+        $assets = [];
+        foreach (is_array($manifest) ? $manifest : [] as $entry) {
+            foreach ([$entry['file'] ?? null, ...($entry['css'] ?? [])] as $file) {
+                if (is_string($file) && preg_match('~^assets/[a-zA-Z0-9_-]+\.(js|css)$~D', $file) === 1) {
+                    $assets[] = '/build/'.$file;
+                }
+            }
+        }
+
+        return response()->json(['assets' => array_values(array_unique($assets))])->header('Cache-Control', 'no-cache');
     }
 
     public function send(PlatformSendAccessCodeRequest $request): JsonResponse
@@ -136,10 +163,23 @@ final class PlatformAttendeeAccessController extends Controller
     public function forget(Request $request): JsonResponse
     {
         $this->verification->forget($request->session());
+        app(\App\Services\Community\PhoneVerification::class)->forget($request->session());
+        app(\App\Services\Community\MemberAccess::class)->forget($request->session());
+        $request->session()->forget([\App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY, \App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::REGISTERED_SESSION_KEY]);
+        $request->session()->regenerate(true);
 
         return response()->json([
             'message' => 'Signed out.',
         ]);
+    }
+
+    public function removeEmail(Request $request): JsonResponse
+    {
+        $this->verification->forget($request->session());
+        $request->session()->forget([\App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::CHECKOUT_GRANTS_SESSION_KEY, \App\Services\Events\PlatformAttendeeWorkspaceAuthorizer::REGISTERED_SESSION_KEY]);
+        $request->session()->regenerate(true);
+
+        return response()->json(['message' => 'Email removed from this device.'])->header('Cache-Control', 'private, no-store');
     }
 
     public function session(Request $request): JsonResponse
@@ -149,6 +189,11 @@ final class PlatformAttendeeAccessController extends Controller
         return response()->json([
             'email' => ContactMask::email($email),
         ]);
+    }
+
+    public function appEvents(\App\Http\Requests\Attendee\AppEventsRequest $request): JsonResponse
+    {
+        return response()->json($this->history->getAppHistory((string) $request->attributes->get('attendee_email'), $request->validated()))->header('Cache-Control', 'private, no-store');
     }
 
     public function events(Request $request): JsonResponse
@@ -217,7 +262,8 @@ final class PlatformAttendeeAccessController extends Controller
             abort(403, 'You are not authorized to access this receipt.');
         }
 
-        if (! $record->isCompleted()) {
+        $refundedGiving = $record->status === EventContribution::STATUS_REFUNDED && \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $record->tenant_id)->where('event_contribution_id', $record->id)->where('origin', 'checkout')->where('category', 'giving')->exists();
+        if (! $record->isCompleted() && ! $refundedGiving) {
             abort(422, 'Receipt is only available for completed contributions.');
         }
 
@@ -226,6 +272,7 @@ final class PlatformAttendeeAccessController extends Controller
 
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'private, no-store',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
@@ -298,7 +345,7 @@ final class PlatformAttendeeAccessController extends Controller
             'short_name' => 'My Events',
             'description' => 'Your tickets, materials, and agendas across all MiConvener events',
             'start_url' => '/my',
-            'scope' => '/my/',
+            'scope' => '/my',
             'display' => 'standalone',
             'background_color' => '#ffffff',
             'theme_color' => '#4f46e5',
@@ -318,5 +365,33 @@ final class PlatformAttendeeAccessController extends Controller
             'Content-Type' => 'application/manifest+json',
             'Cache-Control' => 'public, max-age=86400',
         ]);
+    }
+
+    private function communityReturnUrl(Request $request, ?string $organiserSlug): ?string
+    {
+        $value = $request->query('return_to');
+        if (! is_string($value) || $organiserSlug === null || str_contains($value, '\\') || preg_match('/[\x00-\x20]/', $value)) {
+            return null;
+        }
+        $tenant = Tenant::where('slug', $organiserSlug)->first();
+        if ($tenant === null) {
+            return null;
+        }
+        $expected = route('public.community.about', ['subdomain' => $tenant->slug]);
+        $parsed = parse_url($value);
+        $allowed = parse_url($expected);
+        if (! is_array($parsed) || isset($parsed['user']) || isset($parsed['pass']) || ($parsed['scheme'] ?? null) !== ($allowed['scheme'] ?? null)
+            || ($parsed['host'] ?? null) !== ($allowed['host'] ?? null) || ($parsed['port'] ?? null) !== ($allowed['port'] ?? null)) {
+            return null;
+        }
+        if (($parsed['path'] ?? '') === '/community/about') {
+            return $expected;
+        }
+        if (preg_match('#^/e/([a-z0-9-]+)$#D', $parsed['path'] ?? '', $matches)
+            && \App\Models\Event::withoutGlobalScopes()->where('tenant_id', $tenant->id)->published()->where('slug', $matches[1])->exists()) {
+            return route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $matches[1]]);
+        }
+
+        return null;
     }
 }

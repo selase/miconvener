@@ -80,11 +80,11 @@ test('a member needs an active class of the same organisation', function () {
         ->assertUnprocessable()->assertJsonValidationErrors(['membership_type_id']);
 });
 
-test('a duplicate phone in the same organisation is rejected, the same phone in another is fine', function () {
+test('a duplicate name and phone in the same organisation is rejected, the same identity in another is fine', function () {
     [$tenant, $user, $class] = duesMembersTenant();
     $beta = Tenant::factory()->create(['slug' => 'beta']);
-    Member::factory()->create(['tenant_id' => $beta->id, 'phone' => '0244000001']);
-    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'phone' => '0244000002']);
+    Member::factory()->create(['tenant_id' => $beta->id, 'name' => 'Ama Mensah', 'phone' => '0244000001']);
+    Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'name' => 'Ama Mensah', 'phone' => '0244000002']);
     $host = ['HTTP_HOST' => eventSubdomainHost('acme')];
 
     $this->actingAs($user)->withServerVariables($host)
@@ -95,7 +95,7 @@ test('a duplicate phone in the same organisation is rejected, the same phone in 
         ->assertCreated();
 });
 
-test('an email already used by a member without a phone is rejected, but is fine next to a phone', function () {
+test('an email already used by another member is rejected even alongside a phone', function () {
     [$tenant, $user, $class] = duesMembersTenant();
     Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'email' => 'taken@example.com', 'phone' => null]);
     Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'email' => 'shared@example.com', 'phone' => '0244000009']);
@@ -106,7 +106,8 @@ test('an email already used by a member without a phone is rejected, but is fine
         ->assertUnprocessable()->assertJsonValidationErrors(['email']);
     $this->actingAs($user)->withServerVariables($host)
         ->postJson(route('tenant.community.members.store', ['subdomain' => 'acme']), duesMemberPayload($class, ['email' => 'shared@example.com', 'phone' => '0244000010']))
-        ->assertCreated();
+        ->assertUnprocessable()->assertJsonValidationErrors(['email']);
+    expect(Member::where('tenant_id', $tenant->id)->count())->toBe(2);
 });
 
 test('an admin updates a member, keeping their own phone and email', function () {
@@ -125,7 +126,7 @@ test('the member list is paginated and shows effective amount and open totals', 
     [$tenant, $user, $class] = duesMembersTenant();
     $member = Member::factory()->create(['tenant_id' => $tenant->id, 'membership_type_id' => $class->id, 'amount_override' => 3000]);
     DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'due_on' => now()->subDays(3)->toDateString()]);
-    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonth()->startOfMonth()->toDateString()]);
+    DuesCharge::factory()->create(['tenant_id' => $tenant->id, 'member_id' => $member->id, 'membership_type_id' => $class->id, 'amount' => 3000, 'status' => DuesChargeStatusEnum::Paid, 'period_start' => now()->subMonthNoOverflow()->startOfMonth()->toDateString()]);
     $beta = Tenant::factory()->create(['slug' => 'beta']);
     Member::factory()->create(['tenant_id' => $beta->id]);
 

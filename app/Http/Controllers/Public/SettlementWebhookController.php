@@ -7,17 +7,19 @@ namespace App\Http\Controllers\Public;
 use App\Enum\LedgerCategoryEnum;
 use App\Http\Controllers\Billing\WebhookController as BillingWebhookController;
 use App\Http\Controllers\Controller;
-use App\Mail\Events\EventRegistrationConfirmed;
 use App\Models\Event;
 use App\Models\EventPayout;
 use App\Models\EventRegistration;
 use App\Models\Tenant;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Operations\OperationalSignals;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Laravel\Telescope\Telescope;
 use Throwable;
 
 final class SettlementWebhookController extends Controller
@@ -59,6 +61,26 @@ final class SettlementWebhookController extends Controller
         $data = $request->input('data');
 
         $metadata = BillingWebhookController::metadata($data['metadata'] ?? null);
+        if (($metadata['application'] ?? null) === 'udworkspace') {
+            if ($event !== 'charge.success') {
+                return response()->json(['status' => 'ignored']);
+            }
+
+            return $this->relayUdworkspacePayment($body, $signature);
+        }
+
+        if ($settlementMatches && in_array($event, ['charge.success', 'charge.failed'], true)
+            && app(\App\Services\Marketplace\StorePaymentNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
+            return response()->json(['status' => 'success']);
+        }
+
+        if ($settlementMatches && is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Marketplace\StoreRefunds::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
+            return response()->json(['status' => 'success']);
+        }
+
+        if ($settlementMatches && is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Giving\GivingRefunds::class)->handlePaystackNotification((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
+            return response()->json(['status' => 'success']);
+        }
 
         // The platform's Paystack account is shared with other applications, so
         // this one webhook URL receives their events too. Acting on a charge that
@@ -68,6 +90,10 @@ final class SettlementWebhookController extends Controller
         // never bought. Transfers are exempt because ownership is already proven
         // by the payout reference, which only matches a payout this platform
         // created.
+        if ($settlementMatches && in_array($event, ['charge.success', 'charge.failed'], true) && app(\App\Services\Events\MemberBenefitNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity(), null, $event === 'charge.failed')) {
+            return response()->json(['status' => 'success']);
+        }
+
         if (! $this->isOurs($event, $metadata)) {
             Log::info('Ignoring Paystack event belonging to another application', [
                 'event' => $event,
@@ -104,6 +130,7 @@ final class SettlementWebhookController extends Controller
                     'venue_booking' => $this->confirmVenueBookingCharge($data, $data['reference'] ?? null),
                     'event_contribution' => $this->confirmContributionCharge($data, $data['reference'] ?? null),
                     'marketplace_quote' => $this->confirmMarketplaceQuoteCharge($data, $data['reference'] ?? null),
+                    'community_gift' => $this->confirmGivingCharge($data, $data['reference'] ?? null),
                     'member_dues' => $this->confirmDuesCharge($data, $data['reference'] ?? null),
                     default => $this->confirmPlatformDefaultCharge($metadata, $data['reference'] ?? null, (int) ($data['amount'] ?? 0), (int) ($data['fees'] ?? 0), mb_strtoupper((string) ($data['currency'] ?? 'GHS'))),
                 },
@@ -118,6 +145,53 @@ final class SettlementWebhookController extends Controller
         }
 
         return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * Preserve the original signed bytes. A failure must stay unacknowledged so
+     * Paystack retries; the destination performs its own verification and deduplication.
+     */
+    private function relayUdworkspacePayment(string $body, string $signature): JsonResponse
+    {
+        $attempt = (string) Str::uuid();
+        $context = ['attempt_id' => $attempt, 'payload_sha256' => hash('sha256', $body)];
+        if (! config('services.paystack.udworkspace_relay_enabled')) {
+            Log::warning('UDWorkspace Paystack relay disabled', $context);
+
+            return response()->json(['error' => 'Payment relay unavailable'], 503);
+        }
+
+        try {
+            $send = fn () => Http::connectTimeout(3)
+                ->timeout(15)
+                ->withoutRedirecting()
+                ->withHeaders(['x-paystack-signature' => $signature, 'X-Payment-Relay-Attempt' => $attempt])
+                ->withBody($body, 'application/json')
+                ->post('https://udworkspace.com/webhooks/paystack');
+            $result = class_exists(Telescope::class) ? Telescope::withoutRecording($send) : $send();
+            $context['http_status'] = $result->status();
+            $targetAttempt = (string) $result->header('X-Webhook-Attempt');
+            if (Str::isUuid($targetAttempt)) {
+                $context['target_attempt_id'] = $targetAttempt;
+            }
+            if ($result->status() !== 200) {
+                Log::warning('UDWorkspace Paystack relay failed', $context);
+
+                return response()->json(['error' => 'Payment relay unavailable'], 502)
+                    ->header('X-Payment-Relay-Attempt', $attempt);
+            }
+        } catch (Throwable $exception) {
+            $context['exception_class'] = $exception::class;
+            Log::warning('UDWorkspace Paystack relay failed', $context);
+
+            return response()->json(['error' => 'Payment relay unavailable'], 502)
+                ->header('X-Payment-Relay-Attempt', $attempt);
+        }
+
+        Log::info('UDWorkspace Paystack relay delivered', $context);
+
+        return response()->json(['status' => 'relayed'])
+            ->header('X-Payment-Relay-Attempt', $attempt);
     }
 
     /**
@@ -153,7 +227,7 @@ final class SettlementWebhookController extends Controller
 
         $type = $metadata['type'] ?? null;
 
-        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution', 'marketplace_quote', 'member_dues'], true);
+        return $event === 'charge.success' && in_array($type, ['event_ticket', 'venue_booking', 'event_contribution', 'marketplace_quote', 'member_dues', 'community_gift'], true);
     }
 
     /**
@@ -178,6 +252,21 @@ final class SettlementWebhookController extends Controller
      *
      * @param  array<string, mixed>  $data
      */
+    private function confirmGivingCharge(array $data, ?string $reference): void
+    {
+        if ($reference === null) {
+            return;
+        }
+        app(\App\Services\Giving\GivingPaymentConfirmer::class)->confirm($reference, [
+            'status' => 'success', 'provider' => 'paystack', 'account_identity' => app(\App\Services\Giving\GivingGateways::class)->platformIdentity(),
+            'reference' => $reference, 'provider_reference' => $reference,
+            'metadata' => BillingWebhookController::metadata($data['metadata'] ?? null),
+            'amount' => (int) ($data['amount'] ?? 0), 'fees' => isset($data['fees']) ? (int) $data['fees'] : null,
+            'currency' => mb_strtoupper((string) ($data['currency'] ?? '')), 'paid_at' => $data['paid_at'] ?? null,
+        ]);
+    }
+
+    /** @param array<string, mixed> $data */
     private function confirmDuesCharge(array $data, ?string $reference): void
     {
         if (! $reference) {
@@ -245,51 +334,7 @@ final class SettlementWebhookController extends Controller
             return;
         }
 
-        $eventModel = $registration->event;
-        /*
-         * $amount is what the gateway actually collected. When the organizer
-         * bears the commission that is exactly the ticket price, but when the
-         * attendee bears it the receipt is larger by the commission — so the
-         * ticket price comes from the registration rather than the receipt,
-         * and must not be overwritten with it.
-         */
-        $ticketAmount = $eventModel->effectiveFeeBearer() === \App\Services\Finance\PlatformFeeResolver::BEARER_ATTENDEE
-            ? (int) $registration->amount
-            : $amount;
-
-        $commissionAmount = app(\App\Services\Finance\FeeCalculator::class)->for($eventModel, $ticketAmount)->platformFee;
-
-        // Payment stands in for email verification: the checkout link was sent
-        // to this address and the gateway receipts it there too.
-        $registration->email_verified_at ??= now();
-        $registration->issueTicket();
-        $registration->fill([
-            'status' => EventRegistration::STATUS_CONFIRMED,
-            'payment_reference' => $reference,
-            'amount' => $ticketAmount,
-            'charged_amount' => $amount,
-            'gateway_fee_amount' => $gatewayFeeAmount,
-            'currency' => $currency,
-        ]);
-        $registration->save();
-        app(\App\Services\Notifications\EventRuleTriggerService::class)->registrationCompleted($registration);
-
-        app(\App\Services\Finance\LedgerService::class)->recordTicketSale(
-            $eventModel,
-            $registration,
-            $amount,
-            $commissionAmount,
-            $reference,
-            $gatewayFeeAmount
-        );
-
-        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'event_registrations');
-        app(\App\Services\Tenancy\FeatureMeteringService::class)->recordUsage($tenant, 'email_credits');
-
-        // Queued, not sent inline: the ticket and its ledger entry are already
-        // committed by this point, so a slow or failing mail transport must not
-        // turn a successful charge into a 500 and a provider retry.
-        Mail::to($registration->email)->queue(new EventRegistrationConfirmed($registration));
+        app(\App\Services\Events\StandardEventPaymentConfirmer::class)->confirm($registration, $reference, $amount, $gatewayFeeAmount, $currency, 'paystack', true);
     }
 
     private function confirmTransfer(string $event, string $reference, array $data): void
@@ -298,7 +343,22 @@ final class SettlementWebhookController extends Controller
             return;
         }
 
+        $commerce = EventPayout::withoutGlobalScopes()->where('category', LedgerCategoryEnum::Commerce)->where('provider_reference', $reference)->first();
+        if ($commerce !== null) {
+            app(\App\Services\Marketplace\StorePayouts::class)->reconcile($commerce);
+
+            return;
+        }
         $payout = EventPayout::where('provider_reference', $reference)->first();
+        if ($payout?->category === LedgerCategoryEnum::Giving) {
+            if ($event === 'transfer.success') {
+                app(\App\Services\Finance\CommunityPayouts::class)->settleTransfer($payout, $reference);
+            } else {
+                EventPayout::withoutGlobalScopes()->whereKey($payout->id)->where('status', EventPayout::STATUS_PROCESSING)->update(['status' => EventPayout::STATUS_FAILED, 'failure_reason' => (string) ($data['reason'] ?? 'Transfer failed')]);
+            }
+
+            return;
+        }
         if (! $payout || $payout->status !== EventPayout::STATUS_PROCESSING) {
             // Already processed (idempotent redelivery) or not a payout this
             // webhook is tracking — a no-op either way.

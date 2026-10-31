@@ -21,6 +21,13 @@ final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         $this->hideSensitiveRequestDetails();
 
         Telescope::filter(function (IncomingEntry $entry): bool {
+            $uri = (string) parse_url((string) ($entry->content['uri'] ?? ''), PHP_URL_PATH);
+            if (request()->is('marketplace/shops/*/quotes', 'marketplace/checkout/*/callback', 'store/fulfilment-policies', 'store/collections', 'store/collections/*', 'store/orders', 'store/orders/*', 'store/finance', 'store/refunds/*', 'store/payouts', 'store/payouts/*', 'webhooks/paystack')) {
+                return false;
+            }
+            if (request()->is('my', 'my/*') || ($entry->isRequest() && \Illuminate\Support\Str::is(['my', 'my/*'], mb_ltrim($uri, '/')))) {
+                return false;
+            }
             if ($this->app->environment('local')) {
                 return true;
             }
@@ -58,16 +65,9 @@ final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
      */
     private function hideSensitiveRequestDetails(): void
     {
-        if ($this->app->environment('local')) {
-            return;
-        }
-
-        Telescope::hideRequestParameters(['_token']);
-
-        Telescope::hideRequestHeaders([
-            'cookie',
-            'x-csrf-token',
-            'x-xsrf-token',
-        ]);
+        Telescope::hideRequestParameters(['_token', 'otp', 'data.authorization', 'data.authorization_code', 'code', 'secret', 'capability', 'community_verified_phone',
+            'community_member_grants', 'community_claim_capabilities', 'community_join_capabilities', 'attendee_verified_platform',
+            'attendee_checkout_grants', 'attendee_registered_in_session']);
+        Telescope::hideRequestHeaders(['cookie', 'x-csrf-token', 'x-xsrf-token']);
     }
 }

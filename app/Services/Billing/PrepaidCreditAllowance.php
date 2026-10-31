@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
+use App\Models\PrepaidCreditReceipt;
 use App\Models\Tenant;
 use App\Models\TenantAddon;
+use App\Models\TenantFeatureUsage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -57,35 +59,106 @@ abstract class PrepaidCreditAllowance
      */
     final public function consume(Tenant $tenant, int $quantity): void
     {
-        if ($quantity <= 0) {
-            return;
+        if ($quantity > 0) {
+            $this->withLock($tenant, fn () => $this->debit($tenant, $quantity));
         }
+    }
 
-        DB::connection('landlord')->transaction(function () use ($tenant, $quantity): void {
-            $planRemaining = $this->planRemaining($tenant);
-            $fromPlan = $planRemaining === null ? $quantity : min($quantity, $planRemaining);
-            $owed = $quantity - $fromPlan;
-
-            if ($owed > 0) {
-                foreach ($this->activePacks($tenant)->orderBy('created_at')->lockForUpdate()->get() as $pack) {
-                    $take = min($owed, $this->packBalance($pack));
-
-                    if ($take <= 0) {
-                        continue;
-                    }
-
-                    $pack->meta = array_merge($pack->meta ?? [], ['remaining' => $this->packBalance($pack) - $take]);
-                    $pack->save();
-                    $owed -= $take;
-
-                    if ($owed === 0) {
-                        break;
-                    }
-                }
+    /**
+     * Reserve available credits, recording their exact sources for a later refund.
+     * Legacy Events may explicitly retain their missing-entitlement behavior; an
+     * existing disabled/zero feature is never bypassed. Community uses strict defaults.
+     */
+    final public function reserve(Tenant $tenant, int $quantity, bool $allowMissingLegacyFeature = false): ?PrepaidCreditReceipt
+    {
+        return $this->withLock($tenant, function () use ($tenant, $quantity, $allowMissingLegacyFeature): ?PrepaidCreditReceipt {
+            $legacy = $allowMissingLegacyFeature && ! $tenant->features()->where('feature_key', $this->feature())->exists();
+            if ($quantity <= 0 || (! $legacy && ! $this->canSend($tenant, $quantity))) {
+                return null;
             }
 
-            $tenant->incrementUsage($this->feature(), $fromPlan + $owed);
+            return PrepaidCreditReceipt::query()->create([
+                'tenant_id' => $tenant->id,
+                'feature' => $this->feature(),
+                'sources' => $this->debit($tenant, $quantity),
+            ]);
         });
+    }
+
+    /** Confirmed refusals only. An unknown provider outcome must remain reserved. */
+    final public function refund(Tenant $tenant, string $receiptId): void
+    {
+        $this->withLock($tenant, function () use ($tenant, $receiptId): void {
+            $receipt = PrepaidCreditReceipt::query()->where('tenant_id', $tenant->id)
+                ->where('feature', $this->feature())->lockForUpdate()->findOrFail($receiptId);
+            if ($receipt->refunded_at !== null) {
+                return;
+            }
+            $sources = $receipt->sources;
+            $usage = TenantFeatureUsage::query()->where('tenant_id', $tenant->id)
+                ->where('feature_slug', $this->feature())->lockForUpdate()->find($sources['usage_id']);
+            if ($usage !== null) {
+                $usage->update(['used_count' => max(0, $usage->used_count - $sources['usage_quantity'])]);
+            }
+            foreach ($sources['packs'] as $id => $quantity) {
+                $pack = TenantAddon::query()->where('tenant_id', $tenant->id)->where('addon_type', $this->packType())->lockForUpdate()->find($id);
+                if ($pack !== null) {
+                    $pack->update(['meta' => array_merge($pack->meta ?? [], ['remaining' => $this->packBalance($pack) + $quantity])]);
+                }
+            }
+            $receipt->update(['refunded_at' => now()]);
+        });
+    }
+
+    /**
+     * Shared by reservations and existing consume callers, independent of member-cap locks.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    final public function withLock(Tenant $tenant, callable $callback): mixed
+    {
+        return DB::connection('landlord')->transaction(function () use ($tenant, $callback): mixed {
+            DB::connection('landlord')->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['credits:'.$this->feature().':'.$tenant->id]);
+
+            return $callback();
+        });
+    }
+
+    /** @return array{usage_id: int|null, usage_quantity: int, packs: array<string, int>} */
+    private function debit(Tenant $tenant, int $quantity): array
+    {
+        $planRemaining = $this->planRemaining($tenant);
+        $fromPlan = $planRemaining === null ? $quantity : min($quantity, $planRemaining);
+        $owed = $quantity - $fromPlan;
+        $packs = [];
+        if ($owed > 0) {
+            foreach ($this->activePacks($tenant)->orderBy('created_at')->orderBy('id')->lockForUpdate()->get() as $pack) {
+                $take = min($owed, $this->packBalance($pack));
+                if ($take <= 0) {
+                    continue;
+                }
+                $pack->update(['meta' => array_merge($pack->meta ?? [], ['remaining' => $this->packBalance($pack) - $take])]);
+                $packs[(string) $pack->id] = $take;
+                $owed -= $take;
+                if ($owed === 0) {
+                    break;
+                }
+            }
+        }
+        $quantity = $fromPlan + $owed;
+        $usage = null;
+        if ($quantity > 0) {
+            $usage = TenantFeatureUsage::query()->firstOrCreate(
+                ['tenant_id' => $tenant->id, 'feature_slug' => $this->feature(), 'period_start' => null, 'period_end' => null],
+                ['used_count' => 0],
+            );
+            $usage->increment('used_count', $quantity);
+        }
+
+        return ['usage_id' => $usage?->id, 'usage_quantity' => $quantity, 'packs' => $packs];
     }
 
     /**

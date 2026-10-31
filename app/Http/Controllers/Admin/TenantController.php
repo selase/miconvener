@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enum\CommercialStreamEnum;
 use App\Enum\TenantStatusEnum;
 use App\Enum\UsageMetric;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\CreateTenantRequest;
+use App\Http\Requests\Tenant\UpdateCommercialTermsRequest;
+use App\Http\Requests\Tenant\UpdateTicketTermsRequest;
 use App\Libraries\Helper;
+use App\Models\CommercialTermsOverride;
 use App\Models\Tenant;
 use App\Models\UsageRollup;
+use App\Models\User;
 use App\Providers\RouteServiceProvider;
+use App\Services\Finance\CommercialTerms;
 use App\Services\Tenancy\TenantProvisioner;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\Factory;
@@ -258,12 +264,40 @@ final class TenantController extends Controller
         ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
+    public function updateCommercialTerms(UpdateCommercialTermsRequest $request, Tenant $tenant, CommercialTerms $terms): RedirectResponse
+    {
+        $rate = $request->validated('rate');
+        $cap = $request->validated('cap_amount');
+        $terms->setOverride($tenant, CommercialStreamEnum::from($request->validated('stream')), $rate === null ? null : (float) $rate,
+            $cap === null ? null : (int) $cap, $request->validated('reason'), $request->user());
+
+        return back()->with('success', 'Commercial terms saved and audited.');
+    }
+
+    public function updateTicketTerms(UpdateTicketTermsRequest $request, Tenant $tenant): RedirectResponse
+    {
+        $rate = $request->validated('rate');
+        $cap = $request->validated('cap');
+        $before = ['rate' => $tenant->platform_fee_percentage, 'cap' => $tenant->platform_fee_cap_amount];
+
+        $tenant->update([
+            'platform_fee_percentage' => $rate === null ? null : (float) $rate,
+            'platform_fee_cap_amount' => $cap === null ? null : (int) round((float) $cap * 100),
+        ]);
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($tenant)
+            ->withProperties(['before' => $before, 'after' => ['rate' => $tenant->platform_fee_percentage, 'cap' => $tenant->platform_fee_cap_amount], 'reason' => $request->validated('reason')])
+            ->log("Set ticket terms for {$tenant->name}");
+
+        return back()->with('success', 'Ticket terms saved and recorded.');
+    }
+
     public function show(Request $request, string $id): View
     {
-        $this->authorize('read tenant');
+        // Staff who may set an organisation's commission need to open it to do so.
+        abort_unless($request->user()->can('read tenant') || $request->user()->can('manage-commercial-terms'), 403);
 
         $tenant = Tenant::findByUuidOrFail($id);
 
@@ -312,6 +346,13 @@ final class TenantController extends Controller
         return view('admin.tenants.show', [
             'breadcrumbs' => $breadcrumbs,
             'tenant' => $tenant,
+            'pricingRegion' => $request->user()->can('manage-commercial-terms') ? $this->pricingRegionSummary($tenant) : null,
+            'commercialTerms' => $request->user()->can('manage-commercial-terms')
+                ? collect(CommercialStreamEnum::cases())->mapWithKeys(fn (CommercialStreamEnum $stream): array => [$stream->value => app(CommercialTerms::class)->for($tenant, $stream)])
+                : collect(),
+            'commercialOverrides' => $request->user()->can('manage-commercial-terms')
+                ? CommercialTermsOverride::query()->withoutGlobalScopes()->where('tenant_id', $tenant->id)->get()->keyBy(fn (CommercialTermsOverride $override): string => $override->stream->value)
+                : collect(),
             'days' => $days,
             'start_date' => $startDate->format('Y-m-d'),
             'end_date' => $endDate->format('Y-m-d'),
@@ -427,21 +468,25 @@ final class TenantController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $tenant = Tenant::findByUuidOrFail($id);
+        return (new Tenant)->getConnection()->transaction(function () use ($id): JsonResponse {
+            $tenant = Tenant::query()->where('uuid', $id)->lockForUpdate()->firstOrFail();
+            if (($tenant->getConnection()->getSchemaBuilder()->hasTable('store_merchandise')
+                && \App\Models\StoreMerchandise::query()->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))->exists())
+                || ($tenant->getConnection()->getSchemaBuilder()->hasTable('store_commercial_agreements')
+                    && \App\Models\StoreCommercialAgreement::query()->where('tenant_id', $tenant->id)->exists())) {
+                return response()->json(['message' => 'Deactivate this organisation instead. Commerce agreements, orders and stock audit records must be retained.'], 409);
+            }
 
-        if ($tenant->logo) {
-            config('app.env') === 'production'
-                ? $disk = 's3'
-                : $disk = 'public';
+            if ($tenant->logo) {
+                $disk = config('app.env') === 'production' ? 's3' : 'public';
+                Helper::deleteFile($tenant->logo, $disk);
+            }
+            $tenant->delete();
 
-            Helper::deleteFile($tenant->logo, $disk);
-        }
-
-        $tenant->delete();
-
-        return response()->json([
-            'status' => __('locale.messages.deleted', ['name' => 'Tenant']),
-        ]);
+            return response()->json([
+                'status' => __('locale.messages.deleted', ['name' => 'Tenant']),
+            ]);
+        });
     }
 
     public function changeTenant($tenantId)
@@ -498,6 +543,36 @@ final class TenantController extends Controller
         $target .= 'dashboard';
 
         return redirect()->to($target);
+    }
+
+    /**
+     * Ticket commission for one organisation: no plan caps it, so a cap (or a
+     * different rate) here is a deal. Events already selling keep the terms
+     * they locked; this applies to sales on events that have not locked yet.
+     */
+    /**
+     * What the organisation pays, and the evidence for it, for the staff who may change it.
+     *
+     * @return array{label: string, source: string|null, detail: string|null, by: string|null, at: string|null, eligible: bool}
+     */
+    private function pricingRegionSummary(Tenant $tenant): array
+    {
+        $evidence = (array) $tenant->pricing_region_evidence;
+        $by = isset($evidence['by']) ? User::query()->find($evidence['by']) : null;
+        $detail = (array) ($evidence['detail'] ?? []);
+
+        return [
+            'label' => match ($tenant->pricing_region) {
+                'GH' => 'Ghana price',
+                'INTL' => 'USD price',
+                default => 'Not decided yet (keeps the currency it was on)',
+            },
+            'source' => $evidence['source'] ?? null,
+            'detail' => isset($detail['reason']) ? (string) $detail['reason'] : ($detail === [] ? null : collect($detail)->map(fn (mixed $v, string $k): string => $k.': '.(is_scalar($v) ? (string) $v : json_encode($v)))->implode(', ')),
+            'by' => $by?->displayName(),
+            'at' => isset($evidence['at']) ? Carbon::parse((string) $evidence['at'])->format('j M Y H:i') : null,
+            'eligible' => $tenant->isGhanaEligible(),
+        ];
     }
 
     private function syncUsagePrices(?Tenant $target, array $prices): void

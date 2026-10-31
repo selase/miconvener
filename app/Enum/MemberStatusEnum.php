@@ -6,6 +6,7 @@ namespace App\Enum;
 
 enum MemberStatusEnum: string
 {
+    case Pending = 'pending';
     case Active = 'active';
     case Lapsed = 'lapsed';
     case Exited = 'exited';

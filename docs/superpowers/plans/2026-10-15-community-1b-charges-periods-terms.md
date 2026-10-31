@@ -42,7 +42,7 @@
 - `community_settings`: `tenant_id` (unique), `timezone` (default `Africa/Accra`), `week_starts_on` (1–7, ISO, default 1), `financial_year_start_month` (1–12, default 1), `generate_days_ahead` (default 7), `charge_current_period_on_join` (bool, default false), timestamps. `CommunitySettings::for(Tenant): self` returns the row or an unsaved default.
 - `DuesPeriodEnum::periodStartFor(CarbonImmutable $localDate, CommunitySettings $s): CarbonImmutable` (the anchor on or before the date), `nextStart(CarbonImmutable $start, CommunitySettings $s): CarbonImmutable`, `periodEnd(CarbonImmutable $start, CommunitySettings $s): CarbonImmutable` (= next start − 1 day). Anchors: daily = the date; weekly = the most recent `week_starts_on`; monthly = day 1; quarterly = 1 Jan/Apr/Jul/Oct; yearly = 1st of `financial_year_start_month`.
 
-- [ ] **Step 1: Failing tests** (`DuesPeriodsTest.php`), one per anchor plus edges:
+- [x] **Step 1: Failing tests** (`DuesPeriodsTest.php`), one per anchor plus edges:
 
 ```php
 dataset('anchors', [
@@ -69,10 +69,10 @@ test('monthly periods never drift on the 31st', function () { /* start 2026-01-0
 test('settings default when an organisation has none', function () { /* CommunitySettings::for($tenant) → Africa/Accra, 1, 1, 7, false */ });
 ```
 
-- [ ] **Step 2: Run, see them fail.** `"$PHP" artisan test --compact tests/Feature/Community/DuesPeriodsTest.php`. Expected: FAIL.
-- [ ] **Step 3: Implement** the migration, model and enum methods. Replace the old `nextStart`/`periodEnd` signatures; update their callers (`DuesCharges::createFor`).
-- [ ] **Step 4: Run** the new file and `tests/Feature/Dues`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(community): community settings and anchored dues periods`.
+- [x] **Step 2: Run, see them fail.** `"$PHP" artisan test --compact tests/Feature/Community/DuesPeriodsTest.php`. Expected: FAIL.
+- [x] **Step 3: Implement** the migration, model and enum methods. Replace the old `nextStart`/`periodEnd` signatures; update their callers (`DuesCharges::createFor`).
+- [x] **Step 4: Run** the new file and `tests/Feature/Dues`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(community): community settings and anchored dues periods`.
 
 ### Task 2: Commercial terms and frozen checkout terms
 
@@ -84,7 +84,7 @@ test('settings default when an organisation has none', function () { /* Communit
 - `CommercialTerms::for(Tenant $tenant, CommercialStreamEnum $stream): ResolvedTerms`; `CommercialTerms::commission(ResolvedTerms $terms, int $amount): int` (rounding half up, cap applied, never negative). Precedence: override row → plan default (Free 2%, otherwise 1% for dues) → platform config.
 - `CommercialTerms::setOverride(Tenant, CommercialStreamEnum, ?float $rate, ?int $cap, string $reason, User $by): void` (null rate removes the override; writes the audit row in the same transaction).
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
 
 ```php
 test('dues default to 1% on a paid plan and 2% on Free', function () {});
@@ -116,10 +116,12 @@ test('a retried checkout supersedes the earlier open attempt for the same charge
 test('the callback and the webhook for one payment book it once, in either order', function () {});
 ```
 
-- [ ] **Step 2: Run, see them fail.**
-- [ ] **Step 3: Implement.** Keep `DuesPaymentConfirmer`'s apportioning and own-gateway allocation exactly as they are, replacing only where per-charge commissions come from. Delete `DuesFee` and update its tests to the resolver (no test may lose its assertion; rename, do not delete).
-- [ ] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues tests/Feature/Finance tests/Feature/Payments`. Expected: PASS, with the same per-file counts for Finance and Payments as before the task.
-- [ ] **Step 5: Commit** `feat(finance): commercial terms resolver with frozen dues checkout terms`.
+- [x] **Step 2: Run, see them fail.**
+- [x] **Step 3: Implement.** Keep `DuesPaymentConfirmer`'s apportioning and own-gateway allocation exactly as they are, replacing only where per-charge commissions come from. Delete `DuesFee` and update its tests to the resolver (no test may lose its assertion; rename, do not delete).
+- [x] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues tests/Feature/Finance tests/Feature/Payments`. Expected: PASS, with the same per-file counts for Finance and Payments as before the task.
+- [x] **Step 5: Commit** `feat(finance): commercial terms resolver with frozen dues checkout terms`.
+
+Ruling: Free-plan dues defaults include organisations without a package (2%); only genuine legacy checkout references retain 1%. Giving and contributions controls are clearly labelled future-only until their payment streams adopt the resolver.
 
 ### Task 3: Charge generation (`dues:process`)
 
@@ -133,15 +135,17 @@ test('the callback and the webhook for one payment book it once, in either order
   - **Eligible window:** from the first eligible period (the period containing `active_since` when `charge_current_period_on_join`, otherwise the next period after `active_since`) to `localToday + generate_days_ahead`.
   - **Bounded search for gaps, not "after the latest charge":** walk every period start in the window and create each one that has no charge (any status), oldest first, so an earlier gap is filled even when a later charge exists. The window is capped at the most recent 400 periods (logged when hit).
   - Override of 0 → the charge is created as `waived`.
-  - **Effective-date rules:** a membership type or override change applies to periods with no charge yet; charges already generated (including future ones inside the horizon) keep their amount; an admin can void an open future charge to have it regenerated with the new terms. Exit ends eligibility from `exited_on`; rejoin opens a new window at the rejoin date; periods between exit and rejoin, or while lapsed, are never charged.
+  - **Effective-date rules:** a membership type or override change applies to periods with no charge yet; charges already generated (including future ones inside the horizon) keep their amount. A void is an explicit cancellation and is not automatically regenerated. Exit/lapse voids unpaid periods starting on or after the local eligibility-end date; paid and historical charges remain. Rejoin/reactivation opens a new window from the next period regardless of the initial-join setting; periods between exit and rejoin, or while lapsed, are never charged.
 - Members `pending`, `lapsed`, `exited` get none. Types without dues or inactive get none; inactive types' members are listed on Money > Dues (a notice with a count).
 - `members.rejoin`: `exited` → `active`, sets `rejoined_on` (new nullable date column on `members`) and clears `exited_on`.
 
-- [ ] **Step 1: Failing tests** covering: weekly and daily generation; a gap before an existing later charge is filled; nothing charged while lapsed; catch-up after missed runs (three missing days created once; a second run creates none); join mid-period both settings; exit stops charges from the exit date; rejoin resumes from the next period with no back-charges; type change affects only new charges; override 0 → waived; pending/lapsed/exited and types without dues or inactive → none; per-tenant local midnight (server clock UTC, `--date`); the 400 cap; two tenants processed independently.
-- [ ] **Step 2: Run, see them fail.**
-- [ ] **Step 3: Implement.** Idempotency rests on the existing unique `(member_id, period_start)` plus `firstOrCreate`.
-- [ ] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(community): dues:process raises charges for every period type`.
+- [x] **Step 1: Failing tests** covering: weekly and daily generation; a gap before an existing later charge is filled; nothing charged while lapsed; catch-up after missed runs (three missing days created once; a second run creates none); join mid-period both settings; exit stops charges from the exit date; rejoin resumes from the next period with no back-charges; type change affects only new charges; override 0 → waived; pending/lapsed/exited and types without dues or inactive → none; per-tenant local midnight (server clock UTC, `--date`); the 400 cap; two tenants processed independently.
+- [x] **Step 2: Run, see them fail.**
+- [x] **Step 3: Implement.** Idempotency rests on the existing unique `(member_id, period_start)` plus `firstOrCreate`.
+- [x] **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`. Expected: PASS.
+- [x] **Step 5: Commit** `feat(community): dues:process raises charges for every period type`.
+
+Ruling: a void is a tombstone, never automatic permission to bill again. Status changes cancel only open advance periods; past/paid history is preserved. Rejoin/reactivation always starts next period. Existing non-void periods block overlapping replacement periods, preventing double billing after a frequency change. Member-first locks coordinate generation, manual charges, payment confirmation and cancellation. Cost if an organisation needs replacement levies: a future explicit adjustment workflow rather than automatic resurrection.
 
 ### Task 4: Shared phone numbers
 
@@ -149,13 +153,68 @@ test('the callback and the webhook for one payment book it once, in either order
 - Create: migration `2026_10_16_100300_allow_shared_member_phones.php` (drop unique `(tenant_id, phone)`, add a non-unique index; add unique `(tenant_id, phone, name)` as the duplicate guard), `tests/Feature/Community/SharedNumbersTest.php`
 - Modify: `MemberRequest` (replace the phone-unique rule with name + phone uniqueness; keep the email rule for members with no phone), `MembersTest.php` cases that asserted phone uniqueness (update to the new rule, keep them).
 
-- [ ] **Step 1: Failing tests:** two members with the same phone and different names → both created; same name and phone → 422 with "This person is already a member."; each keeps their own pay link and charges; the pay page for one never shows the other's charges.
-- [ ] **Step 2: Run, see them fail.** **Step 3: Implement.** **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`.
-- [ ] **Step 5: Commit** `feat(community): members may share a phone number`.
+- [x] **Step 1: Failing tests:** two members with the same phone and different names → both created; same name and phone → 422 with "This person is already a member."; each keeps their own pay link and charges; the pay page for one never shows the other's charges.
+- [x] **Step 2: Run, see them fail.** **Step 3: Implement.** **Step 4: Run** `tests/Feature/Community tests/Feature/Dues`.
+- [x] **Step 5: Commit** `feat(community): members may share a phone number`.
+
+
+Ruling: Add a canonical PostgreSQL unique index as well as the raw composite key. Request validation alone cannot prevent concurrent equivalent name/phone identities. Stored contact values remain unchanged; migration refuses ambiguous legacy duplicates without deleting data. Cost if wrong: resolve duplicates before migrating.
 
 ### Task 5: Verification
 
-- [ ] Full suite, `pint --dirty`, phpstan, lint, JS tests, build (commit rebuilt `public/build` if JSX or CSS changed).
-- [ ] Local: migrate, run `"$PHP" artisan dues:process --tenant=purpledot`, check charges appear for the local member.
-- [ ] One whole-branch review by a fresh reviewer; fix Critical and Important findings with tests.
-- [ ] Update `docs/superpowers/community-roadmap.md` (status `built`, evidence) and push.
+- [x] Full suite, `pint --dirty`, phpstan, lint, JS tests, build (commit rebuilt `public/build` if JSX or CSS changed).
+- [x] Local acceptance: migrations, `dues:process --tenant=... --date=...` and charge assertions pass on isolated QA tenant fixtures. Ruling: do not generate charges against the owner’s existing Purpledot data merely for verification; its data and settlement setting remain unchanged.
+- [x] One whole-branch review by a fresh reviewer; fix Critical and Important findings with tests.
+- [x] Update `docs/superpowers/community-roadmap.md` (status `built`, evidence) and push.
+
+
+## Self-Review Report
+
+### Touchpoints updated
+
+- [x] AGENTS.md — dues snapshot and generation invariants documented.
+- [x] Shared handover — roadmap and this plan carry the implementation decisions; no separate personal memory file is needed.
+- [x] Navigation — rejoin lives in People; inactive-type notice in Money > Dues; commercial terms on the existing superadmin tenant page.
+- [x] Permissions — existing `manage members` and application-superadmin gate reused and tested; no new permission or role seed is required.
+- [x] Configuration / `.env.example` — no new environment variable; Free-plan dues default and fixed legacy fallback recorded in services config; no new environment variable or dependency.
+- [x] Tests — new anchor, settings, commercial terms, frozen checkout, generation, lifecycle and shared-number coverage; existing financial assertions retained.
+
+### UI Gap Analysis
+
+- **Discoverability:** existing Community pages and superadmin tenant entry point.
+- **Empty state:** existing member/type empty states and creation actions retained.
+- **Permission gating:** server-side authorization and existing page gating; forbidden/foreign-tenant cases tested.
+- **Loading/errors:** existing confirmation busy/error handling reused; invalid rejoin returns 422.
+- **Responsive:** existing drawer, console and Bootstrap responsive form patterns retained.
+- **Accessibility:** labelled native form controls, native action buttons and status notice. React render/interaction tests pass; no manual browser/phone visual sign-off was performed for this milestone.
+
+### Solved (auto-fixed)
+
+- Rejoin/lapsed reactivation ignores the initial-join current-period switch, preventing back-charges for time away (`app/Services/Dues/DuesScheduler.php:69`).
+- Exit/lapse cancels only unpaid advance periods; paid and past history is preserved. Member-first locks prevent a delayed manual request from charging a stale active member (`app/Services/Dues/DuesCharges.php:33`, `:83`).
+- Concurrent settings creation is tolerated; impossible calendar dates and banned organisations are refused (`app/Console/Commands/Dues/ProcessDuesCommand.php:51`).
+- Explicit-tenant overrides bypass unrelated active-tenant scopes; no-package dues use Free's 2%, while genuine legacy payments keep 1% (`app/Services/Finance/CommercialTerms.php`).
+- Canonical database uniqueness closes normalized-name/phone races without rewriting contacts (`database/migrations/landlord/2026_10_16_100300_allow_shared_member_phones.php`).
+- Contributions/giving controls clearly state that they are future configuration, leaving existing contribution checkout behaviour unchanged (`resources/views/admin/tenants/show.blade.php:29`).
+
+### Recommended for user decision
+
+No new decision blocks 1b. The roadmap's shared/recycled-phone identity decision (milestone 3) and lapsed-member pricing decision (milestone 6) remain open before those milestones. A separate explicit adjustment workflow would be needed if administrators want to replace cancelled future dues; automatic generation intentionally never revives voids.
+
+### Not gaps
+
+- Tickets keep their established resolver; giving and contributions payment integration remains later work.
+- Community settings have persisted defaults; a settings editor was not part of this implementation plan.
+- Local acceptance used isolated QA fixtures and real command/HTTP tests, preserving the owner's Purpledot data and settlement setting. No merge, production migration or deployment was performed.
+
+
+## Final verification — 2026-10-15
+
+- Implementation: `0ad164c` on `community-1b`, based on `community-1a` at `0173494`.
+- Full PHP suite: **2473/2473 passed**, **11621 assertions**, four workers on isolated QA databases.
+- Required Community / Dues / Finance / Payments regression run: **395/395 passed**, **1954 assertions**. Final lifecycle suite: **21/21**, **80 assertions**.
+- JavaScript: **258/258 passed** across 34 files (`npm test -- --maxWorkers=1`). Earlier concurrent runs hit timing-sensitive existing badge tests; the isolated badge file also passed 25/25.
+- PHPStan: **0 errors**, baseline unchanged. Pint, ESLint and production build passed; rebuilt `public/build` committed with the JSX changes. Build retains its existing large-chunk advisory.
+- `finance:verify-categories`: exits **0** on isolated QA database; financial suites exercise populated ledger cases.
+- Fresh whole-branch review and targeted rechecks: no unresolved Critical or Important findings. All reported findings fixed.
+- Original checkout remains clean on `community-1a` at `0173494`. Owner’s local database, settlement mode and production untouched. No merge or deployment.

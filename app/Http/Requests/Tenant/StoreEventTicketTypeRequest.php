@@ -1,0 +1,7 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests\Tenant;
+
+final class StoreEventTicketTypeRequest extends EventTicketTypeRequest {}

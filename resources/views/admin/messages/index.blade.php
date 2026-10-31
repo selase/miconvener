@@ -13,6 +13,7 @@
                 </div>
             </div>
             <div class="card-body py-4">
+                <a href="{{ route('admin.messages.reconciliation.index') }}" class="btn btn-light-primary mb-5">Review uncertain outcomes</a>
                 <form method="GET" action="{{ route('admin.messages.index') }}" class="d-flex gap-3 mb-8">
                     <input type="text" name="q" value="{{ $term }}" class="form-control form-control-solid mw-450px" placeholder="ama@example.com or 024 123 4567" aria-label="Email or phone">
                     <button type="submit" class="btn btn-primary">Search</button>
@@ -40,6 +41,14 @@
                                         <td>{{ \Illuminate\Support\Str::limit($row['subject'], 60) }}</td>
                                         <td class="{{ str_starts_with($row['status'], 'failed') ? 'text-danger' : '' }}">
                                             {{ $row['status'] }}
+                                            @if (!empty($row['inbox_message_id']))
+                                                <form method="POST" action="{{ route('admin.messages.inbox-takedown', ['message'=>$row['inbox_message_id']]) }}" class="mt-3">
+                                                    @csrf
+                                                    <label class="form-label">Inbox takedown reason<input name="reason" required minlength="5" maxlength="1000" class="form-control form-control-sm"></label>
+                                                    <label class="form-check-label d-block"><input type="checkbox" name="confirmed" value="1" required> Remove the in-app copy only; submitted email/SMS remain.</label>
+                                                    <button type="submit" class="btn btn-sm btn-light-danger mt-2">Take down inbox announcement</button>
+                                                </form>
+                                            @endif
                                             @if ($row['error'])
                                                 <div class="text-danger fs-8">{{ \Illuminate\Support\Str::limit($row['error'], 140) }}</div>
                                             @endif

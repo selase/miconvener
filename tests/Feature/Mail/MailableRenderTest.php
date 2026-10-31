@@ -6,12 +6,17 @@ use App\Mail\Auth\SetUpRecoveryCodesMail;
 use App\Mail\Billing\AgreedPriceMail;
 use App\Mail\Billing\BillingDailySummaryMail;
 use App\Mail\Billing\CommissionSplitBrokenMail;
+use App\Mail\Billing\GhanaPriceAdjusted;
+use App\Mail\Billing\GhanaTopUpFailedAlert;
 use App\Mail\Billing\PaymentFailedMail;
 use App\Mail\Billing\PaymentReceiptMail;
 use App\Mail\Billing\RenewalReminderMail;
 use App\Mail\Billing\SubscriptionEndedMail;
 use App\Mail\Billing\SubscriptionEndingMail;
+use App\Mail\CommunityMessage;
 use App\Mail\DuesReceipt;
+use App\Mail\DuesReminder;
+use App\Mail\EnterpriseEnquiryReceived;
 use App\Mail\Events\AbstractDecisionNotificationMail;
 use App\Mail\Events\AutomatedNotificationMail;
 use App\Mail\Events\EventBlastMail;
@@ -32,16 +37,22 @@ use App\Mail\Events\OccurrenceReminderMail;
 use App\Mail\Events\PlatformAttendeeAccessCodeMail;
 use App\Mail\Events\SpeakerPortalInvitationMail;
 use App\Mail\Events\UrgentServiceRequestRaised;
+use App\Mail\GivingReceipt;
+use App\Mail\GivingReminder;
 use App\Mail\Marketplace\BookingConfirmationGuest;
 use App\Mail\Marketplace\NewQuoteRequestNotification;
 use App\Mail\Marketplace\NewVenueBookingNotification;
 use App\Mail\Marketplace\QuoteProposalReady;
 use App\Mail\Marketplace\QuoteSentNotification;
+use App\Mail\Marketplace\VenueApprovalNotice;
+use App\Mail\Marketplace\VenueQuoteNoticeMail;
 use App\Mail\Moderation\TakedownNoticeMail;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Platform\TenantSignupMail;
+use App\Mail\StoreOrderReceipt;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
+use App\Mail\Venue\RoomRequestDecided;
 use App\Mail\WelcomeMail;
 use App\Models\Event;
 use App\Models\EventAbstract;
@@ -126,6 +137,13 @@ test('every mailable renders', function (): void {
         'paid_at' => now(),
         'payment_reference' => 'ref_render_dues',
     ]);
+
+    $givingFund = App\Models\GivingFund::factory()->create(['tenant_id' => $tenant->id]);
+    $givingNotice = App\Models\GivingReceiptNotice::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $givingFund->id, 'snapshot' => [
+        'organisation' => $tenant->name, 'fund' => $givingFund->name, 'amount' => 10000, 'currency' => 'GHS',
+        'receipt_number' => 'GIVING-RENDER', 'paid_at' => now()->toIso8601String(), 'timezone' => 'Africa/Accra',
+    ]]);
+    $givingReminder = App\Models\GivingReminder::factory()->create(['tenant_id' => $tenant->id, 'fund_id' => $givingFund->id]);
 
     // Every real send happens with a tenant resolved, so the templates are
     // rendered the same way here. Whether a queued job actually restores this
@@ -242,7 +260,16 @@ test('every mailable renders', function (): void {
         'webhook_failures' => ['processing' => 0, 'signature' => 0],
     ];
 
+    $storeReceipt = App\Models\StoreReceipt::factory()->create(['snapshot' => [
+        'seller' => 'Association Store', 'number' => 'STORE-RENDER', 'currency' => 'GHS', 'total_pesewas' => 3000,
+        'lines' => [['title' => 'Association notebook', 'quantity' => 1, 'amount_pesewas' => 3000]],
+        'collection_terms' => 'Collect at the office.', 'refund_terms' => 'Contact support before collection.',
+        'support_contact' => 'support@example.test', 'receipt_terms' => 'Payment receipt, not a VAT invoice.',
+    ]]);
+
     $mailables = [
+        'StoreOrderReady' => fn () => new App\Mail\StoreOrderReady(App\Models\StoreFulfilmentNotice::factory()->create()),
+        'StoreOrderReceipt' => fn () => new StoreOrderReceipt($storeReceipt),
         'SetUpRecoveryCodesMail' => fn () => new SetUpRecoveryCodesMail('Ama', 'Acme Events', 'https://acme.test/account'),
         'BillingDailySummaryMail' => fn () => new BillingDailySummaryMail($summary),
         'AgreedPriceMail' => fn () => new AgreedPriceMail($tenant, 'Enterprise', 'GHS 2,500.00 a month', false, 'https://acme.test/billing'),
@@ -275,14 +302,27 @@ test('every mailable renders', function (): void {
         'EventTicketTransferred' => fn () => new EventTicketTransferred($registration, 'Ama Serwaa', 'Kofi Mensah', 'kofi@stem.org'),
         'UrgentServiceRequestRaised' => fn () => new UrgentServiceRequestRaised($urgentRequest),
         'NewEnterpriseLead' => fn () => new NewEnterpriseLead($lead),
+        'GhanaPriceAdjusted' => fn () => new GhanaPriceAdjusted($tenant, 'topped_up', 'Starter plan', 'GHS 288.50', 'https://acme.test/billing'),
+        'GhanaTopUpFailedAlert' => fn () => new GhanaTopUpFailedAlert($tenant, 'ref_123', 'top_up_failed', 'Insufficient Funds'),
+        'RoomRequestDecided' => fn () => new RoomRequestDecided(VenueBooking::factory()->internal()->create(['purpose' => 'Budget review']), 'declined', 'Closed for maintenance'),
+        'EnterpriseEnquiryReceived' => fn () => new EnterpriseEnquiryReceived($lead, ['sales@example.com']),
         'ResendAccountPassword' => fn () => new ResendAccountPassword(['user' => 'Ama', 'email' => 'ama@stem.org', 'password' => 'secret-temp', 'loginUrl' => 'https://acme.test/login']),
         'SendAccountDetails' => fn () => new SendAccountDetails('Ama', 'ama@stem.org', 'secret-temp', 'https://acme.test/login', 'Acme Events'),
         'WelcomeMail' => fn () => new WelcomeMail($user),
+        'CommunityContactNotice' => fn () => new App\Mail\CommunityContactNotice('Acme Events'),
+        'CommunityMessage' => fn () => new CommunityMessage(App\Models\CommunityMessage::factory()->create(['tenant_id' => $tenant->id]), 'https://render-check.miconvener.test/community/preferences/'.str_repeat('a', 64)),
+        'GivingReceipt' => fn () => new GivingReceipt($givingNotice),
+        'GivingReminder' => fn () => new GivingReminder($givingReminder, str_repeat('a', 64)),
+        'DuesReminder' => fn () => new DuesReminder($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge])),
         'DuesReceipt' => fn () => new DuesReceipt($duesMember, new Illuminate\Database\Eloquent\Collection([$duesCharge]), 'ref_render_dues'),
         'BookingConfirmationGuest' => fn () => new BookingConfirmationGuest($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
         'NewVenueBookingNotification' => fn () => new NewVenueBookingNotification($booking, 'https://acme.test/console/venue/inquiries/BK-RENDER-001'),
         'QuoteSentNotification' => fn () => new QuoteSentNotification($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001/checkout'),
         'NewQuoteRequestNotification' => fn () => new NewQuoteRequestNotification($quote, 'https://acme.test/venue/quotes/RFQ-RENDER001'),
+        'VenueApprovalNotice' => fn () => new VenueApprovalNotice(App\Models\VenueBookingAction::factory()->create(['booking_id' => $booking->id, 'action' => 'approved', 'hold_expires_at' => now()->addDay()]), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'VenueApprovalNotice (declined)' => fn () => new VenueApprovalNotice(App\Models\VenueBookingAction::factory()->create(['booking_id' => $booking->id, 'action' => 'declined', 'decision_reason' => 'Closed for repairs']), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'VenueQuoteNoticeMail' => fn () => new VenueQuoteNoticeMail(App\Models\VenueQuoteNotice::factory()->create(), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'VenueQuoteNoticeMail (withdrawn)' => fn () => new VenueQuoteNoticeMail(App\Models\VenueQuoteNotice::factory()->create(['kind' => 'withdrawn']), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
         'QuoteProposalReady' => fn () => new QuoteProposalReady($quote, 'https://miconvener.test/marketplace/quotes/RFQ-RENDER001'),
     ];
 

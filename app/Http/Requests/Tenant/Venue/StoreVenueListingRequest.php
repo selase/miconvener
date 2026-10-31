@@ -6,6 +6,7 @@ namespace App\Http\Requests\Tenant\Venue;
 
 use App\Models\StoreListing;
 use App\Models\Tenant;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -74,10 +75,33 @@ final class StoreVenueListingRequest extends FormRequest
                     StoreListing::STATUS_SUSPENDED,
                 ]),
             ],
+            'audience' => ['sometimes', 'string', Rule::in([StoreListing::AUDIENCE_PUBLIC, StoreListing::AUDIENCE_STAFF])],
+            'requires_approval' => ['sometimes', 'boolean'],
+            'public_booking_policy' => ['nullable', 'array:default_hold_hours,timezone'],
+            'public_booking_policy.default_hold_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
+            'public_booking_policy.timezone' => ['sometimes', 'string', 'timezone:all'],
             'amenities' => ['nullable', 'array'],
             'amenities.*.amenity_id' => ['required', 'uuid', 'exists:landlord.store_amenities,id'],
             'amenities.*.is_included' => ['required', 'boolean'],
             'amenities.*.notes' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * A room can be made staff-only only on a plan with staff room booking.
+     * Making one public is always allowed, so an organisation that has left
+     * Enterprise can always open its rooms again.
+     *
+     * @return array<int, Closure(\Illuminate\Validation\Validator): void>
+     */
+    public function after(): array
+    {
+        return [function (\Illuminate\Validation\Validator $validator): void {
+            $tenant = app(\App\Services\Tenancy\TenantContext::class)->getTenant();
+
+            if ($this->input('audience') === StoreListing::AUDIENCE_STAFF && ! $tenant?->featureEnabled(\App\Services\Tenancy\FeatureService::FEATURE_STAFF_ROOM_BOOKING)) {
+                $validator->errors()->add('audience', 'Staff-only rooms are available on the Enterprise plan.');
+            }
+        }];
     }
 }

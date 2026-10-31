@@ -32,7 +32,7 @@ final class MarketplaceQuotePublicController extends Controller
     public function storeRfq(Request $request, string $slug): RedirectResponse
     {
         /** @var StoreListing $listing */
-        $listing = StoreListing::query()
+        $listing = StoreListing::query()->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE)
             ->with('shop')
             ->where('slug', $slug)
             ->where('status', StoreListing::STATUS_PUBLISHED)

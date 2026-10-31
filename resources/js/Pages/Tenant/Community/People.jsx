@@ -1,6 +1,7 @@
+import ClaimsPanel, { CredentialPanel } from './ClaimsPanel';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { Layers, Plus } from 'lucide-react';
+import { Layers, Plus, Upload } from 'lucide-react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import PageHeader from '@/Components/Console/PageHeader';
 import Button from '@/Components/Console/Button';
@@ -15,6 +16,7 @@ import { useToast } from '@/Components/Console/Toast';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { formatDuesMoney, formatMemberDues, sendJson } from '@/lib/dues';
 import MemberFormModal from './MemberFormModal';
+import GroupsPanel from './GroupsPanel';
 
 const CHARGE_PILL = { open: 'pending', paid: 'success', waived: 'neutral', void: 'neutral' };
 
@@ -48,6 +50,10 @@ export function memberPill(member) {
 
     if (member.status === 'lapsed') {
         return <StatusPill status="pending">Lapsed</StatusPill>;
+    }
+
+    if (member.status === 'pending') {
+        return <StatusPill status="pending">Pending</StatusPill>;
     }
 
     if (member.overdue) {
@@ -131,23 +137,37 @@ function paidLabel(charge) {
 }
 
 /**
- * Whether the drawer offers "Create charge": not for a member who has left,
- * and not when their membership type carries no dues.
+ * Only active members whose membership type carries dues can be charged.
  */
 export function canCreateCharge(member) {
-    return member.status !== 'exited' && member.effective_amount !== null;
+    return (
+        member.status === 'active' &&
+        member.effective_amount !== null &&
+        member.membership_type_active !== false
+    );
 }
 
-export default function People({ members, membershipTypes }) {
+export default function People({
+    members,
+    membershipTypes,
+    memberUsage,
+    groupsEnabled = false,
+    followingEnabled = false,
+    activeTab = 'members',
+}) {
     const showToast = useToast();
     const [selectedId, setSelectedId] = useState(null);
     const [modal, setModal] = useState(null);
     const [confirm, setConfirm] = useState(null);
     const [busy, setBusy] = useState(false);
 
+    const atCap = memberUsage?.limit !== null && memberUsage?.count >= memberUsage?.limit;
     const selected = members.data.find((member) => member.id === selectedId) ?? null;
     const refresh = () =>
-        router.reload({ only: ['members', 'membershipTypes'], preserveScroll: true });
+        router.reload({
+            only: ['members', 'membershipTypes', 'memberUsage'],
+            preserveScroll: true,
+        });
 
     const run = async (request, success) => {
         setBusy(true);
@@ -167,6 +187,16 @@ export default function People({ members, membershipTypes }) {
     };
 
     const confirmAction = () => {
+        if (confirm.kind === 'rejoin') {
+            return run(
+                () =>
+                    sendJson(
+                        'POST',
+                        route('tenant.community.members.rejoin', { member: confirm.member.id })
+                    ),
+                'Member reactivated'
+            );
+        }
         if (confirm.kind === 'exit') {
             return run(
                 () =>
@@ -198,10 +228,18 @@ export default function People({ members, membershipTypes }) {
     };
 
     const confirmCopy = () => {
+        if (confirm?.kind === 'rejoin') {
+            return {
+                title: 'Rejoin member',
+                description: `${confirm.member.name} will become active again. Automatic dues resume from the next eligible period, without charges for the time away.`,
+                label: 'Rejoin',
+                danger: false,
+            };
+        }
         if (confirm?.kind === 'exit') {
             return {
                 title: 'Mark as exited',
-                description: `${confirm.member.name} will stop being charged. Their existing charges are kept and can still be settled.`,
+                description: `${confirm.member.name} will stop being charged. Unpaid periods starting today or later are cancelled. Past and paid charges are kept.`,
                 label: 'Mark as exited',
                 danger: true,
             };
@@ -241,16 +279,41 @@ export default function People({ members, membershipTypes }) {
                         label: 'Members',
                         href: route('tenant.community.people.index'),
                     },
+                    ...(followingEnabled
+                        ? [
+                              {
+                                  key: 'followers',
+                                  label: 'Followers',
+                                  href: route('tenant.community.followers.index'),
+                              },
+                          ]
+                        : []),
+                    ...(groupsEnabled
+                        ? [
+                              {
+                                  key: 'groups',
+                                  label: 'Groups',
+                                  href: `${route('tenant.community.people.index')}?tab=groups`,
+                              },
+                          ]
+                        : []),
                 ]}
-                activeTab="members"
+                activeTab={activeTab}
                 actions={
                     <>
+                        <Button href={`${route('tenant.community.people.index')}?tab=reviews`}>
+                            Access reviews
+                        </Button>
+                        <Button href={route('tenant.community.people.import.show')} icon={Upload}>
+                            Import
+                        </Button>
                         <Button href={route('tenant.community.money.dues.index')} icon={Layers}>
                             Membership types
                         </Button>
                         <Button
                             icon={Plus}
                             variant="primary"
+                            disabled={atCap}
                             onClick={() => setModal({ kind: 'form', member: null })}
                         >
                             Add member
@@ -259,234 +322,290 @@ export default function People({ members, membershipTypes }) {
                 }
             />
 
-            <div className="flex">
-                <div className="min-w-0 flex-1 px-8 py-6">
-                    <Table>
-                        <Thead>
-                            <Th>Name</Th>
-                            <Th>Membership type</Th>
-                            <Th>Amount</Th>
-                            <Th>Owes</Th>
-                            <Th>Status</Th>
-                        </Thead>
-                        <tbody>
-                            {members.data.map((member) => (
-                                <Tr
-                                    key={member.id}
-                                    onClick={() => setSelectedId(member.id)}
-                                    selected={selectedId === member.id}
-                                >
-                                    <Td>
-                                        <div className="font-medium text-ink">{member.name}</div>
-                                        <div className="text-xs text-ink-secondary">
-                                            {member.phone ?? member.email}
-                                        </div>
-                                    </Td>
-                                    <Td muted>{member.class_name}</Td>
-                                    <Td numeric>
-                                        {formatDuesMoney(member.effective_amount, member.currency)}
-                                        {member.amount_override !== null && (
-                                            <span className="ml-1 text-xs text-ink-secondary">
-                                                (custom)
-                                            </span>
-                                        )}
-                                    </Td>
-                                    <Td numeric>
-                                        {member.open_total > 0
-                                            ? formatDuesMoney(member.open_total, member.currency)
-                                            : '—'}
-                                    </Td>
-                                    <Td>{memberPill(member)}</Td>
-                                </Tr>
-                            ))}
-                            {members.data.length === 0 && (
-                                <tr>
-                                    <td colSpan={5}>
-                                        <TableEmpty
-                                            title="No members yet"
-                                            description={
-                                                membershipTypes.length === 0
-                                                    ? 'Add a membership type first (Community > Money), then add your members.'
-                                                    : 'Add your first member to start collecting dues.'
-                                            }
-                                        />
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </Table>
-
-                    {(members.prev_page_url || members.next_page_url) && (
-                        <div className="mt-4 flex justify-end gap-2">
-                            <Button
-                                href={members.prev_page_url ?? undefined}
-                                disabled={!members.prev_page_url}
+            {activeTab === 'reviews' ? (
+                <ClaimsPanel
+                    membershipTypes={membershipTypes}
+                    initialQueue={
+                        new URLSearchParams(window.location.search).get('queue') ?? 'claims'
+                    }
+                />
+            ) : activeTab === 'groups' ? (
+                <GroupsPanel />
+            ) : (
+                <div className="flex">
+                    <div className="min-w-0 flex-1 px-8 py-6">
+                        {memberUsage && (
+                            <p className="mb-4 text-sm text-ink-secondary">
+                                {memberUsage.limit === null
+                                    ? `${memberUsage.count.toLocaleString()} member slots · Unlimited`
+                                    : `${memberUsage.count.toLocaleString()} of ${memberUsage.limit.toLocaleString()} member slots (including pending requests)`}
+                            </p>
+                        )}
+                        {atCap && (
+                            <div
+                                role="alert"
+                                className="mb-5 rounded-md border border-border bg-surface-hover p-4 text-sm text-ink"
                             >
-                                Previous
-                            </Button>
-                            <Button
-                                href={members.next_page_url ?? undefined}
-                                disabled={!members.next_page_url}
-                            >
-                                Next
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                                Your {memberUsage.plan} plan includes{' '}
+                                {memberUsage.limit.toLocaleString()} members. Upgrade your plan or
+                                mark members who have left as exited before adding more. Existing
+                                members can still pay and their dues continue as usual.
+                            </div>
+                        )}
+                        <Table>
+                            <Thead>
+                                <Th>Name</Th>
+                                <Th>Membership type</Th>
+                                <Th>Amount</Th>
+                                <Th>Owes</Th>
+                                <Th>Status</Th>
+                            </Thead>
+                            <tbody>
+                                {members.data.map((member) => (
+                                    <Tr
+                                        key={member.id}
+                                        onClick={() => setSelectedId(member.id)}
+                                        selected={selectedId === member.id}
+                                    >
+                                        <Td>
+                                            <div className="font-medium text-ink">
+                                                {member.name}
+                                            </div>
+                                            <div className="text-xs text-ink-secondary">
+                                                {member.phone ?? member.email}
+                                            </div>
+                                        </Td>
+                                        <Td muted>{member.class_name}</Td>
+                                        <Td numeric>
+                                            {formatDuesMoney(
+                                                member.effective_amount,
+                                                member.currency
+                                            )}
+                                            {member.amount_override !== null && (
+                                                <span className="ml-1 text-xs text-ink-secondary">
+                                                    (custom)
+                                                </span>
+                                            )}
+                                        </Td>
+                                        <Td numeric>
+                                            {member.open_total > 0
+                                                ? formatDuesMoney(
+                                                      member.open_total,
+                                                      member.currency
+                                                  )
+                                                : '—'}
+                                        </Td>
+                                        <Td>{memberPill(member)}</Td>
+                                    </Tr>
+                                ))}
+                                {members.data.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5}>
+                                            <TableEmpty
+                                                title="No members yet"
+                                                description={
+                                                    membershipTypes.length === 0
+                                                        ? 'Add a membership type first (Community > Money), then add your members.'
+                                                        : 'Add your first member to start collecting dues.'
+                                                }
+                                            />
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </Table>
 
-                <Drawer open={selected !== null} onClose={() => setSelectedId(null)}>
-                    {selected && (
-                        <div>
-                            <div className="flex items-start justify-between gap-3 pr-12">
-                                <div>
-                                    <div className="text-lg font-bold text-ink">
-                                        {selected.name}
-                                    </div>
-                                    <div className="mt-1">{memberPill(selected)}</div>
-                                </div>
+                        {(members.prev_page_url || members.next_page_url) && (
+                            <div className="mt-4 flex justify-end gap-2">
                                 <Button
-                                    onClick={() => setModal({ kind: 'form', member: selected })}
+                                    href={members.prev_page_url ?? undefined}
+                                    disabled={!members.prev_page_url}
                                 >
-                                    Edit
+                                    Previous
+                                </Button>
+                                <Button
+                                    href={members.next_page_url ?? undefined}
+                                    disabled={!members.next_page_url}
+                                >
+                                    Next
                                 </Button>
                             </div>
+                        )}
+                    </div>
 
-                            <div className="mt-6 space-y-5">
-                                <DetailCard title="Contact">
-                                    <CopyField label="Phone" value={selected.phone ?? '—'} />
-                                    <CopyField label="Email" value={selected.email ?? '—'} />
-                                    <CopyField
-                                        label="Membership type"
-                                        value={selected.class_name}
-                                    />
-                                </DetailCard>
-
-                                <DetailCard title="Pay link">
-                                    <CopyField
-                                        label="Link"
-                                        value={selected.pay_url}
-                                        display="Open pay page"
-                                    />
-                                    <div className="pt-1">
-                                        <Button
-                                            onClick={() =>
-                                                setConfirm({ kind: 'rotate', member: selected })
-                                            }
-                                        >
-                                            Replace link
-                                        </Button>
+                    <Drawer open={selected !== null} onClose={() => setSelectedId(null)}>
+                        {selected && (
+                            <div>
+                                <div className="flex items-start justify-between gap-3 pr-12">
+                                    <div>
+                                        <div className="text-lg font-bold text-ink">
+                                            {selected.name}
+                                        </div>
+                                        <div className="mt-1">{memberPill(selected)}</div>
                                     </div>
-                                </DetailCard>
-
-                                <div>
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <h3 className="text-sm font-semibold text-ink">Charges</h3>
-                                        {canCreateCharge(selected) && (
-                                            <Button
-                                                icon={Plus}
-                                                onClick={() =>
-                                                    setModal({ kind: 'charge', member: selected })
-                                                }
-                                            >
-                                                Create charge
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {selected.charges.length === 0 && (
-                                        <p className="text-sm text-ink-secondary">
-                                            No charges yet. They are raised each period, or create
-                                            one now.
-                                        </p>
-                                    )}
-
-                                    <ul className="divide-y divide-border border border-border">
-                                        {selected.charges.map((charge) => (
-                                            <li key={charge.id} className="px-4 py-3">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <div>
-                                                        <div className="text-sm font-medium text-ink">
-                                                            {periodLabel(charge)}
-                                                        </div>
-                                                        <div className="text-xs text-ink-secondary">
-                                                            {formatDuesMoney(
-                                                                charge.amount,
-                                                                charge.currency
-                                                            )}
-                                                            {charge.status === 'open' &&
-                                                                ` · due ${charge.due_on}`}
-                                                        </div>
-                                                        {charge.status === 'paid' && (
-                                                            <div className="text-xs text-ink-secondary">
-                                                                {paidLabel(charge)}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <StatusPill
-                                                        status={
-                                                            charge.overdue
-                                                                ? 'failed'
-                                                                : CHARGE_PILL[charge.status]
-                                                        }
-                                                    >
-                                                        {charge.overdue
-                                                            ? 'Overdue'
-                                                            : charge.status[0].toUpperCase() +
-                                                              charge.status.slice(1)}
-                                                    </StatusPill>
-                                                </div>
-                                                {charge.status === 'open' && (
-                                                    <div className="mt-2 flex flex-wrap gap-2">
-                                                        <Button
-                                                            onClick={() =>
-                                                                setConfirm({
-                                                                    kind: 'record-offline',
-                                                                    charge,
-                                                                })
-                                                            }
-                                                        >
-                                                            Record cash payment
-                                                        </Button>
-                                                        <Button
-                                                            onClick={() =>
-                                                                setConfirm({
-                                                                    kind: 'waive',
-                                                                    charge,
-                                                                })
-                                                            }
-                                                        >
-                                                            Waive
-                                                        </Button>
-                                                        <Button
-                                                            onClick={() =>
-                                                                setConfirm({ kind: 'void', charge })
-                                                            }
-                                                        >
-                                                            Void
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    <Button
+                                        onClick={() => setModal({ kind: 'form', member: selected })}
+                                    >
+                                        Edit
+                                    </Button>
                                 </div>
 
-                                {selected.status !== 'exited' && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setConfirm({ kind: 'exit', member: selected })
-                                        }
-                                        className="inline-flex h-control items-center rounded-md border border-danger-fg/30 px-4 text-sm font-medium text-danger-fg transition-colors duration-120 ease-out hover:bg-danger-bg"
-                                    >
-                                        Mark as exited
-                                    </button>
-                                )}
+                                <div className="mt-6 space-y-5">
+                                    <DetailCard title="Contact">
+                                        <CopyField label="Phone" value={selected.phone ?? '—'} />
+                                        <CopyField label="Email" value={selected.email ?? '—'} />
+                                        <CopyField
+                                            label="Membership type"
+                                            value={selected.class_name}
+                                        />
+                                    </DetailCard>
+
+                                    <CredentialPanel key={selected.id} member={selected} />
+                                    <DetailCard title="Pay link">
+                                        <CopyField
+                                            label="Link"
+                                            value={selected.pay_url}
+                                            display="Open pay page"
+                                        />
+                                        <div className="pt-1">
+                                            <Button
+                                                onClick={() =>
+                                                    setConfirm({ kind: 'rotate', member: selected })
+                                                }
+                                            >
+                                                Replace link
+                                            </Button>
+                                        </div>
+                                    </DetailCard>
+
+                                    <div>
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-sm font-semibold text-ink">
+                                                Charges
+                                            </h3>
+                                            {canCreateCharge(selected) && (
+                                                <Button
+                                                    icon={Plus}
+                                                    onClick={() =>
+                                                        setModal({
+                                                            kind: 'charge',
+                                                            member: selected,
+                                                        })
+                                                    }
+                                                >
+                                                    Create charge
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {selected.charges.length === 0 && (
+                                            <p className="text-sm text-ink-secondary">
+                                                No charges yet. They are raised each period, or
+                                                create one now.
+                                            </p>
+                                        )}
+
+                                        <ul className="divide-y divide-border border border-border">
+                                            {selected.charges.map((charge) => (
+                                                <li key={charge.id} className="px-4 py-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div>
+                                                            <div className="text-sm font-medium text-ink">
+                                                                {periodLabel(charge)}
+                                                            </div>
+                                                            <div className="text-xs text-ink-secondary">
+                                                                {formatDuesMoney(
+                                                                    charge.amount,
+                                                                    charge.currency
+                                                                )}
+                                                                {charge.status === 'open' &&
+                                                                    ` · due ${charge.due_on}`}
+                                                            </div>
+                                                            {charge.status === 'paid' && (
+                                                                <div className="text-xs text-ink-secondary">
+                                                                    {paidLabel(charge)}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <StatusPill
+                                                            status={
+                                                                charge.overdue
+                                                                    ? 'failed'
+                                                                    : CHARGE_PILL[charge.status]
+                                                            }
+                                                        >
+                                                            {charge.overdue
+                                                                ? 'Overdue'
+                                                                : charge.status[0].toUpperCase() +
+                                                                  charge.status.slice(1)}
+                                                        </StatusPill>
+                                                    </div>
+                                                    {charge.status === 'open' && (
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            <Button
+                                                                onClick={() =>
+                                                                    setConfirm({
+                                                                        kind: 'record-offline',
+                                                                        charge,
+                                                                    })
+                                                                }
+                                                            >
+                                                                Record cash payment
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() =>
+                                                                    setConfirm({
+                                                                        kind: 'waive',
+                                                                        charge,
+                                                                    })
+                                                                }
+                                                            >
+                                                                Waive
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() =>
+                                                                    setConfirm({
+                                                                        kind: 'void',
+                                                                        charge,
+                                                                    })
+                                                                }
+                                                            >
+                                                                Void
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    {selected.status !== 'exited' && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setConfirm({ kind: 'exit', member: selected })
+                                            }
+                                            className="inline-flex h-control items-center rounded-md border border-danger-fg/30 px-4 text-sm font-medium text-danger-fg transition-colors duration-120 ease-out hover:bg-danger-bg"
+                                        >
+                                            Mark as exited
+                                        </button>
+                                    )}
+                                    {selected.status === 'exited' && (
+                                        <Button
+                                            onClick={() =>
+                                                setConfirm({ kind: 'rejoin', member: selected })
+                                            }
+                                            disabled={busy}
+                                        >
+                                            Rejoin member
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </Drawer>
-            </div>
+                        )}
+                    </Drawer>
+                </div>
+            )}
 
             {modal?.kind === 'form' && (
                 <MemberFormModal

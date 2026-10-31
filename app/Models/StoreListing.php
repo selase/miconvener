@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Jobs\EmbedStoreListingJob;
+use App\Scopes\MerchandiseVisibilityScope;
+use App\Scopes\StaffOnlyScope;
+use App\Services\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property array<string, mixed>|null $public_booking_policy
+ */
 final class StoreListing extends Model
 {
     use HasFactory;
@@ -54,6 +60,12 @@ final class StoreListing extends Model
 
     public const string STATUS_PUBLISHED = 'published';
 
+    /** Anyone may see and book the room (the marketplace). */
+    public const string AUDIENCE_PUBLIC = 'public';
+
+    /** Only the owning organisation's staff may see and request the room. */
+    public const string AUDIENCE_STAFF = 'staff';
+
     public const string STATUS_SUSPENDED = 'suspended';
 
     public const string PRICE_VISIBILITY_PUBLIC = 'public';
@@ -92,6 +104,9 @@ final class StoreListing extends Model
         'sort_order',
         'embedding',
         'is_bookable',
+        'audience',
+        'requires_approval',
+        'public_booking_policy',
     ];
 
     /**
@@ -106,6 +121,7 @@ final class StoreListing extends Model
      */
     protected $casts = [
         'taken_down_at' => 'datetime',
+        'requires_approval' => 'boolean',
         'rental_price_pesewas' => 'integer',
         'security_deposit_pesewas' => 'integer',
         'min_order_pesewas' => 'integer',
@@ -117,7 +133,37 @@ final class StoreListing extends Model
         'ceiling_height_meters' => 'decimal:2',
         'sort_order' => 'integer',
         'is_bookable' => 'boolean',
+        'public_booking_policy' => 'array',
     ];
+
+    /** @return HasOne<StoreMerchandise, $this> */
+    public function merchandise(): HasOne
+    {
+        return $this->hasOne(StoreMerchandise::class, 'listing_id');
+    }
+
+    /** @return HasMany<StoreVariant, $this> */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(StoreVariant::class, 'listing_id');
+    }
+
+    /**
+     * The approval-first public booking policy, with defaults for unset keys.
+     *
+     * @return array{approval_required: bool, default_hold_hours: int, max_hold_hours: int, timezone: string}
+     */
+    public function publicBookingPolicy(): array
+    {
+        $stored = (array) ($this->public_booking_policy ?? []);
+
+        return [
+            'approval_required' => (bool) ($stored['approval_required'] ?? true),
+            'default_hold_hours' => (int) ($stored['default_hold_hours'] ?? 48),
+            'max_hold_hours' => (int) ($stored['max_hold_hours'] ?? 168),
+            'timezone' => (string) ($stored['timezone'] ?? config('app.timezone')),
+        ];
+    }
 
     public function isBookable(): bool
     {
@@ -178,6 +224,23 @@ final class StoreListing extends Model
         $capacities = $this->capacity_breakdown ?? [];
 
         return isset($capacities[$style]) ? (int) $capacities[$style] : null;
+    }
+
+    /** @param Builder<self> $query
+     * @return Builder<self>
+     */
+    public function scopeCatalogAvailable(Builder $query): Builder
+    {
+        return $query->where('store_listings.status', self::STATUS_PUBLISHED)->whereNull('store_listings.taken_down_at')
+            ->whereHas('merchandise', fn (Builder $details) => $details->whereNull('archived_at')->where(function (Builder $ready): void {
+                $ready->whereRaw("collection_instructions ~ '[^[:space:]]'")->orWhereExists(function ($policy): void {
+                    $policy->selectRaw('1')->from('store_fulfilment_policies')->whereColumn('store_fulfilment_policies.shop_id', 'store_merchandise.shop_id');
+                });
+            }))
+            ->whereHas('variants', fn (Builder $variants) => $variants->where('is_active', true))
+            ->whereHas('shop', fn (Builder $shop) => $shop->where('is_active', true)
+                ->whereHas('tenant', fn (Builder $tenant) => $tenant->where('status', 'active')
+                    ->whereHas('features', fn (Builder $feature) => $feature->where('feature_key', 'commerce_catalog')->where('enabled', true))));
     }
 
     /**
@@ -316,13 +379,60 @@ final class StoreListing extends Model
         return null;
     }
 
+    /**
+     * Include staff-only rooms. For the organisation's own console and for
+     * code that has already established the person is that organisation's staff.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeWithStaffOnly(Builder $query): void
+    {
+        $query->withoutGlobalScope(StaffOnlyScope::class);
+    }
+
+    /**
+     * Public rooms, plus the staff-only rooms of this organisation's own shop.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeVisibleToStaffOf(Builder $query, Tenant $tenant): void
+    {
+        $query->withoutGlobalScope(StaffOnlyScope::class)->where(function (Builder $rooms) use ($tenant): void {
+            $rooms->where('store_listings.audience', self::AUDIENCE_PUBLIC)
+                ->orWhereHas('shop', fn (Builder $shop) => $shop->where('tenant_id', $tenant->id));
+        });
+    }
+
+    /**
+     * Console routes bind a room by id: the organisation's own staff-only
+     * rooms resolve, every other organisation's (and anyone's when there is
+     * no organisation) are not found, so their existence is not revealed.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        $query = $this->newQuery();
+
+        if ($tenant instanceof Tenant) {
+            $query->visibleToStaffOf($tenant);
+        }
+
+        return $query->where($field ?? $this->getRouteKeyName(), $value)->first();
+    }
+
     protected static function booted(): void
     {
+        self::addGlobalScope(new StaffOnlyScope);
+        self::addGlobalScope(new MerchandiseVisibilityScope);
+
         // Search reads the embedding, so a published listing whose searchable
         // content changed is re-embedded. Saving the embedding itself changes
         // none of these fields, so this cannot loop.
         self::created(function (self $listing): void {
-            if ($listing->status === self::STATUS_PUBLISHED) {
+            if ($listing->listing_kind !== self::KIND_MERCHANDISE && $listing->status === self::STATUS_PUBLISHED) {
                 EmbedStoreListingJob::dispatch($listing->id);
             }
         });
@@ -330,7 +440,7 @@ final class StoreListing extends Model
         self::updated(function (self $listing): void {
             $searchable = ['title', 'description', 'category', 'listing_kind', 'capacity_breakdown', 'service_scope', 'floor_area_sqm', 'ceiling_height_meters', 'rules_and_policies', 'status'];
 
-            if ($listing->status === self::STATUS_PUBLISHED && $listing->wasChanged($searchable)) {
+            if ($listing->listing_kind !== self::KIND_MERCHANDISE && $listing->status === self::STATUS_PUBLISHED && $listing->wasChanged($searchable)) {
                 EmbedStoreListingJob::dispatch($listing->id);
             }
         });

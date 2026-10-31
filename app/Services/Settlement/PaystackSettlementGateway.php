@@ -95,10 +95,19 @@ final class PaystackSettlementGateway implements SettlementGateway
         try {
             $response = Http::withToken($this->secret)->timeout(10)->get("{$this->baseUrl}/transfer/verify/{$reference}")->throw();
 
-            return [
+            $result = [
                 'status' => (string) $response->json('data.status'),
                 'fee' => $response->json('data.fee_charged') ?? $response->json('data.fee'),
             ];
+            $code = $response->json('data.transfer_code');
+            $reference = $response->json('data.reference');
+            $amount = $response->json('data.amount');
+            $currency = $response->json('data.currency');
+            if (is_string($code) && is_string($reference) && is_int($amount) && is_string($currency)) {
+                $result += ['transfer_code' => $code, 'reference' => $reference, 'amount' => $amount, 'currency' => $currency];
+            }
+
+            return $result;
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
         }

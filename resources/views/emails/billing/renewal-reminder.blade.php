@@ -19,6 +19,10 @@ The **{{ $planName }}** plan for **{{ $tenant->name }}** renews on **{{ $dueOn }
 {{ $planName }} plan
 </x-mail::panel>
 
+@if ($priceNote)
+{{ $priceNote }}
+
+@endif
 <x-mail::button :url="$payUrl">
 Pay {{ $amountDisplay }}
 </x-mail::button>

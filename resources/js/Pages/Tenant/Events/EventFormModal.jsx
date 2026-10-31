@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { AlertCircle, ArrowUp, Repeat, Building2 } from 'lucide-react';
 import Modal from '@/Components/Console/Modal';
 import Button from '@/Components/Console/Button';
@@ -21,6 +21,10 @@ function toDateTimeLocal(iso) {
 }
 
 export default function EventFormModal({ mode, event, onClose }) {
+    const page = usePage();
+    const canUseMemberBenefits =
+        event?.member_benefits_enabled ??
+        Boolean(page.props.tenant?.features?.community_event_benefits);
     const formRef = useRef(null);
     const [fileError, setFileError] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -39,6 +43,15 @@ export default function EventFormModal({ mode, event, onClose }) {
         contact_email: event?.contact_email ?? '',
         capacity: event?.capacity ?? '',
         requires_approval: event?.requires_approval ?? false,
+        ...(canUseMemberBenefits
+            ? {
+                  members_only: event?.members_only ?? false,
+                  member_ticket_price:
+                      event?.member_ticket_price == null
+                          ? ''
+                          : String(event.member_ticket_price / 100),
+              }
+            : {}),
         ticket_price: event ? event.ticket_price / 100 : 0,
         currency: event?.currency ?? 'GHS',
         fee_bearer: event?.fee_bearer ?? 'organizer',
@@ -121,6 +134,15 @@ export default function EventFormModal({ mode, event, onClose }) {
             ...formData,
             capacity: formData.capacity === '' ? null : formData.capacity,
             requires_approval: formData.requires_approval ? '1' : '0',
+            ...(canUseMemberBenefits
+                ? {
+                      members_only: formData.members_only ? '1' : '0',
+                      member_ticket_price:
+                          formData.member_ticket_price === ''
+                              ? null
+                              : Math.round(Number(formData.member_ticket_price) * 100),
+                  }
+                : {}),
             allow_offline_payments: formData.allow_offline_payments ? '1' : '0',
             ticket_price: Math.round(Number(formData.ticket_price) * 100),
         }));
@@ -486,6 +508,38 @@ export default function EventFormModal({ mode, event, onClose }) {
                     deducted from your payout either way.
                 </p>
 
+                {canUseMemberBenefits && (
+                    <fieldset className="space-y-3 border border-border p-4">
+                        <legend className="px-1 text-sm font-semibold text-ink">
+                            Member benefits
+                        </legend>
+                        <label className="flex items-center gap-3 text-sm text-ink">
+                            <input
+                                type="checkbox"
+                                name="members_only"
+                                checked={data.members_only}
+                                onChange={(e) => setData('members_only', e.target.checked)}
+                            />
+                            Members-only registration
+                        </label>
+                        {errors.members_only && (
+                            <p role="alert" className="text-sm text-danger-fg">
+                                {errors.members_only}
+                            </p>
+                        )}
+                        <Input
+                            label={`Member ticket price (${data.currency})`}
+                            type="number"
+                            min="0"
+                            max={Number(data.ticket_price || 0)}
+                            step="0.01"
+                            value={data.member_ticket_price}
+                            onChange={(e) => setData('member_ticket_price', e.target.value)}
+                            error={errors.member_ticket_price}
+                            hint="Leave blank for standard pricing. Enter 0 for free member admission. Active membership does not require dues."
+                        />
+                    </fieldset>
+                )}
                 <label className="flex items-center gap-2.5 text-sm text-ink">
                     <input
                         type="checkbox"

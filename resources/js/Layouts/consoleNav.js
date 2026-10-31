@@ -22,7 +22,7 @@ export const NAV_GROUPS = [
                 href: 'tenant.community.overview',
                 icon: 'LayoutGrid',
                 feature: 'community',
-                permission: 'manage_members',
+                anyPermissions: ['manage_members', 'manage_giving'],
             },
             {
                 label: 'People',
@@ -32,11 +32,94 @@ export const NAV_GROUPS = [
                 permission: 'manage_members',
             },
             {
-                label: 'Money',
+                label: 'Followers',
+                href: 'tenant.community.followers.index',
+                icon: 'UsersRound',
+                feature: 'community_following',
+                permission: 'manage_members',
+            },
+            {
+                label: 'Follower announcements',
+                href: 'tenant.following.announcements.index',
+                icon: 'Inbox',
+                feature: 'community_following',
+                permission: 'send_community_messages',
+            },
+            {
+                label: 'Messages',
+                href: 'tenant.community.messages.index',
+                icon: 'Inbox',
+                anyFeatures: ['community_messages', 'community_inbox'],
+                permission: 'send_community_messages',
+            },
+            {
+                label: 'Polls & surveys',
+                href: 'tenant.community.polls.index',
+                icon: 'BarChart3',
+                feature: 'community_polls_history',
+                anyPermissions: ['manage_community_polls', 'read_community_poll_results'],
+            },
+            {
+                label: 'Library',
+                href: 'tenant.community.library.index',
+                icon: 'FileText',
+                feature: 'community_library_history',
+                permission: 'manage_community_library',
+            },
+            {
+                label: 'Giving',
+                href: 'tenant.community.money.giving.index',
+                icon: 'HandCoins',
+                feature: 'giving_history',
+                anyPermissions: ['manage_giving', 'read_finance'],
+            },
+            {
+                label: 'Dues',
                 href: 'tenant.community.money.dues.index',
                 icon: 'Coins',
                 feature: 'community',
                 permission: 'manage_members',
+            },
+        ],
+    },
+    {
+        key: 'store',
+        label: 'Store',
+        items: [
+            {
+                label: 'Catalog',
+                href: 'tenant.store.catalog.index',
+                icon: 'LayoutGrid',
+                feature: 'commerce_catalog',
+                permission: 'manage_store_catalog',
+            },
+            {
+                label: 'Store quotes',
+                href: 'tenant.store.quotes.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_orders',
+                feature: 'commerce_history',
+            },
+            {
+                label: 'Store orders',
+                href: 'tenant.store.orders.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_orders',
+                feature: 'commerce_history',
+            },
+            {
+                label: 'Store fulfilment',
+                href: 'tenant.store.collections.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_collection',
+                feature: 'commerce_history',
+            },
+            {
+                label: 'Store finance',
+                href: 'tenant.store.finance.index',
+                icon: 'Wallet',
+                permission: 'manage_store_finance',
+                feature: 'commerce_history',
             },
         ],
     },
@@ -63,6 +146,13 @@ export const NAV_GROUPS = [
                 permission: 'manage_venue',
             },
             {
+                label: 'Staff bookings',
+                href: 'tenant.venue.internal-bookings.index',
+                icon: 'UserCheck',
+                feature: 'staff_room_booking',
+                permission: 'manage_room_bookings',
+            },
+            {
                 label: 'Inquiries & leads',
                 href: 'tenant.venue.inquiries.index',
                 icon: 'Inbox',
@@ -73,6 +163,12 @@ export const NAV_GROUPS = [
                 href: 'tenant.venue.quotes.index',
                 icon: 'FileText',
                 permission: 'manage_venue',
+            },
+            {
+                label: 'Venue money',
+                href: 'tenant.venue.finance.index',
+                icon: 'Wallet',
+                permission: 'venue_money',
             },
         ],
     },
@@ -142,7 +238,9 @@ export function visibleGroups(groups, { features = {}, can = {} } = {}) {
             items: group.items.filter(
                 (item) =>
                     (!item.feature || features[item.feature]) &&
-                    (!item.permission || can[item.permission])
+                    (!item.anyFeatures || item.anyFeatures.some((key) => features[key])) &&
+                    (!item.permission || can[item.permission]) &&
+                    (!item.anyPermissions || item.anyPermissions.some((key) => can[key]))
             ),
         }))
         .filter((group) => group.items.length > 0);

@@ -10,12 +10,14 @@ use App\Models\EventPayout;
 use App\Models\LedgerAccount;
 use App\Models\LedgerEntry;
 use App\Models\LedgerTransaction;
+use App\Models\Package;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
 use App\Models\TenantPayoutAccount;
 use App\Models\User;
 use App\Services\Dues\DuesBalance;
-use App\Services\Dues\DuesFee;
+use App\Services\Finance\CommercialTerms;
+use App\Services\Finance\ResolvedTerms;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
@@ -43,7 +45,7 @@ if (! function_exists('duesE2eConsole')) {
     function duesE2eConsole(string $slug, int $classAmount, string $settlementMode): array
     {
         [$tenant, $user] = eventHost($slug);
-        $tenant->update(['settlement_mode' => $settlementMode]);
+        $tenant->update(['package_id' => Package::factory()->create()->id, 'settlement_mode' => $settlementMode]);
         expect(Artisan::call('community:enable', ['tenant' => $tenant->slug]))->toBe(0);
         $console = fn () => test()->actingAs($user)->withServerVariables(['HTTP_HOST' => eventSubdomainHost($slug)]);
 
@@ -161,9 +163,9 @@ test('a platform-default organisation collects a member\'s dues and pays the bal
         && $request->hasHeader('Authorization', 'Bearer sk_settlement_test_123'));
 
     $gatewayFee = 150;
-    $commission = app(DuesFee::class)->for(10000);
+    $commission = app(CommercialTerms::class)->commission(new ResolvedTerms(1.0, null, 'organizer', 'platform'), 10000);
     $chargeEvent = ['event' => 'charge.success', 'data' => [
-        'reference' => 'ref_dues_e2e',
+        'reference' => $initialized['reference'],
         'amount' => 10000,
         'fees' => $gatewayFee,
         'currency' => 'GHS',
@@ -176,14 +178,14 @@ test('a platform-default organisation collects a member\'s dues and pays the bal
     $charge->refresh();
     $payable = 10000 - $gatewayFee - $commission;
     expect($charge->status)->toBe(DuesChargeStatusEnum::Paid)
-        ->and($charge->payment_reference)->toBe('ref_dues_e2e')
+        ->and($charge->payment_reference)->toBe($initialized['reference'])
         ->and($charge->gateway_fee_amount)->toBe($gatewayFee)
         ->and($charge->commission_amount)->toBe($commission)
         ->and(duesE2eBalance($tenant->id, LedgerAccount::CODE_ORGANIZER_PAYABLE))->toBe($payable)
         ->and(duesE2eBalance($tenant->id, LedgerAccount::CODE_PLATFORM_REVENUE))->toBe($commission)
         ->and(app(DuesBalance::class)->available($tenant, 'GHS'))->toBe($payable);
     Mail::assertQueued(DuesReceipt::class, 1);
-    Mail::assertQueued(DuesReceipt::class, fn (DuesReceipt $mail): bool => $mail->hasTo('ama@example.com') && $mail->reference === 'ref_dues_e2e');
+    Mail::assertQueued(DuesReceipt::class, fn (DuesReceipt $mail): bool => $mail->hasTo('ama@example.com') && $mail->reference === $initialized['reference']);
 
     $this->get('http://'.eventSubdomainHost('acme')."/pay/{$charge->member->pay_token}/receipt")
         ->assertInertia(fn (Assert $page) => $page->where('mode', 'receipt')->has('paidCharges', 1)->where('paidCharges.0.id', $charge->id)->etc());
@@ -231,7 +233,7 @@ test('an own-gateway organisation collects dues on its own account and the platf
         'meta' => ['commission_split' => ['subaccount_code' => 'ACCT_abc123', 'ok' => true, 'reason' => null]],
     ]);
 
-    $commission = app(DuesFee::class)->for(10000);
+    $commission = app(CommercialTerms::class)->commission(new ResolvedTerms(1.0, null, 'organizer', 'platform'), 10000);
     $initialized = duesE2eCheckout('acme', $charge);
     expect($initialized['subaccount'])->toBe('ACCT_abc123')
         ->and($initialized['transaction_charge'])->toBe(10000 - $commission);
@@ -239,7 +241,7 @@ test('an own-gateway organisation collects dues on its own account and the platf
         && $request->hasHeader('Authorization', 'Bearer sk_test_tenant'));
 
     $chargeEvent = ['event' => 'charge.success', 'data' => [
-        'reference' => 'ref_own_e2e',
+        'reference' => $initialized['reference'],
         'amount' => 10000,
         'fees' => 150,
         'currency' => 'GHS',
@@ -252,7 +254,7 @@ test('an own-gateway organisation collects dues on its own account and the platf
 
     $charge->refresh();
     expect($charge->status)->toBe(DuesChargeStatusEnum::Paid)
-        ->and($charge->payment_reference)->toBe('ref_own_e2e')
+        ->and($charge->payment_reference)->toBe($initialized['reference'])
         ->and($charge->commission_amount)->toBe($commission)
         ->and(duesE2eBalance($tenant->id, LedgerAccount::CODE_ORGANIZER_PAYABLE))->toBe(0)
         ->and(duesE2eBalance($tenant->id, LedgerAccount::CODE_PLATFORM_REVENUE))->toBe($commission)

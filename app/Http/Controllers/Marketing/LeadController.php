@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
+use App\Mail\EnterpriseEnquiryReceived;
 use App\Mail\NewEnterpriseLead;
 use App\Models\Lead;
+use App\Models\PlatformNotificationRecipient;
+use App\Services\Platform\PlatformStaff;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -44,8 +48,21 @@ final class LeadController extends Controller
             'status' => 'new',
         ]);
 
-        // 4. Dispatch Notification
-        Mail::to(config('mail.from.address'))->send(new NewEnterpriseLead($lead));
+        // 4. Tell the people chosen to receive enquiries (set in the console),
+        // or, if nobody is set, the staff who follow up signups. The sending
+        // address takes no mail, so it is never a recipient.
+        $recipients = PlatformNotificationRecipient::emailsFor(PlatformNotificationRecipient::ENTERPRISE_LEADS);
+        if ($recipients === []) {
+            $recipients = app(PlatformStaff::class)->emailsWithPermission('follow up signups');
+        }
+
+        if ($recipients === []) {
+            Log::warning('Enterprise enquiry saved but nobody is set to receive it', ['lead_id' => $lead->id]);
+        } else {
+            Mail::to($recipients)->queue(new NewEnterpriseLead($lead));
+        }
+
+        Mail::to($lead->email)->queue(new EnterpriseEnquiryReceived($lead, $recipients));
 
         return back()->with('success', 'Thank you! Our sales team will reach out to you shortly.');
     }

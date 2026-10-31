@@ -152,6 +152,7 @@ final class PlatformEarnings
                 : 'Add-ons: '.str_replace('_', ' ', (string) ($meta['addon_type'] ?? 'other')),
             'plan_renewal' => 'Plan renewals',
             'llm_token_purchase' => 'AI token packs',
+            'ghana_price_topup' => 'Ghana price top-ups',
             'invoice_payment', 'metered_invoice' => 'Invoices',
             default => isset($meta['package_id']) || isset($meta['provider_plan_id']) ? 'New plans and upgrades' : 'Other payments',
         };

@@ -9,12 +9,18 @@ use App\Enum\MemberStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Dues\StoreMemberRequest;
 use App\Http\Requests\Tenant\Dues\UpdateMemberRequest;
+use App\Models\CommunitySettings;
 use App\Models\DuesCharge;
 use App\Models\Member;
 use App\Models\MembershipType;
 use App\Models\Tenant;
+use App\Services\Community\MemberCap;
+use App\Services\Community\MemberIdentity;
 use App\Services\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
+use DomainException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -55,6 +61,7 @@ final class MemberController extends Controller
                 'currency' => $member->membershipType->currency,
                 'amount_override' => $member->amount_override,
                 'membership_type_id' => $member->membership_type_id,
+                'membership_type_active' => $member->membershipType->is_active,
                 'joined_on' => $member->joined_on?->toDateString(),
                 'notes' => $member->notes,
                 'pay_url' => route('public.dues.show', ['subdomain' => $tenant->slug, 'token' => $member->pay_token]),
@@ -63,7 +70,15 @@ final class MemberController extends Controller
                 'overdue' => (bool) $member->getAttribute('overdue'),
             ]);
 
+        $cap = app(MemberCap::class);
+        $count = $cap->counted($tenant);
+        $limit = $cap->limit($tenant);
+
         return Inertia::render('Tenant/Community/People', [
+            'followingEnabled' => $tenant->followingEnabled(),
+            'groupsEnabled' => $tenant->featureEnabled('community_messages'),
+            'activeTab' => request('tab') === 'reviews' ? 'reviews' : (request('tab') === 'groups' && $tenant->featureEnabled('community_messages') ? 'groups' : 'members'),
+            'memberUsage' => ['count' => $count, 'limit' => $limit, 'plan' => $tenant->package->name ?? 'Free', 'over_cap' => $limit !== null && $count > $limit],
             'members' => $members,
             'membershipTypes' => MembershipType::query()
                 ->where('tenant_id', $tenant->id)
@@ -80,38 +95,87 @@ final class MemberController extends Controller
         ]);
     }
 
+    public function candidates(\App\Http\Requests\Tenant\Community\MemberCandidatesRequest $request): JsonResponse
+    {
+        $tenant = $this->getTenant();
+        $identity = app(MemberIdentity::class);
+        $data = $request->validated();
+        $ignoreId = $data['ignore_id'] ?? null;
+        $register = $identity->register($tenant, $ignoreId);
+        $candidates = $identity->candidatesIn($register, $data['name'], $data['phone'] ?? null, $data['email'] ?? null);
+
+        return response()->json(['candidates' => $candidates, 'revision' => $identity->duplicateRevision($tenant, $data, $ignoreId),
+            'can_create_distinct' => count(array_filter($candidates, fn ($candidate) => in_array('email', $candidate['reasons'], true))) === 0]);
+    }
+
     public function store(StoreMemberRequest $request): JsonResponse
     {
-        $member = Member::query()->create([
-            ...$request->validated(),
-            'tenant_id' => $this->getTenant()->id,
-            'status' => MemberStatusEnum::Active,
-        ]);
+        $tenant = $this->getTenant();
+        $cap = app(MemberCap::class);
+        try {
+            $member = $cap->withLock($tenant, function () use ($request, $tenant): Member {
+                app(MemberIdentity::class)->assertUnique($tenant, $request->validated());
+
+                return app(\App\Services\Community\MemberEnrollment::class)->create($tenant, array_diff_key($request->validated(), array_flip(['confirm_distinct', 'duplicate_revision'])), MemberStatusEnum::Active);
+            });
+        } catch (DomainException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
 
         return response()->json(['id' => $member->id], 201);
     }
 
     public function update(UpdateMemberRequest $request, string $subdomain, string $member): JsonResponse
     {
-        $model = $this->findMember($member);
-        $model->update($request->validated());
+        $tenant = $this->getTenant();
+        $model = app(MemberCap::class)->withLock($tenant, function () use ($request, $tenant, $member): Member {
+            $model = $this->findMember($member);
+            app(MemberIdentity::class)->assertUnique($tenant, $request->validated(), $model->id);
+            $model = app(\App\Services\Community\MemberContactChanges::class)->update($model, array_diff_key($request->validated(), array_flip(['confirm_distinct', 'duplicate_revision'])), $request->user());
+
+            return $model;
+        });
 
         return response()->json(['id' => $model->id]);
     }
 
     /**
-     * Marks the member as having left. Their charges are kept: open ones can
-     * still be waived, voided or recorded.
+     * Marks the member as having left. Past and paid charges are retained;
+     * unpaid advance periods are voided when eligibility ends.
      */
     public function exit(string $subdomain, string $member): JsonResponse
     {
         $this->authorize('manage members');
         $model = $this->findMember($member);
         if ($model->status !== MemberStatusEnum::Exited) {
-            $model->update(['status' => MemberStatusEnum::Exited, 'exited_on' => today()]);
+            DB::connection('landlord')->transaction(fn (): bool => $model->update(['status' => MemberStatusEnum::Exited]));
         }
 
         return response()->json(['id' => $model->id, 'status' => MemberStatusEnum::Exited->value]);
+    }
+
+    public function rejoin(string $subdomain, string $member): JsonResponse
+    {
+        $this->authorize('manage members');
+        $tenant = $this->getTenant();
+        $cap = app(MemberCap::class);
+        try {
+            $model = $cap->withLock($tenant, function () use ($member, $tenant, $cap): Member {
+                $model = $this->findMember($member);
+                if ($model->status !== MemberStatusEnum::Exited) {
+                    throw new DomainException('Only an exited member can rejoin.');
+                }
+                $cap->assertRoomFor($tenant, 1);
+                $date = CarbonImmutable::now(CommunitySettings::for($tenant)->timezone)->toDateString();
+                $model->update(['status' => MemberStatusEnum::Active, 'rejoined_on' => $date, 'exited_on' => null]);
+
+                return $model;
+            });
+        } catch (DomainException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json(['id' => $model->id, 'status' => MemberStatusEnum::Active->value]);
     }
 
     /**

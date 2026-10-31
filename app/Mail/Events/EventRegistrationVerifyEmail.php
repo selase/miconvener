@@ -20,7 +20,12 @@ final class EventRegistrationVerifyEmail extends Mailable
     use Queueable;
     use SerializesModels;
 
-    public function __construct(public EventRegistration $registration) {}
+    private readonly ?string $recipientToken;
+
+    public function __construct(public EventRegistration $registration)
+    {
+        $this->recipientToken = $registration->member_benefit_required ? $registration->memberBenefitRecipientToken() : null;
+    }
 
     public function envelope(): Envelope
     {
@@ -43,6 +48,7 @@ final class EventRegistrationVerifyEmail extends Mailable
                         'subdomain' => $this->registration->tenant->slug,
                         'event' => $this->registration->event->slug,
                         'registration' => $this->registration->id,
+                        ...($this->recipientToken !== null ? ['recipient' => $this->recipientToken] : []),
                     ],
                 ),
             ],

@@ -40,7 +40,7 @@ export default function Addons({
 
     const handleCheckout = (addonKey) => {
         setSubmittingKey(addonKey);
-        const item = catalog[addonKey];
+        const item = catalogList.find((entry) => entry.key === addonKey);
         const payload = {
             addon_key: addonKey,
             multiplier: quantities[addonKey] || 1,
@@ -66,10 +66,6 @@ export default function Addons({
         router.post(route('billing.addons.cancel', { addon: addonId }));
     };
 
-    const formatPrice = (pesewas) => {
-        return (pesewas / 100).toFixed(2);
-    };
-
     return (
         <ConsoleLayout>
             <Head title="Modular Add-Ons & Capacity" />
@@ -77,7 +73,7 @@ export default function Addons({
             <PageHeader
                 title="Modular Add-Ons"
                 actions={
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button href={route('tenant.pricing')} variant="default">
                             View Core Plans
                         </Button>
@@ -279,7 +275,7 @@ export default function Addons({
 
                                         <div className="mt-4 flex items-baseline gap-1">
                                             <span className="text-2xl font-extrabold text-ink">
-                                                {currency} {formatPrice(item.unit_price)}
+                                                {item.display_price}
                                             </span>
                                             <span className="text-xs text-ink-secondary">
                                                 {isMonthly
@@ -293,6 +289,11 @@ export default function Addons({
                                                           : ''}
                                             </span>
                                         </div>
+                                        {item.charge_note && (
+                                            <p className="mt-1 text-xs text-ink-secondary">
+                                                {item.charge_note}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="mt-6 pt-4 border-t border-border flex items-center gap-3">

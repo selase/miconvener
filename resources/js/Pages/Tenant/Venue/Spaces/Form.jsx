@@ -1,8 +1,9 @@
-import { useForm, router, Link } from '@inertiajs/react';
+import { useForm, router, Link, usePage } from '@inertiajs/react';
 import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
+import VenueRequestPolicyFields from '@/Components/Venue/VenueRequestPolicyFields';
 import PageHeader from '@/Components/Console/PageHeader';
 import {
     ArrowLeft,
@@ -26,7 +27,13 @@ const CATEGORY_META = {
     catering_rules: { label: 'Catering & Food Policy', icon: Utensils },
 };
 
-export default function SpaceForm({ space, amenities }) {
+export default function SpaceForm({
+    space,
+    amenities,
+    venueRequests = false,
+    defaultTimezone = 'UTC',
+}) {
+    const staffRooms = Boolean(usePage().props.tenant?.features?.staff_room_booking);
     const isEdit = !!space;
 
     // Convert initial amenities from listing
@@ -62,6 +69,12 @@ export default function SpaceForm({ space, amenities }) {
         floor_area_sqm: space?.floor_area_sqm || '',
         ceiling_height_meters: space?.ceiling_height_meters || '',
         status: space?.status || 'published',
+        audience: space?.audience || 'public',
+        requires_approval: space?.requires_approval ?? true,
+        public_booking_policy: {
+            default_hold_hours: space?.booking_policy?.default_hold_hours ?? 48,
+            timezone: space?.booking_policy?.timezone ?? defaultTimezone,
+        },
         amenities: [],
     });
 
@@ -452,6 +465,52 @@ export default function SpaceForm({ space, amenities }) {
                     );
                 })}
             </div>
+
+            {/* Who can see and book this room (Enterprise: staff-only rooms and free staff bookings) */}
+            {(staffRooms || data.audience === 'staff') && (
+                <div className="space-y-4 rounded-lg border border-border bg-surface p-6">
+                    <div>
+                        <h3 className="text-sm font-semibold text-ink">Who can see this room</h3>
+                        <p className="mt-1 text-sm text-ink-secondary">
+                            A staff-only room never appears in the marketplace or search. Only your
+                            staff see it, and they book it free of charge.
+                        </p>
+                    </div>
+                    <Select
+                        label="Audience"
+                        value={data.audience}
+                        onChange={(e) => setData('audience', e.target.value)}
+                        error={errors.audience}
+                    >
+                        <option value="public">Public (marketplace, anyone can request)</option>
+                        <option value="staff" disabled={!staffRooms && data.audience !== 'staff'}>
+                            Staff only{staffRooms ? '' : ' (Enterprise plan)'}
+                        </option>
+                    </Select>
+                    {!staffRooms && data.audience === 'staff' && (
+                        <p className="text-sm text-warning-fg">
+                            Your plan no longer includes staff rooms. Make this room public to keep
+                            using it, or return to Enterprise.
+                        </p>
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                        <input
+                            type="checkbox"
+                            checked={data.requires_approval}
+                            onChange={(e) => setData('requires_approval', e.target.checked)}
+                        />
+                        Staff requests for this room need approval
+                    </label>
+                </div>
+            )}
+
+            {venueRequests && (
+                <VenueRequestPolicyFields
+                    policy={data.public_booking_policy}
+                    errors={errors}
+                    onChange={(policy) => setData('public_booking_policy', policy)}
+                />
+            )}
 
             {/* SECTION 5: Status & Submit */}
             <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-6">

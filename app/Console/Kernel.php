@@ -31,6 +31,7 @@ final class Kernel extends ConsoleKernel
         // Recurring events — maintain rolling window of upcoming session occurrences
         $schedule->command('events:generate-recurring-sessions')->dailyAt('02:30')->withoutOverlapping();
         $schedule->command('events:send-occurrence-reminders')->hourly()->withoutOverlapping();
+        $schedule->command('venue:deliver-quote-notices')->everyFiveMinutes()->withoutOverlapping();
 
         // Usage Metering & Billing
         $schedule->command('tenants:audit-storage')->dailyAt('03:00');
@@ -42,11 +43,19 @@ final class Kernel extends ConsoleKernel
          * for everyone until it has. This closes that window nightly instead of
          * leaving it to whoever remembers.
          */
+        $schedule->call(fn () => \App\Models\CommunityAudienceAddress::query()->where('expires_at', '<', now())->delete())->hourly()->name('community:prune-audience-previews')->withoutOverlapping();
         $schedule->command('tenants:sync-features')->dailyAt('03:45')->withoutOverlapping();
+        $schedule->command('community:inbox-prune')->dailyAt('04:15')->withoutOverlapping()->onOneServer();
+        $schedule->command('community:messages-dispatch')->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->call(fn () => app(\App\Services\Marketplace\StoreFulfilmentNotices::class)->retryQueued())->name('commerce-ready-notices')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->call(fn () => app(\App\Services\Marketplace\StoreReceipts::class)->retryQueued())->name('commerce-receipts')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->command('commerce:reconcile')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->command('giving:send-reminders')->hourly()->withoutOverlapping()->onOneServer();
+        $schedule->command('dues:process')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('usage:process-rollups --period=hour')->hourly();
         $schedule->command('usage:process-rollups --period=day')->daily();
         $schedule->command('usage:prune')->dailyAt('04:00');
-        $schedule->command('model:prune', ['--model' => [\App\Models\PlatformAttendeeAccessCode::class]])->dailyAt('04:00');
+        $schedule->command('model:prune', ['--model' => [\App\Models\PlatformAttendeeAccessCode::class, \App\Models\PlatformPhoneAccessCode::class, \App\Models\PlatformPhoneSendReservation::class]])->dailyAt('04:00');
         $schedule->command('usage:check-alerts')->dailyAt('09:00'); // Check limits daily
         $schedule->command('tenants:reset-usage --feature=event_registrations')->monthlyOn(1, '00:05');
         $schedule->command('tenants:reset-usage --feature=email_credits')->monthlyOn(1, '00:10');
@@ -54,6 +63,7 @@ final class Kernel extends ConsoleKernel
 
         // Own-gateway Paystack tenants route the platform commission through a
         // subaccount they own; confirm it still points at us before it costs a sale.
+        $schedule->command('fx:refresh --force')->hourly()->withoutOverlapping();
         $schedule->command('payments:verify-commission-splits')->dailyAt('05:30')->withoutOverlapping();
 
         // Invoicing
@@ -88,6 +98,7 @@ final class Kernel extends ConsoleKernel
         $schedule->command('sms:sync-delivery')->everyFifteenMinutes()->withoutOverlapping();
 
         // Compliance
+        $schedule->call(fn () => app(\App\Services\Marketplace\StoreCollectionPasses::class)->purge())->dailyAt('04:15')->name('store-collection-pass-purge')->withoutOverlapping();
         $schedule->command('compliance:purge-expired')->dailyAt('05:30');
     }
 

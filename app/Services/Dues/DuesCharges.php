@@ -6,6 +6,7 @@ namespace App\Services\Dues;
 
 use App\Enum\DuesChargeStatusEnum;
 use App\Enum\MemberStatusEnum;
+use App\Models\CommunitySettings;
 use App\Models\DuesCharge;
 use App\Models\Member;
 use Carbon\CarbonImmutable;
@@ -20,9 +21,8 @@ use Illuminate\Support\Facades\DB;
 final class DuesCharges
 {
     /**
-     * The charge for the period containing $periodStart. Every period is
-     * anchored to the first of the month, so a start on the 29th to 31st is
-     * moved back to day 1 before the period end is worked out. The amount is
+     * The charge for the period containing $periodStart. Calendar periods use
+     * the organisation's configured weekday and financial-year anchors. The amount is
      * frozen from the member's effective amount now, and a zero amount (a
      * waiver) is created already waived. Asking again for the same period
      * returns the charge that already exists.
@@ -30,37 +30,17 @@ final class DuesCharges
      * @throws DomainException When the member has left, or the amount is
      *                         above zero but below the minimum charge.
      */
-    public function createFor(Member $member, CarbonImmutable $periodStart): DuesCharge
+    public function createFor(Member $member, CarbonImmutable $periodStart, ?CommunitySettings $settings = null): DuesCharge
     {
-        if ($member->status === MemberStatusEnum::Exited) {
-            throw new DomainException('This member has left and cannot be charged.');
-        }
+        return DB::connection('landlord')->transaction(function () use ($member, $periodStart, $settings): DuesCharge {
+            $locked = Member::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)
+                ->with('membershipType')->lockForUpdate()->findOrFail($member->id);
 
-        $class = $member->membershipType;
+            $locked->setRelation('membershipType', \App\Models\MembershipType::withoutGlobalScopes()
+                ->where('tenant_id', $locked->tenant_id)->lockForUpdate()->findOrFail($locked->membership_type_id));
 
-        if (! $class->hasDues() || $class->period === null) {
-            throw new DomainException('This membership type has no dues.');
-        }
-
-        $start = $periodStart->startOfMonth();
-        $amount = (int) $member->effectiveAmount();
-
-        if ($amount > 0 && $amount < DuesCharge::MINIMUM_AMOUNT) {
-            throw new DomainException('A charge must be at least '.DuesCharge::MINIMUM_AMOUNT.' minor units ('.number_format(DuesCharge::MINIMUM_AMOUNT / 100, 2).').');
-        }
-
-        return DuesCharge::query()->firstOrCreate(
-            ['member_id' => $member->id, 'period_start' => $start->toDateString()],
-            [
-                'tenant_id' => $member->tenant_id,
-                'membership_type_id' => $class->id,
-                'period_end' => $class->period->periodEnd($start)->toDateString(),
-                'due_on' => $start->toDateString(),
-                'amount' => $amount,
-                'currency' => $class->currency,
-                'status' => $amount === 0 ? DuesChargeStatusEnum::Waived : DuesChargeStatusEnum::Open,
-            ],
-        );
+            return $this->createLocked($locked, $periodStart, $settings);
+        });
     }
 
     /**
@@ -93,13 +73,85 @@ final class DuesCharges
      */
     public function recordOffline(DuesCharge $charge, int $userId, ?string $note): DuesCharge
     {
-        return $this->closeOpen($charge, [
-            'status' => DuesChargeStatusEnum::Paid,
-            'payment_method' => 'offline',
-            'paid_at' => now(),
-            'recorded_by' => $userId,
-            'note' => $note,
-        ]);
+        return $charge->getConnection()->transaction(function () use ($charge, $userId, $note): DuesCharge {
+            $paid = $this->closeOpen($charge, ['status' => DuesChargeStatusEnum::Paid, 'payment_method' => 'offline', 'paid_at' => now(), 'recorded_by' => $userId, 'note' => $note]);
+            $member = Member::withoutGlobalScopes()->where('tenant_id', $paid->tenant_id)->findOrFail($paid->member_id);
+            $tenant = \App\Models\Tenant::query()->findOrFail($paid->tenant_id);
+            app(\App\Services\Community\InboxNotices::class)->receipt($tenant, $member, $paid->id, new \Illuminate\Database\Eloquent\Collection([$paid]), CarbonImmutable::now());
+
+            return $paid;
+        });
+    }
+
+    /** Cancel unpaid advance periods when eligibility ends, preserving paid history. */
+    public function cancelAdvanceFor(Member $member): void
+    {
+        DB::connection('landlord')->transaction(function () use ($member): void {
+            $locked = Member::withoutGlobalScopes()->where('tenant_id', $member->tenant_id)->lockForUpdate()->findOrFail($member->id);
+            $date = match ($locked->status) {
+                MemberStatusEnum::Exited => $locked->exited_on,
+                MemberStatusEnum::Lapsed => $locked->lapsed_on,
+                default => null,
+            };
+            if ($date === null) {
+                return;
+            }
+            $note = "Dues stopped: membership {$locked->status->value} on {$date->toDateString()}.";
+            $charges = DuesCharge::withoutGlobalScopes()->where('tenant_id', $locked->tenant_id)->where('member_id', $locked->id)
+                ->where('status', DuesChargeStatusEnum::Open)->whereDate('period_start', '>=', $date->toDateString())
+                ->orderBy('period_start')->orderBy('id')->lockForUpdate()->get();
+            foreach ($charges as $charge) {
+                $charge->update(['status' => DuesChargeStatusEnum::Void, 'note' => filled($charge->note) ? "{$charge->note}\n{$note}" : $note]);
+            }
+        });
+    }
+
+    private function createLocked(Member $member, CarbonImmutable $periodStart, ?CommunitySettings $settings): DuesCharge
+    {
+        if ($member->status === MemberStatusEnum::Exited) {
+            throw new DomainException('This member has left and cannot be charged.');
+        }
+        if ($member->status !== MemberStatusEnum::Active) {
+            throw new DomainException('Only active members can be charged.');
+        }
+
+        $class = $member->membershipType;
+        if (! $class->is_active) {
+            throw new DomainException('This membership type is inactive.');
+        }
+
+        if (! $class->hasDues() || $class->period === null) {
+            throw new DomainException('This membership type has no dues.');
+        }
+
+        $settings ??= CommunitySettings::for($member->tenant);
+        $start = $class->period->periodStartFor(CarbonImmutable::parse($periodStart->toDateString(), $settings->timezone), $settings);
+        $duesStart = $member->firstDuesPeriod($settings);
+        if ($duesStart !== null && $start->lt($duesStart)) {
+            $existing = $member->charges()->whereDate('period_start', $start->toDateString())->first();
+            if ($existing !== null) {
+                return $existing;
+            }
+            throw new DomainException('This period starts before dues begin.');
+        }
+        $amount = (int) $member->effectiveAmount();
+
+        if ($amount > 0 && $amount < DuesCharge::MINIMUM_AMOUNT) {
+            throw new DomainException('A charge must be at least '.DuesCharge::MINIMUM_AMOUNT.' minor units ('.number_format(DuesCharge::MINIMUM_AMOUNT / 100, 2).').');
+        }
+
+        return DuesCharge::query()->firstOrCreate(
+            ['member_id' => $member->id, 'period_start' => $start->toDateString()],
+            [
+                'tenant_id' => $member->tenant_id,
+                'membership_type_id' => $class->id,
+                'period_end' => $class->period->periodEnd($start, $settings)->toDateString(),
+                'due_on' => $start->toDateString(),
+                'amount' => $amount,
+                'currency' => $class->currency,
+                'status' => $amount === 0 ? DuesChargeStatusEnum::Waived : DuesChargeStatusEnum::Open,
+            ],
+        );
     }
 
     /**

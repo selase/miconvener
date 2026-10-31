@@ -51,6 +51,12 @@ Route::get('/sample-product', fn (): Factory|View => view('sample-product-page')
 // redirect so old links and search results land on the real homepage.
 Route::permanentRedirect('/product-template', '/')->name('product.template');
 Route::get('/product-enterprise', fn (): Factory|View => view('product.enterprise'))->name('product.enterprise');
+Route::get('/features', fn (): Factory|View => view('product.features'))->name('features');
+Route::post('/currency', [App\Http\Controllers\Marketing\CurrencyController::class, 'update'])->middleware('throttle:30,1')->name('currency.update');
+Route::get('/use-cases', [App\Http\Controllers\Marketing\UseCaseController::class, 'index'])->name('use-cases.index');
+Route::get('/use-cases/{slug}', [App\Http\Controllers\Marketing\UseCaseController::class, 'show'])
+    ->where('slug', '[a-z-]+')
+    ->name('use-cases.show');
 Route::get('/terms', fn (): Factory|View => view('product.terms'))->name('terms');
 
 // The staff links' offline worker. Served by the app rather than as a static
@@ -63,10 +69,10 @@ Route::get('/staff-worker.js', fn () => response()->file(resource_path('js/worke
 ]))->name('staff.worker');
 
 // The attendee portal's offline worker, served uncached for the same reason.
-Route::get('/attendee-worker.js', fn () => response()->file(resource_path('js/workers/attendee-sw.js'), [
+Route::get('/attendee-worker.js', fn () => response(str_replace('__BUILD_ID__', is_file(public_path('build/manifest.json')) ? mb_substr(hash_file('sha256', public_path('build/manifest.json')), 0, 16) : 'dev', (string) file_get_contents(resource_path('js/workers/attendee-sw.js'))), 200, [
     'Content-Type' => 'application/javascript; charset=utf-8',
     'Cache-Control' => 'no-cache, no-store, must-revalidate',
-    'Service-Worker-Allowed' => '/my/',
+    'Service-Worker-Allowed' => '/my',
 ]))->name('attendee.worker');
 Route::get('/privacy', fn (): Factory|View => view('product.privacy'))->name('privacy');
 Route::post('/product-enterprise/leads', [App\Http\Controllers\Marketing\LeadController::class, 'store'])->name('product.enterprise.lead');
@@ -106,6 +112,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('health.tenants');
     Route::get('health/tenants/{tenant:uuid}', [TenantHealthController::class, 'show'])
         ->name('health.tenants.show');
+    Route::get('messages/reconciliation', [App\Http\Controllers\Admin\CommunitySmsReconciliationController::class, 'index'])->name('admin.messages.reconciliation.index');
+    Route::post('messages/reconciliation', [App\Http\Controllers\Admin\CommunitySmsReconciliationController::class, 'resolve'])->name('admin.messages.reconciliation.resolve');
+    Route::post('messages/{message}/inbox-takedown', App\Http\Controllers\Admin\CommunityInboxTakedownController::class)->whereUuid('message')->name('admin.messages.inbox-takedown');
     Route::get('messages', [App\Http\Controllers\Admin\MessageDeliveryController::class, 'index'])
         ->name('admin.messages.index');
     Route::post('takedowns/{type}/{id}', [App\Http\Controllers\Admin\TakedownController::class, 'store'])
@@ -136,6 +145,12 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
 
     // Tenant routes
     Route::group(['prefix' => 'tenants', 'as' => 'tenants.'], function (): void {
+        Route::post('{tenant:uuid}/commercial-terms', [TenantController::class, 'updateCommercialTerms'])
+            ->name('commercial-terms.update');
+        Route::post('{tenant:uuid}/ticket-terms', [TenantController::class, 'updateTicketTerms'])
+            ->name('ticket-terms.update');
+        Route::post('{tenant:uuid}/pricing-region', [App\Http\Controllers\Admin\PricingRegionController::class, 'update'])
+            ->name('pricing-region.update');
         Route::get('reset', [TenantController::class, 'resetTenant'])
             ->name('reset');
         Route::post('all', [TenantController::class, 'getAllTenants'])
@@ -213,8 +228,10 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
     });
 
     // Enterprise Leads
+    Route::post('admin/lead-recipients', [App\Http\Controllers\Admin\LeadRecipientController::class, 'store'])->name('admin.lead-recipients.store');
+    Route::delete('admin/lead-recipients/{recipient}', [App\Http\Controllers\Admin\LeadRecipientController::class, 'destroy'])->name('admin.lead-recipients.destroy');
     Route::resource('admin/leads', App\Http\Controllers\Admin\LeadController::class)
-        ->only(['index', 'show', 'destroy'])
+        ->only(['index', 'show', 'update', 'destroy'])
         ->names('admin.leads');
 
     // Superadmin Operations: run the allowlisted maintenance commands
@@ -233,6 +250,11 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding']], function
         ->name('admin.signups.show');
     Route::post('admin/signups/{tenant:uuid}/follow-up', [App\Http\Controllers\Admin\SignupController::class, 'followUp'])
         ->name('admin.signups.follow-up');
+
+    Route::get('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'index'])
+        ->name('admin.store-agreements.index');
+    Route::post('admin/store-agreements/{tenant}', [App\Http\Controllers\Admin\StoreCommercialAgreementController::class, 'store'])
+        ->name('admin.store-agreements.store');
 
     Route::get('admin/finance', App\Http\Controllers\Admin\FinanceOverviewController::class)
         ->name('admin.finance.overview');
@@ -320,14 +342,35 @@ Route::get('/storage/{path}', [App\Http\Controllers\MediaController::class, 'sho
 Route::get('/verify/cert/{uuid}', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'verify'])->name('web.certificates.verify');
 Route::get('/verify/cert/{uuid}/download', [App\Http\Controllers\Public\PublicCertificateVerificationController::class, 'download'])->name('web.certificates.download');
 
+Route::post('/my/store-orders/{order}/collection-pass', [App\Http\Controllers\Marketplace\StoreCollectionPassController::class, 'store'])->middleware('throttle:30,1')->whereUuid('order')->name('store.orders.collection-pass');
+Route::post('/my/store-orders/{order}/fulfilment', [App\Http\Controllers\Marketplace\StoreFulfilmentChoiceController::class, 'store'])->middleware('throttle:30,1')->whereUuid('order')->name('store.orders.fulfilment');
+Route::post('/my/store-orders/{order}/cancel', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'cancel'])->middleware('throttle:30,1')->whereUuid('order')->name('store.orders.cancel');
+Route::get('/my/store-orders', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'index'])->name('store.orders.index');
+Route::get('/my/store-orders/{order}/receipt', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'receipt'])->whereUuid('order')->name('store.orders.receipt');
+Route::get('/my/store-orders/{order}', [App\Http\Controllers\Marketplace\StoreOrderController::class, 'show'])->whereUuid('order')->name('store.orders.show');
+Route::post('/marketplace/shops/{shop:slug}/quotes', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'quote'])
+    ->middleware('throttle:30,1')->name('store.quotes.create');
+Route::post('/my/store-orders/{order}/checkout', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'start'])
+    ->middleware('throttle:30,1')->whereUuid('order')->name('store.checkout.start');
+Route::get('/my/venue-charges/{charge}/receipt', [App\Http\Controllers\Marketplace\VenueQuoteAcceptanceController::class, 'receipt'])->whereUuid('charge')->name('venue.charges.receipt');
+Route::post('/my/venue-charges/{charge}/checkout', [App\Http\Controllers\Marketplace\VenueChargeController::class, 'start'])
+    ->middleware('throttle:30,1')->whereUuid('charge')->name('venue.charges.checkout');
+Route::get('/marketplace/checkout/{reference}/callback', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'callback'])
+    ->middleware('throttle:30,1')->name('store.checkout.callback');
+
 // MiConvener Marketplace (Public)
 Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
     Route::get('/', [App\Http\Controllers\Marketplace\MarketplaceController::class, 'index'])->name('index');
+    Route::get('/items/{slug}', [App\Http\Controllers\Marketplace\MerchandiseItemController::class, 'show'])->name('items.show');
+    Route::get('/items/{slug}/photos/{media}', [App\Http\Controllers\Marketplace\MerchandiseMediaController::class, 'show'])->name('items.photos');
     Route::get('/venues', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'index'])->name('venues.index');
     Route::get('/venues/{slug}', [App\Http\Controllers\Marketplace\MarketplaceListingController::class, 'show'])->name('venues.show');
     Route::post('/venues/{slug}/check-availability', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkAvailability'])->name('venues.check-availability');
     Route::get('/venues/{slug}/booked-slots', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'bookedSlots'])->name('venues.booked-slots');
     Route::post('/venues/{slug}/book', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'book'])->name('venues.book');
+    Route::post('/venues/{slug}/request', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'requestVenue'])->middleware('throttle:20,1')->name('venues.request');
+    Route::post('/bookings/{reference}/quote/accept', [App\Http\Controllers\Marketplace\VenueQuoteAcceptanceController::class, 'accept'])->middleware('throttle:30,1')->name('bookings.quote.accept');
+    Route::post('/bookings/{reference}/cancel', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'cancel'])->middleware('throttle:30,1')->name('bookings.cancel');
     Route::get('/bookings/{reference}', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'show'])->name('bookings.show');
     Route::post('/bookings/{reference}/checkout', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'checkout'])->name('bookings.checkout');
     Route::get('/bookings/{reference}/callback', [App\Http\Controllers\Marketplace\VenueBookingController::class, 'callback'])->name('bookings.callback');

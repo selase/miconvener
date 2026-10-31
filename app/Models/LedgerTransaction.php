@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/** @property LedgerCategoryEnum $category */
 final class LedgerTransaction extends Model
 {
     use BelongsToTenant;
@@ -25,6 +26,8 @@ final class LedgerTransaction extends Model
     public const TYPE_CONTRIBUTION = 'contribution';
 
     public const TYPE_DUES_PAYMENT = 'dues_payment';
+
+    public const TYPE_GIVING_PAYMENT = 'giving_payment';
 
     public const TYPE_COMMISSION_RECEIVABLE = 'commission_receivable';
 
@@ -42,6 +45,7 @@ final class LedgerTransaction extends Model
 
     protected $fillable = [
         'tenant_id',
+        'giving_fund_id',
         'event_id',
         'category',
         'reference',

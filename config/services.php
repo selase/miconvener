@@ -66,6 +66,7 @@ return [
          * user here would be read as one of ours.
          */
         'metadata_source' => env('PAYSTACK_METADATA_SOURCE', 'miconvener'),
+        'udworkspace_relay_enabled' => env('PAYSTACK_UDWORKSPACE_RELAY_ENABLED', true),
         'public_key' => env('PAYSTACK_PUBLIC_KEY'),
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'merchant_email' => env('PAYSTACK_MERCHANT_EMAIL'),
@@ -103,8 +104,16 @@ return [
         'platform_fee_percentage' => env('CONTRIBUTION_PLATFORM_FEE_PERCENTAGE', 1),
     ],
 
+    'giving' => [
+        'platform_fee_percentage' => 1.0,
+        'free_plan_fee_percentage' => 2.0,
+        'currencies' => ['GHS', 'USD', 'EUR', 'GBP'],
+    ],
+
     'dues' => [
         'platform_fee_percentage' => (float) env('DUES_PLATFORM_FEE_PERCENTAGE', 1),
+        'free_plan_fee_percentage' => 2,
+        'legacy_fee_percentage' => 1,
     ],
 
     'sms' => [
@@ -129,10 +138,10 @@ return [
         /*
          * Commission ceiling per ticket, in minor units, as a last resort.
          *
-         * Null — uncapped — is deliberate. The paid tiers carry their own
-         * GHS 20 ceiling as a package default, so the only packages reaching
-         * this line are Enterprise, whose terms are negotiated on the tenant
-         * row. A number here would silently cap those negotiated deals.
+         * Null — uncapped — is deliberate (owner, 2026-10-19): no plan caps
+         * ticket commission. A cap is a deal for one organisation, set on the
+         * tenant row by staff with the manage commercial terms permission. A
+         * number here would silently cap every organisation.
          */
         'default_fee_cap_amount' => env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT') !== null
             ? (int) env('PLATFORM_DEFAULT_FEE_CAP_AMOUNT')

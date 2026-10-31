@@ -6,9 +6,11 @@ use App\Enum\DuesChargeStatusEnum;
 use App\Enum\MemberStatusEnum;
 use App\Models\DuesCharge;
 use App\Models\Member;
+use App\Models\Package;
 use App\Models\Tenant;
 use App\Models\TenantPaymentGateway;
-use App\Services\Dues\DuesFee;
+use App\Services\Finance\CommercialTerms;
+use App\Services\Finance\ResolvedTerms;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
@@ -34,7 +36,7 @@ if (! function_exists('payPageFixture')) {
     function payPageFixture(string $slug = 'acme', array $tenantAttributes = []): array
     {
         [$tenant] = eventHost($slug);
-        $tenant->update($tenantAttributes);
+        $tenant->update(['package_id' => Package::factory()->create()->id, ...$tenantAttributes]);
         Artisan::call('community:enable', ['tenant' => $tenant->slug]);
 
         $member = Member::factory()->create(['tenant_id' => $tenant->id, 'name' => 'Ama Mensah', 'email' => 'ama@example.com']);
@@ -187,8 +189,9 @@ test('checkout asks Paystack for the total and the summed commission share', fun
     $this->post("http://{$host}/pay/{$member->pay_token}/checkout", ['charge_ids' => [$first->id, $second->id]])
         ->assertRedirect('https://checkout.paystack.com/dues');
 
-    $fee = app(DuesFee::class);
-    $commission = $fee->for(10000) + $fee->for(5050);
+    $fee = app(CommercialTerms::class);
+    $terms = new ResolvedTerms(1.0, null, 'organizer', 'platform');
+    $commission = $fee->commission($terms, 10000) + $fee->commission($terms, 5050);
     $payload = payPageInitializePayload();
 
     expect($commission)->toBe(151)

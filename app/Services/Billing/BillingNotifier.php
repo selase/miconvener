@@ -16,6 +16,8 @@ use App\Models\Package;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
+use App\Services\Pricing\Money;
+use App\Services\Pricing\Rate;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Config;
 
@@ -62,6 +64,24 @@ final class BillingNotifier
     }
 
     /**
+     * For a payment priced in USD and charged in GHS: the USD price and the
+     * rate it was converted at ("US$ 19 at the Bank of Ghana rate of 11.77 (16 Oct 2026)").
+     */
+    public static function priceReference(mixed $pricing): ?string
+    {
+        if (! is_array($pricing) || ($pricing['display_currency'] ?? null) !== 'USD' || ! isset($pricing['fx_rate'], $pricing['fx_as_of'])) {
+            return null;
+        }
+
+        return sprintf(
+            '%s at the Bank of Ghana rate of %s (%s)',
+            (new Money((int) $pricing['display_amount_minor'], 'USD'))->format(),
+            Rate::describe((float) $pricing['fx_rate']),
+            CarbonImmutable::parse((string) $pricing['fx_as_of'])->format('j M Y'),
+        );
+    }
+
+    /**
      * Ask for the next period's payment ahead of the renewal date. One email
      * per threshold (7 and 3 days before), per period.
      */
@@ -75,6 +95,7 @@ final class BillingNotifier
             overdue: false,
             movesToFreeOn: null,
             payUrl: $this->renewUrl($tenant),
+            priceNote: $subscription->renewalNote($package),
         );
 
         $key = "renewal_due:{$subscription->id}:{$subscription->current_period_end->toDateString()}:{$threshold}";
@@ -95,6 +116,7 @@ final class BillingNotifier
             overdue: true,
             movesToFreeOn: $subscription->grace_ends_at ? self::date($subscription->grace_ends_at) : null,
             payUrl: $this->renewUrl($tenant),
+            priceNote: $subscription->renewalNote($package),
         );
 
         $key = "renewal_overdue:{$subscription->id}:{$subscription->current_period_end->toDateString()}:".now()->toDateString();
@@ -265,9 +287,15 @@ final class BillingNotifier
             paymentMethod: self::paymentMethod($provider),
             activePlan: $plan?->name,
             billingUrl: $this->billingUrl($tenant),
+            priceReference: self::priceReference($meta['pricing'] ?? null),
         );
 
         return $this->sender->send($tenant, BillingEmail::TYPE_PAYMENT_RECEIPT, "receipt:{$reference}", [$payerEmail, $tenant->email], $mail);
+    }
+
+    public function billingUrl(Tenant $tenant): string
+    {
+        return route('billing.index', ['subdomain' => $tenant->slug]);
     }
 
     /**
@@ -318,10 +346,5 @@ final class BillingNotifier
     private function renewUrl(Tenant $tenant): string
     {
         return route('billing.renew', ['subdomain' => $tenant->slug]);
-    }
-
-    private function billingUrl(Tenant $tenant): string
-    {
-        return route('billing.index', ['subdomain' => $tenant->slug]);
     }
 }

@@ -12,15 +12,14 @@ use App\Models\LedgerAccount;
 use App\Models\Tenant;
 use App\Models\TenantPayoutAccount;
 use App\Services\Dues\DuesBalance;
-use App\Services\Finance\LedgerService;
+use App\Services\Finance\CommunityPayouts;
 use App\Services\Finance\PayoutRelease;
 use App\Services\Finance\PayoutSender;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,11 +34,13 @@ final class DuesPayoutController extends Controller
     {
         $this->authorize('read finance');
         $tenant = $this->getTenant();
+        $category = $this->category();
+        $balance = app(CommunityPayouts::class)->balance($category);
 
         $currencies = LedgerAccount::on('landlord')
             ->where('tenant_id', $tenant->id)
             ->whereNull('event_id')
-            ->where('category', LedgerCategoryEnum::Dues)
+            ->where('category', $category)
             ->where('code', LedgerAccount::CODE_ORGANIZER_PAYABLE)
             ->orderBy('currency')
             ->pluck('currency')
@@ -48,18 +49,21 @@ final class DuesPayoutController extends Controller
 
         $accounts = TenantPayoutAccount::where('tenant_id', $tenant->id)->orderByDesc('created_at')->get();
 
-        $payouts = $this->duesPayouts($tenant)
+        $payouts = $this->payouts($tenant)->where('category', $category)
             ->with('payoutAccount')
             ->latest()
             ->limit(100)
             ->get();
 
         return Inertia::render('Tenant/Finance/Payouts', [
+            'category' => $category->value,
+            'categories' => ['dues', 'giving'],
             'balances' => $currencies->map(fn (string $currency): array => [
                 'currency' => $currency,
-                'payable' => $duesBalance->payable($tenant, $currency),
-                'in_flight' => $duesBalance->inFlight($tenant, $currency),
-                'available' => $duesBalance->available($tenant, $currency),
+                'payable' => $balance->payable($tenant, $currency),
+                'in_flight' => $balance->inFlight($tenant, $currency),
+                'available' => $balance->available($tenant, $currency),
+                'pending_refunds' => $category === LedgerCategoryEnum::Giving ? $balance->pendingRefundReservations($tenant, $currency) : 0,
             ])->values(),
             'accounts' => $accounts->map(fn (TenantPayoutAccount $a): array => [
                 'id' => $a->id,
@@ -97,38 +101,13 @@ final class DuesPayoutController extends Controller
      * served one after the other and the second sees the first's payout as
      * in flight instead of both spending the same balance.
      */
-    public function store(StoreDuesPayoutRequest $request, LedgerService $ledgerService, DuesBalance $duesBalance): JsonResponse
+    public function store(StoreDuesPayoutRequest $request, CommunityPayouts $payouts): JsonResponse
     {
-        $tenant = $this->getTenant();
         $validated = $request->validated();
-        $currency = (string) $validated['currency'];
+        $category = LedgerCategoryEnum::from($validated['category'] ?? 'dues');
+        $payout = $payouts->reserve($this->getTenant(), $request->user(), $category, $validated);
 
-        $ledgerService->ensureAccountsExist($tenant, null, $currency, LedgerCategoryEnum::Dues);
-
-        return DB::transaction(function () use ($tenant, $validated, $currency, $duesBalance): JsonResponse {
-            $duesBalance->lockPayableAccount($tenant, $currency);
-
-            $amount = (int) $validated['amount'];
-            $available = $duesBalance->available($tenant, $currency);
-
-            if ($amount > $available) {
-                return response()->json(['message' => "Requested amount ({$amount}) exceeds the available dues balance ({$available})."], 422);
-            }
-
-            $payout = EventPayout::create([
-                'tenant_id' => $tenant->id,
-                'event_id' => null,
-                'category' => LedgerCategoryEnum::Dues,
-                'payout_account_id' => $validated['payout_account_id'],
-                'amount' => $amount,
-                'currency' => $currency,
-                'status' => EventPayout::STATUS_SCHEDULED,
-                'scheduled_at' => $validated['scheduled_at'] ?? null,
-                'note' => $validated['note'] ?? null,
-            ]);
-
-            return response()->json(['id' => $payout->id], 201);
-        });
+        return response()->json(['id' => $payout->id], 201);
     }
 
     /**
@@ -141,49 +120,21 @@ final class DuesPayoutController extends Controller
      * takes. Locks are always taken in the same order, payable account first
      * and then the payout, so a send and a store cannot deadlock.
      */
-    public function send(string $subdomain, string $payout, PayoutSender $payoutSender, LedgerService $ledgerService, DuesBalance $duesBalance): JsonResponse
+    public function send(string $subdomain, string $payout, CommunityPayouts $payouts): JsonResponse
     {
-        $this->authorize('manage payouts');
         $tenant = $this->getTenant();
-        $currency = (string) $this->duesPayouts($tenant)->whereKey($payout)->firstOrFail()->currency;
+        $result = $payouts->send($tenant, request()->user(), $this->payouts($tenant)->whereKey($payout)->firstOrFail());
 
-        $ledgerService->ensureAccountsExist($tenant, null, $currency, LedgerCategoryEnum::Dues);
-
-        return DB::transaction(function () use ($tenant, $payout, $currency, $payoutSender, $duesBalance): JsonResponse {
-            $duesBalance->lockPayableAccount($tenant, $currency);
-            $payoutModel = $this->duesPayouts($tenant)->whereKey($payout)->lockForUpdate()->firstOrFail();
-
-            if (! in_array($payoutModel->status, [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_FAILED], true)) {
-                return response()->json(['message' => 'Only a scheduled or failed payout can be sent.'], 422);
-            }
-
-            if ($payoutModel->status === EventPayout::STATUS_FAILED) {
-                $available = $duesBalance->available($tenant, $currency);
-
-                if ($payoutModel->amount > $available) {
-                    return response()->json(['message' => "This payout ({$payoutModel->amount}) is more than the available dues balance ({$available}), so it cannot be sent again."], 422);
-                }
-            }
-
-            $result = $payoutSender->send($payoutModel, $currency);
-
-            return response()->json(Arr::except($result, 'http_status'), $result['http_status']);
-        });
+        return response()->json(Arr::except($result, 'http_status'), $result['http_status']);
     }
 
     /**
      * Release a dues payout Paystack is holding for a one-time code.
      */
-    public function finalize(Request $request, string $subdomain, string $payout, PayoutRelease $payoutRelease): JsonResponse
+    public function finalize(\App\Http\Requests\Tenant\Giving\FinalizeCommunityPayoutRequest $request, string $subdomain, string $payout, CommunityPayouts $payouts): JsonResponse
     {
-        $this->authorize('manage payouts');
         $tenant = $this->getTenant();
-
-        $validated = $request->validate([
-            'otp' => ['required', 'string', 'max:32'],
-        ]);
-
-        $result = $payoutRelease->release($this->duesPayouts($tenant)->whereKey($payout)->firstOrFail(), $validated['otp']);
+        $result = $payouts->finalize($tenant, $request->user(), $this->payouts($tenant)->whereKey($payout)->firstOrFail(), $request->validated('otp'));
 
         return $result['released']
             ? response()->json(['message' => $result['message'], 'status' => EventPayout::STATUS_PROCESSING])
@@ -193,11 +144,18 @@ final class DuesPayoutController extends Controller
     /**
      * @return Builder<EventPayout>
      */
-    private function duesPayouts(Tenant $tenant): Builder
+    private function payouts(Tenant $tenant): Builder
     {
         return EventPayout::query()
             ->where('tenant_id', $tenant->id)
-            ->where('category', LedgerCategoryEnum::Dues);
+            ->whereIn('category', [LedgerCategoryEnum::Dues, LedgerCategoryEnum::Giving]);
+    }
+
+    private function category(): LedgerCategoryEnum
+    {
+        $input = request()->validate(['category' => ['sometimes', Rule::in(['dues', 'giving'])]]);
+
+        return LedgerCategoryEnum::from($input['category'] ?? 'dues');
     }
 
     private function getTenant(): Tenant

@@ -39,7 +39,7 @@ abstract class MembershipTypeRequest extends FormRequest
             'is_active.required' => 'Say whether the class is active.',
             'is_active.boolean' => 'Active must be true or false.',
             'period.required_with' => 'Choose how often this type is billed, or clear the amount for a type without dues.',
-            'period.enum' => 'Choose monthly, quarterly or yearly.',
+            'period.enum' => 'Choose daily, weekly, monthly, quarterly or yearly.',
         ];
     }
 
@@ -52,6 +52,7 @@ abstract class MembershipTypeRequest extends FormRequest
             'name' => ['required', 'string', 'max:120', $this->uniqueName($ignoreId)],
             'amount' => ['nullable', 'required_with:period', 'integer', 'min:'.DuesCharge::MINIMUM_AMOUNT],
             'currency' => ['required', 'string', 'size:3'],
+            'dues_start_on' => ['nullable', 'date_format:Y-m-d'],
             'period' => ['nullable', 'required_with:amount', Rule::enum(DuesPeriodEnum::class)],
         ];
     }

@@ -236,6 +236,7 @@ function GiftWidget({ event }) {
     const [tributeMessage, setTributeMessage] = useState('');
     const [isAnonymous, setIsAnonymous] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionKey] = useState(() => crypto.randomUUID());
     const [errorMessage, setErrorMessage] = useState('');
     const providers = event.contribution_providers || [];
     const [provider, setProvider] = useState(providers[0] || 'paystack');
@@ -311,7 +312,8 @@ function GiftWidget({ event }) {
                 }
             };
 
-            appendField('amount', numericAmount);
+            appendField('amount', customAmount.trim());
+            appendField('submission_key', submissionKey);
             appendField('contributor_name', contributorName.trim());
             appendField('contributor_phone', contributorPhone.trim());
             appendField('contributor_email', contributorEmail.trim());

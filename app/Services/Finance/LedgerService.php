@@ -57,6 +57,11 @@ final class LedgerService
             ],
         ];
 
+        if ($category === LedgerCategoryEnum::Commerce) {
+            $definitions[LedgerAccount::CODE_BUYER_REFUNDS] = ['name' => 'Buyer Refund Liability', 'type' => LedgerAccount::TYPE_LIABILITY];
+            $definitions[LedgerAccount::CODE_SECURITY_DEPOSITS] = ['name' => 'Refundable Security Deposits', 'type' => LedgerAccount::TYPE_LIABILITY];
+        }
+
         $accounts = [];
         $eventId = $event?->id;
 
@@ -94,9 +99,13 @@ final class LedgerService
         array $entries,
         ?string $userId = null,
         string $currency = 'GHS',
-        ?LedgerCategoryEnum $category = null
+        ?LedgerCategoryEnum $category = null,
+        ?\App\Models\GivingFund $givingFund = null
     ): LedgerTransaction {
         $category = $this->resolveCategory($event, $category);
+        if ($givingFund !== null && ($givingFund->tenant_id !== $tenant->id || $category !== LedgerCategoryEnum::Giving)) {
+            throw new InvalidArgumentException('Giving fund attribution must match the tenant and Giving category.');
+        }
 
         if (empty($entries)) {
             throw new InvalidArgumentException('Cannot post an empty ledger transaction.');
@@ -140,11 +149,12 @@ final class LedgerService
         $accounts = $this->ensureAccountsExist($tenant, $event, $currency, $category);
 
         try {
-            return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts, $category): LedgerTransaction {
+            return DB::connection('landlord')->transaction(function () use ($tenant, $event, $transactionType, $description, $reference, $entries, $userId, $currency, $accounts, $category, $givingFund): LedgerTransaction {
                 $transaction = LedgerTransaction::create([
                     'tenant_id' => $tenant->id,
                     'event_id' => $event?->id,
                     'category' => $category,
+                    'giving_fund_id' => $givingFund?->id,
                     'reference' => $reference,
                     'description' => $description,
                     'transaction_type' => $transactionType,
@@ -515,6 +525,224 @@ final class LedgerService
         ]);
 
         return $transaction;
+    }
+
+    /** @param array<string, mixed> $verifiedAmounts */
+    public function recordStoreSale(\App\Models\StoreOrder $order, \App\Models\StorePaymentAttempt $attempt, array $verifiedAmounts): LedgerTransaction
+    {
+        $capture = \App\Models\StorePaymentObservation::query()->where('attempt_id', $attempt->id)->where('order_id', $order->id)->findOrFail($verifiedAmounts['observation_id'] ?? '');
+        if ($capture->integrity_errors !== [] || ! $capture->account_matches || ! $capture->reference_matches || $attempt->order_id !== $order->id
+            || $attempt->tenant_id !== $order->tenant_id || $capture->amount_pesewas !== $order->charged_pesewas
+            || $capture->gateway_fee_pesewas === null || $capture->gateway_fee_pesewas + $order->platform_fee_pesewas >= $order->charged_pesewas) {
+            throw new InvalidArgumentException('Store sale requires matching original-account captured money.');
+        }
+        $net = $order->charged_pesewas - $capture->gateway_fee_pesewas;
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $net],
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $net - $order->platform_fee_pesewas],
+        ];
+        if ($order->platform_fee_pesewas > 0) {
+            $entries[] = ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $order->platform_fee_pesewas];
+        }
+        $transaction = $this->postTransaction($order->tenant, null, 'commerce_sale', 'Store order '.$order->id, $attempt->reference,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, $order->currency, LedgerCategoryEnum::Commerce);
+        if ($transaction->category !== LedgerCategoryEnum::Commerce || $transaction->event_id !== null) {
+            throw new InvalidArgumentException('Store reference conflicts with another ledger stream.');
+        }
+
+        return $transaction;
+    }
+
+    /**
+     * A venue security deposit is the buyer's money, not earnings: the whole
+     * principal is a refundable liability and the gateway fee waits in expense
+     * until the refund recovers it from the venue.
+     */
+    public function recordVenueSecurityCapture(\App\Models\StoreOrder $order, \App\Models\StorePaymentAttempt $attempt, \App\Models\StorePaymentObservation $capture): LedgerTransaction
+    {
+        if ($capture->integrity_errors !== [] || ! $capture->account_matches || ! $capture->reference_matches || $attempt->order_id !== $order->id
+            || $capture->amount_pesewas !== $order->charged_pesewas || $order->platform_fee_pesewas !== 0
+            || $capture->gateway_fee_pesewas === null || $capture->gateway_fee_pesewas >= $order->charged_pesewas) {
+            throw new InvalidArgumentException('A security deposit requires matching original-account captured money and no commission.');
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->amount_pesewas - $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_SECURITY_DEPOSITS, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $capture->amount_pesewas],
+        ];
+
+        return $this->postTransaction($order->tenant, null, 'venue_security_capture', 'Venue security deposit '.$order->id, $attempt->reference,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, $order->currency, LedgerCategoryEnum::Commerce);
+    }
+
+    public function recordStoreRefund(\App\Models\StoreRefund $refund): LedgerTransaction
+    {
+        $capture = $refund->observation;
+        if ($refund->amount_pesewas < 1 || $refund->provider_status !== 'processed' || $refund->provider_processed_at === null || $capture === null
+            || $capture->order_id !== $refund->order_id || $capture->attempt_id !== $refund->attempt_id || $capture->amount_pesewas !== $refund->amount_pesewas
+            || ! $capture->account_matches || ! $capture->reference_matches || $capture->currency !== 'GHS') {
+            throw new InvalidArgumentException('A store refund requires verified original captured money and provider completion.');
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->seller_debit_pesewas],
+            ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->commission_return_pesewas],
+            ['code' => $this->isSecurityCapture($capture) ? LedgerAccount::CODE_SECURITY_DEPOSITS : LedgerAccount::CODE_BUYER_REFUNDS, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->review_liability_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->amount_pesewas],
+        ];
+        if ($refund->review_liability_pesewas === 0 && $refund->fee_bearer === 'platform') {
+            $entries[] = ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $refund->gateway_fee_pesewas];
+        } elseif ($refund->review_liability_pesewas > 0 && $refund->fee_bearer === 'seller') {
+            $entries[] = ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $refund->gateway_fee_pesewas];
+        }
+
+        return $this->postTransaction($refund->order->tenant, null, 'commerce_refund', 'Store refund '.$refund->id, 'store-refund:'.$refund->operation_key,
+            array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
+    public function recordStorePayout(EventPayout $payout, string $reference): LedgerTransaction
+    {
+        if ($payout->category !== LedgerCategoryEnum::Commerce || $payout->event_id !== null || $payout->provider_reference !== $reference || $payout->currency !== 'GHS') {
+            throw new InvalidArgumentException('Store payouts must retain their original commerce reference.');
+        }
+
+        return $this->postTransaction($payout->tenant, null, LedgerTransaction::TYPE_PAYOUT, 'Commerce seller payout', $reference,
+            $this->payoutEntries($payout->amount, $payout->transfer_fee_amount, false), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
+    public function recordStoreCaptureReview(\App\Models\StorePaymentObservation $capture): ?LedgerTransaction
+    {
+        if (! $capture->account_matches || ! $capture->reference_matches || $capture->currency !== 'GHS' || $capture->amount_pesewas === null
+            || $capture->amount_pesewas < 1 || $capture->gateway_fee_pesewas === null || $capture->gateway_fee_pesewas > $capture->amount_pesewas) {
+            return null;
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->amount_pesewas - $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_GATEWAY_FEES, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $capture->gateway_fee_pesewas],
+            ['code' => LedgerAccount::CODE_BUYER_REFUNDS, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $capture->amount_pesewas],
+        ];
+
+        return $this->postTransaction($capture->order->tenant, null, 'commerce_capture_review', 'Captured payment requiring review: '.$capture->order_id,
+            $capture->reference, array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] > 0)), null, 'GHS', LedgerCategoryEnum::Commerce);
+    }
+
+    /** @param array{gateway_fee:int, commission_received:int, credit_used:int} $verifiedAmounts */
+    public function recordGivingPayment(Tenant $tenant, \App\Services\Giving\GivingSource $source, \App\Models\GivingPaymentAttempt $attempt, array $verifiedAmounts): ?LedgerTransaction
+    {
+        if ($source->fund->tenant_id !== $tenant->id || $source->fund->id !== $attempt->fund_id || $source->principal !== $attempt->amount || $source->currency !== $attempt->currency || $attempt->category !== 'giving' || ($source->model instanceof \App\Models\GivingGift && $source->model->source !== 'online')) {
+            throw new InvalidArgumentException('Giving posting must match its online source and frozen attempt.');
+        }
+        $fees = $verifiedAmounts['gateway_fee'];
+        $commission = $attempt->commission_amount;
+        if ($fees < 0 || $fees + $commission > $attempt->amount) {
+            throw new InvalidArgumentException('Giving processing fees and commission exceed the payment.');
+        }
+        if ($attempt->settlement_mode !== Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT) {
+            return $this->recordOwnGatewaySale($tenant, null, 'Giving (own gateway): '.$source->key(), $attempt->reference,
+                $attempt->amount, $commission, $fees, $attempt->provider, $verifiedAmounts['commission_received'], $verifiedAmounts['credit_used'],
+                [], $attempt->provider_reference, LedgerTransaction::TYPE_GIVING_PAYMENT, LedgerCategoryEnum::Giving,
+                'Recorded Giving commission', $attempt->currency, $source->fund);
+        }
+        $entries = [
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $attempt->amount - $fees],
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $attempt->amount - $fees - $commission],
+        ];
+        if ($commission > 0) {
+            $entries[] = ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commission];
+        }
+
+        return $this->postTransaction($tenant, null, LedgerTransaction::TYPE_GIVING_PAYMENT, 'Giving: '.$source->key(), $attempt->reference,
+            $entries, null, $attempt->currency, LedgerCategoryEnum::Giving, $source->fund);
+    }
+
+    public function recordGivingRefund(Tenant $tenant, \App\Services\Giving\GivingSource $source, \App\Models\GivingAdjustment $adjustment): ?LedgerTransaction
+    {
+        $attempt = \App\Models\GivingPaymentAttempt::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('fund_id', $source->fund->id)->where($source->type === 'gift' ? 'gift_id' : 'event_contribution_id', $source->id)->where('state', 'confirmed')->firstOrFail();
+        if ($adjustment->tenant_id !== $tenant->id || $adjustment->fund_id !== $source->fund->id || $adjustment->gift_id !== $source->columns()['gift_id'] || $adjustment->event_contribution_id !== $source->columns()['event_contribution_id']) {
+            throw new InvalidArgumentException('Refund must match the original Giving source.');
+        }
+        $reversal = $adjustment->commission_reversal;
+        if ($attempt->settlement_mode === Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT) {
+            $net = $adjustment->principal - $reversal - $adjustment->gateway_credit;
+            $entries = [
+                ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => max(0, $net)],
+                ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $reversal],
+                ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $adjustment->principal - $adjustment->gateway_credit],
+            ];
+            if ($net < 0) {
+                $entries[] = ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => -$net];
+            }
+        } else {
+            if ($reversal === 0 && $adjustment->commission_returned === 0) {
+                return null;
+            }
+            $entries = [
+                ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $reversal],
+                ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $adjustment->commission_returned],
+                ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => max(0, $reversal - $adjustment->commission_returned)],
+            ];
+        }
+        if ($attempt->settlement_mode !== Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT && $adjustment->commission_returned > $reversal) {
+            $entries[] = ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $adjustment->commission_returned - $reversal];
+        }
+        $entries = array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] !== 0));
+        $transaction = $this->postTransaction($tenant, null, LedgerTransaction::TYPE_REFUND, 'Giving refund: '.$source->key(), 'giving_refund_'.$adjustment->id, $entries, null, $source->currency, LedgerCategoryEnum::Giving, $source->fund);
+        if ($transaction->wasRecentlyCreated && $adjustment->credit_restored > 0) {
+            app(CommissionCredit::class)->grant($tenant, $source->currency, $adjustment->credit_restored);
+        }
+
+        return $transaction;
+    }
+
+    /** Full member-ticket refund using the original captured amounts, never current commercial terms. */
+    public function recordMemberBenefitRefund(\App\Models\EventMemberBenefitAttempt $attempt, int $gatewayCredit, int $commissionReturned): ?LedgerTransaction
+    {
+        $registration = $attempt->registration;
+        $event = Event::withoutGlobalScopes()->where('tenant_id', $attempt->tenant_id)->findOrFail($registration->event_id);
+        $tenant = $attempt->tenant;
+        if ($registration->tenant_id !== $attempt->tenant_id || $gatewayCredit < 0 || $gatewayCredit > (int) $attempt->gateway_fee_amount || $commissionReturned < 0 || $commissionReturned > $attempt->platform_fee_amount) {
+            throw new InvalidArgumentException('Refund amounts and ownership must match the original member payment.');
+        }
+        $commission = $attempt->platform_fee_amount;
+        $reference = 'member_refund_'.$attempt->id;
+        $platform = $attempt->settlement_mode === Tenant::SETTLEMENT_MODE_PLATFORM_DEFAULT;
+        $entries = $platform ? [
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $attempt->charged_amount - $commission - $gatewayCredit],
+            ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $commission],
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $attempt->charged_amount - $gatewayCredit],
+        ] : [
+            ['code' => LedgerAccount::CODE_PLATFORM_REVENUE, 'direction' => LedgerEntry::DIRECTION_DEBIT, 'amount' => $commission],
+            ['code' => LedgerAccount::CODE_GATEWAY_CLEARING, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commissionReturned],
+            ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commission - $commissionReturned],
+        ];
+        if ($platform && $attempt->charged_amount - $commission - $gatewayCredit < 0) {
+            $entries[0]['amount'] = 0;
+            $entries[] = ['code' => LedgerAccount::CODE_ORGANIZER_PAYABLE, 'direction' => LedgerEntry::DIRECTION_CREDIT, 'amount' => $commission + $gatewayCredit - $attempt->charged_amount];
+        }
+        $entries = array_values(array_filter($entries, fn (array $entry): bool => $entry['amount'] !== 0));
+        $transaction = $entries !== [] ? $this->postTransaction($tenant, $event, LedgerTransaction::TYPE_REFUND, 'Member ticket refund', $reference, $entries, null, $attempt->currency) : null;
+        if ($transaction?->wasRecentlyCreated && ! $platform) {
+            $credit = (int) ($attempt->commission_settlement['actual_credit_used'] ?? 0);
+            if ($attempt->provider === 'paystack') {
+                $credit += (int) ($attempt->commission_settlement['actual_received'] ?? 0);
+            }
+            app(CommissionCredit::class)->grant($tenant, $attempt->currency, min($commission - $commissionReturned, $credit));
+        }
+        EventLedgerEntry::firstOrCreate(['tenant_id' => $tenant->id, 'type' => EventLedgerEntry::TYPE_REFUND, 'provider_reference' => $reference],
+            ['event_id' => $event->id, 'registration_id' => $registration->id, 'gross_amount' => $attempt->charged_amount,
+                'gateway_fee_amount' => $gatewayCredit, 'commission_amount' => $commission,
+                'net_amount' => -($attempt->charged_amount - $commission - $gatewayCredit), 'currency' => $attempt->currency, 'provider' => $attempt->provider]);
+
+        return $transaction;
+    }
+
+    public function recordGivingPayout(Tenant $tenant, EventPayout $payout, string $reference, int $transferFee): LedgerTransaction
+    {
+        if ($payout->tenant_id !== $tenant->id || $payout->category !== LedgerCategoryEnum::Giving || $payout->event_id !== null) {
+            throw new InvalidArgumentException('Payout must belong to the organisation Giving pool.');
+        }
+
+        return $this->postTransaction($tenant, null, LedgerTransaction::TYPE_PAYOUT, 'Giving payout', $reference,
+            $this->payoutEntries($payout->amount, $transferFee, false), null, $payout->currency, LedgerCategoryEnum::Giving);
     }
 
     /**
@@ -1084,6 +1312,11 @@ final class LedgerService
         ];
     }
 
+    private function isSecurityCapture(\App\Models\StorePaymentObservation $capture): bool
+    {
+        return LedgerTransaction::withoutGlobalScopes()->whereKey($capture->ledger_transaction_id)->value('transaction_type') === 'venue_security_capture';
+    }
+
     /**
      * The category a posting belongs to: an explicit one, or `event` when an
      * event is given. Money with no event must say what it is.
@@ -1129,6 +1362,7 @@ final class LedgerService
         LedgerCategoryEnum $category,
         string $feeLabel,
         string $currency,
+        ?\App\Models\GivingFund $givingFund = null,
     ): ?LedgerTransaction {
         $received = min(max($commissionReceived, 0), $platformFee);
         $credited = min(max($creditUsed, 0), $platformFee - $received);
@@ -1191,7 +1425,8 @@ final class LedgerService
                 $entries,
                 null,
                 $currency,
-                $category
+                $category,
+                $givingFund
             );
         }
 

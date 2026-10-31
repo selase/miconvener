@@ -87,6 +87,9 @@ final class RegisteredUserController extends Controller
             // it: a free signup never reaches the payment callback that assigns a
             // package on the paid path.
             'package_id' => $package->isFree() ? $package->id : null,
+            // Settled in USD when the visitor signs up from outside Ghana, and kept
+            // so; a Ghana visitor's region stays open until evidence of Ghana exists.
+            'pricing_region' => app(\App\Services\Pricing\VisitorCurrency::class)->forVisitor($request) === 'USD' ? \App\Services\Pricing\GhanaEligibility::REGION_INTERNATIONAL : null,
         ]);
 
         // Provision tenant database and run migrations

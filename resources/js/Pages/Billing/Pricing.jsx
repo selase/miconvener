@@ -27,33 +27,36 @@ export default function Pricing({ packages, currentPackageSlug, currency = 'GHS'
         <ConsoleLayout>
             <PageHeader
                 title="Plans"
-                actions={
-                    <Button href={route('billing.addons.index')}>
-                        Modular Add-Ons
-                    </Button>
-                }
+                actions={<Button href={route('billing.addons.index')}>Modular Add-Ons</Button>}
             />
 
             <div className="px-4 py-6 sm:px-8">
-                <SegmentedControl
-                    value={interval}
-                    onChange={setInterval}
-                    options={[
-                        { value: 'month', label: 'Monthly' },
-                        { value: 'year', label: 'Yearly' },
-                    ]}
-                />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <SegmentedControl
+                        value={interval}
+                        onChange={setInterval}
+                        options={[
+                            { value: 'month', label: 'Monthly' },
+                            { value: 'year', label: 'Yearly' },
+                        ]}
+                    />
+                </div>
 
                 <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
                     {packages.map((pkg) => {
                         const isCurrent = pkg.slug === currentPackageSlug;
-                        const price = interval === 'year' ? pkg.yearly_price : pkg.price;
+                        const priceLabel =
+                            interval === 'year' ? pkg.yearly_price_label : pkg.price_label;
+                        const chargeNote =
+                            interval === 'year' ? pkg.yearly_charge_note : pkg.charge_note;
 
                         return (
                             <div
                                 key={pkg.id}
                                 className={`flex flex-col rounded-lg border p-6 transition-all ${
-                                    isCurrent ? 'border-accent bg-accent-soft/20' : 'border-border bg-surface'
+                                    isCurrent
+                                        ? 'border-accent bg-accent-soft/20'
+                                        : 'border-border bg-surface'
                                 }`}
                             >
                                 <div className="flex items-center justify-between">
@@ -65,13 +68,7 @@ export default function Pricing({ packages, currentPackageSlug, currency = 'GHS'
                                     )}
                                 </div>
                                 <div className="num mt-2 text-3xl font-extrabold text-ink">
-                                    {pkg.is_free ? (
-                                        'Free'
-                                    ) : pkg.is_custom ? (
-                                        'Custom'
-                                    ) : (
-                                        `${currency} ${price.toFixed(2)}`
-                                    )}
+                                    {pkg.is_free ? 'Free' : pkg.is_custom ? 'Custom' : priceLabel}
                                     {!pkg.is_free && !pkg.is_custom && (
                                         <span className="text-sm font-medium text-ink-secondary">
                                             /{interval}
@@ -81,6 +78,11 @@ export default function Pricing({ packages, currentPackageSlug, currency = 'GHS'
                                 {pkg.is_custom && (
                                     <div className="mt-1 text-xs text-ink-secondary">
                                         Negotiated limits & terms
+                                    </div>
+                                )}
+                                {!pkg.is_free && !pkg.is_custom && chargeNote && (
+                                    <div className="mt-1 text-xs text-ink-secondary">
+                                        {chargeNote}
                                     </div>
                                 )}
 
