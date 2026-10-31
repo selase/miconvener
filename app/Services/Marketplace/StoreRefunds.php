@@ -228,7 +228,8 @@ final class StoreRefunds
 
     private function authorize(StoreOrder $order, User $actor): void
     {
-        if (! $this->access->staff($order, $order->tenant, $actor, 'manage store finance')) {
+        $permission = StoreOrder::query()->whereKey($order->id)->value('offering_type') === 'reservation' ? VenueMoneyPermissions::REFUNDS : 'manage store finance';
+        if (! $this->access->staff($order, $order->tenant, $actor, $permission)) {
             throw new AuthorizationException;
         }
     }

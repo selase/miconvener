@@ -17,7 +17,6 @@ use App\Models\VenueBookingAction;
 use App\Models\VenueBookingCharge;
 use App\Models\VenuePaymentResolution;
 use App\Support\WithoutTelescope;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Ramsey\Uuid\Uuid;
 use Throwable;
@@ -41,6 +40,7 @@ final class VenuePaymentReconciliation
         private readonly StorePaymentEvidence $evidence,
         private readonly StorePaymentConfirmer $confirmer,
         private readonly StoreRefunds $refunds,
+        private readonly VenueMoneyPermissions $permissions,
     ) {}
 
     /**
@@ -325,17 +325,7 @@ final class VenuePaymentReconciliation
 
     private function authorize(User $actor, string $tenantId): void
     {
-        $member = User::query()->whereKey($actor->id)->where('tenant_id', $tenantId)->exists() || $actor->tenants()->whereKey($tenantId)->exists();
-        $team = getPermissionsTeamId();
-        try {
-            setPermissionsTeamId($tenantId);
-            $allowed = $member && Gate::forUser($actor->fresh())->allows('manage store finance');
-        } finally {
-            setPermissionsTeamId($team);
-        }
-        if (! $allowed) {
-            throw new \Illuminate\Auth\Access\AuthorizationException;
-        }
+        $this->permissions->authorize($actor, $tenantId, VenueMoneyPermissions::RECONCILE);
     }
 
     private function assertKey(string $operationKey): void

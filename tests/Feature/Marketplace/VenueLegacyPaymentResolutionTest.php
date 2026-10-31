@@ -39,10 +39,12 @@ beforeEach(function (): void {
         'shop_id' => $this->shop->id, 'tenant_id' => $this->tenant->id,
         'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity()),
     ]);
-    Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
+    foreach (['reconcile venue payments', 'manage venue refunds'] as $name) {
+        Permission::query()->firstOrCreate(['name' => $name, 'guard_name' => 'web'], ['category' => 'venue']);
+    }
     $this->finance = User::factory()->create(['tenant_id' => $this->tenant->id]);
     setPermissionsTeamId($this->tenant->id);
-    $this->finance->givePermissionTo('manage store finance');
+    $this->finance->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
     $this->bystander = User::factory()->create(['tenant_id' => $this->tenant->id]);
     app(TenantContext::class)->setTenant($this->tenant);
 
@@ -112,7 +114,7 @@ describe('verifying a conflict payment', function (): void {
         $action = ($this->conflict)($booking);
         ($this->providerSays)($booking);
         $outsider = User::factory()->create(['tenant_id' => Tenant::factory()->create()->id]);
-        $outsider->givePermissionTo('manage store finance');
+        $outsider->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
 
         expect(fn () => ($this->verify)($action, $this->bystander))->toThrow(AuthorizationException::class)
             ->and(fn () => ($this->verify)($action, $outsider))->toThrow(AuthorizationException::class);
@@ -282,7 +284,7 @@ describe('resolving verified money', function (): void {
         ($this->providerSays)($booking);
         $verified = ($this->verify)($action);
         $outsider = User::factory()->create(['tenant_id' => Tenant::factory()->create()->id]);
-        $outsider->givePermissionTo('manage store finance');
+        $outsider->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
 
         foreach ([$this->bystander, $outsider] as $actor) {
             expect(fn () => ($this->reconciliation)()->resolve($verified, $actor, 'refund', 'Return it.', (string) Str::uuid()))->toThrow(AuthorizationException::class);
@@ -350,7 +352,7 @@ it('a venue reconciliation does not borrow purchase-only refund terms', function
         'account_fingerprint' => hash('sha256', app(GivingGateways::class)->platformIdentity())]);
     $this->finance = User::factory()->create(['tenant_id' => $this->tenant->id]);
     setPermissionsTeamId($this->tenant->id);
-    $this->finance->givePermissionTo('manage store finance');
+    $this->finance->givePermissionTo(['reconcile venue payments', 'manage venue refunds']);
     app(TenantContext::class)->setTenant($this->tenant);
     $booking = ($this->booking)();
     $action = ($this->conflict)($booking);

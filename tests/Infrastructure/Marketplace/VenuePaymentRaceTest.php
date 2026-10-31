@@ -232,8 +232,8 @@ it('review legacy conflict recording obeys the money tenant then listing lock or
 
 it('records one full refund when two staff request a refund of the same paid rental together', function (): void {
     $s = venuePaymentScenario();
-    Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
-    $s['host']->givePermissionTo('manage store finance');
+    Permission::query()->firstOrCreate(['name' => 'manage venue refunds', 'guard_name' => 'web'], ['category' => 'venue']);
+    $s['host']->givePermissionTo('manage venue refunds');
     $capture = app(App\Services\Marketplace\StorePaymentEvidence::class)->record($s['attempt'], $s['evidence']);
     app(App\Services\Marketplace\StorePaymentConfirmer::class)->confirm($capture);
     $orderId = $s['attempt']->order_id;

@@ -205,6 +205,9 @@ final class RolePermissions
             'delete notification-rule',
             'manage notification-settings',
             'manage venue',
+            'manage venue refunds',
+            'reconcile venue payments',
+            'release venue settlements',
         ];
     }
 
@@ -284,6 +287,9 @@ final class RolePermissions
             'delete notification-rule',
             'manage notification-settings',
             'manage venue',
+            'manage venue refunds',
+            'reconcile venue payments',
+            'release venue settlements',
         ];
     }
 

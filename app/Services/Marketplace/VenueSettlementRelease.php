@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class VenueSettlementRelease
 {
-    public function __construct(private readonly CommerceOrderLocks $locks, private readonly VenueBookingApprovals $approvals) {}
+    public function __construct(private readonly CommerceOrderLocks $locks, private readonly VenueBookingApprovals $approvals, private readonly VenueMoneyPermissions $permissions) {}
 
     public function complete(VenueBooking $booking, User $actor, string $reason, string $operationKey): VenueFinancialDecision
     {
@@ -35,6 +35,7 @@ final class VenueSettlementRelease
 
         return $this->locks->forBooking($booking->id, function (StoreListing $listing, VenueBooking $locked) use ($actor, $reason, $operationKey, $requestHash): VenueFinancialDecision {
             $this->approvals->assertHost($locked, $actor);
+            $this->permissions->authorize($actor, $locked->tenant_id, VenueMoneyPermissions::SETTLEMENTS);
             $prior = VenueFinancialDecision::query()->where('booking_id', $locked->id)->where('decision', VenueFinancialDecision::COMPLETED)->first();
             if ($prior !== null) {
                 if ($prior->operation_key !== $operationKey || ! hash_equals($prior->request_hash, $requestHash)) {
