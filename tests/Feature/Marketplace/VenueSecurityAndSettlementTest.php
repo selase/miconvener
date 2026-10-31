@@ -341,3 +341,16 @@ it('an extra capture under review prevents settlement release', function (): voi
     $this->travelTo($this->eventStart->addHours(9));
     expect(fn () => app(VenueSettlementRelease::class)->complete($this->booking->fresh(), $this->host, 'Event ended.', (string) Str::uuid()))->toThrow(ValidationException::class);
 });
+
+it('returning the sole late rental capture closes its review order', function (): void {
+    $quote = ($this->accepted)(['payment_plan' => 'full', 'deposit_pesewas' => null, 'balance_due_at' => null]);
+    $attempt = ($this->attemptFor)($quote);
+    $capture = ($this->capture)($attempt, ['paid_at' => $quote->expires_at->toIso8601String()]);
+    expect($capture->processing_state)->toBe('review');
+    ($this->fund)();
+    Http::fake(['*api.paystack.co/refund' => Http::response(['data' => ['id' => 55001, 'status' => 'pending']])]);
+    $refund = app(StoreRefunds::class)->request($capture->order, $this->host, (string) Str::uuid(), 'Return late payment.', $capture->id);
+    ($this->refundFake)($refund);
+    $refund = app(StoreRefunds::class)->reconcile($refund->fresh());
+    expect($refund->status)->toBe('confirmed')->and($capture->order->fresh()->payment_state)->toBe('refunded');
+});
