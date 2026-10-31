@@ -33,6 +33,27 @@ import ContributionWidget from '@/Components/Events/ContributionWidget';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import respondentToken from '@/lib/respondentToken';
 
+/**
+ * Plain text with its web addresses made clickable.
+ */
+function LinkedText({ text }) {
+    return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+            <a
+                key={i}
+                href={part}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all font-medium text-accent underline underline-offset-2 hover:no-underline"
+            >
+                {part}
+            </a>
+        ) : (
+            part
+        )
+    );
+}
+
 function formatDateRange(startsAt, endsAt, timezone) {
     const sameDay =
         new Date(startsAt).toLocaleDateString('en-CA', { timeZone: timezone }) ===
@@ -40,7 +61,16 @@ function formatDateRange(startsAt, endsAt, timezone) {
     const dayOpts = { timeZone: timezone, day: 'numeric', month: 'short', year: 'numeric' };
     const start = new Date(startsAt).toLocaleDateString(undefined, dayOpts);
     const end = new Date(endsAt).toLocaleDateString(undefined, dayOpts);
-    return sameDay ? start : `${start} – ${end}`;
+    if (!sameDay) {
+        return `${start} – ${end}`;
+    }
+    const time = new Date(startsAt).toLocaleTimeString(undefined, {
+        timeZone: timezone,
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+    });
+    return `${start}, ${time}`;
 }
 
 function formatSessionTime(startsAt, endsAt, timezone) {
@@ -1911,15 +1941,17 @@ export default function Show({
     const [copyError, setCopyError] = useState(false);
     const price = lowestPrice(event);
     const interactive = ['qa', 'live', 'contributions'].includes(active);
-    const contributionLabel =
-        event.contribution_title || event.lexicon?.contributions_tab_label || 'Contributions';
+    const hasMessageWall = event.allow_contributions || event.allow_goodwill_messages;
+    const contributionLabel = event.allow_contributions
+        ? event.contribution_title || event.lexicon?.contributions_tab_label || 'Contributions'
+        : event.lexicon?.contributions_tab_label || 'Messages';
     const sections = [
         { key: 'about', label: 'Overview' },
         ...(event.sessions.length ? [{ key: 'schedule', label: 'Programme' }] : []),
         ...(event.speakers.length ? [{ key: 'speakers', label: 'Speakers' }] : []),
         ...(workshops.length ? [{ key: 'workshops', label: 'Workshops' }] : []),
         ...(event.plan_your_visit_content ? [{ key: 'visit', label: 'Plan your visit' }] : []),
-        ...(event.allow_contributions ? [{ key: 'contributions', label: contributionLabel }] : []),
+        ...(hasMessageWall ? [{ key: 'contributions', label: contributionLabel }] : []),
         { key: 'qa', label: 'Q&A' },
         { key: 'live', label: 'Live poll' },
     ];
@@ -1972,7 +2004,11 @@ export default function Show({
                             src={event.hero_image_url}
                             alt={event.name}
                             fetchPriority="high"
-                            className="h-[clamp(220px,28vw,430px)] w-full object-cover"
+                            className={`w-full object-cover ${
+                                event.event_category === 'celebration'
+                                    ? 'h-[clamp(300px,42vw,640px)] object-[center_15%]'
+                                    : 'h-[clamp(220px,28vw,430px)]'
+                            }`}
                         />
                     ) : (
                         <CoverBars height={280} />
@@ -2150,9 +2186,30 @@ export default function Show({
                             <section id="event-about" className="scroll-mt-6 pb-8">
                                 <h2 className={sectionHeading}>About the event</h2>
                                 <p className="whitespace-pre-line text-[15px] leading-7 text-ink-secondary">
-                                    {event.description ||
-                                        'More information about this event will be shared soon.'}
+                                    {event.description ? (
+                                        <LinkedText text={event.description} />
+                                    ) : (
+                                        'More information about this event will be shared soon.'
+                                    )}
                                 </p>
+                                {event.allow_goodwill_messages && !event.allow_contributions && (
+                                    <div className="mt-6 border-l-2 border-accent bg-accent/5 p-5">
+                                        <h3 className="flex items-center gap-2 text-sm font-medium">
+                                            <Heart className="h-4 w-4 text-accent" />
+                                            {event.lexicon?.wall_title}
+                                        </h3>
+                                        <p className="mt-2 text-sm text-ink-secondary">
+                                            {event.lexicon?.wall_subtitle}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => selectSection('contributions')}
+                                            className="mt-4 text-sm font-medium text-accent underline underline-offset-4"
+                                        >
+                                            Leave a message
+                                        </button>
+                                    </div>
+                                )}
                                 {event.allow_contributions && (
                                     <div className="mt-6 border-l-2 border-accent bg-accent/5 p-5">
                                         <h3 className="flex items-center gap-2 text-sm font-medium">

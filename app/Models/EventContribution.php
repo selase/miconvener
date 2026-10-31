@@ -48,6 +48,9 @@ final class EventContribution extends Model
 
     public const string STATUS_COMPLETED = 'completed';
 
+    /** A free goodwill message: no payment is involved, so it is never completed. */
+    public const string STATUS_MESSAGE = 'message';
+
     public const string STATUS_REFUNDED = 'refunded';
 
     public const string STATUS_FAILED = 'failed';

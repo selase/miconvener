@@ -547,6 +547,7 @@ final class EventController extends Controller
 
         $validated = $request->validate([
             'allow_contributions' => ['required', 'boolean'],
+            'allow_goodwill_messages' => ['sometimes', 'boolean'],
             'contribution_title' => ['nullable', 'string', 'max:255'],
             'contribution_description' => ['nullable', 'string', 'max:1000'],
             'contribution_presets' => ['nullable', 'array'],
@@ -1008,6 +1009,7 @@ final class EventController extends Controller
             'contribution_min_amount_pesewas' => $event->contribution_min_amount_pesewas ?? 100,
             'contribution_goal_amount_pesewas' => $event->contribution_goal_amount_pesewas,
             'show_tribute_wall' => (bool) $event->show_tribute_wall,
+            'allow_goodwill_messages' => (bool) $event->allow_goodwill_messages,
             'show_contributor_amounts' => (bool) $event->show_contributor_amounts,
             'is_recurring' => (bool) $event->is_recurring,
             'recurrence_pattern' => $event->recurrence_pattern,
