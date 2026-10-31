@@ -43,6 +43,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
         contribution_goal_amount: event.contribution_goal_amount_pesewas
             ? (event.contribution_goal_amount_pesewas / 100).toString()
             : '',
+        allow_goodwill_messages: Boolean(event.allow_goodwill_messages),
         show_tribute_wall: event.show_tribute_wall !== false,
         show_contributor_amounts: Boolean(event.show_contributor_amounts),
     });
@@ -73,6 +74,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                 preserveScroll: true,
                 data: {
                     allow_contributions: data.allow_contributions,
+                    allow_goodwill_messages: data.allow_goodwill_messages,
                     contribution_title: data.contribution_title,
                     contribution_description: data.contribution_description,
                     contribution_presets: presetsArray,
@@ -201,7 +203,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                     />
                 </div>
                 <div className="flex items-center gap-2">
-                    {['all', 'completed', 'pending_payment', 'failed'].map((st) => (
+                    {['all', 'completed', 'message', 'pending_payment', 'failed'].map((st) => (
                         <button
                             key={st}
                             type="button"
@@ -216,6 +218,8 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                                 ? 'All'
                                 : st === 'completed'
                                 ? 'Completed'
+                                : st === 'message'
+                                ? 'Messages'
                                 : st === 'pending_payment'
                                 ? 'Pending'
                                 : 'Failed'}
@@ -239,8 +243,9 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                     {filteredContributions.length > 0 ? (
                         filteredContributions.map((c) => {
                             const isCompleted = c.status === 'completed';
-                            const pillStatus = isCompleted ? 'success' : c.status === 'pending_payment' ? 'pending' : 'failed';
-                            const statusLabel = isCompleted ? 'Completed' : c.status === 'pending_payment' ? 'Pending' : c.status;
+                            const isMessage = c.status === 'message';
+                            const pillStatus = isCompleted || isMessage ? 'success' : c.status === 'pending_payment' ? 'pending' : 'failed';
+                            const statusLabel = isCompleted ? 'Completed' : isMessage ? 'Message' : c.status === 'pending_payment' ? 'Pending' : c.status;
 
                             return (
                                 <Tr key={c.id}>
@@ -264,7 +269,7 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                                     </Td>
                                     <Td>
                                         <div className="font-semibold text-ink">
-                                            {formatMoney(c.amount, c.currency)}
+                                            {isMessage ? 'Message only' : formatMoney(c.amount, c.currency)}
                                         </div>
                                         {isCompleted && c.net_amount > 0 && (
                                             <div className="text-[11px] text-success-fg">
@@ -360,6 +365,20 @@ export default function ContributionsPanel({ event, contributions = [], stats = 
                             Enable voluntary contributions for this event
                         </span>
                     </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={data.allow_goodwill_messages}
+                            onChange={(e) => setData('allow_goodwill_messages', e.target.checked)}
+                            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                        />
+                        <span className="text-sm font-medium text-ink">
+                            Let guests leave a free message (no gift needed)
+                        </span>
+                    </label>
+                    <p className="-mt-2 text-xs text-ink-secondary">
+                        Free messages wait here until you approve them, then show on the wall.
+                    </p>
                     {event.contribution_fee_note && (
                         <p className="-mt-2 text-xs text-ink-secondary">{event.contribution_fee_note}</p>
                     )}

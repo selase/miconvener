@@ -760,15 +760,16 @@ final class PublicEventController extends Controller
             'contribution_min_amount_pesewas' => $event->contribution_min_amount_pesewas ?? 100,
             'contribution_goal_amount_pesewas' => $event->contribution_goal_amount_pesewas,
             'show_tribute_wall' => (bool) $event->show_tribute_wall,
+            'allow_goodwill_messages' => $event->allowsGoodwillMessages(),
             'show_contributor_amounts' => (bool) $event->show_contributor_amounts,
             'contributions_total_pesewas' => $event->allow_contributions ? (int) $event->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->sum('amount') : 0,
             'contributions_count' => $event->allow_contributions ? (int) $event->contributions()->where('status', \App\Models\EventContribution::STATUS_COMPLETED)->count() : 0,
-            'tributes' => $event->allow_contributions && $event->show_tribute_wall ? $event->contributions()
-                ->where('status', \App\Models\EventContribution::STATUS_COMPLETED)
+            'tributes' => $event->hasMessageWall() && $event->show_tribute_wall ? $event->contributions()
+                ->whereIn('status', [\App\Models\EventContribution::STATUS_COMPLETED, \App\Models\EventContribution::STATUS_MESSAGE])
                 ->where('is_approved', true)
                 ->whereNotNull('tribute_message')
                 ->where('tribute_message', '!=', '')
-                ->orderByDesc('paid_at')
+                ->orderByDesc('created_at')
                 ->limit(50)
                 ->get()
                 ->map(fn (\App\Models\EventContribution $c): array => [

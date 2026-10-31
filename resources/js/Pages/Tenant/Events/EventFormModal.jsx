@@ -180,6 +180,7 @@ export default function EventFormModal({ mode, event, onClose }) {
                         <option value="academic">🎓 Academic / Course, Lecture & Seminar</option>
                         <option value="conference">💼 Conference / Summit & Corporate</option>
                         <option value="fundraiser">🎗️ Nonprofit / Charity & Fundraiser</option>
+                        <option value="celebration">🎉 Celebration / Birthday, Anniversary & Milestone</option>
                     </Select>
                     <p className="mt-1 text-xs text-ink-secondary">
                         MiConvener automatically tailors giving terms, schedules, and occurrence

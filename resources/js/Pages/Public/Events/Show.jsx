@@ -24,6 +24,27 @@ import ContributionWidget from '@/Components/Events/ContributionWidget';
 import csrfFetch, { csrfFetchFormData } from '@/lib/csrfFetch';
 import respondentToken from '@/lib/respondentToken';
 
+/**
+ * Plain text with its web addresses made clickable.
+ */
+function LinkedText({ text }) {
+    return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+            <a
+                key={i}
+                href={part}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all font-medium text-accent underline underline-offset-2 hover:no-underline"
+            >
+                {part}
+            </a>
+        ) : (
+            part
+        )
+    );
+}
+
 function formatDateRange(startsAt, endsAt, timezone) {
     const sameDay =
         new Date(startsAt).toLocaleDateString('en-CA', { timeZone: timezone }) ===
@@ -31,7 +52,16 @@ function formatDateRange(startsAt, endsAt, timezone) {
     const dayOpts = { timeZone: timezone, day: 'numeric', month: 'short', year: 'numeric' };
     const start = new Date(startsAt).toLocaleDateString(undefined, dayOpts);
     const end = new Date(endsAt).toLocaleDateString(undefined, dayOpts);
-    return sameDay ? start : `${start} – ${end}`;
+    if (!sameDay) {
+        return `${start} – ${end}`;
+    }
+    const time = new Date(startsAt).toLocaleTimeString(undefined, {
+        timeZone: timezone,
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+    });
+    return `${start}, ${time}`;
 }
 
 function formatSessionTime(startsAt, endsAt, timezone) {
@@ -1642,10 +1672,14 @@ export default function Show({ event, org, isPrivate = false }) {
 
     const sections = useMemo(() => {
         const list = [{ key: 'about', label: 'About' }];
-        if (event.allow_contributions) {
+        if (event.allow_contributions || event.allow_goodwill_messages) {
             list.push({
                 key: 'contributions',
-                label: event.contribution_title || event.lexicon?.contributions_tab_label || 'Contributions',
+                label: event.allow_contributions
+                    ? event.contribution_title ||
+                      event.lexicon?.contributions_tab_label ||
+                      'Contributions'
+                    : event.lexicon?.contributions_tab_label || 'Messages',
             });
         }
         if (event.sessions.length > 0) list.push({ key: 'schedule', label: 'Programme' });
@@ -1666,7 +1700,11 @@ export default function Show({ event, org, isPrivate = false }) {
                 <img
                     src={event.hero_image_url}
                     alt={event.name}
-                    className="h-56 w-full border-b border-border object-cover sm:h-72"
+                    className={`w-full border-b border-border object-cover ${
+                        event.event_category === 'celebration'
+                            ? 'h-72 object-[center_15%] sm:h-[34rem]'
+                            : 'h-56 sm:h-72'
+                    }`}
                 />
             ) : (
                 <CoverBars height={220} />
@@ -1712,7 +1750,7 @@ export default function Show({ event, org, isPrivate = false }) {
                     </div>
                     <div className="border-r border-border py-4 px-5">
                         <span className="block text-[11.5px] text-ink-tertiary">Where</span>
-                        <b className="mt-1.5 block truncate text-[14px] font-normal text-ink">
+                        <b className="mt-1.5 block break-words text-[14px] font-normal text-ink">
                             {event.location_type === 'virtual' ? 'Virtual' : event.address}
                         </b>
                     </div>
@@ -1799,9 +1837,34 @@ export default function Show({ event, org, isPrivate = false }) {
                                 </div>
                             )}
 
+                            {event.allow_goodwill_messages && !event.allow_contributions && (
+                                <div className="mb-8 flex flex-col justify-between gap-4 rounded-xl border border-accent/25 bg-accent/5 p-4 sm:flex-row sm:items-center sm:p-5">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+                                            <Heart className="h-4.5 w-4.5 fill-current" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-ink">
+                                                {event.lexicon?.wall_title}
+                                            </h4>
+                                            <p className="mt-0.5 text-xs text-ink-secondary">
+                                                {event.lexicon?.wall_subtitle}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActive('contributions')}
+                                        className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent/90"
+                                    >
+                                        Leave a message
+                                    </button>
+                                </div>
+                            )}
+
                             {event.description ? (
                                 <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
-                                    {event.description}
+                                    <LinkedText text={event.description} />
                                 </p>
                             ) : (
                                 <p className="text-[14px] text-ink-secondary">
@@ -1849,8 +1912,10 @@ export default function Show({ event, org, isPrivate = false }) {
                                     Ready to attend {event.name}?
                                 </h4>
                                 <p className="mt-1 text-[13px] text-ink-secondary">
-                                    Join us in person or online. Tickets from{' '}
-                                    {formatMoney(price, event.currency)}.
+                                    Join us in person or online.{' '}
+                                    {event.is_free
+                                        ? 'Free to attend.'
+                                        : `Tickets from ${formatMoney(price, event.currency)}.`}
                                 </p>
                             </div>
                             <button
