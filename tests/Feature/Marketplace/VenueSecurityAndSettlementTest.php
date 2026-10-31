@@ -316,3 +316,28 @@ describe('releasing earnings after the event', function (): void {
         expect(fn () => app(StoreRefunds::class)->request($paid->order, $this->host, (string) Str::uuid(), 'Too late.'))->toThrow(ValidationException::class);
     });
 });
+
+it('refunding an extra rental capture preserves the valid paid booking', function (): void {
+    $quote = ($this->accepted)(['payment_plan' => 'full', 'deposit_pesewas' => null, 'balance_due_at' => null]);
+    $paid = ($this->pay)($quote);
+    $extra = StorePaymentAttempt::factory()->create(['order_id' => $paid->order_id, 'status' => 'ready']);
+    $review = ($this->capture)($extra);
+    expect($review->processing_state)->toBe('review');
+    ($this->fund)();
+    Http::fake(['*api.paystack.co/refund' => Http::response(['data' => ['id' => 55001, 'status' => 'pending']])]);
+    $refund = app(StoreRefunds::class)->request($paid->order, $this->host, (string) Str::uuid(), 'Return extra capture.', $review->id);
+    ($this->refundFake)($refund);
+    app(StoreRefunds::class)->reconcile($refund->fresh());
+    expect($this->booking->fresh()->status)->toBe(VenueBooking::STATUS_CONFIRMED)
+        ->and($paid->order->fresh()->payment_state)->toBe('paid');
+});
+
+it('an extra capture under review prevents settlement release', function (): void {
+    $quote = ($this->accepted)(['payment_plan' => 'full', 'deposit_pesewas' => null, 'balance_due_at' => null]);
+    $paid = ($this->pay)($quote);
+    $extra = StorePaymentAttempt::factory()->create(['order_id' => $paid->order_id, 'status' => 'ready']);
+    $review = ($this->capture)($extra);
+    expect($review->processing_state)->toBe('review');
+    $this->travelTo($this->eventStart->addHours(9));
+    expect(fn () => app(VenueSettlementRelease::class)->complete($this->booking->fresh(), $this->host, 'Event ended.', (string) Str::uuid()))->toThrow(ValidationException::class);
+});

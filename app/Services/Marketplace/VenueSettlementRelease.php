@@ -69,7 +69,8 @@ final class VenueSettlementRelease
         }
         $orders = VenueBookingCharge::query()->where('booking_id', $booking->id)->pluck('order_id');
         $open = StoreRefund::query()->whereIn('order_id', $orders)->where('status', '<>', 'confirmed')->exists()
-            || StorePaymentObservation::query()->whereIn('order_id', $orders)->where('processing_state', 'pending')->exists()
+            || StorePaymentObservation::query()->whereIn('order_id', $orders)->whereIn('processing_state', ['pending', 'review'])
+                ->whereNotIn('id', StoreRefund::query()->where('status', 'confirmed')->whereNotNull('observation_id')->select('observation_id'))->exists()
             || StoreOrder::query()->whereIn('id', $orders)->where('payment_state', 'captured_review')->exists();
         if ($open) {
             $this->refuse('Resolve the open refund or payment review before completing this booking.');

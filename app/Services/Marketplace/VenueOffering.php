@@ -183,6 +183,10 @@ final class VenueOffering implements CommerceOffering
 
             return;
         }
+        if ($refund->observation?->processing_state !== 'posted') {
+            return;
+        }
+
         if ($charge->purpose === VenueBookingCharge::SECURITY) {
             $order->update(['payment_state' => 'refunded', 'ledger_state' => 'posted', 'review_reason' => null]);
 
