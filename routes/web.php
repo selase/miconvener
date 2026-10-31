@@ -352,6 +352,8 @@ Route::post('/marketplace/shops/{shop:slug}/quotes', [App\Http\Controllers\Marke
     ->middleware('throttle:30,1')->name('store.quotes.create');
 Route::post('/my/store-orders/{order}/checkout', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'start'])
     ->middleware('throttle:30,1')->whereUuid('order')->name('store.checkout.start');
+Route::post('/my/venue-charges/{charge}/checkout', [App\Http\Controllers\Marketplace\VenueChargeController::class, 'start'])
+    ->middleware('throttle:30,1')->whereUuid('charge')->name('venue.charges.checkout');
 Route::get('/marketplace/checkout/{reference}/callback', [App\Http\Controllers\Marketplace\StoreCheckoutController::class, 'callback'])
     ->middleware('throttle:30,1')->name('store.checkout.callback');
 

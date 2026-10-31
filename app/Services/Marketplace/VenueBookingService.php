@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\VenueBooking;
 use App\Models\VenueBookingAction;
+use App\Services\Giving\GivingGateways;
 use App\Services\Payment\PaystackGateway;
 use App\Services\Venue\VenueCalendarLocks;
 use Carbon\Carbon;
@@ -29,6 +30,7 @@ final class VenueBookingService
         private readonly VenueAvailabilityService $availabilityService,
         private readonly VenueCalendarLocks $locks,
         private readonly VenueBookingApprovals $approvals,
+        private readonly CommerceOrderLocks $moneyLocks,
     ) {}
 
     /**
@@ -285,9 +287,9 @@ final class VenueBookingService
             throw new RuntimeException("Venue booking not found for Paystack reference: {$reference}");
         }
 
-        // 3. Confirm under the same calendar lock as every other writer. A payment
+        // 3. Confirm under the money lock order (tenant, listing, booking), which is also the calendar writers' order. A payment
         // that can no longer be honoured is kept as evidence, never as a reservation.
-        [$booking, $confirmed] = $this->locks->forBooking($found->id, function (StoreListing $listing, VenueBooking $booking) use ($reference, $gatewayData): array {
+        [$booking, $confirmed] = $this->moneyLocks->forBooking($found->id, function (StoreListing $listing, VenueBooking $booking) use ($reference, $gatewayData): array {
             if ($booking->paystack_reference === $reference) {
                 return [$booking, false];
             }
@@ -377,6 +379,7 @@ final class VenueBookingService
             return;
         }
 
+        $this->claimLegacyReference($booking, $reference);
         $operationKey = $this->paymentConflictKey($reference);
 
         $evidence = [
@@ -413,6 +416,7 @@ final class VenueBookingService
      */
     private function settleLegacyPayment(VenueBooking $booking, string $reference, array $gatewayData): void
     {
+        $this->claimLegacyReference($booking, $reference);
         $buyerFee = (int) $booking->buyer_fee_pesewas;
         $amountPaid = (int) ($gatewayData['amount'] ?? $booking->deposit_required_pesewas + $buyerFee);
         $gatewayFee = (int) ($gatewayData['fees'] ?? 0);
@@ -447,6 +451,15 @@ final class VenueBookingService
                 buyerFee: $buyerFee,
             );
         }
+    }
+
+    /**
+     * Record that this older payment path owns the provider reference, so the
+     * common commerce path can never treat the same money as a second sale.
+     */
+    private function claimLegacyReference(VenueBooking $booking, string $reference): void
+    {
+        app(CommercePaymentReferences::class)->claimForLegacyBooking($booking, 'paystack', hash('sha256', app(GivingGateways::class)->platformIdentity()), $reference);
     }
 
     private function sendGuestConfirmation(VenueBooking $booking): void

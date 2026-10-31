@@ -31,7 +31,7 @@ final class GenerateMonthlyInvoices extends Command
      */
     public function handle(InvoicingService $invoicingService): void
     {
-        $monthStr = $this->option('month') ?: now()->subMonth()->format('Y-m');
+        $monthStr = $this->option('month') ?: now()->subMonthNoOverflow()->format('Y-m');
         $start = Carbon::parse($monthStr)->startOfMonth();
         $end = Carbon::parse($monthStr)->endOfMonth();
 

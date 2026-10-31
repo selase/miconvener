@@ -61,7 +61,7 @@ final class BillingController extends Controller
             ]);
 
         // Analytics: Last 6 months revenue
-        $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
+        $sixMonthsAgo = now()->subMonthsNoOverflow(5)->startOfMonth();
         $monthlyData = Transaction::where('tenant_id', $tenant->id)
             ->whereIn('status', ['success', 'succeeded'])
             ->where('created_at', '>=', $sixMonthsAgo)
@@ -70,7 +70,7 @@ final class BillingController extends Controller
 
         $monthlyStats = [];
         for ($i = 5; $i >= 0; $i--) {
-            $monthLabel = now()->subMonths($i)->format('M');
+            $monthLabel = now()->subMonthsNoOverflow($i)->format('M');
             $total = $monthlyData->get($monthLabel, collect())->sum('amount');
 
             $monthlyStats[] = [

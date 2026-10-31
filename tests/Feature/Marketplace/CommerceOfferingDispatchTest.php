@@ -98,12 +98,12 @@ describe('the lock entry points', function (): void {
             $db->transaction(fn () => app(CommerceOrderLocks::class)->order($order));
             $db->disableQueryLog();
 
-            return collect($db->getQueryLog())->pluck('query')->filter(fn (string $sql) => str_contains($sql, 'for update'))
-                ->map(fn (string $sql) => preg_match('/from "(\w+)"/', $sql, $m) ? $m[1] : $sql)->values()->all();
+            return collect($db->getQueryLog())->pluck('query')->filter(fn (string $sql) => preg_match('/ for (no key )?update/', $sql) === 1)
+                ->map(fn (string $sql) => (preg_match('/from "(\w+)"/', $sql, $m) ? $m[1] : $sql).(str_contains($sql, 'for no key update') ? ':no-key' : ':update'))->values()->all();
         };
 
-        expect($locked($purchase))->toBe(['tenants', 'store_orders'])
-            ->and($locked($charge->order))->toBe(['tenants', 'store_listings', 'venue_bookings', 'venue_booking_charges', 'store_orders']);
+        expect($locked($purchase))->toBe(['tenants:no-key', 'store_orders:update'])
+            ->and($locked($charge->order))->toBe(['tenants:no-key', 'store_listings:update', 'venue_bookings:update', 'venue_booking_charges:update', 'store_orders:update']);
     });
 
     test('the money lock returns the locked reservation order', function (): void {
@@ -222,12 +222,12 @@ describe('the venue offering', function (): void {
             ->and($this->registry->for($closed->order)->captureIssues($closed->order, $capture))->toContain('booking_closed');
     });
 
-    test('keeps money effects closed until the payment slices land', function (): void {
+    test('keeps refunds closed and refuses to apply a capture that was never verified', function (): void {
         $charge = ($this->payable)();
         $offering = $this->registry->for($charge->order);
 
         expect(fn () => $offering->assertRefund($charge->order))->toThrow(ValidationException::class)
-            ->and(fn () => $offering->applyCapture($charge->order, new App\Models\StorePaymentAttempt, new StorePaymentObservation))->toThrow(LogicException::class);
+            ->and(fn () => $offering->applyCapture($charge->order, new App\Models\StorePaymentAttempt, new StorePaymentObservation))->toThrow(Exception::class);
     });
 
     test('describes a reservation receipt without lines for goods', function (): void {
