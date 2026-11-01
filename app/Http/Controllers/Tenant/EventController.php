@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Services\Events\DoorCheckIn;
 use App\Services\Events\EventSections;
 use App\Services\Events\EventWorkspaceSnapshot;
+use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\RecurrenceService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -671,6 +672,7 @@ final class EventController extends Controller
         $snapshot = app(EventWorkspaceSnapshot::class);
         $phase = $snapshot->phase($eventModel);
         $hasActiveGateway = $tenant->canAcceptPayments();
+        $publicUrl = route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]);
         $givingLinks = \App\Models\GivingContributionLink::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('category', 'giving')->pluck('event_contribution_id')->all();
         $canReadGivingFinance = auth()->user()->can('read finance');
 
@@ -726,7 +728,8 @@ final class EventController extends Controller
             'stats' => $section === EventSections::OVERVIEW ? $this->overviewStats($eventModel) : null,
             'hasActiveGateway' => $hasActiveGateway,
             'settlementMode' => $tenant->settlement_mode,
-            'publicUrl' => route('public.events.show', ['subdomain' => $tenant->slug, 'event' => $eventModel->slug]),
+            'publicUrl' => $publicUrl,
+            'publicQr' => $section === EventSections::OVERVIEW ? QrCodeGenerator::svgDataUri($publicUrl, 1024) : null,
             'sections' => $sections->menuFor(request()->user(), $tenant, $eventModel),
             'section' => $section,
             'phase' => $phase,

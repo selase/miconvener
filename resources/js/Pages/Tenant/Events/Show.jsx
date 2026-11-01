@@ -5,6 +5,7 @@ import { router, usePage } from '@inertiajs/react';
 import Button from '@/Components/Console/Button';
 import StatusPill from '@/Components/Console/StatusPill';
 import CopyField from '@/Components/Console/CopyField';
+import ShareQrCard from './panels/ShareQrCard';
 import SegmentedControl from '@/Components/Console/SegmentedControl';
 import { Table, Thead, Th, Tr, Td, TableEmpty } from '@/Components/Console/Table';
 import { Download, Check, X, Pencil, FileText, Clock } from 'lucide-react';
@@ -62,7 +63,7 @@ function formatAmount(amount, currency) {
     return `${currency} ${(amount / 100).toFixed(2)}`;
 }
 
-function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl }) {
+function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl, publicQr }) {
     const [visibility, setVisibilityState] = useState(event.visibility ?? 'public');
 
     // Persisted immediately: a host toggling this is making a confidentiality
@@ -141,6 +142,7 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
             <div>
                 <h3 className="mb-2 text-sm font-semibold text-ink">Public event page</h3>
                 <CopyField value={publicUrl} />
+                <ShareQrCard event={event} qr={publicQr} />
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                     <SegmentedControl
                         value={visibility}
@@ -486,6 +488,7 @@ export default function Show({
     hasActiveGateway,
     settlementMode,
     publicUrl,
+    publicQr,
     sections,
     section,
     badges,
@@ -515,6 +518,7 @@ export default function Show({
                     hasActiveGateway={hasActiveGateway}
                     settlementMode={settlementMode}
                     publicUrl={publicUrl}
+                    publicQr={publicQr}
                 />
             </div>
         ),
