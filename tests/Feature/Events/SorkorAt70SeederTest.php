@@ -32,7 +32,7 @@ test('the celebration is a free, 30 place event with a goodwill wall', function 
         ->and($event->allowsGoodwillMessages())->toBeTrue()
         ->and($event->allowsContributions())->toBeFalse()
         ->and($event->timezone)->toBe('America/New_York')
-        ->and($event->starts_at->setTimezone('America/New_York')->format('Y-m-d H:i'))->toBe('2026-11-14 15:00')
+        ->and($event->starts_at->setTimezone('America/New_York')->format('Y-m-d H:i'))->toBe('2026-11-21 15:00')
         ->and($event->description)->toContain(SorkorAt70Seeder::STORY_URL);
 
     Storage::disk(Event::uploadDisk())->assertExists($event->hero_image_path);
@@ -47,6 +47,16 @@ test('seeding twice updates the event instead of duplicating it', function (): v
 
     expect(Event::query()->where('slug', SorkorAt70Seeder::EVENT_SLUG)->count())->toBe(1)
         ->and(EventTicketType::query()->count())->toBe(1);
+});
+
+test('seeding again keeps an event the organiser has published', function (): void {
+    Tenant::factory()->create(['slug' => SorkorAt70Seeder::TENANT_SLUG, 'isolation_mode' => 'shared']);
+
+    $this->seed(SorkorAt70Seeder::class);
+    Event::query()->where('slug', SorkorAt70Seeder::EVENT_SLUG)->update(['status' => Event::STATUS_PUBLISHED]);
+    $this->seed(SorkorAt70Seeder::class);
+
+    expect(Event::query()->where('slug', SorkorAt70Seeder::EVENT_SLUG)->sole()->status)->toBe(Event::STATUS_PUBLISHED);
 });
 
 test('seeding without the tenant explains what is missing', function (): void {
