@@ -75,6 +75,8 @@ final class Event extends Model
 
     public const string CATEGORY_FUNDRAISER = 'fundraiser';
 
+    public const string CATEGORY_CELEBRATION = 'celebration';
+
     public const array CATEGORIES = [
         self::CATEGORY_GENERAL,
         self::CATEGORY_CONFERENCE,
@@ -82,6 +84,7 @@ final class Event extends Model
         self::CATEGORY_MEMORIAL,
         self::CATEGORY_ACADEMIC,
         self::CATEGORY_FUNDRAISER,
+        self::CATEGORY_CELEBRATION,
     ];
 
     public const string SPEAKER_POLICY_BEFORE = 'before';
@@ -135,6 +138,7 @@ final class Event extends Model
         'currency',
         'hero_image_path',
         'visibility',
+        'show_community_prompts',
         'speaker_slide_policy',
         'plan_your_visit_content',
         'store_listing_id',
@@ -151,6 +155,7 @@ final class Event extends Model
         'contribution_goal_amount_pesewas',
         'show_tribute_wall',
         'show_contributor_amounts',
+        'allow_goodwill_messages',
         'is_recurring',
         'recurrence_pattern',
         'recurrence_days',
@@ -193,6 +198,8 @@ final class Event extends Model
         'contribution_goal_amount_pesewas' => 'integer',
         'show_tribute_wall' => 'boolean',
         'show_contributor_amounts' => 'boolean',
+        'allow_goodwill_messages' => 'boolean',
+        'show_community_prompts' => 'boolean',
         'is_recurring' => 'boolean',
         'recurrence_days' => 'array',
         'recurrence_interval' => 'integer',
@@ -284,6 +291,15 @@ final class Event extends Model
     public function blasts(): HasMany
     {
         return $this->hasMany(EventBlast::class);
+    }
+
+    /**
+     * Whether this event's public page invites visitors to follow the organiser or
+     * learn about its membership. An event with its own audience can switch it off.
+     */
+    public function showsCommunityPrompts(): bool
+    {
+        return (bool) $this->show_community_prompts;
     }
 
     public function isPrivate(): bool
@@ -479,6 +495,22 @@ final class Event extends Model
         return (bool) $this->allow_contributions;
     }
 
+    /**
+     * Whether guests may leave a free message on the wall without giving.
+     */
+    public function allowsGoodwillMessages(): bool
+    {
+        return (bool) $this->allow_goodwill_messages;
+    }
+
+    /**
+     * Whether the contribution tab (money, messages or both) is offered.
+     */
+    public function hasMessageWall(): bool
+    {
+        return $this->allowsContributions() || $this->allowsGoodwillMessages();
+    }
+
     public function allowsOfflinePayments(): bool
     {
         return (bool) $this->allow_offline_payments;
@@ -497,6 +529,11 @@ final class Event extends Model
     public function isMemorial(): bool
     {
         return $this->event_category === self::CATEGORY_MEMORIAL;
+    }
+
+    public function isCelebration(): bool
+    {
+        return $this->event_category === self::CATEGORY_CELEBRATION;
     }
 
     public function isAcademic(): bool

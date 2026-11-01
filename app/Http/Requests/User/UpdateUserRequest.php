@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\User;
 
+use App\Http\Requests\Concerns\NormalisesPhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Propaganistas\LaravelPhone\Rules\Phone;
 
 final class UpdateUserRequest extends FormRequest
 {
+    use NormalisesPhoneNumber;
+
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -31,7 +34,7 @@ final class UpdateUserRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user->id)],
-            'phone_no' => ['required', (new Phone)->country(['GH', 'AUTO'])],
+            'phone_no' => ['required', (new Phone)->international()->country('GH')],
             'roles' => [
                 'required',
                 'array',

@@ -1,6 +1,6 @@
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
 
 /**
  * Inertia's Head, Link and router all reach for an app context that only exists
@@ -13,6 +13,17 @@ vi.mock('@inertiajs/react', () => ({
     Head: () => null,
     Link: ({ href, children, ...rest }) => createElement('a', { href, ...rest }, children),
     usePage: () => ({ props: {}, url: '/', component: '' }),
+    useForm: (initial = {}) => {
+        const [data, setData] = useState(initial);
+        return {
+            data,
+            setData: (key, value) => setData((current) => (typeof key === 'string' ? { ...current, [key]: value } : key)),
+            post: vi.fn(),
+            processing: false,
+            errors: {},
+            reset: vi.fn(),
+        };
+    },
     router: {
         get: vi.fn(),
         post: vi.fn(),
