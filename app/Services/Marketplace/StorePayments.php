@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Marketplace;
 
+use App\Exceptions\CheckoutRejectedException;
 use App\Http\Controllers\Billing\WebhookController;
 use App\Models\StoreOrder;
 use App\Models\StorePaymentAttempt;
@@ -85,6 +86,11 @@ final class StorePayments
                 if ($current->status === 'initializing') {
                     $current->update(['status' => 'ready', 'checkout_url' => $url]);
                 }
+            });
+        } catch (CheckoutRejectedException) {
+            $attempt->getConnection()->transaction(function () use ($attempt): void {
+                $this->locks->order($attempt->order);
+                StorePaymentAttempt::query()->whereKey($attempt->id)->where('status', 'initializing')->update(['status' => 'failed', 'review_reason' => 'initialization_rejected']);
             });
         } catch (Throwable) {
             $attempt->getConnection()->transaction(function () use ($attempt): void {

@@ -26,6 +26,27 @@ it('keeps live event entry email-first without offering phone verification as a 
         window.history.replaceState({}, '', previous);
     }
 });
+it('offers registration to someone opening the attendee area of an upcoming event who has not registered', () => {
+    const previous = window.location.href;
+    window.history.replaceState({}, '', '/my?return_to=%2Fmy%2Fjoin%2Fevent-id');
+    try {
+        render(<MyPortal joinEvent={{ name: 'Sorkor at 70', register_url: 'https://acme.test/e/sorkor?attendee_area=register' }} />);
+        expect(screen.getByText(/Not registered for Sorkor at 70 yet/)).toBeTruthy();
+        expect(screen.getByRole('link', { name: 'Register for this event' }).getAttribute('href')).toBe('https://acme.test/e/sorkor?attendee_area=register');
+    } finally {
+        window.history.replaceState({}, '', previous);
+    }
+});
+it('offers no registration link without an upcoming event to join', () => {
+    const previous = window.location.href;
+    window.history.replaceState({}, '', '/my?return_to=%2Fmy%2Fjoin%2Fevent-id');
+    try {
+        render(<MyPortal />);
+        expect(screen.queryByRole('link', { name: 'Register for this event' })).toBeNull();
+    } finally {
+        window.history.replaceState({}, '', previous);
+    }
+});
 it('offers additive phone proof after email sign-in without discarding the email identity', () => {
     render(
         <MyPortal
