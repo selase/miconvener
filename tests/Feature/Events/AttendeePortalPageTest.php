@@ -65,7 +65,34 @@ test('joining cannot choose another persons registration and fails safely for a 
     [$event, $registration, $host] = portalFor('join-other-email');
     $this->withSession(portalProof('different@example.test'))
         ->get("http://{$host}/my/join/{$event->id}?tab=poll", ['HTTP_HOST' => $host])
+        ->assertRedirect(route('public.events.show', ['subdomain' => $event->tenant->slug, 'event' => $event->slug]).'?attendee_area=register');
+});
+
+test('joining an event that has already finished only explains, instead of inviting registration', function (): void {
+    [$event, , $host] = portalFor('join-finished');
+    $event->update(['starts_at' => now()->subDays(3), 'ends_at' => now()->subDays(3)->addHours(3)]);
+
+    $this->withSession(portalProof('different@example.test'))
+        ->get("http://{$host}/my/join/{$event->id}", ['HTTP_HOST' => $host])
         ->assertRedirect('/my?event_access=not_found');
+});
+
+test('the verify page offers registration for the upcoming event being joined and nothing for any other return', function (): void {
+    [$event, , $host] = portalFor('join-offer');
+    $registerUrl = route('public.events.show', ['subdomain' => $event->tenant->slug, 'event' => $event->slug]).'?attendee_area=register';
+
+    $this->get("http://{$host}/my?return_to=".urlencode('/my/join/'.$event->id.'?tab=forms'), ['HTTP_HOST' => $host])->assertOk()
+        ->assertInertia(fn ($page) => $page->where('joinEvent.name', $event->name)->where('joinEvent.register_url', $registerUrl));
+    $this->get("http://{$host}/my?return_to=".urlencode('/my/store-orders'), ['HTTP_HOST' => $host])->assertOk()
+        ->assertInertia(fn ($page) => $page->where('joinEvent', null));
+    $this->get("http://{$host}/my?return_to=".urlencode('/my/join/not-a-uuid'), ['HTTP_HOST' => $host])->assertOk()
+        ->assertInertia(fn ($page) => $page->where('joinEvent', null));
+    $this->get("http://{$host}/my?return_to=".urlencode('/my/join/'.(string) \Illuminate\Support\Str::uuid()), ['HTTP_HOST' => $host])->assertOk()
+        ->assertInertia(fn ($page) => $page->where('joinEvent', null));
+
+    $event->update(['starts_at' => now()->subDays(3), 'ends_at' => now()->subDays(3)->addHours(3)]);
+    $this->get("http://{$host}/my?return_to=".urlencode('/my/join/'.$event->id), ['HTTP_HOST' => $host])->assertOk()
+        ->assertInertia(fn ($page) => $page->where('joinEvent', null));
 });
 
 test('joining ignores invalid tabs and never revives cancelled registrations', function (): void {
@@ -74,7 +101,7 @@ test('joining ignores invalid tabs and never revives cancelled registrations', f
         ->assertRedirect("http://{$host}/my/events/{$registration->id}?tab=agenda");
     $registration->update(['status' => EventRegistration::STATUS_CANCELLED]);
     $this->withSession(portalProof())->get("http://{$host}/my/join/{$event->id}", ['HTTP_HOST' => $host])
-        ->assertRedirect('/my?event_access=not_found');
+        ->assertRedirect(route('public.events.show', ['subdomain' => $event->tenant->slug, 'event' => $event->slug]).'?attendee_area=register');
 });
 
 test('workspace deep links are passed as a safe initial tab without changing its authorization', function (): void {

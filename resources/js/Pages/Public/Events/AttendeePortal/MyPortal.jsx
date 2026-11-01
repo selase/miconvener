@@ -30,6 +30,7 @@ function LegacyMyPortal({
     organiser = null,
     communityPhoneVerified: phoneAtLoad = false,
     communityReturnUrl = null,
+    joinEvent = null,
     verifiedEmail: provenAtLoad = null,
     initialHistory = null,
     initialCertificates = null,
@@ -617,6 +618,17 @@ function LegacyMyPortal({
                             organiserSlug={selectedOrganiser?.slug}
                             allowPhone={!joiningEvent}
                         />
+                        {joiningEvent && joinEvent && (
+                            <p className="mt-6 text-sm text-ink-secondary">
+                                Not registered for {joinEvent.name} yet?{' '}
+                                <a
+                                    href={joinEvent.register_url}
+                                    className="font-medium text-accent underline"
+                                >
+                                    Register for this event
+                                </a>
+                            </p>
+                        )}
                     </div>
                 )}
                 {(verifiedEmail || phoneVerified) && (

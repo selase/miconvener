@@ -1931,6 +1931,24 @@ export default function Show({
     community = null,
     participation = null,
 }) {
+    const [needsRegistration, setNeedsRegistration] = useState(false);
+    useEffect(() => {
+        setNeedsRegistration(
+            new URLSearchParams(window.location.search).get('attendee_area') === 'register'
+        );
+    }, []);
+    const startRegistration = () => {
+        const section = document.getElementById('register-section');
+        section?.scrollIntoView({
+            behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+                ? 'instant'
+                : 'smooth',
+            block: 'start',
+        });
+        section?.querySelector('input:not([type=hidden]), select, textarea')?.focus({
+            preventScroll: true,
+        });
+    };
     const workshops = useMemo(
         () => event.sessions.filter((session) => session.type === 'workshop'),
         [event.sessions]
@@ -2064,6 +2082,28 @@ export default function Show({
                             </div>
                         )}
                     </section>
+                    {needsRegistration && (
+                        <div
+                            role="status"
+                            className="mb-6 border-l-2 border-accent bg-accent/5 p-5 text-sm text-ink-secondary"
+                        >
+                            <p className="font-medium text-ink">
+                                Register to open the attendee area
+                            </p>
+                            <p className="mt-1">
+                                The email you verified has no registration for this event. Register
+                                below, using the email you want your ticket sent to, and the
+                                attendee area opens once you are registered.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={startRegistration}
+                                className="mt-3 min-h-11 border border-accent px-4 text-sm font-medium text-accent hover:bg-accent hover:text-white"
+                            >
+                                Register now
+                            </button>
+                        </div>
+                    )}
                     <LiveEventAccess participation={participation} />
                     <div className="grid min-w-0 gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:gap-x-12">
                         <header className="min-w-0 lg:col-start-1 lg:row-start-1">
