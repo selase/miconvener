@@ -15,6 +15,7 @@ use App\Services\Events\EventWorkspaceSnapshot;
 use App\Services\Events\QrCodeGenerator;
 use App\Services\Events\RecurrenceService;
 use App\Services\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -896,6 +897,27 @@ final class EventController extends Controller
         // organizer's own pricing decision, so it belongs to them.
 
         unset($validated['hero_image']);
+
+        return $this->withUtcTimes($validated);
+    }
+
+    /**
+     * The form sends the wall-clock time the organiser typed, which means the
+     * time in the event's own timezone. Stored times are UTC, so they are
+     * converted here; a value that already names an offset is left alone.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function withUtcTimes(array $validated): array
+    {
+        foreach (['starts_at', 'ends_at'] as $field) {
+            $value = $validated[$field] ?? null;
+
+            if (is_string($value) && ! preg_match('/(Z|[+-]\d{2}:?\d{2})$/', $value)) {
+                $validated[$field] = CarbonImmutable::parse($value, $validated['timezone'])->utc();
+            }
+        }
 
         return $validated;
     }

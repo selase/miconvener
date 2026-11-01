@@ -11,13 +11,29 @@ const TITLES = {
     edit: 'Edit event',
 };
 
+const TIME_ZONES =
+    typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+
 const MAX_HERO_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
 
-function toDateTimeLocal(iso) {
+// An event's times are shown and typed in the event's own timezone, never the
+// browser's, so an organiser in Accra sees the Maryland event as Maryland time.
+function toDateTimeLocal(iso, timeZone) {
     if (!iso) return '';
-    const date = new Date(iso);
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23',
+        })
+            .formatToParts(new Date(iso))
+            .map(({ type, value }) => [type, value])
+    );
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
 export default function EventFormModal({ mode, event, onClose }) {
@@ -34,8 +50,8 @@ export default function EventFormModal({ mode, event, onClose }) {
         event_category: event?.event_category ?? 'general',
         description: event?.description ?? '',
         status: event?.status ?? 'draft',
-        starts_at: toDateTimeLocal(event?.starts_at) ?? '',
-        ends_at: toDateTimeLocal(event?.ends_at) ?? '',
+        starts_at: toDateTimeLocal(event?.starts_at, event?.timezone ?? 'Africa/Accra') ?? '',
+        ends_at: toDateTimeLocal(event?.ends_at, event?.timezone ?? 'Africa/Accra') ?? '',
         timezone: event?.timezone ?? 'Africa/Accra',
         location_type: event?.location_type ?? 'in_person',
         address: event?.address ?? '',
@@ -202,7 +218,9 @@ export default function EventFormModal({ mode, event, onClose }) {
                         <option value="academic">🎓 Academic / Course, Lecture & Seminar</option>
                         <option value="conference">💼 Conference / Summit & Corporate</option>
                         <option value="fundraiser">🎗️ Nonprofit / Charity & Fundraiser</option>
-                        <option value="celebration">🎉 Celebration / Birthday, Anniversary & Milestone</option>
+                        <option value="celebration">
+                            🎉 Celebration / Birthday, Anniversary & Milestone
+                        </option>
                     </Select>
                     <p className="mt-1 text-xs text-ink-secondary">
                         MiConvener automatically tailors giving terms, schedules, and occurrence
@@ -281,6 +299,19 @@ export default function EventFormModal({ mode, event, onClose }) {
                         error={errors.ends_at}
                     />
                 </div>
+
+                <Select
+                    label="Timezone"
+                    value={data.timezone}
+                    onChange={(e) => setData('timezone', e.target.value)}
+                    error={errors.timezone}
+                >
+                    {[...new Set([data.timezone, ...TIME_ZONES])].map((zone) => (
+                        <option key={zone} value={zone}>
+                            {zone.replaceAll('_', ' ')}
+                        </option>
+                    ))}
+                </Select>
 
                 <div className="rounded-xl border border-border/80 bg-surface-muted/40 p-4 space-y-3.5">
                     <label className="flex items-start gap-3 cursor-pointer">
