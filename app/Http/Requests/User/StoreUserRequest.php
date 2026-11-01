@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\User;
 
+use App\Http\Requests\Concerns\NormalisesPhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Propaganistas\LaravelPhone\Rules\Phone;
 
 final class StoreUserRequest extends FormRequest
 {
+    use NormalisesPhoneNumber;
+
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -34,7 +37,7 @@ final class StoreUserRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users', 'email')],
-            'phone_no' => ['required', (new Phone)->country(['GH', 'AUTO'])],
+            'phone_no' => ['required', (new Phone)->international()->country('GH')],
             'role' => ['nullable', 'exists:roles,id'],
             'roles' => [
                 'required',
