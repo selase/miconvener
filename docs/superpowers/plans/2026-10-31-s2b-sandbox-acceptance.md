@@ -42,7 +42,7 @@ Use the same amounts as the automated tests so results can be compared: hire GHS
 
 - Rental capture: Dr gateway clearing (amount - fee); Cr organiser payable (amount - fee - allocated commission); Cr platform revenue (allocated commission).
 - Security capture: Dr gateway clearing (amount - fee); Dr gateway fees (fee); Cr refundable security (full amount). Payable and revenue unchanged.
-- Rental refund: Dr organiser payable (amount - commission - fee, when the platform funds the processing fee: the fee is subtracted from the seller debit, not added); Dr platform revenue (commission); Cr gateway clearing (amount).
+- Rental refund: Dr organiser payable (amount - commission - fee); Dr gateway fees (fee, the processing fee the platform funds); Dr platform revenue (commission); Cr gateway clearing (amount). The debits sum to the amount credited. The approved default is the venue-funded case: Dr organiser payable (amount - commission); Dr platform revenue (commission); Cr gateway clearing (amount).
 - Security return: Dr refundable security (amount); Dr organiser payable (fee); Cr gateway fees (fee); Cr gateway clearing (amount).
 
 For every step that moves money, dump the ledger transaction and its entries and assert debits equal credits in integer pesewas.
