@@ -55,8 +55,8 @@ final class SorkorAt70Seeder extends Seeder
             'description' => $this->description(),
             'event_category' => Event::CATEGORY_CELEBRATION,
             'visibility' => Event::VISIBILITY_PUBLIC,
-            'starts_at' => Carbon::parse('2026-11-21 15:00', self::TIMEZONE)->utc(),
-            'ends_at' => Carbon::parse('2026-11-21 19:00', self::TIMEZONE)->utc(),
+            'starts_at' => Carbon::parse('2026-11-28 15:00', self::TIMEZONE)->utc(),
+            'ends_at' => Carbon::parse('2026-11-28 19:00', self::TIMEZONE)->utc(),
             'timezone' => self::TIMEZONE,
             'location_type' => Event::LOCATION_IN_PERSON,
             'address' => 'Gaithersburg, Maryland, USA (exact venue to be confirmed)',
@@ -92,7 +92,7 @@ final class SorkorAt70Seeder extends Seeder
 
             Born on 24 October 1956 and raised in James Town, Accra, Sorkor has lived a life of faith, enterprise, courage and service: a seamstress and entrepreneur, a deacon, a voice for her community, a wife, a mother and a grandmother. Seven decades on, her family and friends are gathering to say thank you.
 
-            Saturday 21 November 2026, from 3:00 p.m., in Gaithersburg, Maryland. Entry is free, but places are limited to 30, so please book yours.
+            Saturday 28 November 2026, from 3:00 p.m., in Gaithersburg, Maryland. Entry is free, but places are limited to 30, so please book yours.
 
             Cannot be with us, or have something you want her to hear? Leave a goodwill message on the wall. Every message is read by the family and shared once approved.
 

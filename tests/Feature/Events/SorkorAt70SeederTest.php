@@ -33,7 +33,7 @@ test('the celebration is a free, 30 place event with a goodwill wall', function 
         ->and($event->allowsContributions())->toBeFalse()
         ->and($event->showsCommunityPrompts())->toBeFalse()
         ->and($event->timezone)->toBe('America/New_York')
-        ->and($event->starts_at->setTimezone('America/New_York')->format('Y-m-d H:i'))->toBe('2026-11-21 15:00')
+        ->and($event->starts_at->setTimezone('America/New_York')->format('Y-m-d H:i'))->toBe('2026-11-28 15:00')
         ->and($event->description)->toContain(SorkorAt70Seeder::STORY_URL);
 
     Storage::disk(Event::uploadDisk())->assertExists($event->hero_image_path);
