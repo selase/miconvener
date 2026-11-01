@@ -79,6 +79,16 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
         });
         if (!response.ok) setVisibilityState(previous);
     };
+    const [showCommunity, setShowCommunityState] = useState(event.show_community_prompts ?? true);
+    const setShowCommunity = async (next) => {
+        const previous = showCommunity;
+        setShowCommunityState(next);
+        const response = await csrfFetch(
+            route('tenant.events.community-prompts', { event: event.id }),
+            { method: 'PATCH', body: JSON.stringify({ show_community_prompts: next }) }
+        );
+        if (!response.ok) setShowCommunityState(previous);
+    };
     // Counted on the server: the overview no longer loads every registration.
     const confirmedCount = stats?.confirmed ?? 0;
     const revenue = stats?.collected ?? 0;
@@ -158,6 +168,25 @@ function OverviewTab({ event, stats, hasActiveGateway, settlementMode, publicUrl
                             : 'Anyone with the link sees the full page, including speakers, the agenda and sponsors.'}
                     </p>
                 </div>
+            </div>
+
+            <div>
+                <label className="flex max-w-xl items-start gap-3 text-sm text-ink">
+                    <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={showCommunity}
+                        onChange={(e) => setShowCommunity(e.target.checked)}
+                    />
+                    <span>
+                        Show follow and membership options on this event&apos;s page
+                        <span className="mt-1 block text-xs text-ink-secondary">
+                            Turn this off for an event that does not need to promote your
+                            organisation, such as a private celebration. Attendees can still reach
+                            your organisation page directly.
+                        </span>
+                    </span>
+                </label>
             </div>
 
             <div>

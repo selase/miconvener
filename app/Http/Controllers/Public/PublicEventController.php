@@ -77,7 +77,7 @@ final class PublicEventController extends Controller
         $page = Inertia::render('Public/Events/Show', [
             // A private event shows enough to register and nothing more.
             'event' => $this->toPublicPayload($eventModel, revealDetails: ! $eventModel->isPrivate()),
-            'community' => $tenant->followingEnabled() || $tenant->communityEnabled() ? app(\App\Services\Community\CommunityPublicContext::class)->for($tenant, request()->session(), $eventModel) : null,
+            'community' => $eventModel->showsCommunityPrompts() && ($tenant->followingEnabled() || $tenant->communityEnabled()) ? app(\App\Services\Community\CommunityPublicContext::class)->for($tenant, request()->session(), $eventModel) : null,
             'org' => $tenant->publicEventProfile(),
             'isPrivate' => $eventModel->isPrivate(),
             'participation' => fn (): array => [

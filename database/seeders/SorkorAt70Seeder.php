@@ -43,9 +43,11 @@ final class SorkorAt70Seeder extends Seeder
 
         $event = Event::query()->firstOrNew(['tenant_id' => $tenant->id, 'slug' => self::EVENT_SLUG]);
 
-        // Only a new event gets a status: re-seeding must not unpublish one the organiser has published.
+        // Only a new event gets a status and the family's choice to promote no organisation: re-seeding must
+        // not unpublish one the organiser has published or undo a setting they have changed.
         if (! $event->exists) {
             $event->status = app()->isProduction() ? Event::STATUS_DRAFT : Event::STATUS_PUBLISHED;
+            $event->show_community_prompts = false;
         }
 
         $event->fill([

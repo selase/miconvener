@@ -31,6 +31,7 @@ test('the celebration is a free, 30 place event with a goodwill wall', function 
         ->and($event->capacity)->toBe(30)
         ->and($event->allowsGoodwillMessages())->toBeTrue()
         ->and($event->allowsContributions())->toBeFalse()
+        ->and($event->showsCommunityPrompts())->toBeFalse()
         ->and($event->timezone)->toBe('America/New_York')
         ->and($event->starts_at->setTimezone('America/New_York')->format('Y-m-d H:i'))->toBe('2026-11-21 15:00')
         ->and($event->description)->toContain(SorkorAt70Seeder::STORY_URL);
@@ -61,4 +62,14 @@ test('seeding again keeps an event the organiser has published', function (): vo
 
 test('seeding without the tenant explains what is missing', function (): void {
     expect(fn () => $this->seed(SorkorAt70Seeder::class))->toThrow(RuntimeException::class, 'purpledot');
+});
+
+test('seeding again keeps a membership option the organiser switched back on', function (): void {
+    Tenant::factory()->create(['slug' => SorkorAt70Seeder::TENANT_SLUG, 'isolation_mode' => 'shared']);
+    $this->seed(SorkorAt70Seeder::class);
+    Event::query()->where('slug', SorkorAt70Seeder::EVENT_SLUG)->update(['show_community_prompts' => true]);
+
+    $this->seed(SorkorAt70Seeder::class);
+
+    expect(Event::query()->where('slug', SorkorAt70Seeder::EVENT_SLUG)->sole()->showsCommunityPrompts())->toBeTrue();
 });
