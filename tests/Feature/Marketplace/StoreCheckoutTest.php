@@ -64,6 +64,10 @@ it('keeps initialisation unresolved when the refusal does not prove nothing was 
 
     expect($attempt->status)->toBe('unknown')->and($again->id)->toBe($attempt->id)->and(StorePaymentAttempt::query()->count())->toBe(1);
 })->with([
+    'transaction already exists' => [400, ['status' => false, 'message' => 'Transaction already exists']],
+    'status cannot be determined' => [400, ['status' => false, 'message' => 'Unable to determine transaction status at this time']],
+    'a recognised message with a 422' => [422, ['status' => false, 'message' => 'Invalid Email Address Passed']],
+    'a recognised message without status false' => [400, ['message' => 'Invalid Email Address Passed']],
     'duplicate reference' => [400, ['status' => false, 'message' => 'Duplicate Transaction Reference']],
     'reference mentioned' => [400, ['status' => false, 'message' => 'Invalid reference supplied']],
     'a body that is not Paystack\'s' => [400, '<html>Bad gateway</html>'],

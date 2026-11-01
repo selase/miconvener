@@ -14,6 +14,13 @@ use Throwable;
 
 final class PaystackGateway implements PaymentGateway
 {
+    /**
+     * Paystack's refusals that prove, from the message alone, that no transaction
+     * was created. The list is a positive allowlist: any other message, however
+     * it reads, may hide a transaction that exists, so it stays unresolved.
+     */
+    private const array DEFINITE_INITIALIZATION_REJECTIONS = ['invalid email address passed', 'invalid amount sent'];
+
     private string $baseUrl = 'https://api.paystack.co';
 
     private readonly string $secret;
@@ -407,20 +414,15 @@ final class PaystackGateway implements PaymentGateway
         }
     }
 
-    /**
-     * Only a 400 or 422 carrying Paystack's own `status: false` and a message proves
-     * nothing was created. A message about a duplicate or reference may mean an
-     * earlier request did create the transaction, so it is never definitive.
-     */
     private function isDefiniteInitializationRejection(RequestException $e): bool
     {
         $response = $e->response;
         $message = $response->json('message');
 
-        return in_array($response->status(), [400, 422], true)
+        return $response->status() === 400
             && $response->json('status') === false
-            && is_string($message) && mb_trim($message) !== ''
-            && preg_match('/duplicate|reference/i', $message) !== 1;
+            && is_string($message)
+            && in_array(mb_strtolower(mb_rtrim(mb_trim($message), '.')), self::DEFINITE_INITIALIZATION_REJECTIONS, true);
     }
 
     /** @return array{reference:string, status:string} */
