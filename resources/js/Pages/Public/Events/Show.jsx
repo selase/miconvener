@@ -2026,7 +2026,7 @@ export default function Show({
                             fetchPriority="high"
                             className={`w-full object-cover ${
                                 event.event_category === 'celebration'
-                                    ? 'h-[clamp(300px,42vw,640px)] object-[center_15%]'
+                                    ? 'aspect-video'
                                     : 'h-[clamp(220px,28vw,430px)]'
                             }`}
                         />
