@@ -17,7 +17,7 @@ final class PhoneNumber
      * "0013018201664" and "+13018201664" are the same number; validators and the
      * stored form expect the plus.
      */
-    public static function withInternationalPlus(?string $number): ?string
+    public static function withInternationalPlus(?string $number): string
     {
         $number = mb_trim((string) $number);
 
