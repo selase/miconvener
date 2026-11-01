@@ -709,7 +709,7 @@ final class PublicEventController extends Controller
         $withhold = $event->isPrivate() && ! $revealDetails;
 
         return [
-            'member_benefits' => ['enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant), 'members_only' => $event->members_only],
+            'member_benefits' => ['enabled' => app(\App\Services\Events\MemberBenefitEligibility::class)->enabled($event->tenant), 'members_only' => $event->members_only, 'prompt' => $event->members_only || $event->showsCommunityPrompts()],
             'name' => $event->name,
             'slug' => $event->slug,
             'description' => $event->description,

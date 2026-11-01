@@ -1192,13 +1192,15 @@ function RegistrationPanel({ event }) {
                 )}
 
                 <div>
-                    <MemberBenefitVerification
-                        event={event}
-                        email={data.email}
-                        ticketTypeId={data.ticket_type_id}
-                        accessCode={data.access_code}
-                        onEligibility={setMemberBenefits}
-                    />
+                    {event.member_benefits?.prompt !== false && (
+                        <MemberBenefitVerification
+                            event={event}
+                            email={data.email}
+                            ticketTypeId={data.ticket_type_id}
+                            accessCode={data.access_code}
+                            onEligibility={setMemberBenefits}
+                        />
+                    )}
                     {errors.membership && (
                         <p role="alert" className="text-sm text-danger-fg">
                             {errors.membership}

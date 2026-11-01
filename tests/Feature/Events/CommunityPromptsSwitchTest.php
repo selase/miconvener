@@ -38,6 +38,16 @@ test('an event with the option switched off shows none of them, whatever the org
     ($this->page)()->assertOk()->assertInertia(fn (Assert $page) => $page->where('community', null));
 });
 
+test('the registration form drops the membership check when the option is off, unless the event is for members only', function (): void {
+    ($this->page)()->assertInertia(fn (Assert $page) => $page->where('event.member_benefits.prompt', true));
+
+    $this->event->update(['show_community_prompts' => false]);
+    ($this->page)()->assertInertia(fn (Assert $page) => $page->where('event.member_benefits.prompt', false));
+
+    $this->event->update(['members_only' => true]);
+    ($this->page)()->assertInertia(fn (Assert $page) => $page->where('event.member_benefits.prompt', true));
+});
+
 test('switching it off on one event leaves the organiser\'s other events alone', function (): void {
     $other = Event::factory()->published()->create(['tenant_id' => $this->tenant->id]);
     $this->event->update(['show_community_prompts' => false]);
