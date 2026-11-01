@@ -29,6 +29,55 @@ it('starts one server-priced attempt and returns the original attempt on retry',
     expect($attempt->toArray())->not->toHaveKey('checkout_url');
 });
 
+function fakePaystackInitialization(mixed $initialization): void
+{
+    Http::swap(new Illuminate\Http\Client\Factory);
+    Http::preventStrayRequests();
+    Http::fake([
+        '*api.paystack.co/customer*' => Http::response(['status' => true, 'data' => ['customer_code' => 'CUS_STORE', 'email' => 'buyer@example.test']]),
+        '*api.paystack.co/transaction/initialize' => $initialization,
+    ]);
+}
+
+it('lets the buyer retry after Paystack definitively refuses to initialise the checkout', function (): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    fakePaystackInitialization(Http::sequence()
+        ->push(['status' => false, 'message' => 'Invalid Email Address Passed'], 400)
+        ->push(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/store-test']]));
+
+    $refused = app(StorePayments::class)->start($order, $session, (string) Str::uuid());
+    $retry = app(StorePayments::class)->start($order, $session, (string) Str::uuid());
+
+    expect($refused->status)->toBe('failed')->and($refused->review_reason)->toBe('initialization_rejected')
+        ->and($retry->id)->not->toBe($refused->id)->and($retry->reference)->not->toBe($refused->reference)->and($retry->status)->toBe('ready')
+        ->and(StorePaymentAttempt::query()->count())->toBe(2);
+});
+
+it('keeps initialisation unresolved when the refusal does not prove nothing was created', function (int $status, mixed $body): void {
+    [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
+    $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());
+    fakePaystackInitialization(Http::response($body, $status));
+
+    $attempt = app(StorePayments::class)->start($order, $session, (string) Str::uuid());
+    $again = app(StorePayments::class)->start($order, $session, (string) Str::uuid());
+
+    expect($attempt->status)->toBe('unknown')->and($again->id)->toBe($attempt->id)->and(StorePaymentAttempt::query()->count())->toBe(1);
+})->with([
+    'transaction already exists' => [400, ['status' => false, 'message' => 'Transaction already exists']],
+    'status cannot be determined' => [400, ['status' => false, 'message' => 'Unable to determine transaction status at this time']],
+    'a recognised message with a 422' => [422, ['status' => false, 'message' => 'Invalid Email Address Passed']],
+    'a recognised message without status false' => [400, ['message' => 'Invalid Email Address Passed']],
+    'duplicate reference' => [400, ['status' => false, 'message' => 'Duplicate Transaction Reference']],
+    'reference mentioned' => [400, ['status' => false, 'message' => 'Invalid reference supplied']],
+    'a body that is not Paystack\'s' => [400, '<html>Bad gateway</html>'],
+    'a refusal without a message' => [400, ['status' => false]],
+    'a server error' => [500, ['status' => false, 'message' => 'Internal error']],
+    'a rate limit' => [429, ['status' => false, 'message' => 'Too many requests']],
+    'a success with no checkout page' => [200, ['status' => true, 'data' => []]],
+    'a checkout page on another host' => [200, ['status' => true, 'data' => ['authorization_url' => 'https://evil.example/pay']]],
+]);
+
 it('retains unknown initialization without issuing a second charge after timeout', function (): void {
     [$tenant, $variant, , $session] = StoreCheckoutScenario::make();
     $order = StoreCheckoutScenario::quote($tenant, $session, [['variant_id' => $variant->id, 'quantity' => 1]], (string) Str::uuid());

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Payment;
 
 use App\Contracts\PaymentGateway;
+use App\Exceptions\CheckoutRejectedException;
 use App\Exceptions\PaymentFailedException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -13,6 +14,13 @@ use Throwable;
 
 final class PaystackGateway implements PaymentGateway
 {
+    /**
+     * Paystack's refusals that prove, from the message alone, that no transaction
+     * was created. The list is a positive allowlist: any other message, however
+     * it reads, may hide a transaction that exists, so it stays unresolved.
+     */
+    private const array DEFINITE_INITIALIZATION_REJECTIONS = ['invalid email address passed', 'invalid amount sent'];
+
     private string $baseUrl = 'https://api.paystack.co';
 
     private readonly string $secret;
@@ -139,6 +147,12 @@ final class PaystackGateway implements PaymentGateway
             }
 
             return $url;
+        } catch (RequestException $e) {
+            if ($this->isDefiniteInitializationRejection($e)) {
+                throw CheckoutRejectedException::fromProvider('paystack', $e->response->json('message'), $e);
+            }
+
+            throw PaymentFailedException::fromProvider('paystack', 'Checkout initialization could not be confirmed.', previous: $e);
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', 'Checkout initialization could not be confirmed.', previous: $e);
         }
@@ -398,6 +412,17 @@ final class PaystackGateway implements PaymentGateway
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
         }
+    }
+
+    private function isDefiniteInitializationRejection(RequestException $e): bool
+    {
+        $response = $e->response;
+        $message = $response->json('message');
+
+        return $response->status() === 400
+            && $response->json('status') === false
+            && is_string($message)
+            && in_array(mb_strtolower(mb_rtrim(mb_trim($message), '.')), self::DEFINITE_INITIALIZATION_REJECTIONS, true);
     }
 
     /** @return array{reference:string, status:string} */
