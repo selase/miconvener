@@ -74,6 +74,8 @@ final class PublicEventController extends Controller
             abort(404);
         }
 
+        view()->share('seo', app(\App\Services\Events\EventSocialCard::class)->for($eventModel, $tenant));
+
         $page = Inertia::render('Public/Events/Show', [
             // A private event shows enough to register and nothing more.
             'event' => $this->toPublicPayload($eventModel, revealDetails: ! $eventModel->isPrivate()),
