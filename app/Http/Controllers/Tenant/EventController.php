@@ -292,6 +292,26 @@ final class EventController extends Controller
         ]);
     }
 
+    /**
+     * Whether the public event page shows the follow and membership options. On its
+     * own route, like visibility, so the choice takes effect without a full form.
+     */
+    public function updateCommunityPrompts(Request $request, string $subdomain, string $event): JsonResponse
+    {
+        $this->authorize('update event');
+        $eventModel = $this->resolveEvent($this->getTenant(), $event);
+
+        $validated = $request->validate(['show_community_prompts' => ['required', 'boolean']]);
+        $eventModel->update(['show_community_prompts' => $validated['show_community_prompts']]);
+
+        return response()->json([
+            'show_community_prompts' => $eventModel->show_community_prompts,
+            'message' => $eventModel->show_community_prompts
+                ? 'This event page invites visitors to follow the organiser and see its membership options.'
+                : 'This event page no longer shows follow or membership options.',
+        ]);
+    }
+
     public function destroy(Request $request, string $subdomain, string $event): JsonResponse|RedirectResponse
     {
         $this->authorize('delete event');
@@ -906,6 +926,7 @@ final class EventController extends Controller
             'description' => $event->description,
             'status' => $event->status,
             'visibility' => $event->visibility,
+            'show_community_prompts' => $event->showsCommunityPrompts(),
             'speaker_slide_policy' => $event->speaker_slide_policy ?? Event::SPEAKER_POLICY_AFTER,
             'starts_at' => $event->starts_at->toIso8601String(),
             'ends_at' => $event->ends_at->toIso8601String(),

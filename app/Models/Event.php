@@ -138,6 +138,7 @@ final class Event extends Model
         'currency',
         'hero_image_path',
         'visibility',
+        'show_community_prompts',
         'speaker_slide_policy',
         'plan_your_visit_content',
         'store_listing_id',
@@ -198,6 +199,7 @@ final class Event extends Model
         'show_tribute_wall' => 'boolean',
         'show_contributor_amounts' => 'boolean',
         'allow_goodwill_messages' => 'boolean',
+        'show_community_prompts' => 'boolean',
         'is_recurring' => 'boolean',
         'recurrence_days' => 'array',
         'recurrence_interval' => 'integer',
@@ -289,6 +291,15 @@ final class Event extends Model
     public function blasts(): HasMany
     {
         return $this->hasMany(EventBlast::class);
+    }
+
+    /**
+     * Whether this event's public page invites visitors to follow the organiser or
+     * learn about its membership. An event with its own audience can switch it off.
+     */
+    public function showsCommunityPrompts(): bool
+    {
+        return (bool) $this->show_community_prompts;
     }
 
     public function isPrivate(): bool
