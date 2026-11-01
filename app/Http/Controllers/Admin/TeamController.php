@@ -184,6 +184,7 @@ final class TeamController extends Controller
      */
     public function store(Request $request, string $id)
     {
+        $request->merge(['phone_number' => \App\Support\PhoneNumber::withInternationalPlus($request->input('phone_number'))]);
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
