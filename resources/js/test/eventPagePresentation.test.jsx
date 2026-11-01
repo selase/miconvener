@@ -148,6 +148,21 @@ describe('public event presentation', { timeout: 30000 }, () => {
         expect(access.queryByRole('link', { name: /Surveys/ })).toBeNull();
         expect(access.getByRole('link', { name: /Open attendee area/ })).toBeTruthy();
     });
+    it('shows a celebration banner whole, in its own 16:9 shape, and other events in a fixed-height strip', () => {
+        const heroOf = (container) => container.querySelector('[data-event-hero] img');
+        const withHero = { ...event, hero_image_url: 'https://cdn.example.test/hero.jpg' };
+
+        const celebration = render(
+            <Show event={{ ...withHero, event_category: 'celebration' }} org={org} />
+        );
+        expect(heroOf(celebration.container).className).toContain('aspect-video');
+        expect(heroOf(celebration.container).className).not.toContain('h-[clamp');
+        celebration.unmount();
+
+        const general = render(<Show event={withHero} org={org} />);
+        expect(heroOf(general.container).className).not.toContain('aspect-video');
+        expect(heroOf(general.container).className).toContain('h-[clamp(220px,28vw,430px)]');
+    });
     it('shows the real programme, faculty, organiser and anonymous attendance together', () => {
         render(<Show event={event} org={org} />);
         expect(screen.getByText('Opening session')).toBeTruthy();
