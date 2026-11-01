@@ -39,6 +39,21 @@ it('shows the server quote and disables repeat payment when initialization is un
     expect(screen.queryByRole('button', { name: 'Continue to payment' })).toBeNull();
     expect(csrfFetch).toHaveBeenCalledTimes(2);
 });
+it('lets the buyer try again when the provider definitively refused to start the payment', async () => {
+    csrfFetch
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ order }) })
+        .mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ status: 'failed', checkout_url: null }),
+        });
+    render(<StoreCheckout shop="teachers" variant={{ id: 'medium', available: true }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Review order' }));
+    await screen.findByText('GHS 14.50');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to payment' }));
+    await screen.findByText(/could not start this payment/);
+    expect(screen.queryByText(/Do not pay again/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeTruthy();
+});
 it('focuses a recoverable quote error without claiming payment', async () => {
     csrfFetch.mockResolvedValue({
         ok: false,

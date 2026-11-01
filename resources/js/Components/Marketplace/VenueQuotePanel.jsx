@@ -106,7 +106,9 @@ export default function VenueQuotePanel({ booking }) {
                 return;
             }
             setMessage(
-                response.ok
+                response.ok && data.status === 'failed'
+                    ? 'The payment provider could not start this payment. Check your details and try again.'
+                    : response.ok
                     ? 'Your payment is being prepared. Reload this page in a moment; do not pay twice.'
                     : data.message || 'This payment is not available right now.'
             );

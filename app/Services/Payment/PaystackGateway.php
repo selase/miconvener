@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Payment;
 
 use App\Contracts\PaymentGateway;
+use App\Exceptions\CheckoutRejectedException;
 use App\Exceptions\PaymentFailedException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -139,6 +140,12 @@ final class PaystackGateway implements PaymentGateway
             }
 
             return $url;
+        } catch (RequestException $e) {
+            if ($this->isDefiniteInitializationRejection($e)) {
+                throw CheckoutRejectedException::fromProvider('paystack', $e->response->json('message'), $e);
+            }
+
+            throw PaymentFailedException::fromProvider('paystack', 'Checkout initialization could not be confirmed.', previous: $e);
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', 'Checkout initialization could not be confirmed.', previous: $e);
         }
@@ -398,6 +405,22 @@ final class PaystackGateway implements PaymentGateway
         } catch (Throwable $e) {
             throw PaymentFailedException::fromProvider('paystack', $e->getMessage(), previous: $e);
         }
+    }
+
+    /**
+     * Only a 400 or 422 carrying Paystack's own `status: false` and a message proves
+     * nothing was created. A message about a duplicate or reference may mean an
+     * earlier request did create the transaction, so it is never definitive.
+     */
+    private function isDefiniteInitializationRejection(RequestException $e): bool
+    {
+        $response = $e->response;
+        $message = $response->json('message');
+
+        return in_array($response->status(), [400, 422], true)
+            && $response->json('status') === false
+            && is_string($message) && mb_trim($message) !== ''
+            && preg_match('/duplicate|reference/i', $message) !== 1;
     }
 
     /** @return array{reference:string, status:string} */
