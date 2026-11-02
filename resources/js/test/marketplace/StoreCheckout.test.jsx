@@ -235,7 +235,7 @@ it('requires explicit acceptance before paying a seller-issued quote', async () 
     expect(screen.queryByText(/Release unpaid stock hold/)).toBeNull();
     expect(screen.queryByText(/Receipt email:/)).toBeNull();
     fireEvent.click(screen.getByLabelText(/I accept the quoted specification/));
-    expect(pay.disabled).toBe(false);
+    await waitFor(() => expect(pay.disabled).toBe(false));
     csrfFetch.mockResolvedValueOnce({
         ok: false,
         json: async () => ({ message: 'Payment paused' }),

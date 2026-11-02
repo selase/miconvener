@@ -260,3 +260,17 @@ Keep activation off. Review the correction branch first, then complete trusted-H
 #### Not gaps
 
 Logged mail, synthetic recipients, process-local time simulation and zero-fee test configuration are deliberate isolation choices, labelled as such; they are not evidence of external email delivery, production fees or complete end-to-end browser acceptance.
+
+### Continuation: trusted HTTPS and final correction review
+
+The limitations above describe the first pass, not completed gates. Subsequent checks on 2 November:
+
+- Trusted local HTTPS is now in use. Through the real finance page an oversized payout and a below-fee payout were refused; a GHS3 unsent reservation was created and cancelled. Available funds returned to GHS982.12. The earlier provider submission and owner OTP evidence remain hybrid service/browser checks, as labelled above.
+- A separate synthetic booking (`VRQ-DECLINE01`) exercised the hosted **test-card Declined** option. Provider reconciliation marked the attempt failed with no capture. Before that, leaving checkout and returning resumed the same attempt. After the definitive decline a new checkout was available. The buyer then cancelled the unpaid booking. No real card or funds were used.
+- The security-return/payout concurrency gate is covered by the eight real PostgreSQL worker tests already reported (including the dedicated security refund versus payout race); it is not an outstanding race-test gate.
+- Primary and hover tokens now meet 4.5:1 against their foregrounds. Marketplace solid accent controls use theme-aware foregrounds; the dark AI gradient uses a darker start. Five contrast regression tests cover tokens and affected surfaces. Confirmed buyer page checks at 390px and 1280px found no horizontal overflow, in light and dark themes.
+- The complete PHP CI suite passed on PR #83's preceding head. A component test's immediate checkbox-state assertion failed once in the parallel CI run and passed in isolation. It now waits for the actual enabled state; production checkout logic is unchanged. The focused checkout/status/contrast run passes 27 tests. Final CI must still pass on the final head.
+- Independent review found no blockers in the finance corrections or final contrast/test delta.
+- The owner selected **Purpledot** as the first venue pilot. Other organisations and catalogue hotels are not authorised for activation. Read-only production inspection found the three venue-money permission rows, each with two role grants, and no approved venue agreements. Purpledot has no public venue listing in that inspection. No venue, availability or commercial participation will be invented.
+
+Remaining release distinctions: the GHS10 test fee mismatch remains quarantined, not reconciled; local receipt delivery was logged mail; production fee accounting was not tested with real money. Complete any merchant-specific setup and read-only permission/role verification before activation. Do not describe those distinctions as waived by a green CI run.

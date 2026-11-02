@@ -22,3 +22,12 @@ it.each([':root', '.dark'])('keeps primary action text at WCAG AA contrast in %s
         expect((values[0] + 0.05) / (values[1] + 0.05)).toBeGreaterThanOrEqual(4.5);
     }
 });
+
+it.each([
+    'resources/js/Layouts/MarketplaceLayout.jsx',
+    'resources/js/Components/Marketplace/VenueBookingDrawer.jsx',
+    'resources/js/Pages/Public/Marketplace/Bookings/Show.jsx',
+])('does not force white foreground on theme-changing venue actions in %s', (file) => {
+    const source = readFileSync(file, 'utf8');
+    expect(source.match(/bg-accent\s[^'"\n]*text-white/g)).toBeNull();
+});
