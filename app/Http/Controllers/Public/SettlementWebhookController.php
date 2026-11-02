@@ -69,6 +69,15 @@ final class SettlementWebhookController extends Controller
             return $this->relayUdworkspacePayment($body, $signature);
         }
 
+        if ($settlementMatches && in_array($event, ['charge.success', 'charge.failed'], true)
+            && app(\App\Services\Marketplace\StorePaymentNotifications::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
+            return response()->json(['status' => 'success']);
+        }
+
+        if ($settlementMatches && is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Marketplace\StoreRefunds::class)->paystack((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
+            return response()->json(['status' => 'success']);
+        }
+
         if ($settlementMatches && is_string($event) && str_starts_with($event, 'refund.') && app(\App\Services\Giving\GivingRefunds::class)->handlePaystackNotification((array) $data, app(\App\Services\Giving\GivingGateways::class)->platformIdentity())) {
             return response()->json(['status' => 'success']);
         }
@@ -334,6 +343,12 @@ final class SettlementWebhookController extends Controller
             return;
         }
 
+        $commerce = EventPayout::withoutGlobalScopes()->where('category', LedgerCategoryEnum::Commerce)->where('provider_reference', $reference)->first();
+        if ($commerce !== null) {
+            app(\App\Services\Marketplace\StorePayouts::class)->reconcile($commerce);
+
+            return;
+        }
         $payout = EventPayout::where('provider_reference', $reference)->first();
         if ($payout?->category === LedgerCategoryEnum::Giving) {
             if ($event === 'transfer.success') {

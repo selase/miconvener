@@ -5,14 +5,22 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant\Venue;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Venue\DecideVenueBookingRequest;
 use App\Mail\Marketplace\QuoteSentNotification;
 use App\Models\Shop;
 use App\Models\VenueBooking;
+use App\Models\VenueBookingAction;
+use App\Services\Marketplace\VenueAvailabilityService;
+use App\Services\Marketplace\VenueBookingApprovals;
+use App\Services\Marketplace\VenueBookingService;
 use App\Services\Tenancy\TenantContext;
+use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -91,6 +99,7 @@ final class VenueInquiryController extends Controller
             'deposit_required_pesewas' => $lead->deposit_required_pesewas,
             'amount_paid_pesewas' => $lead->amount_paid_pesewas,
             'status' => $lead->status,
+            'effective_status' => $lead->effectiveStatus(),
             'payment_status' => $lead->payment_status,
             'listing' => $lead->listing ? [
                 'id' => $lead->listing->id,
@@ -145,6 +154,10 @@ final class VenueInquiryController extends Controller
             ->firstOrFail();
 
         return Inertia::render('Tenant/Venue/Inquiries/Show', [
+            'can' => [
+                'complete' => Gate::forUser($request->user())->allows(\App\Services\Marketplace\VenueMoneyPermissions::SETTLEMENTS),
+                'refund' => Gate::forUser($request->user())->allows(\App\Services\Marketplace\VenueMoneyPermissions::REFUNDS),
+            ],
             'shop' => [
                 'id' => $shop->id,
                 'name' => $shop->name,
@@ -181,6 +194,8 @@ final class VenueInquiryController extends Controller
                 'quote_valid_until' => $inquiry->quote_valid_until?->toIso8601String(),
                 'contract_agreed_at' => $inquiry->contract_agreed_at?->toIso8601String(),
                 'host_notes' => $inquiry->host_notes,
+                'approval' => $this->approvalPayload($inquiry),
+                'financial' => $inquiry->usesApprovalFlow() ? app(\App\Services\Marketplace\VenueFinancialJourney::class)->forHost($inquiry) : null,
                 'listing' => $inquiry->listing ? [
                     'id' => $inquiry->listing->id,
                     'title' => $inquiry->listing->title,
@@ -191,6 +206,44 @@ final class VenueInquiryController extends Controller
         ]);
     }
 
+    public function approve(DecideVenueBookingRequest $request, string $subdomain, string $inquiryId): RedirectResponse
+    {
+        return $this->decide($request, $inquiryId, function (VenueBooking $booking) use ($request): string {
+            $hours = (int) ($request->validated('hold_hours') ?? $booking->approvalPolicy()['default_hold_hours']);
+            $held = app(VenueBookingApprovals::class)->approve($booking, $request->user(), $hours, (string) $request->validated('operation_key'));
+
+            return "Dates held for {$held->booking_reference} until ".$held->hold_expires_at?->copy()->setTimezone($held->approvalPolicy()['timezone'])->format('M j, g:i A T').'.';
+        });
+    }
+
+    public function renew(DecideVenueBookingRequest $request, string $subdomain, string $inquiryId): RedirectResponse
+    {
+        return $this->decide($request, $inquiryId, function (VenueBooking $booking) use ($request): string {
+            $hours = (int) ($request->validated('hold_hours') ?? $booking->approvalPolicy()['default_hold_hours']);
+            $held = app(VenueBookingApprovals::class)->renew($booking, $request->user(), $hours, (string) $request->validated('operation_key'));
+
+            return "Hold renewed for {$held->booking_reference} until ".$held->hold_expires_at?->copy()->setTimezone($held->approvalPolicy()['timezone'])->format('M j, g:i A T').'.';
+        });
+    }
+
+    public function decline(DecideVenueBookingRequest $request, string $subdomain, string $inquiryId): RedirectResponse
+    {
+        return $this->decide($request, $inquiryId, function (VenueBooking $booking) use ($request): string {
+            $declined = app(VenueBookingApprovals::class)->decline($booking, $request->user(), (string) $request->validated('reason'), (string) $request->validated('operation_key'));
+
+            return "Request {$declined->booking_reference} declined.";
+        });
+    }
+
+    public function release(DecideVenueBookingRequest $request, string $subdomain, string $inquiryId): RedirectResponse
+    {
+        return $this->decide($request, $inquiryId, function (VenueBooking $booking) use ($request): string {
+            $released = app(VenueBookingApprovals::class)->release($booking, $request->user(), (string) $request->validated('reason'), (string) $request->validated('operation_key'));
+
+            return "Hold on {$released->booking_reference} released.";
+        });
+    }
+
     public function acceptAndHold(Request $request, string $subdomain, string $inquiryId): RedirectResponse
     {
         Gate::authorize('manage venue');
@@ -198,21 +251,11 @@ final class VenueInquiryController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
 
-        /** @var VenueBooking $inquiry */
-        $inquiry = VenueBooking::query()
-            ->where('shop_id', $shop->id)
-            ->where('id', $inquiryId)
-            ->firstOrFail();
-
-        if ($inquiry->isConfirmed() || $inquiry->isDepositPaid()) {
-            return redirect()->back()->with('error', 'Cannot modify an already confirmed or paid reservation.');
+        try {
+            $inquiry = app(VenueBookingService::class)->placeHostHold($shop, $inquiryId);
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', (string) collect($e->errors())->flatten()->first());
         }
-
-        $inquiry->update([
-            'status' => VenueBooking::STATUS_PENDING_PAYMENT,
-            'host_notes' => 'Host has placed a 48-hour tentative reservation hold on this space.',
-            'quote_valid_until' => now()->addHours(48),
-        ]);
 
         return redirect()->back()->with('success', "Booking {$inquiry->booking_reference} placed on tentative hold.");
     }
@@ -231,31 +274,15 @@ final class VenueInquiryController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
 
-        /** @var VenueBooking $inquiry */
-        $inquiry = VenueBooking::query()
-            ->with('listing')
-            ->where('shop_id', $shop->id)
-            ->where('id', $inquiryId)
-            ->firstOrFail();
-
-        if ($inquiry->isConfirmed() || $inquiry->isDepositPaid()) {
-            return redirect()->back()->with('error', 'Cannot modify an already confirmed or paid reservation.');
-        }
-
         $rentalPesewas = (int) round(((float) $validated['rental_amount_ghs']) * 100);
         $depositPesewas = isset($validated['security_deposit_ghs']) ? (int) round(((float) $validated['security_deposit_ghs']) * 100) : 0;
-        $totalPesewas = $rentalPesewas + $depositPesewas;
         $requiredPesewas = (int) round(((float) $validated['deposit_required_ghs']) * 100);
 
-        $inquiry->update([
-            'rental_amount_pesewas' => $rentalPesewas,
-            'security_deposit_pesewas' => $depositPesewas,
-            'total_amount_pesewas' => $totalPesewas,
-            'deposit_required_pesewas' => min($requiredPesewas, $totalPesewas),
-            'host_notes' => $validated['host_notes'] ?? null,
-            'status' => VenueBooking::STATUS_PENDING_PAYMENT,
-            'quote_valid_until' => now()->addDays(7),
-        ]);
+        try {
+            $inquiry = app(VenueBookingService::class)->quoteAsHost($shop, $inquiryId, $rentalPesewas, $depositPesewas, $requiredPesewas, $validated['host_notes'] ?? null);
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', (string) collect($e->errors())->flatten()->first());
+        }
 
         // Send quote notification to planner
         try {
@@ -279,21 +306,97 @@ final class VenueInquiryController extends Controller
         $tenant = app(TenantContext::class)->getTenant();
         $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
 
-        /** @var VenueBooking $inquiry */
-        $inquiry = VenueBooking::query()
+        try {
+            $inquiry = app(VenueBookingService::class)->rejectAsHost($shop, $inquiryId, $validated['reason'] ?? null);
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', (string) collect($e->errors())->flatten()->first());
+        }
+
+        return redirect()->back()->with('info', "Inquiry {$inquiry->booking_reference} marked as declined.");
+    }
+
+    /**
+     * Resolve the request inside this organisation's shop, run one decision and
+     * report it. A stale or refused decision is explained, never half-applied.
+     *
+     * @param  Closure(VenueBooking): string  $decision
+     */
+    private function decide(DecideVenueBookingRequest $request, string $inquiryId, Closure $decision): RedirectResponse
+    {
+        $tenant = app(TenantContext::class)->getTenant();
+        abort_if($tenant === null, 404, 'Tenant not found');
+        $shop = Shop::query()->where('tenant_id', $tenant->id)->firstOrFail();
+
+        $booking = VenueBooking::query()
             ->where('shop_id', $shop->id)
             ->where('id', $inquiryId)
             ->firstOrFail();
 
-        if ($inquiry->isConfirmed() || $inquiry->isDepositPaid()) {
-            return redirect()->back()->with('error', 'Cannot decline an already confirmed or paid reservation.');
+        try {
+            $message = $decision($booking);
+        } catch (AuthorizationException) {
+            abort(403);
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', (string) collect($e->errors())->flatten()->first());
         }
 
-        $inquiry->update([
-            'status' => VenueBooking::STATUS_REJECTED,
-            'host_notes' => $validated['reason'] ?? 'Declined by venue host.',
-        ]);
+        return redirect()->back()->with('success', $message);
+    }
 
-        return redirect()->back()->with('info', "Inquiry {$inquiry->booking_reference} marked as declined.");
+    /**
+     * @return array<string, mixed>
+     */
+    private function approvalPayload(VenueBooking $booking): array
+    {
+        if (! $booking->usesApprovalFlow()) {
+            return [
+                'flow' => false,
+                'conflicts' => $this->paymentConflicts($booking),
+            ];
+        }
+
+        $policy = $booking->approvalPolicy();
+
+        return [
+            'flow' => true,
+            'effective_status' => $booking->effectiveStatus(),
+            'hold_expires_at' => $booking->hold_expires_at?->toIso8601String(),
+            'timezone' => $policy['timezone'],
+            'default_hold_hours' => $policy['default_hold_hours'],
+            'max_hold_hours' => min(168, $policy['max_hold_hours']),
+            'decision_reason' => $booking->decline_reason,
+            'dates_available' => $booking->listing === null || app(VenueAvailabilityService::class)->isSlotAvailable($booking->listing, $booking->starts_at, $booking->ends_at, $booking->id),
+            'actions' => $booking->actions()->get()->map(fn (VenueBookingAction $action): array => [
+                'id' => $action->id,
+                'action' => $action->action,
+                'actor_type' => $action->actor_type,
+                'actor_name' => $action->actor_name,
+                'previous_status' => $action->previous_status,
+                'result_status' => $action->result_status,
+                'hold_expires_at' => $action->hold_expires_at?->toIso8601String(),
+                'decision_reason' => $action->decision_reason,
+                'delivery_state' => $action->delivery_state,
+                'created_at' => $action->created_at?->toIso8601String(),
+            ])->all(),
+            'conflicts' => $this->paymentConflicts($booking),
+        ];
+    }
+
+    /**
+     * Payments the calendar could not honour, awaiting staff reconciliation.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function paymentConflicts(VenueBooking $booking): array
+    {
+        return $booking->actions()->where('action', VenueBookingAction::ACTION_PAYMENT_CALENDAR_CONFLICT)->get()
+            ->map(fn (VenueBookingAction $action): array => [
+                'id' => $action->id,
+                'reason' => $action->decision_reason,
+                'provider_reference' => $action->evidence['provider_reference'] ?? null,
+                'amount_pesewas' => $action->evidence['amount_pesewas'] ?? null,
+                'currency' => $action->evidence['currency'] ?? null,
+                'recorded_at' => $action->created_at?->toIso8601String(),
+            ])->all();
     }
 }

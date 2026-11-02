@@ -54,7 +54,11 @@ final class VenueAvailabilityService
                 'starts_at' => $booking->starts_at->toIso8601String(),
                 'ends_at' => $booking->ends_at->toIso8601String(),
                 // The public only needs to know the time is taken, not that a staff request is still pending.
-                'status' => $booking->kind === VenueBooking::KIND_INTERNAL ? VenueBooking::STATUS_CONFIRMED : $booking->status,
+                'status' => match (true) {
+                    $booking->kind === VenueBooking::KIND_INTERNAL => VenueBooking::STATUS_CONFIRMED,
+                    $booking->status === VenueBooking::STATUS_APPROVED_HOLD => VenueBooking::STATUS_PENDING_PAYMENT,
+                    default => $booking->status,
+                },
             ]);
     }
 

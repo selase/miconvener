@@ -74,11 +74,11 @@ final class TenantPayoutAccountController extends Controller
         $accountModel = TenantPayoutAccount::where('tenant_id', $tenant->id)->where('id', $account)->firstOrFail();
 
         $hasActivePayouts = $accountModel->payouts()
-            ->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID])
+            ->where(fn ($query) => $query->whereIn('status', [EventPayout::STATUS_SCHEDULED, EventPayout::STATUS_PROCESSING, EventPayout::STATUS_PAID, EventPayout::STATUS_AWAITING_OTP])->orWhere('category', \App\Enum\LedgerCategoryEnum::Commerce))
             ->exists();
 
         if ($hasActivePayouts) {
-            return response()->json(['message' => 'Cannot remove this account: it has scheduled, in-flight, or completed payouts. Those records must be preserved.'], 422);
+            return response()->json(['message' => 'Cannot remove this account: its payout history or an in-flight transfer must be preserved.'], 422);
         }
 
         $accountModel->delete();

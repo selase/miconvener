@@ -460,3 +460,17 @@ test('host without a shop profile sees empty calendar state gracefully', functio
             ->has('events', 0)
         );
 });
+
+test('host cannot create a venue calendar blackout for merchandise', function (): void {
+    $this->tenantA->features()->create(['feature_key' => 'commerce_catalog', 'enabled' => true]);
+    $item = StoreListing::factory()->published()->create(['shop_id' => $this->shopA->id, 'listing_kind' => StoreListing::KIND_MERCHANDISE]);
+    \App\Models\StoreMerchandise::factory()->create(['listing_id' => $item->id, 'shop_id' => $this->shopA->id]);
+    \App\Models\StoreVariant::factory()->create(['listing_id' => $item->id]);
+    $this->actingAs($this->userA)->post("http://{$this->hostA}/venue/calendar/blocks", [
+        'store_listing_id' => $item->id,
+        'starts_at' => '2026-12-05 08:00:00',
+        'ends_at' => '2026-12-05 18:00:00',
+        'reason' => 'Not a room',
+    ], ['HTTP_HOST' => $this->hostA])->assertNotFound();
+    expect(VenueBooking::query()->where('store_listing_id', $item->id)->exists())->toBeFalse();
+});

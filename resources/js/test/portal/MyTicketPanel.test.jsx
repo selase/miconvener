@@ -133,3 +133,18 @@ describe('ticket presentation', () => {
         expect(screen.getByText('Transfer (offline)')).toBeTruthy();
     });
 });
+
+it('uses the theme foreground for the primary self-check-in action', () => {
+    render(<MyTicketPanel event={event} registration={{ ...registration, self_check_in_available: true }} />);
+    const action = screen.getByRole('button', { name: "I'm here" });
+    expect(action.classList.contains('text-accent-ink')).toBe(true);
+    expect(action.classList.contains('text-white')).toBe(false);
+});
+
+it('keeps the offline consent primary action readable in either theme', () => {
+    render(<MyTicketPanel event={event} registration={registration} offlineIdentity={{ state: 'verified' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket offline' }));
+    const action = screen.getByRole('button', { name: 'Save offline copy' });
+    expect(action.classList.contains('text-accent-ink')).toBe(true);
+    expect(action.classList.contains('text-white')).toBe(false);
+});

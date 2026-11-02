@@ -91,7 +91,7 @@ final class PhoneVerification
             return;
         }
         try {
-            $results = \Laravel\Telescope\Telescope::withoutRecording(fn () => $this->gateway->send([new SmsMessage($submission[0], 'MiConvener sign-in code: '.$submission[1].'. Expires in 5 minutes. Do not share this code.', $id)]));
+            $results = \App\Support\WithoutTelescope::run(fn () => $this->gateway->send([new SmsMessage($submission[0], 'MiConvener sign-in code: '.$submission[1].'. Expires in 5 minutes. Do not share this code.', $id)]));
             $result = $results[$id] ?? SmsResult::unknown('Missing provider outcome.');
             $this->budget->finish($id, $result->accepted ? 'submitted' : ($result->uncertain ? 'unknown' : 'failed'));
             if (! $result->accepted && ! $result->uncertain) {

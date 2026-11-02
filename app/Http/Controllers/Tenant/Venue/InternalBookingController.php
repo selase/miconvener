@@ -56,7 +56,7 @@ final class InternalBookingController extends Controller
         return Inertia::render('Tenant/Venue/InternalBookings/Index', [
             'pending' => $mine()->where('status', VenueBooking::STATUS_PENDING_APPROVAL)->orderBy('starts_at')->get()->map($row)->values(),
             'upcoming' => $mine()->where('status', VenueBooking::STATUS_CONFIRMED)->where('ends_at', '>=', now())->orderBy('starts_at')->limit(50)->get()->map($row)->values(),
-            'rooms' => StoreListing::query()->withStaffOnly()->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))
+            'rooms' => StoreListing::query()->withStaffOnly()->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE)->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))
                 ->where('status', StoreListing::STATUS_PUBLISHED)->orderBy('title')->get(['id', 'title', 'audience'])
                 ->map(fn (StoreListing $room): array => ['id' => $room->id, 'title' => $room->title, 'audience' => $room->audience])->values(),
             'staff' => Member::query()->where('tenant_id', $tenant->id)->where('is_staff', true)->where('status', '!=', MemberStatusEnum::Exited->value)
@@ -74,7 +74,7 @@ final class InternalBookingController extends Controller
     public function store(StoreInternalBookingRequest $request, StaffIdentity $identity): RedirectResponse
     {
         $tenant = $this->tenant();
-        $room = StoreListing::query()->withStaffOnly()->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))->findOrFail($request->validated('store_listing_id'));
+        $room = StoreListing::query()->withStaffOnly()->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE)->whereHas('shop', fn ($shop) => $shop->where('tenant_id', $tenant->id))->findOrFail($request->validated('store_listing_id'));
 
         $member = $request->validated('member_id')
             ? Member::query()->where('tenant_id', $tenant->id)->findOrFail($request->validated('member_id'))

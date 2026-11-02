@@ -257,7 +257,7 @@ export default function MyTicketPanel({
                             <button
                                 onClick={handleSelfCheckIn}
                                 disabled={checkingIn}
-                                className="inline-flex min-h-control py-2 items-center gap-1.5 border border-accent bg-accent px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60 cursor-pointer"
+                                className="inline-flex min-h-control py-2 items-center gap-1.5 border border-accent bg-accent px-4 text-sm font-medium text-accent-ink hover:opacity-90 disabled:opacity-60 cursor-pointer"
                             >
                                 <Check className="h-4 w-4" />
                                 {checkingIn ? 'Checking you in…' : "I'm here"}
@@ -323,7 +323,7 @@ export default function MyTicketPanel({
                                     <button
                                         type="button"
                                         onClick={handleSaveOffline}
-                                        className="rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white hover:opacity-90 cursor-pointer"
+                                        className="rounded-lg bg-accent px-4 py-2 text-xs font-medium text-accent-ink hover:opacity-90 cursor-pointer"
                                     >
                                         Save offline copy
                                     </button>

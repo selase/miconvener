@@ -46,7 +46,7 @@ final class CommunityHistory
         $followers = $this->followerQuery($session);
         $rows = Tenant::query()->where(function ($query) use ($members, $followers): void {
             $query->whereIn('id', $members->select('tenant_id'))->orWhereIn('id', $followers->select('tenant_id'));
-        })->orderBy('name')->orderBy('id')->paginate(20);
+        })->with('shop')->withExists(['features as commerce_catalog_on' => fn ($feature) => $feature->where('feature_key', 'commerce_catalog')->where('enabled', true)])->orderBy('name')->orderBy('id')->paginate(20);
 
         return $rows->through(fn (Tenant $tenant): array => (new MyCommunityResource($tenant))->withIdentitySession($session)->resolve(request()))->toArray();
     }

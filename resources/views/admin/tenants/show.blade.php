@@ -5,6 +5,9 @@
 @section('content')
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
+        @can('access-superadmin-dashboard')
+            <p><a class="btn btn-light-primary mb-5" href="{{ route('admin.store-agreements.index', $tenant) }}">Commerce agreement</a></p>
+        @endcan
         @can('manage-commercial-terms')
             <div class="card card-flush mb-6">
                 <div class="card-header"><h2 class="card-title">Commercial terms</h2></div>

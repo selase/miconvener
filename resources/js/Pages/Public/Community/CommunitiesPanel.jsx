@@ -403,6 +403,14 @@ export default function CommunitiesPanel({
                                             )}
                                         </div>
                                         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2">
+                                            {community.actions?.store_url && (
+                                                <a
+                                                    className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-medium text-ink hover:text-accent"
+                                                    href={community.actions.store_url}
+                                                >
+                                                    Browse store
+                                                </a>
+                                            )}
                                             {community.actions?.polls && (
                                                 <a
                                                     className="min-h-11 text-accent underline"

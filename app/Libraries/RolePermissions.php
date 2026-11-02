@@ -119,6 +119,10 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
+            'manage store catalog',
+            'manage store collection',
+            'manage store orders',
+            'manage store finance',
             ...self::platformFinancePermissions(),
             ...self::platformMarketingPermissions(),
             // Commission rates and caps for one organisation. Superadmin by
@@ -201,6 +205,9 @@ final class RolePermissions
             'delete notification-rule',
             'manage notification-settings',
             'manage venue',
+            'manage venue refunds',
+            'reconcile venue payments',
+            'release venue settlements',
         ];
     }
 
@@ -212,6 +219,10 @@ final class RolePermissions
     private static function organizationSuperadminPermissions(): array
     {
         return [
+            'manage store catalog',
+            'manage store collection',
+            'manage store orders',
+            'manage store finance',
             'create communication',
             'read communication',
             'update communication',
@@ -276,6 +287,9 @@ final class RolePermissions
             'delete notification-rule',
             'manage notification-settings',
             'manage venue',
+            'manage venue refunds',
+            'reconcile venue payments',
+            'release venue settlements',
         ];
     }
 
@@ -287,6 +301,9 @@ final class RolePermissions
     private static function organizationAdminPermissions(): array
     {
         return [
+            'manage store catalog',
+            'manage store collection',
+            'manage store orders',
             'create communication',
             'read communication',
             'update communication',

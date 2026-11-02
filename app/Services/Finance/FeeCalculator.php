@@ -17,43 +17,33 @@ final class FeeCalculator
 
     public function for(Event $event, int $ticketAmount): FeeBreakdown
     {
-        if ($ticketAmount < 0) {
-            throw new InvalidArgumentException('Ticket amounts cannot be negative.');
+        return $this->forTerms($ticketAmount, new FeeTerms(
+            $this->resolver->percentageFor($event), $this->resolver->capAmountFor($event),
+            $this->resolver->bearerFor($event), $this->resolver->gatewayFeePercentage(),
+        ));
+    }
+
+    public function forTerms(int $principal, FeeTerms $terms): FeeBreakdown
+    {
+        if ($principal < 0 || $principal > 9007199254740991) {
+            throw new InvalidArgumentException('Amount exceeds safe minor-unit bounds.');
         }
-
-        $percentage = $this->resolver->percentageFor($event);
-        $bearer = $this->resolver->bearerFor($event);
-        $cap = $this->resolver->capAmountFor($event);
-
-        if ($ticketAmount === 0) {
-            return new FeeBreakdown(0, 0, 0, 0, 0, $bearer, $percentage, false);
+        $uncapped = $this->percentage($principal, $terms->percentage);
+        $fee = $terms->capAmount === null ? $uncapped : min($uncapped, $terms->capAmount);
+        $charged = $terms->bearer === PlatformFeeResolver::BEARER_ATTENDEE ? $principal + $fee : $principal;
+        if ($charged > 9007199254740991) {
+            throw new InvalidArgumentException('Charged amount exceeds safe minor-unit bounds.');
         }
+        $gateway = $this->percentage($charged, $terms->gatewayEstimateRate);
 
-        $uncappedFee = (int) round($ticketAmount * $percentage / 100);
-        $platformFee = $cap !== null ? min($uncappedFee, $cap) : $uncappedFee;
-        $capApplied = $cap !== null && $uncappedFee > $cap;
+        return new FeeBreakdown($principal, $fee, $gateway, $charged, $charged - $fee - $gateway,
+            $terms->bearer, $terms->percentage, $terms->capAmount !== null && $uncapped > $terms->capAmount);
+    }
 
-        $chargedAmount = $bearer === PlatformFeeResolver::BEARER_ATTENDEE
-            ? $ticketAmount + $platformFee
-            : $ticketAmount;
+    private function percentage(int $amount, float $rate): int
+    {
+        $basisPoints = (int) round($rate * 100);
 
-        /**
-         * Paystack takes its cut of whatever it actually collects, so the
-         * estimate follows the charged amount rather than the ticket price.
-         */
-        $gatewayFeeEstimate = (int) round(
-            $chargedAmount * $this->resolver->gatewayFeePercentage() / 100
-        );
-
-        return new FeeBreakdown(
-            ticketAmount: $ticketAmount,
-            platformFee: $platformFee,
-            gatewayFeeEstimate: $gatewayFeeEstimate,
-            chargedAmount: $chargedAmount,
-            organizerNet: $chargedAmount - $platformFee - $gatewayFeeEstimate,
-            bearer: $bearer,
-            percentage: $percentage,
-            capApplied: $capApplied,
-        );
+        return intdiv($amount, 10000) * $basisPoints + intdiv(($amount % 10000) * $basisPoints + 5000, 10000);
     }
 }

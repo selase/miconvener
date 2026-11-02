@@ -17,7 +17,18 @@ import {
     CreditCard,
 } from 'lucide-react';
 
+const STATUS_LABEL = {
+    pending_host_approval: 'awaiting approval',
+    approved_hold: 'dates held',
+    hold_expired: 'hold expired',
+    declined: 'declined',
+};
+
 const STATUS_MAP = {
+    pending_host_approval: 'pending',
+    approved_hold: 'pending',
+    hold_expired: 'neutral',
+    declined: 'failed',
     pending_quote: 'pending',
     pending_payment: 'pending',
     confirmed: 'success',
@@ -121,6 +132,8 @@ export default function InquiriesIndex({ shop, inquiries, stats, filters }) {
                     <div className="flex flex-wrap gap-2 text-xs">
                         {[
                             { key: 'all', label: 'All Inquiries' },
+                            { key: 'pending_host_approval', label: 'Awaiting Approval' },
+                            { key: 'approved_hold', label: 'Dates Held' },
                             { key: 'pending_quote', label: 'Quotes Needed' },
                             { key: 'pending_payment', label: 'Pending Payment / On Hold' },
                             { key: 'confirmed', label: 'Confirmed' },
@@ -237,8 +250,14 @@ export default function InquiriesIndex({ shop, inquiries, stats, filters }) {
                                         )}
                                     </Td>
                                     <Td>
-                                        <StatusPill status={STATUS_MAP[lead.status] || 'neutral'}>
-                                            {lead.status.replace('_', ' ')}
+                                        <StatusPill
+                                            status={
+                                                STATUS_MAP[lead.effective_status ?? lead.status] ||
+                                                'neutral'
+                                            }
+                                        >
+                                            {STATUS_LABEL[lead.effective_status ?? lead.status] ??
+                                                lead.status.replace('_', ' ')}
                                         </StatusPill>
                                     </Td>
                                     <Td align="right">

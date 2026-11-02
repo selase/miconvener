@@ -156,10 +156,17 @@ test('an organisation that left Enterprise can make rooms public but not staff-o
 });
 
 test('the calendar shows staff bookings with their kind, department and purpose', function (): void {
-    VenueBooking::factory()->internal()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'store_listing_id' => $this->room->id, 'department' => 'Finance', 'purpose' => 'Budget review', 'starts_at' => now()->addDay()->setTime(9, 0), 'ends_at' => now()->addDay()->setTime(11, 0)]);
+    VenueBooking::factory()->internal()->create(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'store_listing_id' => $this->room->id, 'department' => 'Finance', 'purpose' => 'Budget review', 'starts_at' => now()->startOfMonth()->setTime(9, 0), 'ends_at' => now()->startOfMonth()->setTime(11, 0)]);
 
     $this->actingAs($this->owner)->get(route('tenant.venue.calendar.index', ['subdomain' => $this->tenant->slug]))->assertOk()->assertInertia(fn ($page) => $page
         ->where('events', fn ($events) => collect($events)->contains(fn (array $e): bool => ($e['kind'] ?? null) === 'internal' && ($e['department'] ?? null) === 'Finance' && ($e['purpose'] ?? null) === 'Budget review')));
+});
+
+test('the calendar opens the month asked for on the 31st instead of overflowing into the next', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-31 10:00:00'));
+
+    $this->actingAs($this->owner)->get(route('tenant.venue.calendar.index', ['subdomain' => $this->tenant->slug, 'month' => '2026-11']))
+        ->assertOk()->assertInertia(fn ($page) => $page->where('month', '2026-11'));
 });
 
 test('the facility team adds and removes staff from the staff list', function (): void {

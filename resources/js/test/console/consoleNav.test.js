@@ -49,6 +49,7 @@ describe('visibleGroups', () => {
             'top',
             'events',
             'community',
+            'store',
             'venue',
             'finance',
             'organisation',
@@ -147,4 +148,41 @@ it('keeps Library reachable for authorised staff with retained documents', () =>
         can: {},
     });
     expect(hidden.find((group) => group.key === 'community')).toBeUndefined();
+});
+
+describe('Store catalog navigation', () => {
+    it('requires the catalog rollout and its own permission without needing Community', () => {
+        const keys = (context) => visibleGroups(NAV_GROUPS, context).map((group) => group.key);
+        expect(
+            keys({ features: { commerce_catalog: true }, can: { manage_store_catalog: true } })
+        ).toContain('store');
+        expect(keys({ features: {}, can: { manage_store_catalog: true } })).not.toContain('store');
+        expect(
+            keys({ features: { commerce_catalog: true }, can: { manage_venue: true } })
+        ).not.toContain('store');
+    });
+});
+
+it('hides inactive empty Store navigation but retains authorised order and finance recovery', () => {
+    const can = {
+        manage_store_orders: true,
+        manage_store_finance: true,
+        manage_store_catalog: true,
+    };
+    expect(
+        visibleGroups(NAV_GROUPS, { features: {}, can }).find((g) => g.key === 'store')
+    ).toBeUndefined();
+    const retained = visibleGroups(NAV_GROUPS, { features: { commerce_history: true }, can }).find(
+        (g) => g.key === 'store'
+    );
+    expect(retained.items.map((i) => i.label)).toEqual([
+        'Store quotes',
+        'Store orders',
+        'Store finance',
+    ]);
+    expect(
+        visibleGroups(NAV_GROUPS, { features: { commerce_history: true }, can: {} }).find(
+            (g) => g.key === 'store'
+        )
+    ).toBeUndefined();
 });

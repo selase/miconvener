@@ -83,6 +83,47 @@ export const NAV_GROUPS = [
         ],
     },
     {
+        key: 'store',
+        label: 'Store',
+        items: [
+            {
+                label: 'Catalog',
+                href: 'tenant.store.catalog.index',
+                icon: 'LayoutGrid',
+                feature: 'commerce_catalog',
+                permission: 'manage_store_catalog',
+            },
+            {
+                label: 'Store quotes',
+                href: 'tenant.store.quotes.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_orders',
+                feature: 'commerce_history',
+            },
+            {
+                label: 'Store orders',
+                href: 'tenant.store.orders.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_orders',
+                feature: 'commerce_history',
+            },
+            {
+                label: 'Store fulfilment',
+                href: 'tenant.store.collections.index',
+                icon: 'LayoutGrid',
+                permission: 'manage_store_collection',
+                feature: 'commerce_history',
+            },
+            {
+                label: 'Store finance',
+                href: 'tenant.store.finance.index',
+                icon: 'Wallet',
+                permission: 'manage_store_finance',
+                feature: 'commerce_history',
+            },
+        ],
+    },
+    {
         key: 'venue',
         label: 'Venue',
         items: [
@@ -122,6 +163,12 @@ export const NAV_GROUPS = [
                 href: 'tenant.venue.quotes.index',
                 icon: 'FileText',
                 permission: 'manage_venue',
+            },
+            {
+                label: 'Venue money',
+                href: 'tenant.venue.finance.index',
+                icon: 'Wallet',
+                permission: 'venue_money',
             },
         ],
     },

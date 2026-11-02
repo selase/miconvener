@@ -3,6 +3,7 @@ import ConsoleLayout from '@/Layouts/ConsoleLayout';
 import Button from '@/Components/Console/Button';
 import Input from '@/Components/Console/Input';
 import Select from '@/Components/Console/Select';
+import VenueRequestPolicyFields from '@/Components/Venue/VenueRequestPolicyFields';
 import PageHeader from '@/Components/Console/PageHeader';
 import {
     ArrowLeft,
@@ -26,7 +27,12 @@ const CATEGORY_META = {
     catering_rules: { label: 'Catering & Food Policy', icon: Utensils },
 };
 
-export default function SpaceForm({ space, amenities }) {
+export default function SpaceForm({
+    space,
+    amenities,
+    venueRequests = false,
+    defaultTimezone = 'UTC',
+}) {
     const staffRooms = Boolean(usePage().props.tenant?.features?.staff_room_booking);
     const isEdit = !!space;
 
@@ -65,6 +71,10 @@ export default function SpaceForm({ space, amenities }) {
         status: space?.status || 'published',
         audience: space?.audience || 'public',
         requires_approval: space?.requires_approval ?? true,
+        public_booking_policy: {
+            default_hold_hours: space?.booking_policy?.default_hold_hours ?? 48,
+            timezone: space?.booking_policy?.timezone ?? defaultTimezone,
+        },
         amenities: [],
     });
 
@@ -492,6 +502,14 @@ export default function SpaceForm({ space, amenities }) {
                         Staff requests for this room need approval
                     </label>
                 </div>
+            )}
+
+            {venueRequests && (
+                <VenueRequestPolicyFields
+                    policy={data.public_booking_policy}
+                    errors={errors}
+                    onChange={(policy) => setData('public_booking_policy', policy)}
+                />
             )}
 
             {/* SECTION 5: Status & Submit */}

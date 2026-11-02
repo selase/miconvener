@@ -78,7 +78,11 @@ final class PlatformAttendeeWorkspaceController extends Controller
             ->whereNotIn('status', [EventRegistration::STATUS_CANCELLED, EventRegistration::STATUS_REJECTED]);
         $registration = (clone $registrations)->confirmed()->latest()->first() ?? $registrations->latest()->first();
         if ($registration === null) {
-            return redirect('/my?event_access=not_found');
+            // Verified, but not registered for this event: an event still to come
+            // invites them to register; one that has finished only explains.
+            return $eventModel->ends_at->isFuture()
+                ? redirect(route('public.events.show', ['subdomain' => $eventModel->tenant->slug, 'event' => $eventModel->slug]).'?'.http_build_query(['attendee_area' => 'register']))
+                : redirect('/my?event_access=not_found');
         }
 
         return redirect($this->authorizer->workspaceUrl($registration).'?'.http_build_query(['tab' => $tab]));

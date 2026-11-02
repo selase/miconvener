@@ -38,6 +38,10 @@ final class MarketplaceVendorService
         array $payload,
         ?Tenant $plannerTenant = null
     ): MarketplaceQuote {
+        if ($listing->listing_kind === StoreListing::KIND_MERCHANDISE) {
+            throw ValidationException::withMessages(['listing' => 'Merchandise uses the store checkout, not supplier quotes.']);
+        }
+
         do {
             $reference = 'RFQ-'.mb_strtoupper(Str::random(10));
         } while (MarketplaceQuote::query()->where('quote_reference', $reference)->exists());
@@ -121,6 +125,10 @@ final class MarketplaceVendorService
      */
     public function initializeCheckout(MarketplaceQuote $quote, string $callbackUrl): array
     {
+        if (StoreListing::withoutGlobalScope(\App\Scopes\MerchandiseVisibilityScope::class)->whereKey($quote->store_listing_id)->where('listing_kind', StoreListing::KIND_MERCHANDISE)->exists()) {
+            throw new RuntimeException('Merchandise cannot use supplier quote checkout.');
+        }
+
         if ($quote->venuePaymentsPaused()) {
             throw new RuntimeException('Online payments are paused for this venue.');
         }

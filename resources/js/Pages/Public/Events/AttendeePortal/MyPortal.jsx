@@ -19,6 +19,7 @@ import HistorySkeleton from './components/HistorySkeleton';
 import { AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
 import { clearAllOfflineTickets, purgeExpiredOfflineTickets } from '@/lib/offlineTicketStore';
 import { registerAttendeeServiceWorker } from '@/lib/registerServiceWorker';
+import { safePortalReturn } from '@/lib/portalReturn';
 
 /**
  * Platform attendee portal shell: proves identity across all organisers
@@ -29,6 +30,7 @@ function LegacyMyPortal({
     organiser = null,
     communityPhoneVerified: phoneAtLoad = false,
     communityReturnUrl = null,
+    joinEvent = null,
     verifiedEmail: provenAtLoad = null,
     initialHistory = null,
     initialCertificates = null,
@@ -59,6 +61,12 @@ function LegacyMyPortal({
     const joiningEvent =
         typeof window !== 'undefined' &&
         /^\/my\/join\//.test(new URLSearchParams(window.location.search).get('return_to') || '');
+
+    const returningToStore =
+        typeof window !== 'undefined' &&
+        /^\/my\/store-orders(?:\/|$)/.test(
+            new URLSearchParams(window.location.search).get('return_to') || ''
+        );
 
     useEffect(() => {
         registerAttendeeServiceWorker();
@@ -193,8 +201,8 @@ function LegacyMyPortal({
         // back where they were going. The target is only ever followed when it
         // is a path on this portal, so a crafted ?return_to cannot bounce a
         // just-verified visitor off to somewhere else.
-        const requested = new URLSearchParams(window.location.search).get('return_to');
-        if (requested && /^\/my(\/|$)/.test(requested) && !requested.startsWith('//')) {
+        const requested = safePortalReturn(new URLSearchParams(window.location.search).get('return_to'));
+        if (requested) {
             window.location.assign(requested);
             return;
         }
@@ -308,14 +316,26 @@ function LegacyMyPortal({
     };
     if (credential)
         return (
-            <PublicLayout>
+            <PublicLayout
+                headerActions={
+                    <a href="/my/store-orders" className="text-sm text-accent underline">
+                        Store orders
+                    </a>
+                }
+            >
                 <Head title="Save your private recovery key" />
                 <RecoveryCredential credential={credential} onClear={clearCredential} />
             </PublicLayout>
         );
 
     return (
-        <PublicLayout>
+        <PublicLayout
+            headerActions={
+                <a href="/my/store-orders" className="text-sm text-accent underline">
+                    Store orders
+                </a>
+            }
+        >
             <Head title="My MiConvener">
                 <link rel="manifest" href="/my/manifest.json" />
                 <meta name="theme-color" content="#4f46e5" />
@@ -334,20 +354,24 @@ function LegacyMyPortal({
                 )}
                 <div className="space-y-1 mb-8">
                     <h1 className="text-2xl font-normal tracking-tight text-ink">
-                        {joiningEvent && !verifiedEmail
-                            ? 'Verify your registration email'
-                            : selectedOrganiser?.name
-                              ? `Your events with ${selectedOrganiser.name}`
-                              : phoneVerified && !verifiedEmail
-                                ? 'Your MiConvener Communities'
-                                : 'Your MiConvener events'}
+                        {returningToStore && !verifiedEmail
+                            ? 'Your MiConvener store orders'
+                            : joiningEvent && !verifiedEmail
+                              ? 'Verify your registration email'
+                              : selectedOrganiser?.name
+                                ? `Your events with ${selectedOrganiser.name}`
+                                : phoneVerified && !verifiedEmail
+                                  ? 'Your MiConvener Communities'
+                                  : 'Your MiConvener events'}
                     </h1>
                     <p className="text-[13.5px] text-ink-secondary">
-                        {joiningEvent && !verifiedEmail
-                            ? 'Use the email you registered with to open the programme, polls, Q&A and surveys. Phone verification does not unlock event tickets.'
-                            : phoneVerified && !verifiedEmail
-                              ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
-                              : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
+                        {returningToStore && !verifiedEmail
+                            ? 'Verify the email used for your quote or order to review the details, pay and track collection or delivery.'
+                            : joiningEvent && !verifiedEmail
+                              ? 'Use the email you registered with to open the programme, polls, Q&A and surveys. Phone verification does not unlock event tickets.'
+                              : phoneVerified && !verifiedEmail
+                                ? 'Follow organisations, track requests and restore independently approved memberships. Verify email separately for tickets and event history.'
+                                : 'Central workspace for your tickets, materials, agendas, certificates, and attendance across all organisers.'}
                     </p>
                 </div>
 
@@ -594,6 +618,17 @@ function LegacyMyPortal({
                             organiserSlug={selectedOrganiser?.slug}
                             allowPhone={!joiningEvent}
                         />
+                        {joiningEvent && joinEvent && (
+                            <p className="mt-6 text-sm text-ink-secondary">
+                                Not registered for {joinEvent.name} yet?{' '}
+                                <a
+                                    href={joinEvent.register_url}
+                                    className="font-medium text-accent underline"
+                                >
+                                    Register for this event
+                                </a>
+                            </p>
+                        )}
                     </div>
                 )}
                 {(verifiedEmail || phoneVerified) && (

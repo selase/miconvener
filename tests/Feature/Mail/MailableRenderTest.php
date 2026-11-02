@@ -44,9 +44,12 @@ use App\Mail\Marketplace\NewQuoteRequestNotification;
 use App\Mail\Marketplace\NewVenueBookingNotification;
 use App\Mail\Marketplace\QuoteProposalReady;
 use App\Mail\Marketplace\QuoteSentNotification;
+use App\Mail\Marketplace\VenueApprovalNotice;
+use App\Mail\Marketplace\VenueQuoteNoticeMail;
 use App\Mail\Moderation\TakedownNoticeMail;
 use App\Mail\NewEnterpriseLead;
 use App\Mail\Platform\TenantSignupMail;
+use App\Mail\StoreOrderReceipt;
 use App\Mail\Users\ResendAccountPassword;
 use App\Mail\Users\SendAccountDetails;
 use App\Mail\Venue\RoomRequestDecided;
@@ -257,7 +260,16 @@ test('every mailable renders', function (): void {
         'webhook_failures' => ['processing' => 0, 'signature' => 0],
     ];
 
+    $storeReceipt = App\Models\StoreReceipt::factory()->create(['snapshot' => [
+        'seller' => 'Association Store', 'number' => 'STORE-RENDER', 'currency' => 'GHS', 'total_pesewas' => 3000,
+        'lines' => [['title' => 'Association notebook', 'quantity' => 1, 'amount_pesewas' => 3000]],
+        'collection_terms' => 'Collect at the office.', 'refund_terms' => 'Contact support before collection.',
+        'support_contact' => 'support@example.test', 'receipt_terms' => 'Payment receipt, not a VAT invoice.',
+    ]]);
+
     $mailables = [
+        'StoreOrderReady' => fn () => new App\Mail\StoreOrderReady(App\Models\StoreFulfilmentNotice::factory()->create()),
+        'StoreOrderReceipt' => fn () => new StoreOrderReceipt($storeReceipt),
         'SetUpRecoveryCodesMail' => fn () => new SetUpRecoveryCodesMail('Ama', 'Acme Events', 'https://acme.test/account'),
         'BillingDailySummaryMail' => fn () => new BillingDailySummaryMail($summary),
         'AgreedPriceMail' => fn () => new AgreedPriceMail($tenant, 'Enterprise', 'GHS 2,500.00 a month', false, 'https://acme.test/billing'),
@@ -307,6 +319,10 @@ test('every mailable renders', function (): void {
         'NewVenueBookingNotification' => fn () => new NewVenueBookingNotification($booking, 'https://acme.test/console/venue/inquiries/BK-RENDER-001'),
         'QuoteSentNotification' => fn () => new QuoteSentNotification($booking, 'https://miconvener.test/marketplace/bookings/BK-RENDER-001/checkout'),
         'NewQuoteRequestNotification' => fn () => new NewQuoteRequestNotification($quote, 'https://acme.test/venue/quotes/RFQ-RENDER001'),
+        'VenueApprovalNotice' => fn () => new VenueApprovalNotice(App\Models\VenueBookingAction::factory()->create(['booking_id' => $booking->id, 'action' => 'approved', 'hold_expires_at' => now()->addDay()]), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'VenueApprovalNotice (declined)' => fn () => new VenueApprovalNotice(App\Models\VenueBookingAction::factory()->create(['booking_id' => $booking->id, 'action' => 'declined', 'decision_reason' => 'Closed for repairs']), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'VenueQuoteNoticeMail' => fn () => new VenueQuoteNoticeMail(App\Models\VenueQuoteNotice::factory()->create(), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
+        'VenueQuoteNoticeMail (withdrawn)' => fn () => new VenueQuoteNoticeMail(App\Models\VenueQuoteNotice::factory()->create(['kind' => 'withdrawn']), 'https://miconvener.test/marketplace/bookings/BK-RENDER-001'),
         'QuoteProposalReady' => fn () => new QuoteProposalReady($quote, 'https://miconvener.test/marketplace/quotes/RFQ-RENDER001'),
     ];
 

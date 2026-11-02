@@ -315,12 +315,24 @@ final class PermissionsSeeder extends Seeder
                 'guard_name' => 'web',
                 'category' => 'notifications',
             ],
+            ['uuid' => Str::uuid(), 'name' => 'manage store collection', 'guard_name' => 'web', 'category' => 'store'],
+            ['uuid' => Str::uuid(), 'name' => 'manage store orders', 'guard_name' => 'web', 'category' => 'store'],
+            ['uuid' => Str::uuid(), 'name' => 'manage store finance', 'guard_name' => 'web', 'category' => 'store'],
+            [
+                'uuid' => Str::uuid(),
+                'name' => 'manage store catalog',
+                'guard_name' => 'web',
+                'category' => 'store',
+            ],
             [
                 'uuid' => Str::uuid(),
                 'name' => 'manage venue',
                 'guard_name' => 'web',
                 'category' => 'venue',
             ],
+            ['uuid' => Str::uuid(), 'name' => 'manage venue refunds', 'guard_name' => 'web', 'category' => 'venue'],
+            ['uuid' => Str::uuid(), 'name' => 'reconcile venue payments', 'guard_name' => 'web', 'category' => 'venue'],
+            ['uuid' => Str::uuid(), 'name' => 'release venue settlements', 'guard_name' => 'web', 'category' => 'venue'],
         ];
     }
 

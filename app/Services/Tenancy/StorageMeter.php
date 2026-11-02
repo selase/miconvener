@@ -33,6 +33,11 @@ final class StorageMeter
             ]);
         }
 
-        return $totalSize + (int) \App\Models\CommunityLibraryVersion::withoutGlobalScopes()->where('tenant_id', $tenant->id)->sum('size');
+        $merchandiseBytes = (int) \App\Models\StoreListingMedia::withoutGlobalScope('merchandise')
+            ->whereNotNull('disk')->whereExists(fn ($query) => $query->selectRaw('1')->from('store_listings')->join('shops', 'shops.id', '=', 'store_listings.shop_id')
+            ->whereColumn('store_listings.id', 'store_listing_media.listing_id')->where('shops.tenant_id', $tenant->id)
+            ->where('store_listings.listing_kind', \App\Models\StoreListing::KIND_MERCHANDISE))->sum('byte_size');
+
+        return $merchandiseBytes + $totalSize + (int) \App\Models\CommunityLibraryVersion::withoutGlobalScopes()->where('tenant_id', $tenant->id)->sum('size');
     }
 }

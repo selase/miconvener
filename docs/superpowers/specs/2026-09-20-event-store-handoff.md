@@ -2,6 +2,8 @@
 
 **Updated 2026-10-01.** Codifies the agreed architectural and business evolution from the original 2026-09-20 brainstorming notes.
 
+**2026-10-22 audit:** see the [reconciled marketplace roadmap](../marketplace-roadmap.md) for code/test evidence, remaining gaps and the unified catalog/commerce direction and proposed merchandise-first delivery sequence. That roadmap is awaiting owner review. This historical handoff does not by itself approve its older commission/split assumptions, implementation, or booking/payment activation.
+
 ---
 
 ## 1. Executive Summary & Strategic Rationale

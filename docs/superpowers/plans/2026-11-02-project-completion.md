@@ -1,0 +1,150 @@
+# MiConvener Remaining Work: Phased Implementation Plan
+
+> **For agentic workers:** Execute natively with `superpowers:executing-plans`, one bounded release at a time. The owner authorised this plan and systematic implementation on 2 November 2026. Start with Phase 1; continue unblocked work without asking for routine permission again. Preserve the explicit decision and external-action gates below.
+
+**Goal:** close the unreleased fixes and acceptance gaps first, then complete the remaining product roadmap without losing existing features or confusing tested software with approved commercial rollout.
+
+**Architecture:** reuse Laravel services, React/Inertia screens, shared finance/identity controls and per-organisation rollout switches. This master plan orders independently reviewable workstreams; existing detailed plans remain binding, and new feature work gets a focused child spec/plan before code. Do not combine unrelated money, consent and marketplace expansions in one PR.
+
+**Tech stack:** existing Laravel13/PHP8.5, React/Inertia, PostgreSQL, private storage, Paystack, Pest/Vitest and tracked Vite assets. No dependency additions assumed.
+
+**Sources:** `docs/superpowers/community-roadmap.md`; `docs/superpowers/marketplace-roadmap.md`; `docs/superpowers/plans/2026-10-21-community-followups.md`; Community design, Giving/member-benefit/Library plans; Marketplace S2b design and acceptance plan. Read AGENTS finance/session/commerce invariants before relevant work.
+
+## Execution and release constraints
+
+- Use the owned `artifact-completion` worktree; never edit, reset, clean, remove or migrate Claude's checkouts/databases. Reuse inactive branches where appropriate. Inventory exact paths before cleanup.
+- Native implementation. New fixes start with a failing regression; existing reviewed work is reconciled with current main, then retested. Tick steps in the commit carrying the work and record commands/results honestly.
+- One proportionate self-review and one fresh review per release; fix review findings with regressions rather than repeating whole reviews. Use affected local tests and one final CI gate; rerun failed CI jobs only when appropriate. Never merge pending or failed checks.
+- Commit rebuilt `public/build` with JS/CSS changes; run Pint on changed PHP. Rebuild generated conflicts rather than choosing old assets.
+- Owner authorised systematic implementation and release of agreed fixes. New commercial terms, real charges/transfers, historical financial cutovers, public identity publication, broad tenant activation and irreversible data deletion retain their specific approval gates. Reuse already approved test-mode accounts and synthetic recipients only within their authorised scope.
+- Purpledot remains the production pilot. Other organisations stay unchanged. Giving online and historical cutover are independent from venue/merchandise activation.
+- Never invent real photos, venue facilities, stock, customer identities, passwords, consent or successful payment/delivery evidence. No bulk resend/retry of historical financial or mail jobs.
+- Preserve original verified-email ownership, member/representative isolation, consent withdrawal and financial idempotency. Save tickets only through explicit offline selection; never cache private money/messages/documents.
+
+## Review Focus
+
+1. An old PR may pass CI but remain unreleased or overlap current main; compare actual source and final-head checks before merging.
+2. A provider-accepted send/capture is not recipient delivery or reconciled money; record terminal evidence and any ambiguity separately.
+3. No-dues churches and volunteer groups must use Giving, Library, services and polls without accidental membership/dues prerequisites.
+4. Accessibility/offline improvements must preserve access revocation, representative boundaries and signed-out/expired-proof behaviour.
+5. Calendar renewal dates, storage limits, public profiles and marketplace expansion have business/privacy consequences; do not silently turn recommendations into live policy.
+
+## Phase 0 — Reconcile the inventory
+
+- [x] Read current roadmap/follow-up records and actual source; inspect open PRs and worktrees.
+- [x] Confirm PR48 (`codex/ticket-layout`, `e4c2a200`) is still draft/unmerged; current ticket component retains the squeezed note/QR row. Earlier CI was green but is not a current-main release gate.
+- [x] Confirm PR47 ticket-mail retries are already merged; `ping_threshold=9` and bounded retry code exist. Do not rebuild this fix from stale unchecked notes.
+- [x] Confirm PR59 is an obsolete S2a documentation update; S2a/S2b and later pilot records already supersede it. Close it with a concise explanation after preserving any unique information.
+- [x] Confirm Community milestones1–7/4b are deployed; remaining items below are acceptance, policy, follow-up features and marketplace expansion, not unbuilt original milestones.
+- [x] Confirm existing editable marketing pack exists; refresh it rather than create an unrelated replacement.
+
+## Phase 1 — Release the ticket layout correction (start here)
+
+**Files:** `resources/js/Pages/Public/Events/AttendeePortal/panels/MyTicketPanel.jsx`; `resources/js/test/portal/MyTicketPanel.test.jsx`; tracked assets; this plan.
+**Input:** reviewed PR48 implementation and current main. **Output:** readable responsive ticket notice, QR, details/actions with original verification/payment/transfer/certificate behaviour intact.
+
+- [x] Reconcile current main into the existing ticket branch without rewriting reviewed history. Source merges cleanly; generated asset conflicts require a rebuild.
+- [x] Compare the merged source with PR48's reviewed change; retain later main features and identify any new interaction regression.
+- [x] Add a failing test for any newly demonstrated gap (including theme-aware primary action text), then implement only that correction.
+- [x] Run the ticket/attendee tests and existing enlarged-text/long-name/no-QR cases; lint, Pint, rebuild assets and check whitespace.
+- [ ] Browser-check the real built component at desktop/390px, light/dark, long values and enlarged text; retain synthetic/local evidence distinctly from live verification.
+- [x] Self-review touchpoints, empty/loading/error, permission, keyboard and responsive states; one independent review of the reconciled change.
+- [ ] Update PR48's description to its final scope; mark ready; push normally; require green CI on the exact final head; squash-merge and monitor automatic Cloud deployment.
+- [ ] Verify the live ticket surface if normal member access is available. If proof expired, ask for normal email verification without requesting codes; continue unrelated work while waiting. Do not issue another ticket or resend mail unnecessarily.
+
+## Phase 2 — Giving and paid member-benefit acceptance
+
+**Files/services:** `app/Services/Giving/{GivingRollout,GivingCheckout,GivingPaymentConfirmer,GivingReceipts,GivingRefunds,GivingBalance}.php`; `tests/Feature/Giving/*`; `tests/Feature/Events/MemberBenefit{Checkout,Payment,Quote,Lifecycle,Webhook}Test.php`; existing Giving/benefits plans.
+**Output:** a source-specific financial readiness record; corrections only where a failure is reproduced.
+
+- [ ] Inventory effective flags, settlement/account configuration and existing acceptance records read-only; do not assume venue tests certify Giving or ticket pricing.
+- [ ] Prepare isolated church and volunteer-group fixtures with no dues. Reuse approved test-mode provider credentials/synthetic recipients; never replace production keys.
+- [ ] Verify voluntary giving, optional member attribution, receipt and Money/inbox access; failed/abandoned/duplicate callbacks; exact amounts and balanced/idempotent ledger entries.
+- [ ] Verify active-member prices and admission, ordinary/nonmember prices, quote expiry, lapsed membership during checkout, free/paid recovery and representative restrictions.
+- [ ] Verify Giving refund/correction funding and payout/OTP reconciliation with original accounts/references; owner performs any required hosted/OTP action privately.
+- [ ] For each defect: failing regression → minimal fix → affected suite → review/CI/release. Restore only temporary test publication; retain honest financial evidence.
+- [ ] Present a Giving online readiness recommendation. Enabling Purpledot online Giving needs its specific approval; historical contribution association/cutover requires a separate tenant-bounded inventory and approved boundary.
+
+## Phase 3 — Accessibility, offline and representative acceptance
+
+**Files:** personal-app components including `resources/js/Pages/Public/Community/CommunitiesPanel.jsx`; ticket/portal components and `resources/js/lib/offlineTicketStore.*`; existing portal tests and follow-up plan §4.
+
+- [ ] Audit primary controls on both themes; reproduce white-on-bright-accent failures before replacing them with existing `text-accent-ink` semantics. Keep the iconic homepage blue unchanged.
+- [ ] Check actual390px reflow, keyboard navigation/focus return, menu/dialog placement and200% text. Correct demonstrated defects with proportionate regressions.
+- [ ] Save explicitly selected passes, cold-open offline, sign out/remove proof in another tab and verify clearing. Money, inbox, Library and service notes remain online-only.
+- [ ] Exercise personal versus authorised representative contexts, expired proofs, reassigned/shared phone safeguards and cross-organisation denial.
+- [ ] Prepare a short real-phone checklist for the owner. Emulation is not physical-device proof; record audio/vibration/offline scanner checks independently from the already-passed online QR scans.
+- [ ] Release scoped fixes and record remaining owner-device actions without blocking other independent phases.
+
+## Phase 4 — Library attachments and storage policy
+
+**Files:** `app/Services/Community/{CommunityContentStorage,CommunityLibrary}.php`; `app/Services/Tenancy/StorageMeter.php`; existing Library tests/package allowance configuration.
+
+- [ ] Read effective `storage_bytes` allowances and aggregate usage without downloading private content; identify what retained versions/assets count.
+- [ ] Propose concrete tier allowances and over-limit treatment based on that inventory. Owner approves public/package limits before production configuration changes; do not invent prices.
+- [ ] Reuse the existing aggregate meter and20MiB/file validation. Add boundary/concurrent-upload/retained-version/orphan-cleanup regressions only for missing behaviour.
+- [ ] Exercise a synthetic PDF upload, authenticated view/download, foreign tenant and expired-proof denial, unsigned-object denial and readable history while over quota.
+- [ ] Apply approved missing-only configuration, verify capacity/error messages, release and record results. No silent deletion of existing documents.
+
+## Phase 5 — Billing renewal date semantics
+
+**Files:** `app/Services/Billing/SubscriptionRenewalService.php`; `tests/Feature/Billing/SubscriptionRenewalTest.php`; subscription model and billing plan after inspection.
+
+- [ ] Inspect current renewal dates and anchors read-only; prepare a focused child design before changing money-related date behaviour.
+- [ ] Recommended rule for owner confirmation: preserve the intended billing day, clamp only invalid dates to month end, and restore the anchor in later valid months; explicitly cover annual29February. Honour already-issued invoices/quoted payment periods.
+- [ ] Write failing Jan31/Feb28/Feb29/Mar31 and leap-year regressions, plus grace/idempotency/reusable-authorisation checks; implement using existing renewal writer rather than a second payment path.
+- [ ] Release after review and CI. No retroactive invoice rewrite, automatic extra charge or production subscription migration without an explicit bounded approval.
+
+## Phase 6 — Public attendee opt-in profiles
+
+**Sources:** Community follow-ups §6; current public event Going count and registration/identity flows.
+
+- [ ] Produce the consent/visibility design and visual preview first: verified explicit opt-in, optional display name/photo, preview, immediate withdrawal, image safety/retention, cancellation/refund behaviour and public-cache invalidation.
+- [ ] Obtain the requested visual/design review before implementing public identity storage/endpoints. Existing attendees are never published automatically; anonymous Going count remains independent.
+- [ ] Write the native implementation plan against current code, then implement in a separately reviewed release with absent/withdrawn consent, isolation and unsafe-image regressions.
+
+## Phase 7 — Complete the remaining marketplace roadmap
+
+**Sources:** `docs/superpowers/marketplace-roadmap.md`, original Marketplace handoff and S2b specs. Merchandise and Purpledot venue pilot are live; do not rebuild S1/S2a/S2b.
+
+- [ ] **S2c:** design/implement bank-transfer instructions, pro-forma and private payment evidence/manual finance review. A screenshot/upload never marks paid; require authorised reconciliation, append-only evidence, exact amount/currency/account/reference and duplicate/conflict guards. Owner approves new financial policy before activation.
+- [ ] **S3:** focused design/plan for dated equipment quantities/assets, availability, collection/delivery/returns and service schedules/deliverables. Reuse catalog, quotes, verified buyers and commerce; preserve venue calendar and merchandise stock. Confirm damage/security/late-return policy before trading activation.
+- [ ] **S4:** complete private booker/host messaging, attachments/live updates, walk-in intake and consent-bound booking→event handoff. Test wrong-tenant denial and idempotent event creation; preserve staff-room boundaries.
+- [ ] **S5:** consent/moderation/dispute-aware reciprocal reviews, declared cross-category ranking and clearly disclosed promotions with expiry. Only eligible completed transactions may review.
+- [ ] Each slice gets its own concrete spec, native task plan, failure tests, review/CI and pilot acceptance. No mixed multi-seller/type checkout or wider merchant activation is assumed.
+
+## Phase 8 — Marketing pack and pilot content
+
+**Existing artifact:** task visualization directory `marketing-pack/MiConvener Marketing and Proposal Pack.docx`; existing branded QA PDF; current pricing/use-case pages.
+
+- [ ] Read the existing pack and verify every feature/pricing claim against current releases and rollout scope.
+- [ ] Refresh editable Word material and audience proposals for churches, associations, volunteer/NGO groups, academia, social/memorial events and venue/facility operators. Show contributions without dues, recurring service notes, Library, communication and commerce accurately.
+- [ ] Render/visually review the Word outputs using document skills; deliver an index and editable files. Do not send them to prospects without instructions.
+- [ ] Obtain actual classroom photos and any missing commercial content from the owner; never substitute an unrelated venue image or invent a hire rate. Preserve price-on-request until a rate is supplied.
+- [ ] Recheck USA onboarding/mobile sign-in using current deployed fixes and international-card settings. Label test-mode/geography simulations; a real international purchase requires an owner-approved payer/amount and owner payment entry.
+
+## Phase 9 — Operational/repository closure
+
+- [ ] Close superseded PR59 after recording its replacement; keep PR48 until its actual correction is merged/released.
+- [ ] Identify the old risky PHP test and intermittent badge/component timing failures from current named CI results. Fix demonstrated test defects without dropping assertions or suppressing failures.
+- [ ] Measure current CI/setup time before proposing a separate path-aware CI optimisation; frontend-only work should not repeatedly trigger local+remote full runs. Repository protection changes need explicit settings approval; do not bypass checks.
+- [ ] Inventory each worktree/branch's uncommitted files and unique commits read-only. Archive/remove only proven redundant owned worktrees; coordinate Claude-owned resources and keep active Herd paths usable. No blanket `git clean` or database-name glob deletion.
+- [ ] Retain the quarantined GHS10 test fee mismatch as evidence; only clean exact owned disposable databases after evidence is retained and deletion is approved. Never rewrite financial history or resend that transfer.
+- [ ] Consider durable provider-message-ID/delivery-status visibility as a separate scoped operational feature; distinguish queue, SMTP acceptance, recipient-server acceptance and actual receipt. The merged ticket SMTP retry fix is not outstanding implementation.
+- [ ] Reconcile outdated roadmap summaries/checklists, mark each phase implemented/tested/deployed/blocked accurately, and publish the final remaining decisions. A completed phase must include its release and acceptance evidence.
+
+## Start state and decision log
+
+- Phase0 inventory complete; Phase1 integration is in progress on the existing ticket branch. Only generated assets conflicted with current main; rebuild them.
+- Owner authorisation covers systematic native implementation; it does not manufacture missing storage/renewal/commercial policy, real photos, consent or a person's OTP/device action.
+- This plan deliberately separates future large-feature child designs from immediate repair/acceptance tasks. A future phase is not falsely labelled implementation-ready before its exact interfaces and decisions are established.
+
+
+### Phase 1 execution evidence — 2 November 2026
+
+- Current main `63d0f881` reconciled into PR48; source merged without conflict. Generated conflicts resolved by rebuilding. No other checkout/database changed.
+- Two new regressions reproduced the dark-mode primary-action foreground gaps before correction; self-check-in and explicit offline-consent actions now use `text-accent-ink`. Layout/handler changes otherwise remain the previously reviewed PR48 correction.
+- Portal group123/123 passed with `--maxWorkers=2`; the first unrestricted run had one5second timeout in unchanged `AttendeeApp.test.jsx` (122pass/1fail). No timeout limit or assertion was weakened. PHP `TicketEmailQrTest` + `SelfCheckInTest`:9passed/27assertions. ESLint, Pint and production build passed. Source whitespace is clean; the generated vendor bundle retains the same one trailing-whitespace line as main and was not hand-edited.
+- Fresh real-page local fixture uses synthetic event/registration data and an already normally verified synthetic buyer session; it is presentation evidence, not a live registration, payment, email-delivery or verification-flow pass. Desktop1440: details408px, QR160×160, note outside region, no document overflow. Phone390: details342px, QR160×160, note outside region, no document overflow; light/dark inspected and keyboard focus visible. PR48's earlier40-combination enlarged-text/long/no-QR matrix remains historical evidence; new physical-device/200% acceptance is tracked in Phase3, not claimed fresh here.
+- One fresh independent review found no functional/accessibility blockers. No dependency, endpoint, permission, schema, sender/account or financial behaviour changed.
+- Ruling: retain the previously reviewed layout rather than redesigning it; fix only the demonstrated foreground issues. Risk if wrong: visual regression, bounded by the component/browser tests. Larger accessibility/offline acceptance remains a separate phase.

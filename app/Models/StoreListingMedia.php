@@ -33,6 +33,10 @@ final class StoreListingMedia extends Model
         'sort_order',
         'is_primary',
         'status',
+        'disk',
+        'mime',
+        'byte_size',
+        'checksum',
     ];
 
     /**
@@ -41,6 +45,7 @@ final class StoreListingMedia extends Model
     protected $casts = [
         'is_primary' => 'boolean',
         'sort_order' => 'integer',
+        'byte_size' => 'integer',
     ];
 
     /**
@@ -50,8 +55,24 @@ final class StoreListingMedia extends Model
         'url',
     ];
 
+    /** @return array<string,mixed> */
+    public function toArray(): array
+    {
+        $data = parent::toArray();
+        if ($this->merchandiseSlug() !== null) {
+            unset($data['file_path'], $data['disk'], $data['checksum']);
+        }
+
+        return $data;
+    }
+
     public function getUrlAttribute(): string
     {
+        $slug = $this->merchandiseSlug();
+        if ($slug !== null) {
+            return route('marketplace.items.photos', ['slug' => $slug, 'media' => $this->id]);
+        }
+
         if (str_starts_with($this->file_path, 'http://') || str_starts_with($this->file_path, 'https://')) {
             return $this->file_path;
         }
@@ -92,5 +113,22 @@ final class StoreListingMedia extends Model
     public function scopeFloorPlans(Builder $query): Builder
     {
         return $query->where('media_type', self::TYPE_FLOOR_PLAN_PDF);
+    }
+
+    protected static function booted(): void
+    {
+        self::addGlobalScope('merchandise', function (Builder $media): void {
+            $media->where(function (Builder $query): void {
+                $query->whereExists(fn ($legacy) => $legacy->selectRaw('1')->from('store_listings')
+                    ->whereColumn('store_listings.id', 'store_listing_media.listing_id')->where('listing_kind', '!=', StoreListing::KIND_MERCHANDISE))
+                    ->orWhereHas('listing');
+            });
+        });
+    }
+
+    private function merchandiseSlug(): ?string
+    {
+        return StoreListing::withoutGlobalScope(\App\Scopes\MerchandiseVisibilityScope::class)->withoutGlobalScope(\App\Scopes\StaffOnlyScope::class)
+            ->whereKey($this->listing_id)->where('listing_kind', StoreListing::KIND_MERCHANDISE)->value('slug');
     }
 }

@@ -6,6 +6,7 @@ import Join from './Join';
 export default function Organisation({
     organisation,
     givingUrl = null,
+    storeUrl = null,
     events = [],
     identity,
     following,
@@ -46,6 +47,17 @@ export default function Organisation({
                         My Communities and membership access
                     </a>
                 </header>
+                {storeUrl && (
+                    <section className="border border-border p-6">
+                        <h2 className="text-xl font-semibold text-ink">Our store</h2>
+                        <p className="my-3 text-ink-secondary">
+                            Explore organisation merchandise and collection information.
+                        </p>
+                        <a href={storeUrl} className="text-accent underline">
+                            Browse the store
+                        </a>
+                    </section>
+                )}
                 {givingUrl && (
                     <section className="border border-border p-6">
                         <h2 className="text-xl font-semibold text-ink">Support our work</h2>
