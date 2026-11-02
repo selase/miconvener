@@ -50,7 +50,7 @@
 - [x] Browser-check the real built component at desktop/390px, light/dark and long values. Earlier enlarged-text evidence is retained; fresh physical-device/200% checks remain explicitly in Phase3. Keep synthetic/local evidence distinct from live verification.
 - [x] Self-review touchpoints, empty/loading/error, permission, keyboard and responsive states; one independent review of the reconciled change.
 - [x] Update PR48's description to its final scope; mark ready; push normally; require green CI on the exact final head; squash-merge and monitor automatic Cloud deployment.
-- [ ] Verify the live ticket surface if normal member access is available. If proof expired, ask for normal email verification without requesting codes; continue unrelated work while waiting. Do not issue another ticket or resend mail unnecessarily.
+- [x] Verify the live ticket surface using normal member access. Owner completed fresh email verification; desktop/390px and dark-theme checks passed. No new ticket or unnecessary mail sent.
 
 ## Phase 2 — Giving and paid member-benefit acceptance
 
@@ -159,3 +159,5 @@
 - Church staff recorded a GHS5 offering batch and a separate GHS1 correction through the real controls. Online payout availability stayed GHS0.96; cash created no additional sale journal. Original cash record retained.
 - Full online refund preview reverses2pesewas commission and warns the original2pesewas processing fee leaves a shortfall. One native test refund submitted; provider ID18954600 initially processing, its reserve reduced available payout to0. No repeat submission or invented confirmation. Final outcome remains to verify.
 - Focused automated acceptance: Giving EndToEnd/Checkout/Confirmation and MemberBenefit Checkout/Quote/Payment,82passed/294assertions. These use mocked provider cases and are distinct from the two hosted test captures. Remaining Phase2 cases, real-device checks and Giving online activation are not marked complete.
+
+- Live ticket acceptance completed after the owner signed in normally: deployed ticket region found, desktop1280px with QR160px/details408px; phone390px with QR160px/details342px stacked below, document width390px (no horizontal overflow), personal-registration notice outside the ticket region and PDF action present. Dark mode kept the region readable and within viewport. Restored normal size/light theme. No check-in, transfer, offline save, new registration or mail action performed; physical-device/200% coverage remains Phase3.
