@@ -475,7 +475,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                                         'h-7 w-full flex items-center justify-center rounded-md text-[11px] transition-colors ';
 
                                     if (isSelected) {
-                                        cellClasses += 'bg-accent text-white font-bold shadow-2xs';
+                                        cellClasses += 'bg-accent text-accent-ink font-bold shadow-2xs';
                                     } else if (isBlocked) {
                                         cellClasses +=
                                             'bg-rose-500/10 text-rose-500 line-through cursor-not-allowed opacity-70';
@@ -951,7 +951,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                             <button
                                 type="submit"
                                 disabled={submitting || !availability.available}
-                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-accent-ink shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
                                 <Sparkles className="h-4 w-4" />
                                 <span>{submitting ? 'Sending...' : 'Send request'}</span>
@@ -960,7 +960,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                             <button
                                 type="submit"
                                 disabled={submitting || !availability.available}
-                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-accent-ink shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
                                 <Sparkles className="h-4 w-4" />
                                 <span>{submitting ? 'Submitting...' : 'Submit Quote Request'}</span>
@@ -969,7 +969,7 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
                             <button
                                 type="submit"
                                 disabled={submitting || !availability.available}
-                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-accent-ink shadow-md hover:bg-accent/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
                                 <CreditCard className="h-4 w-4" />
                                 <span>

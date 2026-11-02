@@ -41,6 +41,12 @@ final class StoreCheckoutController extends Controller
         $attempt = \App\Models\StorePaymentAttempt::query()->where('reference', $reference)->firstOrFail();
         $notifications->reconcile($attempt);
 
+        if ($attempt->order->offering_type === 'reservation') {
+            $charge = \App\Models\VenueBookingCharge::query()->with('booking')->where('order_id', $attempt->order_id)->firstOrFail();
+
+            return redirect()->route('marketplace.bookings.show', $charge->booking->booking_reference);
+        }
+
         return redirect('/my?return_to='.rawurlencode('/my/store-orders/'.$attempt->order_id));
     }
 }

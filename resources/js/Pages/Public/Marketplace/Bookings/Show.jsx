@@ -182,7 +182,7 @@ export default function BookingShow({ booking }) {
                                             )
                                         )
                                     }
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-95 transition-all shrink-0 cursor-pointer"
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-accent-ink shadow-sm hover:opacity-95 transition-all shrink-0 cursor-pointer"
                                 >
                                     <CreditCard className="h-4 w-4" />
                                     <span>

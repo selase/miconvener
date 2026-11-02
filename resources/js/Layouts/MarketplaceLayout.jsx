@@ -67,7 +67,7 @@ export default function MarketplaceLayout({ children }) {
                         </Link>
                         <Link
                             href="/register"
-                            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-white shadow-xs hover:bg-accent/90 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-ink shadow-xs hover:bg-accent/90 transition-colors"
                         >
                             <Building2 className="h-4 w-4" />
                             <span>List Your Venue</span>
@@ -225,7 +225,7 @@ export default function MarketplaceLayout({ children }) {
                 <button
                     type="button"
                     onClick={() => setConciergeOpen(true)}
-                    className="flex items-center gap-2 rounded-full bg-gradient-to-r from-accent to-purple-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    className="flex items-center gap-2 rounded-full bg-gradient-to-r from-accent dark:from-[#007367] to-purple-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
                 >
                     <Sparkles className="h-4 w-4" />
                     <span>Ask AI Concierge</span>

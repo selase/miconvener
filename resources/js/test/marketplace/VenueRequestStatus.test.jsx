@@ -198,3 +198,11 @@ it('does not poll or refresh a request that has already ended', () => {
 
     expect(router.reload).not.toHaveBeenCalled();
 });
+
+it('shows a paid approval booking as confirmed with no request cancellation', () => {
+    render(<BookingShow booking={withApproval({ effective_status: 'confirmed', can_cancel: false }, 'confirmed')} />);
+    expect(screen.getByText('Confirmed')).toBeTruthy();
+    expect(screen.getByText(/Your booking is confirmed/)).toBeTruthy();
+    expect(screen.queryByText('Awaiting host approval')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancel this request' })).toBeNull();
+});

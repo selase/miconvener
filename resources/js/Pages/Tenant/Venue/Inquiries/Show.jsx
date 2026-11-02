@@ -282,6 +282,7 @@ export default function InquiryShow({ shop, inquiry, can }) {
                         </div>
 
                         {/* Space & Financial Status */}
+                        {!approvalFlow && (
                         <div className="rounded-xl border border-border bg-canvas/40 p-4 space-y-3 text-xs">
                             <div className="font-semibold text-ink flex items-center gap-1.5">
                                 <CreditCard className="h-4 w-4 text-accent" />
@@ -312,6 +313,7 @@ export default function InquiryShow({ shop, inquiry, can }) {
                                 </div>
                             </div>
                         </div>
+                        )}
                     </div>
 
                     {/* Special Logistics Notes */}

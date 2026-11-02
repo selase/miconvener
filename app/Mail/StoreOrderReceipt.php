@@ -31,6 +31,19 @@ final class StoreOrderReceipt extends Mailable
 
     public function content(): Content
     {
-        return new Content(markdown: 'emails.store-order-receipt', with: ['receipt' => $this->receipt->snapshot, 'orderUrl' => route('store.orders.show', $this->receipt->order_id)]);
+        $snapshot = $this->receipt->snapshot;
+        $charge = \App\Models\VenueBookingCharge::query()->with('booking')->where('order_id', $this->receipt->order_id)->first();
+        $isVenue = $charge !== null;
+        if ($isVenue) {
+            $snapshot['seller'] = is_array($snapshot['seller']) ? $snapshot['seller']['name'] : $snapshot['seller'];
+            $snapshot['lines'] = array_map(fn (array $line): array => $line + ['amount_pesewas' => $line['amount_pesewas'] ?? $line['line_amount_pesewas']], $snapshot['lines']);
+            $snapshot['receipt_terms'] ??= '';
+        }
+
+        return new Content(markdown: 'emails.store-order-receipt', with: [
+            'receipt' => $snapshot,
+            'isVenue' => $isVenue,
+            'orderUrl' => $isVenue ? route('marketplace.bookings.show', $charge->booking->booking_reference) : route('store.orders.show', $this->receipt->order_id),
+        ]);
     }
 }

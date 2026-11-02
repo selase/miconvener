@@ -199,3 +199,80 @@ The documented deploy command (`php artisan migrate --force && php artisan db:se
 4. The rest of the browser matrix and the by-hand keyboard walk-through (section 7).
 5. The permission verification gate in section 10.
 6. The merchant-specific approvals in section 9, and the owner's explicit go-live approval (who flips `venue:enable-payments`, first scope, date).
+
+
+## 12. Codex continuation — 2 November 2026 (activation still blocked)
+
+This run started from `0e80d73b` in `.worktrees/artifact-completion`, branch `codex/s2b-acceptance`. It uses a new local database, `miconvener_acceptance_codex_20261102`, synthetic organisation `acceptance-hall`, buyer `buyer1@example.org`, Paystack test keys and logged mail. Claude's checkout, databases and earlier evidence were preserved. No production flags, data, payments or deployment were changed.
+
+### Provider-backed results
+
+- Request `VRQ-27B7SKFM` was requested through the real browser, email-verified using local captured mail, approved by the host, quoted and accepted. Its actual date is 3 November 2026; balance/security deadlines are 07:00/08:00 Africa/Accra that day. This differs from the original illustrative later date.
+- The owner completed **test Mobile Money**, not test cards: GHS300 deposit, GHS750 balance and GHS200 security. Each capture posted once. Rental commission was GHS9 + GHS22.50; security commission was zero. The security journal credited refundable liability account 2030.
+- Finance requested the full GHS200 security return through the real page. Paystack later reported `processed`; one refund journal was posted. The seller bore GHS3.90 processing cost. Booking and rental payments stayed confirmed.
+- Re-verifying the original deposit twice left counts unchanged: five balanced journals (including the completed GHS2 payout below), three receipts, two reserves. This is provider-backed verification replay, not a separately delivered public webhook.
+- A GHS10 test payout was sent once and the owner released its OTP. Paystack reported success for GHS9 with fee zero, whereas GHS1 was reserved for the fee. It remains in **processing / fee accounting review**, with no payout journal. It was never resent or declared reconciled. Retain this evidence.
+- A distinct GHS2 payout used a **process-local zero transfer-fee configuration**, matching Paystack's observed test-mode fee. The owner released the new OTP. Provider verification reported paid, net GHS2, fee zero; two reconciliations produced exactly one balanced payout journal. Production fee settings were unchanged. This does not prove live-fee accounting or resolve the earlier mismatch.
+
+### Explicit simulations and limitations
+
+- Early event completion was refused. Moving Carbon's clock only inside one guarded local PHP process to after the event end allowed authorised completion and released both rental reserves. Neither the system clock nor the stored event dates were changed. The post-end completion was a service-level check, not an end-to-end browser clock test.
+- The HTTP local payout form cannot call `crypto.randomUUID` in that insecure browser context. Test payout account verification, reservation and submission therefore used native application services against the isolated database and test provider. Owner OTP release used the actual browser form. Repeat reservation/send in a trusted HTTPS browser before activation; do not count the HTTP service setup as that browser pass.
+- The recipient was Paystack's documented test MTN number `0551234987`, provider-resolved before creating the local account. No real recipient details were used.
+- Receipt delivery means **local log transport only**, not external email delivery. All three immutable receipts were recovered through the outbox after the rendering fix.
+- Declined-card and abandoned-hosted-checkout browser cases remain open. No hosted test-card payments were performed in this run. Simulated test coverage must not be labelled provider acceptance.
+- Full browser matrix, shared button contrast, remaining refund-funding/provider cases and security-return/payout race remain activation gates unless separately evidenced. The GHS10 fee-review record remains open. Merchant-specific terms, read-only permission verification and explicit owner activation approval are still required.
+
+### Defects corrected locally, not yet merged or deployed
+
+1. Reservation receipt snapshots used structured seller/line fields that the merchandise mail could not render. Adapt them only for rendering, retain immutable snapshots, link to the venue dossier, and omit collection wording. Existing local outbox records subsequently delivered to the log.
+2. Venue payment callbacks returned to merchandise order history. Reservation callbacks now return to the protected venue dossier; goods retain their original return route.
+3. Confirmed approval-flow bookings fell back to “Awaiting host approval” with an empty status panel. Add the explicit confirmed badge and explanation.
+4. Venue-only payouts required a purchase agreement. When no purchase agreement exists, payout validation now resolves approved reservation terms. If purchase terms exist, their validation remains authoritative: a valid venue agreement cannot bypass invalid merchandise terms. Checkout scope, permissions, original-account identity and balance locks are unchanged.
+
+### Self-review
+
+- Existing callback, booking badge, receipt/outbox and payout surfaces were updated; no new dependencies, permissions, seeders, config keys or schema were introduced. No new AGENTS rule is necessary for these corrections; finance invariants remain in force.
+- Regression tests failed before the corresponding fixes. Focused runs: 39 payment/receipt tests (170 assertions), 11 booking-status UI tests, 26 venue-settlement/payout tests (115 assertions), and 60 checkout/legacy/quote-notice tests (265 assertions). Eight real PostgreSQL payment races also passed (88 assertions). JavaScript lint, formatting, changed PHP static analysis and asset build passed. These are scoped results, not a fresh full-suite or CI claim.
+- Discoverability uses existing booking, receipt and finance links. Existing loading, errors, access checks and empty states remain; the confirmed state now has meaningful text. Complete responsive/keyboard/contrast acceptance is still open. Payout-account setup discoverability is weak: Store finance says “Finance” but the general Finance page does not expose the account form for this fixture; address before pilot onboarding.
+- Recommendation: review these corrections in a dedicated PR, keep venue activation off, and finish the explicitly open gates above. Do not erase the test-mode fee discrepancy or silently substitute a fee to make the first payout pass.
+
+
+#### Touchpoints updated
+
+- Existing callback navigation, booking status, receipt rendering/outbox and payout validation: updated and regression-tested; rebuilt `public/build` retained.
+- AGENTS, dependencies, schema, config, `.env.example`, permission and role seeders: no new rule or surface requiring changes. Synthetic fixtures are local only. The checked-in acceptance record is the handover; private run metadata remains outside Git.
+
+#### UI Gap Analysis
+
+- Discoverability: corrected booking/receipt links; existing payout account setup guidance remains a pre-pilot gap as noted above.
+- Empty/loading/error and permission states: existing controls retained; no authorisation bypass added. Unknown transfers stay blocked.
+- Responsive/accessibility: textual confirmation fix introduces no new control; full mobile, keyboard and contrast matrix is not certified by this run.
+
+#### Solved
+
+The four corrections listed above. No financial history was rewritten, no production fee waived and no successful transfer resent.
+
+#### Recommended for user decision
+
+Keep activation off. Review the correction branch first, then complete trusted-HTTPS reservation/send, hosted decline/abandonment, missing financial acceptance cases and merchant policy sign-off. The GHS10 test fee mismatch requires an explicit resolution policy or retention as quarantined test evidence; do not silently force it paid.
+
+#### Not gaps
+
+Logged mail, synthetic recipients, process-local time simulation and zero-fee test configuration are deliberate isolation choices, labelled as such; they are not evidence of external email delivery, production fees or complete end-to-end browser acceptance.
+
+### Continuation: trusted HTTPS and final correction review
+
+The limitations above describe the first pass, not completed gates. Subsequent checks on 2 November:
+
+- Trusted local HTTPS is now in use. Through the real finance page an oversized payout and a below-fee payout were refused; a GHS3 unsent reservation was created and cancelled. Available funds returned to GHS982.12. The earlier provider submission and owner OTP evidence remain hybrid service/browser checks, as labelled above.
+- A separate synthetic booking (`VRQ-DECLINE01`) exercised the hosted **test-card Declined** option. Provider reconciliation marked the attempt failed with no capture. Before that, leaving checkout and returning resumed the same attempt. After the definitive decline a new checkout was available. The buyer then cancelled the unpaid booking. No real card or funds were used.
+- The security-return/payout concurrency gate is covered by the eight real PostgreSQL worker tests already reported (including the dedicated security refund versus payout race); it is not an outstanding race-test gate.
+- Primary and hover tokens now meet 4.5:1 against their foregrounds. Marketplace solid accent controls use theme-aware foregrounds; the dark AI gradient uses a darker start. Five contrast regression tests cover tokens and affected surfaces. Confirmed buyer page checks at 390px and 1280px found no horizontal overflow, in light and dark themes.
+- The complete PHP CI suite passed on PR #83's preceding head. A component test's immediate checkbox-state assertion failed once in the parallel CI run and passed in isolation. It now waits for the actual enabled state; production checkout logic is unchanged. The focused checkout/status/contrast run passes 27 tests. Final CI must still pass on the final head.
+- Independent review found no blockers in the finance corrections or final contrast/test delta.
+- The owner selected **Purpledot** as the first venue pilot. Other organisations and catalogue hotels are not authorised for activation. Read-only production inspection found the three venue-money permission rows, each with two role grants, and no approved venue agreements. Purpledot has no public venue listing in that inspection. No venue, availability or commercial participation will be invented.
+
+Remaining release distinctions: the GHS10 test fee mismatch remains quarantined, not reconciled; local receipt delivery was logged mail; production fee accounting was not tested with real money. Complete any merchant-specific setup and read-only permission/role verification before activation. Do not describe those distinctions as waived by a green CI run.
+
+A further host-page walkthrough found a duplicate legacy financial summary beneath the final accepted quote. It displayed the original estimate and labelled cumulative rental receipts as a deposit. Approval-first bookings now omit that legacy block and use their existing authoritative final-quote/payment panel; legacy bookings retain the existing summary. The new regression failed before the fix; 13 inquiry-summary/venue-money tests pass afterwards, lint and rebuilt assets pass. Host dossier and finance pages were inspected at 390px/1280px in both themes without document overflow; table content uses its own horizontal scroll. Keyboard focus on the finance account selector was visible. Production permission inspection additionally confirmed the expected Superadmin and Org Superadmin grants; no seeding is needed.
