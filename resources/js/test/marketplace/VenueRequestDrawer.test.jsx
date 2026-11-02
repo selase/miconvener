@@ -116,3 +116,32 @@ it('refuses a time that does not exist in the venue zone instead of guessing', a
     await waitFor(() => expect(screen.getByText(/does not exist in Europe\/London/)).toBeTruthy());
     expect(router.post).not.toHaveBeenCalled();
 });
+
+it('starts a classroom-only venue with its seating and capacity', async () => {
+    render(<VenueBookingDrawer isOpen onClose={vi.fn()} venue={{ ...venue, capacity_breakdown: { classroom: 20 } }} />);
+    expect(screen.getByLabelText('Seating Arrangement').value).toBe('classroom');
+    expect(screen.getByRole('spinbutton', { name: /Attendee Count/ }).value).toBe('20');
+    await screen.findByRole('button', { name: /Send request/ });
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
+    expect(router.post.mock.calls[0][1]).toMatchObject({ layout_style: 'classroom', guest_count: 20 });
+});
+
+it('keeps the familiar fifty-person banquet default where capacity supports it', () => {
+    render(<VenueBookingDrawer isOpen onClose={vi.fn()} venue={venue} />);
+    expect(screen.getByLabelText('Seating Arrangement').value).toBe('banquet');
+    expect(screen.getByRole('spinbutton', { name: /Attendee Count/ }).value).toBe('50');
+});
+
+it('ignores empty or unavailable layouts when choosing the initial seating', () => {
+    render(<VenueBookingDrawer isOpen onClose={vi.fn()} venue={{ ...venue, capacity_breakdown: { banquet: 0, theater: null, classroom: 20 } }} />);
+    expect(screen.getByLabelText('Seating Arrangement').value).toBe('classroom');
+    expect(screen.getByRole('spinbutton', { name: /Attendee Count/ }).value).toBe('20');
+});
+
+
+it('preserves the existing fallback when a venue has no declared capacity', () => {
+    render(<VenueBookingDrawer isOpen onClose={vi.fn()} venue={{ ...venue, capacity_breakdown: {} }} />);
+    expect(screen.getByLabelText('Seating Arrangement').value).toBe('banquet');
+    expect(screen.getByRole('spinbutton', { name: /Attendee Count/ }).value).toBe('50');
+});

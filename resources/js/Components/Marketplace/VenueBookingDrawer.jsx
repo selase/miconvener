@@ -43,8 +43,19 @@ export default function VenueBookingDrawer({ isOpen, onClose, venue }) {
     const [endDate, setEndDate] = useState(tomorrowStr());
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('17:00');
-    const [guestCount, setGuestCount] = useState(50);
-    const [layoutStyle, setLayoutStyle] = useState('banquet');
+    const initialLayout = ['banquet', 'theater', 'cocktail', 'classroom', 'boardroom'].find(
+        (layout) => {
+            const capacity = Number(venue.capacity_breakdown?.[layout]);
+            return Number.isSafeInteger(capacity) && capacity > 0;
+        }
+    ) || 'banquet';
+    const initialCapacity = Number(venue.capacity_breakdown?.[initialLayout]);
+    const [guestCount, setGuestCount] = useState(() =>
+        Number.isSafeInteger(initialCapacity) && initialCapacity > 0
+            ? Math.min(50, initialCapacity)
+            : 50
+    );
+    const [layoutStyle, setLayoutStyle] = useState(initialLayout);
     const [eventType, setEventType] = useState('Corporate Event');
     const [plannerName, setPlannerName] = useState('');
     const [plannerEmail, setPlannerEmail] = useState('');
