@@ -361,7 +361,7 @@ export default function Portal({
                             currentRegistration.checkout_url && (
                                 <a
                                     href={currentRegistration.checkout_url}
-                                    className="mt-6 inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-white hover:opacity-90"
+                                    className="mt-6 inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-[13.5px] font-medium text-accent-ink hover:opacity-90"
                                 >
                                     Complete payment
                                 </a>
@@ -476,7 +476,7 @@ export default function Portal({
                                         onClick={() => setTab(key)}
                                         className={`rounded-lg px-3 py-1.5 text-xs font-medium min-h-[44px] flex items-center gap-1.5 cursor-pointer ${
                                             tab === key
-                                                ? 'bg-accent text-white font-semibold'
+                                                ? 'bg-accent text-accent-ink font-semibold'
                                                 : 'bg-surface-subtle text-ink-secondary hover:text-ink'
                                         }`}
                                     >

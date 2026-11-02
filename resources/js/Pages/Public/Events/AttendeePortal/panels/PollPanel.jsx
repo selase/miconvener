@@ -211,7 +211,7 @@ export default function PollPanel({ registration, isOnline = true }) {
                         <button
                             type="submit"
                             disabled={submitting || !isComplete(poll, answer)}
-                            className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-lg bg-accent px-5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 sm:w-auto"
+                            className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-lg bg-accent px-5 text-xs font-semibold text-accent-ink hover:opacity-90 disabled:opacity-50 sm:w-auto"
                         >
                             {submitting ? (
                                 <>

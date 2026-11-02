@@ -125,7 +125,7 @@ export default function EditTributeModal({ open, onClose, contribution, onSucces
                     <button
                         type="submit"
                         disabled={loading}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white shadow-xs hover:bg-accent/90 transition-colors disabled:opacity-50 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-accent-ink shadow-xs hover:bg-accent/90 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                         {loading ? (
                             <>
