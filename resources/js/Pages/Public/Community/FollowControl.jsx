@@ -17,7 +17,7 @@ export default function FollowControl({
         return (
             <a
                 href={signInUrl}
-                className="inline-flex rounded-lg bg-accent px-5 py-3 text-sm font-medium text-white"
+                className="inline-flex rounded-lg bg-accent px-5 py-3 text-sm font-medium text-accent-ink"
             >
                 Verify email to follow
             </a>
@@ -74,7 +74,7 @@ export default function FollowControl({
                 type="button"
                 disabled={busy || (!active && !consent)}
                 onClick={submit}
-                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink disabled:opacity-50"
             >
                 {busy ? 'Saving…' : active ? 'Unfollow' : 'Follow organisation'}
             </button>

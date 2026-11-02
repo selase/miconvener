@@ -118,7 +118,7 @@ export default function Join({
             <button
                 disabled={busy}
                 type="submit"
-                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink disabled:opacity-50"
             >
                 {busy ? 'Submitting…' : 'Request membership'}
             </button>

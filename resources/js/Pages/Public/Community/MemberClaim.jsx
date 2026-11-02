@@ -206,7 +206,7 @@ export default function MemberClaim({
                             type="button"
                             disabled={busy}
                             onClick={complete}
-                            className="rounded-md bg-accent px-4 py-2 text-white"
+                            className="rounded-md bg-accent px-4 py-2 text-accent-ink"
                         >
                             Save approved access
                         </button>
@@ -265,7 +265,7 @@ export default function MemberClaim({
                     )}
                     <button
                         disabled={busy}
-                        className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink disabled:opacity-50"
                         type="submit"
                     >
                         {busy

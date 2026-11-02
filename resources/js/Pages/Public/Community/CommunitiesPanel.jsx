@@ -448,7 +448,7 @@ export default function CommunitiesPanel({
                                                     type="button"
                                                     aria-label={`View messages for ${community.name || community.slug}`}
                                                     onClick={() => onOpenInbox?.(inbox)}
-                                                    className="inline-flex min-h-11 items-center justify-center gap-2 bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                                                    className="inline-flex min-h-11 items-center justify-center gap-2 bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90"
                                                 >
                                                     View messages <span aria-hidden="true">→</span>
                                                 </button>

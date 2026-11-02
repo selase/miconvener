@@ -171,7 +171,7 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                     <button
                         disabled={busy || wait > 0 || (challenge && !token)}
                         type="submit"
-                        className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                        className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink disabled:opacity-50"
                     >
                         {wait > 0
                             ? `Try again in ${wait}s`
@@ -200,7 +200,7 @@ export default function PhoneVerify({ organiserSlug, onVerified, onUseEmail }) {
                         <button
                             type="submit"
                             disabled={busy || code.length !== 6}
-                            className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                            className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink disabled:opacity-50"
                         >
                             Verify code
                         </button>

@@ -121,7 +121,7 @@ export default function LiveNowSection({ items }) {
                                 <div className="flex flex-wrap sm:flex-col items-center sm:items-end gap-2 shrink-0">
                                     <a
                                         href={item.event_workspace_url}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:opacity-90 transition-opacity"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-accent-ink shadow-sm hover:opacity-90 transition-opacity"
                                     >
                                         <span>Open workspace</span>
                                         <ArrowRight className="h-3.5 w-3.5" />

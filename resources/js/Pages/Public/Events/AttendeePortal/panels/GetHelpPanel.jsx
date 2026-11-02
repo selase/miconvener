@@ -325,10 +325,10 @@ export default function GetHelpPanel({ event, registration, isOnline = true }) {
                 <button
                     type="submit"
                     disabled={saving || isTypeCurrentlyActive}
-                    className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-6 text-xs font-semibold text-white transition-opacity cursor-pointer w-full sm:w-auto ${
+                    className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-6 text-xs font-semibold transition-opacity cursor-pointer w-full sm:w-auto ${
                         type === 'medical'
-                            ? 'bg-red-600 hover:bg-red-700 disabled:opacity-50'
-                            : 'bg-accent hover:opacity-90 disabled:opacity-50'
+                            ? 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50'
+                            : 'bg-accent text-accent-ink hover:opacity-90 disabled:opacity-50'
                     }`}
                 >
                     {saving ? (
