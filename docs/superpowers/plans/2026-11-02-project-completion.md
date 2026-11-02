@@ -117,9 +117,9 @@
 
 **Existing artifact:** task visualization directory `marketing-pack/MiConvener Marketing and Proposal Pack.docx`; existing branded QA PDF; current pricing/use-case pages.
 
-- [ ] Read the existing pack and verify every feature/pricing claim against current releases and rollout scope.
-- [ ] Refresh editable Word material and audience proposals for churches, associations, volunteer/NGO groups, academia, social/memorial events and venue/facility operators. Show contributions without dues, recurring service notes, Library, communication and commerce accurately.
-- [ ] Render/visually review the Word outputs using document skills; deliver an index and editable files. Do not send them to prospects without instructions.
+- [x] Read the existing pack and verify every feature/pricing claim against current releases and rollout scope.
+- [x] Refresh editable Word material and audience proposals for churches, associations, volunteer/NGO groups, academia, social/memorial events and venue/facility operators. Show contributions without dues, recurring service notes, Library, communication and commerce accurately.
+- [x] Render/visually review the Word outputs using document skills; deliver an index and editable files. Do not send them to prospects without instructions.
 - [ ] Obtain actual classroom photos and any missing commercial content from the owner; never substitute an unrelated venue image or invent a hire rate. Preserve price-on-request until a rate is supplied.
 - [ ] Recheck USA onboarding/mobile sign-in using current deployed fixes and international-card settings. Label test-mode/geography simulations; a real international purchase requires an owner-approved payer/amount and owner payment entry.
 
@@ -203,3 +203,11 @@
 - Native preview consent/public-view/removal works with synthetic initials only; consent unchecked by default, public count independent, no network writes. Review request is pending. Native photo upload remains intentionally a labelled mockup placeholder.
 - Read-only worktree inventory:20checkouts,14Claude-branched preserved, only the active owned checkout has untracked preview material. Other ownership is not established; no checkout/branch/database was deleted. Exact metadata saved locally in `/private/tmp/miconvener-worktree-inventory-20261102.json`.
 - Current CI baseline takes roughly9minutes for the main PHP run and~4minutes for code quality, not hours. PR87 exposed one test-fixture assumption about a migration-created feature row; reproduced missing-row failure, made its fixture explicit and required new final-head CI. No production policy was altered to make tests pass. The known risky PHP result has no named detail in compact CI output and is still open; do not pretend it was fixed.
+
+
+### Marketing pack refresh
+
+- Refreshed the existing editable Word pack in place into a NEW November copy; original remains unchanged.12pages, eight audience proposals plus platform copy, commercial schedule and internal claim controls. Churches/volunteer groups explicitly use Giving without dues; association Library/member prices, service notes, inbox, approved venue payments, product quotes and collection/delivery are included.
+- Public identities, equipment/service checkout, bank-transfer evidence and broader marketplace expansion remain labelled proposed/roadmap work. No invented prices, testimonials, accreditation, real venue photo or unapproved merchant activation. Editable placeholders remain for client-specific offers; nothing was sent to prospects.
+- Only Word document content XML changed; every other ZIP part, styles, headers/footer and page settings are byte-identical to the retained original. First render exposed one orphan closing paragraph; shortened internal source notes and re-rendered to12pages. All final pages visually checked;10 unchanged pages byte-identical to their inspected render, revised church/reference pages re-inspected.
+- Deliverables in task artifact `marketing-pack`: `MiConvener Marketing and Proposal Pack November 2026.docx`, QA-final PDF and page PNGs. Real international payer/device and actual classroom-photo gates remain open.
