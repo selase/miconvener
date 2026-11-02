@@ -85,10 +85,11 @@ it('retains disabled legacy storage and leaves unrelated package entitlements al
 });
 
 it('keeps unknown future custom packages uncapped unless they have explicit storage terms', function (): void {
+    App\Models\Feature::query()->where('slug', 'storage_bytes')->delete();
     $package = Package::factory()->create(['slug' => 'negotiated']);
     $tenant = Tenant::factory()->create(['package_id' => $package->id]);
     expect($tenant->featureLimitValue('storage_bytes'))->toBeNull();
-    $feature = App\Models\Feature::query()->where('slug', 'storage_bytes')->firstOrFail();
+    $feature = App\Models\Feature::factory()->create(['slug' => 'storage_bytes', 'type' => 'limit']);
     $package->features()->attach($feature->id, ['value' => 123]);
     expect($tenant->fresh()->featureLimitValue('storage_bytes'))->toBe(123);
 });

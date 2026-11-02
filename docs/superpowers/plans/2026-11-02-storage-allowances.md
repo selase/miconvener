@@ -58,3 +58,5 @@ Recommended: future wider upload-route/usage-meter performance audit before adve
 Not gaps: Free storage allowance does not enable paid Library features; existing rollout/plan permissions still apply. Existing organisations retain original terms; no historic asset is deleted, read-restricted or reclassified. Public storage pricing is intentionally deferred under the scope ruling.
 
 Review follow-up:78tests230assertions passed across allowance/migration plus merchandise catalog/visibility suites;3package fee/assignment tests8assertions passed. Migration regression executes the actual up-method after recreating the pre-column schema; destructive down is tested separately.
+
+Final CI found one new test fixture assumed the migration-created storage feature existed. Reproduced the exact missing-row exception locally by removing that fixture inside the test transaction; corrected the test to create its own feature explicitly, without changing production policy or weakening assertions. Final-head CI rerun required.
