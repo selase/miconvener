@@ -98,3 +98,18 @@ it('refuses a destructive rollback of retained customer terms', function (): voi
     expect(fn () => $migration->down())->toThrow(LogicException::class);
     expect(Illuminate\Support\Facades\Schema::connection('landlord')->hasColumn('tenants', 'storage_limit_snapshot'))->toBeTrue();
 });
+
+it('migrates an existing cohort before installing defaults without rewriting their timestamps', function (): void {
+    $package = Package::factory()->create(['slug' => 'free']);
+    $unlimited = Tenant::factory()->create(['package_id' => $package->id, 'updated_at' => now()->subDays(7)]);
+    $finite = Tenant::factory()->create(['package_id' => $package->id]);
+    $finite->features()->create(['feature_key' => 'storage_bytes', 'enabled' => true, 'meta' => ['type' => 'limit', 'value' => 6543]]);
+    $timestamp = $unlimited->fresh()->updated_at->toISOString();
+    Illuminate\Support\Facades\Schema::connection('landlord')->table('tenants', fn ($table) => $table->dropColumn('storage_limit_snapshot'));
+    $migration = require database_path('migrations/landlord/2026_11_02_154431_add_preserved_storage_limit_to_tenants.php');
+    $migration->up();
+    expect($unlimited->fresh()->storage_limit_snapshot)->toBe(-1)
+        ->and($unlimited->fresh()->updated_at->toISOString())->toBe($timestamp)
+        ->and($finite->fresh()->storage_limit_snapshot)->toBe(6543)
+        ->and(Tenant::factory()->create(['package_id' => $package->id])->featureLimitValue('storage_bytes'))->toBe(104857600);
+});

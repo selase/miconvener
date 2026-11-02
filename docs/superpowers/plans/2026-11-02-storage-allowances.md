@@ -41,7 +41,7 @@ Read-only production inventory: five package storage values unset; ten organisat
 
 - First default/preservation run: 8 tests, 6 RED before policy. Follow-up UI regressions: HTTP capacity prop RED; two JS capacity cases RED. Final affected PHP:41passed136assertions; Library JS6passed. Follow-up preservation/rollback tests recorded separately below. Pint, scoped ESLint, PHPStan and asset build passed.
 - Local-only migration applied to `miconvener_acceptance_codex_20261102`, not another checkout/database. Existing synthetic published PDF retained; staff screen shows858KiB and retained unlimited allowance. Desktop1280 light/dark has no overflow. Browser390px override did not take effect (measured1280), so this is NOT a mobile visual pass. Existing responsive classes and component tests remain; physical/zoom checks stay in parentPhase3.
-- Fresh independent reviewer found no blocking defect. Added direct disabled-legacy/custom-package/non-storage-pivot/rollback assertions from minor notes. Full migration executed on owned acceptance database; automated tests exercise policy and DB constraint, not a whole live-cohort migration replay.
+- Fresh independent reviewer found no blocking defect. Added direct disabled-legacy/custom-package/non-storage-pivot/rollback assertions from minor notes. Full migration executed on owned acceptance database; added a real migration-up regression against a pre-existing synthetic cohort, retaining finite/unlimited values and original updated_at.
 - Forward-only schema preservation: rollback application code without dropping snapshots. An automatic down-migration must not erase retained customer terms. Package defaults are attached missing-only; no full production package reseed.
 - Exact quota boundary accepted; retained-edition bytes counted and old edition remains readable after the allowance is reached. Existing native tenant locks are unchanged; this test is boundary/read coverage, not new worker-race evidence.
 
@@ -56,3 +56,5 @@ Solved: legacy unlimited could otherwise inherit new package limits; protected s
 Recommended: future wider upload-route/usage-meter performance audit before advertising a global storage product. No additional owner decision is needed for this bounded release.
 
 Not gaps: Free storage allowance does not enable paid Library features; existing rollout/plan permissions still apply. Existing organisations retain original terms; no historic asset is deleted, read-restricted or reclassified. Public storage pricing is intentionally deferred under the scope ruling.
+
+Review follow-up:78tests230assertions passed across allowance/migration plus merchandise catalog/visibility suites;3package fee/assignment tests8assertions passed. Migration regression executes the actual up-method after recreating the pre-column schema; destructive down is tested separately.
