@@ -201,7 +201,7 @@ describe('confirming the booking from verified money', function (): void {
         $html = $mail->render();
         expect($html)->toContain('300.00')->toContain('booking payment')
             ->toContain('/marketplace/bookings/'.$this->booking->booking_reference)
-            ->not->toContain('/my/store-orders/')->not->toContain('<h2>Collection</h2>');
+            ->not->toContain('/my/store-orders/')->not->toMatch('/<h2\b[^>]*>\s*Collection\s*<\/h2>/i');
     });
 
     test('full payment marks the booking fully paid', function (): void {
