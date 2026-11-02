@@ -30,7 +30,7 @@
 
 - [x] Self-review quota preservation, concurrent upload locking, auth, over-limit reads and failed-upload cleanup; one fresh independent review.
 - [x] Require final-head CI, merge/deploy under approved future-only policy.
-- [ ] Read-only verify old effective allowances unchanged, future standard defaults installed and original assets retained. Update parent roadmap/evidence.
+- [x] Read-only verify old effective allowances unchanged, future standard defaults installed and original assets retained. Update parent roadmap/evidence.
 
 ## Existing acceptance evidence
 
@@ -60,3 +60,10 @@ Not gaps: Free storage allowance does not enable paid Library features; existing
 Review follow-up:78tests230assertions passed across allowance/migration plus merchandise catalog/visibility suites;3package fee/assignment tests8assertions passed. Migration regression executes the actual up-method after recreating the pre-column schema; destructive down is tested separately.
 
 Final CI found one new test fixture assumed the migration-created storage feature existed. Reproduced the exact missing-row exception locally by removing that fixture inside the test transaction; corrected the test to create its own feature explicitly, without changing production policy or weakening assertions. Final-head CI rerun required.
+
+
+## Release result
+
+PR87 merged `fd3cdebcfb143a7be3a7dc2e8c24371edbe2b302` after final-head `2dc16cd5` CI green: code quality3m45s, Laravel15m24s (run41481032640). Automatic Cloud deployment `depl-a3216153-58ba-4d07-8851-28a966613b2a` succeeded16:42:11UTC.
+
+Read-only before/after proves all10existingtenants retain unlimited allowance with snapshot-1. Package financial settings, tenant financial settings and tenant-feature hashes unchanged. Tracked file totals unchanged (Purpledot188396bytes). New limit feature/pivots: Free104857600, Starter1073741824, Growth5368709120, Enterprise21474836480bytes. Probe/custom package unchanged. No full package seeder, other tenant activation, extra deploy or real file mutation.

@@ -82,9 +82,9 @@
 
 - [x] Read effective `storage_bytes` allowances and aggregate usage without downloading private content; identify what retained versions/assets count.
 - [x] Propose concrete tier allowances and over-limit treatment based on that inventory. Owner approves public/package limits before production configuration changes; do not invent prices.
-- [ ] Reuse the existing aggregate meter and20MiB/file validation. Add boundary/concurrent-upload/retained-version/orphan-cleanup regressions only for missing behaviour.
-- [ ] Exercise a synthetic PDF upload, authenticated view/download, foreign tenant and expired-proof denial, unsigned-object denial and readable history while over quota.
-- [ ] Apply approved missing-only configuration, verify capacity/error messages, release and record results. No silent deletion of existing documents.
+- [x] Reuse the existing aggregate meter and20MiB/file validation. Add boundary/concurrent-upload/retained-version/orphan-cleanup regressions only for missing behaviour.
+- [x] Exercise a synthetic PDF upload, authenticated view/download, foreign tenant and expired-proof denial, unsigned-object denial and readable history while over quota.
+- [x] Apply approved missing-only configuration, verify capacity/error messages, release and record results. No silent deletion of existing documents.
 
 ## Phase 5 — Billing renewal date semantics
 
@@ -100,7 +100,7 @@
 **Sources:** Community follow-ups §6; current public event Going count and registration/identity flows.
 
 - [x] Produce the consent/visibility design and visual preview first: verified explicit opt-in, optional display name/photo, preview, immediate withdrawal, image safety/retention, cancellation/refund behaviour and public-cache invalidation.
-- [ ] Obtain the requested visual/design review before implementing public identity storage/endpoints. Existing attendees are never published automatically; anonymous Going count remains independent.
+- [x] Obtain the requested visual/design review before implementing public identity storage/endpoints. Owner approved proposed design2November2026; detailed native plan follows. Existing attendees are never published automatically; anonymous Going count remains independent.
 - [ ] Write the native implementation plan against current code, then implement in a separately reviewed release with absent/withdrawn consent, isolation and unsafe-image regressions.
 
 ## Phase 7 — Complete the remaining marketplace roadmap
@@ -211,3 +211,11 @@
 - Public identities, equipment/service checkout, bank-transfer evidence and broader marketplace expansion remain labelled proposed/roadmap work. No invented prices, testimonials, accreditation, real venue photo or unapproved merchant activation. Editable placeholders remain for client-specific offers; nothing was sent to prospects.
 - Only Word document content XML changed; every other ZIP part, styles, headers/footer and page settings are byte-identical to the retained original. First render exposed one orphan closing paragraph; shortened internal source notes and re-rendered to12pages. All final pages visually checked;10 unchanged pages byte-identical to their inspected render, revised church/reference pages re-inspected.
 - Deliverables in task artifact `marketing-pack`: `MiConvener Marketing and Proposal Pack November 2026.docx`, QA-final PDF and page PNGs. Real international payer/device and actual classroom-photo gates remain open.
+
+
+### Storage production verification and next design approval
+
+- PR87 merged `fd3cdebc`, automatic deployment `depl-a3216153-58ba-4d07-8851-28a966613b2a` succeeded16:42:11UTC. Final-head CI `2dc16cd5`: quality3m45s, Laravel15m24s green. All10oldorganisations remain unlimited (snapshot-1), financial/features hashes and tracked files unchanged. Four standard future defaults installed; custom Probe unchanged. Detailed evidence in storage child plan.
+- Owner approved the proposed attendee-profile design via the pending review question. This settles explicit event consent, adult self-publication, optional photo, immediate removal,30days-after-event/90days-from-consent public limit, and90day minimal consent-audit retention. It does not consent on behalf of actual attendees or activate a live pilot. Prepare the native implementation plan before storage/endpoints.
+
+Native profile plan prepared at `docs/superpowers/plans/2026-11-02-public-attendee-profiles.md` after owner design approval. It is ready for plan review, not an implemented feature. No profile data/schema/endpoint/permissions were deployed.

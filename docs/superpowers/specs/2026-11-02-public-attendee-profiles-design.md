@@ -1,6 +1,6 @@
 # Event attendee profiles: explicit public opt-in
 
-**Status:** proposed design for owner visual/privacy review; not approved for implementation. No public identities, schema or endpoints are added by this document.
+**Status:** owner approved the proposed visual/privacy design on2November2026. Native implementation plan is being prepared for review; this approval does not publish any attendee or enable a production pilot. No public identities, schema or endpoints are added by this document.
 **Parent:** project completionPhase 6; Community follow-ups §6.
 
 ## Intent and existing behaviour
