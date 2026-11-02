@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Package;
 use App\Models\Subscription;
+use App\Services\Billing\SubscriptionPeriod;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Pricing\ChargeQuote;
@@ -165,7 +166,7 @@ final class CheckoutController extends Controller
                 'provider_subscription_id' => 'dev_'.uniqid(),
                 'provider_plan_id' => $newPackage->slug.'_'.$interval,
                 'status' => 'active',
-                'current_period_end' => $interval === 'year' ? now()->addYear() : now()->addMonth(),
+                ...SubscriptionPeriod::starting($interval),
                 'amount_paid' => 0,
                 'currency' => 'ghs',
                 'transaction_id' => 'dev_tx_'.uniqid(),
