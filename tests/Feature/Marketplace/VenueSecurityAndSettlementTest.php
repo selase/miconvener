@@ -286,6 +286,22 @@ describe('releasing earnings after the event', function (): void {
         expect(fn () => app(VenueSettlementRelease::class)->complete($this->booking->fresh(), $this->host, 'Another note.', (string) Str::uuid()))->toThrow(ValidationException::class);
     });
 
+    test('reserves a venue payout using reservation terms without requiring merchandise terms', function (): void {
+        $quote = ($this->accepted)();
+        ($this->pay)($quote);
+        ($this->pay)($quote, VenueBookingCharge::RENTAL_BALANCE);
+        $this->travelTo($this->eventStart->addHours(9));
+        app(VenueSettlementRelease::class)->complete($this->booking->fresh(), $this->host, 'Finished.', (string) Str::uuid());
+        Permission::query()->firstOrCreate(['name' => 'manage store finance', 'guard_name' => 'web'], ['category' => 'store']);
+        $this->host->givePermissionTo('manage store finance');
+        $account = App\Models\TenantPayoutAccount::factory()->create(['tenant_id' => $this->tenant->id, 'is_verified' => true]);
+        $payout = app(App\Services\Marketplace\StorePayouts::class)->reserve($this->tenant, $this->host, [
+            'amount' => 5000, 'currency' => 'GHS', 'payout_account_id' => $account->id, 'operation_key' => (string) Str::uuid(),
+        ]);
+        expect($payout->amount)->toBe(5000)->and($payout->status)->toBe('scheduled');
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/transfer'));
+    });
+
     test('an event still to come, an unpaid balance or an open refund blocks the release', function (): void {
         $quote = ($this->accepted)();
         ($this->pay)($quote);

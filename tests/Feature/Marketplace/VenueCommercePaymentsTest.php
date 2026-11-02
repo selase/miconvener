@@ -192,6 +192,18 @@ describe('confirming the booking from verified money', function (): void {
             ->and(CommercePaymentReference::query()->where('reference', $attempt->reference)->value('ledger_reference'))->toBe($attempt->reference);
     });
 
+    test('renders a reservation receipt with the venue booking link', function (): void {
+        $quote = ($this->accepted)();
+        $attempt = ($this->attemptFor)($quote);
+        ($this->capture)($attempt);
+        $receipt = StoreReceipt::query()->where('order_id', $attempt->order_id)->sole();
+        $mail = new App\Mail\StoreOrderReceipt($receipt);
+        $html = $mail->render();
+        expect($html)->toContain('300.00')->toContain('booking payment')
+            ->toContain('/marketplace/bookings/'.$this->booking->booking_reference)
+            ->not->toContain('/my/store-orders/')->not->toContain('## Collection');
+    });
+
     test('full payment marks the booking fully paid', function (): void {
         $quote = ($this->accepted)(['payment_plan' => 'full', 'deposit_pesewas' => null, 'balance_due_at' => null]);
 
@@ -212,6 +224,15 @@ describe('confirming the booking from verified money', function (): void {
         expect($handled)->toBeTrue()->and(($this->sales)())->toBe(1)
             ->and($this->booking->fresh()->status)->toBe(VenueBooking::STATUS_CONFIRMED)
             ->and(StoreReceipt::query()->count())->toBe(1);
+    });
+
+    test('returns a venue payment callback to its booking instead of a merchandise order', function (): void {
+        $quote = ($this->accepted)();
+        $attempt = ($this->attemptFor)($quote);
+        Http::fake(['*api.paystack.co/transaction/verify/*' => Http::response(['data' => ['id' => 4242, ...($this->evidence)($attempt)]])]);
+        $controller = app(App\Http\Controllers\Marketplace\StoreCheckoutController::class);
+        $response = $controller->callback(Illuminate\Http\Request::create('/'), $attempt->reference, app(StorePaymentNotifications::class));
+        expect($response->getTargetUrl())->toBe(route('marketplace.bookings.show', $this->booking->booking_reference));
     });
 
     test('the signed settlement webhook routes venue money through the same verification', function (): void {

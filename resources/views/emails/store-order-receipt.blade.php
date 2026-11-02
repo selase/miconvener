@@ -1,5 +1,5 @@
 <x-mail::message>
-# Your store order receipt
+# {{ $isVenue ? 'Your venue payment receipt' : 'Your store order receipt' }}
 
 {{ $receipt['seller'] }} · Order {{ $receipt['number'] }}
 
@@ -18,14 +18,16 @@
 {{ $receipt['production_terms'] }}
 
 @endif
-@if (isset($receipt['buyer_fee_pesewas']))
+@if (!$isVenue && isset($receipt['buyer_fee_pesewas']))
 Checkout fee: {{ $receipt['currency'] }} {{ number_format($receipt['buyer_fee_pesewas'] / 100, 2) }}
 
 @endif
 **Total: {{ $receipt['currency'] }} {{ number_format($receipt['total_pesewas'] / 100, 2) }}**
 
+@unless ($isVenue)
 ## Collection
 {{ $receipt['collection_terms'] }}
+@endunless
 
 ## Refunds and support
 {{ $receipt['refund_terms'] }}
@@ -34,7 +36,7 @@ Checkout fee: {{ $receipt['currency'] }} {{ number_format($receipt['buyer_fee_pe
 
 {{ $receipt['receipt_terms'] }}
 
-<x-mail::button :url="$orderUrl">Read your order</x-mail::button>
+<x-mail::button :url="$orderUrl">{{ $isVenue ? 'Read your booking' : 'Read your order' }}</x-mail::button>
 
-Verify the original buyer email to open your private record. This receipt is a payment record, not a VAT invoice or proof of collection. Refund updates appear on your order.
+Verify the original buyer email to open your private record. This receipt is a payment record, not a VAT invoice{{ $isVenue ? '.' : ' or proof of collection.' }} Refund updates appear on your {{ $isVenue ? 'booking' : 'order' }}.
 </x-mail::message>

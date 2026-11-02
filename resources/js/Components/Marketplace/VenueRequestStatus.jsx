@@ -13,6 +13,7 @@ const newOperationKey = () =>
 
 const STATES = {
     pending_host_approval: { label: 'Awaiting host approval', tone: 'blue', Icon: Clock },
+    confirmed: { label: 'Confirmed', tone: 'blue', Icon: CheckCircle2 },
     approved_hold: { label: 'Dates held', tone: 'amber', Icon: CheckCircle2 },
     hold_expired: { label: 'Hold expired', tone: 'slate', Icon: AlertCircle },
     declined: { label: 'Declined', tone: 'rose', Icon: XCircle },
@@ -119,6 +120,11 @@ export default function VenueRequestStatus({ booking }) {
                 <p className="text-ink-secondary leading-relaxed">
                     Your dates are not reserved until the host approves. We will email you when the
                     host decides, and this page always shows the latest answer.
+                </p>
+            )}
+            {status === 'confirmed' && (
+                <p className="text-ink-secondary leading-relaxed">
+                    Your booking is confirmed. See the payment summary below for any balance or refundable security still due.
                 </p>
             )}
             {status === 'approved_hold' && (
