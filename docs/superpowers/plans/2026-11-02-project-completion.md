@@ -69,12 +69,12 @@
 
 **Files:** personal-app components including `resources/js/Pages/Public/Community/CommunitiesPanel.jsx`; ticket/portal components and `resources/js/lib/offlineTicketStore.*`; existing portal tests and follow-up plan §4.
 
-- [ ] Audit primary controls on both themes; reproduce white-on-bright-accent failures before replacing them with existing `text-accent-ink` semantics. Keep the iconic homepage blue unchanged.
+- [x] Audit primary controls on both themes; reproduce white-on-bright-accent failures before replacing them with existing `text-accent-ink` semantics. Keep the iconic homepage blue unchanged.
 - [ ] Check actual390px reflow, keyboard navigation/focus return, menu/dialog placement and200% text. Correct demonstrated defects with proportionate regressions.
 - [ ] Save explicitly selected passes, cold-open offline, sign out/remove proof in another tab and verify clearing. Money, inbox, Library and service notes remain online-only.
 - [ ] Exercise personal versus authorised representative contexts, expired proofs, reassigned/shared phone safeguards and cross-organisation denial.
 - [ ] Prepare a short real-phone checklist for the owner. Emulation is not physical-device proof; record audio/vibration/offline scanner checks independently from the already-passed online QR scans.
-- [ ] Release scoped fixes and record remaining owner-device actions without blocking other independent phases.
+- [x] Release scoped fixes and record remaining owner-device actions without blocking other independent phases.
 
 ## Phase 4 — Library attachments and storage policy
 
@@ -99,7 +99,7 @@
 
 **Sources:** Community follow-ups §6; current public event Going count and registration/identity flows.
 
-- [ ] Produce the consent/visibility design and visual preview first: verified explicit opt-in, optional display name/photo, preview, immediate withdrawal, image safety/retention, cancellation/refund behaviour and public-cache invalidation.
+- [x] Produce the consent/visibility design and visual preview first: verified explicit opt-in, optional display name/photo, preview, immediate withdrawal, image safety/retention, cancellation/refund behaviour and public-cache invalidation.
 - [ ] Obtain the requested visual/design review before implementing public identity storage/endpoints. Existing attendees are never published automatically; anonymous Going count remains independent.
 - [ ] Write the native implementation plan against current code, then implement in a separately reviewed release with absent/withdrawn consent, isolation and unsafe-image regressions.
 
@@ -195,3 +195,11 @@
 - Renewal anchors PR86 merged `4800c272`, Cloud `depl-a3214e4a-669a-4ea3-a6f6-58698677f1ed` succeeded. Owner-approved intended-day clamping implemented, including leap-year restoration and callback/webhook initial periods. All4 production subscriptions retain NULL anchors; no backfill or old invoice rewrite. CI had one unchanged badge-test timing failure; isolated25/25 and a single failed-job retry passed. Badge flake remainsPhase9. One early helper test omitted dedicatedDB; globalUnit bootstrap used disposable default testDB, not acceptance/production. Later runs explicitly isolated; acceptance records remained intact.
 - Storage defaults specifically approved for FUTURE organisations only; implementation/review evidence in child `2026-11-02-storage-allowances.md`. Existing limits protected across plan changes; no production quota configuration changed before final CI/release.
 - Library synthetic PDF878541bytes published by native staff form, verified-member download byte-identical, unsigned URL denied after signout. Quota boundary/old-edition read regression passed. No real organisation document was published for testing.
+
+
+### Follow-up planning and repository inventory
+
+- Phase6 proposed design and standalone sample-only visual: `docs/superpowers/specs/2026-11-02-public-attendee-profiles-design.md` and its `-preview.html` companion. Fresh builder-check covered group payer ownership, recurring-event expiry, moderation actors and retention. Proposed privacy choices require owner design review; no production profile storage/endpoints or actual identities added.
+- Native preview consent/public-view/removal works with synthetic initials only; consent unchecked by default, public count independent, no network writes. Review request is pending. Native photo upload remains intentionally a labelled mockup placeholder.
+- Read-only worktree inventory:20checkouts,14Claude-branched preserved, only the active owned checkout has untracked preview material. Other ownership is not established; no checkout/branch/database was deleted. Exact metadata saved locally in `/private/tmp/miconvener-worktree-inventory-20261102.json`.
+- Current CI baseline takes roughly9minutes for the main PHP run and~4minutes for code quality, not hours. PR87 exposed one test-fixture assumption about a migration-created feature row; reproduced missing-row failure, made its fixture explicit and required new final-head CI. No production policy was altered to make tests pass. The known risky PHP result has no named detail in compact CI output and is still open; do not pretend it was fixed.
