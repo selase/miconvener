@@ -47,9 +47,9 @@
 - [x] Compare the merged source with PR48's reviewed change; retain later main features and identify any new interaction regression.
 - [x] Add a failing test for any newly demonstrated gap (including theme-aware primary action text), then implement only that correction.
 - [x] Run the ticket/attendee tests and existing enlarged-text/long-name/no-QR cases; lint, Pint, rebuild assets and check whitespace.
-- [ ] Browser-check the real built component at desktop/390px, light/dark, long values and enlarged text; retain synthetic/local evidence distinctly from live verification.
+- [x] Browser-check the real built component at desktop/390px, light/dark and long values. Earlier enlarged-text evidence is retained; fresh physical-device/200% checks remain explicitly in Phase3. Keep synthetic/local evidence distinct from live verification.
 - [x] Self-review touchpoints, empty/loading/error, permission, keyboard and responsive states; one independent review of the reconciled change.
-- [ ] Update PR48's description to its final scope; mark ready; push normally; require green CI on the exact final head; squash-merge and monitor automatic Cloud deployment.
+- [x] Update PR48's description to its final scope; mark ready; push normally; require green CI on the exact final head; squash-merge and monitor automatic Cloud deployment.
 - [ ] Verify the live ticket surface if normal member access is available. If proof expired, ask for normal email verification without requesting codes; continue unrelated work while waiting. Do not issue another ticket or resend mail unnecessarily.
 
 ## Phase 2 — Giving and paid member-benefit acceptance
@@ -57,8 +57,8 @@
 **Files/services:** `app/Services/Giving/{GivingRollout,GivingCheckout,GivingPaymentConfirmer,GivingReceipts,GivingRefunds,GivingBalance}.php`; `tests/Feature/Giving/*`; `tests/Feature/Events/MemberBenefit{Checkout,Payment,Quote,Lifecycle,Webhook}Test.php`; existing Giving/benefits plans.
 **Output:** a source-specific financial readiness record; corrections only where a failure is reproduced.
 
-- [ ] Inventory effective flags, settlement/account configuration and existing acceptance records read-only; do not assume venue tests certify Giving or ticket pricing.
-- [ ] Prepare isolated church and volunteer-group fixtures with no dues. Reuse approved test-mode provider credentials/synthetic recipients; never replace production keys.
+- [x] Inventory effective flags, settlement/account configuration and existing acceptance records read-only; do not assume venue tests certify Giving or ticket pricing.
+- [x] Prepare isolated church and volunteer-group fixtures with no dues. Reuse approved test-mode provider credentials/synthetic recipients; never replace production keys.
 - [ ] Verify voluntary giving, optional member attribution, receipt and Money/inbox access; failed/abandoned/duplicate callbacks; exact amounts and balanced/idempotent ledger entries.
 - [ ] Verify active-member prices and admission, ordinary/nonmember prices, quote expiry, lapsed membership during checkout, free/paid recovery and representative restrictions.
 - [ ] Verify Giving refund/correction funding and payout/OTP reconciliation with original accounts/references; owner performs any required hosted/OTP action privately.
@@ -125,7 +125,7 @@
 
 ## Phase 9 — Operational/repository closure
 
-- [ ] Close superseded PR59 after recording its replacement; keep PR48 until its actual correction is merged/released.
+- [x] Close superseded PR59 after recording its replacement; PR48 is now merged and deployed.
 - [ ] Identify the old risky PHP test and intermittent badge/component timing failures from current named CI results. Fix demonstrated test defects without dropping assertions or suppressing failures.
 - [ ] Measure current CI/setup time before proposing a separate path-aware CI optimisation; frontend-only work should not repeatedly trigger local+remote full runs. Repository protection changes need explicit settings approval; do not bypass checks.
 - [ ] Inventory each worktree/branch's uncommitted files and unique commits read-only. Archive/remove only proven redundant owned worktrees; coordinate Claude-owned resources and keep active Herd paths usable. No blanket `git clean` or database-name glob deletion.
@@ -148,3 +148,14 @@
 - Fresh real-page local fixture uses synthetic event/registration data and an already normally verified synthetic buyer session; it is presentation evidence, not a live registration, payment, email-delivery or verification-flow pass. Desktop1440: details408px, QR160×160, note outside region, no document overflow. Phone390: details342px, QR160×160, note outside region, no document overflow; light/dark inspected and keyboard focus visible. PR48's earlier40-combination enlarged-text/long/no-QR matrix remains historical evidence; new physical-device/200% acceptance is tracked in Phase3, not claimed fresh here.
 - One fresh independent review found no functional/accessibility blockers. No dependency, endpoint, permission, schema, sender/account or financial behaviour changed.
 - Ruling: retain the previously reviewed layout rather than redesigning it; fix only the demonstrated foreground issues. Risk if wrong: visual regression, bounded by the component/browser tests. Larger accessibility/offline acceptance remains a separate phase.
+
+### Phase 1 release and Phase 2 acceptance progress — 2 November 2026
+
+- PR48 final head `840e1ef7`: code quality passed3m29s and Laravel passed14m46s, first attempts. Squash-merged as `7825ede7`; production Cloud deployment `depl-a320f39a-9603-4a9a-8f83-580c8ee03b84` succeeded11:35:22UTC. Live protected ticket check correctly requires fresh normal email verification; owner asked to sign in, no bypass or extra email/ticket issuance.
+- Read-only production inventory: Purpledot Giving screens enabled, online disabled, platform-default settlement, current Giving rate1%, no funds/gifts/attempts; Library version bytes0, storage limit unset. No production settings changed by these checks.
+- Isolated database `miconvener_acceptance_codex_20261102`, Paystack test credentials, log-only mail. Two synthetic organisations (`giving-church-qa`, `giving-volunteer-qa`), each with zero Community members and dues. Native local feature commands and fund service used. No real donations, recipients or live flags.
+- Each organisation completed one GHS1 simulated-card payment through the actual hosted Paystack test page and native callback. Each attempt confirmed, gift completed, fee2pesewas, Free/no-plan commission2pesewas, net96pesewas. Each created exactly one Giving sale journal, debit98/credit98. These test fees/rates do not redefine Purpledot's commercial terms.
+- Volunteer gift selected anonymity. Private PDF receipt downloaded through normal capability; rendered/readable. Already normally verified synthetic buyer sees both completed gifts in `/my/giving`; receipt email entry itself was not used as verification. Staff console reports receipt sent through log mail, not recipient delivery.
+- Church staff recorded a GHS5 offering batch and a separate GHS1 correction through the real controls. Online payout availability stayed GHS0.96; cash created no additional sale journal. Original cash record retained.
+- Full online refund preview reverses2pesewas commission and warns the original2pesewas processing fee leaves a shortfall. One native test refund submitted; provider ID18954600 initially processing, its reserve reduced available payout to0. No repeat submission or invented confirmation. Final outcome remains to verify.
+- Focused automated acceptance: Giving EndToEnd/Checkout/Confirmation and MemberBenefit Checkout/Quote/Payment,82passed/294assertions. These use mocked provider cases and are distinct from the two hosted test captures. Remaining Phase2 cases, real-device checks and Giving online activation are not marked complete.
