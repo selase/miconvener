@@ -48,7 +48,9 @@ final class SubscriptionRenewalService
 
                 $start = $lapsed ? CarbonImmutable::now() : CarbonImmutable::parse($subscription->current_period_end);
                 $interval = $subscription->billingInterval();
-                $periodEnd = $interval === 'year' ? $start->addYear() : $start->addMonth();
+                $anchorDay = $lapsed ? $start->day : ($subscription->billing_anchor_day ?? $start->day);
+                $anchorMonth = $lapsed ? $start->month : ($subscription->billing_anchor_month ?? $start->month);
+                $periodEnd = SubscriptionPeriod::end($start, $interval, $anchorDay, $anchorMonth);
 
                 $this->provisioning->moveToPackage($tenant, $package, $lapsed ? 'reactivate' : 'downgrade');
 
@@ -56,6 +58,8 @@ final class SubscriptionRenewalService
                     'provider_status' => Subscription::STATUS_ACTIVE,
                     'provider_plan' => $package->slug.'_'.$interval,
                     'current_period_end' => $periodEnd,
+                    'billing_anchor_day' => $anchorDay,
+                    'billing_anchor_month' => $anchorMonth,
                     'ends_at' => null,
                     'grace_ends_at' => null,
                     'renewal_attempts' => 0,

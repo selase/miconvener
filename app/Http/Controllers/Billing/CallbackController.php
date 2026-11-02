@@ -12,11 +12,11 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Services\Billing\BillingNotifier;
 use App\Services\Billing\PaymentFulfillmentService;
+use App\Services\Billing\SubscriptionPeriod;
 use App\Services\Billing\SubscriptionProvisioningService;
 use App\Services\Billing\SubscriptionRenewalService;
 use App\Services\Pricing\GhanaPaymentProof;
 use App\Services\Tenancy\TenantContext;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -132,7 +132,7 @@ final class CallbackController extends Controller
             'provider_subscription_id' => 'ps_'.$result['reference'],
             'provider_plan_id' => $planSlug.'_'.$interval,
             'status' => 'active',
-            'current_period_end' => $interval === 'year' ? now()->addYear() : now()->addMonth(),
+            ...SubscriptionPeriod::starting($interval),
             'amount_paid' => $result['amount'] ?? 0,
             'currency' => $result['currency'] ?? 'ghs',
             'transaction_id' => $result['reference'],
@@ -197,7 +197,7 @@ final class CallbackController extends Controller
                     'provider_subscription_id' => $result['subscription_code'] ?? $result['reference'],
                     'provider_plan_id' => $planId,
                     'status' => 'active',
-                    'current_period_end' => Carbon::now()->addMonth(),
+                    ...SubscriptionPeriod::starting('month'),
                     'amount_paid' => $result['amount'] ?? 0,
                     'currency' => mb_strtolower($result['currency'] ?? 'usd'),
                     'transaction_id' => $result['reference'],

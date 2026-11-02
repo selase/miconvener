@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\Transaction;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -207,6 +208,7 @@ final class SubscriptionProvisioningService
                 'provider_status' => $dto['status'],
                 'provider_plan' => $dto['provider_plan_id'],
                 'current_period_end' => $dto['current_period_end'],
+                ...Arr::only($dto, ['billing_anchor_day', 'billing_anchor_month']),
                 'ends_at' => null,
                 'pending_package_id' => null,
                 'grace_ends_at' => null,
