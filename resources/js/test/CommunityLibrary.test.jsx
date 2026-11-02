@@ -78,3 +78,29 @@ it('labels representative access when a document is opened directly', async () =
         await screen.findByText('Reading as an approved representative for Ama Mensah.')
     ).toBeTruthy();
 });
+
+it('explains a retained allowance and keeps documents available at capacity', () => {
+    render(
+        <Library
+            items={{ data: [], links: [] }}
+            canPublish
+            storage={{ used: 4096, limit: 4096, retained: true }}
+        />
+    );
+    expect(screen.getByText(/4 KiB of 4 KiB used/)).toBeTruthy();
+    expect(screen.getByText(/Your existing allowance is retained/)).toBeTruthy();
+    expect(screen.getByText(/New attachments are blocked at the allowance/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add document' })).toBeTruthy();
+});
+
+it('labels an unlimited retained allowance without describing it as a new tier default', () => {
+    render(
+        <Library
+            items={{ data: [], links: [] }}
+            canPublish
+            storage={{ used: 4096, limit: null, retained: true }}
+        />
+    );
+    expect(screen.getByText(/4 KiB used · No fixed allowance/)).toBeTruthy();
+    expect(screen.queryByText(/of null/)).toBeNull();
+});

@@ -10,7 +10,13 @@ import Modal from '@/Components/Console/Modal';
 import { csrfFetchFormData } from '@/lib/csrfFetch';
 import { communityRequest } from '@/lib/community';
 
-export default function Library({ items, groups = [], canPublish, initialService = null }) {
+export default function Library({
+    items,
+    groups = [],
+    canPublish,
+    initialService = null,
+    storage = null,
+}) {
     const writeAttempt = useRef(null);
     const [serviceEditor, setServiceEditor] = useState(canPublish ? initialService : null);
     const [editing, setEditing] = useState(null);
@@ -19,6 +25,11 @@ export default function Library({ items, groups = [], canPublish, initialService
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [versions, setVersions] = useState(null);
+    const byteLabel = (bytes) => {
+        const units = ['B', 'KiB', 'MiB', 'GiB'];
+        const unit = Math.min(3, Math.floor(Math.log(Math.max(1, bytes)) / Math.log(1024)));
+        return `${Number((bytes / 1024 ** unit).toFixed(1))} ${units[unit]}`;
+    };
     const open = (item) => {
         writeAttempt.current = null;
         setFile(null);
@@ -74,7 +85,7 @@ export default function Library({ items, groups = [], canPublish, initialService
                         'The document could not be saved.'
                 );
             setEditing(null);
-            router.reload({ only: ['items'], preserveScroll: true });
+            router.reload({ only: ['items', 'storage'], preserveScroll: true });
         } catch (failure) {
             setError(failure.message);
         } finally {
@@ -90,7 +101,7 @@ export default function Library({ items, groups = [], canPublish, initialService
                 'POST',
                 {}
             );
-            router.reload({ only: ['items'], preserveScroll: true });
+            router.reload({ only: ['items', 'storage'], preserveScroll: true });
         } catch (failure) {
             setError(failure.message);
         } finally {
@@ -124,6 +135,35 @@ export default function Library({ items, groups = [], canPublish, initialService
                 }
             />
             <div className="space-y-5 px-4 py-6 sm:px-8">
+                {storage && (
+                    <section
+                        aria-label="File storage"
+                        className="space-y-2 border border-border bg-surface p-4 text-sm text-ink-secondary"
+                    >
+                        <h2 className="font-semibold text-ink">File storage</h2>
+                        <p>
+                            {storage.limit === null
+                                ? `${byteLabel(storage.used)} used · No fixed allowance`
+                                : `${byteLabel(storage.used)} of ${byteLabel(storage.limit)} used`}
+                        </p>
+                        <p>
+                            Library editions and merchandise images share this allowance. Retained
+                            editions count towards usage. Each Library attachment may be up to 20
+                            MiB.
+                        </p>
+                        {storage.retained && (
+                            <p>
+                                Your existing allowance is retained, including after a plan change.
+                            </p>
+                        )}
+                        {storage.limit !== null && storage.used >= storage.limit && (
+                            <p role="status">
+                                New attachments are blocked at the allowance. Existing documents
+                                remain readable; text-only notes can still be saved.
+                            </p>
+                        )}
+                    </section>
+                )}
                 {!canPublish && (
                     <p
                         role="status"
@@ -222,7 +262,7 @@ export default function Library({ items, groups = [], canPublish, initialService
                     onClose={() => setServiceEditor(null)}
                     onSaved={() => {
                         setServiceEditor(null);
-                        router.reload({ only: ['items'], preserveScroll: true });
+                        router.reload({ only: ['items', 'storage'], preserveScroll: true });
                     }}
                 />
             )}

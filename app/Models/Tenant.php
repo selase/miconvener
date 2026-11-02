@@ -40,6 +40,10 @@ final class Tenant extends Model
 
     protected $connection = 'landlord';
 
+    protected $attributes = ['storage_limit_snapshot' => null];
+
+    protected $hidden = ['storage_limit_snapshot'];
+
     protected $fillable = [
         'id',
         'uuid',
@@ -88,6 +92,7 @@ final class Tenant extends Model
     ];
 
     protected $casts = [
+        'storage_limit_snapshot' => 'integer',
         'status' => TenantStatusEnum::class,
         'encryption_at_rest' => 'boolean',
         'meta' => 'array',
@@ -693,6 +698,9 @@ final class Tenant extends Model
      */
     public function featureLimitValue(string $featureSlug): ?int
     {
+        if ($featureSlug === 'storage_bytes') {
+            return app(\App\Services\Tenancy\StorageAllowances::class)->limit($this);
+        }
         $limit = $this->planLimitValue($featureSlug);
 
         if ($limit === null) {
