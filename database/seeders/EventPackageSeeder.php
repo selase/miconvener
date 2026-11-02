@@ -6,6 +6,7 @@ namespace Database\Seeders;
 
 use App\Models\Feature;
 use App\Models\Package;
+use App\Services\Tenancy\StorageAllowances;
 use Illuminate\Database\Seeder;
 
 final class EventPackageSeeder extends Seeder
@@ -14,6 +15,7 @@ final class EventPackageSeeder extends Seeder
      * @var array<string, array{name: string, type: string, description: string}>
      */
     private array $features = [
+        'storage_bytes' => ['name' => 'Library file storage', 'type' => 'limit', 'description' => 'Shared allowance for Library and merchandise-media uploads.'],
         'community_library_access' => ['name' => 'Community Library', 'type' => 'boolean', 'description' => 'Publish organisation documents and service notes.'],
         'community_polls_access' => ['name' => 'Community Polls and Surveys', 'type' => 'boolean', 'description' => 'Publish organisation questionnaires.'],
         'community_message_scheduling' => ['name' => 'Scheduled Community Messages', 'type' => 'boolean', 'description' => 'Schedule Community announcements.'],
@@ -52,6 +54,7 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'storage_bytes' => StorageAllowances::DEFAULTS['free'],
                 'community_library_access' => false,
                 'community_polls_access' => false,
                 'community_message_scheduling' => false,
@@ -88,6 +91,7 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'storage_bytes' => StorageAllowances::DEFAULTS['starter'],
                 'community_library_access' => true,
                 'community_polls_access' => false,
                 'community_message_scheduling' => true,
@@ -124,6 +128,7 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'storage_bytes' => StorageAllowances::DEFAULTS['growth'],
                 'community_library_access' => true,
                 'community_polls_access' => true,
                 'community_message_scheduling' => true,
@@ -158,6 +163,7 @@ final class EventPackageSeeder extends Seeder
             'default_cap' => null,
             'default_bearer' => 'organizer',
             'features' => [
+                'storage_bytes' => StorageAllowances::DEFAULTS['enterprise'],
                 'community_library_access' => true,
                 'community_polls_access' => true,
                 'community_message_scheduling' => true,
@@ -240,6 +246,9 @@ final class EventPackageSeeder extends Seeder
             foreach ($config['features'] as $featureSlug => $value) {
                 $feature = Feature::where('slug', $featureSlug)->first();
                 if ($feature) {
+                    if ($featureSlug === 'storage_bytes') {
+                        $value = $package->features()->where('features.id', $feature->id)->value('package_features.value') ?? $value;
+                    }
                     $syncData[$feature->id] = ['value' => $value];
                 }
             }

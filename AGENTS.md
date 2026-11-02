@@ -363,3 +363,10 @@ Before catalog/commerce work, read `docs/superpowers/marketplace-roadmap.md` and
 - Merchandise media stays private and is streamed through current listing/member authorisation. Never expose storage keys or reuse public venue-media paths.
 - Member-only merchandise requires current native verified-email self membership; phone proof, followers and representative access do not qualify.
 - Before rolling back to source predating merchandise scopes, make merchandise parent listings draft. A disabled catalog flag alone is not honoured by that older source. Retain catalog and audit tables.
+
+
+# File storage allowance preservation
+
+- Standard storage defaults apply to organisations created after the allowance migration only. Existing tenants retain their original finite or unlimited allowance in protected `storage_limit_snapshot`, independent of future package syncs. Never drop or backfill this snapshot from new defaults; rollback application code without dropping the preservation migration.
+- `StorageAllowances` resolves storage-only limits; `StorageMeter` and existing tenant locks remain authoritative for managed Library and merchandise-media uploads. Retained Library editions count. Caps never restrict reading or delete existing content. Do not advertise blanket enforcement across legacy upload routes without auditing them.
+- Storage default installation attaches missing feature pivots only. Do not run the full package seeder in production to install allowances, or overwrite negotiated package limits, prices or financial terms.

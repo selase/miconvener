@@ -80,8 +80,8 @@
 
 **Files:** `app/Services/Community/{CommunityContentStorage,CommunityLibrary}.php`; `app/Services/Tenancy/StorageMeter.php`; existing Library tests/package allowance configuration.
 
-- [ ] Read effective `storage_bytes` allowances and aggregate usage without downloading private content; identify what retained versions/assets count.
-- [ ] Propose concrete tier allowances and over-limit treatment based on that inventory. Owner approves public/package limits before production configuration changes; do not invent prices.
+- [x] Read effective `storage_bytes` allowances and aggregate usage without downloading private content; identify what retained versions/assets count.
+- [x] Propose concrete tier allowances and over-limit treatment based on that inventory. Owner approves public/package limits before production configuration changes; do not invent prices.
 - [ ] Reuse the existing aggregate meter and20MiB/file validation. Add boundary/concurrent-upload/retained-version/orphan-cleanup regressions only for missing behaviour.
 - [ ] Exercise a synthetic PDF upload, authenticated view/download, foreign tenant and expired-proof denial, unsigned-object denial and readable history while over quota.
 - [ ] Apply approved missing-only configuration, verify capacity/error messages, release and record results. No silent deletion of existing documents.
@@ -90,10 +90,10 @@
 
 **Files:** `app/Services/Billing/SubscriptionRenewalService.php`; `tests/Feature/Billing/SubscriptionRenewalTest.php`; subscription model and billing plan after inspection.
 
-- [ ] Inspect current renewal dates and anchors read-only; prepare a focused child design before changing money-related date behaviour.
-- [ ] Recommended rule for owner confirmation: preserve the intended billing day, clamp only invalid dates to month end, and restore the anchor in later valid months; explicitly cover annual29February. Honour already-issued invoices/quoted payment periods.
-- [ ] Write failing Jan31/Feb28/Feb29/Mar31 and leap-year regressions, plus grace/idempotency/reusable-authorisation checks; implement using existing renewal writer rather than a second payment path.
-- [ ] Release after review and CI. No retroactive invoice rewrite, automatic extra charge or production subscription migration without an explicit bounded approval.
+- [x] Inspect current renewal dates and anchors read-only; prepare a focused child design before changing money-related date behaviour.
+- [x] Recommended rule for owner confirmation: preserve the intended billing day, clamp only invalid dates to month end, and restore the anchor in later valid months; explicitly cover annual29February. Honour already-issued invoices/quoted payment periods.
+- [x] Write failing Jan31/Feb28/Feb29/Mar31 and leap-year regressions, plus grace/idempotency/reusable-authorisation checks; implement using existing renewal writer rather than a second payment path.
+- [x] Release after review and CI. No retroactive invoice rewrite, automatic extra charge or production subscription migration without an explicit bounded approval.
 
 ## Phase 6 — Public attendee opt-in profiles
 
@@ -186,3 +186,12 @@
 
 **Ruling:** use the already-established accent-ink pair at each solid-accent control; do not hide mismatches with a broad CSS override or recolour the brand. Cost if wrong is limited to foreground rendering, covered by additive component and actual theme checks.
 **Deferred limitations:** physical-device/offline/200% acceptance and unrelated load-sensitive console tests remain separate tasks. Full final-head CI is mandatory before merge.
+
+
+### Phases2–5 execution update — 2 November2026
+
+- Giving full hosted TEST captures/receipt, append-only cash correction, full refund and owner-OTP GHS2 payout reconciled in isolated acceptance database; member-price hosted TEST registration confirmed. Owner specifically approved Purpledot standalone Giving; native activation enabled screens/online only for Purpledot, with1% terms and no published fund/historical cutover. Other organisations unchanged.
+- Accessibility PR85 merged `bafb1875`, Cloud `depl-a3211f10-24a2-4604-8986-38757baa01de` succeeded; final CI green. Native390px/theme checks previously passed. Selected synthetic ticket offline copy was removed across tabs by normal sign-out; known private Library URL redirected to verification. Cold-offline/physical-phone/200% remain open, not silently ticked.
+- Renewal anchors PR86 merged `4800c272`, Cloud `depl-a3214e4a-669a-4ea3-a6f6-58698677f1ed` succeeded. Owner-approved intended-day clamping implemented, including leap-year restoration and callback/webhook initial periods. All4 production subscriptions retain NULL anchors; no backfill or old invoice rewrite. CI had one unchanged badge-test timing failure; isolated25/25 and a single failed-job retry passed. Badge flake remainsPhase9. One early helper test omitted dedicatedDB; globalUnit bootstrap used disposable default testDB, not acceptance/production. Later runs explicitly isolated; acceptance records remained intact.
+- Storage defaults specifically approved for FUTURE organisations only; implementation/review evidence in child `2026-11-02-storage-allowances.md`. Existing limits protected across plan changes; no production quota configuration changed before final CI/release.
+- Library synthetic PDF878541bytes published by native staff form, verified-member download byte-identical, unsigned URL denied after signout. Quota boundary/old-edition read regression passed. No real organisation document was published for testing.

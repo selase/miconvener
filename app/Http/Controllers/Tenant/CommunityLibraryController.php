@@ -30,7 +30,7 @@ final class CommunityLibraryController extends Controller
         $initialService = is_string($eventId) && is_string($sessionId) && \Illuminate\Support\Str::isUuid($eventId) && \Illuminate\Support\Str::isUuid($sessionId) ? ['event_id' => $eventId, 'session_id' => $sessionId] : null;
         $items = CommunityLibraryItem::query()->where('tenant_id', $tenant->id)->with(['currentVersion', 'tenant'])->latest('updated_at')->paginate(25);
 
-        return Inertia::render('Tenant/Community/Library', ['items' => $items->through(fn ($item) => $library->payload($item, true)), 'canPublish' => $rollout->canPublish($tenant), 'initialService' => $initialService, 'groups' => CommunityGroup::query()->where('tenant_id', $tenant->id)->whereNull('archived_at')->orderBy('name')->get(['id', 'name'])]);
+        return Inertia::render('Tenant/Community/Library', ['items' => $items->through(fn ($item) => $library->payload($item, true)), 'canPublish' => $rollout->canPublish($tenant), 'initialService' => $initialService, 'storage' => ['used' => app(\App\Services\Tenancy\StorageMeter::class)->calculateUsage($tenant), 'limit' => $tenant->featureLimitValue('storage_bytes'), 'retained' => $tenant->storage_limit_snapshot !== null], 'groups' => CommunityGroup::query()->where('tenant_id', $tenant->id)->whereNull('archived_at')->orderBy('name')->get(['id', 'name'])]);
     }
 
     public function store(StoreLibraryItemRequest $request, CommunityLibrary $library): JsonResponse
