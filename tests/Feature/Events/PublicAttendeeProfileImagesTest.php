@@ -153,3 +153,26 @@ it('keeps a currently attached photo when the same owner re-verifies in a differ
     $updated = $service->publish($registration, $session, attendeeProfileInput(['image_id' => $image->id, 'revision' => $profile->revision, 'display_name' => 'Updated chosen name']));
     expect($updated->image_id)->toBe($image->id)->and($updated->display_name)->toBe('Updated chosen name');
 });
+
+it('normalises mirrored rotated JPEG portraits before cropping', function (int $orientation, string $corner): void {
+    Storage::fake('attendee-profiles-local');
+    [, , $registration, $session] = attendeeProfileScenario();
+    $source = imagecreatetruecolor(100, 100);
+    imagefilledrectangle($source, 0, 0, 49, 49, imagecolorallocate($source, 255, 0, 0));
+    imagefilledrectangle($source, 50, 0, 99, 49, imagecolorallocate($source, 0, 255, 0));
+    imagefilledrectangle($source, 0, 50, 49, 99, imagecolorallocate($source, 0, 0, 255));
+    imagefilledrectangle($source, 50, 50, 99, 99, imagecolorallocate($source, 255, 255, 0));
+    ob_start();
+    imagejpeg($source, null, 100);
+    $jpeg = ob_get_clean();
+    $tiff = "II\x2a\x00".pack('V', 8).pack('v', 1).pack('vvV', 0x0112, 3, 1).pack('v', $orientation)."\0\0".pack('V', 0);
+    $exif = "Exif\0\0".$tiff;
+    $jpeg = mb_substr($jpeg, 0, 2, '8bit')."\xff\xe1".pack('n', mb_strlen($exif, '8bit') + 2).$exif.mb_substr($jpeg, 2, null, '8bit');
+    $file = UploadedFile::fake()->createWithContent('portrait.jpg', $jpeg);
+    expect(exif_read_data($file->getRealPath())['Orientation'])->toBe($orientation);
+    $image = app(ProfileImages::class)->upload($registration, $session, $file);
+    $output = imagecreatefromstring(Storage::disk($image->disk)->get($image->path));
+    $colour = imagecolorsforindex($output, imagecolorat($output, 64, 64));
+    expect($colour['red'])->toBeGreaterThan(200)->and($colour['blue'])->toBeLessThan(50);
+    expect($colour['green'])->{$corner === 'red' ? 'toBeLessThan' : 'toBeGreaterThan'}($corner === 'red' ? 50 : 200);
+})->with([[5, 'red'], [7, 'yellow']]);
