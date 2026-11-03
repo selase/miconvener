@@ -3,7 +3,7 @@ import { render, screen, within, fireEvent } from '@testing-library/react';
 import MyTicketPanel from '@/Pages/Public/Events/AttendeePortal/panels/MyTicketPanel';
 import csrfFetch from '@/lib/csrfFetch';
 
-vi.mock('@/lib/csrfFetch', () => ({ default: vi.fn() }));
+vi.mock('@/lib/csrfFetch', () => ({ default: vi.fn(async () => ({ ok: false })) }));
 
 const event = { name: 'Community service series', slug: 'community-service' };
 const registration = {

@@ -219,3 +219,6 @@
 - Owner approved the proposed attendee-profile design via the pending review question. This settles explicit event consent, adult self-publication, optional photo, immediate removal,30days-after-event/90days-from-consent public limit, and90day minimal consent-audit retention. It does not consent on behalf of actual attendees or activate a live pilot. Prepare the native implementation plan before storage/endpoints.
 
 Native profile plan prepared at `docs/superpowers/plans/2026-11-02-public-attendee-profiles.md` after owner design approval. It is ready for plan review, not an implemented feature. No profile data/schema/endpoint/permissions were deployed.
+
+
+3November attendee implementation: owner “Finish it” authorised the native plan. Profile schema, verified self-consent/withdrawal, processed private photos/quota, guarded directory, moderation and UI implemented on `codex/public-attendee-profiles`; code review/CI remain before release. Native95affected PHP tests, focused JS14 and real-worker checks are green; browser proved synthetic opt-in and withdrawal without changing Going count. Production flags remain absent/off. Browser390override still measured1280, so physical mobile/enlarged-text and separate Purpledot activation remain open.

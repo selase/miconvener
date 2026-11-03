@@ -150,7 +150,7 @@ CREATE OR REPLACE FUNCTION attendee_profile_consent_immutable() RETURNS trigger 
 BEGIN
  IF (to_jsonb(NEW)-'retain_until'-'actor_id') IS DISTINCT FROM (to_jsonb(OLD)-'retain_until'-'actor_id') OR
     NEW.retain_until > OLD.retain_until OR
-    (NEW.actor_id IS DISTINCT FROM OLD.actor_id AND NEW.actor_id IS NOT NULL) THEN
+    (NEW.actor_id IS DISTINCT FROM OLD.actor_id AND (NEW.actor_id IS NOT NULL OR EXISTS (SELECT 1 FROM users WHERE id=OLD.actor_id))) THEN
   RAISE EXCEPTION 'Attendee consent evidence cannot be rewritten';
  END IF;
  RETURN NEW;

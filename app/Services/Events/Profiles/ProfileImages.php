@@ -41,7 +41,7 @@ final readonly class ProfileImages
                 $current->refresh();
             }
             $limit = $this->allowances->limit($tenant);
-            if ($limit !== null && $this->meter->calculateUsage($tenant) + mb_strlen($bytes) > $limit) {
+            if ($limit !== null && $this->meter->calculateUsage($tenant, strict: true) + mb_strlen($bytes) > $limit) {
                 throw ValidationException::withMessages(['photo' => 'Your organisation storage allowance is full. You can still publish without a photo.']);
             }
             if (EventAttendeeProfileImage::withoutGlobalScopes()->where('registration_id', $current->id)->whereNull('profile_id')->whereNull('retired_at')->whereNull('deleted_at')->where('expires_at', '>', now())->count() >= 3) {
@@ -78,7 +78,7 @@ final readonly class ProfileImages
 
     private function encode(UploadedFile $file): string
     {
-        if (! $file->isValid() || $file->getSize() > 2097152 || ! function_exists('imagewebp')) {
+        if (! $file->isValid() || $file->getSize() > 2097152 || ! function_exists('imagewebp') || ! function_exists('exif_read_data')) {
             throw ValidationException::withMessages(['photo' => 'Choose a JPEG, PNG or WebP photo up to 2 MiB.']);
         }
         $bytes = file_get_contents($file->getRealPath());
@@ -86,6 +86,10 @@ final readonly class ProfileImages
         if ($bytes === false || $info === false || ! in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)
             || $info[0] > 6000 || $info[1] > 6000 || $info[0] * $info[1] > 12000000 || $this->animated($bytes, $info[2])) {
             throw ValidationException::withMessages(['photo' => 'Choose a static JPEG, PNG or WebP photo, at most 6000 pixels per side and 12 megapixels.']);
+        }
+        $memoryLimit = ini_parse_quantity((string) ini_get('memory_limit'));
+        if ($memoryLimit > 0 && memory_get_usage(true) + $info[0] * $info[1] * 12 + 8388608 > $memoryLimit) {
+            throw ValidationException::withMessages(['photo' => 'Choose a smaller photo so it can be processed safely.']);
         }
         $image = @imagecreatefromstring($bytes);
         if ($image === false) {
@@ -155,6 +159,9 @@ final readonly class ProfileImages
             while ($offset + 8 <= mb_strlen($bytes)) {
                 $chunk = mb_substr($bytes, $offset, 4);
                 $size = unpack('Vsize', mb_substr($bytes, $offset + 4, 4))['size'];
+                if ($size > mb_strlen($bytes) - $offset - 8) {
+                    return true;
+                }
                 if (in_array($chunk, ['ANIM', 'ANMF'], true) || ($chunk === 'VP8X' && $size > 0 && (ord($bytes[$offset + 8]) & 2) !== 0)) {
                     return true;
                 }

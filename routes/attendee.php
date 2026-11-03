@@ -6,6 +6,9 @@ use App\Http\Controllers\Public\PlatformAttendeeAccessController;
 use App\Http\Controllers\Public\PlatformAttendeeWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/attendee-profiles/events/{event}', [App\Http\Controllers\Public\PublicAttendeeDirectoryController::class, 'index'])->whereUuid('event')->middleware('throttle:attendee-profile-read')->name('attendee.profiles.index');
+Route::get('/attendee-profiles/{profile}/{revision}/photo', [App\Http\Controllers\Public\PublicAttendeeDirectoryController::class, 'photo'])->whereUuid('profile')->whereUuid('revision')->middleware('throttle:attendee-profile-read')->name('attendee.profiles.photo');
+
 Route::prefix('my')->group(function (): void {
     Route::get('/join/{event}', [PlatformAttendeeWorkspaceController::class, 'join'])->whereUuid('event')->name('attendee.my.join');
     Route::get('/', [PlatformAttendeeAccessController::class, 'page'])->name('attendee.my');

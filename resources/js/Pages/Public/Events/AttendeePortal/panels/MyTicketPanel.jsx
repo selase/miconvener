@@ -1,3 +1,4 @@
+import PublicProfileEditor from './PublicProfileEditor';
 import { useState } from 'react';
 import {
     AlertCircle,
@@ -476,6 +477,7 @@ export default function MyTicketPanel({
                     )}
                 </div>
             </section>
+            <PublicProfileEditor registrationId={registration.id} isOnline={isOnline} />
         </div>
     );
 }

@@ -147,3 +147,16 @@ it('does not trust a forged or stale event switch in a caller model', function (
     $event->public_attendee_profiles = true;
     expect(app(ProfileRollout::class)->allows($event))->toBeFalse();
 });
+
+it('refuses manually clearing a consent actor while their account still exists', function (): void {
+    $actor = App\Models\User::factory()->create();
+    $consent = App\Models\EventAttendeeProfileConsent::factory()->create(['actor_id' => $actor->id]);
+    expect(fn () => $consent->forceFill(['actor_id' => null])->save())->toThrow(QueryException::class);
+});
+
+it('allows a deleted staff account to clear its retained consent attribution', function (): void {
+    $actor = App\Models\User::factory()->create();
+    $consent = App\Models\EventAttendeeProfileConsent::factory()->create(['actor_id' => $actor->id]);
+    $actor->delete();
+    expect($consent->fresh()->actor_id)->toBeNull();
+});

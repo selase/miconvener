@@ -17,6 +17,7 @@ use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 final readonly class ProfilePublication
 {
@@ -145,7 +146,7 @@ final readonly class ProfilePublication
             'revision' => $visible ? $profile->revision : null,
             'display_name' => $visible ? $profile->display_name : '',
             'expires_at' => $visible ? $profile->expires_at->toIso8601String() : null,
-            'image' => $visible && $profile->image_id !== null ? ['id' => $profile->image_id, 'url' => '/attendee-profiles/'.$profile->id.'/'.$profile->revision.'/photo'] : null,
+            'image' => $visible && $profile->image_id !== null ? ['id' => $profile->image_id, 'url' => route('attendee.profiles.photo', ['profile' => $profile->id, 'revision' => $profile->revision], false)] : null,
         ];
     }
 
@@ -170,6 +171,13 @@ final readonly class ProfilePublication
         EventAttendeeProfileImage::withoutGlobalScopes()->where('profile_id', $profile->id)->whereNull('deleted_at')
             ->when($except !== null, fn ($query) => $query->whereKeyNot($except))
             ->update(['profile_id' => null, 'retired_at' => now()]);
+        $profile->getConnection()->afterCommit(function (): void {
+            try {
+                \App\Jobs\Events\PurgeAttendeeProfiles::dispatch();
+            } catch (Throwable) {
+                \Illuminate\Support\Facades\Log::warning('Attendee photo cleanup queue unavailable; hourly sweep will retry.');
+            }
+        });
     }
 
     private function closeRevision(EventAttendeeProfile $profile, string $action): void

@@ -45,9 +45,10 @@ final readonly class ProfileEligibility
         return CarbonImmutable::instance($event->ends_at);
     }
 
+    /** @phpstan-impure Re-reads current persisted privacy state. */
     public function visible(EventAttendeeProfile $candidate): bool
     {
-        $profile = EventAttendeeProfile::withoutGlobalScopes()->find($candidate->id);
+        $profile = EventAttendeeProfile::withoutGlobalScopes()->where('revision', $candidate->revision)->find($candidate->id);
         if ($profile === null || $profile->state !== 'published' || $profile->moderated_at !== null || $profile->expires_at === null || ! $profile->expires_at->isFuture()) {
             return false;
         }

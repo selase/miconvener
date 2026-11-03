@@ -24,8 +24,8 @@ final class EnableAttendeeProfilesCommand extends Command
 
             return self::FAILURE;
         }
-        if (! $this->option('off') && (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp'))) {
-            $this->error('GD image decoding and WebP encoding are required before enabling profiles.');
+        if (! $this->option('off') && (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp') || ! function_exists('exif_read_data'))) {
+            $this->error('GD decoding, WebP encoding and JPEG orientation support are required before enabling profiles.');
 
             return self::FAILURE;
         }

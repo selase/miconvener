@@ -119,3 +119,13 @@ it('offers a private native upload endpoint with no raw file or storage key in t
         ->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertJsonStructure(['image' => ['id']])
         ->assertJsonMissingPath('image.path')->assertJsonMissingPath('image.proof_hash');
 });
+
+it('fails closed when existing storage usage cannot be measured under a finite cap', function (): void {
+    [$tenant, , $registration, $session] = attendeeProfileScenario();
+    $tenant->forceFill(['storage_limit_snapshot' => 104857600])->save();
+    $disk = Mockery::mock(Illuminate\Filesystem\FilesystemAdapter::class);
+    $disk->shouldReceive('allFiles')->andThrow(new RuntimeException('Storage unavailable'));
+    Storage::partialMock()->shouldReceive('disk')->with('tenant')->andReturn($disk);
+    expect(fn () => app(ProfileImages::class)->upload($registration, $session, profilePhoto()))->toThrow(ValidationException::class);
+    expect(EventAttendeeProfileImage::withoutGlobalScopes()->count())->toBe(0);
+});

@@ -88,6 +88,8 @@ final class RouteServiceProvider extends ServiceProvider
                 Limit::perMinute(600)->by('community-ip:'.$request->ip())];
         });
 
+        RateLimiter::for('attendee-profile-read', fn (Request $request) => Limit::perMinute(120)->by($request->ip().':attendee-profile-read'));
+
         RateLimiter::for('public-registration', fn (Request $request) => Limit::perMinute(10)
             ->by($request->ip()));
 

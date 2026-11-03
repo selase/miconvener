@@ -1,3 +1,4 @@
+import PublicAttendeeStrip from './Components/PublicAttendeeStrip';
 import MemberBenefitVerification from './MemberBenefitVerification';
 import FollowControl from '@/Pages/Public/Community/FollowControl';
 import LiveEventAccess from './LiveEventAccess';
@@ -2288,6 +2289,9 @@ export default function Show({
                                         </span>
                                     </span>
                                 </div>
+                            )}
+                            {!isPrivate && event.public_attendee_profiles_url && (
+                                <PublicAttendeeStrip url={event.public_attendee_profiles_url} />
                             )}
                             {event.sessions.length > 0 && (
                                 <section

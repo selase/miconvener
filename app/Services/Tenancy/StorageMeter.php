@@ -13,7 +13,7 @@ final class StorageMeter
     /**
      * Calculate the total storage usage for a tenant in bytes.
      */
-    public function calculateUsage(Tenant $tenant): int
+    public function calculateUsage(Tenant $tenant, bool $strict = false): int
     {
         // We use the 'tenant' disk which is already scoped to the tenant's root/prefix
         // by the TenantStorageManager
@@ -28,6 +28,9 @@ final class StorageMeter
                 $totalSize += $disk->size($file);
             }
         } catch (Exception $e) {
+            if ($strict) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['photo' => 'Storage usage could not be checked. Try the photo later; text-only publication is still available.']);
+            }
             \Illuminate\Support\Facades\Log::error("Failed to calculate storage for tenant {$tenant->id}", [
                 'error' => $e->getMessage(),
             ]);

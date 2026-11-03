@@ -60,6 +60,7 @@ final class HandleInertiaRequests extends Middleware
                     'manage_payouts' => fn (): bool => (bool) $request->user()?->can('manage payouts'),
                     'send_community_messages' => fn (): bool => (bool) $request->user()?->can('send community messages'),
                     'manage_giving' => fn (): bool => (bool) $request->user()?->can('manage giving'),
+                    'manage_public_attendee_profiles' => fn (): bool => (bool) $request->user()?->can('manage public attendee profiles'),
                     'manage_community_library' => fn (): bool => (bool) $request->user()?->can('manage community library'),
                     'manage_community_polls' => fn (): bool => (bool) $request->user()?->can('manage community polls'),
                     'read_community_poll_results' => fn (): bool => (bool) $request->user()?->can('read community poll results'),
