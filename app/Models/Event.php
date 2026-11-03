@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
+ * @property string|null $attendee_profile_generation
  * @property bool $members_only
  * @property int|null $member_ticket_price
  */

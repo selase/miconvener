@@ -20,6 +20,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
+ * @property string|null $attendee_profile_generation
  * @property bool $member_benefit_required
  * @property int $member_benefit_access_version
  * @property string|null $member_benefit_quote_id

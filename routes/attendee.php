@@ -81,6 +81,9 @@ Route::prefix('my')->group(function (): void {
 
     // Event workspace endpoints (authorized via platform email proof or checkout grant)
     Route::prefix('events/{registration}')->group(function (): void {
+        Route::get('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'current'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile');
+        Route::post('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'publish'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.publish');
+        Route::delete('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'withdraw'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.withdraw');
         Route::get('/', [PlatformAttendeeWorkspaceController::class, 'show'])->name('attendee.my.events.workspace');
         Route::get('/status', [PlatformAttendeeWorkspaceController::class, 'status'])->name('attendee.my.events.status');
         Route::get('/ticket', [PlatformAttendeeWorkspaceController::class, 'ticket'])->name('attendee.my.events.ticket');

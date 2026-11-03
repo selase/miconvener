@@ -42,13 +42,13 @@
 
 ## Task 2 — Verified self-consent and withdrawal
 
-- [ ] Add failing ownership/service/HTTP tests for unverified/expired proof, phone proof, checkout grant only, representative, wrong tenant, group payer/second profile, missing adult/consent, unsafe name markup, stale revision, duplicate operation and consent replay after withdrawal.
-- [ ] Implement `ProfilePublication::publish(...)` and `withdraw(...)` with exact current `PlatformAttendeeVerification::verifiedEmail` ownership plus current registration eligibility. Do not reuse the broader `canAccess` workspace grant as publication authority. No changes to how existing workspace features authenticate.
-- [ ] Audit registration transfer/refund lock paths before choosing mutation locks. Quota mutation uses tenant→registration/profile; no new nested opposite lock in a money writer. Re-read current eligibility while locked. Provider, mail and image HTTP calls never enter this path.
-- [ ] Publish saves chosen plain-text display name, adult self-confirmation, consentversion/time, immutable maximum expiry and random revision with append-only minimal evidence. Changing displayed content needs a new current consent; request-key replay returns the same result only while that exact publication still exists.
-- [ ] Withdrawal is idempotent, immediately removes public visibility/name, retires image metadata for cleanup and records its time. A concurrent transfer/cancellation cannot make it public again. Existing tickets/payments remain untouched.
-- [ ] Add native Form Requests/CSRF POST+DELETE routes under `/my/events/{registration}/public-profile`, explicit safe DTOs and private/no-store responses. Keep profile data out of initial QR/offline ticket snapshots.
-- [ ] Run focused tests and existing ticket/portal identity regressions, Pint, commit.
+- [x] Add failing ownership/service/HTTP tests for unverified/expired proof, phone proof, checkout grant only, representative, wrong tenant, group payer/second profile, missing adult/consent, unsafe name markup, stale revision, duplicate operation and consent replay after withdrawal.
+- [x] Implement `ProfilePublication::publish(...)` and `withdraw(...)` with exact current `PlatformAttendeeVerification::verifiedEmail` ownership plus current registration eligibility. Do not reuse the broader `canAccess` workspace grant as publication authority. No changes to how existing workspace features authenticate.
+- [x] Audit registration transfer/refund lock paths before choosing mutation locks. Quota mutation uses tenant→registration/profile; no new nested opposite lock in a money writer. Re-read current eligibility while locked. Provider, mail and image HTTP calls never enter this path.
+- [x] Publish saves chosen plain-text display name, adult self-confirmation, consentversion/time, immutable maximum expiry and random revision with append-only minimal evidence. Changing displayed content needs a new current consent; request-key replay returns the same result only while that exact publication still exists.
+- [x] Withdrawal is idempotent, immediately removes public visibility/name, retires image metadata for cleanup and records its time. A concurrent transfer/cancellation cannot make it public again. Existing tickets/payments remain untouched.
+- [x] Add native Form Requests/CSRF POST+DELETE routes under `/my/events/{registration}/public-profile`, explicit safe DTOs and private/no-store responses. Keep profile data out of initial QR/offline ticket snapshots.
+- [x] Run focused tests and existing ticket/portal identity regressions, Pint, commit.
 
 ## Task 3 — Safe optional photo and bounded storage
 

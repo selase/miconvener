@@ -103,6 +103,8 @@ BEGIN
   IF OLD.attendee_profile_generation IS NULL OR
      (OLD.visibility = 'public' AND NEW.visibility IS DISTINCT FROM OLD.visibility) OR
      (OLD.status = 'published' AND NEW.status IS DISTINCT FROM OLD.status) OR
+     OLD.starts_at IS DISTINCT FROM NEW.starts_at OR OLD.ends_at IS DISTINCT FROM NEW.ends_at OR
+     OLD.is_recurring IS DISTINCT FROM NEW.is_recurring OR OLD.recurrence_until IS DISTINCT FROM NEW.recurrence_until OR
      (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) OR
      (OLD.public_attendee_profiles AND NOT NEW.public_attendee_profiles) THEN
    NEW.attendee_profile_generation := gen_random_uuid();
