@@ -6,6 +6,9 @@ use App\Http\Controllers\Public\PlatformAttendeeAccessController;
 use App\Http\Controllers\Public\PlatformAttendeeWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/attendee-profiles/events/{event}', [App\Http\Controllers\Public\PublicAttendeeDirectoryController::class, 'index'])->whereUuid('event')->middleware('throttle:attendee-profile-read')->name('attendee.profiles.index');
+Route::get('/attendee-profiles/{profile}/{revision}/photo', [App\Http\Controllers\Public\PublicAttendeeDirectoryController::class, 'photo'])->whereUuid('profile')->whereUuid('revision')->middleware('throttle:attendee-profile-read')->name('attendee.profiles.photo');
+
 Route::prefix('my')->group(function (): void {
     Route::get('/join/{event}', [PlatformAttendeeWorkspaceController::class, 'join'])->whereUuid('event')->name('attendee.my.join');
     Route::get('/', [PlatformAttendeeAccessController::class, 'page'])->name('attendee.my');
@@ -81,6 +84,10 @@ Route::prefix('my')->group(function (): void {
 
     // Event workspace endpoints (authorized via platform email proof or checkout grant)
     Route::prefix('events/{registration}')->group(function (): void {
+        Route::post('/public-profile/photo', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'upload'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.photo');
+        Route::get('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'current'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile');
+        Route::post('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'publish'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.publish');
+        Route::delete('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'withdraw'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.withdraw');
         Route::get('/', [PlatformAttendeeWorkspaceController::class, 'show'])->name('attendee.my.events.workspace');
         Route::get('/status', [PlatformAttendeeWorkspaceController::class, 'status'])->name('attendee.my.events.status');
         Route::get('/ticket', [PlatformAttendeeWorkspaceController::class, 'ticket'])->name('attendee.my.events.ticket');

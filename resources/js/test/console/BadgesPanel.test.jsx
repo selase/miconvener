@@ -59,7 +59,9 @@ it.each([100, 101, 250])(
                   })
                 : Promise.resolve(response(data))
         );
-        render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
+        await act(async () => {
+            render(<BadgesPanel event={{ id: 'event', name: 'Conference' }} />);
+        });
         await screen.findByText('Person 0');
         expect(screen.getByText(/matching badges/).textContent).toContain(String(count));
         if (count > 100)

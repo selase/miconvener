@@ -240,6 +240,9 @@ Route::group(['middleware' => ['auth', '2fa_challenge', 'onboarding', 'event_sta
     Route::post('events/{event}/venue/rooms/{room}/seats', [EventVenueController::class, 'assignSeat'])->name('tenant.events.venue.seats.assign');
     Route::delete('events/{event}/venue/rooms/{room}/seats/{assignment}', [EventVenueController::class, 'unassignSeat'])->name('tenant.events.venue.seats.unassign');
     Route::get('events/{event}/venue/unseated', [EventVenueController::class, 'searchUnseated'])->name('tenant.events.venue.unseated');
+    Route::get('events/{event}/public-profiles', [App\Http\Controllers\Tenant\EventAttendeeProfileController::class, 'index'])->name('tenant.events.public-profiles.index');
+    Route::patch('events/{event}/public-profiles', [App\Http\Controllers\Tenant\EventAttendeeProfileController::class, 'toggle'])->name('tenant.events.public-profiles.switch');
+    Route::post('events/{event}/public-profiles/{profile}/hide', [App\Http\Controllers\Tenant\EventAttendeeProfileController::class, 'hide'])->whereUuid('profile')->name('tenant.events.public-profiles.hide');
     Route::get('events/{event}/venue-collaboration', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'show'])->name('tenant.events.venue-collaboration.show');
     Route::post('events/{event}/venue-collaboration/messages', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'storeMessage'])->name('tenant.events.venue-collaboration.messages.store');
     Route::post('events/{event}/venue-collaboration/inspections', [App\Http\Controllers\Tenant\EventVenueCollaborationController::class, 'storeInspection'])->name('tenant.events.venue-collaboration.inspections.store');

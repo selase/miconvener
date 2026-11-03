@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
+ * @property string|null $attendee_profile_generation
  * @property string|null $package_id Null until a plan is assigned; self-signups
  *                                   on a paid plan have none until they pay.
  * @property-read string|null $logo_url The stored logo's public URL, or null when there is none.
@@ -42,7 +43,7 @@ final class Tenant extends Model
 
     protected $attributes = ['storage_limit_snapshot' => null];
 
-    protected $hidden = ['storage_limit_snapshot'];
+    protected $hidden = ['storage_limit_snapshot', 'attendee_profile_generation'];
 
     protected $fillable = [
         'id',

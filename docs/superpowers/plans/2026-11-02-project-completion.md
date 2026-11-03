@@ -69,12 +69,12 @@
 
 **Files:** personal-app components including `resources/js/Pages/Public/Community/CommunitiesPanel.jsx`; ticket/portal components and `resources/js/lib/offlineTicketStore.*`; existing portal tests and follow-up plan §4.
 
-- [ ] Audit primary controls on both themes; reproduce white-on-bright-accent failures before replacing them with existing `text-accent-ink` semantics. Keep the iconic homepage blue unchanged.
+- [x] Audit primary controls on both themes; reproduce white-on-bright-accent failures before replacing them with existing `text-accent-ink` semantics. Keep the iconic homepage blue unchanged.
 - [ ] Check actual390px reflow, keyboard navigation/focus return, menu/dialog placement and200% text. Correct demonstrated defects with proportionate regressions.
 - [ ] Save explicitly selected passes, cold-open offline, sign out/remove proof in another tab and verify clearing. Money, inbox, Library and service notes remain online-only.
 - [ ] Exercise personal versus authorised representative contexts, expired proofs, reassigned/shared phone safeguards and cross-organisation denial.
 - [ ] Prepare a short real-phone checklist for the owner. Emulation is not physical-device proof; record audio/vibration/offline scanner checks independently from the already-passed online QR scans.
-- [ ] Release scoped fixes and record remaining owner-device actions without blocking other independent phases.
+- [x] Release scoped fixes and record remaining owner-device actions without blocking other independent phases.
 
 ## Phase 4 — Library attachments and storage policy
 
@@ -82,9 +82,9 @@
 
 - [x] Read effective `storage_bytes` allowances and aggregate usage without downloading private content; identify what retained versions/assets count.
 - [x] Propose concrete tier allowances and over-limit treatment based on that inventory. Owner approves public/package limits before production configuration changes; do not invent prices.
-- [ ] Reuse the existing aggregate meter and20MiB/file validation. Add boundary/concurrent-upload/retained-version/orphan-cleanup regressions only for missing behaviour.
-- [ ] Exercise a synthetic PDF upload, authenticated view/download, foreign tenant and expired-proof denial, unsigned-object denial and readable history while over quota.
-- [ ] Apply approved missing-only configuration, verify capacity/error messages, release and record results. No silent deletion of existing documents.
+- [x] Reuse the existing aggregate meter and20MiB/file validation. Add boundary/concurrent-upload/retained-version/orphan-cleanup regressions only for missing behaviour.
+- [x] Exercise a synthetic PDF upload, authenticated view/download, foreign tenant and expired-proof denial, unsigned-object denial and readable history while over quota.
+- [x] Apply approved missing-only configuration, verify capacity/error messages, release and record results. No silent deletion of existing documents.
 
 ## Phase 5 — Billing renewal date semantics
 
@@ -99,8 +99,8 @@
 
 **Sources:** Community follow-ups §6; current public event Going count and registration/identity flows.
 
-- [ ] Produce the consent/visibility design and visual preview first: verified explicit opt-in, optional display name/photo, preview, immediate withdrawal, image safety/retention, cancellation/refund behaviour and public-cache invalidation.
-- [ ] Obtain the requested visual/design review before implementing public identity storage/endpoints. Existing attendees are never published automatically; anonymous Going count remains independent.
+- [x] Produce the consent/visibility design and visual preview first: verified explicit opt-in, optional display name/photo, preview, immediate withdrawal, image safety/retention, cancellation/refund behaviour and public-cache invalidation.
+- [x] Obtain the requested visual/design review before implementing public identity storage/endpoints. Owner approved proposed design2November2026; detailed native plan follows. Existing attendees are never published automatically; anonymous Going count remains independent.
 - [ ] Write the native implementation plan against current code, then implement in a separately reviewed release with absent/withdrawn consent, isolation and unsafe-image regressions.
 
 ## Phase 7 — Complete the remaining marketplace roadmap
@@ -117,9 +117,9 @@
 
 **Existing artifact:** task visualization directory `marketing-pack/MiConvener Marketing and Proposal Pack.docx`; existing branded QA PDF; current pricing/use-case pages.
 
-- [ ] Read the existing pack and verify every feature/pricing claim against current releases and rollout scope.
-- [ ] Refresh editable Word material and audience proposals for churches, associations, volunteer/NGO groups, academia, social/memorial events and venue/facility operators. Show contributions without dues, recurring service notes, Library, communication and commerce accurately.
-- [ ] Render/visually review the Word outputs using document skills; deliver an index and editable files. Do not send them to prospects without instructions.
+- [x] Read the existing pack and verify every feature/pricing claim against current releases and rollout scope.
+- [x] Refresh editable Word material and audience proposals for churches, associations, volunteer/NGO groups, academia, social/memorial events and venue/facility operators. Show contributions without dues, recurring service notes, Library, communication and commerce accurately.
+- [x] Render/visually review the Word outputs using document skills; deliver an index and editable files. Do not send them to prospects without instructions.
 - [ ] Obtain actual classroom photos and any missing commercial content from the owner; never substitute an unrelated venue image or invent a hire rate. Preserve price-on-request until a rate is supplied.
 - [ ] Recheck USA onboarding/mobile sign-in using current deployed fixes and international-card settings. Label test-mode/geography simulations; a real international purchase requires an owner-approved payer/amount and owner payment entry.
 
@@ -195,3 +195,30 @@
 - Renewal anchors PR86 merged `4800c272`, Cloud `depl-a3214e4a-669a-4ea3-a6f6-58698677f1ed` succeeded. Owner-approved intended-day clamping implemented, including leap-year restoration and callback/webhook initial periods. All4 production subscriptions retain NULL anchors; no backfill or old invoice rewrite. CI had one unchanged badge-test timing failure; isolated25/25 and a single failed-job retry passed. Badge flake remainsPhase9. One early helper test omitted dedicatedDB; globalUnit bootstrap used disposable default testDB, not acceptance/production. Later runs explicitly isolated; acceptance records remained intact.
 - Storage defaults specifically approved for FUTURE organisations only; implementation/review evidence in child `2026-11-02-storage-allowances.md`. Existing limits protected across plan changes; no production quota configuration changed before final CI/release.
 - Library synthetic PDF878541bytes published by native staff form, verified-member download byte-identical, unsigned URL denied after signout. Quota boundary/old-edition read regression passed. No real organisation document was published for testing.
+
+
+### Follow-up planning and repository inventory
+
+- Phase6 proposed design and standalone sample-only visual: `docs/superpowers/specs/2026-11-02-public-attendee-profiles-design.md` and its `-preview.html` companion. Fresh builder-check covered group payer ownership, recurring-event expiry, moderation actors and retention. Proposed privacy choices require owner design review; no production profile storage/endpoints or actual identities added.
+- Native preview consent/public-view/removal works with synthetic initials only; consent unchecked by default, public count independent, no network writes. Review request is pending. Native photo upload remains intentionally a labelled mockup placeholder.
+- Read-only worktree inventory:20checkouts,14Claude-branched preserved, only the active owned checkout has untracked preview material. Other ownership is not established; no checkout/branch/database was deleted. Exact metadata saved locally in `/private/tmp/miconvener-worktree-inventory-20261102.json`.
+- Current CI baseline takes roughly9minutes for the main PHP run and~4minutes for code quality, not hours. PR87 exposed one test-fixture assumption about a migration-created feature row; reproduced missing-row failure, made its fixture explicit and required new final-head CI. No production policy was altered to make tests pass. The known risky PHP result has no named detail in compact CI output and is still open; do not pretend it was fixed.
+
+
+### Marketing pack refresh
+
+- Refreshed the existing editable Word pack in place into a NEW November copy; original remains unchanged.12pages, eight audience proposals plus platform copy, commercial schedule and internal claim controls. Churches/volunteer groups explicitly use Giving without dues; association Library/member prices, service notes, inbox, approved venue payments, product quotes and collection/delivery are included.
+- Public identities, equipment/service checkout, bank-transfer evidence and broader marketplace expansion remain labelled proposed/roadmap work. No invented prices, testimonials, accreditation, real venue photo or unapproved merchant activation. Editable placeholders remain for client-specific offers; nothing was sent to prospects.
+- Only Word document content XML changed; every other ZIP part, styles, headers/footer and page settings are byte-identical to the retained original. First render exposed one orphan closing paragraph; shortened internal source notes and re-rendered to12pages. All final pages visually checked;10 unchanged pages byte-identical to their inspected render, revised church/reference pages re-inspected.
+- Deliverables in task artifact `marketing-pack`: `MiConvener Marketing and Proposal Pack November 2026.docx`, QA-final PDF and page PNGs. Real international payer/device and actual classroom-photo gates remain open.
+
+
+### Storage production verification and next design approval
+
+- PR87 merged `fd3cdebc`, automatic deployment `depl-a3216153-58ba-4d07-8851-28a966613b2a` succeeded16:42:11UTC. Final-head CI `2dc16cd5`: quality3m45s, Laravel15m24s green. All10oldorganisations remain unlimited (snapshot-1), financial/features hashes and tracked files unchanged. Four standard future defaults installed; custom Probe unchanged. Detailed evidence in storage child plan.
+- Owner approved the proposed attendee-profile design via the pending review question. This settles explicit event consent, adult self-publication, optional photo, immediate removal,30days-after-event/90days-from-consent public limit, and90day minimal consent-audit retention. It does not consent on behalf of actual attendees or activate a live pilot. Prepare the native implementation plan before storage/endpoints.
+
+Native profile plan prepared at `docs/superpowers/plans/2026-11-02-public-attendee-profiles.md` after owner design approval. It is ready for plan review, not an implemented feature. No profile data/schema/endpoint/permissions were deployed.
+
+
+3November attendee implementation: owner “Finish it” authorised the native plan. Profile schema, verified self-consent/withdrawal, processed private photos/quota, guarded directory, moderation and UI implemented on `codex/public-attendee-profiles`; code review/CI remain before release. Native95affected PHP tests, focused JS14 and real-worker checks are green; browser proved synthetic opt-in and withdrawal without changing Going count. Production flags remain absent/off. Browser390override still measured1280, so physical mobile/enlarged-text and separate Purpledot activation remain open.

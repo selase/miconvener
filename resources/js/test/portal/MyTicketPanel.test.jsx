@@ -135,16 +135,47 @@ describe('ticket presentation', () => {
 });
 
 it('uses the theme foreground for the primary self-check-in action', () => {
-    render(<MyTicketPanel event={event} registration={{ ...registration, self_check_in_available: true }} />);
+    render(
+        <MyTicketPanel
+            event={event}
+            registration={{ ...registration, self_check_in_available: true }}
+        />
+    );
     const action = screen.getByRole('button', { name: "I'm here" });
     expect(action.classList.contains('text-accent-ink')).toBe(true);
     expect(action.classList.contains('text-white')).toBe(false);
 });
 
 it('keeps the offline consent primary action readable in either theme', () => {
-    render(<MyTicketPanel event={event} registration={registration} offlineIdentity={{ state: 'verified' }} />);
+    render(
+        <MyTicketPanel
+            event={event}
+            registration={registration}
+            offlineIdentity={{ state: 'verified' }}
+        />
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Save ticket offline' }));
     const action = screen.getByRole('button', { name: 'Save offline copy' });
     expect(action.classList.contains('text-accent-ink')).toBe(true);
     expect(action.classList.contains('text-white')).toBe(false);
+});
+
+it('mounts the optional profile editor only when the server advertises availability', async () => {
+    csrfFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ profile: { eligible: true, state: 'private', display_name: '' } }),
+    });
+    const { rerender } = render(<MyTicketPanel event={event} registration={registration} />);
+    expect(csrfFetch).not.toHaveBeenCalled();
+    rerender(
+        <MyTicketPanel
+            event={{ ...event, public_profiles_available: true }}
+            registration={registration}
+        />
+    );
+    expect(await screen.findByLabelText('Public display name')).toBeTruthy();
+    expect(csrfFetch).toHaveBeenCalledWith(
+        '/my/events/reg-layout/public-profile',
+        expect.objectContaining({ cache: 'no-store' })
+    );
 });

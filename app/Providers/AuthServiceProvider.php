@@ -53,6 +53,8 @@ final class AuthServiceProvider extends ServiceProvider
             ->whereNull('model_has_roles.tenant_id')
             ->exists()));
 
+        \Illuminate\Support\Facades\Gate::define('moderate-public-attendee-profiles', fn ($user): bool => \Illuminate\Support\Facades\DB::table('model_has_roles')->join('role_has_permissions', 'role_has_permissions.role_id', '=', 'model_has_roles.role_id')->join('permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')->where('model_has_roles.model_id', $user->id)->where('model_has_roles.model_type', $user::class)->whereNull('model_has_roles.tenant_id')->where('permissions.name', 'moderate public attendee profiles')->exists());
+
         /*
          * Changing what one organisation pays in commission. Only a platform
          * role (one held with no tenant) counts, so an organisation can never

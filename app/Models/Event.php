@@ -21,6 +21,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
+ * @property bool $public_attendee_profiles
+ * @property string|null $attendee_profile_generation
  * @property bool $members_only
  * @property int|null $member_ticket_price
  */
@@ -106,11 +108,14 @@ final class Event extends Model
      * an unsaved instance answers isPrivate() correctly rather than null.
      */
     protected $attributes = [
+        'public_attendee_profiles' => false,
         'members_only' => false,
         'visibility' => self::VISIBILITY_PUBLIC,
         'event_category' => self::CATEGORY_GENERAL,
         'speaker_slide_policy' => self::SPEAKER_POLICY_AFTER,
     ];
+
+    protected $hidden = ['attendee_profile_generation'];
 
     protected $fillable = [
         'tenant_id',
@@ -175,6 +180,7 @@ final class Event extends Model
     ];
 
     protected $casts = [
+        'public_attendee_profiles' => 'boolean',
         'taken_down_at' => 'datetime',
         'starts_at' => 'datetime',
         'grandfathered_at' => 'datetime',

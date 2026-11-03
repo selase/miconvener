@@ -1,3 +1,4 @@
+import PublicProfilesPanel from './panels/PublicProfilesPanel';
 import MemberPaymentReviewPanel from './MemberPaymentReviewPanel';
 import MemberBenefitsPanel from './MemberBenefitsPanel';
 import { useState, useMemo } from 'react';
@@ -541,6 +542,9 @@ export default function Show({
         overview: () => (
             <div className="grid gap-6">
                 <OverviewNow event={event} overview={overview} />
+                {page.auth?.can?.manage_public_attendee_profiles && (
+                    <PublicProfilesPanel eventId={event.id} />
+                )}
                 <OverviewTab
                     event={event}
                     stats={stats}

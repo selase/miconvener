@@ -1303,6 +1303,7 @@ final class PlatformAttendeeWorkspaceController extends Controller
         $withhold = $event->isPrivate() && ! $revealDetails;
 
         return [
+            'public_profiles_available' => $registration !== null && $event->public_attendee_profiles && app(\App\Services\Events\Profiles\ProfileEligibility::class)->registrationEligible($registration),
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,

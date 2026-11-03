@@ -119,6 +119,8 @@ final class RolePermissions
     private static function superadminPermissions(): array
     {
         return [
+            'moderate public attendee profiles',
+            'manage public attendee profiles',
             'manage store catalog',
             'manage store collection',
             'manage store orders',
@@ -219,6 +221,7 @@ final class RolePermissions
     private static function organizationSuperadminPermissions(): array
     {
         return [
+            'manage public attendee profiles',
             'manage store catalog',
             'manage store collection',
             'manage store orders',
