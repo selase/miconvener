@@ -61,6 +61,9 @@ return new class extends Migration
             $table->string('disk', 40);
             $table->string('path');
             $table->unsignedBigInteger('byte_size');
+            $table->string('proof_hash', 64)->nullable();
+            $table->uuid('registration_generation')->nullable();
+            $table->timestampTz('stored_at')->nullable();
             $table->timestampTz('expires_at');
             $table->timestampTz('retired_at')->nullable();
             $table->timestampTz('deleted_at')->nullable();
@@ -163,6 +166,7 @@ BEGIN
  ELSE
   IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id OR NEW.event_id IS DISTINCT FROM OLD.event_id OR
      NEW.registration_id IS DISTINCT FROM OLD.registration_id OR NEW.owner_hash IS DISTINCT FROM OLD.owner_hash OR
+     NEW.proof_hash IS DISTINCT FROM OLD.proof_hash OR NEW.registration_generation IS DISTINCT FROM OLD.registration_generation OR
      NEW.disk IS DISTINCT FROM OLD.disk OR NEW.path IS DISTINCT FROM OLD.path OR NEW.byte_size IS DISTINCT FROM OLD.byte_size THEN
    RAISE EXCEPTION 'Attendee image ownership and storage cannot be rewritten';
   END IF;

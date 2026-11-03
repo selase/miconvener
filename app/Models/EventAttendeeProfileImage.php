@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $event_id
  * @property string $registration_id
  * @property string $owner_hash
+ * @property string|null $proof_hash
+ * @property string|null $registration_generation
+ * @property \Carbon\CarbonImmutable|null $stored_at
  * @property string $disk
  * @property string $path
  * @property string|null $profile_id
@@ -38,5 +41,5 @@ final class EventAttendeeProfileImage extends Model
 
     protected $visible = ['id'];
 
-    protected $casts = ['byte_size' => 'integer', 'expires_at' => 'immutable_datetime', 'retired_at' => 'immutable_datetime', 'deleted_at' => 'immutable_datetime'];
+    protected $casts = ['stored_at' => 'immutable_datetime', 'byte_size' => 'integer', 'expires_at' => 'immutable_datetime', 'retired_at' => 'immutable_datetime', 'deleted_at' => 'immutable_datetime'];
 }

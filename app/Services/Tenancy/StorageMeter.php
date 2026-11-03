@@ -38,6 +38,6 @@ final class StorageMeter
             ->whereColumn('store_listings.id', 'store_listing_media.listing_id')->where('shops.tenant_id', $tenant->id)
             ->where('store_listings.listing_kind', \App\Models\StoreListing::KIND_MERCHANDISE))->sum('byte_size');
 
-        return $merchandiseBytes + $totalSize + (int) \App\Models\CommunityLibraryVersion::withoutGlobalScopes()->where('tenant_id', $tenant->id)->sum('size');
+        return (int) \App\Models\EventAttendeeProfileImage::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNull('deleted_at')->sum('byte_size') + $merchandiseBytes + $totalSize + (int) \App\Models\CommunityLibraryVersion::withoutGlobalScopes()->where('tenant_id', $tenant->id)->sum('size');
     }
 }

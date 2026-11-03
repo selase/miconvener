@@ -32,6 +32,13 @@ return [
 
     'disks' => [
 
+        'attendee-profiles-local' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/attendee-profiles'),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         'commerce-media-local' => [
             'driver' => 'local',
             'root' => storage_path('app/private/commerce-media'),

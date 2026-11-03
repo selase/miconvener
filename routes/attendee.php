@@ -81,6 +81,7 @@ Route::prefix('my')->group(function (): void {
 
     // Event workspace endpoints (authorized via platform email proof or checkout grant)
     Route::prefix('events/{registration}')->group(function (): void {
+        Route::post('/public-profile/photo', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'upload'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.photo');
         Route::get('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'current'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile');
         Route::post('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'publish'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.publish');
         Route::delete('/public-profile', [App\Http\Controllers\Public\PublicAttendeeProfileController::class, 'withdraw'])->whereUuid('registration')->middleware('throttle:public-registration')->name('attendee.my.events.public-profile.withdraw');
