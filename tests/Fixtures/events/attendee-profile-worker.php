@@ -18,7 +18,9 @@ config(['cache.default' => 'array', 'queue.default' => 'sync', 'filesystems.disk
 $session = app('session.store');
 $session->setId($input['session_id']);
 $session->put(PlatformAttendeeVerification::SESSION_KEY, $input['proof']);
-while (microtime(true) < $input['start_at']) { usleep(1000); }
+while (microtime(true) < $input['start_at']) {
+    usleep(1000);
+}
 try {
     $registration = EventRegistration::withoutGlobalScopes()->findOrFail($input['registration']);
     if ($input['action'] === 'transfer') {
@@ -34,7 +36,7 @@ try {
         app(ProfilePublication::class)->publish($registration, $session, $input['publication']);
     }
     echo json_encode(['result' => 'done'], JSON_THROW_ON_ERROR);
-} catch (ValidationException|\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+} catch (ValidationException|Symfony\Component\HttpKernel\Exception\HttpException $exception) {
     echo json_encode(['result' => 'refused'], JSON_THROW_ON_ERROR);
 } catch (Throwable $exception) {
     echo json_encode(['error' => $exception::class.': '.$exception->getMessage()], JSON_THROW_ON_ERROR);
