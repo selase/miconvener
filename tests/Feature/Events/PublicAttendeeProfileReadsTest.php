@@ -145,3 +145,12 @@ it('does not let successful tombstones block later retired image deletions', fun
     app(ProfileRetention::class)->sweep();
     expect(EventAttendeeProfileImage::withoutGlobalScopes()->whereNull('deleted_at')->count())->toBe(0);
 });
+
+it('shortens orphaned consent evidence to ninety days when its registration is deleted', function (): void {
+    [, , $registration, $session] = attendeeProfileScenario();
+    $profile = app(ProfilePublication::class)->publish($registration, $session, attendeeProfileInput());
+    $registration->delete();
+    app(ProfileRetention::class)->sweep();
+    $evidence = EventAttendeeProfileConsent::withoutGlobalScopes()->where('profile_id', $profile->id)->sole();
+    expect($evidence->retain_until->lessThanOrEqualTo(now()->addDays(90)))->toBeTrue();
+});

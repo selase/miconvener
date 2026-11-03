@@ -69,6 +69,10 @@ final readonly class ProfileRetention
                 Log::warning('Private attendee photo cleanup needs retry.', ['image_id' => $candidate->id, 'overdue' => ($candidate->retired_at ?? $candidate->expires_at)->lessThanOrEqualTo(now()->subDay())]);
             }
         }
+        $orphanCutoff = now()->addDays(90);
+        EventAttendeeProfileConsent::withoutGlobalScopes()->where('retain_until', '>', $orphanCutoff)
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('event_attendee_profiles')->whereColumn('event_attendee_profiles.id', 'event_attendee_profile_consents.profile_id'))
+            ->limit(1000)->get()->each(fn (EventAttendeeProfileConsent $consent) => $consent->forceFill(['retain_until' => $orphanCutoff])->save());
         EventAttendeeProfileConsent::withoutGlobalScopes()->where('retain_until', '<=', now())->limit(1000)->get()->each->delete();
         EventAttendeeProfileImage::withoutGlobalScopes()->where('deleted_at', '<=', now()->subDay())->limit(1000)->get()->each->delete();
         EventAttendeeProfile::withoutGlobalScopes()->whereIn('state', ['withdrawn', 'expired', 'private'])->whereNotNull('withdrawn_at')->where('withdrawn_at', '<=', now()->subDays(90))->whereNull('moderated_at')->whereNotExists(fn ($query) => $query->selectRaw('1')->from('event_attendee_profile_consents')->whereColumn('event_attendee_profile_consents.profile_id', 'event_attendee_profiles.id'))->limit(1000)->get()->each->delete();
