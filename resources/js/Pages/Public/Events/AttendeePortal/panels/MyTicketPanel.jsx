@@ -477,7 +477,9 @@ export default function MyTicketPanel({
                     )}
                 </div>
             </section>
-            <PublicProfileEditor registrationId={registration.id} isOnline={isOnline} />
+            {event.public_profiles_available === true && (
+                <PublicProfileEditor registrationId={registration.id} isOnline={isOnline} />
+            )}
         </div>
     );
 }

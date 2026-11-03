@@ -217,3 +217,12 @@ it('hides disabled profile reads before advertising email verification to checko
     app(PlatformAttendeeWorkspaceAuthorizer::class)->grantCheckoutAccess($session, $registration->id);
     $this->withSession($session->all())->getJson('/my/events/'.$registration->id.'/public-profile')->assertNotFound();
 });
+
+it('advertises the optional editor only while the stored event rollout is available', function (): void {
+    [, $event, $registration, $session] = attendeeProfileScenario();
+    $this->withSession($session->all())->get('/my/events/'.$registration->id)->assertOk()
+        ->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->where('event.public_profiles_available', true));
+    $event->forceFill(['public_attendee_profiles' => false])->save();
+    $this->get('/my/events/'.$registration->id)->assertOk()
+        ->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->where('event.public_profiles_available', false));
+});
